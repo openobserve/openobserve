@@ -442,13 +442,11 @@ export default defineComponent({
         return;
       }
 
-      console.debug(`[LlmEvalSettings] Mounting for stream: ${props.streamName}`);
       const orgId = store.state.selectedOrganization?.identifier;
 
       try {
         // Fetch templates first so they are available for restoration
         await fetchAvailableTemplates();
-        console.debug(`[LlmEvalSettings] Templates fetched: ${availableTemplates.value.length}`);
 
         const res = await pipelineService.getPipelines(orgId);
         const pipelines: any[] = res.data?.list || [];
@@ -463,7 +461,6 @@ export default defineComponent({
         if (match) {
           existingPipeline = match;
           enabled.value = true;
-          console.debug(`[LlmEvalSettings] Found existing pipeline: ${match.pipeline_id}`);
 
           const evalNode = match.nodes.find(
             (n: any) => n.data?.node_type === "llm_evaluation"
@@ -474,14 +471,12 @@ export default defineComponent({
             const rate = evalNode.data.sampling_rate ?? 0.01;
             enableSampling.value = rate > 0;
             samplingRate.value = rate > 0 ? rate : 0.01;
-            
+
             // Restore saved template ID
             if (evalNode.data.eval_template) {
               selectedTemplate.value = evalNode.data.eval_template;
-              console.debug(`[LlmEvalSettings] Restored template: ${selectedTemplate.value}`);
             } else if (availableTemplates.value.length > 0) {
               selectedTemplate.value = availableTemplates.value[0].id;
-              console.debug(`[LlmEvalSettings] No saved template, defaulting to first: ${selectedTemplate.value}`);
             }
           }
 
@@ -499,7 +494,6 @@ export default defineComponent({
           if (availableTemplates.value.length > 0) {
             selectedTemplate.value = availableTemplates.value[0].id;
           }
-          console.debug(`[LlmEvalSettings] No existing pipeline for ${props.streamName}`);
         }
       } catch (e) {
         console.error("[LlmEvalSettings] Data fetch failed:", e);
@@ -510,7 +504,6 @@ export default defineComponent({
         }
       } finally {
         loading.value = false;
-        console.debug(`[LlmEvalSettings] Loading complete. Selected: ${selectedTemplate.value}`);
       }
     });
 
@@ -527,8 +520,6 @@ export default defineComponent({
         });
         return;
       }
-
-      console.debug("[LlmEvalSettings] Saving with template:", selectedTemplate.value);
 
       const ts = Date.now();
       const inputNodeId = `input-${ts}`;

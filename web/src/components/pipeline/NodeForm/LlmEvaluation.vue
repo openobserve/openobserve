@@ -322,7 +322,7 @@ export default defineComponent({
       await fetchAvailableTemplates(true); // Force refresh by ignoring cache
       q.notify({
         type: "positive",
-        message: "Templates refreshed successfully",
+        message: t("pipeline.evalTemplatesRefreshed"),
         timeout: 1500,
       });
     };
@@ -425,7 +425,6 @@ export default defineComponent({
         nodeData.eval_template = null;
       }
 
-      console.log("[LlmEvaluation] Saving node with data:", nodeData);
       addNode(nodeData);
 
       q.notify({

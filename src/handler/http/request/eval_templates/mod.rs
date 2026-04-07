@@ -201,19 +201,20 @@ pub async fn create(
                 updated_at: template.updated_at,
             };
 
-            if let Err(e) = db_eval_templates::add(&db_template).await {
-                log::error!("Failed to save template to database: {}", e);
+            // Update manager first; only persist to DB on success to avoid orphaned records
+            if let Err(e) = manager.update_template(template.clone()).await {
+                log::error!("Failed to update template in manager: {}", e);
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(HttpResponse::error(
                         500u16,
-                        format!("Failed to save template: {}", e),
+                        format!("Failed to create template: {}", e),
                     )),
                 )
                     .into_response();
             }
 
-            match manager.update_template(template.clone()).await {
+            match db_eval_templates::add(&db_template).await {
                 Ok(_) => {
                     let response = TemplateResponse {
                         id: template.id,
@@ -231,12 +232,12 @@ pub async fn create(
                     (StatusCode::CREATED, Json(response)).into_response()
                 }
                 Err(e) => {
-                    log::error!("Failed to update template in manager: {}", e);
+                    log::error!("Failed to save template to database: {}", e);
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         Json(HttpResponse::error(
                             500u16,
-                            format!("Failed to create template: {}", e),
+                            format!("Failed to save template: {}", e),
                         )),
                     )
                         .into_response()
@@ -446,9 +447,10 @@ pub async fn delete(Path((org_id, template_id)): Path<(String, String)>) -> impl
                         }
                     }
 
-                    // Delete from database
-                    if let Err(e) = db_eval_templates::delete(&template.id).await {
-                        log::error!("Failed to delete template from database: {}", e);
+                    // Remove from in-memory manager first; only delete from DB on success
+                    // to avoid DB/in-memory state divergence
+                    if let Err(e) = manager.remove_template_by_id(&org_id, &template_id).await {
+                        log::error!("Failed to remove template from manager: {}", e);
                         return (
                             StatusCode::INTERNAL_SERVER_ERROR,
                             Json(HttpResponse::error(
@@ -459,15 +461,15 @@ pub async fn delete(Path((org_id, template_id)): Path<(String, String)>) -> impl
                             .into_response();
                     }
 
-                    // Remove from in-memory manager by UUID
-                    match manager.remove_template_by_id(&org_id, &template_id).await {
+                    // Delete from database
+                    match db_eval_templates::delete(&template.id).await {
                         Ok(_) => (
                             StatusCode::OK,
                             Json(serde_json::json!({"message": "Template deleted successfully"})),
                         )
                             .into_response(),
                         Err(e) => {
-                            log::error!("Failed to remove template from manager: {}", e);
+                            log::error!("Failed to delete template from database: {}", e);
                             (
                                 StatusCode::INTERNAL_SERVER_ERROR,
                                 Json(HttpResponse::error(
