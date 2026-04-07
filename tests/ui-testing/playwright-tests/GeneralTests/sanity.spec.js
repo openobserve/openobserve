@@ -207,6 +207,7 @@ test.describe("Sanity Test Cases", () => {
     tag: ['@sanity', '@ui', '@accessibility', '@P3', '@regression']
   }, async ({ page }) => {
     testLogger.info('Testing CamelCase text on Query management page (Bug #11064)');
+    const pm = new PageManager(page);
 
     // Navigate to Query management / Scheduled queries page
     const queryManagementUrl = `${process.env.ZO_BASE_URL || ''}/web/query-management?org_identifier=${getOrgIdentifier()}`;
@@ -215,7 +216,7 @@ test.describe("Sanity Test Cases", () => {
     testLogger.info('✓ Navigated to Query management page');
 
     // Alternatively, try navigating via menu
-    const scheduledQueriesMenu = page.locator('[data-test*="scheduled"], [data-test*="query-management"], text=Scheduled, text=Query Management').first();
+    const scheduledQueriesMenu = pm.commonActions.getQueryManagementMenuItem();
     if (await scheduledQueriesMenu.isVisible({ timeout: 5000 }).catch(() => false)) {
       testLogger.info('Found Query Management menu item');
     }
@@ -229,11 +230,11 @@ test.describe("Sanity Test Cases", () => {
       const camelCase = expectedCamelCase[i];
 
       // Find elements containing the lowercase version (case-sensitive)
-      const lowercaseElement = page.locator(`text="${lowercase}"`);
+      const lowercaseElement = pm.commonActions.getElementsWithText(lowercase);
       const lowercaseCount = await lowercaseElement.count();
 
       // Find elements containing the CamelCase version
-      const camelCaseElement = page.locator(`text="${camelCase}"`);
+      const camelCaseElement = pm.commonActions.getElementsWithText(camelCase);
       const camelCaseCount = await camelCaseElement.count();
 
       testLogger.info(`Word "${lowercase}": lowercase count = ${lowercaseCount}, CamelCase "${camelCase}" count = ${camelCaseCount}`);
@@ -246,7 +247,7 @@ test.describe("Sanity Test Cases", () => {
     }
 
     // Also check page title and headers for proper casing
-    const pageTitle = page.locator('h1, h2, .page-title, [class*="title"]').first();
+    const pageTitle = pm.commonActions.getPageTitle();
     if (await pageTitle.isVisible({ timeout: 3000 }).catch(() => false)) {
       const titleText = await pageTitle.textContent();
       testLogger.info(`Page title text: "${titleText}"`);

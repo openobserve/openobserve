@@ -378,7 +378,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         testLogger.info('✓ Navigated to alerts list');
 
         // Look for any alert that has a firing count displayed
-        const firingCountElements = page.locator('[data-test*="firing-count"], [data-test*="trigger-count"], [class*="fire-count"], td:has-text("fired")');
+        const firingCountElements = pm.alertsPage.getFiringCountElements();
         const countExists = await firingCountElements.count() > 0;
 
         if (countExists) {
@@ -399,9 +399,8 @@ test.describe("Alerts Advanced Coverage Tests", () => {
             testLogger.info('No firing count column visible in current alert list view');
 
             // Try to find alerts table and check for count column
-            const alertTable = page.locator('[data-test*="alert-list"], .alerts-table, table');
-            if (await alertTable.isVisible({ timeout: 3000 }).catch(() => false)) {
-                const headers = await alertTable.locator('th').allTextContents();
+            const headers = await pm.alertsPage.getAlertTableHeaders();
+            if (headers.length > 0) {
                 testLogger.info(`Alert table headers: ${headers.join(', ')}`);
 
                 // Check if there's a trigger/fire count column

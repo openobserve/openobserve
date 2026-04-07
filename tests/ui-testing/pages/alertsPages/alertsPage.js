@@ -2584,4 +2584,32 @@ export class AlertsPage {
     async clickCreateAlertButton() {
         return this.clickAddAlertButton();
     }
+
+    /**
+     * Get firing count elements from alert list
+     * @returns {Locator}
+     */
+    getFiringCountElements() {
+        return this.page.locator('[data-test*="firing-count"], [data-test*="trigger-count"], [class*="fire-count"], td:has-text("fired")');
+    }
+
+    /**
+     * Get alert table element
+     * @returns {Locator}
+     */
+    getAlertTable() {
+        return this.page.locator('[data-test*="alert-list"], .alerts-table, table');
+    }
+
+    /**
+     * Get all table headers from alert table
+     * @returns {Promise<string[]>}
+     */
+    async getAlertTableHeaders() {
+        const table = this.getAlertTable();
+        if (await table.isVisible({ timeout: 3000 }).catch(() => false)) {
+            return await table.locator('th').allTextContents();
+        }
+        return [];
+    }
 }
