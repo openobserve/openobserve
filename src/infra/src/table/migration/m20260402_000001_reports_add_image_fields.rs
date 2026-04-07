@@ -74,7 +74,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(ReportDashboards::Table)
-                    .add_column(ColumnDef::new(ReportDashboards::AttachmentDimensions).json().null())
+                    .add_column(
+                        ColumnDef::new(ReportDashboards::AttachmentDimensions)
+                            .json()
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;
