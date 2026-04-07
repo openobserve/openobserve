@@ -36,6 +36,68 @@ export const usePanelSearchHandlers = ({
   loadData: () => void;
   removeTraceId: (traceId: string) => void;
 }) => {
+  // Microtask-based hit batching: buffers search_response_hits per query
+  // and flushes in a single state.data mutation via queueMicrotask.
+  // When the worker sends batched events in one postMessage, multiple hits
+  // are dispatched in the same macrotask, and queueMicrotask coalesces them.
+  const hitsBuffer: Map<
+    number,
+    { hits: any[][]; streamingAggs: boolean; orderAsc: boolean }
+  > = new Map();
+  let flushScheduled = false;
+
+  function scheduleFlush() {
+    if (!flushScheduled) {
+      flushScheduled = true;
+      queueMicrotask(flushHitsBuffer);
+    }
+  }
+
+  function flushHitsBuffer() {
+    flushScheduled = false;
+
+    for (const [queryIndex, buffer] of hitsBuffer) {
+      if (buffer.hits.length === 0) continue;
+
+      if (buffer.streamingAggs) {
+        // streaming_aggs mode: data is replaced, use only the last batch
+        const lastBatch = buffer.hits[buffer.hits.length - 1];
+        if (lastBatch.length > 0) {
+          state.data[queryIndex] = markRaw([...lastBatch]);
+        }
+      } else {
+        // Combine all buffered hit arrays into one flat array
+        const allNewHits: any[] = [];
+        for (const batch of buffer.hits) {
+          for (const hit of batch) {
+            allNewHits.push(hit);
+          }
+        }
+
+        if (buffer.orderAsc) {
+          // asc: prepend all new hits at once
+          state.data[queryIndex] = markRaw([
+            ...allNewHits,
+            ...toRaw(state.data[queryIndex] ?? []),
+          ]);
+        } else {
+          // desc (default): append all new hits at once
+          state.data[queryIndex] = markRaw([
+            ...toRaw(state.data[queryIndex] ?? []),
+            ...allNewHits,
+          ]);
+        }
+      }
+
+      buffer.hits.length = 0; // clear buffer after flush
+    }
+  }
+
+  function clearHitsBuffer() {
+    hitsBuffer.clear();
+    flushScheduled = false;
+  }
+
   // Low-level streaming event handlers
 
   const handleHistogramResponse = async (payload: any, searchRes: any) => {
@@ -110,58 +172,46 @@ export const usePanelSearchHandlers = ({
       code: "",
     };
 
+    const queryIndex = payload?.meta?.currentQueryIndex;
+
+    // Initialize data array if not exists
+    if (!state.data[queryIndex]) {
+      state.data[queryIndex] = [];
+    }
+
     const lastPartitionIndex = Math.max(
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.length - 1,
+      state?.resultMetaData?.[queryIndex]?.length - 1,
       0,
     );
     // is streaming aggs
     const streaming_aggs =
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
-        lastPartitionIndex
-      ]?.streaming_aggs ?? false;
+      state?.resultMetaData?.[queryIndex]?.[lastPartitionIndex]
+        ?.streaming_aggs ?? false;
+    const orderAsc =
+      state?.resultMetaData?.[queryIndex]?.[lastPartitionIndex]
+        ?.order_by?.toLowerCase() === "asc";
 
-    // Initialize data array if not exists
-    if (!state.data[payload?.meta?.currentQueryIndex]) {
-      state.data[payload?.meta?.currentQueryIndex] = [];
-    }
-
-    // if streaming aggs, replace the state data
-    if (streaming_aggs) {
-      // handle empty hits case
-      if (searchRes?.content?.results?.hits?.length > 0) {
-        state.data[payload?.meta?.currentQueryIndex] = markRaw([
-          ...(searchRes?.content?.results?.hits ?? {}),
-        ]);
-      }
-    }
-    // if order by is desc, append new partition response at end
-    else if (
-      state?.resultMetaData?.[payload?.meta?.currentQueryIndex]?.[
-        lastPartitionIndex
-      ]?.order_by?.toLowerCase() === "asc"
-    ) {
-      // else append new partition response at start
-      state.data[payload?.meta?.currentQueryIndex] = markRaw([
-        ...(searchRes?.content?.results?.hits ?? {}),
-        ...toRaw(state.data[payload?.meta?.currentQueryIndex] ?? []),
-      ]);
-    } else {
-      state.data[payload?.meta?.currentQueryIndex] = markRaw([
-        ...toRaw(state.data[payload?.meta?.currentQueryIndex] ?? []),
-        ...(searchRes?.content?.results?.hits ?? {}),
-      ]);
-    }
+    const hits = searchRes?.content?.results?.hits ?? [];
 
     // update result metadata - update the first partition result
-    if (
-      state.resultMetaData[payload?.meta?.currentQueryIndex]?.[
-        lastPartitionIndex
-      ]
-    ) {
-      state.resultMetaData[payload?.meta?.currentQueryIndex][
-        lastPartitionIndex
-      ].hits = searchRes?.content?.results?.hits ?? {};
+    if (state.resultMetaData[queryIndex]?.[lastPartitionIndex]) {
+      state.resultMetaData[queryIndex][lastPartitionIndex].hits = hits;
     }
+
+    // Buffer hits for batched state.data mutation
+    if (!hitsBuffer.has(queryIndex)) {
+      hitsBuffer.set(queryIndex, {
+        hits: [],
+        streamingAggs: streaming_aggs,
+        orderAsc,
+      });
+    }
+    const buffer = hitsBuffer.get(queryIndex)!;
+    buffer.hits.push(hits);
+    buffer.streamingAggs = streaming_aggs;
+    buffer.orderAsc = orderAsc;
+
+    scheduleFlush();
   };
 
   // Top-level dispatch handler
@@ -182,6 +232,7 @@ export const usePanelSearchHandlers = ({
       }
 
       if (response.type === "error") {
+        clearHitsBuffer();
         state.loading = false;
         state.loadingTotal = 0;
         state.loadingCompleted = 0;
@@ -192,6 +243,9 @@ export const usePanelSearchHandlers = ({
       }
 
       if (response.type === "end") {
+        // Flush any pending buffered hits before marking complete
+        flushHitsBuffer();
+
         state.loading = false;
         state.loadingTotal = 0;
         state.loadingCompleted = 0;
@@ -206,6 +260,7 @@ export const usePanelSearchHandlers = ({
         state.isPartialData = true;
       }
     } catch (error: any) {
+      clearHitsBuffer();
       state.loading = false;
       state.isOperationCancelled = false;
       state.loadingTotal = 0;
@@ -222,6 +277,7 @@ export const usePanelSearchHandlers = ({
   // Connection lifecycle handlers
 
   const handleSearchClose = (payload: any, response: any) => {
+    clearHitsBuffer();
     removeTraceId(payload?.traceId);
 
     if (response.type === "error") {
@@ -258,6 +314,7 @@ export const usePanelSearchHandlers = ({
   };
 
   const handleSearchError = (payload: any, response: any) => {
+    clearHitsBuffer();
     removeTraceId(payload.traceId);
 
     // set loading to false
