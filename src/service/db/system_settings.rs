@@ -787,8 +787,8 @@ mod tests {
         let labels: Vec<&str> = identity_sets.iter().map(|s| s.label.as_str()).collect();
         assert!(labels.contains(&"Common"));
         assert!(labels.contains(&"Kubernetes"));
-        assert!(labels.contains(&"Aws"));
-        assert!(labels.contains(&"Gcp"));
+        assert!(labels.contains(&"AWS"));
+        assert!(labels.contains(&"GCP"));
     }
 
     #[test]
@@ -832,7 +832,7 @@ mod tests {
 
         // All labels should be consistently title case
         assert_eq!(normalized_labels["kubernetes"], "Kubernetes");
-        assert_eq!(normalized_labels["aws"], "Aws");
+        assert_eq!(normalized_labels["aws"], "AWS");
         assert_eq!(normalized_labels["common"], "Common");
         assert_eq!(normalized_labels["custom-test"], "Custom Test");
     }
