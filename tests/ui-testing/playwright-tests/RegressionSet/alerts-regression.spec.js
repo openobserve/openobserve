@@ -388,14 +388,18 @@ test.describe("Alerts Regression Bugs", () => {
       const suggestionCount = await suggestions.count();
       testLogger.info(`Autocomplete suggestions found: ${suggestionCount}`);
 
-      if (suggestionCount > 0) {
-        testLogger.info('✓ Autocomplete suggestions appeared - Bug #10899 is fixed');
-        const firstSuggestion = suggestions.first();
-        if (await firstSuggestion.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await firstSuggestion.click();
-          testLogger.info('✓ Selected first autocomplete suggestion');
-        }
-      }
+      // PRIMARY ASSERTION: Autocomplete should show suggestions
+      expect(suggestionCount, 'Bug #10899: Group By autocomplete should show suggestions').toBeGreaterThan(0);
+      testLogger.info('✓ Autocomplete suggestions appeared - Bug #10899 is fixed');
+
+      // Select first suggestion to verify it's clickable
+      const firstSuggestion = suggestions.first();
+      await expect(firstSuggestion).toBeVisible({ timeout: 2000 });
+      await firstSuggestion.click();
+      testLogger.info('✓ Selected first autocomplete suggestion');
+    } else {
+      // If input not found, fail the test
+      throw new Error('Could not find Group By input field - cannot test autocomplete');
     }
 
     // Clean up
@@ -459,26 +463,34 @@ test.describe("Alerts Regression Bugs", () => {
         await vrlInput.fill(multiWindowVrl);
         testLogger.info('✓ VRL function entered');
 
-        // Click Apply VRL if available
-        if (await applyVrlButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await applyVrlButton.click();
-          await page.waitForTimeout(1000);
-          testLogger.info('✓ Apply VRL button clicked');
+        // PRIMARY ASSERTION: Apply VRL button should be available
+        await expect(applyVrlButton).toBeVisible({ timeout: 3000 });
+        await applyVrlButton.click();
+        await page.waitForTimeout(1000);
+        testLogger.info('✓ Apply VRL button clicked');
 
-          // STRONG ASSERTION: Check for error messages - the bug would cause an error here
-          const errorMessage = pm.alertsPage.getErrorMessageBanner();
-          const hasError = await errorMessage.isVisible({ timeout: 2000 }).catch(() => false);
+        // STRONG ASSERTION: Check for error messages - the bug would cause an error here
+        const errorMessage = pm.alertsPage.getErrorMessageBanner();
+        const hasError = await errorMessage.isVisible({ timeout: 2000 }).catch(() => false);
 
-          if (hasError) {
-            const errorText = await errorMessage.textContent();
-            testLogger.warn(`⚠ VRL Apply error detected: ${errorText} - Bug #10872 may be present`);
-          } else {
-            testLogger.info('✓ VRL applied without errors - Bug #10872 appears fixed');
-          }
+        // PRIMARY ASSERTION: VRL should apply without errors
+        expect(hasError, 'Bug #10872: VRL Apply should not produce errors for multi-window processing').toBe(false);
+
+        if (hasError) {
+          const errorText = await errorMessage.textContent();
+          testLogger.error(`VRL Apply error: ${errorText}`);
+        } else {
+          testLogger.info('✓ VRL applied without errors - Bug #10872 is fixed');
         }
+      } else {
+        throw new Error('VRL input field not found - cannot test VRL processing');
       }
     } else {
-      testLogger.info('VRL editor not visible in current wizard step');
+      testLogger.info('VRL editor not visible - marking test as informational');
+      test.info().annotations.push({
+        type: 'skip-reason',
+        description: 'VRL editor not available in current wizard flow'
+      });
     }
 
     // Clean up

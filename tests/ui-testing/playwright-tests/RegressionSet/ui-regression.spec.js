@@ -216,9 +216,15 @@ test.describe("UI Regression Bugs", () => {
 
       testLogger.info(`Word "${lowercase}": lowercase count = ${lowercaseCount}, CamelCase "${camelCase}" count = ${camelCaseCount}`);
 
-      if (lowercaseCount > 0 && camelCaseCount === 0) {
-        testLogger.warn(`⚠ Found lowercase "${lowercase}" without CamelCase "${camelCase}" - Bug #11064 may be present`);
-      } else if (camelCaseCount > 0) {
+      // PRIMARY ASSERTION: Should use CamelCase, not lowercase
+      // If we find only lowercase without CamelCase, that indicates Bug #11064
+      if (lowercaseCount > 0) {
+        expect(camelCaseCount,
+          `Bug #11064: Found "${lowercase}" (${lowercaseCount} times) but should use "${camelCase}"`
+        ).toBeGreaterThan(0);
+      }
+
+      if (camelCaseCount > 0) {
         testLogger.info(`✓ Found proper CamelCase "${camelCase}"`);
       }
     }
@@ -236,11 +242,8 @@ test.describe("UI Regression Bugs", () => {
         return word[0] === word[0].toUpperCase();
       });
 
-      if (allCapitalized) {
-        testLogger.info('✓ Page title uses proper capitalization');
-      } else {
-        testLogger.warn('⚠ Page title may have casing issues');
-      }
+      expect(allCapitalized, 'Bug #11064: Page title words should be capitalized').toBe(true);
+      testLogger.info('✓ Page title uses proper capitalization');
     }
 
     testLogger.info('✓ PASSED: CamelCase text test completed');
