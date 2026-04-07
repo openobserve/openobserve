@@ -2691,7 +2691,14 @@
     "cached": "Önbelleğe alınmış",
     "cachedReport": "Önbelleğe Alınmış Rapor",
     "destination": "Hedef",
-    "scheduled": "Zamanlanmış"
+    "scheduled": "Zamanlanmış",
+    "reportFormat": "Rapor Biçimi",
+    "reportType": "Rapor Türü",
+    "attachmentType": "Ek Stili",
+    "dimensionWidth": "Genişlik (piksel)",
+    "dimensionHeight": "Yükseklik (piksel)",
+    "imagePreview": "Satır içi gösterge paneli önizleme görüntüsünü ekleyin",
+    "customDimensions": "Özel Boyutlar (Gelişmiş)"
   },
   "queries": {
     "runningQueries": "Çalışan Sorgular",

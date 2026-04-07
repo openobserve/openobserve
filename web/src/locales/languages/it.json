@@ -2689,7 +2689,14 @@
     "cached": "Memorizzato nella cache",
     "cachedReport": "Report memorizzato nella cache",
     "destination": "Destinazione",
-    "scheduled": "Pianificato"
+    "scheduled": "Pianificato",
+    "reportFormat": "Formato del rapporto",
+    "reportType": "Tipo di rapporto",
+    "attachmentType": "Stile di fissaggio",
+    "dimensionWidth": "Larghezza (px)",
+    "dimensionHeight": "Altezza (px)",
+    "imagePreview": "Includi l'immagine di anteprima della dashboard in linea",
+    "customDimensions": "Dimensioni personalizzate (avanzate)"
   },
   "queries": {
     "runningQueries": "Interrogazioni in esecuzione",

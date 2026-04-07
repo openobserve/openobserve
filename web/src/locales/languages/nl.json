@@ -2691,7 +2691,14 @@
     "cached": "In de cache opgeslagen",
     "cachedReport": "Rapport in cache",
     "destination": "Bestemming",
-    "scheduled": "Gepland"
+    "scheduled": "Gepland",
+    "reportFormat": "Formaat van het rapport",
+    "reportType": "Soort rapport",
+    "attachmentType": "Stijl van gehechtheid",
+    "dimensionWidth": "Breedte (px)",
+    "dimensionHeight": "Hoogte (px)",
+    "imagePreview": "Inline voorbeeldafbeelding van het dashboard toevoegen",
+    "customDimensions": "Aangepaste afmetingen (geavanceerd)"
   },
   "queries": {
     "runningQueries": "Zoekopdrachten uitvoeren",

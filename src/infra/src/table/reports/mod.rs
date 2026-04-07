@@ -158,6 +158,7 @@ pub async fn create_report<C: ConnectionTrait + TransactionTrait>(
         created_at: Set(now),
         updated_at: Set(Some(now)),
         start_at: Set(report.start),
+        image_preview: Set(report.image_preview),
     };
     let report_model = report_active_model.insert(&txn).await?;
 
@@ -262,6 +263,7 @@ pub async fn update_report<C: ConnectionTrait + TransactionTrait>(
         created_at: NotSet, // Never updated after creation.
         updated_at: Set(Some(Utc::now().timestamp_micros())),
         start_at: Set(report.start),
+        image_preview: Set(report.image_preview),
     };
     report_active_model.update(&txn).await?;
 

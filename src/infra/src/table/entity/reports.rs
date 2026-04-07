@@ -23,6 +23,7 @@ pub struct Model {
     pub created_at: i64,
     pub updated_at: Option<i64>,
     pub start_at: i64,
+    pub image_preview: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
