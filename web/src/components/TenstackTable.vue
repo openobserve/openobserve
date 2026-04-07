@@ -1196,9 +1196,11 @@ const tableRows = ref<any[]>([...(props.rows ?? [])]);
 // ── Dashboard: convert Quasar column defs → TanStack ColumnDef[] ─────────────
 const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
   if (props.useVirtualScroll || !props.columns) return null;
-  return (props.columns as any[]).map((col: any) => ({
-    id: col.name,
-    header: col.label,
+  return (props.columns as any[])
+    .filter((col: any) => col.name != null && String(col.name) !== "")
+    .map((col: any) => ({
+    id: String(col.name),
+    header: String(col.label ?? col.name),
     ...(typeof col.field === "function"
       ? { accessorFn: col.field }
       : { accessorKey: col.field ?? col.name }),
