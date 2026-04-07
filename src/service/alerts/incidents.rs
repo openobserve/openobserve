@@ -979,12 +979,80 @@ async fn find_or_create_incident(
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
     use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
 
-    // STEP 1: Venn diagram match against all open incidents
+    // STEP 1: AlertId exact match - check for existing incident with same alert_id
+    if key_type == KeyType::AlertId {
+        let alert_id = alert.get_unique_key();
+        let open_incidents =
+            infra::table::alert_incidents::find_open_incidents_filtered(org_id, None, None).await?;
+
+        // Find existing AlertId incident with same alert_id
+        for existing in open_incidents {
+            let existing_key_type = KeyType::from_stored(&existing.key_type);
+
+            // Only match with other AlertId incidents
+            if existing_key_type == KeyType::AlertId {
+                // Check if this incident contains the same alert_id
+                let existing_alerts =
+                    infra::table::alert_incidents::get_incident_alerts(&existing.id).await?;
+                if existing_alerts.iter().any(|a| a.alert_id == alert_id) {
+                    // Found existing AlertId incident for this alert - join it
+                    let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
+                        &existing.id,
+                        &alert_id,
+                        &alert.name,
+                        triggered_at,
+                        correlation_reason,
+                    )
+                    .await?;
+
+                    if let Err(e) = infra::table::incident_events::record_alert(
+                        org_id,
+                        &existing.id,
+                        &alert_id,
+                        &alert.name,
+                        triggered_at,
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "[Incidents] Failed to record alert event for incident {}: {e}",
+                            existing.id
+                        );
+                    }
+
+                    spawn_topology_enrichment(
+                        org_id,
+                        &existing.id,
+                        service_name,
+                        &alert_id,
+                        &alert.name,
+                        triggered_at,
+                    );
+
+                    // AlertId incidents can't have new alert types (always same alert)
+                    // but we respect the database result for consistency
+                    if is_new_alert_type {
+                        log::warn!(
+                            "[incidents] Unexpected new alert type for AlertId incident {}: {}",
+                            existing.id,
+                            alert_id
+                        );
+                    }
+
+                    return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
+                        incident_id: existing.id,
+                        service_name: service_name.to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    // STEP 2: Venn diagram match against all open incidents (for Primary/Secondary key types)
     //
     // Load all open incidents and check for dimension compatibility.
     // Equal or NewIsSubset → join incident; NewIsSuperset → upgrade and join.
     // PartialOverlap or Incompatible → skip (create new incident).
-    // AlertId key_type: skip Venn matching entirely — isolated per-alert.
     if key_type != KeyType::AlertId {
         let open_incidents =
             infra::table::alert_incidents::find_open_incidents_filtered(org_id, None, None).await?;
