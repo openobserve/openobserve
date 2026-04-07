@@ -96,7 +96,7 @@ export default class DashboardCreate {
   //back to dashboard list
   async backToDashboardList() {
     // Wait for navigation to dashboard view page (e.g. after saving a panel)
-    // await this.page.waitForURL(/\/dashboards\/view/, { timeout: 50000 });
+    await this.page.waitForURL(/\/dashboards\/view/, { timeout: 50000 });
     await this.backBtn.waitFor({ state: "visible", timeout: 50000 });
     await this.backBtn.click();
   }
