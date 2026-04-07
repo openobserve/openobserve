@@ -874,7 +874,7 @@ export default defineComponent({
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
     const traceServiceMap: any = ref({});
-    const { getStreams } = useStreams();
+    const { getStreams, getStream } = useStreams();
     const spanDimensions = {
       height: 30,
       barHeight: 8,
@@ -1525,6 +1525,16 @@ export default defineComponent({
 
         // Check if traceId is valid (indicating _oo_trace_id might be present)
         if (!traceId) {
+          return [];
+        }
+
+        // Verify _oo_trace_id field exists in _rumdata stream schema
+        const rumStream = await getStream("_rumdata", "logs", true);
+        const hasTraceIdField = rumStream?.schema?.some(
+          (field: any) => field.name === "_oo_trace_id",
+        );
+
+        if (!hasTraceIdField) {
           return [];
         }
 
