@@ -392,8 +392,10 @@ test.describe("Alerts Advanced Coverage Tests", () => {
                 const count = parseInt(countMatch[0]);
                 testLogger.info(`✓ Firing count value: ${count}`);
 
-                // The bug is that this count doesn't increment - we verify it's at least visible
-                expect(count).toBeGreaterThanOrEqual(0);
+                // The bug is that this count doesn't increment - we verify it's a valid number
+                // Note: This test is informational (verifies column exists) - full increment testing requires alert triggering
+                expect(count, 'Firing count should be a valid non-negative number').toBeGreaterThanOrEqual(0);
+                testLogger.info('NOTE: This test verifies the firing count column is visible but does not test incrementation behavior');
             }
         } else {
             testLogger.info('No firing count column visible in current alert list view');

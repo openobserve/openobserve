@@ -453,7 +453,7 @@ test.describe("Traces Search testcases", () => {
    */
   test("P1: Stream selection persists after navigating away and returning @bug-10743", {
     tag: ['@tracesSearch', '@traces', '@regression', '@P1', '@streamPersistence']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
     testLogger.info('Testing stream selection persistence after navigation (Bug #10743)');
 
     // Step 1: Verify we're on traces page and select a stream
@@ -467,7 +467,7 @@ test.describe("Traces Search testcases", () => {
       testLogger.info('✓ Selected "default" stream');
     } else {
       testLogger.warn('Stream selector not visible, skipping test');
-      test.skip();
+      testInfo.skip(true, 'Stream selector not visible');
       return;
     }
 
@@ -508,11 +508,9 @@ test.describe("Traces Search testcases", () => {
     testLogger.info(`Current URL: ${currentUrl}`);
 
     // The stream should persist - if not, this indicates bug #10743
-    if (!isAnyStreamSelected && !hasStreamInUrl) {
-      testLogger.warn('⚠ Stream selection was lost after navigation - Bug #10743 behavior detected');
-    } else {
-      testLogger.info('✓ Stream selection persisted after navigation');
-    }
+    // Assert that stream selection persisted (either in UI state or URL)
+    expect(isAnyStreamSelected || hasStreamInUrl, 'Bug #10743: stream selection lost after navigation').toBe(true);
+    testLogger.info('✓ Stream selection persisted after navigation');
 
     // Run search again to verify traces page is functional
     await pm.tracesPage.runTraceSearch().catch(() => {});
@@ -524,10 +522,8 @@ test.describe("Traces Search testcases", () => {
 
     testLogger.info(`After returning: Results=${hasResults}, NoResults=${noResults}, NoStreamSelected=${noStreamSelected}`);
 
-    // If no stream is selected after returning, that's the bug
-    if (noStreamSelected) {
-      testLogger.error('✗ Bug #10743 confirmed: Stream selection was lost after navigation');
-    }
+    // Verify that stream selector is not in "no stream selected" state
+    expect(noStreamSelected, 'Stream should remain selected after navigation').toBe(false);
 
     testLogger.info('✓ Stream persistence test completed');
   });

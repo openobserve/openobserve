@@ -1136,6 +1136,8 @@ export class LogsPage {
         await this.page.waitForTimeout(200);
         // Click on the text label "Quick Mode" instead of the toggle switch
         await this.page.locator(this.quickModeToggle).locator('.q-item__label').click();
+        // Close the utilities menu to match the pattern in getQuickModeState()
+        await this.page.keyboard.press('Escape');
     }
 
     // Get the current quick mode state (true/false)
