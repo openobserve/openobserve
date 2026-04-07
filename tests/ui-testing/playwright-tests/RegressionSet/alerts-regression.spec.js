@@ -453,7 +453,7 @@ test.describe("Alerts Regression Bugs", () => {
       testLogger.info('✓ VRL editor found');
 
       // Try to input VRL function that processes array
-      const vrlInput = vrlEditor.locator('textarea, .monaco-editor, input').first();
+      const vrlInput = pm.alertsPage.getVrlEditorInput();
       if (await vrlInput.isVisible({ timeout: 3000 }).catch(() => false)) {
         // Sample VRL for multi-window processing
         const multiWindowVrl = `.result = if is_array(.) {

@@ -2587,10 +2587,12 @@ export class AlertsPage {
 
     /**
      * Get firing count elements from alert list
+     * NOTE: firing_count field exists in data but no column displays it yet
+     * This targets alert table rows as proxy for alerts list functionality
      * @returns {Locator}
      */
     getFiringCountElements() {
-        return this.page.locator('[data-test*="trigger-detection"], [class*="fire-count"], td:has-text("fired")');
+        return this.page.locator('[data-test="alert-list-table"] tbody tr');
     }
 
     /**
@@ -2686,11 +2688,11 @@ export class AlertsPage {
     }
 
     /**
-     * Get "Compare with Past" toggle (VRL encoding test)
+     * Get "Compare with Past" step container (not a toggle - it's a step in alert wizard)
      * @returns {Locator}
      */
     getCompareWithPastToggle() {
-        return this.page.locator('[data-test*="compare"], [class*="compare"], label:has-text("Compare")');
+        return this.page.locator('.step-compare-with-past, [class*="multi-window"]');
     }
 
     /**
@@ -2723,6 +2725,14 @@ export class AlertsPage {
      */
     getApplyVrlButton() {
         return this.page.locator('button:has-text("Apply VRL"), [data-test*="apply-vrl"]');
+    }
+
+    /**
+     * Get VRL editor input field (textarea, monaco-editor, or input)
+     * @returns {Locator}
+     */
+    getVrlEditorInput() {
+        return this.getVrlEditorElement().locator('textarea, .monaco-editor, input').first();
     }
 
     /**
