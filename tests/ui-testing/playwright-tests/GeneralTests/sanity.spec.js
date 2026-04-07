@@ -196,3 +196,4 @@ test.describe("Sanity Test Cases", () => {
   test.skip("create template, destination and alert and then delete it", async ({ page }) => {
     // Alert workflow test implementation
   });
+});
