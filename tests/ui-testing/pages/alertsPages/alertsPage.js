@@ -2570,4 +2570,18 @@ export class AlertsPage {
         }
         return !hasDoubleEncoding;
     }
+
+    /**
+     * Alias for navigateToAlertsPage() - Navigate to alerts list
+     */
+    async navigateToAlertsList() {
+        return this.navigateToAlertsPage();
+    }
+
+    /**
+     * Alias for clickAddAlertButton() - Click create alert button
+     */
+    async clickCreateAlertButton() {
+        return this.clickAddAlertButton();
+    }
 }
