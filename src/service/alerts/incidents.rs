@@ -37,207 +37,6 @@ struct ServiceDiscoveryResult {
     service_name: String,
 }
 
-/// Result from filtered semantic extraction using distinguish_by groups
-struct FilteredSemanticResult {
-    group_values: HashMap<String, String>,
-    key_type: config::meta::alerts::incidents::KeyType,
-    matched_set_id: Option<String>, // Which identity set matched best
-}
-
-/// Combined correlation result from both Service Discovery and semantic extraction
-struct ParallelCorrelationResult {
-    service_discovery: Option<ServiceDiscoveryResult>,
-    semantic_extraction: Option<FilteredSemanticResult>,
-    final_group_values: HashMap<String, String>,
-    final_key_type: config::meta::alerts::incidents::KeyType,
-    correlation_reason: String,
-}
-
-/// Extract semantic dimensions using configured distinguish_by groups only
-/// This replaces the current fallback that uses ALL labels
-#[cfg(feature = "enterprise")]
-async fn extract_filtered_semantic_dimensions(
-    org_id: &str,
-    labels: &HashMap<String, String>,
-) -> Option<FilteredSemanticResult> {
-    use config::meta::alerts::incidents::KeyType;
-
-    // Load ServiceIdentityConfig with auto-configuration applied
-    let identity_config =
-        crate::service::db::system_settings::get_service_identity_config(org_id).await;
-
-    // Validate config has at least one set
-    if identity_config.sets.is_empty() {
-        log::debug!(
-            "[incidents] ServiceIdentityConfig for org {} has no identity sets, semantic extraction skipped",
-            org_id
-        );
-        return None;
-    }
-
-    // Load semantic groups for field mapping
-    let semantic_groups =
-        crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
-
-    // Try each identity set, pick best coverage (same as Service Discovery logic)
-    let best_set = match identity_config.resolve_best_set(labels) {
-        Some(set) => set,
-        None => {
-            log::debug!(
-                "[incidents] No identity set matches labels for org {}, semantic extraction skipped",
-                org_id
-            );
-            return None;
-        }
-    };
-
-    log::debug!(
-        "[incidents] Using identity set '{}' for semantic extraction, distinguish_by: {:?}",
-        best_set.id,
-        best_set.distinguish_by
-    );
-
-    // Extract only dimensions from distinguish_by fields of the best set
-    let mut group_values = HashMap::new();
-    for group_id in &best_set.distinguish_by {
-        if let Some(alias_group) = semantic_groups.iter().find(|g| g.id == *group_id) {
-            // Find first matching field from this semantic group
-            for field_name in &alias_group.fields {
-                if let Some(value) = labels.get(field_name) {
-                    if !value.is_empty() {
-                        group_values.insert(group_id.clone(), value.clone());
-                        log::debug!(
-                            "[incidents] Mapped field '{}' → '{}' = '{}'",
-                            field_name,
-                            group_id,
-                            value
-                        );
-                        break; // Take first match from this group
-                    }
-                }
-            }
-        } else {
-            log::debug!(
-                "[incidents] Semantic group '{}' not found, skipping",
-                group_id
-            );
-        }
-    }
-
-    if group_values.is_empty() {
-        log::debug!(
-            "[incidents] No dimensions extracted from configured distinguish_by groups for org {}",
-            org_id
-        );
-        return None;
-    }
-
-    log::debug!(
-        "[incidents] Filtered semantic extraction for org {} extracted dimensions: {:?}",
-        org_id,
-        group_values
-    );
-
-    Some(FilteredSemanticResult {
-        group_values,
-        key_type: KeyType::Secondary, // Lower priority than Service Discovery
-        matched_set_id: Some(best_set.id.clone()),
-    })
-}
-
-#[cfg(not(feature = "enterprise"))]
-async fn extract_filtered_semantic_dimensions(
-    _org_id: &str,
-    _labels: &HashMap<String, String>,
-) -> Option<FilteredSemanticResult> {
-    None
-}
-
-/// Execute Service Discovery and semantic extraction in parallel
-async fn correlate_parallel(
-    org_id: &str,
-    labels: &HashMap<String, String>,
-) -> ParallelCorrelationResult {
-    // Execute both approaches in parallel
-    let (sd_result, semantic_result) = tokio::join!(
-        query_service_discovery_key(org_id, labels),
-        extract_filtered_semantic_dimensions(org_id, labels)
-    );
-
-    log::debug!(
-        "[incidents] Parallel correlation results: service_discovery_success={}, semantic_extraction_success={}",
-        sd_result.is_some(),
-        semantic_result.is_some()
-    );
-
-    // Merge results using priority system
-    let (final_group_values, final_key_type, correlation_reason) =
-        merge_correlation_results(&sd_result, &semantic_result);
-
-    ParallelCorrelationResult {
-        service_discovery: sd_result,
-        semantic_extraction: semantic_result,
-        final_group_values,
-        final_key_type,
-        correlation_reason,
-    }
-}
-
-/// Merge correlation results from Service Discovery and semantic extraction using priority system
-fn merge_correlation_results(
-    sd_result: &Option<ServiceDiscoveryResult>,
-    semantic_result: &Option<FilteredSemanticResult>,
-) -> (
-    HashMap<String, String>,
-    config::meta::alerts::incidents::KeyType,
-    String,
-) {
-    use config::meta::alerts::incidents::KeyType;
-
-    match (sd_result, semantic_result) {
-        // Service Discovery success - highest priority
-        (Some(sd), _) => {
-            log::debug!(
-                "[incidents] Using Service Discovery result: service='{}', dimensions={:?}",
-                sd.service_name,
-                sd.group_values
-            );
-            (
-                sd.group_values.clone(),
-                sd.key_type,
-                "service_discovery".to_string(),
-            )
-        }
-        // Semantic extraction success - medium priority
-        (None, Some(sem)) => {
-            log::debug!(
-                "[incidents] Using filtered semantic extraction result: set='{}', dimensions={:?}",
-                sem.matched_set_id.as_deref().unwrap_or("unknown"),
-                sem.group_values
-            );
-            (
-                sem.group_values.clone(),
-                sem.key_type,
-                format!(
-                    "semantic_extraction:{}",
-                    sem.matched_set_id.as_deref().unwrap_or("unknown")
-                ),
-            )
-        }
-        // Both failed - fallback to AlertId isolation
-        (None, None) => {
-            log::debug!(
-                "[incidents] Both Service Discovery and semantic extraction failed, using AlertId fallback"
-            );
-            (
-                HashMap::new(),
-                KeyType::AlertId,
-                "alert_id_fallback".to_string(),
-            )
-        }
-    }
-}
-
 /// Extract service name from both parallel correlation results
 fn extract_service_name_parallel(
     labels: &HashMap<String, String>,
@@ -600,19 +399,7 @@ pub async fn correlate_alert_to_incident(
     }
 
     // Guarantee service_name extraction
-    let service_name = if let Some(ref sd_result) = service_discovery_result {
-        sd_result.service_name.clone()
-    } else {
-        // Fallback 1: Check if service_name is directly in the alert result labels
-        if let Some(svc) = labels.get("service_name") {
-            svc.clone()
-        } else if let Some(svc) = labels.get("service") {
-            svc.clone()
-        } else {
-            // Fallback 2: Extract from group_values
-            extract_service_name_from_dimensions(&group_values)
-        }
-    };
+    let service_name = extract_service_name_parallel(&labels, &service_discovery_result);
 
     log::info!(
         "[incidents] Alert {} correlation - service: {}, key_type: {:?}, group_values: {:?}",
@@ -1009,12 +796,80 @@ async fn find_or_create_incident(
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
     use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
 
-    // STEP 1: Venn diagram match against all open incidents
+    // STEP 1: AlertId exact match - check for existing incident with same alert_id
+    if key_type == KeyType::AlertId {
+        let alert_id = alert.get_unique_key();
+        let open_incidents =
+            infra::table::alert_incidents::find_open_incidents_filtered(org_id, None, None).await?;
+
+        // Find existing AlertId incident with same alert_id
+        for existing in open_incidents {
+            let existing_key_type = KeyType::from_stored(&existing.key_type);
+
+            // Only match with other AlertId incidents
+            if existing_key_type == KeyType::AlertId {
+                // Check if this incident contains the same alert_id
+                let existing_alerts =
+                    infra::table::alert_incidents::get_incident_alerts(&existing.id).await?;
+                if existing_alerts.iter().any(|a| a.alert_id == alert_id) {
+                    // Found existing AlertId incident for this alert - join it
+                    let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
+                        &existing.id,
+                        &alert_id,
+                        &alert.name,
+                        triggered_at,
+                        correlation_reason,
+                    )
+                    .await?;
+
+                    if let Err(e) = infra::table::incident_events::record_alert(
+                        org_id,
+                        &existing.id,
+                        &alert_id,
+                        &alert.name,
+                        triggered_at,
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "[Incidents] Failed to record alert event for incident {}: {e}",
+                            existing.id
+                        );
+                    }
+
+                    spawn_topology_enrichment(
+                        org_id,
+                        &existing.id,
+                        service_name,
+                        &alert_id,
+                        &alert.name,
+                        triggered_at,
+                    );
+
+                    // AlertId incidents can't have new alert types (always same alert)
+                    // but we respect the database result for consistency
+                    if is_new_alert_type {
+                        log::warn!(
+                            "[incidents] Unexpected new alert type for AlertId incident {}: {}",
+                            existing.id,
+                            alert_id
+                        );
+                    }
+
+                    return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
+                        incident_id: existing.id,
+                        service_name: service_name.to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    // STEP 2: Venn diagram match against all open incidents (for Primary/Secondary key types)
     //
     // Load all open incidents and check for dimension compatibility.
     // Equal or NewIsSubset → join incident; NewIsSuperset → upgrade and join.
     // PartialOverlap or Incompatible → skip (create new incident).
-    // AlertId key_type: skip Venn matching entirely — isolated per-alert.
     if key_type != KeyType::AlertId {
         let open_incidents =
             infra::table::alert_incidents::find_open_incidents_filtered(org_id, None, None).await?;

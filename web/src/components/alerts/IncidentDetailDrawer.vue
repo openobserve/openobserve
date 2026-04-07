@@ -561,26 +561,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
 
-                    <!-- Key Type -->
+                    <!-- Correlated By -->
                     <div class="tw:grid tw:gap-2" style="grid-template-columns: 120px 1fr;">
                       <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs tw:font-medium">
-                        Key Type
+                        Correlated By
                       </div>
                       <div
-                        class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:py-1 tw:rounded tw:border tw:text-xs tw:font-mono tw:min-w-0"
+                        class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:py-1 tw:rounded tw:border tw:text-xs tw:min-w-0"
                         :style="{
                           backgroundColor: store.state.theme === 'dark' ? '#1F2021' : '#F9FAFB',
                           borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE',
                           color: store.state.theme === 'dark' ? '#E5E7EB' : '#374151'
                         }"
                       >
-                        <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.key_type || 'N/A' }}</span>
+                        <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ getCorrelationMethodLabel(incidentDetails?.key_type) }}</span>
                         <q-icon
                           :name="copiedField === 'key_type' ? 'check' : 'content_copy'"
                           :class="copiedField === 'key_type' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
-                          @click="copyToClipboard(incidentDetails?.key_type, 'key_type')"
+                          @click="copyToClipboard(getCorrelationMethodLabel(incidentDetails?.key_type), 'key_type')"
                         />
                       </div>
                     </div>
@@ -2867,6 +2867,19 @@ export default defineComponent({
       }
     };
 
+    // Humanize key_type for display
+    const getCorrelationMethodLabel = (keyType: string) => {
+      switch (keyType?.toLowerCase()) {
+        case "primary":
+          return t("alerts.incidents.correlatedByServiceDiscovery");
+        case "secondary":
+          return t("alerts.incidents.correlatedBySemanticGroups");
+        case "alertid":
+          return t("alerts.incidents.correlatedByAlertId");
+        default:
+          return keyType || "Unknown";
+      }
+    };
 
     return {
       t,
@@ -2938,6 +2951,7 @@ export default defineComponent({
       formatCustomConditions,
       formatTimestamp,
       formatTimestampUTC,
+      getCorrelationMethodLabel,
       copyToClipboard,
       copiedField,
       calculateDuration,
