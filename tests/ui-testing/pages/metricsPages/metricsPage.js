@@ -391,9 +391,21 @@ export class MetricsPage {
             editorContainer = this.page.locator('.monaco-editor').first();
         }
 
-        // Click on the Monaco editor to focus it
-        await editorContainer.getByRole('code').click();
-        await this.page.waitForTimeout(100);
+        // Wait for Monaco editor to be fully loaded
+        await editorContainer.waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.waitForTimeout(500);
+
+        // Click on the Monaco editor to focus it - try multiple approaches
+        const codeElement = editorContainer.getByRole('code');
+        const isCodeVisible = await codeElement.isVisible({ timeout: 5000 }).catch(() => false);
+
+        if (isCodeVisible) {
+            await codeElement.click();
+        } else {
+            // Fallback: click on the editor container directly
+            await editorContainer.click();
+        }
+        await this.page.waitForTimeout(200);
 
         // Use platform-specific key combo for select all
         const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
