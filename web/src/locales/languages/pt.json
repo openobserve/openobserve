@@ -2691,7 +2691,14 @@
     "cached": "Armazenado em cache",
     "cachedReport": "Relatório em cache",
     "destination": "Destino",
-    "scheduled": "Programado"
+    "scheduled": "Programado",
+    "reportFormat": "Formato do relatório",
+    "reportType": "Tipo de relatório",
+    "attachmentType": "Estilo de anexo",
+    "dimensionWidth": "Largura (px)",
+    "dimensionHeight": "Altura (px)",
+    "imagePreview": "Incluir imagem de visualização do painel em linha",
+    "customDimensions": "Dimensões personalizadas (avançadas)"
   },
   "queries": {
     "runningQueries": "Executando consultas",
