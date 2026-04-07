@@ -339,8 +339,8 @@ describe("VideoPlayer Component", () => {
     });
 
     it("should handle skip forward", () => {
-      wrapper.vm.playerState.actualTime = 10000;
-      wrapper.vm.playerState.totalTime = 120000;
+      wrapper.vm.playerState.value.actualTime = 10000;
+      wrapper.vm.playerState.value.totalTime = 120000;
       wrapper.vm.player = { goto: vi.fn() };
       wrapper.vm.skipTo("forward");
       expect(wrapper.vm.player.goto).toHaveBeenCalledWith(20000, false);
