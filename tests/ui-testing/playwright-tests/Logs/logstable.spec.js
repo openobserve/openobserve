@@ -452,20 +452,20 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.info('✓ Initial query completed, logs table visible');
 
     // Expand a field in the sidebar to see field values
-    const levelField = page.locator('[data-test="log-search-expand-level-field-btn"]');
+    const levelField = pageManager.logsPage.getFieldExpandButton('level');
     if (await levelField.isVisible({ timeout: 5000 }).catch(() => false)) {
       await levelField.click();
       await page.waitForTimeout(500);
       testLogger.info('✓ Expanded level field in sidebar');
 
       // Find and click include button for a field value
-      const includeBtn = page.locator('[data-test*="subfield-list-equal-level"]').first();
+      const includeBtn = pageManager.logsPage.getSubfieldListEqualButton('level').first();
       if (await includeBtn.isVisible()) {
         await includeBtn.click();
         await page.waitForTimeout(500);
 
         // Click "Include Search Term" from the menu
-        const includeMenuItem = page.getByText('Include Search Term', { exact: true });
+        const includeMenuItem = pageManager.logsPage.getIncludeSearchTermMenuItem();
         if (await includeMenuItem.isVisible({ timeout: 3000 }).catch(() => false)) {
           await includeMenuItem.click();
           testLogger.info('✓ Added first include search term');
@@ -476,7 +476,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
 
           // BUG CHECK: The include button should now be disabled or show different state
           // for the already-included value
-          const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+          const queryEditor = pageManager.logsPage.getQueryEditorLocator();
           const queryText = await queryEditor.textContent();
           testLogger.info(`Query editor contains: ${queryText}`);
 
@@ -492,7 +492,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
 
           // Check if we can still click the same value's include button
           // (This tests if spamming is prevented)
-          const includeBtn2 = page.locator('[data-test*="subfield-list-equal-level"]').first();
+          const includeBtn2 = pageManager.logsPage.getSubfieldListEqualButton('level').first();
           if (await includeBtn2.isVisible()) {
             const isDisabled = await includeBtn2.isDisabled().catch(() => false);
             testLogger.info(`Include button disabled state: ${isDisabled}`);
@@ -507,7 +507,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
       }
     } else {
       testLogger.info('Level field not found, trying kubernetes_namespace_name');
-      const nsField = page.locator('[data-test="log-search-expand-kubernetes_namespace_name-field-btn"]');
+      const nsField = pageManager.logsPage.getFieldExpandButton('kubernetes_namespace_name');
       if (await nsField.isVisible()) {
         await nsField.click();
         testLogger.info('✓ Expanded kubernetes_namespace_name field');

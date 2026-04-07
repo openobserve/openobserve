@@ -332,7 +332,7 @@ test.describe("Scheduled Alert Features", () => {
         const copyBtnVisible = await copyBtn.isVisible({ timeout: 3000 }).catch(() => false);
         if (copyBtnVisible) {
             await pm.alertsPage.clickAlertDetailsCopyButton();
-            const notification = page.locator('.q-notification');
+            const notification = pm.alertsPage.getNotification();
             const hasNotification = await notification.isVisible({ timeout: 3000 }).catch(() => false);
             if (hasNotification) {
                 testLogger.info('Copy notification appeared');
@@ -354,7 +354,7 @@ test.describe("Scheduled Alert Features", () => {
         await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
         await page.waitForTimeout(3000);
 
-        const alertSetupText = page.getByText('Alert Setup').first();
+        const alertSetupText = pm.alertsPage.getAlertSetupText().first();
         const wizardVisible = await alertSetupText.isVisible({ timeout: 15000 }).catch(() => false);
         expect(wizardVisible).toBe(true);
         testLogger.info('Edit button navigated to alert wizard');
@@ -472,7 +472,7 @@ test.describe("Scheduled Alert Features", () => {
 
         // The preview chart should now render for SQL mode (PR #10470 change)
         // Verify the old "not available" message is gone regardless
-        const notAvailableMsg = page.getByText('Preview is not available in SQL mode');
+        const notAvailableMsg = pm.alertsPage.getPreviewNotAvailableMessage();
         const msgVisible = await notAvailableMsg.isVisible({ timeout: 3000 }).catch(() => false);
         expect(msgVisible).toBe(false);
         testLogger.info('SQL "not available" message is gone');
@@ -546,19 +546,19 @@ test.describe("Scheduled Alert Features", () => {
 
         // Find and click the aggregation toggle
         // The aggregation toggle is the only q-toggle in the step-query-config section
-        const queryConfigSection = page.locator('.step-query-config');
+        const queryConfigSection = pm.alertsPage.getStepQueryConfigSection();
         const aggregationToggle = queryConfigSection.locator('.q-toggle').first();
         await aggregationToggle.waitFor({ state: 'visible', timeout: 5000 });
         await aggregationToggle.click();
         await page.waitForTimeout(1000);
 
         // Verify group-by section appeared
-        const groupByLabel = page.getByText('Group by').first();
+        const groupByLabel = pm.alertsPage.getGroupByLabel().first();
         await expect(groupByLabel).toBeVisible({ timeout: 5000 });
         testLogger.info('Aggregation ON: Group By section visible');
 
         // Verify aggregation threshold section appeared (i18n: "Alert If Any Groups *")
-        const aggThresholdLabel = page.getByText('Alert If Any Groups').first();
+        const aggThresholdLabel = pm.alertsPage.getAggregationThresholdLabel().first();
         await expect(aggThresholdLabel).toBeVisible({ timeout: 5000 });
         testLogger.info('Aggregation ON: Threshold section visible');
 
@@ -598,7 +598,7 @@ test.describe("Scheduled Alert Features", () => {
 
         testLogger.info('=== PHASE 2: Enable aggregation to show Group By section ===');
 
-        const queryConfigSection = page.locator('.step-query-config');
+        const queryConfigSection = pm.alertsPage.getStepQueryConfigSection();
         const aggregationToggle = queryConfigSection.locator('.q-toggle').first();
         await aggregationToggle.waitFor({ state: 'visible', timeout: 5000 });
         await expect(aggregationToggle).toBeEnabled({ timeout: 3000 });
@@ -606,7 +606,7 @@ test.describe("Scheduled Alert Features", () => {
         await page.waitForTimeout(1000);
 
         // Verify group-by section appeared
-        const groupByLabel = page.getByText('Group by').first();
+        const groupByLabel = pm.alertsPage.getGroupByLabel().first();
         await expect(groupByLabel).toBeVisible({ timeout: 5000 });
         testLogger.info('✓ Group By section visible');
 

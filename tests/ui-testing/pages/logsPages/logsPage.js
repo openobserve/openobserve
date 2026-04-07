@@ -6870,4 +6870,38 @@ export class LogsPage {
         await expect(locator).toBeVisible();
         testLogger.info('Element is visible');
     }
+
+    /**
+     * Get expand button for a specific field in sidebar (Bug #11041)
+     * @param {string} fieldName - The field name (e.g., "level", "kubernetes_namespace_name")
+     * @returns {Locator}
+     */
+    getFieldExpandButton(fieldName) {
+        return this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+    }
+
+    /**
+     * Get include/exclude button for a specific field value in sidebar (Bug #11041)
+     * @param {string} fieldName - The field name (e.g., "level")
+     * @returns {Locator}
+     */
+    getSubfieldListEqualButton(fieldName) {
+        return this.page.locator(`[data-test*="subfield-list-equal-${fieldName}"]`);
+    }
+
+    /**
+     * Get "Include Search Term" menu item (Bug #11041)
+     * @returns {Locator}
+     */
+    getIncludeSearchTermMenuItem() {
+        return this.page.getByText('Include Search Term', { exact: true });
+    }
+
+    /**
+     * Get query editor locator
+     * @returns {Locator}
+     */
+    getQueryEditorLocator() {
+        return this.page.locator(this.logsSearchBarQueryEditor);
+    }
 }

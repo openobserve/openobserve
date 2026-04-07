@@ -2612,4 +2612,52 @@ export class AlertsPage {
         }
         return [];
     }
+
+    /**
+     * Get notification element (Scheduled features test)
+     * @returns {Locator}
+     */
+    getNotification() {
+        return this.page.locator('.q-notification');
+    }
+
+    /**
+     * Get "Alert Setup" text element (Scheduled features test)
+     * @returns {Locator}
+     */
+    getAlertSetupText() {
+        return this.page.getByText('Alert Setup');
+    }
+
+    /**
+     * Get "Preview is not available in SQL mode" text element (Scheduled features test)
+     * @returns {Locator}
+     */
+    getPreviewNotAvailableMessage() {
+        return this.page.getByText('Preview is not available in SQL mode');
+    }
+
+    /**
+     * Get step query config section (Scheduled features test)
+     * @returns {Locator}
+     */
+    getStepQueryConfigSection() {
+        return this.page.locator('.step-query-config');
+    }
+
+    /**
+     * Get "Group by" text element (Scheduled features test)
+     * @returns {Locator}
+     */
+    getGroupByLabel() {
+        return this.page.getByText('Group by');
+    }
+
+    /**
+     * Get "Alert If Any Groups" text element (Scheduled features test)
+     * @returns {Locator}
+     */
+    getAggregationThresholdLabel() {
+        return this.page.getByText('Alert If Any Groups');
+    }
 }
