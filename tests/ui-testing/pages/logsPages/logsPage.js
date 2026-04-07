@@ -1121,7 +1121,8 @@ export class LogsPage {
     async clickQuickModeToggle() {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
+        // Click the q-item directly - it has @click="handleQuickMode" handler
+        await this.page.locator(this.quickModeToggle).click();
     }
 
     // Histogram methods
@@ -1498,7 +1499,7 @@ export class LogsPage {
     async kubernetesContainerName() {
         await this.page.getByLabel('Expand "kubernetes_container_name"').click();
         await this.page.waitForTimeout(5000);
-        await this.page.locator('[data-test="logs-search-subfield-add-kubernetes_container_name-ziox"] [data-test="log-search-subfield-list-equal-kubernetes_container_name-field-btn"]').click();
+        await this.page.locator('[data-test="logs-search-subfield-add-kubernetes_container_name-ziox"]').click();
     }
 
     async kubernetesContainerNameJoin() {

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fmt::Debug, ops::Range, sync::Arc};
+use std::{
+    fmt::Debug,
+    ops::Range,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use async_trait::async_trait;
 use bytes::{Bytes, buf::Buf};
@@ -26,7 +30,6 @@ use object_store::{
     ObjectMeta, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, WriteMultipart,
     path::Path,
 };
-use once_cell::sync::Lazy;
 use parquet::file::metadata::{FooterTail, ParquetMetaDataReader};
 
 pub mod accounts;
@@ -79,11 +82,11 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
     ) -> Result<Vec<Bytes>>;
     async fn head(&self, account: &str, location: &Path) -> Result<ObjectMeta>;
     async fn delete(&self, account: &str, location: &Path) -> Result<()>;
-    fn delete_stream<'a>(
-        &'a self,
+    fn delete_stream(
+        &self,
         account: &str,
-        locations: BoxStream<'a, Result<Path>>,
-    ) -> BoxStream<'a, Result<Path>>;
+        locations: BoxStream<'static, Result<Path>>,
+    ) -> BoxStream<'static, Result<Path>>;
     fn list(&self, account: &str, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>>;
     fn list_with_offset(
         &self,
@@ -229,25 +232,30 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
     let columns = files[0].1.split('/').collect::<Vec<&str>>();
 
     if !is_local_disk_storage() && get_config().s3.feature_bulk_delete {
-        // group the files by account
-        let mut file_groups = HashMap::new();
+        // group the files by account (convert to owned strings for 'static)
+        let mut file_groups: HashMap<String, Vec<String>> = HashMap::new();
         for (account, file) in files {
             file_groups
-                .entry(account)
+                .entry(account.to_string())
                 .or_insert_with(Vec::new)
-                .push(file);
+                .push(file.to_string());
         }
         for (account, files) in file_groups {
             let files = futures::stream::iter(files)
                 .map(|file| Ok(Path::from(file)))
                 .boxed();
             match MULTI_ACCOUNTS
-                .delete_stream(account, files)
+                .delete_stream(&account, files)
                 .try_collect::<Vec<Path>>()
                 .await
             {
-                Ok(files) => {
-                    log::debug!("Deleted objects: {files:?}");
+                Ok(deleted) => {
+                    log::debug!("Deleted objects: {deleted:?}");
+                    if columns.len() > 2 && columns[0] == "files" {
+                        metrics::STORAGE_WRITE_REQUESTS
+                            .with_label_values(&[columns[1], columns[2], "remote"])
+                            .inc_by(deleted.len() as u64);
+                    }
                 }
                 Err(e) => {
                     log::error!("Failed to delete objects: {e}");
@@ -255,6 +263,11 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
             }
         }
     } else {
+        let storage_type = if is_local_disk_storage() {
+            "local"
+        } else {
+            "remote"
+        };
         let files = files
             .into_iter()
             .map(|(account, file)| (account, file.to_string()))
@@ -268,6 +281,12 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
                 {
                     Ok(_) => {
                         log::debug!("Deleted object: {file}");
+                        let columns = file.split('/').collect::<Vec<&str>>();
+                        if columns.len() > 2 && columns[0] == "files" {
+                            metrics::STORAGE_WRITE_REQUESTS
+                                .with_label_values(&[columns[1], columns[2], storage_type])
+                                .inc();
+                        }
                     }
                     Err(e) => {
                         // TODO: need a better solution for identifying the error

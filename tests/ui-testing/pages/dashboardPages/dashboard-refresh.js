@@ -50,12 +50,16 @@ export default class DashboardTimeRefresh {
     // Switch to the absolute tab
     await this.absolutetimeTime.click();
 
-    // Click the left chevron button (if needed)
-    await this.page
+    // Click the left chevron button within the QDate component to navigate to previous month.
+    // Scope to .q-date to avoid clicking unrelated chevron_left buttons on the page.
+    const qDate = this.page.locator(".q-date").first();
+    await qDate.waitFor({ state: "visible" });
+    await qDate
       .locator("button")
       .filter({ hasText: "chevron_left" })
       .first()
       .click();
+    await this.page.waitForTimeout(500);
 
     // Select the start and end days dynamically
     await this.page

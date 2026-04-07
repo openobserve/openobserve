@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -97,7 +97,10 @@ import { useQuasar } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useTraces from "@/composables/useTraces";
-import { applyFilterTerm } from "@/utils/traces/filterUtils";
+import {
+  applyFilterTerm,
+  removeFieldCondition,
+} from "@/utils/traces/filterUtils";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 
 import segment from "@/services/segment_analytics";
@@ -309,6 +312,16 @@ export default defineComponent({
         if (this.queryEditorRef?.setValue)
           this.queryEditorRef.setValue(newValue);
       }
+    },
+    removeFieldTerm(fieldName: string) {
+      if (!fieldName) return;
+      const newValue = removeFieldCondition(
+        this.searchObj.data.editorValue,
+        fieldName,
+      );
+      this.searchObj.data.query = newValue;
+      this.searchObj.data.stream.removeFilterField = "";
+      if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
     },
   },
 });

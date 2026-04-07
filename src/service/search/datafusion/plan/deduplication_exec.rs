@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -48,7 +48,7 @@ pub struct DeduplicationExec {
     input: Arc<dyn ExecutionPlan>,
     deduplication_columns: Vec<Column>,
     max_rows: usize, // current unused
-    cache: PlanProperties,
+    cache: Arc<PlanProperties>,
     metrics: ExecutionPlanMetricsSet,
 }
 
@@ -69,8 +69,8 @@ impl DeduplicationExec {
         }
     }
 
-    fn compute_properties(schema: SchemaRef) -> PlanProperties {
-        PlanProperties::new(
+    fn compute_properties(schema: SchemaRef) -> Arc<PlanProperties> {
+        Arc::new(PlanProperties::new(
             // TODO: add the order by properties
             EquivalenceProperties::new(schema.clone()),
             // Output Partitioning
@@ -78,7 +78,7 @@ impl DeduplicationExec {
             // Execution Mode
             EmissionType::Incremental,
             Boundedness::Bounded,
-        )
+        ))
     }
 
     /// Get the deduplication columns
@@ -115,7 +115,7 @@ impl ExecutionPlan for DeduplicationExec {
         self
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.cache
     }
 

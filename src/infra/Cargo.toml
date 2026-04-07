@@ -28,7 +28,6 @@ itertools.workspace = true
 log.workspace = true
 async-nats.workspace = true
 object_store.workspace = true
-once_cell.workspace = true
 parking_lot.workspace = true
 parquet.workspace = true
 serde.workspace = true

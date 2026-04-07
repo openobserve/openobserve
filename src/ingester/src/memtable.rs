@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::{
     path::PathBuf,
     sync::{
-        Arc,
+        Arc, LazyLock as Lazy,
         atomic::{AtomicU64, Ordering},
     },
 };
@@ -24,7 +24,6 @@ use std::{
 use arrow_schema::Schema;
 use config::{metrics, stats::MemorySize, utils::time::now_micros};
 use hashbrown::HashMap;
-use once_cell::sync::Lazy;
 
 use crate::{
     ReadRecordBatchEntry,

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -38,10 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="ellipsis tw:max-w-[calc(100%-1.5rem)]!"
             style="display: inline-block"
           >
-            <span
-              v-if="field.dataType"
-              class="field-type-container"
-            >
+            <span v-if="field.dataType" class="field-type-container">
               <q-icon
                 class="field-expand-icon"
                 :name="isExpanded ? 'expand_more' : 'chevron_right'"
@@ -128,6 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @add-multiple-search-terms="
             (fn, vs, a) => emit('add-multiple-search-terms', fn, vs, a)
           "
+          @remove-field-filter="(fn) => emit('remove-field-filter', fn)"
           @load-more-values="(fn) => emit('load-more-values', fn)"
           @search-field-values="(fn, t) => emit('search-field-values', fn, t)"
         />
@@ -175,6 +173,7 @@ const emit = defineEmits<{
     values: string[],
     action: string,
   ];
+  "remove-field-filter": [fieldName: string];
   "search-field-values": [fieldName: string, searchTerm: string];
   "load-more-values": [fieldName: string];
   "before-show": [event: any, field: any];

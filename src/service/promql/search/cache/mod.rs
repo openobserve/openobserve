@@ -16,7 +16,7 @@
 use std::{
     collections::VecDeque,
     sync::{
-        Arc,
+        Arc, LazyLock as Lazy,
         atomic::{AtomicI64, Ordering},
     },
 };
@@ -31,7 +31,6 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::errors::{Error, Result};
-use once_cell::sync::Lazy;
 use prost::Message;
 use tokio::sync::RwLock;
 
