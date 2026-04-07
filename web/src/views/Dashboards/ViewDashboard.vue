@@ -1542,7 +1542,8 @@ export default defineComponent({
         } else {
           isInternalUrlUpdate.value = false;
         }
-      } catch {
+      } catch (e) {
+        console.error(e);
         isInternalUrlUpdate.value = false;
       }
     };
