@@ -15,7 +15,7 @@
 
 use std::{
     collections::{HashMap, VecDeque},
-    sync::Arc,
+    sync::{Arc, LazyLock as Lazy},
 };
 
 use dashmap::DashMap;
@@ -27,7 +27,6 @@ use datafusion::{
     },
 };
 use object_store::{ObjectMeta, path::Path};
-use once_cell::sync::Lazy;
 
 use super::TRACE_ID_SEPARATOR;
 

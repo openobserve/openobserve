@@ -35,7 +35,7 @@
 use std::{
     collections::HashMap,
     sync::{
-        Arc, RwLock,
+        Arc, LazyLock as Lazy, OnceLock, RwLock,
         atomic::{AtomicI64, AtomicU64, Ordering},
     },
 };
@@ -51,7 +51,6 @@ use config::{
     },
     utils::json,
 };
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
@@ -73,9 +72,8 @@ static FLUSH_TX: Lazy<mpsc::Sender<FlushRecord>> = Lazy::new(|| {
 });
 
 /// The receiver end, set once during FLUSH_TX initialization.
-static FLUSH_RX: once_cell::sync::OnceCell<
-    &'static tokio::sync::Mutex<mpsc::Receiver<FlushRecord>>,
-> = once_cell::sync::OnceCell::new();
+static FLUSH_RX: OnceLock<&'static tokio::sync::Mutex<mpsc::Receiver<FlushRecord>>> =
+    OnceLock::new();
 
 /// Dedicated NATS queue for HA sync of quota deductions across nodes.
 pub const TRIAL_QUOTA_HA_QUEUE: &str = "trial_quota_ha_queue";

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use ::datafusion::arrow::datatypes::Schema;
 use arrow::array::{
@@ -36,7 +36,6 @@ use config::{
 };
 use hashbrown::HashSet;
 use infra::{cluster::get_node_from_consistent_hash, file_list as infra_file_list, storage};
-use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use tokio::sync::{Semaphore, mpsc};
 

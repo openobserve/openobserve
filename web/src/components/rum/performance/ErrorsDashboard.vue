@@ -116,14 +116,6 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       // emit window resize event to trigger the layout
-      if (errorRenderDashboardChartsRef.value) {
-        errorRenderDashboardChartsRef.value.layoutUpdate();
-
-        // Dashboards gets overlapped as we have used keep alive
-        // Its an internal bug of vue-grid-layout
-        // So adding settimeout of 1 sec to fix the issue
-        errorRenderDashboardChartsRef.value.layoutUpdate();
-      }
       window.dispatchEvent(new Event("resize"));
     };
 

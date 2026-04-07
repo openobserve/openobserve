@@ -16,7 +16,6 @@ config.workspace = true
 serde.workspace = true
 tokio.workspace = true
 chromiumoxide.workspace=true
-once_cell.workspace=true
 lettre.workspace=true
 chrono.workspace=true
 futures.workspace=true
