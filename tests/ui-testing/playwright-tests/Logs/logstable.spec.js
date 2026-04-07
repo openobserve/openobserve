@@ -453,7 +453,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
 
     // Expand a field in the sidebar to see field values
     const levelField = page.locator('[data-test="log-search-expand-level-field-btn"]');
-    if (await levelField.isVisible()) {
+    if (await levelField.isVisible({ timeout: 5000 }).catch(() => false)) {
       await levelField.click();
       await page.waitForTimeout(500);
       testLogger.info('✓ Expanded level field in sidebar');

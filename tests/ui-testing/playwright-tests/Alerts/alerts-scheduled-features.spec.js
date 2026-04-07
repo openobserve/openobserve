@@ -601,6 +601,7 @@ test.describe("Scheduled Alert Features", () => {
         const queryConfigSection = page.locator('.step-query-config');
         const aggregationToggle = queryConfigSection.locator('.q-toggle').first();
         await aggregationToggle.waitFor({ state: 'visible', timeout: 5000 });
+        await expect(aggregationToggle).toBeEnabled({ timeout: 3000 });
         await aggregationToggle.click();
         await page.waitForTimeout(1000);
 

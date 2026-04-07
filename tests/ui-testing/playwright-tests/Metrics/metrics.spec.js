@@ -598,10 +598,17 @@ test.describe("Metrics testcases", () => {
       await pm.metricsPage.gotoMetricsPage();
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(1000);
+
+      // Mark this test as informational if dark mode couldn't be enabled
+      test.info().annotations.push({
+        type: 'warning',
+        description: 'Dark mode could not be activated - testing with default theme'
+      });
     } else {
       // Wait for page to stabilize after theme change
       await page.waitForTimeout(2000);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      testLogger.info('✓ Dark mode confirmed active, proceeding with visibility test');
     }
 
     // Enter query that returns no results

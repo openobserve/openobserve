@@ -412,6 +412,12 @@ test.describe("Alerts Advanced Coverage Tests", () => {
                 );
                 testLogger.info(`Has count column: ${hasCountColumn}`);
             }
+
+            // Soft assertion to mark this as informational rather than a hard failure
+            test.info().annotations.push({
+                type: 'skip-reason',
+                description: 'Firing count column not visible in UI - feature may not be implemented yet'
+            });
         }
 
         testLogger.info('✓ Alert firing count test completed');
