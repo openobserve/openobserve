@@ -20,8 +20,16 @@ import testLogger from '../../utils/test-logger.js';
  * @param {object} pm - PageManager instance
  */
 export async function reopenPanelConfig(page, pm) {
-  // savePanel() already waited for navigation away from add_panel.
-  // Just wait for the panel bar to be rendered before hovering.
+  // savePanel() may not wait for navigation — ensure we're on the dashboard view
+  // page before looking for the panel bar.
+  if (page.url().includes('add_panel')) {
+    await page.waitForURL(
+      (url) => !url.pathname.includes('add_panel'),
+      { timeout: 30000 }
+    );
+  }
+
+  // Wait for the panel bar to be rendered before hovering.
   const panelBar = page.locator('[data-test="dashboard-panel-bar"]').first();
   await panelBar.waitFor({ state: 'visible', timeout: 30000 });
   await panelBar.hover();

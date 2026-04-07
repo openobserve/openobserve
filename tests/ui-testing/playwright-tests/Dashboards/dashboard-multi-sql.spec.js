@@ -389,6 +389,7 @@ test.describe("Multi-SQL Query Support", () => {
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
+      await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
 
       await msql.switchToQueryTab(0);
       await msql.configLegend(0).waitFor({ state: "visible", timeout: 10000 });
@@ -401,10 +402,7 @@ test.describe("Multi-SQL Query Support", () => {
       await msql.configLegend(1).fill("staging");
 
       await msql.switchToQueryTab(0);
-      await pm.dashboardPanelActions.applyDashboardBtn();
-      await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
-      await pm.dashboardPanelActions.savePanel();
-      await page.waitForTimeout(1000);
+      await msql.applyAndSave(pm);
       await reopenPanelConfig(page, pm);
 
       await expect(msql.configLegend(0)).toHaveValue("prod");
