@@ -93,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-tr :props="props">
           <q-th style="width: 40px; text-align: center;">
             <q-checkbox
+              v-if="selectableModels.length > 0"
               :model-value="allSelected"
               :indeterminate="someSelected"
               size="sm"
@@ -352,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onBeforeMount, onActivated } from "vue";
+import { ref, computed, onBeforeMount, onActivated, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -415,20 +416,37 @@ const resultTotal = computed(() => filteredModels.value.length);
 const selectableModels = computed(() =>
   filteredModels.value.filter((m: any) => !isReadOnly(m))
 );
+
+/** Selectable models visible on the current page only. */
+const currentPageSelectableModels = computed(() => {
+  const perPage = pagination.value.rowsPerPage ?? 20;
+  const page = (qTableRef.value?.computedPagination?.page ?? 1);
+  const start = (page - 1) * perPage;
+  const end = start + perPage;
+  // filteredModels is the full ordered list; slice to current page
+  const pageRows = filteredModels.value.slice(start, end);
+  return pageRows.filter((m: any) => !isReadOnly(m));
+});
+
 const selectedCount = computed(() => selectedIds.value.length);
 const allSelected = computed(() =>
-  selectableModels.value.length > 0 &&
-  selectableModels.value.every((m: any) => selectedIds.value.includes(m.id))
+  currentPageSelectableModels.value.length > 0 &&
+  currentPageSelectableModels.value.every((m: any) => selectedIds.value.includes(m.id))
 );
 const someSelected = computed(() =>
   selectedCount.value > 0 && !allSelected.value
 );
 
 function toggleSelectAll() {
+  const pageIds = currentPageSelectableModels.value.map((m: any) => m.id);
   if (allSelected.value) {
-    selectedIds.value = [];
+    // Deselect only the current page's items
+    selectedIds.value = selectedIds.value.filter((id: string) => !pageIds.includes(id));
   } else {
-    selectedIds.value = selectableModels.value.map((m: any) => m.id);
+    // Select only the current page's items (merge with existing selections)
+    const existing = new Set(selectedIds.value);
+    for (const id of pageIds) existing.add(id);
+    selectedIds.value = [...existing];
   }
 }
 
@@ -552,13 +570,21 @@ const orgIdentifier = computed(
   () => store.state.selectedOrganization?.identifier || ""
 );
 
+/** Show error notification only for non-403 errors.
+ *  403 errors are already handled by the global HTTP interceptor (persistent top banner). */
+function notifyError(prefix: string, e: any) {
+  if (e?.response?.status === 403) return;
+  const msg = e?.response?.data?.message || e?.message || "Unknown error";
+  q.notify({ type: "negative", message: `${prefix}: ${msg}`, position: "bottom", timeout: 5000 });
+}
+
 async function fetchModels() {
   loading.value = true;
   try {
     const res = await modelPricingService.list(orgIdentifier.value);
     models.value = res.data || [];
   } catch (e: any) {
-    q.notify({ type: "negative", message: "Failed to load models: " + e.message, position: "bottom", timeout: 5000 });
+    notifyError("Failed to load models", e);
   } finally {
     loading.value = false;
   }
@@ -580,12 +606,14 @@ function openEditor(model: any) {
 
 async function toggleEnabled(model: any, enabled: boolean) {
   try {
-    const updated = { ...model, enabled };
+    // Strip internal UI fields before sending to API
+    const { __sectionStart, ...clean } = model;
+    const updated = { ...clean, enabled };
     await modelPricingService.update(orgIdentifier.value, model.id, updated);
-    model.enabled = enabled;
+    await fetchModels(); // refetch to reflect server state
     q.notify({ type: "positive", message: `Model "${model.name}" ${enabled ? "enabled" : "disabled"}`, position: "bottom", timeout: 3000 });
   } catch (e: any) {
-    q.notify({ type: "negative", message: "Failed to update: " + e.message, position: "bottom", timeout: 5000 });
+    notifyError("Failed to update", e);
   }
 }
 
@@ -607,7 +635,7 @@ function confirmDelete(model: any) {
         q.notify({ type: "positive", message: "Model pricing deleted", position: "bottom", timeout: 3000 });
         await fetchModels();
       } catch (e: any) {
-        q.notify({ type: "negative", message: "Failed to delete: " + e.message, position: "bottom", timeout: 5000 });
+        notifyError("Failed to delete", e);
       }
     },
   };
@@ -631,7 +659,7 @@ async function refreshBuiltIn() {
     q.notify({ type: "positive", message: "Built-in models refreshed", position: "bottom", timeout: 3000 });
     await fetchModels();
   } catch (e: any) {
-    q.notify({ type: "negative", message: "Refresh failed: " + e.message, position: "bottom", timeout: 5000 });
+    notifyError("Refresh failed", e);
   } finally {
     refreshing.value = false;
   }
@@ -697,7 +725,7 @@ function confirmDeleteSelected() {
           await modelPricingService.delete(orgIdentifier.value, id);
           successCount++;
         } catch (e: any) {
-          q.notify({ type: "negative", message: `Failed to delete model: ${e.message}`, position: "bottom", timeout: 5000 });
+          notifyError("Failed to delete model", e);
         }
       }
       if (successCount > 0) {

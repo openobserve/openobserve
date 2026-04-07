@@ -232,24 +232,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span></span>
                     </div>
 
-                    <!-- Existing rows -->
+                    <!-- Existing rows — use stable numeric index as :key so
+                         renaming a key doesn't destroy/recreate the DOM node -->
                     <div
-                      v-for="(price, pkey) in tier.prices"
-                      :key="pkey"
+                      v-for="(entry, entryIdx) in priceEntries(tier)"
+                      :key="entry.stableId"
                       class="price-row"
                     >
                       <q-input
-                        :model-value="pkey"
+                        :model-value="entry.key"
                         placeholder="e.g. input"
                         dense borderless
-                        @update:model-value="(val: any) => renamePrice(tier, pkey as string, val)"
+                        @update:model-value="(val: any) => renamePriceByIndex(tier, entryIdx, val)"
                       />
                       <q-input
-                        :model-value="toPerMillion(Number(price))"
+                        :model-value="toPerMillion(entry.value)"
                         type="number" :min="0" step="0.01"
                         placeholder="0.00"
                         dense borderless
-                        @update:model-value="(val: any) => updatePrice(tier, pkey as string, fromPerMillion(Number(val)))"
+                        @update:model-value="(val: any) => updatePrice(tier, entry.key, fromPerMillion(Number(val)))"
                       >
                         <template #prepend><span class="price-dollar">$</span></template>
                       </q-input>
@@ -258,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         padding="sm"
                         unelevated size="sm" flat
                         style="min-width: auto; border: 1px solid #F2452F; color: #F2452F;"
-                        @click="deletePrice(tier, pkey as string)"
+                        @click="deletePrice(tier, entry.key)"
                       />
                     </div>
 
@@ -468,6 +469,39 @@ function deletePrice(tier: any, key: string) {
   tier.prices = { ...tier.prices };
 }
 
+/** Stable ID counter for price entries — survives key renames without resetting. */
+let nextStableId = 0;
+const stableIdMap = new WeakMap<any, Map<number, number>>();
+
+/** Convert tier.prices object to an array with stable IDs for v-for :key.
+ *  Each entry gets a numeric stableId that persists across key renames. */
+function priceEntries(tier: any): Array<{ key: string; value: number; stableId: number }> {
+  if (!stableIdMap.has(tier)) stableIdMap.set(tier, new Map());
+  const idMap = stableIdMap.get(tier)!;
+  return Object.entries(tier.prices || {}).map(([k, v], idx) => {
+    if (!idMap.has(idx)) idMap.set(idx, nextStableId++);
+    return { key: k, value: Number(v), stableId: idMap.get(idx)! };
+  });
+}
+
+/** Rename a price entry by its array index — keeps the DOM node alive. */
+function renamePriceByIndex(tier: any, index: number, newKey: string) {
+  const entries = Object.entries(tier.prices);
+  if (index < 0 || index >= entries.length) return;
+  const [oldKey, val] = entries[index];
+  if (newKey === oldKey) return;
+  // Rebuild the object preserving insertion order with the new key at the same position
+  const rebuilt: Record<string, number> = {};
+  for (let i = 0; i < entries.length; i++) {
+    if (i === index) {
+      rebuilt[newKey] = val as number;
+    } else {
+      rebuilt[entries[i][0]] = entries[i][1] as number;
+    }
+  }
+  tier.prices = rebuilt;
+}
+
 function renamePrice(tier: any, oldKey: string, newKey: string) {
   if (!newKey || newKey === oldKey) return;
   const val = tier.prices[oldKey];
@@ -525,6 +559,14 @@ function notifyWarn(message: string) {
   q.notify({ type: "warning", message, position: "bottom", timeout: 4000 });
 }
 
+/** Show error notification only for non-403 errors.
+ *  403 errors are already handled by the global HTTP interceptor (persistent top banner). */
+function notifyError(prefix: string, e: any) {
+  if (e?.response?.status === 403) return;
+  const msg = e?.response?.data?.message || e?.message || "Unknown error";
+  q.notify({ type: "negative", message: `${prefix}: ${msg}`, position: "bottom", timeout: 5000 });
+}
+
 async function save() {
   const m = model.value;
 
@@ -572,8 +614,7 @@ async function save() {
     q.notify({ type: "positive", message: "Model pricing saved", position: "bottom", timeout: 3000 });
     goBack();
   } catch (e: any) {
-    const msg = e.response?.data?.message || e.message;
-    q.notify({ type: "negative", message: "Failed to save: " + msg, position: "bottom", timeout: 5000 });
+    notifyError("Failed to save", e);
   } finally {
     saving.value = false;
   }
@@ -604,7 +645,7 @@ onBeforeMount(async () => {
         }
       }
     } catch (e: any) {
-      q.notify({ type: "negative", message: "Failed to load model: " + e.message, position: "bottom", timeout: 5000 });
+      notifyError("Failed to load model", e);
     }
   }
   resetAddState(model.value.tiers.length);

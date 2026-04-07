@@ -321,7 +321,7 @@ async function processJsonObject(jsonObj: any, index: number) {
     return created;
   } catch (e: any) {
     q.notify({
-      message: "Error importing model pricing — please check the JSON",
+      message: "Error importing model pricing. Please check the JSON format.",
       color: "negative",
       position: "bottom",
       timeout: 2000,
@@ -392,18 +392,21 @@ async function createModelPricing(jsonObj: any, index: number) {
     return true;
   } catch (error: any) {
     const errorMessage =
-      error?.response?.data?.message || "Unknown Error";
+      error?.response?.data?.message || "Unknown error";
 
-    q.notify({
-      message: `Failed to import model pricing "${jsonObj.name}": ${errorMessage}`,
-      color: "negative",
-      position: "bottom",
-      timeout: 4000,
-    });
+    // Skip bottom snackbar for 403 — global interceptor already shows persistent top banner.
+    if (error?.response?.status !== 403) {
+      q.notify({
+        message: `Failed to import "${jsonObj.name}": ${errorMessage}`,
+        color: "negative",
+        position: "bottom",
+        timeout: 4000,
+      });
+    }
 
     modelPricingCreators.value.push({
       success: false,
-      message: `Model pricing - ${index}: "${jsonObj.name}" creation failed --> \n Reason: ${errorMessage}`,
+      message: `Model pricing - ${index}: "${jsonObj.name}" creation failed\n Reason: ${errorMessage}`,
     });
     return false;
   }
