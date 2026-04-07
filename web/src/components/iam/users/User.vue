@@ -163,7 +163,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #bottom="scope">
             <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
               <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md">
-                {{ resultTotal }} {{ t('user.header') }}
+                {{ resultTotal }}
+                {{
+                  resultTotal === 1
+                    ? t("user.header")
+                    : t("user.header") + "s"
+                }}
               </div>
               <q-btn
                 v-if="selectedUsers.length > 0"
