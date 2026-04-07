@@ -1929,7 +1929,7 @@ export class TracesPage {
    * @returns {Locator}
    */
   getRunQueryButton() {
-    return this.page.locator('[data-test="trace-search-run-query-btn"], button:has-text("Run query")');
+    return this.page.locator('[data-test="logs-search-bar-refresh-btn"]');
   }
 
   /**
@@ -1977,7 +1977,7 @@ export class TracesPage {
    * @returns {Locator}
    */
   getSelectedStreamToggle() {
-    return this.page.locator('[data-test*="stream-toggle-"][class*="truthy"]');
+    return this.page.locator('[data-test*="stream-toggle-"][class*="truthy"], [data-test*="stream-chip"]');
   }
 
 }

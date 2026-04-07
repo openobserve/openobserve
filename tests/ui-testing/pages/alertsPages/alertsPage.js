@@ -2654,6 +2654,30 @@ export class AlertsPage {
     }
 
     /**
+     * Get Group By section container
+     * @returns {Locator}
+     */
+    getGroupBySection() {
+        return this.page.locator('.step-query-config').locator('div:has-text("Group by")').first();
+    }
+
+    /**
+     * Get autocomplete suggestions dropdown
+     * @returns {Locator}
+     */
+    getAutocompleteSuggestions() {
+        return this.page.locator('.q-menu, [role="listbox"], .autocomplete-dropdown, .q-item');
+    }
+
+    /**
+     * Get Group By input field
+     * @returns {Locator}
+     */
+    getGroupByInput() {
+        return this.page.locator('[data-test*="group-by"] input, [data-test*="groupby"] input, .group-by-field input').first();
+    }
+
+    /**
      * Get "Alert If Any Groups" text element (Scheduled features test)
      * @returns {Locator}
      */

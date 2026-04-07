@@ -612,11 +612,11 @@ test.describe("Scheduled Alert Features", () => {
 
         testLogger.info('=== PHASE 3: Test autocomplete in Group By field ===');
 
-        // Find the Group By input field
-        const groupByInput = page.locator('[data-test*="group-by"] input, [data-test*="groupby"] input, .group-by-field input').first();
+        // Find the Group By input field using POM
+        const groupByInput = pm.alertsPage.getGroupByInput();
 
-        // If no specific test attribute, try to find input near "Group by" label
-        const groupBySection = page.locator('.step-query-config').locator('div:has-text("Group by")').first();
+        // If no specific test attribute, try to find input near "Group by" label using POM
+        const groupBySection = pm.alertsPage.getGroupBySection();
         const inputInSection = groupBySection.locator('input, .q-select').first();
 
         if (await inputInSection.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -630,22 +630,20 @@ test.describe("Scheduled Alert Features", () => {
             await page.waitForTimeout(1000);
             testLogger.info('✓ Typed "k8s" to trigger autocomplete');
 
-            // Check for autocomplete suggestions
-            const suggestions = page.locator('.q-menu, [role="listbox"], .autocomplete-dropdown, .q-item');
+            // Check for autocomplete suggestions using POM
+            const suggestions = pm.alertsPage.getAutocompleteSuggestions();
             const suggestionCount = await suggestions.count();
             testLogger.info(`Autocomplete suggestions found: ${suggestionCount}`);
 
-            if (suggestionCount > 0) {
-                testLogger.info('✓ Autocomplete suggestions appeared - Bug #10899 is fixed');
+            // STRONG ASSERTION: Autocomplete must show suggestions - this verifies Bug #10899 is fixed
+            expect(suggestionCount, 'Bug #10899: Autocomplete suggestions must appear').toBeGreaterThan(0);
+            testLogger.info('✓ Autocomplete suggestions appeared - Bug #10899 is fixed');
 
-                // Try to select a suggestion
-                const firstSuggestion = suggestions.first();
-                if (await firstSuggestion.isVisible({ timeout: 2000 }).catch(() => false)) {
-                    await firstSuggestion.click();
-                    testLogger.info('✓ Selected first autocomplete suggestion');
-                }
-            } else {
-                testLogger.warn('⚠ No autocomplete suggestions appeared - Bug #10899 may still exist');
+            // Try to select a suggestion
+            const firstSuggestion = suggestions.first();
+            if (await firstSuggestion.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await firstSuggestion.click();
+                testLogger.info('✓ Selected first autocomplete suggestion');
             }
 
             // Clear the input
@@ -656,11 +654,14 @@ test.describe("Scheduled Alert Features", () => {
             await groupByInput.fill('level');
             await page.waitForTimeout(1000);
 
-            const suggestions = page.locator('.q-menu, [role="listbox"]');
+            const suggestions = pm.alertsPage.getAutocompleteSuggestions();
             const suggestionCount = await suggestions.count();
             testLogger.info(`Autocomplete suggestions found: ${suggestionCount}`);
+
+            // STRONG ASSERTION: Verify autocomplete works
+            expect(suggestionCount, 'Bug #10899: Autocomplete suggestions must appear').toBeGreaterThan(0);
         } else {
-            testLogger.warn('⚠ Could not locate Group By input field');
+            throw new Error('Could not locate Group By input field - test setup failed');
         }
 
         testLogger.info('=== PHASE 4: Clean up ===');

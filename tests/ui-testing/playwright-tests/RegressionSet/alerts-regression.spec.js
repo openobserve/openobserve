@@ -16,6 +16,7 @@ test.describe("Alerts Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
   let pm; // Page Manager instance
   let randomValue = `${Date.now()}`;
+  const TEST_STREAM = 'e2e_automate';
   const METRICS_STREAM = 'e2e_test_cpu_usage';
   const DESTINATION_NAME = 'e2e_promql_dest';
   const TEMPLATE_NAME = 'e2e_promql_template';
@@ -368,8 +369,8 @@ test.describe("Alerts Regression Bugs", () => {
     await expect(groupByLabel).toBeVisible({ timeout: 5000 });
     testLogger.info('✓ Group By section visible');
 
-    // Find the Group By input field
-    const groupBySection = page.locator('.step-query-config').locator('div:has-text("Group by")').first();
+    // Find the Group By input field using POM
+    const groupBySection = pm.alertsPage.getGroupBySection();
     const inputInSection = groupBySection.locator('input, .q-select').first();
 
     if (await inputInSection.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -383,8 +384,8 @@ test.describe("Alerts Regression Bugs", () => {
       await page.waitForTimeout(1000);
       testLogger.info('✓ Typed "k8s" to trigger autocomplete');
 
-      // STRONG ASSERTION: Check for autocomplete suggestions
-      const suggestions = page.locator('.q-menu, [role="listbox"], .autocomplete-dropdown, .q-item');
+      // STRONG ASSERTION: Check for autocomplete suggestions using POM
+      const suggestions = pm.alertsPage.getAutocompleteSuggestions();
       const suggestionCount = await suggestions.count();
       testLogger.info(`Autocomplete suggestions found: ${suggestionCount}`);
 

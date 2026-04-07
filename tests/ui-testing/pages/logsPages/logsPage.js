@@ -1144,10 +1144,8 @@ export class LogsPage {
     async getQuickModeState() {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const isOn = toggleInner
-            ? await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy'))
-            : false;
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
         await this.page.keyboard.press('Escape');
         return isOn;
     }
