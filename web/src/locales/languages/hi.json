@@ -2000,7 +2000,7 @@
       "clickToViewSuggestions": "Click to view correlation improvement suggestions",
       "byService": "By Service",
       "byStream": "By Stream",
-      "searchServiceName": "Search service name...",
+      "searchServiceName": "Search service or stream name...",
       "searchStreamName": "Search stream name...",
       "allServices": "All Services",
       "missingTelemetry": "Missing Telemetry",

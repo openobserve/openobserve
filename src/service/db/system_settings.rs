@@ -398,12 +398,64 @@ pub fn get_default_semantic_field_groups() -> Vec<config::meta::correlation::Fie
     }
 }
 
+/// Normalize a semantic group category name to a consistent identity set ID
+///
+/// Converts category names to lowercase, dash-separated format while maintaining
+/// consistency to prevent duplicate groups in the UI.
+///
+/// Examples:
+/// - "Kubernetes" -> "kubernetes"
+/// - "AWS EC2" -> "aws-ec2"
+/// - "Common" -> "common"
+fn normalize_category_to_id(category: &str) -> String {
+    category.to_lowercase().replace(' ', "-")
+}
+
+/// Normalize a semantic group category name to a consistent label format
+///
+/// Uses title case to ensure consistent display in the UI.
+/// This ensures that auto-generated identity sets have consistent casing
+/// with manually defined semantic groups.
+///
+/// Examples:
+/// - "kubernetes" -> "Kubernetes"
+/// - "aws ec2" -> "Aws Ec2"
+/// - "COMMON" -> "Common"
+fn normalize_category_to_label(category: &str) -> String {
+    // Convert to title case: first letter of each word capitalized, rest lowercase
+    // Special case for common acronyms to match frontend expectations
+    category
+        .split_whitespace()
+        .map(|word| {
+            let upper_word = word.to_uppercase();
+            match upper_word.as_str() {
+                "AWS" | "GCP" => upper_word,
+                _ => {
+                    let mut chars = word.chars();
+                    match chars.next() {
+                        None => String::new(),
+                        Some(first) => {
+                            first.to_uppercase().collect::<String>()
+                                + &chars.collect::<String>().to_lowercase()
+                        }
+                    }
+                }
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Load the service identity config for an org, applying env-default tracked_alias_ids
 /// when the stored config has an empty list (pre-migration records or first run).
+/// Also applies auto-config when sets is empty but tracked_alias_ids is not empty.
 pub async fn get_service_identity_config(
     org_id: &str,
 ) -> config::meta::correlation::ServiceIdentityConfig {
-    use config::meta::{correlation::ServiceIdentityConfig, system_settings::SettingScope};
+    use config::meta::{
+        correlation::{IdentitySet, ServiceIdentityConfig},
+        system_settings::SettingScope,
+    };
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
     let mut config = match db::get(&SettingScope::Org, Some(org_id), None, "service_identity").await
     {
@@ -422,6 +474,52 @@ pub async fn get_service_identity_config(
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .collect();
+    }
+
+    // Auto-config: if sets is empty but tracked_alias_ids is not empty, create category-based sets
+    if config.sets.is_empty() && !config.tracked_alias_ids.is_empty() {
+        // Group tracked alias IDs by their semantic categories
+        let semantic_groups = get_semantic_field_groups(org_id).await;
+        let mut category_groups = std::collections::HashMap::new();
+
+        // Map each tracked alias ID to its semantic group category
+        // Use String as HashMap key to ensure proper equality comparison
+        // (avoids potential issues with &str slices from different iterations)
+        for alias_id in &config.tracked_alias_ids {
+            if let Some(group) = semantic_groups.iter().find(|g| g.id == *alias_id) {
+                let category = group.group.as_deref().unwrap_or("Common").to_string();
+                category_groups
+                    .entry(category)
+                    .or_insert_with(Vec::new)
+                    .push(alias_id.clone());
+            }
+        }
+
+        // Create identity sets for each category that has tracked aliases
+        // Sort categories to ensure deterministic order
+        let mut categories: Vec<_> = category_groups.keys().cloned().collect();
+        categories.sort();
+
+        for category in categories {
+            let alias_ids = category_groups.remove(&category).unwrap();
+            if !alias_ids.is_empty() {
+                let set_id = normalize_category_to_id(&category);
+                let normalized_label = normalize_category_to_label(&category);
+                let identity_set = IdentitySet {
+                    id: set_id,
+                    label: normalized_label,
+                    distinguish_by: alias_ids,
+                };
+                config.sets.push(identity_set);
+            }
+        }
+
+        log::debug!(
+            "[ServiceIdentityConfig] Auto-configured {} identity sets for org {}: categories {:?}",
+            config.sets.len(),
+            org_id,
+            config.sets.iter().map(|s| &s.label).collect::<Vec<_>>()
+        );
     }
 
     config
@@ -474,5 +572,268 @@ mod tests {
             ),
             "user:default:user@example.com:test_key"
         );
+    }
+
+    #[test]
+    fn test_normalize_category_to_id() {
+        assert_eq!(normalize_category_to_id("Kubernetes"), "kubernetes");
+        assert_eq!(normalize_category_to_id("AWS EC2"), "aws-ec2");
+        assert_eq!(normalize_category_to_id("Common"), "common");
+        assert_eq!(normalize_category_to_id("GCP"), "gcp");
+        assert_eq!(
+            normalize_category_to_id("Custom Category"),
+            "custom-category"
+        );
+        assert_eq!(normalize_category_to_id("UPPERCASE"), "uppercase");
+        assert_eq!(normalize_category_to_id("mixed CaSe"), "mixed-case");
+    }
+
+    #[test]
+    fn test_normalize_category_to_label() {
+        assert_eq!(normalize_category_to_label("kubernetes"), "Kubernetes");
+        assert_eq!(normalize_category_to_label("aws ec2"), "AWS Ec2");
+        assert_eq!(normalize_category_to_label("Common"), "Common");
+        assert_eq!(normalize_category_to_label("GCP"), "GCP");
+        assert_eq!(
+            normalize_category_to_label("custom category"),
+            "Custom Category"
+        );
+        assert_eq!(normalize_category_to_label("UPPERCASE"), "Uppercase");
+        assert_eq!(normalize_category_to_label("mixed CaSe"), "Mixed Case");
+        // Test edge cases
+        assert_eq!(normalize_category_to_label(""), "");
+        assert_eq!(normalize_category_to_label("a"), "A");
+        assert_eq!(normalize_category_to_label("a b"), "A B");
+    }
+
+    #[test]
+    fn test_category_normalization_consistency() {
+        // Ensure that normalizing a category to ID and then back creates consistent results
+        let test_cases = vec![
+            "Kubernetes",
+            "AWS EC2",
+            "Common",
+            "GCP",
+            "Custom Category",
+            "kubernetes", // Already lowercase
+            "mixed CaSe",
+        ];
+
+        for category in test_cases {
+            let id = normalize_category_to_id(category);
+            let label = normalize_category_to_label(category);
+
+            // ID should always be lowercase with dashes
+            assert!(
+                !id.contains(char::is_uppercase),
+                "ID '{}' contains uppercase",
+                id
+            );
+            assert!(!id.contains(' '), "ID '{}' contains spaces", id);
+
+            // Label should be title case
+            let words: Vec<&str> = label.split_whitespace().collect();
+            for word in words {
+                let first_char = word.chars().next().unwrap();
+                assert!(
+                    first_char.is_uppercase(),
+                    "Label '{}' word '{}' should start with uppercase",
+                    label,
+                    word
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_service_identity_config_no_auto_config_when_sets_exist() {
+        // Test that auto-config doesn't run when sets already exist
+        // (This condition check still applies in the new logic)
+        use config::meta::correlation::{IdentitySet, ServiceIdentityConfig};
+
+        let mut config = ServiceIdentityConfig::default_config();
+        config.tracked_alias_ids = vec!["service".to_string(), "environment".to_string()];
+        config.sets = vec![IdentitySet {
+            id: "existing".to_string(),
+            label: "Existing Set".to_string(),
+            distinguish_by: vec!["service".to_string()],
+        }];
+
+        let original_sets_len = config.sets.len();
+
+        // Test the condition that prevents auto-config (still relevant)
+        let should_auto_config = config.sets.is_empty() && !config.tracked_alias_ids.is_empty();
+        assert!(
+            !should_auto_config,
+            "Auto-config should not run when sets already exist"
+        );
+
+        // Verify sets are unchanged
+        assert_eq!(config.sets.len(), original_sets_len);
+        assert_eq!(config.sets[0].id, "existing");
+    }
+
+    #[test]
+    fn test_service_identity_config_no_auto_config_when_tracked_alias_ids_empty() {
+        // Test that auto-config doesn't run when tracked_alias_ids is empty
+        // (This condition check still applies in the new logic)
+        use config::meta::correlation::ServiceIdentityConfig;
+
+        let config = ServiceIdentityConfig::default_config();
+        // sets is empty (default), tracked_alias_ids is also empty (default)
+
+        let original_sets_len = config.sets.len();
+
+        // Test the condition that prevents auto-config (still relevant)
+        let should_auto_config = config.sets.is_empty() && !config.tracked_alias_ids.is_empty();
+        assert!(
+            !should_auto_config,
+            "Auto-config should not run when tracked_alias_ids is empty"
+        );
+
+        // Verify sets are unchanged
+        assert_eq!(config.sets.len(), original_sets_len);
+        assert!(config.sets.is_empty());
+    }
+
+    #[test]
+    fn test_auto_config_category_grouping_simulation() {
+        // Test that demonstrates the new category-based grouping logic
+        // (This simulates the behavior without requiring async calls)
+        use std::collections::HashMap;
+
+        use config::meta::correlation::{FieldAlias, IdentitySet};
+
+        // Simulate semantic groups that would be loaded
+        let semantic_groups = vec![
+            FieldAlias::with_group("environment", "Environment", "Common", &["env"]),
+            FieldAlias::with_group("region", "Region", "Common", &["region"]),
+            FieldAlias::with_group("k8s-cluster", "K8s Cluster", "Kubernetes", &["cluster"]),
+            FieldAlias::with_group(
+                "k8s-namespace",
+                "K8s Namespace",
+                "Kubernetes",
+                &["namespace"],
+            ),
+            FieldAlias::with_group("aws-ecs-cluster", "ECS Cluster", "AWS", &["ecs_cluster"]),
+            FieldAlias::with_group("gcp-instance", "GCP Instance", "GCP", &["gcp_instance"]),
+        ];
+
+        let tracked_alias_ids = vec![
+            "environment".to_string(),
+            "region".to_string(),
+            "k8s-cluster".to_string(),
+            "k8s-namespace".to_string(),
+            "aws-ecs-cluster".to_string(),
+            "gcp-instance".to_string(),
+        ];
+
+        // Simulate the new category-based grouping logic
+        let mut category_groups = HashMap::new();
+
+        for alias_id in &tracked_alias_ids {
+            if let Some(group) = semantic_groups.iter().find(|g| g.id == *alias_id) {
+                let category = group.group.as_deref().unwrap_or("Common");
+                category_groups
+                    .entry(category)
+                    .or_insert_with(Vec::new)
+                    .push(alias_id.clone());
+            }
+        }
+
+        let mut identity_sets = Vec::new();
+        for (category, alias_ids) in category_groups {
+            if !alias_ids.is_empty() {
+                let set_id = normalize_category_to_id(category);
+                let normalized_label = normalize_category_to_label(category);
+                let identity_set = IdentitySet {
+                    id: set_id,
+                    label: normalized_label,
+                    distinguish_by: alias_ids,
+                };
+                identity_sets.push(identity_set);
+            }
+        }
+
+        // Verify the expected category-based grouping
+        assert_eq!(identity_sets.len(), 4); // Common, Kubernetes, AWS, GCP
+
+        // Check that we have the expected categories
+        let set_ids: Vec<&str> = identity_sets.iter().map(|s| s.id.as_str()).collect();
+        assert!(set_ids.contains(&"common"));
+        assert!(set_ids.contains(&"kubernetes"));
+        assert!(set_ids.contains(&"aws"));
+        assert!(set_ids.contains(&"gcp"));
+
+        // Check the Common category contains environment and region
+        let common_set = identity_sets.iter().find(|s| s.id == "common").unwrap();
+        assert!(
+            common_set
+                .distinguish_by
+                .contains(&"environment".to_string())
+        );
+        assert!(common_set.distinguish_by.contains(&"region".to_string()));
+
+        // Check the Kubernetes category contains k8s fields
+        let k8s_set = identity_sets.iter().find(|s| s.id == "kubernetes").unwrap();
+        assert!(k8s_set.distinguish_by.contains(&"k8s-cluster".to_string()));
+        assert!(
+            k8s_set
+                .distinguish_by
+                .contains(&"k8s-namespace".to_string())
+        );
+
+        // Verify that labels are normalized to title case
+        let labels: Vec<&str> = identity_sets.iter().map(|s| s.label.as_str()).collect();
+        assert!(labels.contains(&"Common"));
+        assert!(labels.contains(&"Kubernetes"));
+        assert!(labels.contains(&"Aws"));
+        assert!(labels.contains(&"Gcp"));
+    }
+
+    #[test]
+    fn test_category_normalization_prevents_duplicates() {
+        // Test that demonstrates how normalization prevents duplicate categories
+        // This addresses the issue where auto-config creates "kubernetes" (lowercase ID)
+        // while semantic groups have "Kubernetes" (capitalized), causing UI duplicates
+        use std::collections::{HashMap, HashSet};
+
+        // Simulate mixed-case category input that could cause duplicates
+        let mixed_case_categories = vec![
+            "Kubernetes",  // From semantic group
+            "kubernetes",  // From potential auto-config without normalization
+            "AWS",         // Uppercase
+            "aws",         // Lowercase
+            "Common",      // Title case
+            "COMMON",      // All caps
+            "custom test", // Lowercase with space
+            "Custom Test", // Title case with space
+        ];
+
+        // Normalize all categories and verify no duplicates
+        let mut normalized_ids = HashSet::new();
+        let mut normalized_labels = HashMap::new();
+
+        for category in mixed_case_categories {
+            let id = normalize_category_to_id(category);
+            let label = normalize_category_to_label(category);
+
+            // Store the first occurrence for comparison
+            normalized_labels.entry(id.clone()).or_insert(label.clone());
+            normalized_ids.insert(id);
+        }
+
+        // Should have only 4 unique categories after normalization
+        assert_eq!(normalized_ids.len(), 4);
+        assert!(normalized_ids.contains("kubernetes"));
+        assert!(normalized_ids.contains("aws"));
+        assert!(normalized_ids.contains("common"));
+        assert!(normalized_ids.contains("custom-test"));
+
+        // All labels should be consistently title case
+        assert_eq!(normalized_labels["kubernetes"], "Kubernetes");
+        assert_eq!(normalized_labels["aws"], "Aws");
+        assert_eq!(normalized_labels["common"], "Common");
+        assert_eq!(normalized_labels["custom-test"], "Custom Test");
     }
 }

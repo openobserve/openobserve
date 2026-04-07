@@ -60,37 +60,11 @@ async fn extract_filtered_semantic_dimensions(
     org_id: &str,
     labels: &HashMap<String, String>,
 ) -> Option<FilteredSemanticResult> {
-    use config::meta::{
-        alerts::incidents::KeyType, correlation::ServiceIdentityConfig,
-        system_settings::SettingScope,
-    };
+    use config::meta::alerts::incidents::KeyType;
 
-    // Load ServiceIdentityConfig to get distinguish_by groups
-    let identity_config = match infra::table::system_settings::get(
-        &SettingScope::Org,
-        Some(org_id),
-        None,
-        "service_identity",
-    )
-    .await
-    {
-        Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
-            .unwrap_or_else(|e| {
-                log::warn!(
-                    "[incidents] Invalid service_identity config for org {}: {}, using default",
-                    org_id,
-                    e
-                );
-                ServiceIdentityConfig::default_config()
-            }),
-        _ => {
-            log::debug!(
-                "[incidents] No service_identity config found for org {}, using default",
-                org_id
-            );
-            ServiceIdentityConfig::default_config()
-        }
-    };
+    // Load ServiceIdentityConfig with auto-configuration applied
+    let identity_config =
+        crate::service::db::system_settings::get_service_identity_config(org_id).await;
 
     // Validate config has at least one set
     if identity_config.sets.is_empty() {

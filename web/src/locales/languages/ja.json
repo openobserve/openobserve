@@ -2417,7 +2417,7 @@
       "clickToViewSuggestions": "クリックして相関関係の改善提案を表示",
       "byService": "サービス別",
       "byStream": "ストリーム別",
-      "searchServiceName": "サービス名を検索中...",
+      "searchServiceName": "サービスまたはストリーム名を検索...",
       "searchStreamName": "ストリーム名を検索...",
       "allServices": "すべてのサービス",
       "missingTelemetry": "テレメトリが見つからない",
