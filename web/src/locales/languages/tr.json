@@ -2697,7 +2697,8 @@
     "attachmentType": "Ek Stili",
     "dimensionWidth": "Genişlik (piksel)",
     "dimensionHeight": "Yükseklik (piksel)",
-    "imagePreview": "Satır içi gösterge paneli önizleme görüntüsünü ekleyin"
+    "imagePreview": "Satır içi gösterge paneli önizleme görüntüsünü ekleyin",
+    "customDimensions": "Özel Boyutlar (Gelişmiş)"
   },
   "queries": {
     "runningQueries": "Çalışan Sorgular",

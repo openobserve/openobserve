@@ -2697,7 +2697,8 @@
     "attachmentType": "Art der Anlage",
     "dimensionWidth": "Breite (px)",
     "dimensionHeight": "Höhe (px)",
-    "imagePreview": "Fügen Sie ein Inline-Dashboard-Vorschaubild hinzu"
+    "imagePreview": "Fügen Sie ein Inline-Dashboard-Vorschaubild hinzu",
+    "customDimensions": "Benutzerdefinierte Abmessungen (für Fortgeschrittene)"
   },
   "queries": {
     "runningQueries": "Abfragen ausführen",

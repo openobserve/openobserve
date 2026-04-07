@@ -2697,7 +2697,8 @@
     "attachmentType": "Style de pièce jointe",
     "dimensionWidth": "Largeur (px)",
     "dimensionHeight": "Hauteur (px)",
-    "imagePreview": "Inclure une image d'aperçu du tableau de bord en ligne"
+    "imagePreview": "Inclure une image d'aperçu du tableau de bord en ligne",
+    "customDimensions": "Dimensions personnalisées (avancées)"
   },
   "queries": {
     "runningQueries": "Exécution de requêtes",

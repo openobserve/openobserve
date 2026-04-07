@@ -2695,7 +2695,8 @@
     "attachmentType": "Stile di fissaggio",
     "dimensionWidth": "Larghezza (px)",
     "dimensionHeight": "Altezza (px)",
-    "imagePreview": "Includi l'immagine di anteprima della dashboard in linea"
+    "imagePreview": "Includi l'immagine di anteprima della dashboard in linea",
+    "customDimensions": "Dimensioni personalizzate (avanzate)"
   },
   "queries": {
     "runningQueries": "Interrogazioni in esecuzione",

@@ -2718,7 +2718,8 @@
     "attachmentType": "アタッチメントスタイル",
     "dimensionWidth": "幅 (ピクセル)",
     "dimensionHeight": "高さ (ピクセル)",
-    "imagePreview": "インラインダッシュボードのプレビュー画像を含める"
+    "imagePreview": "インラインダッシュボードのプレビュー画像を含める",
+    "customDimensions": "カスタムディメンション (アドバンス)"
   },
   "queries": {
     "runningQueries": "実行中のクエリ",

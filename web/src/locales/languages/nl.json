@@ -2697,7 +2697,8 @@
     "attachmentType": "Stijl van gehechtheid",
     "dimensionWidth": "Breedte (px)",
     "dimensionHeight": "Hoogte (px)",
-    "imagePreview": "Inline voorbeeldafbeelding van het dashboard toevoegen"
+    "imagePreview": "Inline voorbeeldafbeelding van het dashboard toevoegen",
+    "customDimensions": "Aangepaste afmetingen (geavanceerd)"
   },
   "queries": {
     "runningQueries": "Zoekopdrachten uitvoeren",
