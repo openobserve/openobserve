@@ -52,6 +52,7 @@ export const convertMultiSQLData = async (
 
     // Create a per-query schema view: set queries[0] to the current query
     // so contextBuilder.ts reads the correct query's fields
+    if (!panelSchema.queries[panelQueryIndex]) continue;
     const querySchema = {
       ...panelSchema,
       queries: [panelSchema.queries[panelQueryIndex]],
@@ -65,7 +66,7 @@ export const convertMultiSQLData = async (
         chartPanelRef,
         hoveredSeriesState,
         resultMetaData.value?.[i] ?? [],
-        { queries: [metadata.queries[i]] },
+        { queries: [metadata?.queries?.[i]] },
         chartPanelStyle,
         annotations,
       ),

@@ -1573,7 +1573,7 @@
     "axisLabelTooltipNoteText": " Cette option n'est pas prise en charge pour les champs de l'axe X de séries chronologiques.",
     "multiSqlQueryLabel": "Libellé de requête",
     "multiSqlQueryLabelHint": "Nom personnalisé pour cette requête dans les légendes (par exemple, « Production »)",
-    "multiQueryWarning": "Seule la requête 1 est affichée pour {ChartType}",
+    "multiQueryWarning": "Seule la requête 1 est affichée pour {chartType}",
     "trellisNotSupportedWithMultiQuery": "La disposition en treillis est désactivée en cas de requêtes multiples. Supprimez les requêtes supplémentaires pour utiliser Trellis."
   },
   "panel": {

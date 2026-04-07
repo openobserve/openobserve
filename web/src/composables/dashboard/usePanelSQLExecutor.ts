@@ -414,6 +414,7 @@ export const usePanelSQLExecutor = (ctx: {
 
       state.data.push([]);
       state.resultMetaData.push([{}]);
+      state.metadata.queries.push({ panelQueryIndex: 0 });
 
       const currentQueryIndex = state.data.length - 1;
       state.data[currentQueryIndex] = markRaw(

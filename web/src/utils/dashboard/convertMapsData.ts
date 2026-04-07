@@ -89,6 +89,9 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
   options.xAxis = [];
   options.yAxis = [];
   options.series = panelSchema.queries.map((query: any, index: any) => {
+    if (!query.fields?.name || !query.fields?.value_for_maps) {
+      return { type: "map", data: [] };
+    }
     return {
       type: "map",
       map: panelSchema.config?.map_type.type || "world",
