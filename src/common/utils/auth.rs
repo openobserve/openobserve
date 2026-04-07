@@ -912,6 +912,8 @@ where
                 && path_columns[2].eq("alerts")
                 && path_columns[url_len - 1].eq("trigger")
             {
+                // For v2/default/alerts/3ATPoRfPdc0n1mEcORhMHV4h56n/trigger api to trigger
+                // destination
                 format!(
                     "{}:{}",
                     OFGA_MODELS
