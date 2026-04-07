@@ -439,9 +439,6 @@ export default defineComponent({
 
       const type = dashboardPanelData.data.type;
 
-      // Heatmap uses x+y+z grid — multi-query would be ambiguous
-      if (type === "heatmap") return false;
-
       // Pivot table requires consistent field aliases — single query only
       const isPivot =
         type === "table" &&
@@ -457,10 +454,6 @@ export default defineComponent({
       if (promqlMode.value) return null;
 
       const type = dashboardPanelData.data.type;
-
-      if (type === "heatmap") {
-        return t("dashboard.multiQueryWarning", { chartType: "Heatmap" });
-      }
 
       const pivotQuery = dashboardPanelData.data.queries?.[0];
       const isPivot =

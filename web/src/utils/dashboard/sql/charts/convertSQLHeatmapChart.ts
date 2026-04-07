@@ -92,7 +92,7 @@ export function applyHeatmapChart(ctx: SQLContext): void {
     (options.series = [
       {
         ...defaultSeriesProps,
-        name: panelSchema?.queries[0]?.fields?.y[0].label,
+        name: panelSchema?.queries[0]?.fields?.z[0].label,
 
         data: zValues
           .map((it: any, index: any) => {

@@ -25,6 +25,7 @@ import { convertSQLChartData } from "./sql";
 import { applySeriesColorMappings } from "./chartColorUtils";
 import { calculateOptimalFontSize } from "./chartDimensionUtils";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
+import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 
 export const convertMultiSQLData = async (
   panelSchema: any,
@@ -259,11 +260,144 @@ export const convertMultiSQLData = async (
     return options[0];
   }
 
+  // C7: Heatmap — render each query as an independent heatmap in its own grid cell
+  if (chartType === "heatmap" && options.length > 1) {
+    // Reserve space at the bottom for the visualMap colour scale and legend.
+    const VISUAL_MAP_HEIGHT = 80;
+    const LEGEND_BOTTOM = 5;
+    const VISUAL_MAP_BOTTOM = 38;
+    const TITLE_HEIGHT_PX = 20;
+    const containerHeight = chartPanelRef.value.offsetHeight;
+    const usableHeight = Math.max(containerHeight - VISUAL_MAP_HEIGHT, 1);
+    // Scale vertically so grid cells stay above the reserved bottom area.
+    const heightScale = usableHeight / containerHeight;
+    const titleHeightPct = (TITLE_HEIGHT_PX / containerHeight) * 100;
+
+    const gridDataForHeatmap = calculateGridPositions(
+      chartPanelRef.value.offsetWidth,
+      usableHeight,
+      options.length,
+    );
+
+    const allGrids: any[] = [];
+    const allXAxes: any[] = [];
+    const allYAxes: any[] = [];
+    const allSeries: any[] = [];
+    const allTitles: any[] = [];
+    let globalMin = Infinity;
+    let globalMax = -Infinity;
+
+    // Gap between adjacent cells and horizontal padding from the container edge.
+    const GAP = 1.5;
+    const H_PAD = 2;
+
+    options.forEach((opt: any, i: number) => {
+      const cell = gridDataForHeatmap.gridArray[i];
+      const left = H_PAD + (parseFloat(cell.left) / 100) * (100 - 2 * H_PAD);
+      const rawTop = parseFloat(cell.top) * heightScale;
+      const width = (parseFloat(cell.width) / 100) * (100 - 2 * H_PAD) - GAP;
+      const height = parseFloat(cell.height) * heightScale - GAP;
+
+      // containLabel keeps axis labels inside the cell boundary.
+      allGrids.push({
+        containLabel: true,
+        left: `${left}%`,
+        top: `${rawTop + titleHeightPct}%`,
+        width: `${width}%`,
+        height: `${Math.max(height - titleHeightPct, 1)}%`,
+      });
+
+      // xAxis is always an array in the single-query heatmap output.
+      const srcXAxis = opt?.options?.xAxis?.[0];
+      if (srcXAxis) allXAxes.push({ ...srcXAxis, gridIndex: i });
+
+      // yAxis is always a plain object in the single-query heatmap output.
+      const srcYAxis = opt?.options?.yAxis;
+      if (srcYAxis) allYAxes.push({ ...srcYAxis, gridIndex: i });
+
+      const srcSeries = opt?.options?.series?.[0];
+      if (srcSeries) {
+        const panelQueryIndex = metadata?.queries?.[i]?.panelQueryIndex ?? i;
+        const queryConfig = panelSchema.queries[panelQueryIndex]?.config;
+        const periodAsStr = metadata?.queries[i]?.timeRangeGap?.periodAsStr || "";
+        const labeledName = buildLabeledName(srcSeries.name, queryConfig, panelQueryIndex, periodAsStr);
+
+        allSeries.push({ ...srcSeries, xAxisIndex: i, yAxisIndex: i, name: labeledName });
+
+        allTitles.push({
+          text: labeledName,
+          textStyle: {
+            fontSize: 12,
+            fontWeight: "bold",
+            overflow: "truncate",
+            ellipsis: "...",
+            width: (width / 100) * chartPanelRef.value.offsetWidth - 8,
+          },
+          top: `${rawTop}%`,
+          left: `${left}%`,
+        });
+      }
+
+      const vm = opt?.options?.visualMap;
+      if (vm) {
+        if (typeof vm.min === "number") globalMin = Math.min(globalMin, vm.min);
+        if (typeof vm.max === "number") globalMax = Math.max(globalMax, vm.max);
+      }
+    });
+
+    options[0].options.grid = allGrids;
+    options[0].options.xAxis = allXAxes;
+    options[0].options.yAxis = allYAxes;
+    options[0].options.series = allSeries;
+    options[0].options.title = allTitles;
+
+    // The single-query tooltip formatter closes over yAxis as a plain object;
+    // in multi-query mode yAxis is an array, so we replace the formatter.
+    options[0].options.tooltip = {
+      ...(options[0].options.tooltip ?? {}),
+      trigger: "item",
+      formatter: (params: any) => {
+        try {
+          const yLabel =
+            allYAxes[params.seriesIndex]?.data?.[params?.value?.[1]] ??
+            params?.seriesName ??
+            "";
+          const rawVal = params?.value?.[2];
+          const formatted =
+            formatUnitValue(
+              getUnitValue(
+                rawVal,
+                panelSchema?.config?.unit,
+                panelSchema?.config?.unit_custom,
+                panelSchema?.config?.decimals,
+              ),
+            ) || rawVal;
+          return `${yLabel} <br/> ${params?.marker ?? ""} ${params?.name ?? ""} : ${formatted}`;
+        } catch {
+          return "";
+        }
+      },
+    };
+
+    if (options[0].options.visualMap) {
+      options[0].options.visualMap.min = isFinite(globalMin) ? globalMin : 0;
+      options[0].options.visualMap.max = isFinite(globalMax) ? globalMax : 0;
+      options[0].options.visualMap.bottom = VISUAL_MAP_BOTTOM;
+    }
+
+    if (options[0].options.legend) {
+      options[0].options.legend.show = true;
+      options[0].options.legend.bottom = LEGEND_BOTTOM;
+    }
+
+    return options[0];
+  }
+
   // C3: X-axis merge + reindex for time-series charts
   const needsXAxisMerge =
     options.length > 1 &&
     options[0]?.options?.xAxis?.[0]?.data &&
-    !["pie", "donut", "metric", "gauge"].includes(chartType);
+    !["pie", "donut", "metric", "gauge", "heatmap"].includes(chartType);
 
   if (needsXAxisMerge) {
     // Save each query's original xAxis BEFORE merging
