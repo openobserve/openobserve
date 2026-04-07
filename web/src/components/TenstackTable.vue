@@ -1203,7 +1203,7 @@ const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
     header: String(col.label ?? col.name),
     ...(typeof col.field === "function"
       ? { accessorFn: col.field }
-      : { accessorKey: col.field ?? col.name }),
+      : { accessorKey: String(col.field ?? col.name) }),
     meta: {
       align: col.align,
       format: col.format,
