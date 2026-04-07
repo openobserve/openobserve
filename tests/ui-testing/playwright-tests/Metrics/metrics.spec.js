@@ -592,9 +592,17 @@ test.describe("Metrics testcases", () => {
     const isDarkMode = bodyClass.includes('dark') || bodyClass.includes('body--dark');
     testLogger.info(`Dark mode active: ${isDarkMode}`);
 
-    // Wait for page to stabilize after theme change
-    await page.waitForTimeout(2000);
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    // If dark mode attempts failed, reload the metrics page to ensure clean state
+    if (!isDarkMode) {
+      testLogger.info('Dark mode not activated, reloading metrics page for clean state');
+      await pm.metricsPage.gotoMetricsPage();
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(1000);
+    } else {
+      // Wait for page to stabilize after theme change
+      await page.waitForTimeout(2000);
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
 
     // Enter query that returns no results
     await pm.metricsPage.enterMetricsQuery('non_existent_metric_for_dark_mode_test_xyz');
