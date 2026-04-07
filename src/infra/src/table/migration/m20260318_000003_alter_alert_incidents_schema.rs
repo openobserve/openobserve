@@ -58,6 +58,35 @@ impl MigrationTrait for Migration {
                 // SQLite cannot DROP COLUMN or ALTER column constraints.
                 // Reconstruct the table to remove correlation_key (NOT NULL, no default)
                 // and stable_dimensions, replacing them with group_values + key_type.
+
+                // Step 1: Store alert_incident_alerts data before breaking foreign key
+                // Drop temp table if it exists (cleanup from failed previous run)
+                let _ = manager
+                    .get_connection()
+                    .execute(sea_orm::Statement::from_string(
+                        backend,
+                        "DROP TABLE IF EXISTS temp_alert_incident_alerts".to_string(),
+                    ))
+                    .await;
+
+                manager
+                    .get_connection()
+                    .execute(sea_orm::Statement::from_string(
+                        backend,
+                        "CREATE TABLE temp_alert_incident_alerts AS SELECT * FROM alert_incident_alerts".to_string(),
+                    ))
+                    .await?;
+
+                // Step 2: Drop alert_incident_alerts (has foreign key to alert_incidents)
+                manager
+                    .drop_table(
+                        Table::drop()
+                            .table(Alias::new("alert_incident_alerts"))
+                            .to_owned(),
+                    )
+                    .await?;
+
+                // Step 3: Rename alert_incidents to alert_incidents_old
                 manager
                     .rename_table(
                         Table::rename()
@@ -65,7 +94,11 @@ impl MigrationTrait for Migration {
                             .to_owned(),
                     )
                     .await?;
+
+                // Step 4: Create new alert_incidents table with updated schema
                 manager.create_table(create_alert_incidents_table()).await?;
+
+                // Step 5: Copy data from old to new alert_incidents
                 manager
                     .get_connection()
                     .execute(sea_orm::Statement::from_string(
@@ -73,6 +106,53 @@ impl MigrationTrait for Migration {
                         SQLITE_COPY_SQL.to_string(),
                     ))
                     .await?;
+
+                // Step 6: Recreate alert_incident_alerts with correct foreign key
+                manager
+                    .create_table(recreate_alert_incident_alerts_table())
+                    .await?;
+
+                // Step 7: Restore alert_incident_alerts data
+                manager
+                    .get_connection()
+                    .execute(sea_orm::Statement::from_string(
+                        backend,
+                        "INSERT INTO alert_incident_alerts SELECT * FROM temp_alert_incident_alerts".to_string(),
+                    ))
+                    .await?;
+
+                // Step 8: Recreate indexes for alert_incident_alerts
+                manager
+                    .create_index(
+                        Index::create()
+                            .if_not_exists()
+                            .name("alert_incident_alerts_alert_idx")
+                            .table(Alias::new("alert_incident_alerts"))
+                            .col(Alias::new("alert_id"))
+                            .to_owned(),
+                    )
+                    .await?;
+
+                manager
+                    .create_index(
+                        Index::create()
+                            .if_not_exists()
+                            .name("alert_incident_alerts_fired_idx")
+                            .table(Alias::new("alert_incident_alerts"))
+                            .col(Alias::new("alert_fired_at"))
+                            .to_owned(),
+                    )
+                    .await?;
+
+                // Step 9: Clean up temporary table and old incidents table
+                manager
+                    .get_connection()
+                    .execute(sea_orm::Statement::from_string(
+                        backend,
+                        "DROP TABLE temp_alert_incident_alerts".to_string(),
+                    ))
+                    .await?;
+
                 manager
                     .drop_table(
                         Table::drop()
@@ -188,6 +268,60 @@ fn create_alert_incidents_table() -> TableCreateStatement {
                 .big_integer()
                 .not_null()
                 .default(0),
+        )
+        .to_owned()
+}
+
+fn recreate_alert_incident_alerts_table() -> TableCreateStatement {
+    use sea_orm_migration::prelude::*;
+
+    Table::create()
+        .table(Alias::new("alert_incident_alerts"))
+        .if_not_exists()
+        .col(
+            ColumnDef::new(Alias::new("incident_id"))
+                .char_len(27)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(Alias::new("alert_id"))
+                .string_len(256)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(Alias::new("alert_fired_at"))
+                .big_integer()
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(Alias::new("alert_name"))
+                .string_len(256)
+                .not_null(),
+        )
+        .col(
+            ColumnDef::new(Alias::new("correlation_reason"))
+                .string_len(50)
+                .null(),
+        )
+        .col(
+            ColumnDef::new(Alias::new("created_at"))
+                .big_integer()
+                .not_null(),
+        )
+        .primary_key(
+            Index::create()
+                .col(Alias::new("incident_id"))
+                .col(Alias::new("alert_id"))
+                .col(Alias::new("alert_fired_at")),
+        )
+        .foreign_key(
+            ForeignKey::create()
+                .from(
+                    Alias::new("alert_incident_alerts"),
+                    Alias::new("incident_id"),
+                )
+                .to(AlertIncidents::Table, AlertIncidents::Id)
+                .on_delete(ForeignKeyAction::Cascade),
         )
         .to_owned()
 }

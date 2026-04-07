@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -424,10 +424,13 @@ const setupSession = async () => {
 };
 
 const updatePlayerState = () => {
+  if (!player?.value) return;
   const playerMeta = player.value?.getMetaData();
-  playerState.value.startTime = playerMeta.startTime;
-  playerState.value.endTime = playerMeta.endTime;
-  playerState.value.totalTime = playerMeta.totalTime;
+
+  if (!playerMeta) return;
+  playerState.value.startTime = playerMeta?.startTime;
+  playerState.value.endTime = playerMeta?.endTime;
+  playerState.value.totalTime = playerMeta?.totalTime;
   playerState.value.duration = formatTimeDifference(
     playerState.value.totalTime,
   );
@@ -543,9 +546,16 @@ const goto = (timeOffset: number, play: boolean = false) => {
 
 const skipTo = (skipTo: string) => {
   const seconds = 10;
-  if (skipTo === "forward")
-    goto(playerState.value.actualTime + seconds * 1000, false);
-  else goto(playerState.value.actualTime - seconds * 1000, false);
+  if (skipTo === "forward") {
+    const newTime = Math.min(
+      playerState.value.actualTime + seconds * 1000,
+      playerState.value.totalTime,
+    );
+    goto(newTime, false);
+  } else {
+    const newTime = Math.max(playerState.value.actualTime - seconds * 1000, 0);
+    goto(newTime, false);
+  }
 };
 
 const initializeWorker = () => {

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -131,14 +131,6 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       // emit window resize event to trigger the layout
-      if (apiDashboardChartsRef.value) {
-        apiDashboardChartsRef.value.layoutUpdate();
-
-        // Dashboards gets overlapped as we have used keep alive
-        // Its an internal bug of vue-grid-layout
-        // So adding settimeout of 1 sec to fix the issue
-        apiDashboardChartsRef.value.layoutUpdate();
-      }
       window.dispatchEvent(new Event("resize"));
     };
 

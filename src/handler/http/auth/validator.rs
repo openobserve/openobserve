@@ -324,9 +324,9 @@ pub async fn validate_credentials(
     let user = user.unwrap();
 
     // Check token authentication first (before native login restrictions)
-    // This allows service accounts and all users to use API tokens regardless of native login
-    // settings
-    if user.role.eq(&UserRole::ServiceAccount) && user.token.eq(&user_password) {
+    // This allows service accounts (including SRE agents) and all users to use API tokens
+    // regardless of native login settings
+    if user.role.is_service_account() && user.token.eq(&user_password) {
         // Check if service accounts are enabled
         let config = get_config();
         if !config.auth.service_account_enabled {
@@ -804,10 +804,13 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
 
 /// Validates RUM requests
 pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResult, AuthError> {
+    // By the time this middleware runs, axum's nested router has already stripped
+    // both the base_uri prefix (outer nest) and the "/rum" prefix (inner nest),
+    // so the path is always "/v1/{org_id}/{endpoint}" regardless of base_uri.
     let path = req_data
         .uri
         .path()
-        .strip_prefix(format!("{}/v1/", get_config().common.base_uri).as_str())
+        .strip_prefix("/v1/")
         .unwrap_or(req_data.uri.path());
 
     // After this previous path clean we should get only the

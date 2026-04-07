@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,6 +19,13 @@ use std::{fmt, str::FromStr};
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 use utoipa::ToSchema;
+
+/// Email prefix/suffix for system-managed SRE agent service accounts.
+/// These are used both at runtime (organization.rs) and in DB migrations —
+/// kept here as the single source of truth for runtime code.
+/// NOTE: Migration files inline these literals directly (frozen snapshot pattern).
+pub const SRE_AGENT_EMAIL_PREFIX: &str = "o2-sre-agent.org-";
+pub const SRE_AGENT_EMAIL_SUFFIX: &str = "@openobserve.internal";
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct DBUser {
@@ -59,6 +66,8 @@ pub enum UserRole {
     // No access only login user
     User = 4,
     ServiceAccount = 5,
+    // System-managed SRE agent service account — read-only access to telemetry/alerts/incidents
+    SreAgent = 6,
 }
 
 impl From<UserRole> for i16 {
@@ -70,6 +79,7 @@ impl From<UserRole> for i16 {
             UserRole::Viewer => 3,
             UserRole::User => 4,
             UserRole::ServiceAccount => 5,
+            UserRole::SreAgent => 6,
         }
     }
 }
@@ -83,6 +93,7 @@ impl From<i16> for UserRole {
             3 => UserRole::Viewer,
             4 => UserRole::User,
             5 => UserRole::ServiceAccount,
+            6 => UserRole::SreAgent,
             _ => UserRole::Admin,
         }
     }
@@ -105,11 +116,17 @@ impl fmt::Display for UserRole {
             UserRole::Editor => write!(f, "editor"),
             UserRole::User => write!(f, "user"),
             UserRole::ServiceAccount => write!(f, "service_account"),
+            UserRole::SreAgent => write!(f, "sre_agent"),
         }
     }
 }
 
 impl UserRole {
+    /// Returns true for any role that represents a service account (human or system).
+    pub fn is_service_account(&self) -> bool {
+        matches!(self, UserRole::ServiceAccount | UserRole::SreAgent)
+    }
+
     pub fn get_label(&self) -> String {
         match self {
             UserRole::Admin => "Admin".to_string(),
@@ -118,6 +135,7 @@ impl UserRole {
             UserRole::Editor => "Editor".to_string(),
             UserRole::User => "User".to_string(),
             UserRole::ServiceAccount => "Service Account".to_string(),
+            UserRole::SreAgent => "SRE Agent".to_string(),
         }
     }
 
@@ -126,7 +144,7 @@ impl UserRole {
     pub fn is_valid_role(role: &str) -> bool {
         matches!(
             role,
-            "admin" | "root" | "viewer" | "editor" | "user" | "service_account"
+            "admin" | "root" | "viewer" | "editor" | "user" | "service_account" | "sre_agent"
         )
     }
 }
@@ -143,6 +161,7 @@ impl FromStr for UserRole {
             "editor" => Ok(UserRole::Editor),
             "user" => Ok(UserRole::User),
             "service_account" => Ok(UserRole::ServiceAccount),
+            "sre_agent" => Ok(UserRole::SreAgent),
             _ => Ok(UserRole::Admin),
         }
     }
