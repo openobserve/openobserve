@@ -352,6 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :index="calculateActualIndex(virtualRow.index - 1)"
                 :highlight-query="highlightQuery"
                 :hide-view-related="hideViewRelatedButton"
+                :hide-field-options="hideExpandFieldOptions"
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
@@ -397,7 +398,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : wrap
                         ? width - 260 - 12 + 'px'
                         : 'auto',
-                  height: wrap ? 'stretch' : rowHeight != null ? rowHeight + 'px' : undefined,
+                  height: wrap
+                    ? 'stretch'
+                    : rowHeight != null
+                      ? rowHeight + 'px'
+                      : undefined,
                 }"
                 @mouseover="handleCellMouseOver(cell)"
                 @mouseleave="handleCellMouseLeave()"
@@ -597,6 +602,10 @@ const props = defineProps({
     default: () => [],
   },
   hideViewRelatedButton: {
+    type: Boolean,
+    default: false,
+  },
+  hideExpandFieldOptions: {
     type: Boolean,
     default: false,
   },
