@@ -275,9 +275,9 @@ export const convertTableData = (
         let obj: any = {};
         const isNumber = isSampleValuesNumbers(tableRows, it, 20);
 
-        obj["name"] = it;
-        obj["field"] = it;
-        obj["label"] = it;
+        obj["name"] = String(it);
+        obj["field"] = String(it);
+        obj["label"] = String(it);
         obj["align"] = !isNumber ? "left" : "right";
         obj["sortable"] = true;
         // pass color mode info for renderer
