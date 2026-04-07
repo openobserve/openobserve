@@ -2874,7 +2874,7 @@ export default defineComponent({
           return t("alerts.incidents.correlatedByServiceDiscovery");
         case "secondary":
           return t("alerts.incidents.correlatedBySemanticGroups");
-        case "alertid":
+        case "alert_id":
           return t("alerts.incidents.correlatedByAlertId");
         default:
           return keyType || "Unknown";
