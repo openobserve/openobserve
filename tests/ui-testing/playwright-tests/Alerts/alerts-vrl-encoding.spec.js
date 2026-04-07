@@ -478,8 +478,8 @@ test.describe("Multi-Window Alert VRL Processing @bug-10872", {
     await page.waitForTimeout(1000);
 
     // Check if multi-window/compare options are available
-    const compareWithPastToggle = page.locator('[data-test*="compare"], [class*="compare"], label:has-text("Compare")');
-    const multiWindowOption = page.locator('[data-test*="multi-window"], [data-test*="multiwindow"]');
+    const compareWithPastToggle = pm.alertsPage.getCompareWithPastToggle();
+    const multiWindowOption = pm.alertsPage.getMultiWindowOption();
 
     // Try to find and enable multi-window mode
     if (await compareWithPastToggle.first().isVisible({ timeout: 5000 }).catch(() => false)) {
@@ -491,15 +491,15 @@ test.describe("Multi-Window Alert VRL Processing @bug-10872", {
     }
 
     // Navigate to the SQL/condition step where VRL can be applied
-    const conditionTab = page.locator('[data-test*="condition"], [role="tab"]:has-text("Condition")');
+    const conditionTab = pm.alertsPage.getConditionTab();
     if (await conditionTab.first().isVisible({ timeout: 3000 }).catch(() => false)) {
       await conditionTab.first().click();
       await page.waitForTimeout(500);
     }
 
     // Look for VRL editor or apply VRL button
-    const vrlEditor = page.locator('[data-test*="vrl"], .vrl-editor, [class*="vrl"]');
-    const applyVrlButton = page.locator('button:has-text("Apply VRL"), [data-test*="apply-vrl"]');
+    const vrlEditor = pm.alertsPage.getVrlEditorElement();
+    const applyVrlButton = pm.alertsPage.getApplyVrlButton();
 
     if (await vrlEditor.first().isVisible({ timeout: 5000 }).catch(() => false)) {
       testLogger.info('✓ VRL editor found');
@@ -523,7 +523,7 @@ test.describe("Multi-Window Alert VRL Processing @bug-10872", {
           testLogger.info('✓ Apply VRL button clicked');
 
           // Check for error messages - the bug would cause an error here
-          const errorMessage = page.locator('[class*="error"], .q-banner--negative, [data-test*="error"]');
+          const errorMessage = pm.alertsPage.getErrorMessageBanner();
           const hasError = await errorMessage.isVisible({ timeout: 2000 }).catch(() => false);
 
           if (hasError) {

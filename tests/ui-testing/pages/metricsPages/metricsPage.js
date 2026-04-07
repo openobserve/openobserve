@@ -1811,4 +1811,56 @@ export class MetricsPage {
         return this.page.locator(`text=/${optionText}/i`).first();
     }
 
+    // ============================================
+    // DARK MODE TEST METHODS
+    // ============================================
+
+    /**
+     * Get theme toggle button
+     * @returns {Locator}
+     */
+    getThemeToggleButton() {
+        return this.page.locator('[data-test*="theme"], [class*="theme-toggle"], button:has-text("dark"), .q-toggle:has-text("dark")');
+    }
+
+    /**
+     * Get dark mode button
+     * @returns {Locator}
+     */
+    getDarkModeButton() {
+        return this.page.locator('[data-test*="dark-mode"], [aria-label*="dark"]');
+    }
+
+    /**
+     * Get settings button
+     * @returns {Locator}
+     */
+    getSettingsButton() {
+        return this.page.locator('[data-test*="settings"], [data-test*="profile"]');
+    }
+
+    /**
+     * Get dark mode option in menu
+     * @returns {Locator}
+     */
+    getDarkModeOption() {
+        return this.page.locator('text=Dark, text=dark mode, [data-test*="dark"]');
+    }
+
+    /**
+     * Get body element
+     * @returns {Locator}
+     */
+    getBodyElement() {
+        return this.page.locator('body');
+    }
+
+    /**
+     * Get "No results" text element
+     * @returns {Locator}
+     */
+    getNoResultsText() {
+        return this.page.locator('text=No results, text=no data, text=No results found');
+    }
+
 }

@@ -1920,6 +1920,66 @@ export class TracesPage {
     await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
+  // ============================================
+  // TRACES SEARCH TEST METHODS (Bug fixes)
+  // ============================================
+
+  /**
+   * Get run query button
+   * @returns {Locator}
+   */
+  getRunQueryButton() {
+    return this.page.locator('[data-test="trace-search-run-query-btn"], button:has-text("Run query")');
+  }
+
+  /**
+   * Get column headers from trace results table
+   * @returns {Locator}
+   */
+  getTraceResultColumnHeaders() {
+    return this.page.locator('[data-test*="trace-result"] th, .traces-table th, [class*="trace"] thead th');
+  }
+
+  /**
+   * Get duration column header
+   * @returns {Locator}
+   */
+  getDurationHeader() {
+    return this.page.locator('th:has-text("Duration"), th:has-text("duration")');
+  }
+
+  /**
+   * Get timestamp column header
+   * @returns {Locator}
+   */
+  getTimestampHeader() {
+    return this.page.locator('th:has-text("Timestamp"), th:has-text("timestamp"), th:has-text("Time")');
+  }
+
+  /**
+   * Get sort indicator element
+   * @returns {Locator}
+   */
+  getSortIndicator() {
+    return this.page.locator('[class*="sort"], [data-test*="sort"], .q-icon:has-text("arrow")');
+  }
+
+  /**
+   * Get stream selector dropdown
+   * @returns {Locator}
+   */
+  getStreamSelector() {
+    return this.page.locator('[data-test="log-search-index-list-select-stream"]');
+  }
+
+  /**
+   * Get selected/active stream toggle
+   * @returns {Locator}
+   */
+  getSelectedStreamToggle() {
+    return this.page.locator('[data-test*="stream-toggle-"][class*="truthy"]');
+  }
+
 }
 
 

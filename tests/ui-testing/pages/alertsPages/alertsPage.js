@@ -2660,4 +2660,52 @@ export class AlertsPage {
     getAggregationThresholdLabel() {
         return this.page.getByText('Alert If Any Groups');
     }
+
+    /**
+     * Get "Compare with Past" toggle (VRL encoding test)
+     * @returns {Locator}
+     */
+    getCompareWithPastToggle() {
+        return this.page.locator('[data-test*="compare"], [class*="compare"], label:has-text("Compare")');
+    }
+
+    /**
+     * Get multi-window option (VRL encoding test)
+     * @returns {Locator}
+     */
+    getMultiWindowOption() {
+        return this.page.locator('[data-test*="multi-window"], [data-test*="multiwindow"]');
+    }
+
+    /**
+     * Get condition tab (VRL encoding test)
+     * @returns {Locator}
+     */
+    getConditionTab() {
+        return this.page.locator('[data-test*="condition"], [role="tab"]:has-text("Condition")');
+    }
+
+    /**
+     * Get VRL editor (VRL encoding test)
+     * @returns {Locator}
+     */
+    getVrlEditorElement() {
+        return this.page.locator('[data-test*="vrl"], .vrl-editor, [class*="vrl"]');
+    }
+
+    /**
+     * Get "Apply VRL" button (VRL encoding test)
+     * @returns {Locator}
+     */
+    getApplyVrlButton() {
+        return this.page.locator('button:has-text("Apply VRL"), [data-test*="apply-vrl"]');
+    }
+
+    /**
+     * Get error message banner (VRL encoding test)
+     * @returns {Locator}
+     */
+    getErrorMessageBanner() {
+        return this.page.locator('[class*="error"], .q-banner--negative, [data-test*="error"]');
+    }
 }

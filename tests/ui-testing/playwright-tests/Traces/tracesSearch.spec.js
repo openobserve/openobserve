@@ -293,7 +293,7 @@ test.describe("Traces Search testcases", () => {
     await page.waitForTimeout(1000);
 
     // Try to run a simple search without time range setup (to avoid date picker issues)
-    const runBtn = page.locator('[data-test="trace-search-run-query-btn"], button:has-text("Run query")').first();
+    const runBtn = pm.tracesPage.getRunQueryButton().first();
     if (await runBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await runBtn.click();
       await page.waitForTimeout(2000);
@@ -308,14 +308,14 @@ test.describe("Traces Search testcases", () => {
     }
 
     // Find column headers in the trace results table
-    const columnHeaders = page.locator('[data-test*="trace-result"] th, .traces-table th, [class*="trace"] thead th');
+    const columnHeaders = pm.tracesPage.getTraceResultColumnHeaders();
     const headerCount = await columnHeaders.count();
     testLogger.info(`Found ${headerCount} column headers`);
 
     if (headerCount > 0) {
       // Try clicking the first sortable column (usually duration or timestamp)
-      const durationHeader = page.locator('th:has-text("Duration"), th:has-text("duration")').first();
-      const timestampHeader = page.locator('th:has-text("Timestamp"), th:has-text("timestamp"), th:has-text("Time")').first();
+      const durationHeader = pm.tracesPage.getDurationHeader().first();
+      const timestampHeader = pm.tracesPage.getTimestampHeader().first();
 
       if (await durationHeader.isVisible({ timeout: 3000 }).catch(() => false)) {
         await durationHeader.click();
@@ -323,7 +323,7 @@ test.describe("Traces Search testcases", () => {
         testLogger.info('✓ Clicked Duration column header');
 
         // Check for sort indicator
-        const sortIndicator = page.locator('[class*="sort"], [data-test*="sort"], .q-icon:has-text("arrow")');
+        const sortIndicator = pm.tracesPage.getSortIndicator();
         const hasSortIndicator = await sortIndicator.count() > 0;
         testLogger.info(`Sort indicator visible: ${hasSortIndicator}`);
 
@@ -492,11 +492,11 @@ test.describe("Traces Search testcases", () => {
 
     // Step 5: Verify the stream is still selected (BUG CHECK)
     // The bug is that the stream selection is lost after navigation
-    const streamSelector = page.locator('[data-test="log-search-index-list-select-stream"]');
+    const streamSelector = pm.tracesPage.getStreamSelector();
     await expect(streamSelector).toBeVisible({ timeout: 5000 });
 
     // Check if any stream is selected by looking for selected toggle
-    const selectedToggle = page.locator('[data-test*="stream-toggle-"][class*="truthy"]');
+    const selectedToggle = pm.tracesPage.getSelectedStreamToggle();
     const isAnyStreamSelected = await selectedToggle.count() > 0;
 
     // Also check the URL for stream parameter

@@ -560,8 +560,8 @@ test.describe("Metrics testcases", () => {
     testLogger.info('Testing "No results found" visibility in dark mode (Bug #11061)');
 
     // Enable dark mode if not already enabled
-    const themeToggle = page.locator('[data-test*="theme"], [class*="theme-toggle"], button:has-text("dark"), .q-toggle:has-text("dark")');
-    const darkModeButton = page.locator('[data-test*="dark-mode"], [aria-label*="dark"]');
+    const themeToggle = pm.metricsPage.getThemeToggleButton();
+    const darkModeButton = pm.metricsPage.getDarkModeButton();
 
     // Try to find and click dark mode toggle
     if (await darkModeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -574,12 +574,12 @@ test.describe("Metrics testcases", () => {
       testLogger.info('✓ Clicked theme toggle');
     } else {
       // Try via settings or profile menu
-      const settingsBtn = page.locator('[data-test*="settings"], [data-test*="profile"]').first();
+      const settingsBtn = pm.metricsPage.getSettingsButton().first();
       if (await settingsBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
         await settingsBtn.click();
         await page.waitForTimeout(500);
 
-        const darkModeOption = page.locator('text=Dark, text=dark mode, [data-test*="dark"]').first();
+        const darkModeOption = pm.metricsPage.getDarkModeOption().first();
         if (await darkModeOption.isVisible({ timeout: 2000 }).catch(() => false)) {
           await darkModeOption.click();
           testLogger.info('✓ Enabled dark mode via settings');
@@ -588,7 +588,7 @@ test.describe("Metrics testcases", () => {
     }
 
     // Check if page is in dark mode by looking for dark class or dark theme styles
-    const bodyClass = await page.locator('body').getAttribute('class') || '';
+    const bodyClass = await pm.metricsPage.getBodyElement().getAttribute('class') || '';
     const isDarkMode = bodyClass.includes('dark') || bodyClass.includes('body--dark');
     testLogger.info(`Dark mode active: ${isDarkMode}`);
 
@@ -619,7 +619,7 @@ test.describe("Metrics testcases", () => {
     await pm.metricsPage.waitForMetricsResults();
 
     // Check for "No results found" or similar message
-    const noResultsText = page.locator('text=No results, text=no data, text=No results found').first();
+    const noResultsText = pm.metricsPage.getNoResultsText().first();
 
     if (await noResultsText.isVisible({ timeout: 5000 }).catch(() => false)) {
       // Verify text is readable by checking color contrast
