@@ -280,6 +280,9 @@ jobs:
                 "enrichment-regression.spec.js",
                 "ui-regression.spec.js",
                 "pipeline-regression.spec.js",
+                "alerts-regression.spec.js",
+                "metrics-regression.spec.js",
+                "traces-regression.spec.js",
               ]
           - testfolder: "Metrics"
             browser: "chrome"
