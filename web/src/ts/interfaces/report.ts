@@ -32,14 +32,5 @@ export interface ScheduledDashboardReport {
   orgId: string | number;
   isCached: boolean;
   /** When true and report_type is PDF, a PNG screenshot is embedded inline in the email. */
-  image_preview: boolean;
-}
-
-export interface ReportDashboardConfig {
-  /** Type of the generated report attachment. */
-  report_type: ReportMediaType;
-  /** Whether the attachment is sent as a downloadable file or embedded inline in the email. */
-  email_attachment_type: ReportEmailAttachmentType;
-  /** Optional browser viewport override. When absent the report server uses its defaults. */
-  attachment_dimensions?: ReportAttachmentDimensions;
+  imagePreview: boolean;
 }
