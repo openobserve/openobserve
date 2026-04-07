@@ -1121,7 +1121,8 @@ export class LogsPage {
     async clickQuickModeToggle() {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
+        // Click the q-item directly - it has @click="handleQuickMode" handler
+        await this.page.locator(this.quickModeToggle).click();
     }
 
     // Histogram methods
