@@ -302,7 +302,12 @@ describe('OtelConfig.vue', () => {
         organization: my-org
         stream-name: default
       tls:
-        insecure: true`
+        insecure: true
+
+service:
+  telemetry:
+    logs:
+      level: warn`
       
       expect(vm.getOtelGrpcConfig).toBe(expectedConfig)
     })
@@ -346,6 +351,15 @@ describe('OtelConfig.vue', () => {
       
       expect(vm.getOtelGrpcConfig).toContain('stream-name: default')
     })
+
+    it('should include service telemetry logs level warn in gRPC config', () => {
+      wrapper = createWrapper()
+      const vm = wrapper.vm
+      
+      expect(vm.getOtelGrpcConfig).toContain('service:')
+      expect(vm.getOtelGrpcConfig).toContain('telemetry:')
+      expect(vm.getOtelGrpcConfig).toContain('level: warn')
+    })
   })
 
   describe('OTLP HTTP Configuration', () => {
@@ -359,7 +373,12 @@ describe('OtelConfig.vue', () => {
     endpoint: ${mockEndpoint.url}/api/my-org
     headers:
       Authorization: Basic [BASIC_PASSCODE]
-      stream-name: default`
+      stream-name: default
+
+service:
+  telemetry:
+    logs:
+      level: warn`
       
       expect(vm.getOtelHttpConfig).toBe(expectedConfig)
     })
@@ -396,6 +415,15 @@ describe('OtelConfig.vue', () => {
       const vm = wrapper.vm
       
       expect(vm.getOtelHttpConfig).toContain('stream-name: default')
+    })
+
+    it('should include service telemetry logs level warn in HTTP config', () => {
+      wrapper = createWrapper()
+      const vm = wrapper.vm
+      
+      expect(vm.getOtelHttpConfig).toContain('service:')
+      expect(vm.getOtelHttpConfig).toContain('telemetry:')
+      expect(vm.getOtelHttpConfig).toContain('level: warn')
     })
   })
 
