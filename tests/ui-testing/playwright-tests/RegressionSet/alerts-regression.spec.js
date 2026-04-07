@@ -522,6 +522,10 @@ test.describe("Alerts Regression Bugs", () => {
     const firingCountElements = pm.alertsPage.getFiringCountElements();
     const countExists = await firingCountElements.count() > 0;
 
+    // STRONG ASSERTION: Firing count column must exist (Bug #10472 was that column was not visible)
+    expect(countExists, 'Bug #10472: Firing count column should be visible in alerts list').toBe(true);
+    testLogger.info('✓ Firing count column is visible');
+
     if (countExists) {
       const firstCountElement = firingCountElements.first();
       const countText = await firstCountElement.textContent();
@@ -532,9 +536,6 @@ test.describe("Alerts Regression Bugs", () => {
       if (countMatch) {
         const count = parseInt(countMatch[0]);
         testLogger.info(`✓ Firing count value: ${count}`);
-
-        // STRONG ASSERTION: Verify the count is a valid non-negative number
-        expect(count, 'Firing count should be a valid non-negative number').toBeGreaterThanOrEqual(0);
         testLogger.info('NOTE: Firing count column exists and displays a valid number');
       }
     } else {
@@ -650,55 +651,13 @@ async function ingestMetricsData(page) {
  */
 async function createAlertDestination(page, pm) {
   const destinationName = 'e2e_promql_dest';
+  const url = 'http://localhost:8080/webhook';
+  const templateName = 'e2e_promql_template';
 
   try {
-    // Navigate to Settings > Destinations using homePage
-    await pm.homePage.navigateToAlertDestinations();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    // Check if destination already exists
-    const existingDest = page.locator(`text=${destinationName}`);
-    if (await existingDest.isVisible({ timeout: 3000 }).catch(() => false)) {
-      testLogger.info('Destination already exists', { destinationName });
-      return;
-    }
-
-    // Click add destination
-    await page.locator('[data-test="alert-destination-list-add-alert-btn"]').click();
-    await page.waitForTimeout(1000);
-
-    // Fill destination details
-    await page.locator('[data-test="add-destination-name-input"]').fill(destinationName);
-
-    // Select HTTP destination type
-    await page.locator('[data-test="add-destination-type-select"]').click();
-    await page.getByRole('option', { name: 'Http' }).click();
-
-    // Fill URL
-    await page.locator('[data-test="add-destination-url-input"]').fill('http://localhost:8080/webhook');
-
-    // Select POST method
-    await page.locator('[data-test="add-destination-method-select"]').click();
-    await page.getByRole('option', { name: 'post' }).click();
-
-    // Select template
-    await page.locator('[data-test="add-destination-template-select"]').click();
-    await page.waitForTimeout(500);
-
-    // Try to select e2e_promql_template or first available
-    const templateOption = page.getByRole('option', { name: 'e2e_promql_template' });
-    if (await templateOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await templateOption.click();
-    } else {
-      // Select first available template or create one
-      await page.locator('.q-menu:visible .q-item').first().click();
-    }
-
-    // Save destination
-    await page.locator('[data-test="add-destination-submit-btn"]').click();
-    await page.waitForTimeout(2000);
-
-    testLogger.info('Destination created', { destinationName });
+    // Use POM method to ensure destination exists (handles navigation and existence check)
+    await pm.alertDestinationsPage.ensureDestinationExists(destinationName, url, templateName);
+    testLogger.info('Destination ensured to exist', { destinationName });
   } catch (e) {
     testLogger.warn('Could not create destination', { error: e.message });
   }
@@ -711,30 +670,9 @@ async function createAlertTemplate(page, pm) {
   const templateName = 'e2e_promql_template';
 
   try {
-    // Navigate to Settings > Templates using homePage
-    await pm.homePage.navigateToTemplates();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    // Check if template already exists
-    const existingTemplate = page.locator(`text=${templateName}`);
-    if (await existingTemplate.isVisible({ timeout: 3000 }).catch(() => false)) {
-      testLogger.info('Template already exists', { templateName });
-      return;
-    }
-
-    // Click add template (correct selector: template-list-add-btn)
-    await page.locator('[data-test="template-list-add-btn"]').click();
-    await page.waitForTimeout(1000);
-
-    // Fill template details
-    await page.locator('[data-test="add-template-name-input"]').fill(templateName);
-    await page.locator('[data-test="add-template-body-input"]').fill('{"alert": "{alert_name}", "message": "{alert_type}"}');
-
-    // Save template
-    await page.locator('[data-test="add-template-submit-btn"]').click();
-    await page.waitForTimeout(2000);
-
-    testLogger.info('Template created', { templateName });
+    // Use POM method to ensure template exists (handles navigation and existence check)
+    await pm.alertTemplatesPage.ensureTemplateExists(templateName);
+    testLogger.info('Template ensured to exist', { templateName });
   } catch (e) {
     testLogger.warn('Could not create template', { error: e.message });
   }
@@ -747,17 +685,9 @@ async function cleanupAlertDestination(page, pm) {
   const destinationName = 'e2e_promql_dest';
 
   try {
-    // Navigate to Settings > Destinations using homePage
-    await pm.homePage.navigateToAlertDestinations();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    const deleteBtn = page.locator(`[data-test="alert-destination-list-${destinationName}-delete-destination"]`);
-    if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await deleteBtn.click();
-      await page.locator('button:has-text("Delete")').click();
-      await page.waitForTimeout(1000);
-      testLogger.info('Destination deleted', { destinationName });
-    }
+    // Use POM method to delete destination
+    await pm.alertDestinationsPage.deleteDestinationByName(destinationName);
+    testLogger.info('Destination deleted', { destinationName });
   } catch (e) {
     testLogger.warn('Could not delete destination', { error: e.message });
   }
@@ -770,17 +700,9 @@ async function cleanupAlertTemplate(page, pm) {
   const templateName = 'e2e_promql_template';
 
   try {
-    // Navigate to Settings > Templates using homePage
-    await pm.homePage.navigateToTemplates();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    const deleteBtn = page.locator(`[data-test="alert-template-list-${templateName}-delete-template"]`);
-    if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await deleteBtn.click();
-      await page.locator('button:has-text("Delete")').click();
-      await page.waitForTimeout(1000);
-      testLogger.info('Template deleted', { templateName });
-    }
+    // Use POM method to delete template
+    await pm.alertTemplatesPage.deleteTemplateAndVerify(templateName);
+    testLogger.info('Template deleted', { templateName });
   } catch (e) {
     testLogger.warn('Could not delete template', { error: e.message });
   }
