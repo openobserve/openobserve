@@ -139,7 +139,7 @@ test.describe("Multi-SQL Query Support", () => {
   );
 
   test(
-    "add button is hidden for heatmap (single-query restriction)",
+    "add button is visible for heatmap (multi-query supported)",
     { tag: ["@multiSQL", "@P0", "@smoke"] },
     async ({ page }) => {
       const pm = new PageManager(page);
@@ -148,7 +148,9 @@ test.describe("Multi-SQL Query Support", () => {
 
       await buildPanel(page, pm, dashboardName, { chartType: "bar" });
       await pm.chartTypeSelector.selectChartType("heatmap");
-      await expect(msql.addQueryBtn).not.toBeVisible();
+
+      // Heatmap now supports multiple queries — add button must be visible
+      await expect(msql.addQueryBtn).toBeVisible();
 
       await pm.chartTypeSelector.selectChartType("bar");
       await msql.applyAndSave(pm);
@@ -313,7 +315,7 @@ test.describe("Multi-SQL Query Support", () => {
   // ==========================================================================
 
   test(
-    "warning banner shows for restricted chart types and clears when switching back",
+    "warning banner does NOT show for heatmap with multiple queries (heatmap supports multi-query)",
     { tag: ["@multiSQL", "@P1"] },
     async ({ page }) => {
       const pm = new PageManager(page);
@@ -325,9 +327,11 @@ test.describe("Multi-SQL Query Support", () => {
 
       await expect(msql.warningBanner).not.toBeVisible();
 
+      // Heatmap no longer restricts multiple queries — no warning banner expected
       await pm.chartTypeSelector.selectChartType("heatmap");
-      await expect(msql.warningBanner).toBeVisible();
-      await expect(msql.warningBanner).toContainText("Heatmap");
+      await expect(msql.warningBanner).not.toBeVisible();
+
+      // Both query tabs still present
       await expect(msql.queryTab(0)).toBeVisible();
       await expect(msql.queryTab(1)).toBeVisible();
 
@@ -649,6 +653,52 @@ test.describe("Multi-SQL Query Support", () => {
       await msql.closeQueryInspector();
 
       await msql.applyAndSave(pm);
+      await cleanupTestDashboard(page, pm, dashboardName);
+    }
+  );
+
+  // ==========================================================================
+  // 11 — Per-Query Error Visibility
+  // ==========================================================================
+
+  test(
+    "error from an unconfigured query tab is shown regardless of which tab is active",
+    { tag: ["@multiSQL", "@P1"] },
+    async ({ page }) => {
+      const pm = new PageManager(page);
+      const msql = pm.dashboardMultiSQL;
+      const dashboardName = generateDashboardName();
+
+      // Q1: valid bar chart with y-field configured
+      await buildPanel(page, pm, dashboardName, { chartType: "bar" });
+
+      // Add Q2 and intentionally leave it empty (no stream, no fields)
+      await msql.addQueryTab(1);
+
+      // Switch back to Q1 — error from Q2 should surface regardless of active tab
+      await msql.switchToQueryTab(0);
+
+      // Apply while on Q1 — Q2 has an invalid/empty query which triggers a
+      // chart-execution error. The inline error panel must appear even though
+      // we are currently viewing Q1 (not Q2).
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await page.waitForTimeout(3000);
+
+      // DashboardErrors.vue renders two elements with data-test="dashboard-error":
+      //   - the outer conditional wrapper (first)
+      //   - the inner list container (second)
+      // Use .first() to target the outer wrapper for visibility checks.
+      const errorWrapper = page.locator('[data-test="dashboard-error"]').first();
+      await expect(errorWrapper).toBeVisible({ timeout: 10000 });
+
+      // Switch to Q2 — error panel must persist (not cleared by tab switch alone)
+      await msql.switchToQueryTab(1);
+      await expect(errorWrapper).toBeVisible();
+
+      // Switch back to Q1 — error still visible
+      await msql.switchToQueryTab(0);
+      await expect(errorWrapper).toBeVisible();
+
       await cleanupTestDashboard(page, pm, dashboardName);
     }
   );
