@@ -19,11 +19,11 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 pub async fn run() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
-        // Service graph processor writes data via ingestion pipeline
-        // and must run on ingester nodes only
-        if !LOCAL_NODE.is_ingester() {
+        // Only alert_manager nodes run the service graph job.
+        // (Ingester/querier/compactor/router nodes exit here.)
+        if !LOCAL_NODE.is_alert_manager() {
             log::info!(
-                "[SERVICE_GRAPH::JOB] Service graph processor disabled on non-ingester node (role: {:?})",
+                "[SERVICE_GRAPH::JOB] Service graph processor disabled on non-alert-manager node (role: {:?})",
                 LOCAL_NODE.role
             );
             return Ok(());
@@ -35,6 +35,29 @@ pub async fn run() -> Result<(), anyhow::Error> {
             "service_graph_processor",
             get_o2_config().service_graph.processing_interval_secs,
             {
+                // Leader election: only the alert_manager with the smallest UUID runs the job.
+                // This prevents duplicate writes when multiple alert_manager nodes are running.
+                let is_leader = match infra::cluster::get_cached_nodes(|node| {
+                    node.status == config::meta::cluster::NodeStatus::Online
+                        && node.is_alert_manager()
+                })
+                .await
+                {
+                    Some(mut nodes) if !nodes.is_empty() => {
+                        nodes.sort_by(|a, b| a.uuid.cmp(&b.uuid));
+                        nodes[0].uuid == LOCAL_NODE.uuid
+                    }
+                    // Cache empty or single-node — fall through and run.
+                    _ => true,
+                };
+
+                if !is_leader {
+                    log::debug!(
+                        "[SERVICE_GRAPH::JOB] Not leader alert_manager, skipping this interval"
+                    );
+                    continue;
+                }
+
                 log::debug!("[SERVICE_GRAPH::JOB] Running service graph processing");
                 if let Err(e) = crate::service::traces::service_graph::process_service_graph().await
                 {
