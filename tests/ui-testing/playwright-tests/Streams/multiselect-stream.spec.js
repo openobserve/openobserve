@@ -144,7 +144,6 @@ async function multistreamselect(page) {
 
     // Verify Common Group Fields are present using POM
     const cell = await pageManager.logsPage.getCellByName(/Common Group Fields/);
-
     const cellText = await cell.textContent();
     expect(cellText).toContain('Common Group Fields');
 
