@@ -515,7 +515,7 @@ describe("TenstackTable", () => {
 
   // ── sort-change emit ──────────────────────────────────────────────────────
   describe("sort-change emit", () => {
-    it("should emit sort-change with asc on first click of an inactive sortable column", async () => {
+    it("should emit sort-change with desc on first click of an inactive sortable column", async () => {
       wrapper = mountTable({
         columns: [
           {
@@ -534,7 +534,7 @@ describe("TenstackTable", () => {
         .find('[data-test="o2-table-th-sort-duration"]')
         .trigger("click");
       expect(wrapper.emitted("sort-change")).toBeTruthy();
-      expect(wrapper.emitted("sort-change")![0]).toEqual(["duration", "asc"]);
+      expect(wrapper.emitted("sort-change")![0]).toEqual(["duration", "desc"]);
     });
 
     it("should toggle from desc to asc when clicking the active sort column", async () => {
@@ -597,7 +597,7 @@ describe("TenstackTable", () => {
       await wrapper
         .find('[data-test="o2-table-th-sort-timestamp"]')
         .trigger("click");
-      expect(wrapper.emitted("sort-change")![0]).toEqual(["start_time", "asc"]);
+      expect(wrapper.emitted("sort-change")![0]).toEqual(["start_time", "desc"]);
     });
 
     it("should not emit sort-change when sortBy prop is not provided", async () => {
