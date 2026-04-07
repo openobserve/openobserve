@@ -37,13 +37,234 @@ struct ServiceDiscoveryResult {
     service_name: String,
 }
 
-/// Extract service name from dimensions
-/// Guarantees a service name is always returned (fallback to "unknown")
-fn extract_service_name_from_dimensions(dimensions: &HashMap<String, String>) -> String {
-    dimensions
-        .get("service")
-        .cloned()
-        .unwrap_or_else(|| "unknown".to_string())
+/// Result from filtered semantic extraction using distinguish_by groups
+struct FilteredSemanticResult {
+    group_values: HashMap<String, String>,
+    key_type: config::meta::alerts::incidents::KeyType,
+    matched_set_id: Option<String>, // Which identity set matched best
+}
+
+/// Combined correlation result from both Service Discovery and semantic extraction
+struct ParallelCorrelationResult {
+    service_discovery: Option<ServiceDiscoveryResult>,
+    semantic_extraction: Option<FilteredSemanticResult>,
+    final_group_values: HashMap<String, String>,
+    final_key_type: config::meta::alerts::incidents::KeyType,
+    correlation_reason: String,
+}
+
+/// Extract semantic dimensions using configured distinguish_by groups only
+/// This replaces the current fallback that uses ALL labels
+#[cfg(feature = "enterprise")]
+async fn extract_filtered_semantic_dimensions(
+    org_id: &str,
+    labels: &HashMap<String, String>,
+) -> Option<FilteredSemanticResult> {
+    use config::meta::alerts::incidents::KeyType;
+
+    // Load ServiceIdentityConfig with auto-configuration applied
+    let identity_config =
+        crate::service::db::system_settings::get_service_identity_config(org_id).await;
+
+    // Validate config has at least one set
+    if identity_config.sets.is_empty() {
+        log::debug!(
+            "[incidents] ServiceIdentityConfig for org {} has no identity sets, semantic extraction skipped",
+            org_id
+        );
+        return None;
+    }
+
+    // Load semantic groups for field mapping
+    let semantic_groups =
+        crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
+
+    // Try each identity set, pick best coverage (same as Service Discovery logic)
+    let best_set = match identity_config.resolve_best_set(labels) {
+        Some(set) => set,
+        None => {
+            log::debug!(
+                "[incidents] No identity set matches labels for org {}, semantic extraction skipped",
+                org_id
+            );
+            return None;
+        }
+    };
+
+    log::debug!(
+        "[incidents] Using identity set '{}' for semantic extraction, distinguish_by: {:?}",
+        best_set.id,
+        best_set.distinguish_by
+    );
+
+    // Extract only dimensions from distinguish_by fields of the best set
+    let mut group_values = HashMap::new();
+    for group_id in &best_set.distinguish_by {
+        if let Some(alias_group) = semantic_groups.iter().find(|g| g.id == *group_id) {
+            // Find first matching field from this semantic group
+            for field_name in &alias_group.fields {
+                if let Some(value) = labels.get(field_name) {
+                    if !value.is_empty() {
+                        group_values.insert(group_id.clone(), value.clone());
+                        log::debug!(
+                            "[incidents] Mapped field '{}' → '{}' = '{}'",
+                            field_name,
+                            group_id,
+                            value
+                        );
+                        break; // Take first match from this group
+                    }
+                }
+            }
+        } else {
+            log::debug!(
+                "[incidents] Semantic group '{}' not found, skipping",
+                group_id
+            );
+        }
+    }
+
+    if group_values.is_empty() {
+        log::debug!(
+            "[incidents] No dimensions extracted from configured distinguish_by groups for org {}",
+            org_id
+        );
+        return None;
+    }
+
+    log::debug!(
+        "[incidents] Filtered semantic extraction for org {} extracted dimensions: {:?}",
+        org_id,
+        group_values
+    );
+
+    Some(FilteredSemanticResult {
+        group_values,
+        key_type: KeyType::Secondary, // Lower priority than Service Discovery
+        matched_set_id: Some(best_set.id.clone()),
+    })
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn extract_filtered_semantic_dimensions(
+    _org_id: &str,
+    _labels: &HashMap<String, String>,
+) -> Option<FilteredSemanticResult> {
+    None
+}
+
+/// Execute Service Discovery and semantic extraction in parallel
+async fn correlate_parallel(
+    org_id: &str,
+    labels: &HashMap<String, String>,
+) -> ParallelCorrelationResult {
+    // Execute both approaches in parallel
+    let (sd_result, semantic_result) = tokio::join!(
+        query_service_discovery_key(org_id, labels),
+        extract_filtered_semantic_dimensions(org_id, labels)
+    );
+
+    log::debug!(
+        "[incidents] Parallel correlation results: service_discovery_success={}, semantic_extraction_success={}",
+        sd_result.is_some(),
+        semantic_result.is_some()
+    );
+
+    // Merge results using priority system
+    let (final_group_values, final_key_type, correlation_reason) =
+        merge_correlation_results(&sd_result, &semantic_result);
+
+    ParallelCorrelationResult {
+        service_discovery: sd_result,
+        semantic_extraction: semantic_result,
+        final_group_values,
+        final_key_type,
+        correlation_reason,
+    }
+}
+
+/// Merge correlation results from Service Discovery and semantic extraction using priority system
+fn merge_correlation_results(
+    sd_result: &Option<ServiceDiscoveryResult>,
+    semantic_result: &Option<FilteredSemanticResult>,
+) -> (
+    HashMap<String, String>,
+    config::meta::alerts::incidents::KeyType,
+    String,
+) {
+    use config::meta::alerts::incidents::KeyType;
+
+    match (sd_result, semantic_result) {
+        // Service Discovery success - highest priority
+        (Some(sd), _) => {
+            log::debug!(
+                "[incidents] Using Service Discovery result: service='{}', dimensions={:?}",
+                sd.service_name,
+                sd.group_values
+            );
+            (
+                sd.group_values.clone(),
+                sd.key_type,
+                "service_discovery".to_string(),
+            )
+        }
+        // Semantic extraction success - medium priority
+        (None, Some(sem)) => {
+            log::debug!(
+                "[incidents] Using filtered semantic extraction result: set='{}', dimensions={:?}",
+                sem.matched_set_id.as_deref().unwrap_or("unknown"),
+                sem.group_values
+            );
+            (
+                sem.group_values.clone(),
+                sem.key_type,
+                format!(
+                    "semantic_extraction:{}",
+                    sem.matched_set_id.as_deref().unwrap_or("unknown")
+                ),
+            )
+        }
+        // Both failed - fallback to AlertId isolation
+        (None, None) => {
+            log::debug!(
+                "[incidents] Both Service Discovery and semantic extraction failed, using AlertId fallback"
+            );
+            (
+                HashMap::new(),
+                KeyType::AlertId,
+                "alert_id_fallback".to_string(),
+            )
+        }
+    }
+}
+
+/// Extract service name from both parallel correlation results
+fn extract_service_name_parallel(
+    labels: &HashMap<String, String>,
+    sd_result: &Option<ServiceDiscoveryResult>,
+) -> String {
+    // Priority 1: Service Discovery result
+    if let Some(sd) = sd_result {
+        return sd.service_name.clone();
+    }
+
+    // Priority 2: Extract from labels using standard service field names
+    for field in ["service", "service_name", "svc", "app"] {
+        if let Some(service) = labels.get(field) {
+            if !service.is_empty() {
+                log::debug!(
+                    "[incidents] Extracted service name from field '{}': '{}'",
+                    field,
+                    service
+                );
+                return service.clone();
+            }
+        }
+    }
+
+    // Priority 3: Default fallback
+    log::debug!("[incidents] No service name found in labels, using 'unknown'");
+    "unknown".to_string()
 }
 
 /// Collect the union of notification destinations from all alerts correlated to an incident.

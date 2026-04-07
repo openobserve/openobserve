@@ -2736,7 +2736,7 @@
       "clickToViewSuggestions": "Click to view correlation improvement suggestions",
       "byService": "By Service",
       "byStream": "By Stream",
-      "searchServiceName": "Search service name...",
+      "searchServiceName": "Search service or stream name...",
       "searchStreamName": "Search stream name...",
       "allServices": "All Services",
       "missingTelemetry": "Missing Telemetry",
@@ -3187,11 +3187,6 @@
     "deduplicateFieldTooltip": "Select which field mappings to use for deduplication fingerprinting",
     "alertDeduplicationMessage": "Alerts with the same values for these fields will be deduplicated (e.g., same fingerprint = same field values)",
     "atLeastOneDeduplicationField": "At least one field mapping is required for deduplication",
-    "scope": "Scope",
-    "scopeTooltip": "Scope dimensions define environmental boundaries (cluster, region, host) and are concatenated to form the scope part of the Service Identity: {scope}/{workload}",
-    "stable": "Stable",
-    "stableTooltip": "Stable dimensions have low cardinality and are used for correlation key computation",
-    "normalize": "Normalize",
     "noSemanticGroupsInCategory": "No semantic groups in category: {category}"
   },
   "search_scheduler_job": {

@@ -28,9 +28,6 @@ const makeGroup = (overrides: Record<string, any> = {}) => ({
   id: "group-1",
   display: "Infrastructure",
   fields: ["host", "service"],
-  normalize: false,
-  is_stable: false,
-  is_scope: false,
   ...overrides,
 });
 
@@ -57,20 +54,6 @@ describe("SemanticGroupItem - rendering", () => {
     expect(w.find('[data-test="semantic-group-display-input"]').exists()).toBe(true);
   });
 
-  it("renders the scope checkbox", async () => {
-    const w = await mountComp();
-    expect(w.find('[data-test="semantic-group-action-scope-chkbox"]').exists()).toBe(true);
-  });
-
-  it("renders the stable checkbox", async () => {
-    const w = await mountComp();
-    expect(w.find('[data-test="semantic-group-action-stable-chkbox"]').exists()).toBe(true);
-  });
-
-  it("renders the normalize checkbox", async () => {
-    const w = await mountComp();
-    expect(w.find('[data-test="semantic-group-action-normalize-chkbox"]').exists()).toBe(true);
-  });
 
   it("renders the delete button", async () => {
     const w = await mountComp();
@@ -93,32 +76,6 @@ describe("SemanticGroupItem - rendering", () => {
   });
 });
 
-describe("SemanticGroupItem - emitUpdate on checkbox changes", () => {
-  it("emits update when scope checkbox changes", async () => {
-    const w = await mountComp();
-    (w.vm as any).localGroup.is_scope = true;
-    (w.vm as any).emitUpdate();
-    expect(w.emitted("update")).toBeTruthy();
-    const payload = (w.emitted("update") as any[][])[0][0];
-    expect(payload.is_scope).toBe(true);
-  });
-
-  it("emits update when stable checkbox changes", async () => {
-    const w = await mountComp();
-    (w.vm as any).localGroup.is_stable = true;
-    (w.vm as any).emitUpdate();
-    const payload = (w.emitted("update") as any[][])[0][0];
-    expect(payload.is_stable).toBe(true);
-  });
-
-  it("emits update when normalize checkbox changes", async () => {
-    const w = await mountComp();
-    (w.vm as any).localGroup.normalize = true;
-    (w.vm as any).emitUpdate();
-    const payload = (w.emitted("update") as any[][])[0][0];
-    expect(payload.normalize).toBe(true);
-  });
-});
 
 describe("SemanticGroupItem - delete", () => {
   it("emits delete when delete button is clicked", async () => {

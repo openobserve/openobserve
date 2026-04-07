@@ -33,12 +33,20 @@ vi.mock("@/services/incidents", () => ({
   },
 }));
 
+// Mock service streams API
+vi.mock("@/services/service_streams", () => ({
+  default: {
+    getSemanticGroups: vi.fn(),
+  },
+}));
+
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
 import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
+import serviceStreamsApi from "@/services/service_streams";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -167,6 +175,11 @@ describe("IncidentDetailDrawer.vue", () => {
     (incidentsService.updateIncident as any).mockResolvedValue({
       data: { severity: "P2" },
     });
+
+    // Mock service streams API
+    (serviceStreamsApi.getSemanticGroups as any).mockResolvedValue({
+      data: [],
+    });
   });
 
   afterEach(() => {
@@ -246,14 +259,27 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should set loading state during fetch", async () => {
+      // Create a pending promise that we can control
+      let resolvePromise: (value: any) => void;
+      const pendingPromise = new Promise((resolve) => {
+        resolvePromise = resolve;
+      });
+
+      (incidentsService.get as any).mockReturnValue(pendingPromise);
+
       wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
 
-      // Loading should be true during fetch
-      // But may complete quickly, so just verify it was called
-      await flushPromises();
+      // Now loading should be true since the promise is pending
+      expect(wrapper.vm.loading).toBe(true);
 
+      // Resolve the promise
+      resolvePromise!({ data: createIncidentWithAlerts({ id: "test-123" }) });
+      await flushPromises();
+      await nextTick(); // Give Vue time to update reactive state
+
+      // Now loading should be false
       expect(incidentsService.get).toHaveBeenCalled();
       expect(wrapper.vm.loading).toBe(false);
     });

@@ -29,9 +29,6 @@ const makeGroup = (overrides: Record<string, any> = {}) => ({
   display: "Test Group",
   group: "Infrastructure",
   fields: ["host", "service"],
-  normalize: false,
-  is_stable: false,
-  is_scope: false,
   ...overrides,
 });
 

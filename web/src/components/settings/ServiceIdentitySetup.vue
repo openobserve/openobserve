@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="tw:text-[10px] tw:font-bold"
                 :class="store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-6'"
               >
-                {{ SET_LABELS[envKey] || envKey }}
+                {{ getIdentitySetLabel(envKey) }}
               </span>
             </div>
 
@@ -1092,7 +1092,7 @@ const suggestionAlreadyApplied = computed(() => {
 
 /** Display label for the active environment tab */
 const activeEnvLabel = computed(() =>
-  ENV_SEGMENTS[activeEnvironment.value]?.label ?? activeEnvironment.value ?? ''
+  getIdentitySetLabel(activeEnvironment.value)
 );
 
 /** Field Details Dialog State */
@@ -1116,13 +1116,16 @@ const nameField = "service";
  */
 const setDistinguishBy = ref<Record<string, string[]>>({});
 
-/** Display labels for well-known identity set IDs */
-const SET_LABELS: Record<string, string> = {
-  k8s: "Kubernetes",
-  aws: "AWS",
-  gcp: "GCP",
-  azure: "Azure",
-};
+/**
+ * Store for identity set labels from API.
+ * Maps set ID to display label, populated from loaded config.
+ */
+const setLabels = ref<Record<string, string>>({});
+
+/** Get display label for identity set ID from API-provided labels */
+function getIdentitySetLabel(id: string): string {
+  return setLabels.value[id] ?? id;
+}
 
 /**
  * Computed getter/setter for the currently active environment's distinguish_by list.
@@ -1168,15 +1171,19 @@ function groupEnvKey(groupId: string): string | null {
   return ENV_SEGMENTS[seg]?.key ?? null;
 }
 
+
+
 /** Coverage % for any given environment key (used for sorting tabs) */
 function getEnvCoverage(envKey: string): number {
-  if (!totalServices.value) return 0;
-  const groups = envKey === "all"
-    ? availableGroups.value
-    : availableGroups.value.filter(g => groupEnvKey(g.group_id) === envKey);
-  const coverages = groups
-    .map(g => {
-      const dim = dimensionAnalytics.value[g.group_id];
+  if (!totalServices.value || !currentIdentityConfig.value?.sets) return 0;
+
+  // Get configured fields for this environment
+  const activeSet = currentIdentityConfig.value.sets.find(set => set.id === envKey);
+  const configuredFieldIds = activeSet?.distinguish_by || [];
+
+  const coverages = configuredFieldIds
+    .map(fieldId => {
+      const dim = dimensionAnalytics.value[fieldId];
       return dim ? Math.round((dim.service_count / totalServices.value) * 100) : null;
     })
     .filter((v): v is number => v !== null);
@@ -1184,26 +1191,40 @@ function getEnvCoverage(envKey: string): number {
   return Math.round(coverages.reduce((a, b) => a + b, 0) / coverages.length);
 }
 
-/** Detected environments from available groups, sorted by decreasing coverage */
+/** Environments from the identity config, sorted alphabetically by label */
 const detectedEnvironments = computed(() => {
-  const seen = new Set<string>();
-  const envs: { key: string; label: string }[] = [];
-  for (const group of availableGroups.value) {
-    const key = groupEnvKey(group.group_id);
-    if (key && !seen.has(key)) {
-      seen.add(key);
-      envs.push(ENV_SEGMENTS[group.group_id.split('-')[0]]);
-    }
-  }
-  if (envs.length === 0) return [{ key: "all", label: "All" }];
-  // Sort by coverage descending so most-used environment appears first
-  return envs.sort((a, b) => getEnvCoverage(b.key) - getEnvCoverage(a.key));
+  const sets = currentIdentityConfig.value?.sets;
+  if (!sets?.length) return [{ key: "all", label: "All" }];
+  return sets
+    .map(set => ({ key: set.id, label: set.label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 });
 
 /** Groups visible in the currently active environment tab */
 const activeEnvGroups = computed(() => {
-  if (!activeEnvironment.value || activeEnvironment.value === "all") return availableGroups.value;
-  return availableGroups.value.filter(g => groupEnvKey(g.group_id) === activeEnvironment.value);
+  const sets = currentIdentityConfig.value?.sets;
+  if (!sets?.length) return [];
+
+  let configuredFieldIds: string[] = [];
+
+  if (!activeEnvironment.value || activeEnvironment.value === "all") {
+    // For "all" tab: show all configured distinguish_by fields from all sets
+    configuredFieldIds = sets.flatMap(set => set.distinguish_by || []);
+  } else {
+    // For specific environment tab: show only fields for that set
+    const activeSet = sets.find(set => set.id === activeEnvironment.value);
+    configuredFieldIds = activeSet?.distinguish_by || [];
+  }
+
+  // Convert field IDs to FoundGroup format by looking them up in availableGroups
+  // Remove duplicates and sort alphabetically for consistent display
+  const uniqueFieldIds = [...new Set(configuredFieldIds)];
+  const groups = uniqueFieldIds
+    .map(fieldId => availableGroups.value.find(group => group.group_id === fieldId))
+    .filter((group): group is FoundGroup => group !== undefined);
+
+  // Sort groups by display name for consistent ordering
+  return groups.sort((a, b) => a.display.localeCompare(b.display));
 });
 
 /** Auto-select first detected environment when data loads */
@@ -1965,7 +1986,7 @@ const detectedEnvironment = computed<DetectedEnvironment | null>(() => {
   let description = "General fields detected in your telemetry data.";
   let evidenceGroups: string[] = [];
 
-  if (env === "k8s") {
+  if (env === "kubernetes" || env === "k8s") {
     envType = "Kubernetes";
     description = "Kubernetes fields detected in your telemetry data.";
     evidenceGroups = activeEnvGroups.value.filter(g => g.group_id.startsWith('k8s-')).map(g => g.group_id);
@@ -2230,9 +2251,72 @@ function onAddTrackedAlias(value: string) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Find a FoundGroup by its group_id value */
+/** Find a FoundGroup by its group_id value with case-insensitive and semantic-group fallbacks */
 function getGroupByValue(value: string): FoundGroup | undefined {
-  return availableGroups.value.find((g) => g.group_id === value);
+  // First try exact match in analytics groups
+  let group = availableGroups.value.find((g) => g.group_id === value);
+
+  // If no exact match, try case-insensitive fallback
+  if (!group) {
+    const lowerValue = value.toLowerCase();
+    group = availableGroups.value.find((g) => g.group_id.toLowerCase() === lowerValue);
+  }
+
+  // Fall back to semanticGroups prop for display name when not in analytics data
+  if (!group && props.semanticGroups) {
+    const alias = props.semanticGroups.find(
+      (a) => a.id === value || a.id.toLowerCase() === value.toLowerCase()
+    );
+    if (alias) {
+      return { group_id: value, display: alias.display, stream_types: [], aliases: {}, recommended: false };
+    }
+  }
+
+  return group;
+}
+
+/**
+ * Deduplicate and consistently sort FoundGroups as frontend safety net.
+ * Addresses user complaint: "it's changing order every single time"
+ *
+ * Deduplication: Keep first occurrence by group_id
+ * Sorting: 1) Environment type, 2) Recommended first, 3) Alphabetical by group_id
+ */
+function deduplicateAndSortGroups(groups: FoundGroup[]): FoundGroup[] {
+  if (!groups?.length) return [];
+
+  // 1. Deduplicate by group_id (keep first occurrence)
+  const seen = new Set<string>();
+  const deduplicated = groups.filter(group => {
+    if (seen.has(group.group_id)) {
+      return false; // Skip duplicate
+    }
+    seen.add(group.group_id);
+    return true;
+  });
+
+  // 2. Sort consistently
+  const envOrder: Record<string, number> = { k8s: 1, aws: 2, azure: 3, gcp: 4 };
+
+  return deduplicated.sort((a, b) => {
+    // Sort by environment type first
+    const aEnv = groupEnvKey(a.group_id);
+    const bEnv = groupEnvKey(b.group_id);
+    const aEnvOrder = aEnv ? (envOrder[aEnv] ?? 999) : 999;
+    const bEnvOrder = bEnv ? (envOrder[bEnv] ?? 999) : 999;
+
+    if (aEnvOrder !== bEnvOrder) {
+      return aEnvOrder - bEnvOrder;
+    }
+
+    // Within same environment, recommended groups first
+    if (a.recommended !== b.recommended) {
+      return b.recommended ? 1 : -1; // recommended first
+    }
+
+    // Finally, sort alphabetically by group_id for stable ordering
+    return a.group_id.localeCompare(b.group_id);
+  });
 }
 
 /**
@@ -2596,7 +2680,10 @@ async function loadData() {
     const analyticsRes = await serviceStreamsService.getDimensionAnalytics(props.orgIdentifier);
     const summary: DimensionAnalyticsSummary = analyticsRes.data;
     
-    availableGroups.value = summary.available_groups ?? [];
+    // Apply frontend deduplication and consistent sorting as safety net
+    const rawGroups = summary.available_groups ?? [];
+    const dedupedGroups = deduplicateAndSortGroups(rawGroups);
+    availableGroups.value = dedupedGroups;
     serviceFieldSources.value = summary.service_field_sources ?? [];
 
     if (summary.dimensions) {
@@ -2610,21 +2697,28 @@ async function loadData() {
     const configRes = await serviceStreamsService.getIdentityConfig(props.orgIdentifier);
     currentIdentityConfig.value = configRes.data;
 
-    // Populate per-set distinguish_by from the loaded config
+    // Populate per-set distinguish_by and labels from the loaded config
     if (currentIdentityConfig.value?.sets?.length) {
       const byId: Record<string, string[]> = {};
+      const labels: Record<string, string> = {};
       for (const set of currentIdentityConfig.value.sets) {
         byId[set.id] = [...set.distinguish_by];
+        labels[set.id] = set.label; // Store API-provided label
       }
       setDistinguishBy.value = byId;
+      setLabels.value = labels;
     }
 
     // Populate tracked alias IDs from loaded config
     trackedAliasIds.value = currentIdentityConfig.value?.tracked_alias_ids ?? [];
 
     // 3. Initial suggestion for active env if no config exists for it
+    // Guard: skip if activeEnvironment is the placeholder "all" key (set before real config loads)
+    const realSetIds = new Set((currentIdentityConfig.value?.sets ?? []).map(s => s.id));
     if (
       activeEnvironment.value &&
+      activeEnvironment.value !== "all" &&
+      realSetIds.has(activeEnvironment.value) &&
       !setDistinguishBy.value[activeEnvironment.value]?.length &&
       suggestedConfig.value?.distinguish_by?.length
     ) {
@@ -2662,11 +2756,11 @@ async function saveConfig() {
   saving.value = true;
   try {
     // Build sets array: include only sets that have at least 1 non-empty distinguish_by field.
-    // Set label uses SET_LABELS lookup for known IDs, falls back to the ID itself.
+    // Preserve API-provided labels from loaded config, fall back to ID itself for new sets.
     const sets: IdentitySet[] = Object.entries(setDistinguishBy.value)
       .map(([id, fields]) => ({
         id,
-        label: SET_LABELS[id] ?? id,
+        label: setLabels.value[id] ?? id,
         distinguish_by: fields.filter(Boolean),
       }))
       .filter((s) => s.distinguish_by.length > 0);
