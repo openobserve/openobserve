@@ -368,21 +368,52 @@ export class MetricsBuilderPage {
      * @param {string} operationName - e.g., "Rate", "Sum", "Avg"
      */
     async selectOperation(operationName) {
-        // Wait for dialog to appear
+        // Wait for dialog to appear and fully render (expansion items are default-opened)
         const dialog = this.page.locator('.q-dialog');
         await dialog.waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.waitForTimeout(300);
 
-        // Search for the operation
-        const searchInput = dialog.locator('input').first();
-        if (await searchInput.isVisible({ timeout: 2000 })) {
-            await searchInput.fill(operationName);
-            await this.page.waitForTimeout(500);
-        }
+        // Do NOT fill the search input: typing triggers a Vue re-render that temporarily
+        // collapses q-expansion-item sections, making items transiently invisible.
+        // The full un-filtered list is already rendered with all sections expanded.
 
-        // Click on the operation item
-        const opItem = dialog.locator(`.q-item:has-text("${operationName}")`).first();
+        // Find a clickable q-item inside expansion content whose primary label matches.
+        // Structure: .q-expansion-item__content > .q-list > .q-item
+        //              > .q-item__section > .q-item__label (op name, NOT caption)
+        const opItem = dialog
+            .locator('.q-expansion-item__content .q-item')
+            .filter({
+                has: this.page.locator('.q-item__label').filter({
+                    hasText: new RegExp(`^\\s*${operationName}\\s*$`)
+                })
+            })
+            .first();
+
         if (await opItem.isVisible({ timeout: 3000 })) {
             await opItem.click();
+            await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            return true;
+        }
+
+        // Fallback: explicitly open all expansion sections, then retry
+        const expansionHeaders = dialog.locator('.q-expansion-item__container > .q-item');
+        const headerCount = await expansionHeaders.count();
+        for (let i = 0; i < headerCount; i++) {
+            await expansionHeaders.nth(i).click().catch(() => {});
+        }
+        await this.page.waitForTimeout(400);
+
+        const opItemRetry = dialog
+            .locator('.q-expansion-item__content .q-item')
+            .filter({
+                has: this.page.locator('.q-item__label').filter({
+                    hasText: new RegExp(`^\\s*${operationName}\\s*$`)
+                })
+            })
+            .first();
+
+        if (await opItemRetry.isVisible({ timeout: 3000 })) {
+            await opItemRetry.click();
             await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
