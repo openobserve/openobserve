@@ -13,11 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, time::Duration};
+use std::{collections::HashSet, sync::LazyLock as Lazy, time::Duration};
 
 use config::meta::promql::value::{EvalContext, LabelsExt, RangeValue, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
-use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use strum::EnumString;
 

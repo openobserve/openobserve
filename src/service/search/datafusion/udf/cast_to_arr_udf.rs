@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use arrow::array::{Array, ListBuilder, StringBuilder};
 use arrow_schema::Field;
@@ -26,7 +26,6 @@ use datafusion::{
     prelude::create_udf,
     sql::sqlparser::parser::ParserError,
 };
-use once_cell::sync::Lazy;
 
 /// The name of the cast_to_arr UDF given to DataFusion.
 pub const CAST_TO_ARR_UDF_NAME: &str = "cast_to_arr";

@@ -34,10 +34,10 @@ use {
     jsonwebtoken::TokenData,
     o2_openfga::authorizer::authz::{get_new_user_creation_tuple, update_tuples},
     o2_openfga::config::get_config as get_openfga_config,
-    once_cell::sync::Lazy,
     regex::Regex,
     serde_json::Value,
     std::collections::HashMap,
+    std::sync::LazyLock as Lazy,
 };
 
 #[cfg(feature = "cloud")]

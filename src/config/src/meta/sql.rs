@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::LazyLock;
+
 use datafusion::sql::{TableReference, parser::DFParser, resolve::resolve_table_references};
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use sqlparser::{
     ast::{Expr, SelectItem, SetExpr, Statement},
@@ -29,7 +30,7 @@ use super::stream::StreamType;
 pub const MAX_LIMIT: i64 = 100000;
 pub const MAX_OFFSET: i64 = 100000;
 
-pub static SQL_RESERVED_KEYWORDS: Lazy<Vec<String>> = Lazy::new(|| {
+pub static SQL_RESERVED_KEYWORDS: LazyLock<Vec<String>> = LazyLock::new(|| {
     ALL_KEYWORDS
         .iter()
         .filter(|kw| is_reserved_identifier(kw))
