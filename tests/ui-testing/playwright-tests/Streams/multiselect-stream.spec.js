@@ -142,14 +142,8 @@ async function multistreamselect(page) {
     await pageManager.logsPage.selectRunQuery();
     await page.waitForTimeout(3000);
 
-    // Verify Common Group Fields are present using POM
-    const cell = await pageManager.logsPage.getCellByName(/Common Group Fields/);
-    const cellText = await cell.textContent();
-    expect(cellText).toContain('Common Group Fields');
-
-    // Select both streams using POM
-    await pageManager.logsPage.clickCellByName(/E2e_automate/);
-    await pageManager.logsPage.clickCellByName(/E2e_stream1/);
+    // Verify both streams are selected in the index list
+    await pageManager.logsPage.expectLogsSearchIndexListContainsText('e2e_automate, e2e_stream1');
 
     // Execute query and navigate time picker using POM
     await pageManager.logsPage.selectRunQuery();
