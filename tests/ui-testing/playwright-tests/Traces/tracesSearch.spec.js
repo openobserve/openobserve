@@ -288,15 +288,23 @@ test.describe("Traces Search testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing trace column sorting (Bug #10769)');
 
-    // Setup trace search
-    await pm.tracesPage.setupTraceSearch();
-    await page.waitForTimeout(2000);
+    // Wait for traces page to be ready
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(1000);
+
+    // Try to run a simple search without time range setup (to avoid date picker issues)
+    const runBtn = page.locator('[data-test="trace-search-run-query-btn"], button:has-text("Run query")').first();
+    if (await runBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await runBtn.click();
+      await page.waitForTimeout(2000);
+      testLogger.info('✓ Ran trace search');
+    } else {
+      testLogger.info('Run button not visible, checking existing results');
+    }
 
     const hasResults = await pm.tracesPage.hasTraceResults();
     if (!hasResults) {
-      testLogger.info('No trace results - skipping sort test');
-      test.skip();
-      return;
+      testLogger.info('No trace results - checking for table UI anyway');
     }
 
     // Find column headers in the trace results table
