@@ -1414,10 +1414,10 @@ export default defineComponent({
         const panelTimeParams: Record<string, any> = {};
 
         // Find the currently active tab and iterate through its panels only
-        const activeTab = currentDashboardData.data.tabs.find(
+        const activeTab = currentDashboardData?.data?.tabs?.find(
           (tab: any) => tab.tabId === selectedTabId.value,
         );
-        if (currentDashboardData.data?.tabs && selectedTabId.value) {
+        if (currentDashboardData?.data?.tabs && selectedTabId.value) {
           if (activeTab?.panels) {
             activeTab.panels.forEach((panel: any) => {
               if (!panel.id) return;
