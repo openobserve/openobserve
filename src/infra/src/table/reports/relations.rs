@@ -72,7 +72,8 @@ pub async fn relations_to_create<C: ConnectionTrait>(
         let attachment_dimensions = Set(rltn
             .attachment_dimensions
             .as_ref()
-            .map(|d| serde_json::to_value(d).unwrap_or_default()));
+            .map(|d| serde_json::to_value(d))
+            .transpose()?);
 
         to_create.push(report_dashboards::ActiveModel {
             report_id: Set(report_id.to_owned()),
@@ -176,7 +177,8 @@ pub fn relations_to_update(
             Set(des_rltn
                 .attachment_dimensions
                 .as_ref()
-                .map(|d| serde_json::to_value(d).unwrap_or_default()))
+                .map(|d| serde_json::to_value(d))
+                .transpose()?)
         } else {
             NotSet
         };
