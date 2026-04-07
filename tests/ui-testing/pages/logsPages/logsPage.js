@@ -1130,6 +1130,26 @@ export class LogsPage {
         await this.page.locator(this.quickModeToggle).click();
     }
 
+    // Click on the Quick Mode text label (not the toggle switch) - for testing #10821
+    async clickQuickModeTextLabel() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        // Click on the text label "Quick Mode" instead of the toggle switch
+        await this.page.locator(this.quickModeToggle).locator('.q-item__label').click();
+    }
+
+    // Get the current quick mode state (true/false)
+    async getQuickModeState() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isOn = toggleInner
+            ? await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy'))
+            : false;
+        await this.page.keyboard.press('Escape');
+        return isOn;
+    }
+
     // Histogram methods
     async toggleHistogram() {
         // await this.page.locator(this.utilitiesMenuButton).click();

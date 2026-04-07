@@ -95,10 +95,47 @@ test.describe("Logs Quickmode testcases", () => {
     tag: ['@quickModeLogs', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing quick mode toggle button visibility');
-    
+
     await pm.logsPage.expectQuickModeToggleVisible();
-    
+
     testLogger.info('Quick mode toggle button visible');
+  });
+
+  // Test for issue #10821 - Quick mode text click not working
+  test("should toggle quick mode when clicking on text label @bug-10821", {
+    tag: ['@quickModeTextClick', '@regression', '@logs', '@P3']
+  }, async ({ page }) => {
+    testLogger.info('Testing quick mode toggle via text label click (Bug #10821)');
+
+    // Get initial quick mode state
+    const initialState = await pm.logsPage.getQuickModeState();
+    testLogger.info(`Initial quick mode state: ${initialState}`);
+
+    // Click on the text label (not the toggle switch)
+    await pm.logsPage.clickQuickModeTextLabel();
+    testLogger.info('Clicked on quick mode text label');
+
+    // Wait for toggle to update
+    await page.waitForTimeout(500);
+
+    // Get new state
+    const newState = await pm.logsPage.getQuickModeState();
+    testLogger.info(`New quick mode state: ${newState}`);
+
+    // Verify state changed
+    expect(newState).not.toBe(initialState);
+    testLogger.info('✓ Quick mode state changed after clicking text label');
+
+    // Toggle back by clicking text label again
+    await pm.logsPage.clickQuickModeTextLabel();
+    await page.waitForTimeout(500);
+
+    const finalState = await pm.logsPage.getQuickModeState();
+    testLogger.info(`Final quick mode state: ${finalState}`);
+
+    // Verify it toggled back
+    expect(finalState).toBe(initialState);
+    testLogger.info('✓ Quick mode toggled back successfully via text label');
   });
 
   test("should click on interesting fields icon in histogram mode and run query", {

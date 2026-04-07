@@ -1277,6 +1277,36 @@ export class TracesPage {
   }
 
   /**
+   * Get the currently selected stream name from the stream selector
+   * @returns {Promise<string|null>} - The selected stream name or null if not found
+   */
+  async getSelectedStreamName() {
+    const streamSelector = this.page.locator(this.streamSelect);
+    if (await streamSelector.isVisible({ timeout: 3000 }).catch(() => false)) {
+      // The selected streams are shown as chips/tags inside the selector
+      const selectedChip = this.page.locator('[data-test*="stream-toggle-"][class*="truthy"], [data-test*="stream-chip"]').first();
+      if (await selectedChip.isVisible({ timeout: 2000 }).catch(() => false)) {
+        const text = await selectedChip.textContent();
+        return text?.trim() || null;
+      }
+      // Fallback: try to get from input value
+      const inputValue = await streamSelector.inputValue().catch(() => null);
+      return inputValue;
+    }
+    return null;
+  }
+
+  /**
+   * Navigate to logs page
+   */
+  async navigateToLogs() {
+    const logsMenuItem = this.page.locator('[data-test="menu-link-\\/logs-item"]');
+    await logsMenuItem.click();
+    await this.page.waitForURL('**/logs**', { timeout: 10000 }).catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  /**
    * Check if trace details tree is visible
    * @returns {Promise<boolean>}
    */
