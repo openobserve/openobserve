@@ -1627,7 +1627,7 @@ pub static LICENSE_USAGE_LAST_REPORT_TIMESTAMP: Lazy<IntGaugeVec> = Lazy::new(||
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &[],
-            )
+    )
     .expect("Metric created")
 });
 pub static LICENSE_USAGE_LAST_REPORTING_SUCCESS: Lazy<IntGauge> = Lazy::new(|| {
