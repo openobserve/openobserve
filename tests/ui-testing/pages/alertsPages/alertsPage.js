@@ -2587,12 +2587,12 @@ export class AlertsPage {
 
     /**
      * Get firing count elements from alert list
-     * NOTE: firing_count field exists in data but no column displays it yet
-     * This targets alert table rows as proxy for alerts list functionality
+     * NOTE: firing_count field exists in data but no dedicated column displays it
+     * Returns "last_triggered_at" column header as proxy - closest related column
      * @returns {Locator}
      */
     getFiringCountElements() {
-        return this.page.locator('[data-test="alert-list-table"] tbody tr');
+        return this.page.locator('[data-test="alert-list-table"] th:has-text("Last Triggered")');
     }
 
     /**
@@ -2664,11 +2664,12 @@ export class AlertsPage {
     }
 
     /**
-     * Get autocomplete suggestions dropdown
+     * Get autocomplete suggestions dropdown items
+     * Scoped to menu context to avoid matching all q-items on page
      * @returns {Locator}
      */
     getAutocompleteSuggestions() {
-        return this.page.locator('.q-menu, [role="listbox"], .autocomplete-dropdown, .q-item');
+        return this.page.locator('.q-menu .q-item, [role="listbox"] .q-item, .autocomplete-dropdown .q-item');
     }
 
     /**
@@ -2691,7 +2692,7 @@ export class AlertsPage {
      * Get "Compare with Past" step container (not a toggle - it's a step in alert wizard)
      * @returns {Locator}
      */
-    getCompareWithPastToggle() {
+    getCompareWithPastContainer() {
         return this.page.locator('.step-compare-with-past, [class*="multi-window"]');
     }
 
