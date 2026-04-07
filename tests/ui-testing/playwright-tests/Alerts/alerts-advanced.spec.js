@@ -369,8 +369,14 @@ test.describe("Alerts Advanced Coverage Tests", () => {
      */
     test("Alert firing count should increment when alert fires @bug-10472", {
         tag: ['@alertAdvanced', '@firingCount', '@P2', '@regression']
-    }, async ({ page }) => {
+    }, async ({ page }, testInfo) => {
         testLogger.info('Testing alert firing count increment (Bug #10472)');
+
+        // Mark this test as informational - it verifies the column exists but doesn't test increment behavior
+        testInfo.annotations.push({
+            type: 'informational',
+            description: 'This test verifies the firing count column is visible but does not validate increment behavior. Full testing requires triggering alerts, which is done in other tests.'
+        });
 
         // Navigate to alerts list
         await pm.alertsPage.navigateToAlertsList();
@@ -392,10 +398,9 @@ test.describe("Alerts Advanced Coverage Tests", () => {
                 const count = parseInt(countMatch[0]);
                 testLogger.info(`✓ Firing count value: ${count}`);
 
-                // The bug is that this count doesn't increment - we verify it's a valid number
-                // Note: This test is informational (verifies column exists) - full increment testing requires alert triggering
+                // Verify the count is a valid non-negative number (informational check)
                 expect(count, 'Firing count should be a valid non-negative number').toBeGreaterThanOrEqual(0);
-                testLogger.info('NOTE: This test verifies the firing count column is visible but does not test incrementation behavior');
+                testLogger.info('NOTE: Firing count column exists and displays a valid number');
             }
         } else {
             testLogger.info('No firing count column visible in current alert list view');
