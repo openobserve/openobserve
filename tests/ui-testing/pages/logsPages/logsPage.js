@@ -6883,7 +6883,7 @@ export class LogsPage {
      * @returns {Locator}
      */
     getSubfieldListEqualButton(fieldName) {
-        return this.page.locator(`[data-test*="subfield-list-equal-${fieldName}"]`);
+        return this.page.locator(`[data-test*="logs-search-subfield-add-${fieldName}"]`);
     }
 
     /**

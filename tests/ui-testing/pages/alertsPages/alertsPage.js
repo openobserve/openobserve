@@ -2590,7 +2590,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getFiringCountElements() {
-        return this.page.locator('[data-test*="firing-count"], [data-test*="trigger-count"], [class*="fire-count"], td:has-text("fired")');
+        return this.page.locator('[data-test*="trigger-detection"], [class*="fire-count"], td:has-text("fired")');
     }
 
     /**

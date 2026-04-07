@@ -1973,11 +1973,12 @@ export class TracesPage {
   }
 
   /**
-   * Get selected/active stream toggle
+   * Get selected/active stream indicator
+   * For traces, checks if stream dropdown has a selected value
    * @returns {Locator}
    */
   getSelectedStreamToggle() {
-    return this.page.locator('[data-test*="stream-toggle-"][class*="truthy"], [data-test*="stream-chip"]');
+    return this.page.locator('[data-test="log-search-index-list-select-stream"] .q-field__native, [data-test="log-search-index-list-select-stream"][aria-label]:not([aria-label=""])');
   }
 
 }
