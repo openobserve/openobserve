@@ -135,6 +135,7 @@ export const convertMultiSQLData = async (
 
   // C6: Metric — build grid so each query value occupies its own cell
   if (chartType === "metric" && options.length > 1) {
+    if (!chartPanelRef?.value) return options[0];
     const allMetricSeries: any[] = [];
     options.forEach((opt: any) => {
       if (opt?.options?.series?.[0]) {
@@ -217,6 +218,7 @@ export const convertMultiSQLData = async (
 
   // C6: Gauge — collect all dials and recalculate grid positions
   if (chartType === "gauge" && options.length > 1) {
+    if (!chartPanelRef?.value) return options[0];
     const allSeries: any[] = [];
     options.forEach((opt: any) => {
       if (opt?.options?.series) {
@@ -262,6 +264,7 @@ export const convertMultiSQLData = async (
 
   // C7: Heatmap — render each query as an independent heatmap in its own grid cell
   if (chartType === "heatmap" && options.length > 1) {
+    if (!chartPanelRef?.value) return options[0];
     // Reserve space at the bottom for the visualMap colour scale and legend.
     const VISUAL_MAP_HEIGHT = 80;
     const LEGEND_BOTTOM = 5;
