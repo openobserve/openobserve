@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,14 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::any::Any;
+use std::{any::Any, sync::LazyLock as Lazy};
 
 use arrow::datatypes::DataType;
 use datafusion::{
     common::{DataFusionError, Result},
     logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, Volatility},
 };
-use once_cell::sync::Lazy;
 
 pub const MATCH_ALL_UDF_NAME: &str = "match_all";
 pub const FUZZY_MATCH_ALL_UDF_NAME: &str = "fuzzy_match_all";

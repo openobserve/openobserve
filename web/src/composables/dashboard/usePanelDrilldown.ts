@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -1117,46 +1117,32 @@ export function usePanelDrilldown({
           let oldParams: any = {};
           // if pass all variables is true
           if (drilldownData.data.passAllVariables) {
-            // get current query params
+            // get current query params — spread to avoid mutating Vue Router's reactive object
             oldParams = { ...route.query };
           }
 
           drilldownData.data.variables.forEach((variable: any) => {
             if (variable?.name?.trim() && variable?.value?.trim()) {
-              const newKey = "var-" + replacePlaceholders(variable.name, drilldownVariables);
-              const newValue = replacePlaceholders(variable.value, drilldownVariables);
-              oldParams[newKey] = newValue;
+              oldParams[
+                "var-" + replacePlaceholders(variable.name, drilldownVariables)
+              ] = replacePlaceholders(variable.value, drilldownVariables);
             }
           });
-
-          const newQueryParams = {
-              ...oldParams,
-              org_identifier: store.state.selectedOrganization.identifier,
-              dashboard: dashboardData.dashboardId,
-              folder: folderId,
-              tab: tabId,
-          };
-
-          // ======= [START] default variable values
-          const initialVariableValues: any = {};
-          Object.keys(newQueryParams).forEach((key) => {
-            if (key.startsWith("var-")) {
-              const newKey = key.slice(4);
-              initialVariableValues[newKey] = newQueryParams[key];
-            }
-          });
-          // ======= [END] default variable values
-
-          // FIX: Emit BEFORE `router.push` so that the event has time to bubble up
-          // to the parent before the component potentially unmounts.
-          // ALSO: Pass newQueryParams as second arg as planned.
-          emit("update:initialVariableValues", initialVariableValues, newQueryParams);
 
           // make changes in router
+          const pushQuery = {
+            ...oldParams,
+            org_identifier: store.state.selectedOrganization.identifier,
+            dashboard: dashboardData.dashboardId,
+            folder: folderId,
+            tab: tabId,
+          };
           await router.push({
             path: "/dashboards/view",
-            query: newQueryParams,
+            query: pushQuery,
           });
+          // ViewDashboard's var-* watcher detects the route change and calls
+          // updateInitialVariableValues() directly via component ref — no emit needed.
         }
       }
     }

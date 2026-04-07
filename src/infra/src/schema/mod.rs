@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use arc_swap::ArcSwap;
 use chrono::Utc;
@@ -27,7 +30,6 @@ use config::{
     utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
-use once_cell::sync::Lazy;
 use serde::Serialize;
 
 use crate::{

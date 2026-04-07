@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 // base64 characters contain a-zA-Z0-9 , + , / and = for padding
 const BASE64_CHARS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+=/";
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use arrow::array::{ArrayRef, StringArray};
 use config::utils::str;
@@ -30,7 +30,6 @@ use datafusion::{
     sql::sqlparser::parser::ParserError,
 };
 use o2_enterprise::enterprise::cipher::Cipher;
-use once_cell::sync::Lazy;
 use serde_json::Value;
 
 use crate::cipher::registry::REGISTRY;

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use arrow::array::{Array, ListBuilder, StringBuilder};
 use arrow_schema::Field;
@@ -24,7 +24,6 @@ use datafusion::{
     logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
 };
-use once_cell::sync::Lazy;
 
 /// The name of the string_to_array_v2 UDF given to DataFusion.
 pub const STRING_TO_ARRAY_V2_UDF_NAME: &str = "string_to_array_v2";

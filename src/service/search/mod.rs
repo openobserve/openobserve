@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, sync::Arc};
+use std::{
+    cmp::max,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
@@ -48,7 +51,6 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::unwrap_stream_settings,
 };
-use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
 use sql::Sql;

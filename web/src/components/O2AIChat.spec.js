@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 // O2AIChat.vue unit tests (50+)
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';

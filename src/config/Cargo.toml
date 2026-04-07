@@ -52,7 +52,6 @@ log.workspace = true
 md5.workspace = true
 memchr.workspace = true
 murmur3.workspace = true
-once_cell.workspace = true
 opentelemetry.workspace = true
 ordered-float.workspace = true
 parking_lot.workspace = true
@@ -92,7 +91,7 @@ roaring.workspace = true
 tonic.workspace = true
 tonic-prost.workspace = true
 tracing-opentelemetry.workspace = true
-vortex = { git = "https://github.com/openobserve/vortex", rev = "1ca97ea3fadd049ff09561430de9480f74c6c46e", features = [
+vortex = { git = "https://github.com/openobserve/vortex", rev = "13423ca204f81dc1b20ca040da2aeb386220a312", features = [
     "tokio",
 ], optional = true }
 

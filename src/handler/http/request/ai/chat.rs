@@ -171,8 +171,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
 
     #[cfg(feature = "enterprise")]
     {
-        use config::get_config;
-        use o2_enterprise::enterprise::alerts::rca_agent::{QueryRequest, RcaAgentClient};
+        use o2_enterprise::enterprise::alerts::rca_agent::QueryRequest;
 
         let trace_id = auth_data.get_trace_id();
         let user_id = &auth_data.user_id;
@@ -227,36 +226,20 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             }
         }
 
-        // Extract user token from cookie/header for per-user MCP auth
-        // Unwrap Session:: wrapper if present, otherwise use token as-is
+        // Extract user auth from headers to pass to the agent
         let auth_str =
             crate::common::utils::auth::extract_auth_str_from_headers(&parts.headers).await;
-        let user_token = if auth_str.starts_with("Session::") {
-            // Session format: "Session::{session_id}::{actual_token}"
-            // Extract actual token (already has Bearer/Basic prefix)
-            auth_str.splitn(3, "::").nth(2).map(|s| s.to_string())
-        } else if !auth_str.is_empty() {
-            Some(auth_str)
-        } else {
-            None
-        };
+        // Auth header is passed directly to agent - no need to extract user_token
 
-        // Create agent client
-        let zo_config = get_config();
-        let client = match RcaAgentClient::new(
-            &o2_cfg.ai.agent_url,
-            &zo_config.auth.root_user_email,
-            &zo_config.auth.root_user_password,
-        ) {
-            Ok(c) => c,
-            Err(e) => {
+        // Get global agent client singleton
+        let client = match o2_enterprise::enterprise::alerts::rca_agent::get_agent_client() {
+            Some(c) => c,
+            None => {
                 log::error!(
                     "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
-                     Failed to create agent client: {e}"
+                     Agent service not configured"
                 );
-                return MetaHttpResponse::internal_error(format!(
-                    "Failed to create agent client: {e}"
-                ));
+                return MetaHttpResponse::bad_request("Agent service not configured");
             }
         };
 
@@ -327,7 +310,6 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             } else {
                 Some(history)
             },
-            user_token,
             images,
         };
 
@@ -340,7 +322,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             Some(passthrough_headers)
         };
 
-        match client.query(agent_type, query_req).await {
+        match client.query(agent_type, query_req, &auth_str).await {
             Ok(response) => {
                 // QueryResponse has a `response: String` field
                 let prompt_response = PromptResponse {
@@ -691,15 +673,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         // Unwrap Session:: wrapper if present, otherwise use token as-is
         let auth_str =
             crate::common::utils::auth::extract_auth_str_from_headers(&parts.headers).await;
-        let user_token = if auth_str.starts_with("Session::") {
-            // Session format: "Session::{session_id}::{actual_token}"
-            // Extract actual token (already has Bearer/Basic prefix)
-            auth_str.splitn(3, "::").nth(2).map(|s| s.to_string())
-        } else if !auth_str.is_empty() {
-            Some(auth_str)
-        } else {
-            None
-        };
+        // Auth header is passed directly to agent - no need to extract user_token
 
         // Transform PromptRequest -> QueryRequest
         let last_user_message = prompt_body
@@ -759,7 +733,6 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             } else {
                 Some(history)
             },
-            user_token,
             images,
         };
 
@@ -791,7 +764,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         let s = async_stream::stream! {
             // Call the agent service with forwarded headers
             let response = match client
-                .query_stream_with_headers(agent_type, query_req, headers_to_forward.as_ref())
+                .query_stream_with_headers(agent_type, query_req, &auth_str, headers_to_forward.as_ref())
                 .await
             {
                 Ok(r) => r,
@@ -937,6 +910,10 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
             }
         };
 
+        // Extract user auth from headers to pass to the agent
+        let auth_str =
+            crate::common::utils::auth::extract_auth_str_from_headers(&parts.headers).await;
+
         let headers_to_forward = if forward_headers.is_empty() {
             None
         } else {
@@ -944,7 +921,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
         };
 
         match client
-            .post_feedback(feedback_body, headers_to_forward.as_ref())
+            .post_feedback(feedback_body, &auth_str, headers_to_forward.as_ref())
             .await
         {
             Ok(response) => {
@@ -1024,33 +1001,19 @@ pub async fn confirm_action(
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 
-        if get_agent_client().is_none() {
-            return MetaHttpResponse::bad_request("Agent service not configured");
-        }
-
-        // Extract user token for identity verification (same as chat_stream)
-        let auth_str =
-            crate::common::utils::auth::extract_auth_str_from_headers(&parts.headers).await;
-        let user_token = if auth_str.starts_with("Session::") {
-            auth_str.splitn(3, "::").nth(2).map(|s| s.to_string())
-        } else if !auth_str.is_empty() {
-            Some(auth_str)
-        } else {
-            None
+        let client = match get_agent_client() {
+            Some(c) => c,
+            None => {
+                return MetaHttpResponse::bad_request("Agent service not configured");
+            }
         };
 
-        // Inject user_token into the body for identity verification by the agent
-        let mut forward_body: serde_json::Value =
-            serde_json::from_slice(&body_bytes).unwrap_or(serde_json::json!({}));
-        if let Some(token) = &user_token
-            && let Some(obj) = forward_body.as_object_mut()
-        {
-            obj.insert(
-                "user_token".to_string(),
-                serde_json::Value::String(token.clone()),
-            );
-        }
-        let forward_bytes = serde_json::to_vec(&forward_body).unwrap_or_default();
+        // Extract user auth from headers to pass to the agent
+        let auth_str =
+            crate::common::utils::auth::extract_auth_str_from_headers(&parts.headers).await;
+
+        // Agent uses Authorization header directly - no need to inject user_token into body
+        let forward_bytes = body_bytes;
 
         // Forward the confirmation to the agent's /confirm endpoint
         let confirm_url = format!(
@@ -1059,12 +1022,8 @@ pub async fn confirm_action(
             session_id
         );
 
-        let http_client = reqwest::Client::new();
-        match http_client
-            .post(&confirm_url)
-            .header("Content-Type", "application/json")
-            .body(forward_bytes)
-            .send()
+        match client
+            .confirm_action(&confirm_url, forward_bytes.to_vec(), &auth_str)
             .await
         {
             Ok(resp) => {
