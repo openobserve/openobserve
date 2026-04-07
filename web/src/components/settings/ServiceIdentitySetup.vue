@@ -1172,25 +1172,6 @@ function groupEnvKey(groupId: string): string | null {
 }
 
 
-
-/** Coverage % for any given environment key (used for sorting tabs) */
-function getEnvCoverage(envKey: string): number {
-  if (!totalServices.value || !currentIdentityConfig.value?.sets) return 0;
-
-  // Get configured fields for this environment
-  const activeSet = currentIdentityConfig.value.sets.find(set => set.id === envKey);
-  const configuredFieldIds = activeSet?.distinguish_by || [];
-
-  const coverages = configuredFieldIds
-    .map(fieldId => {
-      const dim = dimensionAnalytics.value[fieldId];
-      return dim ? Math.round((dim.service_count / totalServices.value) * 100) : null;
-    })
-    .filter((v): v is number => v !== null);
-  if (!coverages.length) return 0;
-  return Math.round(coverages.reduce((a, b) => a + b, 0) / coverages.length);
-}
-
 /** Environments from the identity config, sorted alphabetically by label */
 const detectedEnvironments = computed(() => {
   const sets = currentIdentityConfig.value?.sets;

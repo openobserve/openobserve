@@ -955,6 +955,15 @@ async fn create_new_incident(
                     log::debug!(
                         "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
                     );
+
+                    emit_analysis_failure(
+                        &org_id_rca,
+                        &incident_id_rca,
+                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident,
+                        "Background spawn failed",
+                        Some(&e),
+                    )
+                    .await;
                 }
             });
         }
@@ -982,69 +991,58 @@ async fn find_or_create_incident(
     // STEP 1: AlertId exact match - check for existing incident with same alert_id
     if key_type == KeyType::AlertId {
         let alert_id = alert.get_unique_key();
-        let open_incidents =
-            infra::table::alert_incidents::find_open_incidents_filtered(org_id, None, None).await?;
 
-        // Find existing AlertId incident with same alert_id
-        for existing in open_incidents {
-            let existing_key_type = KeyType::from_stored(&existing.key_type);
+        if let Some(existing) =
+            infra::table::alert_incidents::find_open_incident_by_alert_id(org_id, &alert_id).await?
+        {
+            // Found existing AlertId incident for this alert - join it
+            let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
+                &existing.id,
+                &alert_id,
+                &alert.name,
+                triggered_at,
+                correlation_reason,
+            )
+            .await?;
 
-            // Only match with other AlertId incidents
-            if existing_key_type == KeyType::AlertId {
-                // Check if this incident contains the same alert_id
-                let existing_alerts =
-                    infra::table::alert_incidents::get_incident_alerts(&existing.id).await?;
-                if existing_alerts.iter().any(|a| a.alert_id == alert_id) {
-                    // Found existing AlertId incident for this alert - join it
-                    let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
-                        &existing.id,
-                        &alert_id,
-                        &alert.name,
-                        triggered_at,
-                        correlation_reason,
-                    )
-                    .await?;
-
-                    if let Err(e) = infra::table::incident_events::record_alert(
-                        org_id,
-                        &existing.id,
-                        &alert_id,
-                        &alert.name,
-                        triggered_at,
-                    )
-                    .await
-                    {
-                        log::error!(
-                            "[Incidents] Failed to record alert event for incident {}: {e}",
-                            existing.id
-                        );
-                    }
-
-                    spawn_topology_enrichment(
-                        org_id,
-                        &existing.id,
-                        service_name,
-                        &alert_id,
-                        &alert.name,
-                        triggered_at,
-                    );
-
-                    // AlertId incidents can't have new alert types (always same alert)
-                    // but we respect the database result for consistency
-                    if is_new_alert_type {
-                        log::warn!(
-                            "[incidents] Unexpected new alert type for AlertId incident {}: {}",
-                            existing.id,
-                            alert_id
-                        );
-                    }
-
-                    return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
-                        incident_id: existing.id,
-                        service_name: service_name.to_string(),
-                    });
-                }
+            if let Err(e) = infra::table::incident_events::record_alert(
+                org_id,
+                &existing.id,
+                &alert_id,
+                &alert.name,
+                triggered_at,
+            )
+            .await
+            {
+                log::error!(
+                    "[Incidents] Failed to record alert event for incident {}: {e}",
+                    existing.id
+                );
             }
+
+            spawn_topology_enrichment(
+                org_id,
+                &existing.id,
+                service_name,
+                &alert_id,
+                &alert.name,
+                triggered_at,
+            );
+
+            // AlertId incidents can't have new alert types (always same alert)
+            // but we respect the database result for consistency
+            if is_new_alert_type {
+                log::warn!(
+                    "[incidents] Unexpected new alert type for AlertId incident {}: {}",
+                    existing.id,
+                    alert_id
+                );
+            }
+
+            return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
+                incident_id: existing.id,
+                service_name: service_name.to_string(),
+            });
         }
     }
 
@@ -1206,6 +1204,14 @@ async fn find_or_create_incident(
                                 log::debug!(
                                     "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
                                 );
+
+                                emit_analysis_failure(
+                                    &org_id_rca,
+                                    &incident_id_rca,
+                                    config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis,
+                                    "Reanalysis trigger failed",
+                                    Some(&e),
+                                ).await;
                             }
                         });
                     } else {
@@ -1587,6 +1593,32 @@ fn cooldown_elapsed(
     }
 }
 
+/// Emit an AI analysis failure event for the specified incident
+#[cfg(feature = "enterprise")]
+async fn emit_analysis_failure(
+    org_id: &str,
+    incident_id: &str,
+    trigger_type: config::meta::alerts::incidents::AnalysisTriggerType,
+    reason: &str,
+    error: Option<&anyhow::Error>,
+) {
+    use config::meta::alerts::incidents::IncidentEvent;
+
+    let error_details = error.map(|e| format!("{:#}", e).chars().take(500).collect::<String>());
+
+    if let Err(e) = infra::table::incident_events::append(
+        org_id,
+        incident_id,
+        IncidentEvent::ai_analysis_failed(reason, trigger_type, error_details),
+    )
+    .await
+    {
+        log::error!(
+            "[INCIDENTS::RCA] Failed to emit AIAnalysisFailed event for {incident_id}: {e}"
+        );
+    }
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn trigger_rca_for_incident(
     org_id: String,
@@ -1763,6 +1795,27 @@ pub async fn trigger_rca_for_incident(
         }
         Err(e) => {
             log::warn!("[INCIDENTS::RCA] RCA failed for {incident_id}: {e}");
+
+            // Determine trigger type based on function context
+            let trigger_type = if reanalysis {
+                if _user_email == "system@openobserve.ai" {
+                    config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis
+                } else {
+                    config::meta::alerts::incidents::AnalysisTriggerType::Manual
+                }
+            } else {
+                config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident
+            };
+
+            emit_analysis_failure(
+                &org_id,
+                &incident_id,
+                trigger_type,
+                "RCA service call failed",
+                Some(&e),
+            )
+            .await;
+
             Err(e)
         }
     }
@@ -1852,7 +1905,7 @@ pub async fn update_status(
                 // reanalysis on reopen: deduct credits and report usage;
                 // begin_already_emitted=true skips cooldown/in-flight guards
                 if let Err(e) = trigger_rca_for_incident(
-                    org_id_rca,
+                    org_id_rca.clone(),
                     incident_id_rca.clone(),
                     true, // reanalysis — deduct credits and report usage
                     true, // begin already emitted above
@@ -1861,6 +1914,15 @@ pub async fn update_status(
                 .await
                 {
                     log::debug!("[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}");
+
+                    emit_analysis_failure(
+                        &org_id_rca,
+                        &incident_id_rca,
+                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReopened,
+                        "Reanalysis after reopen failed",
+                        Some(&e),
+                    )
+                    .await;
                 }
             });
         } else {
