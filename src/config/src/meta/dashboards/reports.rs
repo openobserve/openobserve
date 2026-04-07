@@ -27,11 +27,10 @@ pub enum ReportDestination {
 }
 
 #[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum ReportMediaType {
     #[default]
-    #[serde(rename = "pdf")]
     Pdf,
-    #[serde(rename = "png")]
     Png,
 }
 
@@ -54,11 +53,10 @@ impl From<ReportMediaType> for i16 {
 }
 
 #[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum ReportEmailAttachmentType {
     #[default]
-    #[serde(rename = "standard")]
     Standard,
-    #[serde(rename = "inline")]
     Inline,
 }
 
@@ -205,8 +203,6 @@ pub struct Report {
     pub message: String,
     #[serde(default)]
     pub enabled: bool,
-    #[serde(default)]
-    pub media_type: ReportMediaType,
     /// When `true` and the report type is PDF, a PNG screenshot is also captured and embedded
     /// inline in the email body alongside the PDF attachment.
     #[serde(default)]
@@ -240,7 +236,6 @@ impl Default for Report {
             description: "".to_string(),
             message: "".to_string(),
             enabled: false,
-            media_type: ReportMediaType::default(),
             image_preview: false,
             timezone: "".to_string(),
             tz_offset: 0, // UTC
@@ -500,7 +495,6 @@ mod tests {
         assert!(report.description.is_empty());
         assert!(report.message.is_empty());
         assert!(!report.enabled);
-        assert_eq!(report.media_type, ReportMediaType::Pdf);
         assert!(report.timezone.is_empty());
         assert_eq!(report.tz_offset, 0);
         assert!(report.updated_at.is_none());
@@ -531,7 +525,6 @@ mod tests {
             description: "Test description".to_string(),
             message: "Test message".to_string(),
             enabled: true,
-            media_type: ReportMediaType::Pdf,
             image_preview: false,
             timezone: "UTC".to_string(),
             tz_offset: 0,
@@ -569,7 +562,6 @@ mod tests {
             description: "Test description".to_string(),
             message: "Test message".to_string(),
             enabled: true,
-            media_type: ReportMediaType::Pdf,
             image_preview: false,
             timezone: "UTC".to_string(),
             tz_offset: 0,
@@ -723,13 +715,6 @@ mod tests {
         assert_eq!(ReportFrequencyType::Once, ReportFrequencyType::Once);
         assert_ne!(ReportFrequencyType::Once, ReportFrequencyType::Weeks);
         assert_ne!(ReportFrequencyType::Hours, ReportFrequencyType::Days);
-    }
-
-    #[test]
-    fn test_report_media_type_clone() {
-        let media_type = ReportMediaType::Pdf;
-        let cloned = media_type.clone();
-        assert_eq!(media_type, cloned);
     }
 
     #[test]

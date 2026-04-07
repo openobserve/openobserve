@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   outline
                 />
                 <q-badge
-                  v-if="props.row.image_preview"
+                  v-if="props.row.imagePreview"
                   color="blue-grey"
                   class="q-ml-xs"
                   label="Preview"

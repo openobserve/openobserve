@@ -2899,7 +2899,8 @@
     "attachmentType": "Attachment Style",
     "dimensionWidth": "Width (px)",
     "dimensionHeight": "Height (px)",
-    "imagePreview": "Include inline dashboard preview image"
+    "imagePreview": "Include inline dashboard preview image",
+    "customDimensions": "Custom Dimensions (Advanced)"
   },
   "queries": {
     "runningQueries": "Running Queries",

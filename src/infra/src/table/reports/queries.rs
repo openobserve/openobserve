@@ -277,7 +277,6 @@ impl TryFrom<SelectReportAndJoinRelationsResult> for (MetaFolder, MetaReport) {
             description: report_model.description.unwrap_or_default(),
             message: report_model.message.unwrap_or_default(),
             enabled: report_model.enabled,
-            media_type: config::meta::dashboards::reports::ReportMediaType::Pdf,
             image_preview: report_model.image_preview,
             timezone: report_model.timezone,
             tz_offset: report_model.tz_offset,
@@ -362,7 +361,6 @@ impl ListReportsQueryResult {
         params: &ListReportsParams,
     ) -> Result<Vec<Self>, sea_orm::DbErr> {
         let rslts = Self::select(params).all(conn).await?;
-        log::info!("rslts: {rslts:?}");
         Ok(rslts)
     }
 

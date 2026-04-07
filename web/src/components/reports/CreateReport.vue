@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-select
                             v-model="dashboard.report_type"
                             :options="[
-                              { label: 'PDF', value: 'pdf' },
+                              { label: 'PDF (default)', value: 'pdf' },
                               { label: 'PNG (Image)', value: 'png' },
                             ]"
                             emit-value
@@ -363,14 +363,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
 
-                      <!-- Custom Dimensions (Advanced) -->
-                      <q-expansion-item
+                      <!-- PNG note -->
+                      <div
+                        v-if="dashboard.report_type === 'png'"
                         class="q-mt-sm"
-                        label="Advanced: Custom Dimensions"
-                        dense
-                        data-test="add-report-custom-dimensions-section"
+                        data-test="add-report-png-note"
                       >
-                        <div class="row q-col-gutter-md q-pt-sm">
+                        <q-banner dense rounded class="bg-orange-1 text-orange-9" style="font-size: 13px;">
+                          <template v-slot:avatar>
+                            <q-icon name="info" color="orange-7" />
+                          </template>
+                          PNG captures only the first visible page of the dashboard. Use PDF if the dashboard spans multiple pages.
+                        </q-banner>
+                      </div>
+
+                      <!-- Custom Dimensions (Advanced) -->
+                      <div class="q-mt-md" data-test="add-report-custom-dimensions-section">
+                        <div
+                          class="flex items-center cursor-pointer"
+                          style="font-size: 14px; color: inherit;"
+                          @click="showCustomDimensions = !showCustomDimensions"
+                        >
+                          <q-icon
+                            :name="showCustomDimensions ? 'expand_less' : 'expand_more'"
+                            size="18px"
+                            class="q-mr-xs"
+                          />
+                          <span class="text-bold text-grey-8">{{ t("reports.customDimensions") }}</span>
+                        </div>
+                        <div v-if="showCustomDimensions" class="row q-col-gutter-md q-pt-sm">
                           <div class="col-auto o2-input">
                             <q-input
                               :model-value="dashboard.attachment_dimensions?.width ?? ''"
@@ -415,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                           </div>
                         </div>
-                      </q-expansion-item>
+                      </div>
                     </div>
                   </div>
                 </template>
@@ -884,19 +905,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Image Preview toggle — only shown when all dashboards are PDF type -->
                   <div
                     v-if="allDashboardsArePdf"
-                    class="q-mt-md"
+                    class="tw:flex tw:items-center tw:pt-4"
                     data-test="add-report-image-preview-section"
                   >
                     <q-toggle
-                      v-model="formData.image_preview"
+                      v-model="formData.imagePreview"
+                      size="lg"
+                      class="q-pl-0 o2-toggle-button-lg tw:h-[36px] tw:ml-1"
                       :label="t('reports.imagePreview')"
-                      color="primary"
                       data-test="add-report-image-preview-toggle"
                     />
-                    <div class="text-caption text-grey-6 q-mt-xs q-ml-md" style="max-width: 480px">
-                      When enabled, a PNG screenshot of the dashboard is embedded inline in the
-                      email body alongside the PDF attachment for a quick visual preview.
-                    </div>
+                    <q-icon
+                      name="info_outline"
+                      class="cursor-pointer q-ml-sm"
+                      size="16px"
+                    >
+                      <q-tooltip max-width="320px">
+                        Captures a PNG screenshot of the dashboard and embeds it inline in the
+                        email body alongside the PDF attachment for a quick visual preview.
+                      </q-tooltip>
+                    </q-icon>
                   </div>
                 </div>
                 <q-stepper-navigation>
@@ -1016,8 +1044,7 @@ const defaultReport = {
     },
   ],
   enabled: true,
-  media_type: "Pdf",
-  image_preview: false,
+  imagePreview: false,
   name: "",
   title: "",
   message: "",
@@ -1298,8 +1325,10 @@ const setDashboardTabOptions = (dashboardId: any) => {
   options.value["tabs"] = [...dashboardTabOptions.value];
 };
 
+const showCustomDimensions = ref(false);
+
 // Returns true when every dashboard in the report is configured as PDF type.
-// Used to show/hide the image_preview toggle (preview only applies to PDF).
+// Used to show/hide the imagePreview toggle (preview only applies to PDF).
 const allDashboardsArePdf = computed(() =>
   formData.value.dashboards.every((d: any) => d.report_type === "pdf"),
 );
@@ -1307,8 +1336,8 @@ const allDashboardsArePdf = computed(() =>
 // Returns the available attachment type options for a given report type.
 // Inline is disabled for PDF since the report server does not support it.
 const attachmentTypeOptions = (reportType: string) => [
-  { label: "Standard (downloadable)", value: "standard" },
-  { label: "Inline (embed in email)", value: "inline", disable: reportType === "pdf" },
+  { label: "Standard — downloadable attachment (default)", value: "standard" },
+  { label: "Inline — embedded in email body", value: "inline", disable: reportType === "pdf" },
 ];
 
 // Sets a single dimension key (width or height) on a dashboard's attachment_dimensions.
@@ -1524,6 +1553,11 @@ const saveReport = async () => {
       reportPayload.dashboards[0].tabs as string,
     ];
 
+  // Remove attachment_dimensions when unset so the report server uses its configured defaults.
+  if (!reportPayload.dashboards[0]?.attachment_dimensions) {
+    delete reportPayload.dashboards[0].attachment_dimensions;
+  }
+
   const reportAction = isEditingReport.value
     ? reports.updateReport
     : reports.createReport;
@@ -1733,6 +1767,9 @@ const setupEditingReport = async (report: any) => {
         tabs: "" as string | string[],
         variables: report.dashboards[0].variables,
         timerange: report.dashboards[0].timerange,
+        report_type: report.dashboards[0].report_type,
+        email_attachment_type: report.dashboards[0].email_attachment_type,
+        attachment_dimensions: report.dashboards[0].attachment_dimensions,
       },
     ],
   };
@@ -1779,6 +1816,10 @@ const setupEditingReport = async (report: any) => {
     frequency.value.custom.interval = report.frequency.interval;
   } else {
     frequency.value.type = report.frequency.type;
+  }
+
+  if (report.dashboards[0].attachment_dimensions) {
+    showCustomDimensions.value = true;
   }
 
   await setDashboardOptions(report.dashboards[0].folder);

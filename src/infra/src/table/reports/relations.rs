@@ -14,8 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::dashboards::reports::{
-    ReportAttachmentDimensions, ReportDashboard as MetaReportDashboard, ReportEmailAttachmentType,
-    ReportMediaType,
+    ReportAttachmentDimensions, ReportDashboard as MetaReportDashboard,
 };
 use sea_orm::{ActiveValue::NotSet, ConnectionTrait, Set};
 
@@ -168,20 +167,19 @@ pub fn relations_to_update(
             .report_dashboard_attachment_dimensions
             .as_ref()
             .and_then(|v| serde_json::from_value(v.clone()).ok());
-        let attachment_dimensions =
-            if existing_dims.as_ref().map(|d| (d.width, d.height))
-                != des_rltn
-                    .attachment_dimensions
-                    .as_ref()
-                    .map(|d| (d.width, d.height))
-            {
-                Set(des_rltn
-                    .attachment_dimensions
-                    .as_ref()
-                    .map(|d| serde_json::to_value(d).unwrap_or_default()))
-            } else {
-                NotSet
-            };
+        let attachment_dimensions = if existing_dims.as_ref().map(|d| (d.width, d.height))
+            != des_rltn
+                .attachment_dimensions
+                .as_ref()
+                .map(|d| (d.width, d.height))
+        {
+            Set(des_rltn
+                .attachment_dimensions
+                .as_ref()
+                .map(|d| serde_json::to_value(d).unwrap_or_default()))
+        } else {
+            NotSet
+        };
 
         if tab_names.is_not_set()
             && variables.is_not_set()
