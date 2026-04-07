@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,11 +19,11 @@ use arrow_schema::SortOptions;
 use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
-    common::{Result, Statistics, internal_err},
+    common::{Result, internal_err},
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, LexOrdering, Partitioning, PhysicalSortExpr},
     physical_plan::{
-        DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, common,
+        DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType, SchedulingType},
         expressions::Column,
         memory::MemoryStream,
@@ -37,7 +37,7 @@ pub struct NewEmptyExec {
     name: String,      // table name
     schema: SchemaRef, // The schema for the produced row
     partitions: usize, // Number of partitions
-    cache: PlanProperties,
+    cache: Arc<PlanProperties>,
     projection: Option<Vec<usize>>,
     filters: Vec<Expr>,
     limit: Option<usize>,
@@ -75,7 +75,12 @@ impl NewEmptyExec {
         self.partitions = partitions;
         // Changing partitions may invalidate output partitioning, so update it:
         let output_partitioning = Self::output_partitioning_helper(self.partitions);
-        self.cache = self.cache.with_partitioning(output_partitioning);
+        self.cache = Arc::new(
+            self.cache
+                .as_ref()
+                .clone()
+                .with_partitioning(output_partitioning),
+        );
         self
     }
 
@@ -93,7 +98,7 @@ impl NewEmptyExec {
         schema: SchemaRef,
         n_partitions: usize,
         sorted_by_time: bool,
-    ) -> PlanProperties {
+    ) -> Arc<PlanProperties> {
         let index = schema.index_of(TIMESTAMP_COL_NAME);
         let eq_properties = if !sorted_by_time {
             EquivalenceProperties::new(schema)
@@ -116,15 +121,17 @@ impl NewEmptyExec {
             }
         };
         let output_partitioning = Self::output_partitioning_helper(n_partitions);
-        PlanProperties::new(
-            eq_properties,
-            // Output Partitioning
-            output_partitioning,
-            // Execution Mode
-            EmissionType::Incremental,
-            Boundedness::Bounded,
+        Arc::new(
+            PlanProperties::new(
+                eq_properties,
+                // Output Partitioning
+                output_partitioning,
+                // Execution Mode
+                EmissionType::Incremental,
+                Boundedness::Bounded,
+            )
+            .with_scheduling_type(SchedulingType::Cooperative),
         )
-        .with_scheduling_type(SchedulingType::Cooperative)
     }
 
     pub fn name(&self) -> &str {
@@ -194,7 +201,7 @@ impl ExecutionPlan for NewEmptyExec {
         self
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.cache
     }
 
@@ -227,17 +234,6 @@ impl ExecutionPlan for NewEmptyExec {
             Arc::clone(&self.schema),
             None,
         )?))
-    }
-
-    fn statistics(&self) -> Result<Statistics> {
-        let batch = self
-            .data()
-            .expect("Create empty RecordBatch should not fail");
-        Ok(common::compute_record_batch_statistics(
-            &[batch],
-            &self.schema,
-            None,
-        ))
     }
 }
 

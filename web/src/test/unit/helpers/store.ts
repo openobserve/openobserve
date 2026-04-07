@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -51,6 +51,29 @@ const store = createStore({
     regionInfo: [],
     zoConfig: {
       sql_mode: false,
+      sql_reserved_keywords: [
+        "all",
+        "current_catalog",
+        "current_date",
+        "current_time",
+        "current_timestamp",
+        "current_user",
+        "distinct",
+        "end-exec",
+        "exists",
+        "false",
+        "from",
+        "interval",
+        "localtime",
+        "localtimestamp",
+        "not",
+        "null",
+        "session_user",
+        "top",
+        "trim",
+        "true",
+        "user",
+      ],
       version: "v0.2.0",
       sql_mode_manual_trigger: false,
       commit_hash: "dc2b38c0f8be27bde395922d61134f09a3b4c",

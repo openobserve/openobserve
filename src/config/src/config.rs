@@ -17,7 +17,7 @@ use std::{
     cmp::max,
     collections::BTreeMap,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, LazyLock as Lazy},
     time::Duration,
 };
 
@@ -35,7 +35,6 @@ use lettre::{
         client::{Tls, TlsParameters},
     },
 };
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 
@@ -108,8 +107,8 @@ pub const MESSAGE_COL_NAME: &str = "message";
 pub const STREAM_NAME_LABEL: &str = "o2_stream_name";
 pub const DEFAULT_STREAM_NAME: &str = "default";
 
-const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 9] = [
-    "log", "message", "msg", "content", "data", "body", "json", "error", "errors",
+const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
+    "log", "message", "msg", "content", "data", "body", "json", "error",
 ];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
@@ -3389,6 +3388,15 @@ pub fn ensure_not_empty(s: &str, name: &str) -> Result<(), anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_config_static_uses_std_lazylock_api() {
+        let cfg = std::sync::LazyLock::force(&CONFIG).load();
+        assert_eq!(
+            cfg.limit.req_cols_per_record_limit,
+            get_config().limit.req_cols_per_record_limit
+        );
+    }
 
     #[test]
     fn test_get_config() {

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
+    sync::{Arc, LazyLock as Lazy},
 };
 
 use config::meta::promql::{
@@ -23,7 +23,6 @@ use config::meta::promql::{
     value::{Label, LabelsExt, RangeValue, Sample, Value, signature},
 };
 use datafusion::error::{DataFusionError, Result};
-use once_cell::sync::Lazy;
 use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token};
 use rayon::prelude::*;
 

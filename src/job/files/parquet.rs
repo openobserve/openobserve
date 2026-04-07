@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::Path, sync::Arc, time::UNIX_EPOCH};
+use std::{
+    path::Path,
+    sync::{Arc, LazyLock as Lazy},
+    time::UNIX_EPOCH,
+};
 
 use arrow_schema::Schema;
 use bytes::Bytes;
@@ -43,7 +47,6 @@ use infra::{
     storage,
 };
 use ingester::WAL_PARQUET_METADATA;
-use once_cell::sync::Lazy;
 use tokio::{
     fs::remove_file,
     sync::{Mutex, RwLock},

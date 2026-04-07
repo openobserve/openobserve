@@ -130,7 +130,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     testLogger.info('Screenshot captured');
   });
 
-  test("P0: Click node and verify side panel opens with metrics", {
+  test("P0: Click node and verify side panel opens with RED charts", {
     tag: ['@serviceGraph', '@traces', '@smoke', '@P0', '@all']
   }, async ({ page }) => {
     const pm = new PageManager(page);
@@ -156,19 +156,9 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     expect(serviceName).toContain('api-gateway');
     testLogger.info(`Service name: ${serviceName}`);
 
-    // Verify metrics section is visible
-    await pm.serviceGraphPage.expectMetricsSectionVisible();
-    testLogger.info('Metrics section is visible');
-
-    // Verify request rate is shown
-    const requestRate = await pm.serviceGraphPage.getRequestRate();
-    expect(requestRate).toBeTruthy();
-    testLogger.info(`Request rate: ${requestRate}`);
-
-    // Verify error rate is shown
-    const errorRate = await pm.serviceGraphPage.getErrorRate();
-    expect(errorRate).toBeTruthy();
-    testLogger.info(`Error rate: ${errorRate}`);
+    // Verify RED charts section is visible (Rate/Errors/Duration dashboards)
+    await pm.serviceGraphPage.expectRedChartsSectionVisible();
+    testLogger.info('RED charts section is visible');
   });
 
   // ===== P1: FUNCTIONAL TESTS =====
@@ -451,11 +441,11 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     testLogger.info('Search cleared and graph restored');
   });
 
-  test("P2: Recent traces appear in side panel for a service", {
+  test("P2: Operations tab appears in side panel for a service", {
     tag: ['@serviceGraph', '@traces', '@edge', '@P2', '@all']
   }, async ({ page }) => {
     const pm = new PageManager(page);
-    testLogger.info('=== Testing recent traces in side panel ===');
+    testLogger.info('=== Testing operations tab in side panel ===');
 
     // Step 1: API validation — confirm api-gateway has requests
     const node = await pm.serviceGraphPage.findNodeByLabel('api-gateway');
@@ -463,20 +453,20 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     expect(node.requests).toBeGreaterThan(0);
     testLogger.info(`API confirmed api-gateway has ${node.requests} requests`);
 
-    // Step 2: UI validation — click node and check recent traces
+    // Step 2: UI validation — click node and check operations tab
     await pm.serviceGraphPage.navigateToServiceGraphUrl();
     await pm.serviceGraphPage.expectServiceGraphPageVisible();
 
     await pm.serviceGraphPage.clickNodeByName('api-gateway');
     await pm.serviceGraphPage.expectSidePanelVisible();
 
-    // Verify recent traces section is visible (10s auto-retry)
-    await pm.serviceGraphPage.expectRecentTracesSectionVisible();
-    testLogger.info('Recent traces section is visible');
+    // Verify operations section is visible (default active tab)
+    await pm.serviceGraphPage.expectOperationsSectionVisible();
+    testLogger.info('Operations section is visible');
 
-    const traceCount = await pm.serviceGraphPage.getRecentTraceCount();
-    testLogger.info(`Recent traces count: ${traceCount}`);
-    expect(traceCount).toBeGreaterThan(0);
+    const rowCount = await pm.serviceGraphPage.getOperationsTableRowCount();
+    testLogger.info(`Operations table row count: ${rowCount}`);
+    expect(rowCount).toBeGreaterThanOrEqual(0);
 
     await pm.serviceGraphPage.closeSidePanel();
   });

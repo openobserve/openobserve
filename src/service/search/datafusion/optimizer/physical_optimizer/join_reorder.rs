@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -140,14 +140,13 @@ mod tests {
             "  AggregateExec: mode=Final, gby=[], aggr=[count(Int64(1))]",
             "    CoalescePartitionsExec",
             "      AggregateExec: mode=Partial, gby=[], aggr=[count(Int64(1))]",
-            "        ProjectionExec: expr=[]",
-            "          HashJoinExec: mode=Partitioned, join_type=RightSemi, on=[(name@0, name@0)]",
-            "            AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
-            "              RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
-            "                AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
-            "                  NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
+            "        HashJoinExec: mode=Partitioned, join_type=RightSemi, on=[(name@0, name@0)], projection=[]",
+            "          AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[]",
             "            RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
-            "              NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
+            "              AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[]",
+            "                NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
+            "          RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
+            "            NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));
@@ -258,16 +257,16 @@ mod tests {
             "  AggregateExec: mode=Final, gby=[], aggr=[count(Int64(1))]",
             "    CoalescePartitionsExec",
             "      AggregateExec: mode=Partial, gby=[], aggr=[count(Int64(1))]",
-            "        ProjectionExec: expr=[]",
-            "          HashJoinExec: mode=CollectLeft, join_type=RightSemi, on=[(name@0, name@0)]",
-            "            DeduplicationExec: columns: [name@0]",
-            "              SortExec: TopK(fetch=50000), expr=[name@0 DESC NULLS LAST], preserve_partitioning=[false]",
-            "                CoalescePartitionsExec",
+            "        HashJoinExec: mode=CollectLeft, join_type=RightSemi, on=[(name@0, name@0)], projection=[]",
+            "          DeduplicationExec: columns: [name@0]",
+            "            SortExec: TopK(fetch=50000), expr=[name@0 DESC NULLS LAST], preserve_partitioning=[false]",
+            "              CoalescePartitionsExec",
+            "                LocalLimitExec: fetch=50000",
             "                  AggregateExec: mode=FinalPartitioned, gby=[name@0 as name], aggr=[], lim=[50000]",
             "                    RepartitionExec: partitioning=Hash([name@0], 12), input_partitions=12",
             "                      AggregateExec: mode=Partial, gby=[name@0 as name], aggr=[], lim=[50000]",
             "                        NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
-            "            NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
+            "          NewEmptyExec: name=\"t\", projection=[\"name\"], filters=[]",
         ];
 
         assert_eq!(expected, get_plan_string(&physical_plan));

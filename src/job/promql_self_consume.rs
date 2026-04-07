@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::LazyLock as Lazy;
+
 use config::{
     META_ORG_ID,
     cluster::LOCAL_NODE,
@@ -21,7 +23,6 @@ use config::{
     utils::{prom_json_encoder::JsonEncoder, util::zero_or},
 };
 use hashbrown::HashSet;
-use once_cell::sync::Lazy;
 use proto::cluster_rpc::{
     IngestionData, IngestionRequest, IngestionType, ingest_client::IngestClient,
 };

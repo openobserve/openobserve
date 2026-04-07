@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -32,6 +32,7 @@ import useNotifications from "@/composables/useNotifications";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useSearchStream from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import config from "@/aws-exports";
 
 export const useSearchBar = () => {
@@ -348,8 +349,10 @@ export const useSearchBar = () => {
       // Replace field list in query
       const fieldList =
         searchObj.meta.quickMode &&
-        searchObj.data.stream.interestingFieldList.length > 0
-          ? searchObj.data.stream.interestingFieldList.join(",")
+          searchObj.data.stream.interestingFieldList.length > 0
+          ? searchObj.data.stream.interestingFieldList
+            .map((field: string) => quoteSqlIdentifierIfNeeded(field))
+            .join(",")
           : "*";
 
       const finalQuery = query.replace(/\[FIELD_LIST\]/g, fieldList);

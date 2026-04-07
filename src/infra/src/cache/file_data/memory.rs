@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,6 +16,7 @@
 use std::{
     cmp::{max, min},
     ops::Range,
+    sync::LazyLock as Lazy,
 };
 
 use bytes::Bytes;
@@ -28,7 +29,6 @@ use config::{
 };
 use futures::StreamExt;
 use object_store::{GetOptions, GetResult, GetResultPayload, ObjectMeta};
-use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 use super::CacheStrategy;

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ use std::{any::Any, sync::Arc};
 use config::utils::record_batch_ext::convert_json_to_record_batch;
 use datafusion::{
     arrow::datatypes::SchemaRef,
-    common::{Result, Statistics},
+    common::Result,
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning},
     physical_plan::{
@@ -38,7 +38,7 @@ pub struct EnrichExec {
     org_id: String,
     name: String,
     schema: SchemaRef, // The schema for the produced row
-    cache: PlanProperties,
+    cache: Arc<PlanProperties>,
     metrics: ExecutionPlanMetricsSet,
 }
 
@@ -57,17 +57,17 @@ impl EnrichExec {
 
     /// This function creates the cache object that stores the plan properties such as schema,
     /// equivalence properties, ordering, partitioning, etc.
-    fn compute_properties(schema: SchemaRef, n_partitions: usize) -> PlanProperties {
+    fn compute_properties(schema: SchemaRef, n_partitions: usize) -> Arc<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         let output_partitioning = Partitioning::UnknownPartitioning(n_partitions);
-        PlanProperties::new(
+        Arc::new(PlanProperties::new(
             eq_properties,
             // Output Partitioning
             output_partitioning,
             // Execution Mode
             EmissionType::Incremental,
             Boundedness::Bounded,
-        )
+        ))
     }
 }
 
@@ -98,7 +98,7 @@ impl ExecutionPlan for EnrichExec {
         self
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.cache
     }
 
@@ -130,10 +130,6 @@ impl ExecutionPlan for EnrichExec {
             self.schema.clone(),
             stream,
         )))
-    }
-
-    fn statistics(&self) -> Result<Statistics> {
-        Ok(Statistics::new_unknown(&self.schema()))
     }
 
     fn metrics(&self) -> Option<MetricsSet> {

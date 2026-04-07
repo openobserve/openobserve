@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::LazyLock as Lazy};
 
 use config::{
     RwHashMap, RwHashSet,
@@ -26,7 +26,6 @@ use o2_enterprise::enterprise::{
     common::config::get_config as get_o2_config,
     super_cluster::stream::client::super_cluster_cache_stats,
 };
-use once_cell::sync::Lazy;
 pub mod broadcast;
 pub mod local;
 

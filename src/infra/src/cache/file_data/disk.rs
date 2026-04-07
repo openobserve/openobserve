@@ -18,7 +18,10 @@ use std::{
     fmt,
     ops::Range,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::{
+        LazyLock as Lazy,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
     time::SystemTime,
 };
 
@@ -34,7 +37,6 @@ use config::{
 };
 use hashbrown::HashMap;
 use object_store::{GetOptions, GetResult, GetResultPayload, ObjectMeta};
-use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 use super::CacheStrategy;
