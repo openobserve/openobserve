@@ -31,6 +31,9 @@ export default class DashboardactionPage {
   async savePanel() {
     await this.panelSaveBtn.waitFor({ state: "visible" });
     await this.panelSaveBtn.click();
+      
+    // Wait for save to complete
+    // await this.page.waitForLoadState("networkidle");
   }
 
   //Apply dashboard button
