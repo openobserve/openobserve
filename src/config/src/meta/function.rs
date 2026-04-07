@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock as Lazy;
+
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

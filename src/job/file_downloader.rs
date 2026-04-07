@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::VecDeque, sync::Arc};
+use std::{
+    collections::VecDeque,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use config::{
     cluster::LOCAL_NODE,
@@ -25,7 +28,6 @@ use config::{
 use futures_util::StreamExt;
 use hashbrown::{HashMap, HashSet};
 use infra::{cache::file_data, cluster};
-use once_cell::sync::Lazy;
 use proto::cluster_rpc::{SimpleFileList, event_client::EventClient};
 use tokio::sync::{
     Mutex,

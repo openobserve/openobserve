@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock as Lazy,
+};
 
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
@@ -35,7 +38,6 @@ use config::{
 use futures::future::try_join_all;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
-use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 #[cfg(feature = "enterprise")]
