@@ -1295,6 +1295,10 @@ interface Props {
   externalActiveTab?: string; // For embedded-tabs mode, allows parent to control active tab
   hideDimensionFilters?: boolean; // Hide dimension filters in embedded-tabs mode
   metricGroupDefinitions?: MetricGroupDefinition[]; // Override the default Infra/Network/Others groups
+  panelWidth?: number; // Override default panel width (grid units) for metric panels
+  panelHeight?: number; // Override default panel height (grid units) for metric panels
+  logsPanelWidth?: number; // Override default panel width (grid units) for logs panel
+  logsPanelHeight?: number; // Override default panel height (grid units) for logs panel
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -1655,6 +1659,8 @@ const regenerateGroupDashboards = (config: MetricsCorrelationConfig) => {
         grouped.byGroup[gId],
         config,
         store.state.theme,
+        props.panelWidth,
+        props.panelHeight,
       );
     }
   }
@@ -1936,6 +1942,8 @@ const loadDashboard = async () => {
         selectedMetricStreams.value,
         config,
         store.state.theme,
+        props.panelWidth,
+        props.panelHeight,
       );
       dashboardData.value = dashboard;
       dashboardRenderKey.value++;
@@ -1955,6 +1963,8 @@ const loadDashboard = async () => {
       const logsDashboard = generateLogsDashboard(
         props.logStreams || [],
         config,
+        props.logsPanelWidth,
+        props.logsPanelHeight,
       );
       logsDashboardData.value = logsDashboard;
       logsDashboardRenderKey.value++;
@@ -2030,6 +2040,8 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
         streamsNeedingGeneration,
         config,
         store.state.theme,
+        props.panelWidth,
+        props.panelHeight,
       );
       newPanels = newDashboard.tabs[0].panels;
     }
@@ -2050,14 +2062,15 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
       }
     });
 
+    const grid = 192;
     // Update layout positions for all panels being added
     allPanelsToAdd.forEach((panel: any, index: number) => {
       const uniqueId = `${panel.layout.i}_${timestamp}_${index}`;
       // Preserve original layout properties (w, h) from generateDashboard or cache
       panel.layout = {
         ...panel.layout,
-        x: (index % 2) * 96,
-        y: maxY + Math.floor(index / 3) * 16,
+        x: (index % Math.floor(grid / props.panelWidth)) * props.panelWidth,
+        y: maxY + Math.floor(index / 3) * props.panelHeight,
         i: uniqueId,
       };
       panel.id = `${panel.id}_${timestamp}`;

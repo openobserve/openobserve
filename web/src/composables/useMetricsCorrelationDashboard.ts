@@ -46,9 +46,11 @@ export function useMetricsCorrelationDashboard() {
     streams: StreamInfo[],
     config: MetricsCorrelationConfig,
     _theme: "dark" | "light" = "dark",
+    panelWidth = 64,
+    panelHeight = 16,
   ) => {
     const panels = streams.map((stream, index) => {
-      return createMetricPanel(stream, index, config);
+      return createMetricPanel(stream, index, config, panelWidth, panelHeight);
     });
 
     // No variables in the metrics dashboard - dimensions are managed at the top level
@@ -90,6 +92,8 @@ export function useMetricsCorrelationDashboard() {
     stream: StreamInfo,
     index: number,
     config: MetricsCorrelationConfig,
+    panelWidth = 64,
+    panelHeight = 16,
   ) => {
     // Get schema information for this metric stream
     const schema = config.metricSchemas?.[stream.stream_name];
@@ -261,10 +265,10 @@ ORDER BY x_axis_1`;
         },
       ],
       layout: {
-        x: col * 96,
-        y: row * 16,
-        w: 96,
-        h: 16,
+        x: col * panelWidth,
+        y: row * panelHeight,
+        w: panelWidth,
+        h: panelHeight,
         i: `${stream.stream_name}_${index}`,
       },
       htmlContent: "",
@@ -279,6 +283,8 @@ ORDER BY x_axis_1`;
   const generateLogsDashboard = (
     streams: StreamInfo[],
     config: MetricsCorrelationConfig,
+    panelWidth = 192,
+    panelHeight = 44,
   ) => {
     // Determine stream and filters based on available data
     let streamName: string;
@@ -393,8 +399,8 @@ ORDER BY x_axis_1`;
       layout: {
         x: 0,
         y: 0,
-        w: 192,
-        h: 44,
+        w: panelWidth,
+        h: panelHeight,
         i: 1,
       },
       htmlContent: "",
