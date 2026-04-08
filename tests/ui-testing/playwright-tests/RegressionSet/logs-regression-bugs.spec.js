@@ -460,13 +460,15 @@ test.describe("Logs Regression Bug Fixes", () => {
           // Check if we can still click the same value's include button
           // (This tests if spamming is prevented)
           const includeBtn2 = pm.logsPage.getSubfieldListEqualButton('level').first();
-          if (await includeBtn2.isVisible()) {
-            const isDisabled = await includeBtn2.isDisabled().catch(() => false);
-            testLogger.info(`Include button disabled state: ${isDisabled}`);
 
-            // PRIMARY ASSERTION: The button should be disabled for already-included values
-            expect(isDisabled, 'Bug #11041: include button should be disabled for already-included value').toBe(true);
-          }
+          // Assert button is still visible after adding filter
+          await expect(includeBtn2, 'Bug #11041: include button should remain visible after adding filter').toBeVisible({ timeout: 3000 });
+
+          const isDisabled = await includeBtn2.isDisabled().catch(() => false);
+          testLogger.info(`Include button disabled state: ${isDisabled}`);
+
+          // PRIMARY ASSERTION: The button should be disabled for already-included values
+          expect(isDisabled, 'Bug #11041: include button should be disabled for already-included value').toBe(true);
         }
       }
     } else {
