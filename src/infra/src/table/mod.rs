@@ -34,6 +34,7 @@ pub mod distinct_values;
 pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod entity;
+pub mod eval_templates;
 pub mod folders;
 pub mod incident_events;
 pub mod kv_store;

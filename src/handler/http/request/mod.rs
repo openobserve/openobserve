@@ -32,6 +32,8 @@ pub mod dashboards;
 #[cfg(feature = "enterprise")]
 pub mod domain_management;
 pub mod enrichment_table;
+#[cfg(feature = "enterprise")]
+pub mod eval_templates;
 #[allow(deprecated)]
 pub mod folders;
 pub mod functions;
