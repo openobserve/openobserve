@@ -114,7 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Aggregation Header -->
             <div
-              class="section-group-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2"
+              class="section-group-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2 tw:cursor-pointer"
+              @click="handleAggregationHeaderClick"
             >
               <div class="tw:flex tw:items-center tw:gap-1.5">
                 <span
@@ -128,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-6'
                   "
+                  @click.stop
                 >
                   <q-tooltip
                     anchor="center right"
@@ -147,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="localIsAggregationEnabled"
                 size="30px"
                 class="o2-toggle-button-xs"
+                @click.stop
                 @update:model-value="toggleAggregation"
               />
             </div>
@@ -1045,7 +1048,13 @@ export default defineComponent({
       emit("validate-sql");
     };
 
-    // Toggle aggregation
+    // Called from the header title bar — flips the value before running the shared logic
+    const handleAggregationHeaderClick = () => {
+      localIsAggregationEnabled.value = !localIsAggregationEnabled.value;
+      toggleAggregation();
+    };
+
+    // Toggle aggregation — called from the q-toggle @update:model-value (v-model already flipped)
     const toggleAggregation = () => {
       if (localIsAggregationEnabled.value) {
         // Enabling — initialize with defaults
@@ -1260,6 +1269,7 @@ export default defineComponent({
       filteredNumericColumns,
       filterNumericColumns,
       toggleAggregation,
+      handleAggregationHeaderClick,
       addGroupByColumn,
       deleteGroupByColumn,
       emitAggregationUpdate,
