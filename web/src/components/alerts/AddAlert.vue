@@ -252,6 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @validate-sql="validateSqlQuery"
                 @clear-multi-windows="clearMultiWindows"
                 @editor-closed="handleEditorClosed"
+                @apply-vrl="handleApplyVrl"
                 @editor-state-changed="handleEditorStateChanged"
                 @update:isAggregationEnabled="
                   (value) => (isAggregationEnabled = value)
@@ -2190,6 +2191,23 @@ export default defineComponent({
       }
     };
 
+    // Handle Apply VRL button from inline editor - sync previewQuery then trigger chart refresh
+    const handleApplyVrl = async () => {
+      if (getSelectedTab.value === "sql") {
+        previewQuery.value = formData.value.query_condition.sql?.trim() ?? "";
+      } else if (getSelectedTab.value === "promql") {
+        previewQuery.value =
+          formData.value.query_condition.promql?.trim() ?? "";
+      }
+      await nextTick();
+      if (
+        previewAlertRef.value &&
+        typeof previewAlertRef.value.refreshData === "function"
+      ) {
+        previewAlertRef.value.refreshData();
+      }
+    };
+
     // Method to handle the emitted changes and update the structure
     const updateGroup = (updatedGroup: any) => {
       const transformContext: TransformContext = { formData: formData.value };
@@ -3153,6 +3171,7 @@ export default defineComponent({
       validateStep,
       handleGoToSqlEditor,
       handleEditorClosed,
+      handleApplyVrl,
       handleEditorStateChanged,
       isEditorOpen,
       // Anomaly Detection
