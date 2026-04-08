@@ -643,10 +643,22 @@ export const usePanelVariableSubstitution = ({
               value: valueToUse,
             });
           }
+
+          // Replace all forms of the variable placeholder in the query,
+          // placeholders can be in the form of {{varName}}, ${varName}, ${varName}, {{varName:csv}}, ${varName:csv} etc.
+          // which will be replaced with the variable value. For csv and pipe forms, if the variable value is an array, it will be joined with comma or pipe respectively.
+          // For doublequote form, the variable value will be wrapped with double quotes.
+          // For singlequote form, the variable value will be wrapped with single quotes.
           query = query.replaceAll(`{{${variable.name}:csv}}`, variableValue);
           query = query.replaceAll(`{{${variable.name}:pipe}}`, variableValue);
-          query = query.replaceAll(`{{${variable.name}:doublequote}}`, `"${variableValue}"`);
-          query = query.replaceAll(`{{${variable.name}:singlequote}}`, `'${variableValue}'`);
+          query = query.replaceAll(
+            `{{${variable.name}:doublequote}}`,
+            variableValue,
+          );
+          query = query.replaceAll(
+            `{{${variable.name}:singlequote}}`,
+            variableValue,
+          );
           query = query.replaceAll(mustachePlaceholder, variableValue);
           query = query.replaceAll(variableNameWithBrackets, variableValue);
           query = query.replaceAll(variableName, variableValue);
