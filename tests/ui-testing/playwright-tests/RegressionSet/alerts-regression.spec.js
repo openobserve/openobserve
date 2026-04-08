@@ -258,7 +258,7 @@ test.describe("Alerts Regression Bugs", () => {
   //       isn't loaded from saved alert (shows default 1 instead of saved value).
   //       This test validates the UI displays the edit form correctly.
   // ============================================================================
-  test.skip("should load existing PromQL alert with correct condition values (Bug #9967 - P2)", {
+  test("should load existing PromQL alert with correct condition values (Bug #9967 - P2)", {
     tag: ['@promqlAlert', '@alerts', '@regressionBugs', '@P2', '@metrics', '@bug-9967']
   }, async ({ page }) => {
     testLogger.info('Testing loading existing PromQL alert');
@@ -293,15 +293,14 @@ test.describe("Alerts Regression Bugs", () => {
     await pm.alertsPage.clickAlertUpdateButton(alertName);
     testLogger.info('Opened alert for editing');
 
-    // Navigate to Step 4: Alert Settings to check the promql_condition values
-    await pm.alertsPage.clickContinueButton(); // Step 2
-    await pm.alertsPage.clickContinueButton(); // Step 3
-    await pm.alertsPage.clickContinueButton(); // Step 4
+    // Navigate to Step 2: Conditions to check the promql_condition values
+    // (PromQL condition is set in Step 2, not Step 4)
+    await pm.alertsPage.clickContinueButton(); // Navigate to Step 2
     await page.waitForTimeout(500);
 
-    // Verify the PromQL condition row is visible (key fix from Bug #9967)
+    // Verify the PromQL condition row is visible in Step 2 (key fix from Bug #9967)
     await pm.alertsPage.expectPromqlConditionRowVisible();
-    testLogger.info('PromQL condition row is visible in edit mode - Bug #9967 fix verified');
+    testLogger.info('PromQL condition row is visible in edit mode Step 2 - Bug #9967 fix verified');
 
     // Verify the operator dropdown is visible
     await pm.alertsPage.expectOperatorDropdownVisible();
@@ -335,7 +334,7 @@ test.describe("Alerts Regression Bugs", () => {
   // Bug #10899: Group By field autocomplete not working
   // https://github.com/openobserve/openobserve/issues/10899
   // ============================================================================
-  test.skip("Group By field should show autocomplete suggestions @bug-10899 @P1 @regression @alerts", async ({ page }) => {
+  test("Group By field should show autocomplete suggestions @bug-10899 @P1 @regression @alerts", async ({ page }) => {
     testLogger.info('Test: Verify Group By field autocomplete (Bug #10899)');
 
     const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
@@ -369,18 +368,34 @@ test.describe("Alerts Regression Bugs", () => {
     await expect(groupByLabel).toBeVisible({ timeout: 5000 });
     testLogger.info('✓ Group By section visible');
 
-    // Find the Group By input field using POM
-    const groupBySection = pm.alertsPage.getGroupBySection();
-    const inputInSection = groupBySection.locator('input, .q-select').first();
+    // Find the Group By input field - try multiple selectors
+    // Try to find Group By input using various selectors
+    const possibleSelectors = [
+      'div:has-text("Group by") input',
+      'div:has-text("Group by") .q-select',
+      '.group-by-input',
+      '[data-test*="group-by"] input',
+      '[data-test*="group-by"] .q-select'
+    ];
 
-    if (await inputInSection.isVisible({ timeout: 3000 }).catch(() => false)) {
+    let groupByInput = null;
+    for (const selector of possibleSelectors) {
+      const element = queryConfigSection.locator(selector).first();
+      if (await element.isVisible({ timeout: 1000 }).catch(() => false)) {
+        groupByInput = element;
+        testLogger.info(`✓ Found Group By input using selector: ${selector}`);
+        break;
+      }
+    }
+
+    if (groupByInput) {
       // Click to open dropdown/autocomplete
-      await inputInSection.click();
+      await groupByInput.click();
       await page.waitForTimeout(500);
       testLogger.info('✓ Clicked Group By input');
 
       // Type characters to trigger autocomplete
-      await inputInSection.fill('k8s');
+      await groupByInput.fill('k8s');
       await page.waitForTimeout(1000);
       testLogger.info('✓ Typed "k8s" to trigger autocomplete');
 
@@ -399,7 +414,8 @@ test.describe("Alerts Regression Bugs", () => {
       await firstSuggestion.click();
       testLogger.info('✓ Selected first autocomplete suggestion');
     } else {
-      // If input not found, fail the test
+      // If input not found after trying all selectors, this feature might not exist in current UI
+      testLogger.warn('Could not find Group By input field with any selector - feature may not be in current UI');
       throw new Error('Could not find Group By input field - cannot test autocomplete');
     }
 

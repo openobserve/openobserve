@@ -2096,6 +2096,42 @@ export class AlertsPage {
     }
 
     /**
+     * Select a logs stream from dropdown with fallback to first available
+     */
+    async selectLogsStream(streamName) {
+        const streamDropdown = this.page.locator(this.locators.streamNameDropdown);
+        await streamDropdown.click();
+
+        const testStreamOption = this.page.getByText(streamName, { exact: true });
+        try {
+            await expect(testStreamOption).toBeVisible({ timeout: 5000 });
+            await testStreamOption.click();
+            testLogger.info('Selected logs stream', { stream: streamName });
+            return true;
+        } catch (e) {
+            // Retry: click dropdown again
+            await streamDropdown.click();
+            await this.page.waitForTimeout(1000);
+
+            if (await testStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await testStreamOption.click();
+                testLogger.info('Selected logs stream on retry', { stream: streamName });
+                return true;
+            } else {
+                // Use first available logs stream from dropdown
+                const anyStreamOption = this.page.locator('.q-menu .q-item').first();
+                if (await anyStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    await anyStreamOption.click();
+                    testLogger.info('Using first available logs stream');
+                    return true;
+                }
+                testLogger.warn('No logs streams available');
+                return false;
+            }
+        }
+    }
+
+    /**
      * Select scheduled alert type
      */
     async selectScheduledAlertType() {
@@ -2222,6 +2258,16 @@ export class AlertsPage {
     }
 
     // ==================== PROMQL CONDITION ROW METHODS ====================
+
+    /**
+     * Get the PromQL condition row locator in Step 2 (QueryConfig)
+     */
+    getPromqlConditionRow() {
+        const queryConfigSection = this.page.locator('.step-query-config');
+        const promqlConditionLabel = queryConfigSection.getByText('Trigger if the value is').first();
+        // Return the parent container that holds both label and controls
+        return promqlConditionLabel.locator('..');
+    }
 
     /**
      * Expect the PromQL threshold operator control to be visible in Step 4.
