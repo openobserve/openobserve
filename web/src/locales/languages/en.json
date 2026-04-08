@@ -2297,13 +2297,13 @@
       "autoUsesCheckInterval": "Auto (uses check interval)"
     },
     "steps": {
-      "alertSetup": "Data Source",
-      "conditions": "Query & Conditions",
+      "alertSetup": "What to Monitor",
+      "conditions": "Detect Events",
       "compareWithPast": "Compare with Past",
-      "alertSettings": "Alert Rules",
+      "alertSettings": "Rules & Notifications",
       "deduplication": "Deduplication",
-      "advanced": "Advanced",
-      "nameAndOrganize": "Name & Organize"
+      "advanced": "Fine-tune",
+      "nameAndOrganize": "Name & Save"
     },
     "stepIntro": {
       "conditions": "Write a query to define what data this alert watches. Use Builder to get started quickly, SQL for advanced log queries, or PromQL for metrics.",
@@ -2314,13 +2314,13 @@
       "advanced": "Optionally attach context variables to enrich notification payloads, add a description for documentation purposes, or customise how individual matched rows appear in notifications."
     },
     "stepCaptions": {
-      "alertSetup": "Choose the data stream and alert type you want to monitor",
-      "conditions": "Define the query and filter conditions that describe the events you care about",
-      "compareWithPast": "Optionally compare current window results against a historical baseline",
-      "alertSettings": "Set when the alert fires, how often to check, and where to send notifications",
-      "deduplication": "Group similar alerts together so you don\u2019t receive the same notification multiple times",
-      "nameAndOrganize": "Name your alert and choose which folder to save it in",
-      "advanced": "Attach extra context variables, a custom description, or a row-level message template"
+      "alertSetup": "Pick data stream & alert type",
+      "conditions": "Query the events you want to watch",
+      "compareWithPast": "Compare against a historical baseline",
+      "alertSettings": "Threshold, frequency & notification channels",
+      "deduplication": "Suppress repeated notifications",
+      "nameAndOrganize": "Name your alert & pick a folder",
+      "advanced": "Deduplication, templates & extras"
     },
     "setup": {
       "whatToMonitor": "What are you monitoring?",
