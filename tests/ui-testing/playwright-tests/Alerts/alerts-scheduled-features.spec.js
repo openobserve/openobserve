@@ -346,22 +346,6 @@ test.describe("Scheduled Alert Features", () => {
         await pm.alertsPage.closeAlertDetailsDialog();
         await pm.alertsPage.expectAlertDetailsDialogClosed();
 
-        testLogger.info('=== PHASE 7: Test edit button navigates to wizard ===');
-
-        await pm.alertsPage.openAlertDetailsDialog(API_ALERT_NAME);
-        await pm.alertsPage.expectAlertDetailsDialogVisible();
-        await pm.alertsPage.clickAlertDetailsEditButton();
-        await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
-        await page.waitForTimeout(3000);
-
-        const alertSetupText = pm.alertsPage.getAlertSetupText().first();
-        const wizardVisible = await alertSetupText.isVisible({ timeout: 15000 }).catch(() => false);
-        expect(wizardVisible).toBe(true);
-        testLogger.info('Edit button navigated to alert wizard');
-
-        await pm.alertsPage.clickBackButton();
-        await page.waitForTimeout(1000);
-
         testLogger.info('=== Alert details dialog test COMPLETE ===');
     });
 

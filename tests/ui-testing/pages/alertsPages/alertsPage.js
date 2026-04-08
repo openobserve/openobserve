@@ -542,10 +542,10 @@ export class AlertsPage {
     }
 
     /**
-     * Verify all action buttons (edit, refresh, close) are visible in the alert details dialog
+     * Verify action buttons (close, optional refresh) are visible in the alert details dialog
+     * Note: Edit button was removed from the UI in alert history sidebar refactoring
      */
     async expectAlertDetailsActionButtonsVisible() {
-        await expect(this.page.locator(this.locators.alertDetailsEditButton)).toBeVisible({ timeout: 10000 });
         // Refresh button may not be present on all deployments (absent on alpha1 cloud)
         const refreshVisible = await this.page.locator(this.locators.alertDetailsRefreshButton)
             .isVisible({ timeout: 3000 }).catch(() => false);
