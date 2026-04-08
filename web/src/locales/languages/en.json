@@ -2319,6 +2319,7 @@
       "compareWithPast": "Optionally compare current window results against a historical baseline",
       "alertSettings": "Set when the alert fires, how often to check, and where to send notifications",
       "deduplication": "Group similar alerts together so you don\u2019t receive the same notification multiple times",
+      "nameAndOrganize": "Name your alert and choose which folder to save it in",
       "advanced": "Attach extra context variables, a custom description, or a row-level message template"
     },
     "setup": {

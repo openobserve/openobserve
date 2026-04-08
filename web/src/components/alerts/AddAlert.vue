@@ -308,15 +308,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </q-step>
 
-            <!-- Step 4: Advanced Settings (Scheduled / Real-Time alerts only) -->
+            <!-- Step 4: Name & Organize (non-anomaly alerts only) -->
             <q-step
               v-if="!isAnomalyMode"
               :name="4"
+              :title="t('alerts.steps.nameAndOrganize')"
+              caption=""
+              icon="label"
+              :done="wizardStep > 4"
+              :disable="4 > lastValidStep"
+            >
+              <div class="tw:flex tw:flex-col tw:gap-4 tw:max-w-lg">
+                <q-input
+                  data-test="add-alert-name-input"
+                  v-model="formData.name"
+                  :label="t('alerts.name') + ' *'"
+                  class="showLabelOnTop"
+                  stack-label
+                  dense
+                  borderless
+                  v-bind:readonly="beingUpdated"
+                  v-bind:disable="beingUpdated"
+                  :rules="[
+                    (val: any) =>
+                      !!val
+                        ? isValidResourceName(val) ||
+                          'Characters like :, ?, /, #, and spaces are not allowed.'
+                        : t('common.nameRequired'),
+                  ]"
+                  hide-bottom-space
+                />
+                <SelectFolderDropDown
+                  :disableDropdown="beingUpdated"
+                  :type="'alerts'"
+                  :style="'height: 36px;'"
+                  @folder-selected="updateActiveFolderId"
+                  :activeFolderId="
+                    Array.isArray(activeFolderId)
+                      ? activeFolderId[0]
+                      : activeFolderId
+                  "
+                />
+              </div>
+            </q-step>
+
+            <!-- Step 5: Advanced Settings (Scheduled / Real-Time alerts only) -->
+            <q-step
+              v-if="!isAnomalyMode"
+              :name="5"
               :title="t('alerts.steps.advanced')"
               caption=""
               icon="settings_applications"
               :done="false"
-              :disable="4 > lastValidStep"
+              :disable="5 > lastValidStep"
             >
               <Advanced
                 :contextAttributes="formData.context_attributes"
@@ -352,50 +396,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 @goToSqlEditor="handleGoToSqlEditor"
               />
-            </q-step>
-
-            <!-- Step 5: Name & Organize (non-anomaly alerts only) -->
-            <q-step
-              v-if="!isAnomalyMode"
-              :name="5"
-              :title="t('alerts.steps.nameAndOrganize')"
-              caption=""
-              icon="label"
-              :done="false"
-              :disable="5 > lastValidStep"
-            >
-              <div class="tw:flex tw:flex-col tw:gap-4 tw:max-w-lg">
-                <q-input
-                  data-test="add-alert-name-input"
-                  v-model="formData.name"
-                  :label="t('alerts.name') + ' *'"
-                  class="showLabelOnTop"
-                  stack-label
-                  dense
-                  borderless
-                  v-bind:readonly="beingUpdated"
-                  v-bind:disable="beingUpdated"
-                  :rules="[
-                    (val: any) =>
-                      !!val
-                        ? isValidResourceName(val) ||
-                          'Characters like :, ?, /, #, and spaces are not allowed.'
-                        : t('common.nameRequired'),
-                  ]"
-                  hide-bottom-space
-                />
-                <SelectFolderDropDown
-                  :disableDropdown="beingUpdated"
-                  :type="'alerts'"
-                  :style="'height: 36px;'"
-                  @folder-selected="updateActiveFolderId"
-                  :activeFolderId="
-                    Array.isArray(activeFolderId)
-                      ? activeFolderId[0]
-                      : activeFolderId
-                  "
-                />
-              </div>
             </q-step>
 
             <!-- Step 2: Anomaly Detection Config -->
@@ -1038,7 +1038,8 @@ export default defineComponent({
         1: t("alerts.stepCaptions.alertSetup"),
         2: t("alerts.stepCaptions.conditions"),
         3: t("alerts.stepCaptions.alertSettings"),
-        4: t("alerts.stepCaptions.advanced"),
+        4: t("alerts.stepCaptions.nameAndOrganize"),
+        5: t("alerts.stepCaptions.advanced"),
       };
       return captions[wizardStep.value] || "";
     });
@@ -2825,7 +2826,7 @@ export default defineComponent({
       if (formData.value.is_real_time === "anomaly") {
         return wizardStep.value === 3;
       }
-      // Both real-time and scheduled: step 5 (Name & Organize) is last
+      // Both real-time and scheduled: step 5 (Advanced) is last
       return wizardStep.value === 5;
     });
 
@@ -2841,9 +2842,9 @@ export default defineComponent({
         }
         return true;
       }
-      // Required steps: 1 (Alert Setup), 2 (Conditions), 3 (Alert Settings)
-      // Optional steps: 4 (Advanced — includes Compare Past + Deduplication)
-      return wizardStep.value >= 3;
+      // Required steps: 1 (Alert Setup), 2 (Conditions), 3 (Alert Settings), 4 (Name & Organize)
+      // Optional step: 5 (Advanced — includes Compare Past, Deduplication, Variables, Row Template)
+      return wizardStep.value >= 4;
     });
 
     // ── Anomaly Detection save ──────────────────────────────────────────────
