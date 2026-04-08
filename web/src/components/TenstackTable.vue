@@ -1265,8 +1265,12 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
 
 const getCellDisplayValue = (cell: any): any => {
   const value = cell.getValue();
-  if (value === "undefined" || value === null || value === undefined) return "";
   const format = (cell.column.columnDef.meta as any)?.format;
+  // If a format function is defined (dashboard mode), always call it — this allows
+  // no_value_replacement to be applied even when the raw cell value is null/undefined.
+  if (value === "undefined" || value === null || value === undefined) {
+    return format ? format(null, cell.row.original) : "";
+  }
   return format ? format(value, cell.row.original) : value;
 };
 
