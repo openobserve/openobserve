@@ -74,7 +74,20 @@ async function globalSetup() {
     await emailField.first().fill(userEmail);
     testLogger.info('[alpha1] Email entered');
 
-    await passwordField.first().waitFor({ state: 'visible', timeout: 5000 });
+    // Handle multi-step Dex login: if password field not immediately visible,
+    // click Continue/Next to advance to the password step
+    const passwordVisible = await passwordField.first().isVisible().catch(() => false);
+    if (!passwordVisible) {
+      const continueBtn = page.locator('button:has-text("Continue"), button:has-text("Next")').first();
+      const continueBtnVisible = await continueBtn.isVisible().catch(() => false);
+      if (continueBtnVisible) {
+        testLogger.info('[alpha1] Clicking Continue to advance to password step...');
+        await continueBtn.click();
+        await page.waitForLoadState('domcontentloaded');
+      }
+    }
+
+    await passwordField.first().waitFor({ state: 'visible', timeout: 10000 });
     await passwordField.first().fill(userPassword);
     testLogger.info('[alpha1] Password entered');
 
