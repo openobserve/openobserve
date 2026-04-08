@@ -17,6 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div ref="multiWindowContainerRef" class="step-compare-with-past" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="step-content card-container tw:px-3 tw:py-4" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
+      <!-- Step intro -->
+      <p class="step-intro-hint tw:mb-3">{{ t('alerts.stepIntro.compareWithPast') }}</p>
+
       <!-- Alert set for header -->
       <div class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-md">
         <span>{{ t('alerts.compareWithPast.alertSetFor') }}</span>

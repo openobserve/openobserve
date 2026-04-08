@@ -2297,20 +2297,53 @@
       "autoUsesCheckInterval": "Auto (uses check interval)"
     },
     "steps": {
-      "alertSetup": "Alert Setup",
-      "conditions": "Conditions",
+      "alertSetup": "Data Source",
+      "conditions": "Query & Conditions",
       "compareWithPast": "Compare with Past",
-      "alertSettings": "Alert Settings",
+      "alertSettings": "Alert Rules",
       "deduplication": "Deduplication",
-      "advanced": "Advanced"
+      "advanced": "Advanced",
+      "nameAndOrganize": "Name & Organize"
+    },
+    "stepIntro": {
+      "conditions": "Write the query that selects the data this alert monitors. Use Builder for a guided experience, SQL for full control, or PromQL for metrics.",
+      "compareWithPast": "Compare data from the current check window against one or more past time windows. Useful for detecting relative changes, such as more errors than usual compared to yesterday.",
+      "alertSettingsScheduled": "Set the detection window, how often to check, the threshold that triggers the alert, and where to send notifications.",
+      "alertSettingsRealtime": "Choose how long to wait before re-notifying (cooldown) and which channels should receive this alert.",
+      "deduplication": "Define a fingerprint — a set of fields that uniquely identify an alert event. Alerts sharing the same fingerprint within the window will be grouped instead of firing separately.",
+      "advanced": "Optionally attach context variables to enrich notification payloads, add a description for documentation purposes, or customise how individual matched rows appear in notifications."
     },
     "stepCaptions": {
-      "alertSetup": "Set the stage for your alert",
-      "conditions": "What should trigger the alert",
-      "compareWithPast": "Compare current results with data from another time period",
-      "alertSettings": "Set your alert rules and choose how you'd like to be notified.",
-      "deduplication": "Avoid sending the same alert multiple times by grouping similar alerts together.",
-      "advanced": "Context variables, description, and row template"
+      "alertSetup": "Choose the data stream and alert type you want to monitor",
+      "conditions": "Define the query and filter conditions that describe the events you care about",
+      "compareWithPast": "Optionally compare current window results against a historical baseline",
+      "alertSettings": "Set when the alert fires, how often to check, and where to send notifications",
+      "deduplication": "Group similar alerts together so you don\u2019t receive the same notification multiple times",
+      "advanced": "Attach extra context variables, a custom description, or a row-level message template"
+    },
+    "setup": {
+      "whatToMonitor": "What are you monitoring?",
+      "whatToMonitorHint": "Select the data stream you want this alert to watch",
+      "alertTypeLabel": "How should this alert work?",
+      "alertTypeHint": "Choose the alert type that best fits your monitoring need",
+      "identityLabel": "Name & organize",
+      "identityHint": "Give your alert a clear name so it\u2019s easy to find later"
+    },
+    "alertTypeCards": {
+      "scheduledLabel": "Scheduled",
+      "scheduledDesc": "Checks data at regular intervals over a configurable look-back window. Best for catching trends, thresholds, and periodic conditions.",
+      "realtimeLabel": "Real-time",
+      "realtimeDesc": "Fires immediately when matching data is ingested. Ideal for catching critical issues the moment they happen.",
+      "anomalyLabel": "Anomaly Detection",
+      "anomalyDesc": "Uses machine learning to detect unusual patterns and deviations from normal baseline behaviour."
+    },
+    "optionalSections": {
+      "compareWithPast": "Compare with Past",
+      "compareWithPastDesc": "Alert when current values deviate from a historical baseline",
+      "deduplication": "Deduplication",
+      "deduplicationDesc": "Suppress duplicate notifications by grouping similar alerts",
+      "advanced": "Advanced Options",
+      "advancedDesc": "Context variables, custom row templates, and additional configuration"
     },
     "noHistory": "No alert history found",
     "totalEvaluations": "Total Evaluations",

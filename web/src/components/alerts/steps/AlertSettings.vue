@@ -17,6 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="step-alert-conditions" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="step-content card-container tw:px-3 tw:py-4">
+      <!-- Step intro — changes by alert type -->
+      <p class="step-intro-hint tw:mb-4">
+        <template v-if="isRealTime === 'true'">{{ t('alerts.stepIntro.alertSettingsRealtime') }}</template>
+        <template v-else>{{ t('alerts.stepIntro.alertSettingsScheduled') }}</template>
+      </p>
+
       <q-form ref="alertSettingsForm" @submit.prevent>
       <!-- For Real-Time Alerts -->
       <template v-if="isRealTime === 'true'">

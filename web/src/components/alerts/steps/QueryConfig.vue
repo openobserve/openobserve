@@ -17,6 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="step-query-config" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="step-content card-container tw:px-3 tw:py-4">
+      <!-- Step intro -->
+      <p class="step-intro-hint tw:mb-4">{{ t('alerts.stepIntro.conditions') }}</p>
+
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
       <div v-if="shouldShowTabs" class="tw:mb-4 tw:flex tw:items-center tw:justify-between">
         <div class="flex items-center app-tabs-container tw:h-[36px] tw:w-fit">

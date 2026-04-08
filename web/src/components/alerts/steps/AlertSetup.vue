@@ -16,81 +16,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="step-alert-setup" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw:px-3 tw:py-4">
-      <q-form ref="step1Form" @submit.prevent>
-        <!-- Alert Name -->
-        <div class="form-field tw:mb-4">
-          <q-input
-            data-test="add-alert-name-input"
-            v-model="formData.name"
-            :label="t('alerts.name') + ' *'"
-            class="showLabelOnTop"
-            stack-label
-            dense
-            borderless
-            v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated"
-            :rules="[
-              (val: any) =>
-                !!val
-                  ? isValidResourceName(val) ||
-                    `Characters like :, ?, /, #, and spaces are not allowed.`
-                  : t('common.nameRequired'),
-            ]"
-            tabindex="0"
-            hide-bottom-space
-          />
-        </div>
+    <q-form ref="step1Form" @submit.prevent>
 
-        <!-- Folder Selection -->
-        <div class="form-field tw:mb-4">
-          <SelectFolderDropDown
-            :disableDropdown="beingUpdated"
-            :type="'alerts'"
-            :style="'height: 36px;'"
-            @folder-selected="updateActiveFolderId"
-            :activeFolderId="activeFolderId"
-          />
-        </div>
+      <!-- ── Section 1: What are you monitoring? ─────────────────────── -->
+      <div class="setup-section tw:mb-6">
+        <div class="section-label tw:mb-1">{{ t('alerts.setup.whatToMonitor') }}</div>
+        <div class="section-hint tw:mb-3">{{ t('alerts.setup.whatToMonitorHint') }}</div>
 
-        <!-- Stream Type and Stream Name Row -->
-        <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 tw:gap-4">
-          <!-- Stream Type -->
-          <div class="form-field">
-            <q-select
-              ref="streamTypeFieldRef"
+        <!-- Stream Type + Stream Name row -->
+        <div class="tw:flex tw:items-start tw:gap-3">
+          <!-- Stream Type segmented button -->
+          <div class="tw:flex-shrink-0">
+            <div class="tw:text-xs tw:font-medium tw:mb-2 stream-type-label">
+              {{ t('alerts.streamType') }} *
+            </div>
+            <div
+              class="stream-type-switch"
+              :class="{ 'switch-disabled': beingUpdated }"
               data-test="add-alert-stream-type-select-dropdown"
-              v-model="formData.stream_type"
-              :options="streamTypes"
-              :label="t('alerts.streamType') + ' *'"
-              :popup-content-style="{ textTransform: 'lowercase' }"
-              class="showLabelOnTop no-case"
-              stack-label
-              borderless
-              dense
-              hide-bottom-space
-              v-bind:readonly="beingUpdated"
-              v-bind:disable="beingUpdated"
-              @update:model-value="updateStreams()"
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            />
+            >
+              <button
+                v-for="type in streamTypes"
+                :key="type"
+                type="button"
+                class="stream-type-btn"
+                :class="{ 'btn-active': formData.stream_type === type }"
+                :disabled="beingUpdated"
+                @click="!beingUpdated && selectStreamType(type)"
+              >
+                <q-icon :name="streamTypeIcon(type)" size="0.9rem" class="tw:mr-1" />
+                <span>{{ type }}</span>
+              </button>
+            </div>
           </div>
 
           <!-- Stream Name -->
-          <div class="form-field">
+          <div class="tw:flex-1 tw:min-w-0">
+            <div class="tw:text-xs tw:font-medium tw:mb-2 stream-type-label">
+              {{ t('alerts.stream_name') }} *
+            </div>
             <q-select
               ref="streamFieldRef"
               data-test="add-alert-stream-name-select-dropdown"
               v-model="formData.stream_name"
               :options="filteredStreams"
-              :label="t('alerts.stream_name') + ' *'"
               :loading="isFetchingStreams"
               color="input-border"
-              class="showLabelOnTop no-case"
-              stack-label
+              class="no-case stream-name-select"
               dense
               use-input
-              borderless
+              outlined
               hide-selected
               hide-bottom-space
               fill-input
@@ -104,47 +79,101 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
+      </div>
 
-        <!-- Alert Type (Scheduled/Real-time/Anomaly Detection) -->
-        <div class="form-field tw:mb-4 tw:mt-4">
-          <div class="tw:flex tw:items-center tw:gap-5">
-            <q-radio
-              data-test="add-alert-scheduled-alert-radio"
-              v-bind:readonly="beingUpdated"
-              v-bind:disable="beingUpdated"
-              v-model="formData.is_real_time"
-              :checked="formData.is_real_time"
-              val="false"
-              dense
-              :label="t('alerts.scheduled')"
-              class="q-ml-none o2-radio-button"
-            />
-            <q-radio
-              data-test="add-alert-realtime-alert-radio"
-              v-bind:readonly="beingUpdated"
-              v-bind:disable="beingUpdated"
-              v-model="formData.is_real_time"
-              :checked="!formData.is_real_time"
-              val="true"
-              dense
-              :label="t('alerts.realTime')"
-              class="q-ml-none o2-radio-button"
-            />
-            <q-radio
-              v-if="isAnomalyDetectionEnabled"
-              data-test="add-alert-anomaly-detection-radio"
-              v-bind:readonly="beingUpdated"
-              v-bind:disable="beingUpdated"
-              v-model="formData.is_real_time"
-              val="anomaly"
-              dense
-              :label="t('alerts.anomalyDetection')"
-              class="q-ml-none o2-radio-button"
-            />
+      <!-- ── Section 2: Alert Type ────────────────────────────────────── -->
+      <div class="setup-section tw:mb-6">
+        <div class="section-label tw:mb-1">{{ t('alerts.setup.alertTypeLabel') }}</div>
+        <div class="section-hint tw:mb-3">{{ t('alerts.setup.alertTypeHint') }}</div>
+
+        <div class="alert-type-cards tw:grid tw:gap-3"
+          :class="isAnomalyDetectionEnabled ? 'tw:grid-cols-3' : 'tw:grid-cols-2'">
+
+          <!-- Scheduled -->
+          <div
+            data-test="add-alert-scheduled-alert-radio"
+            class="alert-type-card"
+            :class="{
+              'card-selected': formData.is_real_time === 'false',
+              'card-disabled': beingUpdated
+            }"
+            @click="!beingUpdated && (formData.is_real_time = 'false')"
+          >
+            <div class="tw:flex tw:items-start tw:gap-3">
+              <div class="card-icon-wrap">
+                <q-icon name="schedule" size="1.25rem" />
+              </div>
+              <div class="tw:flex-1">
+                <div class="card-title">{{ t('alerts.alertTypeCards.scheduledLabel') }}</div>
+                <div class="card-desc">{{ t('alerts.alertTypeCards.scheduledDesc') }}</div>
+              </div>
+              <q-icon
+                v-if="formData.is_real_time === 'false'"
+                name="check_circle"
+                size="1rem"
+                class="card-check-icon"
+              />
+            </div>
+          </div>
+
+          <!-- Real-time -->
+          <div
+            data-test="add-alert-realtime-alert-radio"
+            class="alert-type-card"
+            :class="{
+              'card-selected': formData.is_real_time === 'true',
+              'card-disabled': beingUpdated
+            }"
+            @click="!beingUpdated && (formData.is_real_time = 'true')"
+          >
+            <div class="tw:flex tw:items-start tw:gap-3">
+              <div class="card-icon-wrap">
+                <q-icon name="bolt" size="1.25rem" />
+              </div>
+              <div class="tw:flex-1">
+                <div class="card-title">{{ t('alerts.alertTypeCards.realtimeLabel') }}</div>
+                <div class="card-desc">{{ t('alerts.alertTypeCards.realtimeDesc') }}</div>
+              </div>
+              <q-icon
+                v-if="formData.is_real_time === 'true'"
+                name="check_circle"
+                size="1rem"
+                class="card-check-icon"
+              />
+            </div>
+          </div>
+
+          <!-- Anomaly Detection -->
+          <div
+            v-if="isAnomalyDetectionEnabled"
+            data-test="add-alert-anomaly-detection-radio"
+            class="alert-type-card"
+            :class="{
+              'card-selected': formData.is_real_time === 'anomaly',
+              'card-disabled': beingUpdated
+            }"
+            @click="!beingUpdated && (formData.is_real_time = 'anomaly')"
+          >
+            <div class="tw:flex tw:items-start tw:gap-3">
+              <div class="card-icon-wrap">
+                <q-icon name="auto_graph" size="1.25rem" />
+              </div>
+              <div class="tw:flex-1">
+                <div class="card-title">{{ t('alerts.alertTypeCards.anomalyLabel') }}</div>
+                <div class="card-desc">{{ t('alerts.alertTypeCards.anomalyDesc') }}</div>
+              </div>
+              <q-icon
+                v-if="formData.is_real_time === 'anomaly'"
+                name="check_circle"
+                size="1rem"
+                class="card-check-icon"
+              />
+            </div>
           </div>
         </div>
-      </q-form>
-    </div>
+      </div>
+
+    </q-form>
   </div>
 </template>
 
@@ -152,14 +181,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { isValidResourceName } from "@/utils/zincutils";
-import SelectFolderDropDown from "../../common/sidebar/SelectFolderDropDown.vue";
+import {
+  outlinedSearch,
+  outlinedBarChart,
+  outlinedAccountTree,
+} from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "Step1AlertSetup",
-  components: {
-    SelectFolderDropDown,
-  },
+  components: {},
   props: {
     formData: {
       type: Object as PropType<any>,
@@ -181,10 +211,6 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    activeFolderId: {
-      type: String,
-      required: true,
-    },
     streamFieldRef: {
       type: Object as PropType<any>,
       default: null,
@@ -194,7 +220,7 @@ export default defineComponent({
       default: null,
     },
   },
-  emits: ["update:streams", "filter:streams", "update:stream-name", "update:active-folder-id"],
+  emits: ["update:streams", "filter:streams", "update:stream-name"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -203,6 +229,20 @@ export default defineComponent({
     const isAnomalyDetectionEnabled = computed(
       () => store.state.zoConfig.anomaly_detection_enabled === true,
     );
+
+    const streamTypeIcon = (type: string): string => {
+      const icons: Record<string, string> = {
+        logs: outlinedSearch,
+        metrics: outlinedBarChart,
+        traces: outlinedAccountTree,
+      };
+      return icons[type] ?? "circle";
+    };
+
+    const selectStreamType = (type: string) => {
+      props.formData.stream_type = type;
+      emit("update:streams");
+    };
 
     const updateStreams = () => {
       emit("update:streams");
@@ -216,9 +256,6 @@ export default defineComponent({
       emit("update:stream-name", streamName);
     };
 
-    const updateActiveFolderId = (folderId: any) => {
-      emit("update:active-folder-id", folderId);
-    };
 
     const validate = async () => {
       if (step1Form.value) {
@@ -231,12 +268,12 @@ export default defineComponent({
       t,
       store,
       step1Form,
-      isValidResourceName,
       isAnomalyDetectionEnabled,
+      streamTypeIcon,
+      selectStreamType,
       updateStreams,
       filterStreams,
       handleStreamNameChange,
-      updateActiveFolderId,
       validate,
     };
   },
@@ -246,61 +283,142 @@ export default defineComponent({
 <style scoped lang="scss">
 .step-alert-setup {
   width: 100%;
-  margin: 0 auto;
-  height: 100%;
 
-  .step-content {
-    border-radius: 8px;
-    height: 100%;
-  }
-
-  .step-header {
-    .step-title {
-      font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 0.2rem;
+  .setup-section {
+    .section-label {
+      font-size: 0.875rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: var(--o2-text-primary);
     }
 
-    .step-subtitle {
-      font-size: 13px;
-      opacity: 0.8;
-      margin: 0;
-      margin-bottom: 0.5rem;
+    .section-hint {
+      font-size: 0.8125rem;
+      color: var(--o2-text-secondary);
+      line-height: 1.4;
+    }
+  }
+
+  // Alert type selection cards
+  .alert-type-cards {
+    .alert-type-card {
+      border: 1.5px solid var(--o2-border);
+      border-radius: 0.5rem;
+      padding: 0.875rem 1rem;
+      cursor: pointer;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+      position: relative;
+
+      &:hover:not(.card-disabled) {
+        border-color: var(--o2-primary-color);
+        box-shadow: 0 0 0 3px rgba(var(--o2-primary-color-rgb, 99, 102, 241), 0.08);
+      }
+
+      &.card-selected {
+        border-color: var(--o2-primary-color);
+        box-shadow: 0 0 0 3px rgba(var(--o2-primary-color-rgb, 99, 102, 241), 0.1);
+        background-color: var(--o2-primary-background);
+      }
+
+      &.card-disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+
+      .card-icon-wrap {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 0.375rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        background-color: var(--o2-primary-background);
+        color: var(--o2-primary-color);
+      }
+
+      .card-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+        color: var(--o2-text-primary);
+      }
+
+      .card-desc {
+        font-size: 0.75rem;
+        line-height: 1.45;
+        color: var(--o2-text-secondary);
+      }
+
+      .card-check-icon {
+        color: var(--o2-primary-color);
+        flex-shrink: 0;
+        margin-top: 0.125rem;
+      }
+    }
+  }
+
+  // Stream type segmented switch
+  .stream-type-label {
+    color: var(--o2-text-secondary);
+    letter-spacing: 0.01em;
+  }
+
+  .stream-type-switch {
+    display: inline-flex;
+    border: 1.5px solid var(--o2-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: transparent;
+
+    &.switch-disabled {
+      opacity: 0.55;
+      pointer-events: none;
+    }
+
+    .stream-type-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.375rem 1.1rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      text-transform: capitalize;
+      background: transparent;
+      border: none;
+      border-right: 1.5px solid var(--o2-border);
+      cursor: pointer;
+      color: var(--o2-text-secondary);
+      transition: background-color 0.12s ease, color 0.12s ease;
+      outline: none;
+      white-space: nowrap;
+
+      &:last-child {
+        border-right: none;
+      }
+
+      &:hover:not(:disabled) {
+        background-color: var(--o2-primary-background);
+        color: var(--o2-primary-color);
+      }
+
+      &.btn-active {
+        background-color: var(--o2-primary-color);
+        color: #fff;
+
+        .q-icon {
+          color: #fff;
+        }
+      }
+
+      &:disabled {
+        cursor: not-allowed;
+      }
     }
   }
 
   .form-field {
     width: 100%;
-  }
-
-  &.dark-mode {
-    .step-content {
-      background-color: #212121;
-      border: 1px solid #343434;
-    }
-
-    .step-title {
-      color: #ffffff;
-    }
-
-    .step-subtitle {
-      color: #bdbdbd;
-    }
-  }
-
-  &.light-mode {
-    .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
-    }
-
-    .step-title {
-      color: #1a1a1a;
-    }
-
-    .step-subtitle {
-      color: #5c5c5c;
-    }
   }
 }
 </style>

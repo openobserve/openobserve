@@ -17,6 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="step-advanced" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="step-content card-container tw:px-3 tw:py-4">
+      <!-- Step intro -->
+      <p class="step-intro-hint tw:mb-4">{{ t('alerts.stepIntro.advanced') }}</p>
+
       <!-- Context Variables -->
       <div class="tw:mb-4">
         <div class="tw:pb-2 custom-input-label text-bold">
