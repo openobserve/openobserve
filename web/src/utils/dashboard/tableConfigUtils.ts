@@ -156,9 +156,11 @@ export const detectTimestampFields = (
 
   for (const field of fields) {
     if (field?.functionName === "histogram") {
-      if (!field.treatAsNonTimestamp) {
-        result.add(field.alias);
-      }
+      // Histogram fields always produce datetime values; format them as
+      // timestamps regardless of the treatAsNonTimestamp flag so that values
+      // like "2026-02-09T18:00:00" are always shown in timezone-aware
+      // "YYYY-MM-DD HH:mm:ss" format.
+      result.add(field.alias);
     } else {
       const sample = tableRows
         ?.slice(0, Math.min(20, tableRows.length))
