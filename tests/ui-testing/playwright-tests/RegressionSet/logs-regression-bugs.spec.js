@@ -426,51 +426,49 @@ test.describe("Logs Regression Bug Fixes", () => {
 
       // Find and click include button for a field value
       const includeBtn = pm.logsPage.getSubfieldListEqualButton('level').first();
-      if (await includeBtn.isVisible()) {
-        await includeBtn.click();
-        await page.waitForTimeout(500);
+      await expect(includeBtn, 'Bug #11041: include button should be visible').toBeVisible({ timeout: 3000 });
+      await includeBtn.click();
+      await page.waitForTimeout(500);
 
-        // Click "Include Search Term" from the menu
-        const includeMenuItem = pm.logsPage.getIncludeSearchTermMenuItem();
-        if (await includeMenuItem.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await includeMenuItem.click();
-          testLogger.info('✓ Added first include search term');
+      // Click "Include Search Term" from the menu
+      const includeMenuItem = pm.logsPage.getIncludeSearchTermMenuItem();
+      await expect(includeMenuItem, 'Bug #11041: include menu item should be visible').toBeVisible({ timeout: 3000 });
+      await includeMenuItem.click();
+      testLogger.info('✓ Added first include search term');
 
-          // Run the query with the include filter
-          await pm.logsPage.clickRefreshButton();
-          await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-          await page.waitForTimeout(2000);
+      // Run the query with the include filter
+      await pm.logsPage.clickRefreshButton();
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(2000);
 
-          // BUG CHECK: The include button should now be disabled or show different state
-          // for the already-included value
-          const queryEditor = pm.logsPage.getQueryEditorLocator();
-          const queryText = await queryEditor.textContent();
-          testLogger.info(`Query editor contains: ${queryText}`);
+      // BUG CHECK: The include button should now be disabled or show different state
+      // for the already-included value
+      const queryEditor = pm.logsPage.getQueryEditorLocator();
+      const queryText = await queryEditor.textContent();
+      testLogger.info(`Query editor contains: ${queryText}`);
 
-          // STRONG ASSERTION: Verify the include term is in the query
-          expect(queryText).toContain('level');
-          testLogger.info('✓ Include term is present in query');
+      // STRONG ASSERTION: Verify the include term is in the query
+      expect(queryText).toContain('level');
+      testLogger.info('✓ Include term is present in query');
 
-          // Try clicking the same include button again - it should either:
-          // 1. Be disabled, OR
-          // 2. Not add duplicate entries
-          await levelField.click().catch(() => {});
-          await page.waitForTimeout(500);
+      // Try clicking the same include button again - it should either:
+      // 1. Be disabled, OR
+      // 2. Not add duplicate entries
+      await levelField.click().catch(() => {});
+      await page.waitForTimeout(500);
 
-          // Check if we can still click the same value's include button
-          // (This tests if spamming is prevented)
-          const includeBtn2 = pm.logsPage.getSubfieldListEqualButton('level').first();
+      // Check if we can still click the same value's include button
+      // (This tests if spamming is prevented)
+      const includeBtn2 = pm.logsPage.getSubfieldListEqualButton('level').first();
 
-          // Assert button is still visible after adding filter
-          await expect(includeBtn2, 'Bug #11041: include button should remain visible after adding filter').toBeVisible({ timeout: 3000 });
+      // Assert button is still visible after adding filter
+      await expect(includeBtn2, 'Bug #11041: include button should remain visible after adding filter').toBeVisible({ timeout: 3000 });
 
-          const isDisabled = await includeBtn2.isDisabled().catch(() => false);
-          testLogger.info(`Include button disabled state: ${isDisabled}`);
+      const isDisabled = await includeBtn2.isDisabled().catch(() => false);
+      testLogger.info(`Include button disabled state: ${isDisabled}`);
 
-          // PRIMARY ASSERTION: The button should be disabled for already-included values
-          expect(isDisabled, 'Bug #11041: include button should be disabled for already-included value').toBe(true);
-        }
-      }
+      // PRIMARY ASSERTION: The button should be disabled for already-included values
+      expect(isDisabled, 'Bug #11041: include button should be disabled for already-included value').toBe(true);
     } else {
       testLogger.info('Level field not found, trying kubernetes_namespace_name');
       const nsField = pm.logsPage.getFieldExpandButton('kubernetes_namespace_name');
