@@ -601,6 +601,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :time-range="telemetryTimeRange"
                 :hide-dimension-filters="true"
                 :metric-group-definitions="metricGroupResources"
+                :panelHeight="12"
+                :panelWidth="96"
                 data-test="service-graph-side-panel-metrics-dashboard"
               />
 
