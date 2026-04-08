@@ -2396,7 +2396,7 @@
       "clickToViewSuggestions": "点击查看关联度改善建议",
       "byService": "按服务分类",
       "byStream": "按数据流",
-      "searchServiceName": "搜索服务名称...",
+      "searchServiceName": "搜索服务或流名称...",
       "searchStreamName": "搜索数据流名称...",
       "allServices": "所有服务",
       "missingTelemetry": "缺少遥测",
@@ -2670,7 +2670,8 @@
     "errorGettingResults": "获取结果时出错",
     "discardChangesTitle": "放弃更改",
     "deleteNodeTitle": "删除节点",
-    "deleteNodeLlmEvalConfirm": "您确定要删除此 LLM 评估节点吗？"
+    "deleteNodeLlmEvalConfirm": "您确定要删除此 LLM 评估节点吗？",
+    "evalTemplates": "评估模板"
   },
   "reports": {
     "header": "报表",
@@ -2695,7 +2696,14 @@
     "cached": "已缓存",
     "cachedReport": "缓存报表",
     "destination": "接收地址",
-    "scheduled": "已计划"
+    "scheduled": "已计划",
+    "reportFormat": "报告格式",
+    "reportType": "报告类型",
+    "attachmentType": "附件风格",
+    "dimensionWidth": "宽度 (px)",
+    "dimensionHeight": "高度 (px)",
+    "imagePreview": "包括内联仪表板预览图片",
+    "customDimensions": "自定义尺寸（高级）"
   },
   "queries": {
     "runningQueries": "运行查询",

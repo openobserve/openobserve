@@ -6017,9 +6017,9 @@ export class LogsPage {
      * @returns {Promise<number>} Number of pattern cards
      */
     async getPatternCardCount() {
-        // Use efficient CSS selector to count all pattern cards at once
-        // Pattern cards have data-test attribute: pattern-card-{index}
-        const count = await this.page.locator('[data-test^="pattern-card-"]:not([data-test*="-template"]):not([data-test*="-frequency"]):not([data-test*="-percentage"]):not([data-test*="-include"]):not([data-test*="-exclude"]):not([data-test*="-details"]):not([data-test*="-anomaly"])').count().catch(() => 0);
+        // Count by template elements (one per card) to avoid overcounting card sub-elements
+        // that may have data-test attributes (e.g. tokenized chips) not covered by exclusions
+        const count = await this.page.locator('[data-test^="pattern-card-"][data-test$="-template"]').count().catch(() => 0);
 
         testLogger.info(`Pattern card count: ${count}`);
         return count;

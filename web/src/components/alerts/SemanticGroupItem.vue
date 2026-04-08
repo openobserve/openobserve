@@ -49,30 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Checkboxes Column: scope, stable, normalize -->
-      <div class="checkboxes-column">
-        <q-checkbox
-          data-test="semantic-group-action-scope-chkbox"
-          v-model="localGroup.is_scope"
-          :label="t('correlation.scope')"
-          dense
-          @update:model-value="emitUpdate"
-        />
-        <q-checkbox
-          data-test="semantic-group-action-stable-chkbox"
-          v-model="localGroup.is_stable"
-          :label="t('correlation.stable')"
-          dense
-          @update:model-value="emitUpdate"
-        />
-        <q-checkbox
-          data-test="semantic-group-action-normalize-chkbox"
-          v-model="localGroup.normalize"
-          :label="t('correlation.normalize')"
-          dense
-          @update:model-value="emitUpdate"
-        />
-      </div>
 
       <!-- Actions Column: Delete -->
       <div class="actions-column">
@@ -108,9 +84,6 @@ interface SemanticGroup {
   id: string;
   display: string;
   fields: string[];
-  normalize: boolean;
-  is_stable: boolean;
-  is_scope: boolean;
 }
 
 interface Props {
@@ -181,7 +154,7 @@ const emitUpdate = () => {
 
 .group-layout {
   display: grid;
-  grid-template-columns: 200px 1fr auto auto;
+  grid-template-columns: 200px 1fr auto;
   gap: 16px;
   align-items: start;
   width: 100%;

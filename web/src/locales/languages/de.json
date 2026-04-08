@@ -2396,7 +2396,7 @@
       "clickToViewSuggestions": "Klicken Sie hier, um Vorschläge zur Verbesserung der Korrelation anzuzeigen",
       "byService": "Von Service",
       "byStream": "Von Stream",
-      "searchServiceName": "Dienstname suchen...",
+      "searchServiceName": "Service- oder Stream-Name suchen...",
       "searchStreamName": "Stream-Namen suchen...",
       "allServices": "Alle Dienste",
       "missingTelemetry": "Fehlende Telemetrie",
@@ -2666,7 +2666,8 @@
     "errorGettingResults": "Fehler beim Abrufen der Ergebnisse",
     "discardChangesTitle": "Änderungen verwerfen",
     "deleteNodeTitle": "Knoten löschen",
-    "deleteNodeLlmEvalConfirm": "Möchten Sie diesen LLM-Evaluierungsknoten wirklich löschen?"
+    "deleteNodeLlmEvalConfirm": "Möchten Sie diesen LLM-Evaluierungsknoten wirklich löschen?",
+    "evalTemplates": "Vorlagen für Evaluierungen"
   },
   "reports": {
     "header": "Berichte",
@@ -2691,7 +2692,14 @@
     "cached": "Zwischengespeichert",
     "cachedReport": "Zwischengespeicherter Bericht",
     "destination": "Reiseziel",
-    "scheduled": "Geplant"
+    "scheduled": "Geplant",
+    "reportFormat": "Format des Berichts",
+    "reportType": "Art des Berichts",
+    "attachmentType": "Art der Anlage",
+    "dimensionWidth": "Breite (px)",
+    "dimensionHeight": "Höhe (px)",
+    "imagePreview": "Fügen Sie ein Inline-Dashboard-Vorschaubild hinzu",
+    "customDimensions": "Benutzerdefinierte Abmessungen (für Fortgeschrittene)"
   },
   "queries": {
     "runningQueries": "Abfragen ausführen",

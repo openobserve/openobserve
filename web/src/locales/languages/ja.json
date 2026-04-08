@@ -2417,7 +2417,7 @@
       "clickToViewSuggestions": "クリックして相関関係の改善提案を表示",
       "byService": "サービス別",
       "byStream": "ストリーム別",
-      "searchServiceName": "サービス名を検索中...",
+      "searchServiceName": "サービスまたはストリーム名を検索...",
       "searchStreamName": "ストリーム名を検索...",
       "allServices": "すべてのサービス",
       "missingTelemetry": "テレメトリが見つからない",
@@ -2687,7 +2687,8 @@
     "errorGettingResults": "結果を取得中にエラーが発生しました",
     "discardChangesTitle": "変更を破棄",
     "deleteNodeTitle": "ノードを削除",
-    "deleteNodeLlmEvalConfirm": "この LLM 評価ノードを削除してよろしいですか?"
+    "deleteNodeLlmEvalConfirm": "この LLM 評価ノードを削除してよろしいですか?",
+    "evalTemplates": "評価テンプレート"
   },
   "reports": {
     "header": "レポート",
@@ -2712,7 +2713,14 @@
     "cached": "キャッシュ",
     "cachedReport": "キャッシュレポート",
     "destination": "送信先",
-    "scheduled": "スケジュール済み"
+    "scheduled": "スケジュール済み",
+    "reportFormat": "レポート形式",
+    "reportType": "レポートタイプ",
+    "attachmentType": "アタッチメントスタイル",
+    "dimensionWidth": "幅 (ピクセル)",
+    "dimensionHeight": "高さ (ピクセル)",
+    "imagePreview": "インラインダッシュボードのプレビュー画像を含める",
+    "customDimensions": "カスタムディメンション (アドバンス)"
   },
   "queries": {
     "runningQueries": "実行中のクエリ",

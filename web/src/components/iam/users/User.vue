@@ -90,11 +90,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:header="props">
             <q-tr :props="props">
               <!-- Adding this block to render the select-all checkbox -->
-              <q-th v-if="columns.length > 0" auto-width>
+               <q-th v-if="columns.length > 0" auto-width>
+                
                 <q-checkbox
-                  v-model="props.selected"
+                  v-model="headerCheckboxValue"
                   size="sm"
-                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                  toggle-indeterminate
+                  :disable="selectableRows.length === 0"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'o2-table-checkbox-dark'
+                      : 'o2-table-checkbox-light'
+                  "
                   class="o2-table-checkbox"
                 />
               </q-th>
@@ -156,7 +163,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #bottom="scope">
             <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
               <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md">
-                {{ resultTotal }} {{ t('user.header') }}
+                {{ resultTotal }}
+                {{
+                  resultTotal === 1
+                    ? t("user.header")
+                    : t("user.header") + "s"
+                }}
               </div>
               <q-btn
                 v-if="selectedUsers.length > 0"
@@ -1074,6 +1086,29 @@ export default defineComponent({
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
+    const selectableRows = computed(() =>
+      visibleRows.value.filter((row: any) => row.enableDelete)
+    );
+
+    const headerCheckboxValue = computed({
+      get() {
+        if (selectableRows.value.length === 0) return false;
+        const selectedCount = selectableRows.value.filter((row: any) =>
+          selectedUsers.value.some((u: any) => u.email === row.email)
+        ).length;
+        if (selectedCount === 0) return false;
+        if (selectedCount === selectableRows.value.length) return true;
+        return null; // indeterminate: some but not all selectable rows selected
+      },
+      set(val: boolean | null) {
+        if (val) {
+          selectedUsers.value = [...selectableRows.value];
+        } else {
+          selectedUsers.value = [];
+        }
+      },
+    });
+
     // Watch visibleRows to sync resultTotal with search filter
     watch(visibleRows, (newVisibleRows) => {
       resultTotal.value = newVisibleRows.length;
@@ -1151,6 +1186,8 @@ export default defineComponent({
       fetchUserRoles,
       visibleRows,
       hasVisibleRows,
+      selectableRows,
+      headerCheckboxValue,
       selectedUsers,
       confirmBulkDelete,
       openBulkDeleteDialog,

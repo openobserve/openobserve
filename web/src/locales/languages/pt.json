@@ -2396,7 +2396,7 @@
       "clickToViewSuggestions": "Clique para ver sugestões de melhoria de correlação",
       "byService": "Por serviço",
       "byStream": "Por stream",
-      "searchServiceName": "Pesquisar nome do serviço...",
+      "searchServiceName": "Pesquisar nome do serviço ou stream...",
       "searchStreamName": "Nome do stream de pesquisa...",
       "allServices": "Todos os serviços",
       "missingTelemetry": "Telemetria ausente",
@@ -2666,7 +2666,8 @@
     "errorGettingResults": "Erro ao obter resultados",
     "discardChangesTitle": "Descartar alterações",
     "deleteNodeTitle": "Excluir Node",
-    "deleteNodeLlmEvalConfirm": "Tem certeza de que deseja excluir esse nó de avaliação do LLM?"
+    "deleteNodeLlmEvalConfirm": "Tem certeza de que deseja excluir esse nó de avaliação do LLM?",
+    "evalTemplates": "Modelos de avaliação"
   },
   "reports": {
     "header": "Relatórios",
@@ -2691,7 +2692,14 @@
     "cached": "Armazenado em cache",
     "cachedReport": "Relatório em cache",
     "destination": "Destino",
-    "scheduled": "Programado"
+    "scheduled": "Programado",
+    "reportFormat": "Formato do relatório",
+    "reportType": "Tipo de relatório",
+    "attachmentType": "Estilo de anexo",
+    "dimensionWidth": "Largura (px)",
+    "dimensionHeight": "Altura (px)",
+    "imagePreview": "Incluir imagem de visualização do painel em linha",
+    "customDimensions": "Dimensões personalizadas (avançadas)"
   },
   "queries": {
     "runningQueries": "Executando consultas",
