@@ -449,49 +449,40 @@ test.describe("Alerts Regression Bugs", () => {
     const vrlEditor = pm.alertsPage.getVrlEditorElement();
     const applyVrlButton = pm.alertsPage.getApplyVrlButton();
 
-    if (await vrlEditor.first().isVisible({ timeout: 5000 }).catch(() => false)) {
-      testLogger.info('✓ VRL editor found');
+    await expect(vrlEditor.first(), 'Bug #10872: VRL editor must be visible').toBeVisible({ timeout: 5000 });
+    testLogger.info('✓ VRL editor found');
 
-      // Try to input VRL function that processes array
-      const vrlInput = pm.alertsPage.getVrlEditorInput();
-      if (await vrlInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-        // Sample VRL for multi-window processing
-        const multiWindowVrl = `.result = if is_array(.) {
+    // Try to input VRL function that processes array
+    const vrlInput = pm.alertsPage.getVrlEditorInput();
+    await expect(vrlInput, 'Bug #10872: VRL input must be visible').toBeVisible({ timeout: 3000 });
+
+    // Sample VRL for multi-window processing
+    const multiWindowVrl = `.result = if is_array(.) {
   map_values(., |item| item.count)
 } else {
   [.count]
 }`;
-        await vrlInput.fill(multiWindowVrl);
-        testLogger.info('✓ VRL function entered');
+    await vrlInput.fill(multiWindowVrl);
+    testLogger.info('✓ VRL function entered');
 
-        // PRIMARY ASSERTION: Apply VRL button should be available
-        await expect(applyVrlButton).toBeVisible({ timeout: 3000 });
-        await applyVrlButton.click();
-        await page.waitForTimeout(1000);
-        testLogger.info('✓ Apply VRL button clicked');
+    // PRIMARY ASSERTION: Apply VRL button should be available
+    await expect(applyVrlButton).toBeVisible({ timeout: 3000 });
+    await applyVrlButton.click();
+    await page.waitForTimeout(1000);
+    testLogger.info('✓ Apply VRL button clicked');
 
-        // STRONG ASSERTION: Check for error messages - the bug would cause an error here
-        const errorMessage = pm.alertsPage.getErrorMessageBanner();
-        const hasError = await errorMessage.isVisible({ timeout: 2000 }).catch(() => false);
+    // STRONG ASSERTION: Check for error messages - the bug would cause an error here
+    const errorMessage = pm.alertsPage.getErrorMessageBanner();
+    const hasError = await errorMessage.isVisible({ timeout: 2000 }).catch(() => false);
 
-        // PRIMARY ASSERTION: VRL should apply without errors
-        expect(hasError, 'Bug #10872: VRL Apply should not produce errors for multi-window processing').toBe(false);
+    // PRIMARY ASSERTION: VRL should apply without errors
+    expect(hasError, 'Bug #10872: VRL Apply should not produce errors for multi-window processing').toBe(false);
 
-        if (hasError) {
-          const errorText = await errorMessage.textContent();
-          testLogger.error(`VRL Apply error: ${errorText}`);
-        } else {
-          testLogger.info('✓ VRL applied without errors - Bug #10872 is fixed');
-        }
-      } else {
-        throw new Error('VRL input field not found - cannot test VRL processing');
-      }
+    if (hasError) {
+      const errorText = await errorMessage.textContent();
+      testLogger.error(`VRL Apply error: ${errorText}`);
     } else {
-      testLogger.info('VRL editor not visible - marking test as informational');
-      test.info().annotations.push({
-        type: 'skip-reason',
-        description: 'VRL editor not available in current wizard flow'
-      });
+      testLogger.info('✓ VRL applied without errors - Bug #10872 is fixed');
     }
 
     // Clean up
