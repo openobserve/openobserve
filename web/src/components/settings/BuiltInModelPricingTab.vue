@@ -168,17 +168,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-else>{{ tier.name }}</span>
                   </div>
                   <div class="tier-prices">
-                    <span v-if="tier.prices?.input != null" class="price-chip price-input">
-                      in: ${{ fmtPrice(tier.prices.input) }}/1M
-                    </span>
-                    <span v-if="tier.prices?.output != null" class="price-chip price-output">
-                      out: ${{ fmtPrice(tier.prices.output) }}/1M
-                    </span>
-                    <span v-if="tier.prices?.cache_read_input_tokens != null" class="price-chip price-cache-read">
-                      cache-read: ${{ fmtPrice(tier.prices.cache_read_input_tokens) }}/1M
-                    </span>
-                    <span v-if="tier.prices?.cache_creation_input_tokens != null" class="price-chip price-cache-write">
-                      cache-write: ${{ fmtPrice(tier.prices.cache_creation_input_tokens) }}/1M
+                    <span
+                      v-for="(price, key) in tier.prices"
+                      :key="key"
+                      class="price-chip"
+                    >
+                      {{ fmtKey(key as string) }}: ${{ fmtPrice(price as number) }}/1M
                     </span>
                   </div>
                 </div>
@@ -287,6 +282,10 @@ export default defineComponent({
     function providerBadgeBg(name: string | undefined)  { return getProvider(name).bg; }
     function providerBadgeText(name: string | undefined){ return getProvider(name).text; }
 
+    function fmtKey(key: string): string {
+      return key.replace(/_tokens$/, '').replace(/_/g, '-');
+    }
+
     function fmtPrice(perToken: number): string {
       const perM = perToken * 1_000_000;
       if (perM >= 1)    return perM.toFixed(2);
@@ -360,7 +359,7 @@ export default defineComponent({
       models, loading, error, searchQuery, selectedProvider,
       columns, providerOptions, filteredModels, selectedCount,
       providerColor, providerBadgeBg, providerBadgeText,
-      fmtPrice, fetchModels, refreshModels, importSelectedModels,
+      fmtKey, fmtPrice, fetchModels, refreshModels, importSelectedModels,
     };
   },
 });
@@ -434,18 +433,15 @@ export default defineComponent({
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
-  border: 1px solid currentColor;
+  color: #555;
+  border: 1px solid #ccc;
 }
-.price-input       { color: #2e7d32; }
-.price-output      { color: #1565c0; }
-.price-cache-read  { color: #f57f17; }
-.price-cache-write { color: #880e4f; }
 
 body.body--dark {
-  .price-input       { color: #81c784; }
-  .price-output      { color: #64b5f6; }
-  .price-cache-read  { color: #ffd54f; }
-  .price-cache-write { color: #f48fb1; }
+  .price-chip {
+    color: #bbb;
+    border-color: #555;
+  }
   .provider-badge    { opacity: 0.85; }
 }
 </style>

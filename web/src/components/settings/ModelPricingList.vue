@@ -91,24 +91,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:header="props">
         <q-tr :props="props">
-          <q-th style="width: 40px; text-align: center;">
-            <q-checkbox
-              v-if="selectableModels.length > 0"
-              :model-value="allSelected"
-              :indeterminate="someSelected"
-              size="sm"
-              class="o2-table-checkbox"
-              @update:model-value="toggleSelectAll"
-              data-test="model-pricing-select-all"
-            />
-          </q-th>
           <q-th
-            v-for="col in props.cols.filter((c: any) => c.name !== 'select')"
+            v-for="col in props.cols"
             :key="col.name"
             :props="props"
             :style="col.style"
           >
-            {{ col.label }}
+            <template v-if="col.name === 'select'">
+              <q-checkbox
+                v-if="selectableModels.length > 0"
+                :model-value="allSelected"
+                :indeterminate="someSelected"
+                size="sm"
+                class="o2-table-checkbox"
+                @update:model-value="toggleSelectAll"
+                data-test="model-pricing-select-all"
+              />
+            </template>
+            <template v-else>{{ col.label }}</template>
           </q-th>
         </q-tr>
       </template>
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="props.row.__sectionStart"
           class="inherited-section-header"
         >
-          <q-td :colspan="columns.length + 1" class="section-header-cell">
+          <q-td :colspan="columns.length" class="section-header-cell">
             <div class="tw:flex tw:items-center tw:gap-2">
               <q-icon :name="sectionIcon(props.row.__sectionStart)" size="18px" color="grey-7" />
               <span class="text-caption section-header-title">
@@ -198,11 +198,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template v-else-if="col.name === 'pricing'">
-              <div class="o2-table-cell-content">
-                <span v-if="getDefaultTier(props.row)">
-                  {{ formatPerMillion(getDefaultTier(props.row).prices?.input) }} /
-                  {{ formatPerMillion(getDefaultTier(props.row).prices?.output) }}
-                </span>
+              <div class="o2-table-cell-content" style="white-space: normal;">
+                <div v-if="getDefaultTier(props.row) && Object.keys(getDefaultTier(props.row).prices || {}).length" class="pricing-chips">
+                  <span
+                    v-for="(price, key) in getDefaultTier(props.row).prices"
+                    :key="key"
+                    class="price-chip"
+                  >
+                    {{ formatPriceKey(key as string) }}: {{ formatPerMillion(price as number) }}/1M
+                  </span>
+                </div>
                 <span v-else class="text-grey-5">—</span>
               </div>
             </template>
@@ -399,14 +404,24 @@ function changePagination(val: { label: string; value: any }) {
   qTableRef.value?.setPagination(pagination.value);
 }
 
-const columns: any[] = [
-  { name: "select", label: "", field: "select", align: "center", style: "width: 40px" },
-  { name: "name", label: "Model", field: "name", align: "left", sortable: true },
-  { name: "provider", label: "Provider", field: "provider", align: "left", style: "width: 120px" },
-  { name: "match_pattern", label: "Pattern", field: "match_pattern", align: "left", style: "max-width: 300px; overflow: hidden;" },
-  { name: "pricing", label: "Input / Output (per 1M)", field: "pricing", align: "left" },
-  { name: "actions", label: "Actions", field: "actions", align: "center", style: "width: 140px" },
-];
+const hasSelectableModels = computed(() =>
+  models.value.some((m: any) => !isReadOnly(m))
+);
+
+const columns = computed(() => {
+  const cols: any[] = [];
+  if (hasSelectableModels.value) {
+    cols.push({ name: "select", label: "", field: "select", align: "center", style: "width: 40px" });
+  }
+  cols.push(
+    { name: "name", label: "Model", field: "name", align: "left", sortable: true },
+    { name: "provider", label: "Provider", field: "provider", align: "left", style: "width: 120px" },
+    { name: "match_pattern", label: "Pattern", field: "match_pattern", align: "left", style: "max-width: 300px; overflow: hidden;" },
+    { name: "pricing", label: "Pricing (per 1M tokens)", field: "pricing", align: "left" },
+    { name: "actions", label: "Actions", field: "actions", align: "center", style: "width: 140px" },
+  );
+  return cols;
+});
 
 const pagination = ref({ rowsPerPage: 20 });
 
@@ -440,13 +455,10 @@ const someSelected = computed(() =>
 function toggleSelectAll() {
   const pageIds = currentPageSelectableModels.value.map((m: any) => m.id);
   if (allSelected.value) {
-    // Deselect only the current page's items
-    selectedIds.value = selectedIds.value.filter((id: string) => !pageIds.includes(id));
+    selectedIds.value = [];
   } else {
-    // Select only the current page's items (merge with existing selections)
-    const existing = new Set(selectedIds.value);
-    for (const id of pageIds) existing.add(id);
-    selectedIds.value = [...existing];
+    // Select only the current page's selectable items — clear any off-screen selections
+    selectedIds.value = [...pageIds];
   }
 }
 
@@ -557,6 +569,11 @@ function getDefaultTier(model: any) {
   // entries might have a different order.
   const fallback = model.tiers?.find((t: any) => !t.condition);
   return fallback || model.tiers?.[0];
+}
+
+/** Shorten usage key for display: replace underscores with hyphens, drop trailing "_tokens". */
+function formatPriceKey(key: string): string {
+  return key.replace(/_tokens$/, '').replace(/_/g, '-');
 }
 
 function formatPerMillion(pricePerToken: number | undefined | null): string {
@@ -797,5 +814,29 @@ onActivated(() => {
 
 .section-header-subtitle {
   opacity: 0.5;
+}
+
+/* Pricing chips */
+.pricing-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.price-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #555;
+  border: 1px solid #ccc;
+}
+
+body.body--dark .price-chip {
+  color: #bbb;
+  border-color: #555;
 }
 </style>

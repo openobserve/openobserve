@@ -360,11 +360,11 @@ function copyPattern(pattern: string) {
 }
 
 const patternExamples = [
-  { name: "GPT-4o",           match_pattern: "(?i)gpt-4o(?:-\\d{4}[-\\d]*)?$" },
-  { name: "o3",               match_pattern: "(?i)(?:^|[-/])o3(?:$|[-/])" },
-  { name: "Claude 3.5 Sonnet",match_pattern: "(?i)claude-3-5-sonnet" },
-  { name: "Gemini 2.5 Pro",   match_pattern: "(?i)gemini-2\\.5-pro" },
-  { name: "GPT-4o Mini",      match_pattern: "(?i)gpt-4o-mini" },
+  { name: "GPT-4o",           match_pattern: "gpt-4o" },
+  { name: "o3",               match_pattern: "o3" },
+  { name: "Claude Sonnet 4.6",match_pattern: "claude-sonnet-4-6" },
+  { name: "Gemini 2.5 Pro",   match_pattern: "gemini-2.5-pro" },
+  { name: "GPT-4o Mini",      match_pattern: "gpt-4o-mini" },
 ];
 
 const orgIdentifier = computed(
