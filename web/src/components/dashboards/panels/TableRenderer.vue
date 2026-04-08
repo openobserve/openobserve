@@ -251,6 +251,64 @@ export default defineComponent({
   position: relative;
 }
 
+// Dashboard table cells should not use the monospace font from tenstack-table.scss
+// (that scss is shared with logs, which intentionally uses monospace for log data)
+:deep(td) {
+  font-family: "Nunito Sans", sans-serif;
+}
+
+// Pivot table styles
+:deep(.pivot-total-row) {
+  font-weight: bold;
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.body--dark :deep(.pivot-total-row) {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+:deep(.pivot-group-header) {
+  font-weight: 600;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.12);
+}
+
+:deep(.pivot-section-border) {
+  border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
+}
+
+:deep(.pivot-value-header) {
+  font-weight: 500;
+  font-size: 0.85em;
+}
+
+// Sticky total row (bottom-row slot)
+:deep(.pivot-sticky-total-row) {
+  font-weight: bold;
+
+  td {
+    border-top: 2px solid rgba(0, 0, 0, 0.12);
+  }
+}
+
+// Pivot header sort icons
+:deep(.pivot-sort-icon) {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+:deep(th:hover .pivot-sort-icon) {
+  opacity: 0.4;
+}
+
+:deep(.pivot-sort-active) {
+  opacity: 1 !important;
+}
+
+// Sticky total column visual separator
+:deep(.pivot-total-col) {
+  border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
+}
+
 @media print {
   // .table-wrapper is the containing block (position:relative).
   // It clips the expanded table at the panel height; the footer is

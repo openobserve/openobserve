@@ -1907,11 +1907,13 @@ defineExpose({
 .pivot-group-header {
   text-align: center;
   font-weight: 600;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.12);
 }
 
 .pivot-value-header {
   text-align: center;
+  font-weight: 500;
+  font-size: 0.85em;
 }
 
 // Column separator between pivot sections
@@ -1946,12 +1948,12 @@ defineExpose({
 
 // Sort icon shown in pivot header clicks
 .pivot-sort-icon {
-  font-size: 0.8rem;
-  opacity: 0.5;
   vertical-align: middle;
+  opacity: 0;
+  transition: opacity 0.2s;
 
   &.pivot-sort-active {
-    opacity: 1;
+    opacity: 1 !important;
     color: var(--q-primary);
   }
 }
