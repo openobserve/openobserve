@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :key="key"
                       class="price-chip"
                     >
-                      {{ fmtKey(key as string) }}: ${{ fmtPrice(price as number) }}/1M
+                      {{ fmtKey(key as string) }}: ${{ fmtPrice(price as number) }}
                     </span>
                   </div>
                 </div>

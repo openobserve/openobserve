@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="key"
                     class="price-chip"
                   >
-                    {{ formatPriceKey(key as string) }}: {{ formatPerMillion(price as number) }}/1M
+                    {{ formatPriceKey(key as string) }}: {{ formatPerMillion(price as number) }}
                   </span>
                 </div>
                 <span v-else class="text-grey-5">—</span>
