@@ -2217,7 +2217,39 @@
     },
     "updateAnomalyDetection": "Mettre à jour la détection des anomalies :",
     "anomalyCreated": "Configuration de détection des anomalies créée. La formation débutera prochainement.",
-    "editJson": "Modifier le JSON d'alerte"
+    "editJson": "Modifier le JSON d'alerte",
+    "stepIntro": {
+      "conditions": "Écrivez la requête qui sélectionne les données surveillées par cette alerte. Utilisez Builder pour une expérience guidée, SQL pour un contrôle total ou ProMQL pour les métriques.",
+      "compareWithPast": "Comparez les données de la fenêtre de contrôle actuelle avec une ou plusieurs fenêtres temporelles passées. Utile pour détecter des changements relatifs, tels qu'un plus grand nombre d'erreurs que d'habitude par rapport à la veille.",
+      "alertSettingsScheduled": "Définissez la fenêtre de détection, la fréquence de vérification, le seuil qui déclenche l'alerte et l'endroit où envoyer les notifications.",
+      "alertSettingsRealtime": "Choisissez le temps d'attente avant de recevoir une nouvelle notification (temps de recharge) et les chaînes qui doivent recevoir cette alerte.",
+      "deduplication": "Définissez une empreinte digitale : un ensemble de champs qui identifient de manière unique un événement d'alerte. Les alertes partageant la même empreinte digitale dans la fenêtre seront regroupées au lieu d'être déclenchées séparément.",
+      "advanced": "Vous pouvez éventuellement joindre des variables de contexte pour enrichir les charges utiles des notifications, ajouter une description à des fins de documentation ou personnaliser la façon dont les lignes correspondantes apparaissent dans les notifications."
+    },
+    "setup": {
+      "whatToMonitor": "Qu'est-ce que vous surveillez ?",
+      "whatToMonitorHint": "Sélectionnez le flux de données que vous souhaitez que cette alerte regarde",
+      "alertTypeLabel": "Comment doit fonctionner cette alerte ?",
+      "alertTypeHint": "Choisissez le type d'alerte qui correspond le mieux à vos besoins de surveillance",
+      "identityLabel": "Nommez et organisez",
+      "identityHint": "Donnez un nom clair à votre alerte afin qu'elle soit facile à retrouver plus tard"
+    },
+    "alertTypeCards": {
+      "scheduledLabel": "Planifié",
+      "scheduledDesc": "Vérifie les données à intervalles réguliers via une fenêtre rétrospective configurable. Idéal pour détecter les tendances, les seuils et les conditions périodiques.",
+      "realtimeLabel": "En temps réel",
+      "realtimeDesc": "Se déclenche immédiatement lorsque les données correspondantes sont ingérées. Idéal pour détecter les problèmes critiques dès qu'ils surviennent.",
+      "anomalyLabel": "Détection d'anomalies",
+      "anomalyDesc": "Utilise l'apprentissage automatique pour détecter des modèles inhabituels et des écarts par rapport au comportement de base normal."
+    },
+    "optionalSections": {
+      "compareWithPast": "Comparer avec Past",
+      "compareWithPastDesc": "Alerte lorsque les valeurs actuelles s'écartent d'une référence historique",
+      "deduplication": "Déduplication",
+      "deduplicationDesc": "Supprimez les notifications dupliquées en regroupant les alertes similaires",
+      "advanced": "Options avancées",
+      "advancedDesc": "Variables de contexte, modèles de lignes personnalisés et configuration supplémentaire"
+    }
   },
   "alert_templates": {
     "header": "Modèles",

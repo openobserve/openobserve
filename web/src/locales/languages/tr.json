@@ -2217,7 +2217,39 @@
     },
     "updateAnomalyDetection": "Anomali algılamayı güncelle:",
     "anomalyCreated": "Anomali algılama yapılandırması oluşturuldu. Eğitim kısa süre içinde başlayacak.",
-    "editJson": "Uyarı JSON'unu Düzenle"
+    "editJson": "Uyarı JSON'unu Düzenle",
+    "stepIntro": {
+      "conditions": "Bu uyarının izlediği verileri seçen sorguyu yazın. Kılavuzlu bir deneyim için Builder'ı, tam kontrol için SQL'i veya metrikler için PromQL'yi kullanın.",
+      "compareWithPast": "Geçerli kontrol penceresindeki verileri bir veya daha fazla geçmiş zaman penceresiyle karşılaştırın. Düne kıyasla normalden daha fazla hata gibi göreceli değişiklikleri tespit etmek için kullanışlıdır.",
+      "alertSettingsScheduled": "Algılama penceresini, ne sıklıkta kontrol edileceğini, uyarıyı tetikleyen eşiği ve bildirimlerin nereye gönderileceğini ayarlayın.",
+      "alertSettingsRealtime": "Yeniden bildirimde bulunmadan önce ne kadar bekleyeceğinizi (bekleme süresi) ve bu uyarıyı hangi kanalların alacağını seçin.",
+      "deduplication": "Bir parmak izi tanımlayın - bir uyarı olayını benzersiz bir şekilde tanımlayan bir dizi alan. Pencerede aynı parmak izini paylaşan uyarılar ayrı ayrı ateşlenmek yerine gruplandırılacaktır.",
+      "advanced": "İsteğe bağlı olarak bildirim yüklerini zenginleştirmek, dokümantasyon amacıyla bir açıklama eklemek veya eşleşen satırların bildirimlerde nasıl görüneceğini özelleştirmek için bağlam değişkenleri ekleyin."
+    },
+    "setup": {
+      "whatToMonitor": "Neyi izliyorsunuz?",
+      "whatToMonitorHint": "Bu uyarının izlemesini istediğiniz veri akışını seçin",
+      "alertTypeLabel": "Bu uyarı nasıl çalışmalı?",
+      "alertTypeHint": "İzleme ihtiyacınıza en uygun uyarı türünü seçin",
+      "identityLabel": "Adlandırın ve düzenleyin",
+      "identityHint": "Daha sonra kolayca bulunabilmesi için uyarınıza net bir ad verin"
+    },
+    "alertTypeCards": {
+      "scheduledLabel": "Zamanlanmış",
+      "scheduledDesc": "Yapılandırılabilir bir geri bakış penceresi üzerinden verileri düzenli aralıklarla kontrol eder. Eğilimleri, eşikleri ve periyodik koşulları yakalamak için en iyisidir.",
+      "realtimeLabel": "Gerçek Zamanlı",
+      "realtimeDesc": "Eşleşen veriler alındığında hemen ateşlenir. Kritik sorunları meydana geldikleri anda yakalamak için idealdir.",
+      "anomalyLabel": "Anomali Algılama",
+      "anomalyDesc": "Olağandışı kalıpları ve normal temel davranıştan sapmaları tespit etmek için makine öğrenimini kullanır."
+    },
+    "optionalSections": {
+      "compareWithPast": "Geçmişle karşılaştırın",
+      "compareWithPastDesc": "Geçerli değerler geçmiş bir taban çizgisinden saptığında uyarı",
+      "deduplication": "Tekilleştirme",
+      "deduplicationDesc": "Benzer uyarıları gruplandırarak yinelenen bildirimleri bastırın",
+      "advanced": "Gelişmiş Seçenekler",
+      "advancedDesc": "Bağlam değişkenleri, özel satır şablonları ve ek yapılandırma"
+    }
   },
   "alert_templates": {
     "header": "Şablonlar",

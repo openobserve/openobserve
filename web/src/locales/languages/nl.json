@@ -2217,7 +2217,39 @@
     },
     "updateAnomalyDetection": "Anomaliedetectie bijwerken:",
     "anomalyCreated": "Configuratie voor anomaliedetectie gemaakt. De training start binnenkort.",
-    "editJson": "Waarschuwings-JSON bewerken"
+    "editJson": "Waarschuwings-JSON bewerken",
+    "stepIntro": {
+      "conditions": "Schrijf de query die de gegevens selecteert die deze waarschuwing controleert. Gebruik Builder voor een begeleide ervaring, SQL voor volledige controle of ProMQL voor statistieken.",
+      "compareWithPast": "Vergelijk gegevens uit het huidige controlevenster met een of meer tijdvensters uit het verleden. Handig voor het detecteren van relatieve veranderingen, zoals meer fouten dan normaal in vergelijking met gisteren.",
+      "alertSettingsScheduled": "Stel het detectievenster in, hoe vaak u dit wilt controleren, de drempelwaarde die de waarschuwing activeert en waar u de meldingen naartoe wilt sturen.",
+      "alertSettingsRealtime": "Kies hoe lang je wilt wachten voordat je opnieuw een melding doet (afkoelperiode) en welke kanalen deze waarschuwing moeten ontvangen.",
+      "deduplication": "Definieer een vingerafdruk — een set velden die een waarschuwingsgebeurtenis op unieke wijze identificeren. Waarschuwingen met dezelfde vingerafdruk in het venster worden gegroepeerd in plaats van afzonderlijk te worden geactiveerd.",
+      "advanced": "Voeg desgewenst contextvariabelen toe om de payloads van meldingen te verrijken, een beschrijving toe te voegen voor documentatiedoeleinden of om aan te passen hoe afzonderlijke overeenkomende rijen in meldingen worden weergegeven."
+    },
+    "setup": {
+      "whatToMonitor": "Wat houdt u in de gaten?",
+      "whatToMonitorHint": "Selecteer de gegevensstroom die u met deze waarschuwing wilt bekijken",
+      "alertTypeLabel": "Hoe moet deze waarschuwing werken?",
+      "alertTypeHint": "Kies het waarschuwingstype dat het beste past bij uw bewakingsbehoeften",
+      "identityLabel": "Naam en organisatie",
+      "identityHint": "Geef je melding een duidelijke naam zodat je deze later gemakkelijk kunt terugvinden"
+    },
+    "alertTypeCards": {
+      "scheduledLabel": "Gepland",
+      "scheduledDesc": "Controleert gegevens met regelmatige tussenpozen in een configureerbaar terugkijkvenster. Ideaal voor het opvangen van trends, drempels en periodieke omstandigheden.",
+      "realtimeLabel": "Realtime",
+      "realtimeDesc": "Wordt onmiddellijk geactiveerd wanneer overeenkomende gegevens worden opgenomen. Ideaal om kritieke problemen op te sporen op het moment dat ze zich voordoen.",
+      "anomalyLabel": "Detectie van afwijkingen",
+      "anomalyDesc": "Gebruikt machine learning om ongebruikelijke patronen en afwijkingen van normaal basisgedrag te detecteren."
+    },
+    "optionalSections": {
+      "compareWithPast": "Vergelijk met Past",
+      "compareWithPastDesc": "Waarschuwing wanneer de huidige waarden afwijken van een historische basislijn",
+      "deduplication": "Deduplicatie",
+      "deduplicationDesc": "Dubbele meldingen onderdrukken door soortgelijke meldingen te groeperen",
+      "advanced": "Geavanceerde opties",
+      "advancedDesc": "Contextvariabelen, aangepaste rijsjablonen en aanvullende configuratie"
+    }
   },
   "alert_templates": {
     "header": "Sjablonen",

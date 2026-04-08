@@ -2217,7 +2217,39 @@
     },
     "updateAnomalyDetection": "Atualize a detecção de anomalias:",
     "anomalyCreated": "Configuração de detecção de anomalias criada. O treinamento começará em breve.",
-    "editJson": "Editar alerta JSON"
+    "editJson": "Editar alerta JSON",
+    "stepIntro": {
+      "conditions": "Escreva a consulta que seleciona os dados que esse alerta monitora. Use o Builder para uma experiência guiada, o SQL para controle total ou o ProMQL para métricas.",
+      "compareWithPast": "Compare os dados da janela de verificação atual com uma ou mais janelas anteriores. Útil para detectar mudanças relativas, como mais erros do que o normal em comparação com ontem.",
+      "alertSettingsScheduled": "Defina a janela de detecção, a frequência de verificação, o limite que aciona o alerta e para onde enviar as notificações.",
+      "alertSettingsRealtime": "Escolha quanto tempo esperar antes de renotificar (resfriamento) e quais canais devem receber esse alerta.",
+      "deduplication": "Defina uma impressão digital — um conjunto de campos que identificam de forma exclusiva um evento de alerta. Os alertas que compartilham a mesma impressão digital na janela serão agrupados em vez de serem disparados separadamente.",
+      "advanced": "Opcionalmente, anexe variáveis de contexto para enriquecer as cargas de notificação, adicionar uma descrição para fins de documentação ou personalizar como as linhas correspondentes individuais aparecem nas notificações."
+    },
+    "setup": {
+      "whatToMonitor": "O que você está monitorando?",
+      "whatToMonitorHint": "Selecione o fluxo de dados que você deseja que esse alerta assista",
+      "alertTypeLabel": "Como esse alerta deve funcionar?",
+      "alertTypeHint": "Escolha o tipo de alerta que melhor se adapta às suas necessidades de monitoramento",
+      "identityLabel": "Nomeie e organize",
+      "identityHint": "Dê um nome claro ao seu alerta para que seja fácil encontrá-lo mais tarde"
+    },
+    "alertTypeCards": {
+      "scheduledLabel": "Programado",
+      "scheduledDesc": "Verifica os dados em intervalos regulares em uma janela de retrospectiva configurável. Ideal para detectar tendências, limites e condições periódicas.",
+      "realtimeLabel": "Em tempo real",
+      "realtimeDesc": "É acionado imediatamente quando os dados correspondentes são ingeridos. Ideal para detectar problemas críticos no momento em que eles acontecem.",
+      "anomalyLabel": "Detecção de anomalias",
+      "anomalyDesc": "Usa aprendizado de máquina para detectar padrões incomuns e desvios do comportamento normal da linha de base."
+    },
+    "optionalSections": {
+      "compareWithPast": "Compare com o passado",
+      "compareWithPastDesc": "Alerta quando os valores atuais se desviam de uma linha de base histórica",
+      "deduplication": "Desduplicação",
+      "deduplicationDesc": "Suprima notificações duplicadas agrupando alertas semelhantes",
+      "advanced": "Opções avançadas",
+      "advancedDesc": "Variáveis de contexto, modelos de linha personalizados e configuração adicional"
+    }
   },
   "alert_templates": {
     "header": "Modelos",

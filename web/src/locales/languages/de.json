@@ -2217,7 +2217,39 @@
     },
     "updateAnomalyDetection": "Anomalieerkennung aktualisieren:",
     "anomalyCreated": "Konfiguration zur Erkennung von Anomalien wurde erstellt. Die Schulung beginnt in Kürze.",
-    "editJson": "Alert-JSON bearbeiten"
+    "editJson": "Alert-JSON bearbeiten",
+    "stepIntro": {
+      "conditions": "Schreiben Sie die Abfrage, die die Daten auswählt, die diese Warnung überwacht. Verwenden Sie Builder für eine geführte Erfahrung, SQL für die vollständige Kontrolle oder PromQL für Metriken.",
+      "compareWithPast": "Vergleichen Sie Daten aus dem aktuellen Prüffenster mit einem oder mehreren vergangenen Zeitfenstern. Nützlich, um relative Veränderungen zu erkennen, z. B. mehr Fehler als sonst im Vergleich zu gestern.",
+      "alertSettingsScheduled": "Legen Sie das Erkennungsfenster fest, wie oft überprüft werden soll, den Schwellenwert, der die Warnung auslöst, und wohin Benachrichtigungen gesendet werden sollen.",
+      "alertSettingsRealtime": "Wähle aus, wie lange du warten möchtest, bevor du erneut benachrichtigt wirst (Cooldown) und welche Kanäle diese Warnung erhalten sollen.",
+      "deduplication": "Definieren Sie einen Fingerabdruck — eine Reihe von Feldern, die ein Alarmereignis eindeutig identifizieren. Alarme, die innerhalb des Fensters denselben Fingerabdruck haben, werden gruppiert, anstatt separat ausgelöst zu werden.",
+      "advanced": "Fügen Sie optional Kontextvariablen hinzu, um die Nutzdaten für Benachrichtigungen anzureichern, fügen Sie eine Beschreibung zu Dokumentationszwecken hinzu oder passen Sie an, wie einzelne übereinstimmende Zeilen in Benachrichtigungen angezeigt werden."
+    },
+    "setup": {
+      "whatToMonitor": "Was überwachen Sie?",
+      "whatToMonitorHint": "Wählen Sie den Datenstrom aus, den diese Warnung verfolgen soll",
+      "alertTypeLabel": "Wie sollte diese Warnung funktionieren?",
+      "alertTypeHint": "Wählen Sie den Warnungstyp, der Ihren Überwachungsanforderung am besten entspricht",
+      "identityLabel": "Benennen und organisieren",
+      "identityHint": "Geben Sie Ihrer Warnung einen eindeutigen Namen, damit Sie sie später leicht wiederfinden können"
+    },
+    "alertTypeCards": {
+      "scheduledLabel": "Geplant",
+      "scheduledDesc": "Überprüft Daten in regelmäßigen Abständen über ein konfigurierbares Lookback-Fenster. Am besten geeignet, um Trends, Schwellenwerte und periodische Bedingungen zu erfassen.",
+      "realtimeLabel": "Echtzeit",
+      "realtimeDesc": "Wird sofort ausgelöst, wenn übereinstimmende Daten aufgenommen werden. Ideal, um kritische Probleme sofort zu erkennen, sobald sie auftreten.",
+      "anomalyLabel": "Erkennung von Anomalien",
+      "anomalyDesc": "Nutzt maschinelles Lernen, um ungewöhnliche Muster und Abweichungen vom normalen Grundverhalten zu erkennen."
+    },
+    "optionalSections": {
+      "compareWithPast": "Mit der Vergangenheit vergleichen",
+      "compareWithPastDesc": "Warnung, wenn aktuelle Werte von einem historischen Basiswert abweichen",
+      "deduplication": "Deduplizierung",
+      "deduplicationDesc": "Unterdrücken Sie doppelte Benachrichtigungen, indem Sie ähnliche Benachrichtigungen gruppieren",
+      "advanced": "Erweiterte Optionen",
+      "advancedDesc": "Kontextvariablen, benutzerdefinierte Zeilenvorlagen und zusätzliche Konfiguration"
+    }
   },
   "alert_templates": {
     "header": "Vorlagen",

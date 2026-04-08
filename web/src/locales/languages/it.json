@@ -2217,7 +2217,39 @@
     },
     "updateAnomalyDetection": "Aggiorna il rilevamento delle anomalie:",
     "anomalyCreated": "Configurazione di rilevamento delle anomalie creata. La formazione inizierà a breve.",
-    "editJson": "Modifica avviso JSON"
+    "editJson": "Modifica avviso JSON",
+    "stepIntro": {
+      "conditions": "Scrivi la query che seleziona i dati monitorati da questo avviso. Usa Builder per un'esperienza guidata, SQL per il controllo completo o ProMQL per le metriche.",
+      "compareWithPast": "Confronta i dati della finestra di controllo corrente con una o più finestre temporali passate. Utile per rilevare modifiche relative, ad esempio più errori del solito rispetto a ieri.",
+      "alertSettingsScheduled": "Imposta la finestra di rilevamento, la frequenza del controllo, la soglia che attiva l'avviso e dove inviare le notifiche.",
+      "alertSettingsRealtime": "Scegli quanto tempo aspettare prima di inviare nuovamente la notifica (tempo di recupero) e quali canali devono ricevere questo avviso.",
+      "deduplication": "Definisci un'impronta digitale, una serie di campi che identificano in modo univoco un evento di avviso. Gli avvisi che condividono la stessa impronta digitale all'interno della finestra verranno raggruppati anziché essere attivati separatamente.",
+      "advanced": "È possibile allegare variabili di contesto per arricchire i payload delle notifiche, aggiungere una descrizione a scopo di documentazione o personalizzare la modalità di visualizzazione delle singole righe corrispondenti nelle notifiche."
+    },
+    "setup": {
+      "whatToMonitor": "Cosa stai monitorando?",
+      "whatToMonitorHint": "Seleziona il flusso di dati che desideri che questo avviso guardi",
+      "alertTypeLabel": "Come dovrebbe funzionare questo avviso?",
+      "alertTypeHint": "Scegli il tipo di avviso più adatto alle tue esigenze di monitoraggio",
+      "identityLabel": "Nome e organizzazione",
+      "identityHint": "Assegna un nome chiaro al tuo avviso in modo che sia facile trovarlo in seguito"
+    },
+    "alertTypeCards": {
+      "scheduledLabel": "Pianificato",
+      "scheduledDesc": "Controlla i dati a intervalli regolari in una finestra di look-back configurabile. Ideale per rilevare tendenze, soglie e condizioni periodiche.",
+      "realtimeLabel": "In tempo reale",
+      "realtimeDesc": "Si attiva immediatamente quando vengono inseriti i dati corrispondenti. Ideale per individuare i problemi critici nel momento in cui si verificano.",
+      "anomalyLabel": "Rilevamento di anomalie",
+      "anomalyDesc": "Utilizza l'apprendimento automatico per rilevare modelli e deviazioni insoliti dal normale comportamento di base."
+    },
+    "optionalSections": {
+      "compareWithPast": "Confronta con il passato",
+      "compareWithPastDesc": "Avvisa quando i valori correnti si discostano da una linea di base storica",
+      "deduplication": "Deduplicazione",
+      "deduplicationDesc": "Elimina le notifiche duplicate raggruppando avvisi simili",
+      "advanced": "Opzioni avanzate",
+      "advancedDesc": "Variabili di contesto, modelli di riga personalizzati e configurazione aggiuntiva"
+    }
   },
   "alert_templates": {
     "header": "Modelli",

@@ -2217,7 +2217,39 @@
     },
     "updateAnomalyDetection": "이상 탐지 업데이트:",
     "anomalyCreated": "이상 탐지 구성이 생성되었습니다.훈련이 곧 시작될 예정입니다.",
-    "editJson": "알림 JSON 편집"
+    "editJson": "알림 JSON 편집",
+    "stepIntro": {
+      "conditions": "이 경고가 모니터링하는 데이터를 선택하는 쿼리를 작성하십시오.가이드 경험을 위해서는 Builder를 사용하고, 전체 제어를 위해서는 SQL을, 지표에는 PromQL을 사용하세요.",
+      "compareWithPast": "현재 검사 창의 데이터를 하나 이상의 과거 시간 창과 비교합니다.어제와 비교했을 때 평소보다 더 많은 오류가 발생하는 등 상대적 변화를 감지하는 데 유용합니다.",
+      "alertSettingsScheduled": "탐지 창, 확인 빈도, 경고를 트리거하는 임계값, 알림을 보낼 위치를 설정합니다.",
+      "alertSettingsRealtime": "알림을 다시 보내기 전에 대기할 시간 (쿨다운) 과 이 알림을 수신할 채널을 선택하세요.",
+      "deduplication": "경보 이벤트를 고유하게 식별하는 필드 집합인 핑거프린트를 정의합니다.창 내에서 동일한 지문을 공유하는 경고는 개별적으로 실행되지 않고 그룹화됩니다.",
+      "advanced": "필요에 따라 컨텍스트 변수를 추가하여 알림 페이로드를 강화하고, 문서화 목적으로 설명을 추가하거나, 일치하는 개별 행이 알림에 표시되는 방식을 사용자 지정할 수 있습니다."
+    },
+    "setup": {
+      "whatToMonitor": "무엇을 모니터링하고 계신가요?",
+      "whatToMonitorHint": "이 알림을 모니터링하려는 데이터 스트림을 선택합니다.",
+      "alertTypeLabel": "이 알림은 어떻게 작동해야 할까요?",
+      "alertTypeHint": "모니터링 요구 사항에 가장 적합한 경고 유형을 선택하세요.",
+      "identityLabel": "이름 지정 및 구성",
+      "identityHint": "나중에 쉽게 찾을 수 있도록 알림에 명확한 이름을 지정하세요."
+    },
+    "alertTypeCards": {
+      "scheduledLabel": "예약됨",
+      "scheduledDesc": "구성 가능한 룩백 윈도우를 통해 정기적으로 데이터를 검사합니다.추세, 임계값 및 주기적 조건을 파악하는 데 가장 적합합니다.",
+      "realtimeLabel": "실시간",
+      "realtimeDesc": "일치하는 데이터가 수집되면 즉시 실행됩니다.중요한 문제가 발생하는 즉시 파악하는 데 적합합니다.",
+      "anomalyLabel": "이상 징후 탐지",
+      "anomalyDesc": "머신 러닝을 사용하여 비정상적인 패턴과 정상 기준 동작과의 편차를 탐지합니다."
+    },
+    "optionalSections": {
+      "compareWithPast": "과거와 비교하기",
+      "compareWithPastDesc": "현재 값이 과거 기준선과 다를 경우 경고",
+      "deduplication": "중복 제거",
+      "deduplicationDesc": "유사한 알림을 그룹화하여 중복 알림을 차단합니다.",
+      "advanced": "고급 옵션",
+      "advancedDesc": "컨텍스트 변수, 사용자 지정 행 템플릿 및 추가 구성"
+    }
   },
   "alert_templates": {
     "header": "템플릿",
