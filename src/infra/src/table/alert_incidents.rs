@@ -281,6 +281,40 @@ pub async fn get_incident_alerts(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// Find an open AlertId incident that already contains a given alert_id.
+///
+/// Uses two queries (junction lookup + incident fetch) instead of loading all
+/// open incidents and calling get_incident_alerts in a loop.
+pub async fn find_open_incident_by_alert_id(
+    org_id: &str,
+    alert_id: &str,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // Step 1: find all incident IDs that reference this alert_id in the junction table
+    let rows = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    if rows.is_empty() {
+        return Ok(None);
+    }
+
+    let incident_ids: Vec<String> = rows.into_iter().map(|r| r.incident_id).collect();
+
+    // Step 2: find the open AlertId incident from those IDs
+    alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .filter(alert_incidents::Column::KeyType.eq("alert_id"))
+        .filter(alert_incidents::Column::Id.is_in(incident_ids))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 /// Get actual alert counts for multiple incidents (source of truth)
 ///
 /// Returns a HashMap of incident_id -> actual_count from junction table.
