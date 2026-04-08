@@ -143,39 +143,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator class="tw:my-[1rem]!" />
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
-          <q-tabs
-            v-model="activeTab"
-            dense
-            inline-label
-            align="left"
-            class="text-bold q-mx-sm tw:mb-[0.375rem] tw:border-b tw:border-b-[var(--o2-border-color)]"
-            data-test="service-graph-node-panel-tabs"
+          <div
+            class="tw:flex tw:items-end tw:border-b tw:border-b-[var(--o2-border-color)] tw:mx-[0.5rem] tw:mb-[0.375rem]"
+            data-test="service-graph-node-panel-tabs-row"
           >
-            <q-tab
-              name="operations"
-              label="Operations"
-              style="text-transform: capitalize"
-              data-test="service-graph-node-panel-tab-operations"
-            />
-            <q-tab
-              name="nodes"
-              label="Nodes"
-              style="text-transform: capitalize"
-              data-test="service-graph-node-panel-tab-nodes"
-            />
-            <q-tab
-              name="pods"
-              label="Pods"
-              style="text-transform: capitalize"
-              data-test="service-graph-node-panel-tab-pods"
-            />
-            <q-tab
-              name="metrics"
-              label="Metrics"
-              style="text-transform: capitalize"
-              data-test="service-graph-node-panel-tab-metrics"
-            />
-          </q-tabs>
+            <q-tabs
+              v-model="activeTab"
+              dense
+              inline-label
+              align="left"
+              class="text-bold tw:flex-1"
+              data-test="service-graph-node-panel-tabs"
+            >
+              <q-tab
+                name="operations"
+                label="Operations"
+                style="text-transform: capitalize"
+                data-test="service-graph-node-panel-tab-operations"
+              />
+              <q-tab
+                name="nodes"
+                label="Nodes"
+                style="text-transform: capitalize"
+                data-test="service-graph-node-panel-tab-nodes"
+              />
+              <q-tab
+                name="pods"
+                label="Pods"
+                style="text-transform: capitalize"
+                data-test="service-graph-node-panel-tab-pods"
+              />
+              <q-tab
+                name="metrics"
+                label="Metrics"
+                style="text-transform: capitalize"
+                data-test="service-graph-node-panel-tab-metrics"
+              />
+            </q-tabs>
+
+            <!-- Workload fields dropdown -->
+            <q-btn
+              v-if="resolvedWorkloadFields.length > 0"
+              flat
+              dense
+              round
+              icon="tune"
+              size="sm"
+              class="tw:mb-[0.2rem]"
+              data-test="service-graph-node-panel-workload-fields-btn"
+            >
+              <q-tooltip>Workload Fields</q-tooltip>
+              <q-menu anchor="bottom right" self="top right" :offset="[0, 4]">
+                <q-list
+                  dense
+                  style="min-width: 10rem"
+                  data-test="service-graph-node-panel-workload-fields-menu"
+                >
+                  <q-item-label header class="tw:text-xs tw:pb-1 tw:pt-2">
+                    Resource Fields
+                  </q-item-label>
+                  <q-item
+                    v-for="wf in resolvedWorkloadFields"
+                    :key="wf.alias.id"
+                    tag="label"
+                    clickable
+                    :data-test="`service-graph-node-panel-workload-field-${wf.alias.id}`"
+                  >
+                    <q-item-section side>
+                      <q-checkbox
+                        v-model="selectedWorkloadFields"
+                        :val="wf.alias.id"
+                        size="sm"
+                      />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label class="tw:text-xs">
+                        {{ wf.alias.display }}
+                      </q-item-label>
+                      <q-item-label caption class="tw:text-[0.65rem]">
+                        {{ wf.field }}
+                      </q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </q-list>
+              </q-menu>
+            </q-btn>
+          </div>
           <q-tab-panels v-model="activeTab" animated class="tw:h-full!">
             <!-- Operations Tab -->
             <q-tab-panel
@@ -651,7 +704,12 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
-import { correlate as correlateStreams } from "@/services/service_streams";
+import streamService from "@/services/stream";
+import {
+  correlate as correlateStreams,
+  getSemanticGroups,
+  type FieldAlias,
+} from "@/services/service_streams";
 import {
   escapeSingleQuotes,
   deepCopy,
@@ -1161,6 +1219,13 @@ export default defineComponent({
     const recentPods = ref<any[]>([]);
     const loadingPods = ref(false);
 
+    // Workload Field Discovery State
+    const resolvedWorkloadFields = ref<{ field: string; alias: FieldAlias }[]>(
+      [],
+    );
+    // IDs of alias entries the user has checked in the dropdown
+    const selectedWorkloadFields = ref<string[]>([]);
+
     // Computed: Service Metrics
     const serviceMetrics = computed(() => {
       if (!props.selectedNode || !props.graphData) {
@@ -1640,6 +1705,53 @@ export default defineComponent({
       }
     };
 
+    // Discover which workload fields exist in the trace stream and are mapped in semantic groups
+    const resolveWorkloadFields = async () => {
+      if (!props.visible || props.streamFilter === "all" || !props.streamFilter)
+        return;
+
+      try {
+        const org = store.state.selectedOrganization.identifier;
+
+        // Step 1: Fetch semantic groups and build a reverse lookup map (field → alias)
+        const semanticGroupsResponse = await getSemanticGroups(org);
+        const fieldToAliasMap = new Map<string, FieldAlias>();
+        for (const alias of semanticGroupsResponse.data) {
+          for (const field of alias.fields) {
+            fieldToAliasMap.set(field, alias);
+          }
+        }
+
+        // Step 2: Fetch trace stream schema
+        const schemaResponse = await streamService.schema(
+          org,
+          props.streamFilter,
+          "traces",
+        );
+        const schemaFields: { name: string; type: string }[] =
+          schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+
+        // Step 3: Filter for service_ fields, intersect with semantic groups, deduplicate by alias.id
+        const seen = new Set<string>();
+        const matched: { field: string; alias: FieldAlias }[] = [];
+        for (const f of schemaFields) {
+          if (!f.name.startsWith("service_")) continue;
+          const alias = fieldToAliasMap.get(f.name);
+          if (!alias || seen.has(alias.id)) continue;
+          seen.add(alias.id);
+          matched.push({ field: f.name, alias });
+        }
+
+        resolvedWorkloadFields.value = matched;
+      } catch (err) {
+        console.error(
+          "[ServiceGraphNodeSidePanel] Failed to resolve workload fields:",
+          err,
+        );
+        resolvedWorkloadFields.value = [];
+      }
+    };
+
     // Computed: Nodes table columns
     const nodesTableColumns = computed(() =>
       buildEntityTableColumns("node", "Node"),
@@ -1706,12 +1818,25 @@ export default defineComponent({
       },
     );
 
+    // Trigger workload field discovery when the panel becomes visible with a valid stream
+    watch(
+      () => [props.visible, props.selectedNode?.id, props.streamFilter],
+      ([visible]) => {
+        if (visible && props.selectedNode && props.streamFilter !== "all") {
+          resolveWorkloadFields();
+        }
+      },
+      { immediate: true },
+    );
+
     // Reset nodes/pods/metrics data, local filters, and go back to operations tab when node or stream changes
     watch(
       () => [props.selectedNode?.id, props.streamFilter],
       () => {
         recentNodes.value = [];
         recentPods.value = [];
+        resolvedWorkloadFields.value = [];
+        selectedWorkloadFields.value = [];
         metricsCorrelationData.value = null;
         metricsCorrelationError.value = null;
         metricsCorrelationLoaded.value = false;
@@ -1834,6 +1959,9 @@ export default defineComponent({
       recentPods,
       podsTableColumns,
       podsTableRows,
+      // Workload Field Discovery
+      resolvedWorkloadFields,
+      selectedWorkloadFields,
       // Metrics Tab
       metricsCorrelationLoading,
       metricsCorrelationError,
