@@ -2691,7 +2691,14 @@
     "cached": "캐시됨",
     "cachedReport": "캐시된 보고서",
     "destination": "목적지",
-    "scheduled": "예약됨"
+    "scheduled": "예약됨",
+    "reportFormat": "보고서 형식",
+    "reportType": "보고서 유형",
+    "attachmentType": "어태치먼트 스타일",
+    "dimensionWidth": "너비 (픽셀)",
+    "dimensionHeight": "높이 (픽셀)",
+    "imagePreview": "인라인 대시보드 미리 보기 이미지 포함",
+    "customDimensions": "사용자 지정 치수 (고급)"
   },
   "queries": {
     "runningQueries": "쿼리 실행",
