@@ -201,6 +201,7 @@ test.describe("UI Regression Bugs", () => {
     // Check for lowercase words that should be CamelCase
     const lowercaseWords = ['dashboards', 'ui'];
     const expectedCamelCase = ['Dashboards', 'UI'];
+    let totalElementsFound = 0;
 
     for (let i = 0; i < lowercaseWords.length; i++) {
       const lowercase = lowercaseWords[i];
@@ -216,6 +217,8 @@ test.describe("UI Regression Bugs", () => {
 
       testLogger.info(`Word "${lowercase}": lowercase count = ${lowercaseCount}, CamelCase "${camelCase}" count = ${camelCaseCount}`);
 
+      totalElementsFound += lowercaseCount + camelCaseCount;
+
       // PRIMARY ASSERTION: Should use CamelCase, not lowercase
       // If we find only lowercase without CamelCase, that indicates Bug #11064
       if (lowercaseCount > 0) {
@@ -228,6 +231,9 @@ test.describe("UI Regression Bugs", () => {
         testLogger.info(`✓ Found proper CamelCase "${camelCase}"`);
       }
     }
+
+    // Ensure page content was actually inspected
+    expect(totalElementsFound, 'Bug #11064: Page should contain relevant text elements').toBeGreaterThan(0);
 
     // Also check page title and headers for proper casing
     const pageTitle = pm.commonActions.getPageTitle();

@@ -33,7 +33,7 @@ test.describe("Metrics Regression Bugs", () => {
   // Bug #11061: "No results found" text not visible in dark mode
   // https://github.com/openobserve/openobserve/issues/11061
   // ==========================================================================
-  test("No results found text should be visible in dark mode @bug-11061 @P2 @regression @darkMode", async ({ page }) => {
+  test("No results found text should be visible in dark mode @bug-11061 @P2 @regression @darkMode", async ({ page }, testInfo) => {
     testLogger.info('Test: Verify "No results found" visibility in dark mode (Bug #11061)');
 
     // Enable dark mode if not already enabled
@@ -69,24 +69,17 @@ test.describe("Metrics Regression Bugs", () => {
     const isDarkMode = bodyClass.includes('dark') || bodyClass.includes('body--dark');
     testLogger.info(`Dark mode active: ${isDarkMode}`);
 
-    // If dark mode attempts failed, reload the metrics page to ensure clean state
+    // If dark mode attempts failed, skip the test
     if (!isDarkMode) {
-      testLogger.info('Dark mode not activated, reloading metrics page for clean state');
-      await pm.metricsPage.gotoMetricsPage();
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(1000);
-
-      // Mark this test as informational if dark mode couldn't be enabled
-      test.info().annotations.push({
-        type: 'warning',
-        description: 'Dark mode could not be activated - testing with default theme'
-      });
-    } else {
-      // Wait for page to stabilize after theme change
-      await page.waitForTimeout(2000);
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      testLogger.info('✓ Dark mode confirmed active, proceeding with visibility test');
+      testLogger.info('Dark mode not activated - skipping test');
+      testInfo.skip(true, 'Dark mode unavailable - cannot test Bug #11061');
+      return;
     }
+
+    // Wait for page to stabilize after theme change
+    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    testLogger.info('✓ Dark mode confirmed active, proceeding with visibility test');
 
     // Enter query that returns no results
     await pm.metricsPage.enterMetricsQuery('non_existent_metric_for_dark_mode_test_xyz');
