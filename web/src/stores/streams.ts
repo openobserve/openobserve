@@ -9,6 +9,7 @@ export default {
       metadata: null,
       streamsIndexMapping: {},
       areAllStreamsFetched: false,
+      evalTemplatesByOrg: {} as Record<string, any[]>,
     }),
     getters: {
       getAllStreams(state: any) {
@@ -59,6 +60,9 @@ export default {
       updateStreamsFetched(state: any, areAllStreamsFetched: any) {
         state.areAllStreamsFetched = areAllStreamsFetched;
       },
+      updateEvalTemplates(state: any, { orgId, templates }: { orgId: string; templates: any[] }) {
+        state.evalTemplatesByOrg = { ...state.evalTemplatesByOrg, [orgId]: templates };
+      },
     },
     actions: {
       setLogsStreams(context: any, logs: any) {
@@ -99,6 +103,9 @@ export default {
       },
       setStreamsFetched(context: any, areAllStreamsFetched: any) {
         context.commit('updateStreamsFetched', areAllStreamsFetched);
+      },
+      setEvalTemplates(context: any, payload: { orgId: string; templates: any[] }) {
+        context.commit('updateEvalTemplates', payload);
       },
     },
   };

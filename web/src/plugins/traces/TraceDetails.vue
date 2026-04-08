@@ -622,6 +622,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
+
+            <!-- Evaluations View - only for LLM traces with evaluation data -->
+            <div
+              v-if="
+                hasLLMSpans && evalPipelineExists && activeTab === 'evaluations'
+              "
+              style="display: flex; flex: 1; min-height: 0; overflow-y: auto"
+              class="tw:w-full tw:bg-[var(--o2-card-bg)]!"
+            >
+              <TraceEvaluationsView
+                ref="traceEvaluationsViewRef"
+                data-test="trace-details-evaluations"
+                :eval-data="evalData"
+                :is-loading="isLoadingEvalData"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -766,10 +782,16 @@ import {
   useTraceProcessing,
 } from "@/composables/traces/useTraceProcessing";
 import AppTabs from "@/components/common/AppTabs.vue";
+import pipelineService from "@/services/pipelines";
 
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(
   () => import("@/components/traces/FlameGraphView.vue"),
+);
+
+// Import TraceEvaluationsView
+const TraceEvaluationsView = defineAsyncComponent(
+  () => import("./TraceEvaluationsView.vue"),
 );
 
 export default defineComponent({
@@ -850,6 +872,7 @@ export default defineComponent({
     TraceDAG,
     TraceHeader,
     FlameGraphView,
+    TraceEvaluationsView,
     AppTabs,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -1141,6 +1164,13 @@ export default defineComponent({
       return spans.some((span: any) => isLLMTrace(span));
     });
 
+    // Evaluation pipeline state
+    const evalPipelineExists = ref(false);
+    const evalPipelineStreamName = ref<string | null>(null);
+    const evalData = ref<any[]>([]);
+    const isLoadingEvalData = ref(false);
+    const traceEvaluationsViewRef = ref<any>(null);
+
     // Computed properties for new header
     const errorSpansCount = computed(() => {
       const spans = effectiveSpanList.value;
@@ -1172,6 +1202,14 @@ export default defineComponent({
       // Conditionally add DAG tab for LLM traces
       if (hasLLMSpans.value) {
         tabs.push({ label: "DAG", value: "dag" });
+      }
+      // Conditionally add Evaluations tab for LLM traces with evaluation data
+      if (
+        hasLLMSpans.value &&
+        evalPipelineExists.value &&
+        evalData.value.length > 0
+      ) {
+        tabs.push({ label: "Evaluations", value: "evaluations" });
       }
       return tabs;
     });
@@ -1249,6 +1287,37 @@ export default defineComponent({
           setupTraceDetails();
         }
       },
+    );
+
+    // Watch for stream and LLM spans to fetch evaluation pipeline
+    watch(
+      () => [currentTraceStreamName.value, hasLLMSpans.value],
+      async ([streamName, hasLlm]) => {
+        if (hasLlm && streamName) {
+          await fetchEvalPipeline();
+        } else {
+          evalPipelineExists.value = false;
+          evalPipelineStreamName.value = null;
+        }
+      },
+      { immediate: true },
+    );
+
+    // Watch for trace ID changes to fetch evaluation data
+    watch(
+      () => [
+        effectiveTraceId.value,
+        evalPipelineExists.value,
+        evalPipelineStreamName.value,
+      ],
+      async ([traceId, pipelineExists, streamName]) => {
+        if (pipelineExists && streamName && traceId) {
+          await fetchEvalData();
+        } else {
+          evalData.value = [];
+        }
+      },
+      { immediate: true },
     );
 
     const backgroundStyle = computed(() => {
@@ -2425,6 +2494,130 @@ export default defineComponent({
       await setupTraceDetails();
     };
 
+    /**
+     * Fetch LLM evaluation pipeline for the current trace stream
+     */
+    const fetchEvalPipeline = async () => {
+      if (!currentTraceStreamName.value) {
+        evalPipelineExists.value = false;
+        return;
+      }
+
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        const res = await pipelineService.getPipelines(orgId);
+        const pipelines: any[] = res.data?.list || [];
+
+        console.log(
+          "[TraceEval] Fetched pipelines:",
+          pipelines.length,
+          "Stream:",
+          currentTraceStreamName.value,
+        );
+
+        // Find pipeline with matching source stream and llm_evaluation node
+        const evalPipeline = pipelines.find(
+          (p: any) =>
+            p.source?.stream_name === currentTraceStreamName.value &&
+            p.source?.stream_type === "traces" &&
+            p.nodes?.some((n: any) => n.data?.node_type === "llm_evaluation"),
+        );
+
+        if (evalPipeline) {
+          evalPipelineExists.value = true;
+          // Get the evaluation output stream name
+          const evalOutputNode = evalPipeline.nodes.find(
+            (n: any) =>
+              n.io_type === "output" && n.data?.stream_type === "logs",
+          );
+          evalPipelineStreamName.value =
+            evalOutputNode?.data?.stream_name ||
+            `${currentTraceStreamName.value}_evaluations`;
+          console.log(
+            "[TraceEval] Found eval pipeline, stream:",
+            evalPipelineStreamName.value,
+          );
+        } else {
+          console.log(
+            "[TraceEval] No eval pipeline found for stream:",
+            currentTraceStreamName.value,
+          );
+          evalPipelineExists.value = false;
+          evalPipelineStreamName.value = null;
+        }
+      } catch (error) {
+        console.error("Error fetching evaluation pipeline:", error);
+        evalPipelineExists.value = false;
+        evalPipelineStreamName.value = null;
+      }
+    };
+
+    /**
+     * Fetch evaluation data for the current trace
+     */
+    const fetchEvalData = async () => {
+      if (
+        !evalPipelineExists.value ||
+        !evalPipelineStreamName.value ||
+        !effectiveTraceId.value
+      ) {
+        evalData.value = [];
+        return;
+      }
+
+      isLoadingEvalData.value = true;
+      try {
+        console.log(
+          "[TraceEval] Fetching data from stream:",
+          evalPipelineStreamName.value,
+          "traceId:",
+          effectiveTraceId.value,
+        );
+
+        const req = {
+          query: {
+            sql: `SELECT * FROM "${evalPipelineStreamName.value}" WHERE trace_id = '${effectiveTraceId.value}' ORDER BY _timestamp ASC`,
+            start_time: effectiveTimeRange.value.from - 60000000,
+            end_time: effectiveTimeRange.value.to + 60000000,
+            from: 0,
+            size: 100,
+          },
+        };
+
+        const res = await searchService.search(
+          {
+            org_identifier:
+              (router.currentRoute.value.query?.org_identifier as string) ||
+              store.state.selectedOrganization.identifier,
+            query: req,
+            page_type: "logs",
+          },
+          "ui",
+        );
+
+        evalData.value = res.data?.hits || [];
+        console.log(
+          "[TraceEval] Fetched evaluation records:",
+          evalData.value.length,
+        );
+
+        // Load templates for the current org
+        if (
+          traceEvaluationsViewRef.value?.loadTemplates &&
+          effectiveOrgIdentifier.value
+        ) {
+          await traceEvaluationsViewRef.value.loadTemplates(
+            effectiveOrgIdentifier.value,
+          );
+        }
+      } catch (error) {
+        console.error("Error fetching evaluation data:", error);
+        evalData.value = [];
+      } finally {
+        isLoadingEvalData.value = false;
+      }
+    };
+
     return {
       router,
       t,
@@ -2535,6 +2728,14 @@ export default defineComponent({
       // FlameGraph data
       flatSpans,
       traceMetadata,
+      // Evaluation data
+      evalPipelineExists,
+      evalPipelineStreamName,
+      evalData,
+      isLoadingEvalData,
+      traceEvaluationsViewRef,
+      fetchEvalPipeline,
+      fetchEvalData,
     };
   },
 });

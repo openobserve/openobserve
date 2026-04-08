@@ -2666,7 +2666,8 @@
     "errorGettingResults": "Erro ao obter resultados",
     "discardChangesTitle": "Descartar alterações",
     "deleteNodeTitle": "Excluir Node",
-    "deleteNodeLlmEvalConfirm": "Tem certeza de que deseja excluir esse nó de avaliação do LLM?"
+    "deleteNodeLlmEvalConfirm": "Tem certeza de que deseja excluir esse nó de avaliação do LLM?",
+    "evalTemplates": "Modelos de avaliação"
   },
   "reports": {
     "header": "Relatórios",
