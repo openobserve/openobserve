@@ -40,15 +40,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <!-- View Editor Button (only for SQL/PromQL tabs) -->
-        <q-btn
+        <!-- Right side controls (only for SQL/PromQL tabs) -->
+        <div
           v-if="localTab !== 'custom'"
-          data-test="step2-view-editor-btn"
-          label="View Editor"
-          size="sm"
-          class="o2-secondary-button q-py-sm"
-          @click="viewSqlEditor = true"
-        />
+          class="tw:flex tw:items-center tw:gap-2"
+        >
+          <!-- VRL Function Toggle -->
+          <div class="tw:flex tw:items-center tw:gap-1.5">
+            <span class="tw:text-xs tw:font-medium">VRL Function</span>
+            <q-toggle
+              v-model="showVrlEditor"
+              size="30px"
+              class="o2-toggle-button-xs"
+              data-test="step2-vrl-toggle"
+            />
+          </div>
+          <q-btn
+            data-test="step2-view-editor-btn"
+            label="View Editor"
+            size="sm"
+            class="o2-secondary-button q-py-sm"
+            @click="viewSqlEditor = true"
+          />
+        </div>
       </div>
 
       <!-- Custom Query Builder -->
@@ -342,53 +356,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- SQL/PromQL Preview Mode -->
       <template v-else>
         <div class="tw:w-full tw:flex tw:flex-col tw:gap-4">
-          <!-- Preview Boxes Container -->
-          <div class="tw:flex tw:gap-4 tw:w-full">
-            <!-- SQL/PromQL Preview Box (50% or 100% if no VRL) -->
+          <!-- SQL/PromQL Editor (full width) -->
+          <div
+            ref="sqlPromqlPreviewRef"
+            class="query-editor-box"
+            :class="
+              store.state.theme === 'dark'
+                ? 'dark-mode-preview'
+                : 'light-mode-preview'
+            "
+          >
             <div
-              ref="sqlPromqlPreviewRef"
-              class="preview-box tw:flex-1"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dark-mode-preview'
-                  : 'light-mode-preview'
-              "
-              :style="{ height: localTab === 'promql' ? '380px' : '464px' }"
+              class="preview-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2"
             >
-              <div
-                class="preview-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2"
-              >
-                <span class="preview-title"
-                  >{{ localTab === "sql" ? "SQL" : "PromQL" }} Preview</span
-                >
-              </div>
-              <div class="preview-content tw:px-3 tw:py-2">
-                <pre class="preview-code">{{
-                  sqlOrPromqlQuery ||
-                  `No ${localTab === "sql" ? "SQL" : "PromQL"} query defined yet`
-                }}</pre>
-              </div>
+              <span class="preview-title">{{
+                localTab === "sql" ? "SQL" : "PromQL"
+              }}</span>
             </div>
+            <div style="height: 280px">
+              <QueryEditor
+                :editor-id="`alert-query-editor-${localTab}`"
+                :query="sqlOrPromqlQuery"
+                :language="localTab === 'sql' ? 'sql' : 'promql'"
+                :fields="columns"
+                @update:query="
+                  localTab === 'sql'
+                    ? updateSqlQuery($event)
+                    : updatePromqlQuery($event)
+                "
+              />
+            </div>
+          </div>
 
-            <!-- VRL Preview Box (50%) - Only show if VRL function exists -->
+          <!-- VRL Function Editor (full width, below SQL) -->
+          <div
+            v-if="showVrlEditor && localTab !== 'promql'"
+            class="query-editor-box"
+            :class="
+              store.state.theme === 'dark'
+                ? 'dark-mode-preview'
+                : 'light-mode-preview'
+            "
+          >
             <div
-              v-if="vrlFunction"
-              class="preview-box tw:flex-1"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dark-mode-preview'
-                  : 'light-mode-preview'
-              "
-              :style="{ height: localTab === 'promql' ? '380px' : '464px' }"
+              class="preview-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2"
             >
-              <div
-                class="preview-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2"
-              >
-                <span class="preview-title">VRL Preview</span>
-              </div>
-              <div class="preview-content tw:px-3 tw:py-2">
-                <pre class="preview-code">{{ vrlFunction }}</pre>
-              </div>
+              <span class="preview-title">VRL Function</span>
+            </div>
+            <div style="height: 200px">
+              <QueryEditor
+                editor-id="alert-vrl-editor"
+                :query="vrlFunctionContent"
+                language="vrl"
+                @update:query="handleVrlEditorUpdate"
+              />
             </div>
           </div>
 
@@ -637,6 +658,7 @@ export default defineComponent({
 
     const localTab = ref(props.tab);
     const viewSqlEditor = ref(false);
+    const showVrlEditor = ref(false);
     const customConditionsForm = ref(null);
     const showMultiWindowDialog = ref(false);
     const pendingTab = ref<string | null>(null);
@@ -870,6 +892,12 @@ export default defineComponent({
       emit("update:vrlFunction", vrlValue);
     };
 
+    // Handler for VRL editor updates from inline editor
+    const handleVrlEditorUpdate = (vrlValue: string) => {
+      vrlFunctionContent.value = vrlValue;
+      emit("update:vrlFunction", vrlValue);
+    };
+
     // Handler for SQL validation from QueryEditorDialog
     const handleValidateSql = () => {
       emit("validate-sql");
@@ -1044,6 +1072,7 @@ export default defineComponent({
       localTab,
       tabOptions,
       shouldShowTabs,
+      showVrlEditor,
       updateTab,
       updateGroup,
       removeConditionGroup,
@@ -1056,6 +1085,7 @@ export default defineComponent({
       updateSqlQuery,
       updatePromqlQuery,
       handleVrlFunctionUpdate,
+      handleVrlEditorUpdate,
       handleValidateSql,
       functionsList,
       validate,
