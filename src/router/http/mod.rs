@@ -25,7 +25,10 @@ use ::config::{
             SearchPartitionRequest, ValuesRequest,
         },
     },
-    router::{is_fixed_querier_route, is_querier_route, is_querier_route_by_body},
+    router::{
+        extract_path_without_query, is_fixed_querier_route, is_querier_route,
+        is_querier_route_by_body,
+    },
     utils::{json, rand::get_rand_element},
 };
 use actix_web::{
@@ -685,6 +688,7 @@ fn build_response_headers(
 const STREAMING_ENDPOINTS: &[&str] = &[
     "/_search_stream",
     "/_values_stream",
+    "/_search_multi_stream",
     "/ai/chat_stream",
     "/prometheus/api/v1/query_range",
 ];
@@ -692,12 +696,6 @@ const STREAMING_ENDPOINTS: &[&str] = &[
 /// Checks if the request path is for a streaming endpoint.
 fn is_streaming_endpoint(path: &str) -> bool {
     STREAMING_ENDPOINTS.iter().any(|&ep| path.ends_with(ep))
-}
-
-/// Extracts the path without query string.
-fn extract_path_without_query(path: &str) -> &str {
-    let query_start = path.find('?').unwrap_or(path.len());
-    &path[..query_start]
 }
 
 /// Reads payload bytes with error handling.
@@ -750,22 +748,13 @@ mod tests {
     fn test_is_streaming_endpoint() {
         assert!(is_streaming_endpoint("/api/org/_search_stream"));
         assert!(is_streaming_endpoint("/api/org/_values_stream"));
+        assert!(is_streaming_endpoint("/api/org/_search_multi_stream"));
         assert!(is_streaming_endpoint("/api/org/ai/chat_stream"));
         assert!(is_streaming_endpoint(
             "/api/org/prometheus/api/v1/query_range"
         ));
         assert!(!is_streaming_endpoint("/api/org/_search"));
         assert!(!is_streaming_endpoint("/api/org/logs"));
-    }
-
-    #[test]
-    fn test_extract_path_without_query() {
-        assert_eq!(extract_path_without_query("/api/test?foo=bar"), "/api/test");
-        assert_eq!(extract_path_without_query("/api/test"), "/api/test");
-        assert_eq!(
-            extract_path_without_query("/api/test?foo=bar&baz=qux"),
-            "/api/test"
-        );
     }
 
     #[tokio::test]
