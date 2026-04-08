@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <q-btn
             data-test="step2-view-editor-btn"
-            label="View Editor"
+            label="Full View"
             size="sm"
             class="o2-secondary-button q-py-sm"
             @click="viewSqlEditor = true"
@@ -374,16 +374,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</span>
             </div>
             <div style="height: 280px">
-              <QueryEditor
-                :editor-id="`alert-query-editor-${localTab}`"
+              <UnifiedQueryEditor
+                :languages="localTab === 'sql' ? ['sql'] : ['promql']"
+                :default-language="localTab"
                 :query="sqlOrPromqlQuery"
-                :language="localTab === 'sql' ? 'sql' : 'promql'"
-                :fields="columns"
-                @update:query="
-                  localTab === 'sql'
-                    ? updateSqlQuery($event)
-                    : updatePromqlQuery($event)
-                "
+                :disable-ai="!streamName"
+                :disable-ai-reason="t('search.selectStreamForAI')"
+                editor-height="280px"
+                data-test-prefix="alert-inline"
+                @update:query="updateMainQuery"
               />
             </div>
           </div>
@@ -404,10 +403,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="preview-title">VRL Function</span>
             </div>
             <div style="height: 200px">
-              <QueryEditor
-                editor-id="alert-vrl-editor"
+              <UnifiedQueryEditor
+                :languages="['vrl']"
+                default-language="vrl"
                 :query="vrlFunctionContent"
-                language="vrl"
+                :disable-ai="!streamName"
+                :disable-ai-reason="t('search.selectStreamForAI')"
+                editor-height="200px"
+                data-test-prefix="alert-vrl-inline"
                 @update:query="handleVrlEditorUpdate"
               />
             </div>
@@ -564,6 +567,9 @@ import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
+const UnifiedQueryEditor = defineAsyncComponent(
+  () => import("@/components/QueryEditor.vue"),
+);
 
 export default defineComponent({
   name: "Step2QueryConfig",
@@ -571,6 +577,7 @@ export default defineComponent({
     AppTabs,
     FilterGroup,
     QueryEditor,
+    UnifiedQueryEditor,
     QueryEditorDialog,
     CustomConfirmDialog,
   },
@@ -1136,6 +1143,52 @@ export default defineComponent({
   &.light-mode {
     .step-content {
       background-color: transparent;
+    }
+  }
+}
+
+.query-editor-box {
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+
+  .preview-header {
+    border-bottom: 1px solid;
+    flex-shrink: 0;
+  }
+
+  .preview-title {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  &.dark-mode-preview {
+    background-color: #181a1b;
+    border: 1px solid #343434;
+
+    .preview-header {
+      background-color: #212121;
+      border-bottom-color: #343434;
+    }
+
+    .preview-title {
+      color: #ffffff;
+    }
+  }
+
+  &.light-mode-preview {
+    background-color: #f5f5f5;
+    border: 1px solid #e6e6e6;
+
+    .preview-header {
+      background-color: #ffffff;
+      border-bottom-color: #e6e6e6;
+    }
+
+    .preview-title {
+      color: #1a1a1a;
     }
   }
 }
