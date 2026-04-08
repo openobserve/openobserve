@@ -1081,9 +1081,9 @@ export default defineComponent({
 
         // Fetch latest span to extract richer semantic dimensions
         const latestSpan = await fetchLatestSpan();
-        const spanDimensions = latestSpan
-          ? extractSpanDimensions(latestSpan)
-          : { "service-name": serviceName };
+        const spanDimensions = {
+          service: serviceName,
+        };
 
         const correlateResponse = await correlateStreams(org, {
           source_stream: props.streamFilter || "default",
