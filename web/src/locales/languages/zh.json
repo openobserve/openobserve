@@ -2217,7 +2217,39 @@
     },
     "updateAnomalyDetection": "更新异常检测：",
     "anomalyCreated": "异常检测配置已创建。培训将很快开始。",
-    "editJson": "编辑警报 JSON"
+    "editJson": "编辑警报 JSON",
+    "stepIntro": {
+      "conditions": "编写查询以选择此警报监控的数据。使用 Builder 获得引导式体验，使用 SQL 进行完全控制，或使用 PromQL 获取指标。",
+      "compareWithPast": "将当前检查窗口的数据与过去一个或多个时间窗口的数据进行比较。可用于检测相对变化，例如与昨天相比，错误比平时多。",
+      "alertSettingsScheduled": "设置检测窗口、检查频率、触发警报的阈值以及向何处发送通知。",
+      "alertSettingsRealtime": "选择等待多长时间才能重新通知（冷却时间）以及哪些频道应收到此警报。",
+      "deduplication": "定义指纹 — 一组唯一标识警报事件的字段。窗口内共享相同指纹的警报将分组，而不是单独触发。",
+      "advanced": "（可选）附加上下文变量以丰富通知有效载荷，为文档目的添加描述，或自定义各个匹配行在通知中的显示方式。"
+    },
+    "setup": {
+      "whatToMonitor": "你在监视什么？",
+      "whatToMonitorHint": "选择您希望此警报监视的数据流",
+      "alertTypeLabel": "此警报应如何运作？",
+      "alertTypeHint": "选择最适合您的监控需求的警报类型",
+      "identityLabel": "命名和整理",
+      "identityHint": "为您的警报起一个清晰的名称，便于日后查找"
+    },
+    "alertTypeCards": {
+      "scheduledLabel": "已排定",
+      "scheduledDesc": "在可配置的回顾窗口中定期检查数据。最适合捕捉趋势、阈值和周期性条件。",
+      "realtimeLabel": "实时",
+      "realtimeDesc": "摄取匹配数据时立即触发。非常适合在关键问题发生时立即捕捉问题。",
+      "anomalyLabel": "异常检测",
+      "anomalyDesc": "使用机器学习来检测异常模式和与正常基线行为的偏差。"
+    },
+    "optionalSections": {
+      "compareWithPast": "与过去比较",
+      "compareWithPastDesc": "当当前值偏离历史基线时发出警报",
+      "deduplication": "重复数据删除",
+      "deduplicationDesc": "通过对相似警报进行分组来抑制重复的通知",
+      "advanced": "高级选项",
+      "advancedDesc": "上下文变量、自定义行模板和其他配置"
+    }
   },
   "alert_templates": {
     "header": "模板",

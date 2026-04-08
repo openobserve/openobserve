@@ -2217,7 +2217,39 @@
     },
     "updateAnomalyDetection": "Actualizar la detección de anomalías:",
     "anomalyCreated": "Se creó una configuración de detección de anomalías. La formación comenzará en breve.",
-    "editJson": "Editar alerta JSON"
+    "editJson": "Editar alerta JSON",
+    "stepIntro": {
+      "conditions": "Escriba la consulta que selecciona los datos que monitoriza esta alerta. Utilice Builder para una experiencia guiada, SQL para un control total o PromQL para las métricas.",
+      "compareWithPast": "Compare los datos de la ventana de verificación actual con los de una o más ventanas de tiempo anteriores. Resulta útil para detectar cambios relativos, por ejemplo, más errores de lo habitual en comparación con los de ayer.",
+      "alertSettingsScheduled": "Configure la ventana de detección, la frecuencia de comprobación, el umbral que activa la alerta y dónde enviar las notificaciones.",
+      "alertSettingsRealtime": "Elige cuánto tiempo esperar antes de volver a notificar (tiempo de espera) y qué canales deben recibir esta alerta.",
+      "deduplication": "Defina una huella digital: un conjunto de campos que identifican de forma exclusiva un evento de alerta. Las alertas que compartan la misma huella digital en la ventana se agruparán en lugar de activarse por separado.",
+      "advanced": "Si lo desea, puede adjuntar variables de contexto para enriquecer la carga útil de las notificaciones, añadir una descripción con fines de documentación o personalizar la forma en que aparecen las filas coincidentes individuales en las notificaciones."
+    },
+    "setup": {
+      "whatToMonitor": "¿Qué está monitoreando?",
+      "whatToMonitorHint": "Seleccione el flujo de datos que desea que vea esta alerta",
+      "alertTypeLabel": "¿Cómo debería funcionar esta alerta?",
+      "alertTypeHint": "Elija el tipo de alerta que mejor se adapte a sus necesidades de monitoreo",
+      "identityLabel": "Nombra y organiza",
+      "identityHint": "Dale a tu alerta un nombre claro para que sea fácil encontrarla más adelante"
+    },
+    "alertTypeCards": {
+      "scheduledLabel": "Programado",
+      "scheduledDesc": "Comprueba los datos a intervalos regulares en una ventana retrospectiva configurable. Ideal para detectar tendencias, umbrales y condiciones periódicas.",
+      "realtimeLabel": "En tiempo real",
+      "realtimeDesc": "Se activa inmediatamente cuando se ingieren datos coincidentes. Ideal para detectar problemas críticos en el momento en que ocurren.",
+      "anomalyLabel": "Detección de anomalías",
+      "anomalyDesc": "Utiliza el aprendizaje automático para detectar patrones inusuales y desviaciones del comportamiento normal de referencia."
+    },
+    "optionalSections": {
+      "compareWithPast": "Comparar con Past",
+      "compareWithPastDesc": "Alerta cuando los valores actuales se desvían de una línea base histórica",
+      "deduplication": "Deduplicación",
+      "deduplicationDesc": "Suprima las notificaciones duplicadas agrupando alertas similares",
+      "advanced": "Opciones avanzadas",
+      "advancedDesc": "Variables de contexto, plantillas de filas personalizadas y configuración adicional"
+    }
   },
   "alert_templates": {
     "header": "Plantillas",
