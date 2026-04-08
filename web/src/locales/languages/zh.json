@@ -119,7 +119,9 @@
     "set": "+ 设置",
     "goBack": "回去",
     "stopGenerating": "停止生成",
-    "redirectingHome": "{倒计时} 秒后重定向到主页..."
+    "redirectingHome": "{倒计时} 秒后重定向到主页...",
+    "version": "版本",
+    "create": "创建"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -2671,7 +2673,11 @@
     "discardChangesTitle": "放弃更改",
     "deleteNodeTitle": "删除节点",
     "deleteNodeLlmEvalConfirm": "您确定要删除此 LLM 评估节点吗？",
-    "evalTemplates": "评估模板"
+    "evalTemplates": "评估模板",
+    "evaluationTemplate": "评估模板",
+    "evaluationTemplateHelp": "选择一个评估模板来定义 LLM 评委的标准和维度。",
+    "noTemplatesFound": "未找到评估模板。在 “评估模板” 页面中创建一个。",
+    "evalTemplatesRefreshed": "评估模板已成功刷新"
   },
   "reports": {
     "header": "报表",
@@ -3269,5 +3275,40 @@
     "guideQuery": "当前 SQL 查询",
     "guideQueryEncoded": "Base64 编码的 SQL 查询",
     "guideExampleHeader": "示例"
+  },
+  "evalTemplate": {
+    "header": "评估模板",
+    "newTemplate": "新模板",
+    "editTemplate": "编辑评估模板",
+    "createTemplate": "创建新的评估模板",
+    "noTemplatesFound": "未找到评估模板",
+    "templateName": "模板名称",
+    "responseType": "回复类型",
+    "dimensions": "评估维度",
+    "promptTemplate": "提示模板",
+    "statsTitle": "模板统计",
+    "avgQualityScore": "平均质量得分",
+    "usageStats": "使用情况统计",
+    "totalEvaluations": "总评估",
+    "lastUsed": "上次使用",
+    "deleteTemplate": "删除模板",
+    "deleteConfirmation": "您确定要删除 “{name}” 吗？",
+    "loadFailed": "加载模板失败",
+    "saveRequiredFields": "请填写所有必填字段",
+    "updateSuccess": "模板更新成功",
+    "createSuccess": "模板已成功创建",
+    "updateFailed": "更新模板失败",
+    "createFailed": "创建模板失败",
+    "deleteSuccess": "模板已成功删除",
+    "deleteFailed": "删除模板失败",
+    "statsLoadFailed": "加载模板统计信息失败",
+    "nameRequired": "姓名为必填项",
+    "responseTypeRequired": "回复类型为必填项",
+    "dimensionRequired": "至少需要一个维度",
+    "contentRequired": "内容为必填项",
+    "never": "永远不要",
+    "typeScore": "数字分数（例如，0.0-1.0）",
+    "typeBoolean": "二进制/合格失败（布尔值）",
+    "typeCustom": "分类/自定义文本"
   }
 }
