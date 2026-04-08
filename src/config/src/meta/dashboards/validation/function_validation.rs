@@ -48,7 +48,7 @@ pub struct ArgType {
 /// Load functionValidation.json once at startup — same file used by FE.
 static FUNCTION_DEFS: Lazy<Vec<FunctionDef>> = Lazy::new(|| {
     let json_str =
-        include_str!("../../../../../../../schemas/functions/functionValidation.json");
+        include_str!("../../../../../../schemas/functions/functionValidation.json");
     serde_json::from_str(json_str).expect("Invalid functionValidation.json")
 });
 
