@@ -119,7 +119,9 @@
     "copyError": "Fehler beim Kopieren in die Zwischenablage",
     "goBack": "Geh zurück",
     "stopGenerating": "Generieren beenden",
-    "redirectingHome": "In {Countdown} Sekunden wird zur Startseite weitergeleitet..."
+    "redirectingHome": "In {Countdown} Sekunden wird zur Startseite weitergeleitet...",
+    "version": "Version",
+    "create": "Erstellen"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -2667,7 +2669,11 @@
     "discardChangesTitle": "Änderungen verwerfen",
     "deleteNodeTitle": "Knoten löschen",
     "deleteNodeLlmEvalConfirm": "Möchten Sie diesen LLM-Evaluierungsknoten wirklich löschen?",
-    "evalTemplates": "Vorlagen für Evaluierungen"
+    "evalTemplates": "Vorlagen für Evaluierungen",
+    "evaluationTemplate": "Vorlage für eine Bewertung",
+    "evaluationTemplateHelp": "Wählen Sie eine Bewertungsvorlage aus, die die Kriterien und Dimensionen für den LLM-Richter definiert.",
+    "noTemplatesFound": "Es wurden keine Bewertungsvorlagen gefunden. Erstellen Sie eine auf der Seite mit den Bewertungsvorlagen.",
+    "evalTemplatesRefreshed": "Die Bewertungsvorlagen wurden erfolgreich aktualisiert"
   },
   "reports": {
     "header": "Berichte",
@@ -3265,5 +3271,40 @@
     "guideQuery": "Aktuelle SQL-Abfrage",
     "guideQueryEncoded": "Base64-kodierte SQL-Abfrage",
     "guideExampleHeader": "Beispiel"
+  },
+  "evalTemplate": {
+    "header": "Vorlagen für Evaluierungen",
+    "newTemplate": "Neue Vorlage",
+    "editTemplate": "Bewertungsvorlage bearbeiten",
+    "createTemplate": "Neue Bewertungsvorlage erstellen",
+    "noTemplatesFound": "Keine Bewertungsvorlagen gefunden",
+    "templateName": "Name der Vorlage",
+    "responseType": "Art der Antwort",
+    "dimensions": "Dimensionen der Bewertung",
+    "promptTemplate": "Vorlage für Aufforderungen",
+    "statsTitle": "Template-Statistiken",
+    "avgQualityScore": "Durchschnittlicher Qualitätsfaktor",
+    "usageStats": "Nutzungsstatistiken",
+    "totalEvaluations": "Bewertungen insgesamt",
+    "lastUsed": "Zuletzt verwendet",
+    "deleteTemplate": "Vorlage löschen",
+    "deleteConfirmation": "Bist du sicher, dass du „{name}“ löschen möchtest?",
+    "loadFailed": "Vorlagen konnten nicht geladen werden",
+    "saveRequiredFields": "Bitte füllen Sie alle Pflichtfelder aus",
+    "updateSuccess": "Vorlage wurde erfolgreich aktualisiert",
+    "createSuccess": "Vorlage wurde erfolgreich erstellt",
+    "updateFailed": "Vorlage konnte nicht aktualisiert werden",
+    "createFailed": "Vorlage konnte nicht erstellt werden",
+    "deleteSuccess": "Vorlage wurde erfolgreich gelöscht",
+    "deleteFailed": "Vorlage konnte nicht gelöscht werden",
+    "statsLoadFailed": "Die Vorlagenstatistik konnte nicht geladen werden",
+    "nameRequired": "Name ist erforderlich",
+    "responseTypeRequired": "Antworttyp ist erforderlich",
+    "dimensionRequired": "Es ist mindestens eine Dimension erforderlich",
+    "contentRequired": "Inhalt ist erforderlich",
+    "never": "Niemals",
+    "typeScore": "Numerischer Wert (z. B. 0,0 — 1,0)",
+    "typeBoolean": "Binär//Pass-Fail (Boolean)",
+    "typeCustom": "Kategorisch//Benutzerdefinierter Text"
   }
 }
