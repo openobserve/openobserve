@@ -2306,7 +2306,7 @@
       "nameAndOrganize": "Name & Organize"
     },
     "stepIntro": {
-      "conditions": "Write the query that selects the data this alert monitors. Use Builder for a guided experience, SQL for full control, or PromQL for metrics.",
+      "conditions": "Write a query to define what data this alert watches. Use Builder to get started quickly, SQL for advanced log queries, or PromQL for metrics.",
       "compareWithPast": "Compare data from the current check window against one or more past time windows. Useful for detecting relative changes, such as more errors than usual compared to yesterday.",
       "alertSettingsScheduled": "Set the detection window, how often to check, the threshold that triggers the alert, and where to send notifications.",
       "alertSettingsRealtime": "Choose how long to wait before re-notifying (cooldown) and which channels should receive this alert.",

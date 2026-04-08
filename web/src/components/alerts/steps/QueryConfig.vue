@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
       <div
         v-if="shouldShowTabs"
-        class="tw:mb-3 tw:flex tw:items-center tw:justify-between"
+        class="tw:mb-3 tw:flex tw:items-center tw:justify-between tw:mt-2"
       >
         <div class="flex items-center app-tabs-container tw:h-[36px] tw:w-fit">
           <AppTabs
