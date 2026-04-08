@@ -2396,7 +2396,7 @@
       "clickToViewSuggestions": "Clique para ver sugestões de melhoria de correlação",
       "byService": "Por serviço",
       "byStream": "Por stream",
-      "searchServiceName": "Pesquisar nome do serviço...",
+      "searchServiceName": "Pesquisar nome do serviço ou stream...",
       "searchStreamName": "Nome do stream de pesquisa...",
       "allServices": "Todos os serviços",
       "missingTelemetry": "Telemetria ausente",
