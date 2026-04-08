@@ -2224,15 +2224,6 @@ export class AlertsPage {
     // ==================== PROMQL CONDITION ROW METHODS ====================
 
     /**
-     * Get the PromQL condition row locator.
-     * The "Alert if [op] [value] series match criteria" row uses data-test="alert-threshold-operator-select".
-     * This row is present in PromQL mode (bug #9967 fix) and absent in Custom/SQL modes.
-     */
-    getPromqlConditionRow() {
-        return this.page.locator('[data-test="alert-threshold-operator-select"]');
-    }
-
-    /**
      * Expect the PromQL threshold operator control to be visible in Step 4.
      * Verifies bug #9967 fix: "Alert if [op] [value] series match criteria" row exists in PromQL mode.
      */
