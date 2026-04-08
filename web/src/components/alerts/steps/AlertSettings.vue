@@ -16,13 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="step-alert-conditions" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw:px-3 tw:py-4">
+    <!-- Section header -->
+    <div class="section-header">
+      <div class="section-header-accent" />
+      <span class="section-header-title">Settings</span>
+    </div>
+    <div class="tw:px-3 tw:py-2">
       <q-form ref="alertSettingsForm" @submit.prevent>
       <!-- For Real-Time Alerts -->
       <template v-if="isRealTime === 'true'">
         <!-- Silence Notification (Cooldown) -->
         <div class="flex justify-start items-start tw:pb-3 tw:mb-4">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
             {{ t("alerts.silenceNotification") + " *" }}
             <q-icon
               name="info"
@@ -57,7 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="
                   min-width: 90px;
                   margin-left: 0 !important;
-                  height: 36px;
+                  height: 28px;
+                  font-size: 13px;
                 "
                 :class="
                   store.state.theme === 'dark'
@@ -81,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Destinations -->
         <div class="flex items-start tw:pb-4 tw:mb-4">
-          <div style="width: 190px; height: 36px" class="flex items-center tw:font-semibold">
+          <div style="width: 190px; height: 28px" class="flex items-center tw:font-semibold">
             <span>{{ t("alerts.destination") }} *</span>
           </div>
           <div class="tw:flex tw:flex-col">
@@ -149,11 +155,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('alerts.alertSettings.addNewDestination')"
                 class="o2-secondary-button q-ml-sm"
                 no-caps
+                size="sm"
+                style="min-height: 28px; height: 28px;"
                 @click="routeToCreateDestination"
               />
             </div>
             <div
-              v-if="!localDestinations || localDestinations.length === 0"
+              v-if="destinationsTouched && (!localDestinations || localDestinations.length === 0)"
               class="text-red-8 q-pt-xs"
               style="font-size: 11px; line-height: 12px"
             >
@@ -162,75 +170,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Template Override for Real-Time Alerts -->
-        <div class="flex items-start tw:pb-4 tw:mb-4">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.template") }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.templateTooltip') }}
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div>
-            <div class="flex items-center">
-              <q-select
-                v-model="localTemplate"
-                :options="filteredTemplates"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop no-case template-select-field"
-                filled
-                dense
-                use-input
-                clearable
-                emit-value
-                input-debounce="0"
-                @filter="filterTemplates"
-                @update:model-value="emitTemplateUpdate"
-                style="width: 300px; max-width: 300px"
-              >
-                <template v-slot:selected>
-                  <div v-if="localTemplate" class="ellipsis">
-                    {{ localTemplate }}
-                    <q-tooltip>{{ localTemplate }}</q-tooltip>
-                  </div>
-                </template>
-                <template v-slot:no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">No templates available</q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-              <q-btn
-                icon="refresh"
-                class="iconHoverBtn q-ml-xs"
-                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                padding="xs"
-                unelevated
-                size="sm"
-                round
-                flat
-                title="Refresh latest Templates"
-                @click="$emit('refresh:templates')"
-                style="min-width: auto"
-              />
-            </div>
-          </div>
-        </div>
       </template>
 
       <!-- For Scheduled Alerts -->
       <template v-else>
-        <!-- Threshold (for custom and sql queries without aggregation, always shown for promql) -->
-        <div class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
+        <!-- Threshold — now handled by inline condition sentence in QueryConfig (V3.1) -->
+        <div v-if="false" class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
             {{ t("alerts.threshold") + " *" }}
             <q-icon
@@ -338,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Period -->
         <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
             {{ t("alerts.period") + " *" }}
             <q-icon
               name="info"
@@ -368,8 +313,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div
-                style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
-               
+                style="min-width: 90px; margin-left: 0 !important; height: 28px; font-weight: normal; font-size: 13px;"
+
                 :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
                 class="flex justify-center items-center"
               >
@@ -386,153 +331,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Frequency (with inline interval/cron toggle) -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.frequency") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="auto">
-                <span style="font-size: 14px" v-if="formData.trigger_condition.frequency_type === 'minutes'">
-                  {{ t('alerts.alertSettings.frequencyTooltipMinutes') }}
-                </span>
-                <span style="font-size: 14px" v-else>
-                  {{ t('alerts.alertSettings.frequencyTooltipCron') }}
-                </span>
-              </q-tooltip>
-            </q-icon>
-            <template v-if="formData.trigger_condition.frequency_type === 'cron' && showTimezoneWarning">
-              <q-icon
-                name="warning"
-                size="18px"
-                class="cursor-pointer tw:ml-2"
-                :class="store.state.theme === 'dark' ? 'tw:text-orange-500' : 'tw:text-orange-500'"
-              >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
-                  max-width="auto"
-                  class="tw:text-[14px]"
-                >
-                  {{ t('alerts.alertSettings.timezoneWarning') }}
-                </q-tooltip>
-              </q-icon>
-            </template>
-          </div>
-          <div class="tw:flex tw:flex-col" style="min-height: 78px">
-            <!-- Interval/Cron Mode Buttons -->
-            <div class="tw:flex frequency-toggle-group tw:mb-3">
-              <q-btn
-                :label="t('alerts.interval')"
-                :outline="formData.trigger_condition.frequency_type === 'cron'"
-                :unelevated="formData.trigger_condition.frequency_type === 'minutes'"
-                :color="formData.trigger_condition.frequency_type === 'minutes' ? 'primary' : 'grey-7'"
-                no-caps
-                size="sm"
-                class="tw:px-4 frequency-toggle-btn frequency-toggle-left"
-                :class="formData.trigger_condition.frequency_type === 'minutes' ? 'active' : 'inactive'"
-                style="min-width: 90px"
-                @click="handleFrequencyTypeChange('minutes')"
-              />
-              <q-btn
-                :label="t('alerts.alertSettings.cronSchedule')"
-                :outline="formData.trigger_condition.frequency_type === 'minutes'"
-                :unelevated="formData.trigger_condition.frequency_type === 'cron'"
-                :color="formData.trigger_condition.frequency_type === 'cron' ? 'primary' : 'grey-7'"
-                no-caps
-                size="sm"
-                class="tw:px-4 frequency-toggle-btn frequency-toggle-right"
-                :class="formData.trigger_condition.frequency_type === 'cron' ? 'active' : 'inactive'"
-                style="min-width: 130px"
-                @click="handleFrequencyTypeChange('cron')"
-              />
-            </div>
-
-            <!-- Input Fields Container (fixed height to prevent shifting) -->
-            <div class="tw:flex tw:items-start" style="min-height: 36px">
-              <!-- Interval Mode -->
-              <div v-if="formData.trigger_condition.frequency_type === 'minutes'" class="tw:flex tw:items-center">
-                <div style="width: 87px; margin-left: 0 !important">
-                  <q-input
-                    v-model.number="formData.trigger_condition.frequency"
-                    type="number"
-                    dense
-                    borderless
-                    min="1"
-                    style="background: none"
-                    debounce="300"
-                    @update:model-value="emitTriggerUpdate"
-                  />
-                </div>
-                <div
-                  style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
-                 
-                  :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
-                  class="flex justify-center items-center"
-                >
-                  {{ t("alerts.minutes") }}
-                </div>
-              </div>
-
-              <!-- Cron Mode -->
-              <div v-else class="tw:flex tw:items-center tw:gap-2">
-                <q-input
-                  v-model="formData.trigger_condition.cron"
-                  dense
-                  borderless
-                  placeholder="Cron Expression *"
-                  style="background: none; width: 180px"
-                  debounce="300"
-                  @update:model-value="emitTriggerUpdate"
-                />
-                <q-select
-                  v-model="formData.trigger_condition.timezone"
-                  :options="filteredTimezone"
-                  @blur="
-                    browserTimezone =
-                      browserTimezone === ''
-                        ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                        : browserTimezone
-                  "
-                  use-input
-                  @filter="timezoneFilterFn"
-                  input-debounce="0"
-                  dense
-                  borderless
-                  emit-value
-                  fill-input
-                  hide-selected
-                  :title="formData.trigger_condition.timezone"
-                  placeholder="Timezone *"
-                  :display-value="`${browserTimezone || 'Select timezone'}`"
-                  style="width: 210px"
-                  @update:model-value="emitTriggerUpdate"
-                />
-              </div>
-            </div>
-
-            <!-- Error Message -->
-            <div
-              v-if="
-                (formData.trigger_condition.frequency_type === 'minutes' && !Number(formData.trigger_condition.frequency)) ||
-                (formData.trigger_condition.frequency_type === 'cron' && (!formData.trigger_condition.cron || !formData.trigger_condition.timezone)) ||
-                cronJobError
-              "
-              class="text-red-8 tw:mt-1"
-              style="font-size: 11px; line-height: 12px"
-            >
-              {{ cronJobError || "Field is required!" }}
-            </div>
-          </div>
-        </div>
-
         <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
         <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
             {{ t("alerts.silenceNotification") + " *" }}
             <q-icon
               name="info"
@@ -566,9 +367,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="
                   min-width: 90px;
                   margin-left: 0 !important;
-                  height: 36px;
+                  height: 28px;
+                  font-size: 13px;
                 "
-               
+
                 :class="
                   store.state.theme === 'dark'
                     ? 'bg-grey-9'
@@ -591,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Destinations -->
         <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
+          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
             {{ t("alerts.destination") + " *" }}
             <q-icon
               name="info"
@@ -673,11 +475,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('alerts.alertSettings.addNewDestination')"
                 class="o2-secondary-button q-ml-sm"
                 no-caps
+                size="sm"
+                style="min-height: 28px; height: 28px;"
                 @click="routeToCreateDestination"
               />
             </div>
             <div
-              v-if="!localDestinations || localDestinations.length === 0"
+              v-if="destinationsTouched && (!localDestinations || localDestinations.length === 0)"
               class="text-red-8 q-pt-xs"
               style="font-size: 11px; line-height: 12px"
             >
@@ -686,75 +490,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Template Override -->
-        <div class="flex items-start q-mr-sm alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.template") }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.templateTooltip') }}
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div>
-            <div class="flex items-center">
-              <q-select
-                ref="templateFieldRef"
-                v-model="localTemplate"
-                :options="filteredTemplates"
-                class="no-case q-py-none template-select-field"
-                borderless
-                dense
-                use-input
-                clearable
-                emit-value
-                :input-debounce="400"
-                hide-bottom-space
-                @filter="filterTemplates"
-                @update:model-value="emitTemplateUpdate"
-                style="width: 180px; max-width: 300px"
-              >
-                <template v-slot:selected>
-                  <div v-if="localTemplate" class="ellipsis">
-                    {{ localTemplate }}
-                    <q-tooltip>{{ localTemplate }}</q-tooltip>
-                  </div>
-                </template>
-                <template v-slot:no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">No templates available</q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-              <q-btn
-                icon="refresh"
-                class="q-ml-xs"
-                padding="xs"
-                unelevated
-                size="sm"
-                round
-                flat
-                title="Refresh latest Templates"
-                @click="$emit('refresh:templates')"
-                style="min-width: auto"
-              />
-            </div>
-          </div>
-        </div>
       </template>
 
       <!-- Creates Incident toggle — shown for all alert types -->
-      <div class="flex items-start tw:pb-4 tw:mb-4">
+      <div class="flex items-start alert-settings-row">
         <div
           class="tw:font-semibold flex items-center"
-          style="width: 190px; height: 36px"
+          style="width: 190px; height: 28px"
         >
           {{ t("alerts.alertSettings.createsIncident") }}
           <q-icon
@@ -822,14 +564,6 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       default: () => [],
     },
-    template: {
-      type: String,
-      default: "",
-    },
-    templates: {
-      type: Array as PropType<any[]>,
-      default: () => [],
-    },
   },
   emits: [
     "update:trigger",
@@ -838,8 +572,6 @@ export default defineComponent({
     "update:destinations",
     "refresh:destinations",
     "update:promqlCondition",
-    "update:template",
-    "refresh:templates",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -854,7 +586,6 @@ export default defineComponent({
     const thresholdFieldRef = ref(null);
     const silenceFieldRef = ref(null);
     const destinationsFieldRef = ref(null);
-    const templateFieldRef = ref(null);
 
     // Local state for aggregation toggle
     // Only enable aggregation when query type is "custom" (not "sql" or "promql")
@@ -863,7 +594,7 @@ export default defineComponent({
       queryType.value === "custom" && props.isAggregationEnabled
     );
     const localDestinations = ref(props.destinations);
-    const localTemplate = ref(props.template);
+    const destinationsTouched = ref(false);
 
     // Timezone management
     const browserTimezone = ref("");
@@ -1045,13 +776,6 @@ export default defineComponent({
       (newVal) => {
         // Only enable aggregation if query type is "custom"
         localIsAggregationEnabled.value = queryType.value === "custom" && newVal;
-      }
-    );
-
-     watch(
-      () => props.template,
-      (newVal) => {
-        localTemplate.value = newVal;
       }
     );
 
@@ -1242,30 +966,6 @@ export default defineComponent({
       });
     };
 
-       // Filtered templates
-    const formattedTemplates = computed(() => props.templates.map((t: any) => t.name));
-    const filteredTemplates = ref<string[]>([]);
-    const filterTemplates = (val: string, update: any) => {
-      update(() => {
-        if (val === "") {
-          filteredTemplates.value = [...formattedTemplates.value];
-        } else {
-          const needle = val.toLowerCase();
-          filteredTemplates.value = formattedTemplates.value.filter(
-            (v: string) => v.toLowerCase().indexOf(needle) > -1
-          );
-        }
-      });
-    };
-    // Watch for templates prop changes
-    watch(
-      () => props.templates,
-      () => {
-        filteredTemplates.value = [...formattedTemplates.value];
-      },
-      { immediate: true }
-    );
-
     // Timezone filter function
     const timezoneFilterFn = (val: string, update: any) => {
       update(() => {
@@ -1396,11 +1096,8 @@ export default defineComponent({
     };
 
     const emitDestinationsUpdate = () => {
+      destinationsTouched.value = true;
       emit("update:destinations", localDestinations.value);
-    };
-
-    const emitTemplateUpdate = () => {
-      emit("update:template", localTemplate.value || "");
     };
 
     const emitPromqlConditionUpdate = () => {
@@ -1442,6 +1139,7 @@ export default defineComponent({
 
         // Check destinations (required for both real-time and scheduled)
         if (!localDestinations.value || localDestinations.value.length === 0) {
+          destinationsTouched.value = true;
           return { valid: false, message: null }; // null means show inline error only
         }
 
@@ -1546,6 +1244,7 @@ export default defineComponent({
 
       // Check destinations (required for both real-time and scheduled)
       if (!localDestinations.value || localDestinations.value.length === 0) {
+        destinationsTouched.value = true;
         return { valid: false, message: null }; // null means show inline error only
       }
 
@@ -1558,6 +1257,7 @@ export default defineComponent({
       queryType,
       localIsAggregationEnabled,
       localDestinations,
+      destinationsTouched,
       aggFunctions,
       triggerOperators,
       filteredNumericColumns,
@@ -1568,13 +1268,7 @@ export default defineComponent({
       emitAggregationUpdate,
       emitDestinationsUpdate,
       routeToCreateDestination,
-      handleFrequencyTypeChange,
       handlePeriodChange,
-      // Timezone-related
-      browserTimezone,
-      filteredTimezone,
-      showTimezoneWarning,
-      timezoneFilterFn,
       // Cron validation
       cronJobError,
       validateFrequency,
@@ -1594,12 +1288,7 @@ export default defineComponent({
       showHavingContext,
       groupByFieldsText,
       havingFieldsText,
-      emitTemplateUpdate,
       emitPromqlConditionUpdate,
-      localTemplate,
-      filteredTemplates,
-      filterTemplates,
-      templateFieldRef,
     };
   },
 });
@@ -1608,8 +1297,8 @@ export default defineComponent({
 <style scoped lang="scss">
 .step-alert-conditions {
   width: 100%;
-  height: 100%;
   margin: 0 auto;
+  border-radius: 8px;
 
   .step-content {
     border-radius: 8px;
@@ -1633,9 +1322,17 @@ export default defineComponent({
   }
 
   &.dark-mode {
-    .step-content {
-      background-color: #212121;
-      border: 1px solid #343434;
+    background-color: #212121;
+    border: 1px solid #343434;
+
+    .section-header {
+      border-bottom: 1px solid #343434;
+    }
+    .section-header-title {
+      color: #e0e0e0;
+    }
+    .section-header-accent {
+      background: var(--q-primary);
     }
 
     .step-title {
@@ -1648,9 +1345,17 @@ export default defineComponent({
   }
 
   &.light-mode {
-    .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
+    background-color: #ffffff;
+    border: 1px solid #e6e6e6;
+
+    .section-header {
+      border-bottom: 1px solid #eeeeee;
+    }
+    .section-header-title {
+      color: #374151;
+    }
+    .section-header-accent {
+      background: var(--q-primary);
     }
 
     .step-title {
@@ -1663,61 +1368,30 @@ export default defineComponent({
   }
 }
 
+.section-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+}
+
+.section-header-accent {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.section-header-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
 // Consistent spacing for alert settings rows
 .alert-settings-row {
-  margin-bottom: 24px !important;
+  margin-bottom: 16px !important;
   padding-bottom: 0 !important;
-}
-
-// Frequency toggle buttons styling
-.frequency-toggle-group {
-  display: flex;
-  width: fit-content;
-}
-
-.frequency-toggle-btn {
-  border: 1px solid !important;
-  border-radius: 0 !important;
-  transition: all 0.2s ease;
-  margin: 0 !important;
-
-  &.active {
-    border-color: var(--q-primary) !important;
-    background-color: var(--q-primary) !important;
-    color: white !important;
-    z-index: 1;
-  }
-
-  &.inactive {
-    border-color: #d0d0d0 !important;
-    background-color: transparent !important;
-  }
-}
-
-.frequency-toggle-left {
-  border-radius: 4px 0 0 4px !important;
-}
-
-.frequency-toggle-right {
-  border-left: none !important;
-  border-radius: 0 4px 4px 0 !important;
-}
-
-.dark-mode {
-  .frequency-toggle-btn {
-    &.inactive {
-      border-color: #404040 !important;
-      color: #bdbdbd !important;
-    }
-  }
-}
-
-.light-mode {
-  .frequency-toggle-btn {
-    &.inactive {
-      color: #5c5c5c !important;
-    }
-  }
 }
 
 // Fix for destinations select - keep selected items and input on same line

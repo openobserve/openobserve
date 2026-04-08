@@ -17,6 +17,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="step-advanced" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="step-content card-container tw:px-3 tw:py-4">
+      <!-- Template Override -->
+      <div class="tw:mb-4">
+        <div class="tw:pb-2 custom-input-label text-bold">
+          <span>{{ t("alerts.template") }}</span>
+          <q-btn
+            style="color: #A0A0A0;"
+            no-caps
+            padding="xs"
+            class="q-ml-xs"
+            size="sm"
+            flat
+            icon="info_outline"
+          >
+            <q-tooltip>
+              {{ t('alerts.alertSettings.templateTooltip') }}
+            </q-tooltip>
+          </q-btn>
+        </div>
+        <div class="flex items-center">
+          <q-select
+            v-model="localTemplate"
+            :options="filteredTemplates"
+            class="no-case q-py-none template-select-field"
+            borderless
+            dense
+            use-input
+            clearable
+            emit-value
+            :input-debounce="400"
+            hide-bottom-space
+            @filter="filterTemplates"
+            @update:model-value="emitTemplateUpdate"
+            style="width: 300px; max-width: 300px"
+          >
+            <template v-slot:selected>
+              <div v-if="localTemplate" class="ellipsis">
+                {{ localTemplate }}
+                <q-tooltip>{{ localTemplate }}</q-tooltip>
+              </div>
+            </template>
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-grey">No templates available</q-item-section>
+              </q-item>
+            </template>
+          </q-select>
+          <q-btn
+            icon="refresh"
+            class="q-ml-xs iconHoverBtn"
+            :class="store.state.theme === 'dark' ? 'icon-dark' : ''"
+            padding="xs"
+            unelevated
+            size="sm"
+            round
+            flat
+            title="Refresh latest Templates"
+            @click="$emit('refresh:templates')"
+            style="min-width: auto"
+          />
+        </div>
+      </div>
+
       <!-- Context Variables -->
       <div class="tw:mb-4">
         <div class="tw:pb-2 custom-input-label text-bold">
@@ -187,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, type PropType } from "vue";
+import { defineComponent, ref, computed, watch, type PropType, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
@@ -201,6 +263,14 @@ export interface Variable {
 export default defineComponent({
   name: "Step6Advanced",
   props: {
+    template: {
+      type: String,
+      default: "",
+    },
+    templates: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
     contextAttributes: {
       type: Array as PropType<Variable[]>,
       default: () => [],
@@ -218,10 +288,44 @@ export default defineComponent({
       default: "String",
     },
   },
-  emits: ["update:contextAttributes", "update:description", "update:rowTemplate", "update:rowTemplateType"],
+  emits: ["update:template", "refresh:templates", "update:contextAttributes", "update:description", "update:rowTemplate", "update:rowTemplateType"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
+
+    // Template override
+    const localTemplate = ref(props.template);
+    const formattedTemplates = computed(() => props.templates.map((t: any) => t.name));
+    const filteredTemplates: Ref<string[]> = ref([]);
+    const filterTemplates = (val: string, update: any) => {
+      update(() => {
+        if (val === "") {
+          filteredTemplates.value = [...formattedTemplates.value];
+        } else {
+          const needle = val.toLowerCase();
+          filteredTemplates.value = formattedTemplates.value.filter(
+            (v: string) => v.toLowerCase().indexOf(needle) > -1
+          );
+        }
+      });
+    };
+    const emitTemplateUpdate = () => {
+      emit("update:template", localTemplate.value || "");
+    };
+
+    watch(
+      () => props.template,
+      (newVal) => {
+        localTemplate.value = newVal;
+      }
+    );
+    watch(
+      () => props.templates,
+      () => {
+        filteredTemplates.value = [...formattedTemplates.value];
+      },
+      { immediate: true }
+    );
 
     const localVariables = ref<Variable[]>([...props.contextAttributes]);
     const localDescription = ref(props.description);
@@ -301,6 +405,10 @@ export default defineComponent({
     return {
       t,
       store,
+      localTemplate,
+      filteredTemplates,
+      filterTemplates,
+      emitTemplateUpdate,
       localVariables,
       localDescription,
       localRowTemplate,

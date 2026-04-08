@@ -424,6 +424,23 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   });
   const chartCollapsed = ref(false);
 
+  // Preview DateTimePicker value — controls the time range for preview data
+  const previewDateTimeValue = ref({
+    tab: "relative",
+    relative: {
+      period: { label: "Minutes", value: "Minutes" },
+      value: 15,
+    },
+    absolute: {
+      date: {
+        from: new Date().toLocaleDateString("en-ZA"),
+        to: new Date().toLocaleDateString("en-ZA"),
+      },
+      startTime: "00:00",
+      endTime: "23:59",
+    },
+  });
+
   // ── Computed Properties ─────────────────────────────────────────────────
 
   const editorData = ref("");
@@ -1038,7 +1055,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // Reset tab errors
     tabErrors.value = {
       condition: false,
-      rules: false,
       compare: false,
       dedup: false,
       advanced: false,
@@ -1059,11 +1075,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return { valid: false, firstErrorTab: "condition" };
     }
 
-    // Validate rules & routing tab
+    // Validate alert settings (now part of condition tab)
     const rulesValid = await validateStep(4);
     if (!rulesValid) {
-      tabErrors.value.rules = true;
-      return { valid: false, firstErrorTab: "rules" };
+      tabErrors.value.condition = true;
+      return { valid: false, firstErrorTab: "condition" };
     }
 
     return { valid: true, firstErrorTab: null };
@@ -1155,7 +1171,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const handleGoToSqlEditor = () => {
     formData.value.query_condition.type = "sql";
     if (isAnomalyMode.value) {
-      wizardStep.value = 2;
+      activeTab.value = "anomaly-config";
     } else {
       activeTab.value = "condition";
     }
@@ -1777,7 +1793,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
             : validationResult;
         const isValid = typeof result === "boolean" ? result : result.valid;
         if (!isValid) {
-          activeTab.value = "rules";
+          activeTab.value = "condition";
           q.notify({
             type: "negative",
             message: "Please complete Alert Settings correctly.",
@@ -1981,8 +1997,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
 
     if (store.state?.zoConfig?.min_auto_refresh_interval)
-      formData.value.trigger_condition.frequency = Math.ceil(
-        store.state?.zoConfig?.min_auto_refresh_interval / 60 || 10,
+      formData.value.trigger_condition.frequency = Math.max(
+        10,
+        Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60 || 10),
       );
 
     beingUpdated = props.isUpdated;
@@ -2275,9 +2292,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               ref: (newVal as any).periodFieldRef,
               onBeforeFocus: () => {
                 if (isAnomalyMode.value) {
-                  if (wizardStep.value !== 4) wizardStep.value = 4;
+                  activeTab.value = "anomaly-alerting";
                 } else {
-                  activeTab.value = "rules";
+                  activeTab.value = "condition";
                 }
               },
             });
@@ -2287,9 +2304,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               ref: (newVal as any).thresholdFieldRef,
               onBeforeFocus: () => {
                 if (isAnomalyMode.value) {
-                  if (wizardStep.value !== 4) wizardStep.value = 4;
+                  activeTab.value = "anomaly-alerting";
                 } else {
-                  activeTab.value = "rules";
+                  activeTab.value = "condition";
                 }
               },
             });
@@ -2299,9 +2316,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               ref: (newVal as any).silenceFieldRef,
               onBeforeFocus: () => {
                 if (isAnomalyMode.value) {
-                  if (wizardStep.value !== 4) wizardStep.value = 4;
+                  activeTab.value = "anomaly-alerting";
                 } else {
-                  activeTab.value = "rules";
+                  activeTab.value = "condition";
                 }
               },
             });
@@ -2311,9 +2328,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               ref: (newVal as any).destinationsFieldRef,
               onBeforeFocus: () => {
                 if (isAnomalyMode.value) {
-                  if (wizardStep.value !== 4) wizardStep.value = 4;
+                  activeTab.value = "anomaly-alerting";
                 } else {
-                  activeTab.value = "rules";
+                  activeTab.value = "condition";
                 }
               },
             });
@@ -2336,7 +2353,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               ref: (newVal as any).customPreviewRef,
               onBeforeFocus: () => {
                 if (isAnomalyMode.value) {
-                  if (wizardStep.value !== 2) wizardStep.value = 2;
+                  activeTab.value = "anomaly-config";
                 } else {
                   activeTab.value = "condition";
                 }
@@ -2350,7 +2367,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               ref: (newVal as any).sqlPromqlPreviewRef,
               onBeforeFocus: () => {
                 if (isAnomalyMode.value) {
-                  if (wizardStep.value !== 2) wizardStep.value = 2;
+                  activeTab.value = "anomaly-config";
                 } else {
                   activeTab.value = "condition";
                 }
@@ -2373,7 +2390,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
             ref: (newVal as any).multiWindowContainerRef,
             onBeforeFocus: () => {
               if (isAnomalyMode.value) {
-                if (wizardStep.value !== 3) wizardStep.value = 3;
+                activeTab.value = "anomaly-alerting";
               } else {
                 activeTab.value = "compare";
               }
@@ -2396,7 +2413,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               ref: (step2Ref.value as any).customPreviewRef,
               onBeforeFocus: () => {
                 if (isAnomalyMode.value) {
-                  if (wizardStep.value !== 2) wizardStep.value = 2;
+                  activeTab.value = "anomaly-config";
                 } else {
                   activeTab.value = "condition";
                 }
@@ -2410,7 +2427,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               ref: (step2Ref.value as any).sqlPromqlPreviewRef,
               onBeforeFocus: () => {
                 if (isAnomalyMode.value) {
-                  if (wizardStep.value !== 2) wizardStep.value = 2;
+                  activeTab.value = "anomaly-config";
                 } else {
                   activeTab.value = "condition";
                 }
@@ -2665,6 +2682,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     activeTab,
     tabErrors,
     chartCollapsed,
+    previewDateTimeValue,
     thresholdMarkLine,
 
     // Computed

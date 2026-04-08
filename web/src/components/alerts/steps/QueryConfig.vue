@@ -16,17 +16,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="step-query-config" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw:px-3 tw:py-4">
+    <div class="step-content card-container">
+      <!-- Section header -->
+      <div class="section-header">
+        <div class="section-header-accent" />
+        <span class="section-header-title">Conditions</span>
+      </div>
+      <div class="tw:px-3 tw:py-2">
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
-      <div v-if="shouldShowTabs" class="tw:mb-4 tw:flex tw:items-center tw:justify-between">
-        <div class="flex items-center app-tabs-container tw:h-[36px] tw:w-fit">
-          <AppTabs
-            data-test="step2-query-tabs"
-            :tabs="tabOptions"
-            class="tabs-selection-container"
-            :active-tab="localTab"
-            @update:active-tab="updateTab"
-          />
+      <div v-if="shouldShowTabs" class="tw:mb-2 tw:flex tw:items-center tw:justify-between">
+        <div class="query-mode-tabs" data-test="step2-query-tabs">
+          <button
+            v-for="tab in tabOptions"
+            :key="tab.value"
+            type="button"
+            class="query-mode-tab"
+            :class="{ active: localTab === tab.value }"
+            @click="updateTab(tab.value)"
+          >
+            {{ tab.label }}
+          </button>
         </div>
 
         <!-- View Editor Button (only for SQL/PromQL tabs) -->
@@ -43,11 +52,623 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Custom Query Builder -->
       <template v-if="localTab === 'custom'">
         <q-form ref="customConditionsForm" greedy>
-          <div ref="customPreviewRef">
+
+          <!-- Section 1: Alert condition sentence — scheduled only -->
+          <div v-if="isRealTime === 'false'" class="condition-rows">
+
+            <!-- LOGS/TRACES -->
+            <template v-if="isEventBased">
+              <!-- Alert if row -->
+              <div class="condition-row">
+                <span class="condition-label">Alert if</span>
+                <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
+                  <q-select
+                    v-model="selectedFunction"
+                    :options="logFunctionOptions"
+                    emit-value
+                    map-options
+                    dense
+                    borderless
+                    hide-bottom-space
+                    class="inline-condition-select"
+                    style="min-width: 130px; max-width: 180px;"
+                    @update:model-value="onLogFunctionChange"
+                  >
+                    <q-tooltip :delay="400">
+                      {{ logFunctionOptions.find((o: any) => o.value === selectedFunction)?.tooltip || '' }}
+                    </q-tooltip>
+                    <template #option="{ opt, itemProps }">
+                      <q-item v-bind="itemProps" dense>
+                        <q-item-section>
+                          <q-item-label>{{ opt.label }}</q-item-label>
+                        </q-item-section>
+                        <q-tooltip v-if="opt.tooltip" anchor="center right" self="center left" :delay="300">
+                          {{ opt.tooltip }}
+                        </q-tooltip>
+                      </q-item>
+                    </template>
+                  </q-select>
+                  <!-- "of [field]" shown for measure modes -->
+                  <template v-if="selectedFunction !== 'count'">
+                    <span class="condition-text">of</span>
+                    <q-select
+                      v-model="logMeasureColumn"
+                      :options="filteredLogMeasureColumns"
+                      emit-value
+                      dense
+                      borderless
+                      use-input
+                      hide-selected
+                      fill-input
+                      hide-bottom-space
+                      :placeholder="t('alerts.placeholders.selectColumn')"
+                      @filter="filterLogMeasureColumns"
+                      class="inline-condition-select"
+                      style="min-width: 140px; max-width: 200px;"
+                      @update:model-value="onLogMeasureColumnChange"
+                    />
+                  </template>
+
+                  <!-- COUNT mode -->
+                  <template v-if="selectedFunction === 'count'">
+                    <q-select
+                      v-model="triggerOperator"
+                      :options="numericOperators"
+                      dense
+                      borderless
+                      hide-bottom-space
+                      class="inline-condition-select"
+                      style="min-width: 70px; max-width: 120px;"
+                      @update:model-value="onTriggerOperatorChange"
+                    />
+                    <q-input
+                      v-model="triggerThreshold"
+                      type="number"
+                      dense
+                      borderless
+                      hide-bottom-space
+                      @blur="restoreDefaultThreshold"
+                      class="inline-condition-select"
+                      style="min-width: 60px; max-width: 80px;"
+                      min="1"
+                      :rules="[(val: any) => !!val || 'Required']"
+                      @update:model-value="onTriggerThresholdChange"
+                    />
+                    <span v-if="streamName" class="condition-text">matching {{ streamType === 'traces' ? 'traces' : 'logs' }} found</span>
+                  </template>
+
+                  <!-- MEASURE mode -->
+                  <template v-else>
+                    <span class="condition-text">is</span>
+                    <q-select
+                      v-model="conditionOperator"
+                      :options="numericOperators"
+                      dense
+                      borderless
+                      hide-bottom-space
+                      class="inline-condition-select"
+                      style="min-width: 70px; max-width: 120px;"
+                      @update:model-value="onConditionOperatorChange"
+                    />
+                    <q-input
+                      v-model="conditionValue"
+                      type="number"
+                      dense
+                      borderless
+                      hide-bottom-space
+                      :placeholder="t('alerts.placeholders.value')"
+                      class="inline-condition-select"
+                      style="min-width: 80px; max-width: 120px;"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
+                      @update:model-value="onConditionValueChange"
+                    />
+                  </template>
+                </div>
+              </div>
+
+              <!-- For any (group by) row (hidden for count mode) -->
+              <div v-if="selectedFunction !== 'count'" class="condition-row">
+                <span class="condition-label">
+                  For any <span class="condition-label-hint">(group by)</span>
+                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                    Group results by these fields — alert triggers per unique combination
+                  </q-tooltip>
+                </span>
+                <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+                  <template
+                    v-for="(group, index) in logGroupBy"
+                    :key="index"
+                  >
+                    <div class="tw:flex tw:items-center tw:gap-1">
+                      <q-select
+                        v-model="logGroupBy[index]"
+                        :options="filteredFields"
+                        class="inline-condition-select"
+                        borderless
+                        dense
+                        use-input
+                        emit-value
+                        hide-selected
+                        :placeholder="t('alerts.placeholders.selectColumn')"
+                        fill-input
+                        :input-debounce="400"
+                        hide-bottom-space
+                        @filter="(val: string, update: any) => filterFields(val, update)"
+                        style="min-width: 120px; max-width: 180px;"
+                        @update:model-value="onLogGroupByChange"
+                      />
+                      <q-btn
+                        icon="close"
+                        size="xs"
+                        flat
+                        round
+                        dense
+                        class="tw:text-gray-400 hover:tw:text-red-500"
+                        @click="deleteLogGroupByColumn(index)"
+                      />
+                    </div>
+                  </template>
+                  <!-- Default empty dropdown when no group-by fields yet -->
+                  <q-select
+                    v-if="logGroupBy.length === 0"
+                    :model-value="null"
+                    :options="filteredFields"
+                    class="inline-condition-select"
+                    borderless
+                    dense
+                    use-input
+                    emit-value
+                    hide-selected
+                    :placeholder="t('alerts.placeholders.selectColumn')"
+                    fill-input
+                    :input-debounce="400"
+                    hide-bottom-space
+                    @filter="(val: string, update: any) => filterFields(val, update)"
+                    style="min-width: 120px; max-width: 180px;"
+                    @update:model-value="(val: string) => { logGroupBy.push(val); onLogGroupByChange(); }"
+                  />
+                  <q-btn
+                    icon="add"
+                    size="xs"
+                    flat
+                    round
+                    dense
+                    color="primary"
+                    @click="addLogGroupByColumn"
+                  >
+                    <q-tooltip>Add group by field</q-tooltip>
+                  </q-btn>
+                </div>
+              </div>
+
+              <!-- Atleast row — trigger threshold for measure mode -->
+              <div v-if="selectedFunction !== 'count'" class="condition-row">
+                <span class="condition-label">
+                  Atleast
+                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                    Minimum number of matching groups required to trigger the alert
+                  </q-tooltip>
+                </span>
+                <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
+                  <q-select
+                    v-model="triggerOperator"
+                    :options="numericOperators"
+                    dense
+                    borderless
+                    hide-bottom-space
+                    class="inline-condition-select"
+                    style="min-width: 70px; max-width: 120px;"
+                    @update:model-value="onTriggerOperatorChange"
+                  />
+                  <q-input
+                    v-model="triggerThreshold"
+                    type="number"
+                    dense
+                    borderless
+                    hide-bottom-space
+                    class="inline-condition-select"
+                    style="min-width: 60px; max-width: 80px;"
+                    min="1"
+                    :rules="[(val: any) => !!val || 'Required']"
+                    @update:model-value="onTriggerThresholdChange"
+                    @blur="restoreDefaultThreshold"
+                  />
+                  <span class="condition-text">matching groups found</span>
+                </div>
+              </div>
+            </template>
+
+            <!-- METRICS -->
+            <template v-else>
+              <!-- Alert if row -->
+              <div class="condition-row">
+                <span class="condition-label">Alert if</span>
+                <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
+                  <q-select
+                    v-model="selectedFunction"
+                    :options="metricFunctionOptions"
+                    emit-value
+                    map-options
+                    dense
+                    borderless
+                    hide-bottom-space
+                    class="inline-condition-select"
+                    style="min-width: 130px; max-width: 180px;"
+                    @update:model-value="onMetricFunctionChange"
+                  >
+                    <q-tooltip :delay="400">
+                      {{ metricFunctionOptions.find((o: any) => o.value === selectedFunction)?.tooltip || '' }}
+                    </q-tooltip>
+                    <template #option="{ opt, itemProps }">
+                      <q-item v-bind="itemProps" dense>
+                        <q-item-section>
+                          <q-item-label>{{ opt.label }}</q-item-label>
+                        </q-item-section>
+                        <q-tooltip v-if="opt.tooltip" anchor="center right" self="center left" :delay="300">
+                          {{ opt.tooltip }}
+                        </q-tooltip>
+                      </q-item>
+                    </template>
+                  </q-select>
+
+                  <!-- "of [field]" hidden for count mode -->
+                  <template v-if="selectedFunction !== 'count'">
+                    <span class="condition-text">of</span>
+                    <q-select
+                      v-model="inputData.aggregation.having.column"
+                      :options="filteredNumericColumns"
+                      emit-value
+                      dense
+                      borderless
+                      use-input
+                      hide-selected
+                      fill-input
+                      hide-bottom-space
+                      :placeholder="t('alerts.placeholders.selectColumn')"
+                      @filter="filterNumericColumns"
+                      @update:model-value="emitAggregationUpdate"
+                      class="inline-condition-select"
+                      style="min-width: 140px; max-width: 200px;"
+                    />
+                    <span class="condition-text">is</span>
+                  </template>
+
+                  <!-- Count mode for metrics -->
+                  <template v-if="selectedFunction === 'count'">
+                    <q-select
+                      v-model="triggerOperator"
+                      :options="numericOperators"
+                      dense
+                      borderless
+                      hide-bottom-space
+                      class="inline-condition-select"
+                      style="min-width: 70px; max-width: 120px;"
+                      @update:model-value="onTriggerOperatorChange"
+                    />
+                    <q-input
+                      v-model="triggerThreshold"
+                      type="number"
+                      dense
+                      borderless
+                      hide-bottom-space
+                      class="inline-condition-select"
+                      style="min-width: 80px; max-width: 120px;"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
+                      @update:model-value="onTriggerThresholdChange"
+                    />
+                    <span class="condition-text">matching metrics found</span>
+                  </template>
+
+                  <!-- Measure mode for metrics -->
+                  <template v-else>
+                    <q-select
+                      v-model="conditionOperator"
+                      :options="numericOperators"
+                      dense
+                      borderless
+                      hide-bottom-space
+                      class="inline-condition-select"
+                      style="min-width: 70px; max-width: 120px;"
+                      @update:model-value="onConditionOperatorChange"
+                    />
+                    <q-input
+                      v-model="conditionValue"
+                      type="number"
+                      dense
+                      borderless
+                      hide-bottom-space
+                      :placeholder="t('alerts.placeholders.value')"
+                      class="inline-condition-select"
+                      style="min-width: 80px; max-width: 120px;"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
+                      @update:model-value="onConditionValueChange"
+                    />
+                  </template>
+                </div>
+              </div>
+
+              <!-- For any (group by) row — hidden for count mode -->
+              <div v-if="inputData.aggregation && selectedFunction !== 'count'" class="condition-row">
+                <span class="condition-label">
+                  For any <span class="condition-label-hint">(group by)</span>
+                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                    Group results by these fields — alert triggers per unique combination
+                  </q-tooltip>
+                </span>
+                <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+                  <template
+                    v-for="(group, index) in inputData.aggregation.group_by"
+                    :key="index"
+                  >
+                    <div class="tw:flex tw:items-center tw:gap-1">
+                      <q-select
+                        v-model="inputData.aggregation.group_by[index]"
+                        :options="filteredFields"
+                        class="inline-condition-select"
+                        borderless
+                        dense
+                        use-input
+                        emit-value
+                        hide-selected
+                        :placeholder="t('alerts.placeholders.selectColumn')"
+                        fill-input
+                        :input-debounce="400"
+                        hide-bottom-space
+                        @filter="(val: string, update: any) => filterFields(val, update)"
+                        style="min-width: 120px; max-width: 180px;"
+                        @update:model-value="emitAggregationUpdate"
+                      />
+                      <q-btn
+                        icon="close"
+                        size="xs"
+                        flat
+                        round
+                        dense
+                        class="tw:text-gray-400 hover:tw:text-red-500"
+                        @click="deleteGroupByColumn(index)"
+                      />
+                    </div>
+                  </template>
+                  <!-- Default empty dropdown when no group-by fields yet -->
+                  <q-select
+                    v-if="!inputData.aggregation.group_by || inputData.aggregation.group_by.length === 0"
+                    :model-value="null"
+                    :options="filteredFields"
+                    class="inline-condition-select"
+                    borderless
+                    dense
+                    use-input
+                    emit-value
+                    hide-selected
+                    :placeholder="t('alerts.placeholders.selectColumn')"
+                    fill-input
+                    :input-debounce="400"
+                    hide-bottom-space
+                    @filter="(val: string, update: any) => filterFields(val, update)"
+                    style="min-width: 120px; max-width: 180px;"
+                    @update:model-value="(val: string) => { if (inputData.aggregation) { inputData.aggregation.group_by.push(val); emitAggregationUpdate(); } }"
+                  />
+                  <q-btn
+                    icon="add"
+                    size="xs"
+                    flat
+                    round
+                    dense
+                    color="primary"
+                    @click="addGroupByColumn"
+                  >
+                    <q-tooltip>Add group by field</q-tooltip>
+                  </q-btn>
+                </div>
+              </div>
+
+              <!-- Atleast row — trigger threshold for metrics measure mode -->
+              <div v-if="selectedFunction !== 'count'" class="condition-row">
+                <span class="condition-label">
+                  Atleast
+                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                    Minimum number of matching groups required to trigger the alert
+                  </q-tooltip>
+                </span>
+                <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
+                  <q-select
+                    v-model="triggerOperator"
+                    :options="numericOperators"
+                    dense
+                    borderless
+                    hide-bottom-space
+                    class="inline-condition-select"
+                    style="min-width: 70px; max-width: 120px;"
+                    @update:model-value="onTriggerOperatorChange"
+                  />
+                  <q-input
+                    v-model="triggerThreshold"
+                    type="number"
+                    dense
+                    borderless
+                    hide-bottom-space
+                    class="inline-condition-select"
+                    style="min-width: 60px; max-width: 80px;"
+                    min="1"
+                    :rules="[(val: any) => !!val || 'Required']"
+                    @update:model-value="onTriggerThresholdChange"
+                    @blur="restoreDefaultThreshold"
+                  />
+                  <span class="condition-text">matching groups found</span>
+                </div>
+              </div>
+            </template>
+
+            <!-- Check every row -->
+            <div class="condition-row tw:!items-start">
+              <span class="condition-label" style="line-height: 28px;">
+                Check every
+                <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                  How often to check this alert condition
+                </q-tooltip>
+              </span>
+              <div class="tw:flex tw:flex-col tw:gap-1">
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <!-- Minutes/hours mode: number input -->
+                  <template v-if="frequencyMode !== 'cron'">
+                    <q-input
+                      v-model="checkEveryFrequency"
+                      type="number"
+                      dense
+                      borderless
+                      hide-bottom-space
+                      class="inline-condition-select"
+                      style="min-width: 60px; max-width: 80px;"
+                      min="1"
+                      :rules="[(val: any) => !!val || 'Required']"
+                      @update:model-value="onCheckEveryChange"
+                      @blur="restoreDefaultFrequency"
+                    />
+                  </template>
+                  <!-- Cron mode: expression input + timezone -->
+                  <template v-else>
+                    <q-input
+                      v-model="cronExpression"
+                      dense
+                      borderless
+                      hide-bottom-space
+                      class="inline-condition-select"
+                      placeholder="0 */10 * * * *"
+                      style="min-width: 140px; max-width: 180px;"
+                      @update:model-value="onCronExpressionChange"
+                    />
+                  </template>
+
+                  <!-- Unit dropdown: minutes / hours / cron -->
+                  <q-select
+                    :model-value="frequencyMode"
+                    :options="frequencyUnitOptions"
+                    dense
+                    borderless
+                    hide-bottom-space
+                    emit-value
+                    map-options
+                    class="inline-condition-select frequency-unit-select"
+                    style="min-width: 80px; max-width: 100px;"
+                    @update:model-value="onFrequencyUnitChange"
+                  />
+
+                  <!-- Timezone (only for cron, inline) -->
+                  <template v-if="frequencyMode === 'cron'">
+                    <q-select
+                      v-model="cronTimezone"
+                      :options="filteredTimezones"
+                      dense
+                      borderless
+                      hide-bottom-space
+                      use-input
+                      emit-value
+                      fill-input
+                      hide-selected
+                      :input-debounce="0"
+                      class="inline-condition-select"
+                      placeholder="timezone"
+                      :display-value="cronTimezone || 'timezone'"
+                      style="min-width: 130px; max-width: 180px;"
+                      @filter="timezoneFilterFn"
+                      @update:model-value="onCronTimezoneChange"
+                    />
+                  </template>
+
+                  <span class="condition-text">on these</span>
+                  <div
+                    class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle"
+                    @click="toggleFilters"
+                  >
+                    <q-icon
+                      :name="showFilters ? 'expand_more' : 'chevron_right'"
+                      size="16px"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                    />
+                    <span class="tw:text-xs tw:font-semibold"
+                          :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-600'">
+                      filters
+                    </span>
+                    <span v-if="filterCount > 0"
+                          class="tw:text-xs tw:px-1.5 tw:py-0.5 tw:rounded-full tw:font-medium"
+                          :class="store.state.theme === 'dark' ? 'tw:bg-blue-900 tw:text-blue-200' : 'tw:bg-blue-100 tw:text-blue-700'">
+                      {{ filterCount }}
+                    </span>
+                    <!-- Review your SQL query hint -->
+                    <span v-if="generatedSqlQuery && !showFilters"
+                          class="tw:text-xs tw:italic tw:ml-1 sql-query-hint"
+                          :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
+                      review your sql query
+                      <q-tooltip
+                        anchor="bottom middle"
+                        self="top middle"
+                        :delay="200"
+                        max-width="500px"
+                        class="sql-preview-tooltip"
+                      >
+                        <pre class="hljs tw:text-xs tw:m-0 tw:whitespace-pre-wrap tw:font-mono tw:p-2 tw:rounded" v-html="highlightedSqlQuery" />
+                      </q-tooltip>
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Cron description + error -->
+                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:ml-0 tw:italic"
+                     :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
+                  {{ cronDescription }}
+                </div>
+                <div v-if="frequencyMode === 'cron' && cronError" class="tw:text-red-500 tw:text-[11px] tw:ml-0">
+                  {{ cronError }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filters section — scheduled -->
+          <div v-if="isRealTime === 'false'" ref="filtersSectionRef" class="tw:mt-1 tw:px-3">
+            <div v-show="showFilters" ref="customPreviewRef">
+              <FilterGroup
+                :stream-fields="columns"
+                :stream-fields-map="streamFieldsMap"
+                :show-sql-preview="false"
+                :sql-query="generatedSqlQuery"
+                :group="inputData.conditions"
+                :depth="0"
+                module="alerts"
+                @add-condition="updateGroup"
+                @add-group="updateGroup"
+                @remove-group="removeConditionGroup"
+                @input:update="onInputUpdate"
+              />
+            </div>
+          </div>
+
+          <!-- Realtime — no threshold sentence, just filters always visible -->
+          <div v-else ref="customPreviewRef" class="tw:mb-1 tw:px-3">
+            <div class="tw:flex tw:items-center tw:gap-1.5 tw:py-1">
+              <span class="tw:text-xs tw:font-semibold"
+                    :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-600'">
+                Filters
+              </span>
+              <span v-if="generatedSqlQuery"
+                    class="tw:text-xs tw:italic tw:ml-2 sql-query-hint"
+                    :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
+                review your sql query
+                <q-tooltip
+                  anchor="bottom middle"
+                  self="top middle"
+                  :delay="200"
+                  max-width="500px"
+                  class="sql-preview-tooltip"
+                >
+                  <pre class="hljs tw:text-xs tw:m-0 tw:whitespace-pre-wrap tw:font-mono tw:p-2 tw:rounded" v-html="highlightedSqlQuery" />
+                </q-tooltip>
+              </span>
+            </div>
             <FilterGroup
               :stream-fields="columns"
               :stream-fields-map="streamFieldsMap"
-              :show-sql-preview="true"
+              :show-sql-preview="false"
               :sql-query="generatedSqlQuery"
               :group="inputData.conditions"
               :depth="0"
@@ -59,198 +680,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <!-- Aggregation Section (only for custom mode and scheduled alerts) -->
-          <div v-if="isRealTime === 'false'" class="tw:mt-6 tw:pt-6" :style="store.state.theme === 'dark' ? 'border-top: 2px solid #343434' : 'border-top: 2px solid #e6e6e6'">
-            <!-- Aggregation Toggle -->
-            <div class="flex justify-start items-center tw:font-semibold tw:mb-4">
-              <div class="flex items-center" style="width: 190px; height: 36px">
-                {{ t("common.aggregation") }}
-                <q-icon
-                  name="info"
-                  size="17px"
-                  class="q-ml-xs cursor-pointer"
-                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-                >
-                  <q-tooltip anchor="center right" self="center left" max-width="300px">
-                    <span style="font-size: 14px">
-                      Enable to summarize data using functions like count, sum, avg, etc. before triggering the alert.<br />
-                      Example: Alert when average response time exceeds 500ms instead of individual events.
-                    </span>
-                  </q-tooltip>
-                </q-icon>
-              </div>
-              <q-toggle
-                v-model="localIsAggregationEnabled"
-                size="30px"
-                class="text-bold o2-toggle-button-xs"
-                @update:model-value="toggleAggregation"
-              />
-            </div>
-
-            <!-- Aggregation Fields Container with Border -->
-            <div v-if="localIsAggregationEnabled && inputData.aggregation" class="tw:p-4 tw:rounded" :style="store.state.theme === 'dark' ? 'border: 1px solid #343434' : 'border: 1px solid #e6e6e6'">
-              <!-- Group By Fields (shown when aggregation is enabled) -->
-            <div
-              v-if="localIsAggregationEnabled && inputData.aggregation"
-              class="flex items-start no-wrap q-mr-sm tw:mb-4"
-            >
-              <div class="flex items-center tw:font-semibold" style="width: 190px; height: 36px">
-                {{ t("alerts.groupBy") }}
-                <q-icon
-                  name="info"
-                  size="17px"
-                  class="q-ml-xs cursor-pointer"
-                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-                >
-                  <q-tooltip anchor="center right" self="center left" max-width="300px">
-                    <span style="font-size: 14px">
-                      {{ t('alerts.groupByHelp.description') }}<br />
-                      {{ t('alerts.groupByHelp.example') }}
-                    </span>
-                  </q-tooltip>
-                </q-icon>
-              </div>
-              <div class="flex justify-start items-center flex-wrap" style="width: calc(100% - 190px)">
-                <template
-                  v-for="(group, index) in inputData.aggregation.group_by"
-                  :key="index"
-                >
-                  <div class="flex justify-start items-center no-wrap">
-                    <div>
-                      <q-select
-                        v-model="inputData.aggregation.group_by[index]"
-                        :options="filteredFields"
-                        class="no-case q-py-none q-mb-sm"
-                        borderless
-                        dense
-                        use-input
-                        emit-value
-                        hide-selected
-                        :placeholder="t('alerts.placeholders.selectColumn')"
-                        fill-input
-                        :input-debounce="400"
-                        hide-bottom-space
-                        @filter="(val: string, update: any) => filterFields(val, update)"
-                        :rules="[(val: any) => !!val || 'Field is required!']"
-                        style="width: 200px"
-                        @update:model-value="emitAggregationUpdate"
-                      />
-                    </div>
-                    <q-btn
-                      icon="delete"
-                      class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
-                      :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                      padding="xs"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      :title="t('alert_templates.delete')"
-                      @click="deleteGroupByColumn(index)"
-                      style="min-width: auto"
-                    />
-                  </div>
-                </template>
-                <q-btn
-                  icon="add"
-                  class="iconHoverBtn q-mb-sm q-mr-sm"
-                  :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                  padding="xs"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :title="t('common.add')"
-                  @click="addGroupByColumn"
-                  style="min-width: auto"
-                />
-              </div>
-            </div>
-
-            <!-- Threshold with Aggregation -->
-            <div v-if="localIsAggregationEnabled && inputData.aggregation" class="flex justify-start items-start q-mb-xs no-wrap">
-              <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-                {{ t("alerts.aggregation_threshold") + " *" }}
-                <q-icon
-                  name="info"
-                  size="17px"
-                  class="q-ml-xs cursor-pointer"
-                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-                >
-                  <q-tooltip anchor="center right" self="center left" max-width="300px">
-                    <span style="font-size: 14px">
-                      Defines when the alert should trigger based on the aggregated value.<br />
-                      Example: If set to "avg latency > 500", the alert triggers when the average latency exceeds 500ms.
-                    </span>
-                  </q-tooltip>
-                </q-icon>
-              </div>
-              <div style="width: calc(100% - 190px)">
-                <div class="flex items-center tw:gap-2 tw:flex-wrap">
-                  <div style="flex: 0 0 auto; width: 110px">
-                    <q-select
-                      v-model="inputData.aggregation.function"
-                      :options="aggFunctions"
-                      class="no-case q-py-none"
-                      borderless
-                      hide-bottom-space
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      @update:model-value="emitAggregationUpdate"
-                    />
-                  </div>
-                  <div style="flex: 0 0 auto; width: 180px">
-                    <q-select
-                      v-model="inputData.aggregation.having.column"
-                      :options="filteredNumericColumns"
-                      class="no-case q-py-none"
-                      borderless
-                      dense
-                      use-input
-                      emit-value
-                      hide-selected
-                      fill-input
-                      @filter="filterNumericColumns"
-                      @update:model-value="emitAggregationUpdate"
-                      hide-bottom-space
-                      :error="!inputData.aggregation.having.column || inputData.aggregation.having.column.length === 0"
-                      error-message="Field is required!"
-                    />
-                  </div>
-                  <div style="flex: 0 0 auto; width: 110px">
-                    <q-select
-                      v-model="inputData.aggregation.having.operator"
-                      :options="triggerOperators"
-                      color="input-border"
-                      class="no-case q-py-none"
-                      borderless
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      @update:model-value="emitAggregationUpdate"
-                    />
-                  </div>
-                  <div style="flex: 0 0 auto; width: 150px">
-                    <q-input
-                      v-model="inputData.aggregation.having.value"
-                      type="number"
-                      dense
-                      borderless
-                      min="0"
-                      :placeholder="t('alerts.placeholders.value')"
-                      @update:model-value="emitAggregationUpdate"
-                      hide-bottom-space
-                      :rules="[(val: any) => !!val || 'Field is required!']"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            </div>
-          </div>
         </q-form>
       </template>
 
@@ -355,6 +784,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </template>
+      </div>
     </div>
 
     <!-- Query Editor Dialog -->
@@ -392,8 +822,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, type PropType, defineAsyncComponent, nextTick, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { b64EncodeUnicode } from "@/utils/zincutils";
-import AppTabs from "@/components/common/AppTabs.vue";
+import { b64EncodeUnicode, getUUID, convertMinutesToCron, getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval, describeCron } from "@/utils/zincutils";
+import hljs from "highlight.js/lib/core";
+import sql from "highlight.js/lib/languages/sql";
+
+hljs.registerLanguage("sql", sql);
+
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
@@ -405,7 +839,6 @@ const QueryEditor = defineAsyncComponent(
 export default defineComponent({
   name: "Step2QueryConfig",
   components: {
-    AppTabs,
     FilterGroup,
     QueryEditor,
     QueryEditorDialog,
@@ -472,8 +905,12 @@ export default defineComponent({
       type: Object as PropType<any>,
       default: null,
     },
+    triggerCondition: {
+      type: Object as PropType<any>,
+      default: null,
+    },
   },
-  emits: ["update:tab", "update-group", "remove-group", "input:update", "update:sqlQuery", "update:promqlQuery", "update:vrlFunction", "validate-sql", "clear-multi-windows", "editor-closed", "editor-state-changed", "update:isAggregationEnabled", "update:aggregation", "update:promqlCondition"],
+  emits: ["update:tab", "update-group", "remove-group", "input:update", "update:sqlQuery", "update:promqlQuery", "update:vrlFunction", "validate-sql", "clear-multi-windows", "editor-closed", "editor-state-changed", "update:isAggregationEnabled", "update:aggregation", "update:promqlCondition", "update:triggerCondition"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -496,7 +933,357 @@ export default defineComponent({
     // Aggregation state
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
 
-    // Aggregation functions
+    // Expandable section toggles — auto-expand filters if editing an alert with existing conditions
+    const hasExistingFilters = props.inputData.conditions?.conditions?.some(
+      (c: any) => c.filterType === 'condition' && c.column && c.column.trim() !== ''
+    );
+    const showFilters = ref(true);
+    const showVrl = ref(false);
+    const filtersSectionRef = ref<HTMLElement | null>(null);
+
+    // Toggle filters and ensure at least one empty condition exists
+    const toggleFilters = () => {
+      showFilters.value = !showFilters.value;
+      if (showFilters.value && props.inputData.conditions?.conditions) {
+        const conditions = props.inputData.conditions.conditions;
+        if (conditions.length === 0) {
+          conditions.push({
+            filterType: 'condition',
+            column: '',
+            operator: '=',
+            value: '',
+            values: [],
+            logicalOperator: 'AND',
+            id: getUUID(),
+          });
+        }
+      }
+    };
+
+    // Stream-type-driven: logs/traces are event-based, metrics are aggregation-based
+    const isEventBased = computed(() => {
+      return props.streamType !== 'metrics';
+    });
+
+    // Set aggregation state based on stream type on mount
+    if (!isEventBased.value) {
+      // Metrics: always aggregation-enabled
+      localIsAggregationEnabled.value = true;
+      // Initialize aggregation object if missing
+      if (!props.inputData.aggregation) {
+        props.inputData.aggregation = {
+          group_by: [""],
+          function: "avg",
+          having: { column: "", operator: ">=", value: "" },
+        };
+      }
+    } else {
+      // Logs/Traces: event-based, no aggregation
+      localIsAggregationEnabled.value = false;
+    }
+
+    // Log function options — count (default) and measure functions
+    const logFunctionOptions = [
+      { label: 'events count', value: 'count', tooltip: 'Count the number of log events matching your filters' },
+      { label: 'avg', value: 'avg', tooltip: 'Average value of a numeric field' },
+      { label: 'min', value: 'min', tooltip: 'Minimum value of a numeric field' },
+      { label: 'max', value: 'max', tooltip: 'Maximum value of a numeric field' },
+      { label: 'sum', value: 'sum', tooltip: 'Sum of values of a numeric field' },
+      { label: 'median', value: 'median', tooltip: 'Median value of a numeric field' },
+      { label: 'p50', value: 'p50', tooltip: '50th percentile of a numeric field' },
+      { label: 'p75', value: 'p75', tooltip: '75th percentile of a numeric field' },
+      { label: 'p90', value: 'p90', tooltip: '90th percentile of a numeric field' },
+      { label: 'p95', value: 'p95', tooltip: '95th percentile of a numeric field' },
+      { label: 'p99', value: 'p99', tooltip: '99th percentile of a numeric field' },
+    ];
+
+    // Metric function options — always aggregated
+    const metricFunctionOptions = [
+      { label: 'events count', value: 'count', tooltip: 'Count the number of metric events matching your filters' },
+      { label: 'avg', value: 'avg', tooltip: 'Average value of a numeric field' },
+      { label: 'min', value: 'min', tooltip: 'Minimum value of a numeric field' },
+      { label: 'max', value: 'max', tooltip: 'Maximum value of a numeric field' },
+      { label: 'sum', value: 'sum', tooltip: 'Sum of values of a numeric field' },
+      { label: 'median', value: 'median', tooltip: 'Median value of a numeric field' },
+      { label: 'p50', value: 'p50', tooltip: '50th percentile of a numeric field' },
+      { label: 'p75', value: 'p75', tooltip: '75th percentile of a numeric field' },
+      { label: 'p90', value: 'p90', tooltip: '90th percentile of a numeric field' },
+      { label: 'p95', value: 'p95', tooltip: '95th percentile of a numeric field' },
+      { label: 'p99', value: 'p99', tooltip: '99th percentile of a numeric field' },
+    ];
+
+    // Numeric-only operators (no Contains/NotContains for thresholds)
+    const numericOperators = ["=", "!=", ">=", ">", "<=", "<"];
+
+    // Selected function — for logs defaults to 'count', for metrics to 'avg'
+    const selectedFunction = ref(
+      isEventBased.value
+        ? (props.isAggregationEnabled && props.inputData.aggregation?.function
+            ? props.inputData.aggregation.function
+            : 'count')
+        : (props.inputData.aggregation?.function || 'avg')
+    );
+
+    // Log-specific: measure column and group-by
+    const logMeasureColumn = ref(
+      props.inputData.aggregation?.having?.column || ''
+    );
+    const logGroupBy = ref<string[]>(
+      props.inputData.aggregation?.group_by?.filter((g: string) => g)?.length
+        ? [...props.inputData.aggregation.group_by.filter((g: string) => g)]
+        : []
+    );
+
+    // Condition operator and value
+    // Logs/Traces: maps to trigger_condition (event count threshold)
+    // Metrics: maps to aggregation.having (aggregated value threshold)
+    const conditionOperator = ref(
+      isEventBased.value
+        ? (props.triggerCondition?.operator || '>=')
+        : (props.inputData.aggregation?.having?.operator || '>=')
+    );
+    const conditionValue = ref(
+      isEventBased.value
+        ? (props.triggerCondition?.threshold || '')
+        : (props.inputData.aggregation?.having?.value || '')
+    );
+
+    // Watch stream type changes to reset defaults
+    watch(isEventBased, (eventBased) => {
+      if (eventBased) {
+        // Switched to logs/traces
+        selectedFunction.value = 'count';
+        localIsAggregationEnabled.value = false;
+      } else {
+        // Switched to metrics — default to avg
+        selectedFunction.value = 'avg';
+        localIsAggregationEnabled.value = true;
+        if (!props.inputData.aggregation) {
+          props.inputData.aggregation = {
+            group_by: [""],
+            function: "avg",
+            having: { column: "", operator: ">=", value: "" },
+          };
+        } else {
+          props.inputData.aggregation.function = 'avg';
+        }
+      }
+    });
+
+    // Trigger threshold — "for >= N times" (how many evaluation periods must match)
+    const triggerOperator = ref(props.triggerCondition?.operator || '>=');
+    const triggerThreshold = ref(props.triggerCondition?.threshold || 3);
+
+    const onTriggerOperatorChange = (value: string) => {
+      triggerOperator.value = value;
+      if (props.triggerCondition) {
+        props.triggerCondition.operator = value;
+        emit("update:triggerCondition", { ...props.triggerCondition });
+      }
+    };
+
+    const onTriggerThresholdChange = (value: any) => {
+      isUserTriggerChange.value = true;
+      triggerThreshold.value = value === '' || value === null || value === undefined ? null : Number(value);
+      if (props.triggerCondition) {
+        props.triggerCondition.threshold = triggerThreshold.value;
+        emit("update:triggerCondition", { ...props.triggerCondition });
+      }
+    };
+
+    const restoreDefaultThreshold = () => {
+      if (triggerThreshold.value === null || triggerThreshold.value === '' || triggerThreshold.value === undefined || Number.isNaN(Number(triggerThreshold.value))) {
+        triggerThreshold.value = 3;
+        if (props.triggerCondition) {
+          props.triggerCondition.threshold = 3;
+          emit("update:triggerCondition", { ...props.triggerCondition });
+        }
+      }
+    };
+
+    // Check every — evaluation frequency
+    const checkEveryFrequency = ref(props.triggerCondition?.frequency || 10);
+    // Determine initial unit: if frequency_type is 'cron' use cron, else check if frequency >= 60 for hours
+    const initFrequencyUnit = (): 'minutes' | 'hours' | 'cron' => {
+      if (props.triggerCondition?.frequency_type === 'cron') return 'cron';
+      const freq = props.triggerCondition?.frequency || 10;
+      // If frequency is >= 60 and divisible by 60, show as hours
+      if (freq >= 60 && freq % 60 === 0) return 'hours';
+      return 'minutes';
+    };
+    const frequencyMode = ref<'minutes' | 'hours' | 'cron'>(initFrequencyUnit());
+    const isUserTriggerChange = ref(false);
+    const cronExpression = ref(props.triggerCondition?.cron || '');
+    const cronTimezone = ref(props.triggerCondition?.timezone || '');
+    const cronError = ref('');
+    const cronDescription = computed(() => describeCron(cronExpression.value, cronTimezone.value));
+    const filteredTimezones = ref<string[]>([]);
+
+    // Initialize timezone
+    const initTimezones = () => {
+      try {
+        if (!cronTimezone.value) {
+          cronTimezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        }
+        // @ts-ignore
+        if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+          // @ts-ignore
+          filteredTimezones.value = Intl.supportedValuesOf("timeZone");
+        } else {
+          filteredTimezones.value = [cronTimezone.value];
+        }
+      } catch {
+        cronTimezone.value = cronTimezone.value || 'UTC';
+        filteredTimezones.value = ['UTC'];
+      }
+    };
+    initTimezones();
+
+    const timezoneFilterFn = (val: string, update: any) => {
+      update(() => {
+        try {
+          // @ts-ignore
+          const all: string[] = (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function')
+            // @ts-ignore
+            ? Intl.supportedValuesOf("timeZone") : [cronTimezone.value];
+          if (val === '') {
+            filteredTimezones.value = all;
+          } else {
+            const needle = val.toLowerCase();
+            filteredTimezones.value = all.filter((tz: string) => tz.toLowerCase().includes(needle));
+          }
+        } catch {
+          // keep current list
+        }
+      });
+    };
+
+    const validateCron = () => {
+      cronError.value = '';
+      if (frequencyMode.value !== 'cron') return;
+      if (!cronExpression.value || !cronTimezone.value) {
+        cronError.value = 'Cron expression and timezone are required';
+        return;
+      }
+      try {
+        const intervalInSecs = getCronIntervalDifferenceInSeconds(cronExpression.value);
+        if (typeof intervalInSecs === 'number' && !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)) {
+          const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
+          cronError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
+        }
+      } catch {
+        cronError.value = 'Invalid cron expression';
+      }
+    };
+
+    const frequencyUnitOptions = [
+      { label: 'minutes', value: 'minutes' },
+      { label: 'hours', value: 'hours' },
+      { label: 'cron', value: 'cron' },
+    ];
+
+    const onFrequencyUnitChange = (unit: string) => {
+      const prevMode = frequencyMode.value;
+      isUserTriggerChange.value = true;
+      frequencyMode.value = unit as 'minutes' | 'hours' | 'cron';
+
+      if (!props.triggerCondition) return;
+
+      if (unit === 'cron') {
+        props.triggerCondition.frequency_type = 'cron';
+        // Auto-convert current frequency to cron if no expression yet
+        if (!cronExpression.value) {
+          let mins = Number(checkEveryFrequency.value);
+          if (prevMode === 'hours') mins = mins * 60;
+          if (mins > 0) {
+            cronExpression.value = convertMinutesToCron(mins);
+            props.triggerCondition.cron = cronExpression.value;
+          }
+          if (!cronTimezone.value) {
+            cronTimezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          }
+          props.triggerCondition.timezone = cronTimezone.value;
+        }
+        validateCron();
+      } else {
+        props.triggerCondition.frequency_type = 'minutes';
+        // Convert between minutes and hours
+        if (unit === 'hours' && prevMode === 'minutes') {
+          // Converting minutes to hours: round up
+          const hrs = Math.max(1, Math.round(Number(checkEveryFrequency.value) / 60));
+          checkEveryFrequency.value = hrs;
+          props.triggerCondition.frequency = hrs * 60;
+        } else if (unit === 'minutes' && prevMode === 'hours') {
+          // Converting hours to minutes
+          const mins = Number(checkEveryFrequency.value) * 60;
+          checkEveryFrequency.value = mins;
+          props.triggerCondition.frequency = mins;
+        } else if (unit === 'minutes' && prevMode === 'cron') {
+          // Coming back from cron, restore sensible default
+          checkEveryFrequency.value = props.triggerCondition.frequency || 10;
+        } else if (unit === 'hours' && prevMode === 'cron') {
+          const mins = props.triggerCondition.frequency || 60;
+          checkEveryFrequency.value = Math.max(1, Math.round(mins / 60));
+          props.triggerCondition.frequency = checkEveryFrequency.value * 60;
+        }
+      }
+      emit("update:triggerCondition", { ...props.triggerCondition });
+    };
+
+    const onCronExpressionChange = (value: any) => {
+      isUserTriggerChange.value = true;
+      cronExpression.value = value;
+      if (props.triggerCondition) {
+        props.triggerCondition.cron = value;
+        validateCron();
+        emit("update:triggerCondition", { ...props.triggerCondition });
+      }
+    };
+
+    const onCronTimezoneChange = (value: any) => {
+      isUserTriggerChange.value = true;
+      cronTimezone.value = value;
+      if (props.triggerCondition) {
+        props.triggerCondition.timezone = value;
+        validateCron();
+        emit("update:triggerCondition", { ...props.triggerCondition });
+      }
+    };
+
+    const onCheckEveryChange = (value: any) => {
+      isUserTriggerChange.value = true;
+      const parsed = value === '' || value === null || value === undefined ? null : Number(value);
+      checkEveryFrequency.value = parsed;
+      if (props.triggerCondition) {
+        // Store as minutes internally (hours mode: multiply by 60)
+        const mins = parsed != null ? (frequencyMode.value === 'hours' ? parsed * 60 : parsed) : null;
+        props.triggerCondition.frequency = mins;
+        emit("update:triggerCondition", { ...props.triggerCondition });
+      }
+    };
+
+    const restoreDefaultFrequency = () => {
+      if (checkEveryFrequency.value === null || checkEveryFrequency.value === '' || checkEveryFrequency.value === undefined || Number.isNaN(Number(checkEveryFrequency.value))) {
+        const defaultVal = frequencyMode.value === 'hours' ? 1 : 10;
+        checkEveryFrequency.value = defaultVal;
+        if (props.triggerCondition) {
+          props.triggerCondition.frequency = frequencyMode.value === 'hours' ? 60 : 10;
+          emit("update:triggerCondition", { ...props.triggerCondition });
+        }
+      }
+    };
+
+    // Count of active filter conditions
+    const filterCount = computed(() => {
+      const conditions = props.inputData.conditions?.conditions;
+      if (!conditions || !Array.isArray(conditions)) return 0;
+      return conditions.filter((c: any) => c.filterType === 'condition' && c.column).length;
+    });
+
+    // Ensure at least one empty filter condition exists on mount (filters are always visible now)
+    // Empty condition is now provided by default form data in useAlertForm.ts
+
+    // Aggregation functions (kept for legacy references)
     const aggFunctions = ["count", "min", "max", "avg", "sum", "median", "p50", "p75", "p90", "p95", "p99"];
 
     // Trigger operators
@@ -527,6 +1314,22 @@ export default defineComponent({
         } else {
           const needle = val.toLowerCase();
           filteredNumericColumns.value = props.columns.filter((v: any) => {
+            const label = typeof v === "string" ? v : v.label || v.value || "";
+            return label.toLowerCase().indexOf(needle) > -1;
+          });
+        }
+      });
+    };
+
+    // Filtered columns for log measure column (unique count uses all fields, measure uses numeric)
+    const filteredLogMeasureColumns = ref([...props.columns]);
+    const filterLogMeasureColumns = (val: string, update: any) => {
+      update(() => {
+        if (val === "") {
+          filteredLogMeasureColumns.value = [...props.columns];
+        } else {
+          const needle = val.toLowerCase();
+          filteredLogMeasureColumns.value = props.columns.filter((v: any) => {
             const label = typeof v === "string" ? v : v.label || v.value || "";
             return label.toLowerCase().indexOf(needle) > -1;
           });
@@ -689,26 +1492,163 @@ export default defineComponent({
       emit("validate-sql");
     };
 
-    // Toggle aggregation
-    const toggleAggregation = () => {
-      // Initialize aggregation object when enabling
-      if (localIsAggregationEnabled.value && !props.inputData.aggregation) {
+    // Emit trigger condition update (for non-aggregation mode)
+    const emitTriggerUpdate = () => {
+      if (props.triggerCondition) {
+        emit("update:triggerCondition", { ...props.triggerCondition });
+      }
+    };
+
+    // When metric function dropdown changes — handles count vs aggregation modes
+    const onMetricFunctionChange = (value: string) => {
+      if (value === 'count') {
+        // Count mode — same as logs count, use trigger_condition
+        localIsAggregationEnabled.value = false;
+        emit("update:isAggregationEnabled", false);
+      } else {
+        // Measure mode — aggregation
+        localIsAggregationEnabled.value = true;
+        emit("update:isAggregationEnabled", true);
+        onFunctionChange(value);
+      }
+    };
+
+    // When function dropdown changes (metrics only — always aggregation)
+    const onFunctionChange = (value: string) => {
+      localIsAggregationEnabled.value = true;
+      emit("update:isAggregationEnabled", true);
+
+      // Initialize aggregation object if needed
+      if (!props.inputData.aggregation) {
         props.inputData.aggregation = {
           group_by: [""],
-          function: "avg",
+          function: value,
           having: {
             column: "",
-            operator: "=",
-            value: "",
+            operator: conditionOperator.value || ">=",
+            value: conditionValue.value || "",
           },
         };
+      } else {
+        props.inputData.aggregation.function = value;
+        props.inputData.aggregation.having.operator = conditionOperator.value;
+        props.inputData.aggregation.having.value = conditionValue.value;
       }
+      emitAggregationUpdate();
+    };
 
-      // Also initialize if aggregation exists but doesn't have function property
-      if (localIsAggregationEnabled.value && props.inputData.aggregation && !props.inputData.aggregation.function) {
-        props.inputData.aggregation.function = "avg";
+    // When log function mode changes (count / unique_count / avg / etc.)
+    const onLogFunctionChange = (value: string) => {
+      if (value === 'count') {
+        // Simple count mode — no aggregation, trigger threshold shown inline
+        localIsAggregationEnabled.value = false;
+        emit("update:isAggregationEnabled", false);
+        logMeasureColumn.value = '';
+        // Restore default threshold for count mode
+        triggerThreshold.value = 3;
+        triggerOperator.value = '>=';
+        if (props.triggerCondition) {
+          props.triggerCondition.threshold = 3;
+          props.triggerCondition.operator = '>=';
+          emit("update:triggerCondition", { ...props.triggerCondition });
+        }
+      } else {
+        // Measure mode — uses aggregation, default trigger to "atleast 1 group"
+        localIsAggregationEnabled.value = true;
+        if (triggerThreshold.value === 3) {
+          // Only change if still at count-mode default
+          triggerThreshold.value = 1;
+          triggerOperator.value = '>=';
+          if (props.triggerCondition) {
+            props.triggerCondition.threshold = 1;
+            props.triggerCondition.operator = '>=';
+            emit("update:triggerCondition", { ...props.triggerCondition });
+          }
+        }
+        emit("update:isAggregationEnabled", true);
+        const aggFunction = value;
+        if (!props.inputData.aggregation) {
+          props.inputData.aggregation = {
+            group_by: logGroupBy.value.length ? [...logGroupBy.value] : [],
+            function: aggFunction,
+            having: {
+              column: logMeasureColumn.value || "",
+              operator: conditionOperator.value || ">=",
+              value: conditionValue.value || "",
+            },
+          };
+        } else {
+          props.inputData.aggregation.function = aggFunction;
+          props.inputData.aggregation.having.operator = conditionOperator.value;
+          props.inputData.aggregation.having.value = conditionValue.value;
+          props.inputData.aggregation.having.column = logMeasureColumn.value || "";
+          props.inputData.aggregation.group_by = logGroupBy.value.length ? [...logGroupBy.value] : [];
+        }
+        emitAggregationUpdate();
       }
+    };
 
+    // When log measure column changes (for unique count / measure modes)
+    const onLogMeasureColumnChange = (value: string) => {
+      if (props.inputData.aggregation) {
+        props.inputData.aggregation.having.column = value;
+        emitAggregationUpdate();
+      }
+    };
+
+    // Log group-by management
+    const addLogGroupByColumn = () => {
+      logGroupBy.value.push("");
+    };
+    const deleteLogGroupByColumn = (index: number) => {
+      logGroupBy.value.splice(index, 1);
+      onLogGroupByChange();
+    };
+    const onLogGroupByChange = () => {
+      if (props.inputData.aggregation) {
+        props.inputData.aggregation.group_by = [...logGroupBy.value];
+        emitAggregationUpdate();
+      }
+    };
+
+    // When condition operator changes
+    const onConditionOperatorChange = (value: string) => {
+      if (isEventBased.value && selectedFunction.value === 'count') {
+        // Logs count mode: maps to trigger_condition
+        if (props.triggerCondition) {
+          props.triggerCondition.operator = value;
+          emitTriggerUpdate();
+        }
+      } else {
+        // Metrics or logs measure/unique count: maps to aggregation.having
+        if (props.inputData.aggregation) {
+          props.inputData.aggregation.having.operator = value;
+          emitAggregationUpdate();
+        }
+      }
+    };
+
+    // When condition value changes
+    const onConditionValueChange = (value: any) => {
+      const parsed = value === '' || value === null || value === undefined ? null : Number(value);
+      if (isEventBased.value && selectedFunction.value === 'count') {
+        // Logs count mode: maps to trigger_condition
+        if (props.triggerCondition) {
+          isUserTriggerChange.value = true;
+          props.triggerCondition.threshold = parsed;
+          emitTriggerUpdate();
+        }
+      } else {
+        // Metrics or logs measure/unique count: maps to aggregation.having
+        if (props.inputData.aggregation) {
+          props.inputData.aggregation.having.value = parsed;
+          emitAggregationUpdate();
+        }
+      }
+    };
+
+    // Legacy toggle kept for compatibility — not used in new UI
+    const toggleAggregation = () => {
       emit("update:isAggregationEnabled", localIsAggregationEnabled.value);
     };
 
@@ -761,12 +1701,57 @@ export default defineComponent({
       }
     );
 
-    // Watch for isAggregationEnabled prop changes
+    // Watch for isAggregationEnabled prop changes (for loading saved alerts)
     watch(
       () => props.isAggregationEnabled,
       (newVal) => {
         localIsAggregationEnabled.value = newVal;
       }
+    );
+
+    // Sync from aggregation data when it changes (e.g. loading saved metric alert)
+    watch(
+      () => props.inputData.aggregation,
+      (agg) => {
+        if (isEventBased.value) return; // Only for metrics
+        if (agg?.having) {
+          conditionOperator.value = agg.having.operator || '>=';
+          conditionValue.value = agg.having.value || '';
+        }
+        if (agg?.function) {
+          selectedFunction.value = agg.function;
+        }
+      },
+      { deep: true, immediate: false }
+    );
+
+    // Sync from trigger_condition when it changes (e.g. loading saved alert)
+    watch(
+      () => props.triggerCondition,
+      (tc) => {
+        if (!tc) return;
+        // Skip frequency mode sync when the change was triggered by user interaction
+        if (isUserTriggerChange.value) {
+          isUserTriggerChange.value = false;
+          return;
+        }
+        triggerOperator.value = tc.operator ?? '>=';
+        triggerThreshold.value = tc.threshold ?? 3;
+        const freq = tc.frequency ?? 10;
+        if (tc.frequency_type === 'cron') {
+          frequencyMode.value = 'cron';
+          checkEveryFrequency.value = freq;
+        } else if (freq >= 60 && freq % 60 === 0) {
+          frequencyMode.value = 'hours';
+          checkEveryFrequency.value = freq / 60;
+        } else {
+          frequencyMode.value = 'minutes';
+          checkEveryFrequency.value = freq;
+        }
+        cronExpression.value = tc.cron || '';
+        cronTimezone.value = tc.timezone || '';
+      },
+      { deep: true, immediate: false }
     );
 
     // Validation function for Step 2
@@ -834,9 +1819,15 @@ export default defineComponent({
       return true;
     };
 
+    const highlightedSqlQuery = computed(() => {
+      if (!props.generatedSqlQuery) return "";
+      return hljs.highlight(props.generatedSqlQuery, { language: "sql" }).value;
+    });
+
     return {
       t,
       store,
+      highlightedSqlQuery,
       localTab,
       tabOptions,
       shouldShowTabs,
@@ -864,7 +1855,7 @@ export default defineComponent({
       pendingTab,
       handleConfirmClearMultiWindows,
       handleCancelClearMultiWindows,
-      // Aggregation
+      // Aggregation & inline condition
       localIsAggregationEnabled,
       aggFunctions,
       triggerOperators,
@@ -877,6 +1868,52 @@ export default defineComponent({
       deleteGroupByColumn,
       emitAggregationUpdate,
       emitPromqlConditionUpdate,
+      // V3.1 inline condition
+      isEventBased,
+      logFunctionOptions,
+      metricFunctionOptions,
+      numericOperators,
+      selectedFunction,
+      conditionOperator,
+      conditionValue,
+      triggerOperator,
+      triggerThreshold,
+      onTriggerOperatorChange,
+      onTriggerThresholdChange,
+      restoreDefaultThreshold,
+      checkEveryFrequency,
+      onCheckEveryChange,
+      restoreDefaultFrequency,
+      frequencyMode,
+      cronExpression,
+      cronTimezone,
+      cronError,
+      cronDescription,
+      filteredTimezones,
+      timezoneFilterFn,
+      onFrequencyUnitChange,
+      frequencyUnitOptions,
+      onCronExpressionChange,
+      onCronTimezoneChange,
+      logMeasureColumn,
+      filteredLogMeasureColumns,
+      filterLogMeasureColumns,
+      logGroupBy,
+      onFunctionChange,
+      onMetricFunctionChange,
+      onLogFunctionChange,
+      onLogMeasureColumnChange,
+      addLogGroupByColumn,
+      deleteLogGroupByColumn,
+      onLogGroupByChange,
+      onConditionOperatorChange,
+      onConditionValueChange,
+      showFilters,
+      toggleFilters,
+      filtersSectionRef,
+      showVrl,
+      filterCount,
+      emitTriggerUpdate,
     };
   },
 });
@@ -899,6 +1936,15 @@ export default defineComponent({
       background-color: #212121;
       border: 1px solid #343434;
     }
+    .section-header {
+      border-bottom: 1px solid #343434;
+    }
+    .section-header-title {
+      color: #e0e0e0;
+    }
+    .section-header-accent {
+      background: var(--q-primary);
+    }
   }
 
   &.light-mode {
@@ -906,7 +1952,37 @@ export default defineComponent({
       background-color: #ffffff;
       border: 1px solid #e6e6e6;
     }
+    .section-header {
+      border-bottom: 1px solid #eeeeee;
+    }
+    .section-header-title {
+      color: #374151;
+    }
+    .section-header-accent {
+      background: var(--q-primary);
+    }
   }
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 10px 12px;
+}
+
+.section-header-accent {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.section-header-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .preview-box {
@@ -976,6 +2052,32 @@ export default defineComponent({
   }
 }
 
+.condition-label-hint {
+  font-weight: 500;
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+.sql-query-hint {
+  cursor: help;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+// Override Quasar tooltip background for SQL preview
+:global(.sql-preview-tooltip) {
+  background: #1e1e1e !important;
+  padding: 0 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+
+  .hljs {
+    background: #1e1e1e !important;
+    border-radius: 6px;
+  }
+}
+
 .editor-dialog-card {
   background-color: var(--q-dark-page);
 }
@@ -1001,6 +2103,77 @@ export default defineComponent({
   }
 }
 
+// Condition rows layout
+.condition-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.condition-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.condition-label {
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.condition-text {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.light-mode {
+  .condition-label {
+    color: rgba(0, 0, 0, 0.8);
+  }
+  .condition-text {
+    color: rgba(0, 0, 0, 0.7);
+  }
+}
+
+.dark-mode {
+  .condition-label {
+    color: rgba(255, 255, 255, 0.9);
+  }
+  .condition-text {
+    color: rgba(255, 255, 255, 0.75);
+  }
+}
+
+// Inline condition sentence styling
+.inline-condition-select {
+  :deep(.q-field__control) {
+    background: rgba(var(--q-primary-rgb, 92, 107, 192), 0.06);
+    border: 1px solid rgba(var(--q-primary-rgb, 92, 107, 192), 0.25);
+    border-radius: 6px;
+    padding: 2px 8px;
+    min-height: 28px;
+    height: 28px;
+  }
+
+  :deep(.q-field__native),
+  :deep(.q-field__input) {
+    color: var(--q-primary);
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  :deep(.q-field__append) {
+    color: var(--q-primary);
+  }
+}
+
 .ai-hover-btn {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
   transition: background 0.3s ease, box-shadow 0.3s ease;
@@ -1023,5 +2196,50 @@ export default defineComponent({
 .light-mode-chat-container {
   background-color: #ffffff;
   border-left: 1px solid #e5e7eb;
+}
+
+.query-mode-tabs {
+  display: flex;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  padding: 3px;
+
+  .query-mode-tab {
+    padding: 4px 12px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: rgba(0, 0, 0, 0.4);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    line-height: 1.4;
+
+    &:hover { color: rgba(0, 0, 0, 0.7); }
+
+    &.active {
+      background: #fff;
+      color: #1a1a1a;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+  }
+}
+
+.dark-mode .query-mode-tabs {
+  background: rgba(255, 255, 255, 0.05);
+
+  .query-mode-tab {
+    color: rgba(255, 255, 255, 0.6);
+
+    &:hover { color: rgba(255, 255, 255, 0.85); }
+
+    &.active {
+      background: #374151;
+      color: #e4e7eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    }
+  }
 }
 </style>

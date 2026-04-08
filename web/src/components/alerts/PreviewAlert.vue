@@ -47,6 +47,7 @@ import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 import { b64EncodeUnicode, b64DecodeUnicode, smartDecodeVrlFunction } from "@/utils/zincutils";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { getConsumableDateTime } from "@/utils/commons";
 
 const getDefaultDashboardPanelData: any = () => ({
   data: {
@@ -177,6 +178,10 @@ const props = defineProps({
   isEditorOpen: {
     type: Boolean,
     default: false,
+  },
+  previewDateTime: {
+    type: Object,
+    default: null,
   },
 });
 
@@ -623,7 +628,9 @@ const handleSeriesDataUpdate = (seriesData: any) => {
 const evaluateAndSetStatus = (resultCount: number) => {
   const isRealTime = props.formData.is_real_time === "true" || props.formData.is_real_time === true;
 
-  // Use the configured trigger condition threshold values
+  // Always use triggerCondition for the final "should we fire?" decision
+  // For count mode: triggerCondition is the event count threshold
+  // For measure mode: triggerCondition is the "atleast N matching groups" threshold
   const threshold = props.formData.trigger_condition?.threshold || 0;
   const operator = props.formData.trigger_condition?.operator || ">=";
 
@@ -700,30 +707,50 @@ const refreshData = () => {
     return;
   }
 
-  const relativeTime = props.formData.trigger_condition.period;
-
-  const endTime = new Date().getTime() * 1000;
-
-  // Priority order for time range:
-  // 1. Use env variable ZO_ALERT_PREVIEW_TIMERANGE_MINUTES if set and > 0
-  // 2. Fall back to alert period
-  const previewTimerangeMinutes = store.state.zoConfig.alert_preview_timerange_minutes || 0;
-  let new_relative_time;
-
-  if (previewTimerangeMinutes > 0) {
-    // Use the configured preview timerange from env variable
-    new_relative_time = previewTimerangeMinutes;
+  // Calculate time range — PanelSchemaRenderer expects Date objects created from
+  // microsecond timestamps (i.e. new Date(microseconds)), so we must match that format.
+  if (props.previewDateTime && props.previewDateTime.tab === 'absolute') {
+    // Absolute mode: convert absolute dates to microsecond-based Date objects
+    const consumable = getConsumableDateTime(props.previewDateTime);
+    const startMicros = consumable.start_time.getTime() * 1000;
+    const endMicros = consumable.end_time.getTime() * 1000;
+    dashboardPanelData.meta.dateTime = {
+      start_time: new Date(startMicros),
+      end_time: new Date(endMicros),
+    };
   } else {
-    // Fall back to using the alert period
-    new_relative_time = relativeTime;
+    // Relative mode: convert to minutes then use microsecond math
+    let timeRangeMinutes: number;
+
+    if (props.previewDateTime && props.previewDateTime.tab === 'relative') {
+      const period = props.previewDateTime.relative.period.label?.toLowerCase() || 'minutes';
+      const value = Number(props.previewDateTime.relative.value) || 15;
+      switch (period) {
+        case 'minutes': timeRangeMinutes = value; break;
+        case 'hours': timeRangeMinutes = value * 60; break;
+        case 'days': timeRangeMinutes = value * 60 * 24; break;
+        case 'weeks': timeRangeMinutes = value * 60 * 24 * 7; break;
+        case 'months': timeRangeMinutes = value * 60 * 24 * 30; break;
+        default: timeRangeMinutes = value; break;
+      }
+    } else {
+      // No DateTimePicker — fall back to alert period or env variable
+      const previewTimerangeMinutes = store.state.zoConfig.alert_preview_timerange_minutes || 0;
+      timeRangeMinutes = previewTimerangeMinutes > 0
+        ? previewTimerangeMinutes
+        : props.formData.trigger_condition.period;
+    }
+
+    const endTime = new Date().getTime() * 1000;
+    const startTime = endTime - timeRangeMinutes * 60 * 1000000;
+
+    dashboardPanelData.meta.dateTime = {
+      start_time: new Date(startTime),
+      end_time: new Date(endTime),
+    };
   }
 
-  const startTime = endTime - new_relative_time * 60 * 1000000;
 
-  dashboardPanelData.meta.dateTime = {
-    start_time: new Date(startTime),
-    end_time: new Date(endTime),
-  };
 
   let xAxis = [
     {
@@ -878,6 +905,7 @@ watch(
     props.formData.trigger_condition?.operator,
     props.selectedTab,
     props.isUsingBackendSql,
+    props.previewDateTime,
   ],
   () => {
     // Skip if editor is open - we'll refresh when it closes

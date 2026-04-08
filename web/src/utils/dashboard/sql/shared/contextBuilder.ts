@@ -126,16 +126,31 @@ export function buildSQLContext(
   const getMarkLineData = (panelSchema: any) => {
     return (
       panelSchema?.config?.mark_line?.map((markLine: any) => {
-        return {
+        const item: any = {
           name: markLine.name,
-          type: markLine.type,
-          xAxis: markLine.type == "xAxis" ? markLine.value : null,
-          yAxis: markLine.type == "yAxis" ? markLine.value : null,
           label: {
             formatter: markLine.name ? "{b}:{c}" : "{c}",
             position: "insideEndTop",
           },
         };
+        // For xAxis/yAxis types, set the axis value directly
+        // (ECharts type only accepts "average"/"min"/"max", not "xAxis"/"yAxis")
+        if (markLine.type === "xAxis") {
+          item.xAxis = markLine.value;
+        } else if (markLine.type === "yAxis") {
+          item.yAxis = markLine.value;
+        } else {
+          item.type = markLine.type;
+        }
+        // Optional line styling
+        if (markLine.color || markLine.lineStyle) {
+          item.lineStyle = {
+            color: markLine.color || '#FF0000',
+            type: markLine.lineStyle || 'solid',
+            width: markLine.width || 2,
+          };
+        }
+        return item;
       }) ?? []
     );
   };

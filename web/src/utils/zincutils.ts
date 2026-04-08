@@ -1313,6 +1313,81 @@ export const getCronIntervalInMinutes = (cronExpression: string): number => {
   }
 };
 
+/**
+ * Converts a 6-field cron expression to a human-readable string.
+ * Format: [Second] [Minute] [Hour] [DayOfMonth] [Month] [DayOfWeek]
+ */
+export const describeCron = (cronExpression: string, timezone?: string): string => {
+  if (!cronExpression || !cronExpression.trim()) return '';
+  try {
+    const parts = cronExpression.trim().split(/\s+/);
+    if (parts.length !== 6) return 'invalid cron (expected 6 fields)';
+
+    const [sec, min, hour, dom, month, dow] = parts;
+    const tz = timezone || 'UTC';
+    const tzLabel = tz.replace(/_/g, ' ');
+
+    // Helper: check if field is "every" (*)
+    const isEvery = (f: string) => f === '*';
+    // Helper: check if field is a step like */N
+    const getStep = (f: string) => {
+      const m = f.match(/^\*\/(\d+)$/);
+      return m ? parseInt(m[1]) : null;
+    };
+    // Helper: check if field is a fixed value
+    const getFixed = (f: string) => {
+      const m = f.match(/^(\d+)$/);
+      return m ? parseInt(m[1]) : null;
+    };
+
+    const minStep = getStep(min);
+    const hourStep = getStep(hour);
+    const fixedMin = getFixed(min);
+    const fixedHour = getFixed(hour);
+    const fixedSec = getFixed(sec);
+
+    // Common patterns
+    // Every N minutes: 0 */N * * * *
+    if (fixedSec === 0 && minStep && isEvery(hour) && isEvery(dom) && isEvery(month) && isEvery(dow)) {
+      return `every ${minStep} minute${minStep > 1 ? 's' : ''}`;
+    }
+
+    // Every N hours: 0 0 */N * * *
+    if (fixedSec === 0 && fixedMin === 0 && hourStep && isEvery(dom) && isEvery(month) && isEvery(dow)) {
+      return `every ${hourStep} hour${hourStep > 1 ? 's' : ''}`;
+    }
+
+    // At specific time daily: 0 M H * * *
+    if (fixedSec === 0 && fixedMin !== null && fixedHour !== null && isEvery(dom) && isEvery(month) && isEvery(dow)) {
+      const hh = String(fixedHour).padStart(2, '0');
+      const mm = String(fixedMin).padStart(2, '0');
+      return `daily at ${hh}:${mm} (${tzLabel})`;
+    }
+
+    // At specific minute every hour: 0 M * * * *
+    if (fixedSec === 0 && fixedMin !== null && isEvery(hour) && isEvery(dom) && isEvery(month) && isEvery(dow)) {
+      return `every hour at minute ${fixedMin}`;
+    }
+
+    // Fallback: use cron-parser to show next run time in the selected timezone
+    const interval = CronExpressionParser.parse(cronExpression, {
+      currentDate: new Date(),
+      tz,
+    });
+    const next = interval.next();
+    const nextDate = new Date(next.getTime());
+    const nextStr = nextDate.toLocaleString('en-GB', {
+      timeZone: tz,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    });
+    return `next check at ${nextStr} (${tzLabel})`;
+  } catch {
+    return 'invalid cron expression';
+  }
+};
+
 export const convertMinutesToCron = (minutes: number): string => {
   if (!minutes || minutes <= 0) {
     return "";
