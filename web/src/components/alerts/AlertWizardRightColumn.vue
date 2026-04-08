@@ -16,7 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Right Column: Preview & Summary (calc to account for gap) -->
-  <div class="tw:flex-[0_0_calc(32%-0.625rem)] tw:flex tw:flex-col tw:gap-2 right-column-container" style="height: calc(100vh - 302px); position: sticky; top: 0;">
+  <div
+    class="tw:flex-[0_0_calc(32%-0.625rem)] tw:flex tw:flex-col tw:gap-2 right-column-container"
+    style="height: 100%"
+  >
     <!-- Preview Section -->
     <div
       class="collapsible-section card-container preview-section"
@@ -27,7 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="togglePreview"
       >
         <div class="tw:flex tw:items-center tw:gap-2">
-          <span class="tw:text-sm tw:font-semibold">{{ t('alerts.preview') }}</span>
+          <span class="tw:text-sm tw:font-semibold">{{
+            t("alerts.preview")
+          }}</span>
           <!-- Status Indicator -->
           <div
             v-if="evaluationStatus && !isRealTime"
@@ -35,17 +40,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="{
               'status-would-trigger': evaluationStatus.wouldTrigger,
               'status-would-not-trigger': !evaluationStatus.wouldTrigger,
-              'status-indicator-light': store.state.theme !== 'dark'
+              'status-indicator-light': store.state.theme !== 'dark',
             }"
             data-test="alert-status-indicator"
           >
             <q-icon
               :name="evaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'"
               class="tw:text-xs tw:flex-shrink-0"
-              :class="evaluationStatus.wouldTrigger ? 'text-positive' : 'text-grey-6'"
+              :class="
+                evaluationStatus.wouldTrigger ? 'text-positive' : 'text-grey-6'
+              "
             />
-            <span class="tw:text-[0.625rem] tw:font-semibold tw:tracking-wide tw:uppercase tw:flex-shrink-0 tw:whitespace-nowrap">
-              {{ evaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
+            <span
+              class="tw:text-[0.625rem] tw:font-semibold tw:tracking-wide tw:uppercase tw:flex-shrink-0 tw:whitespace-nowrap"
+            >
+              {{
+                evaluationStatus.wouldTrigger
+                  ? t("alerts.wouldTrigger")
+                  : t("alerts.wouldNotTrigger")
+              }}
             </span>
             <span class="status-separator tw:text-xs tw:flex-shrink-0">•</span>
             <span class="tw:text-xs">
@@ -66,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-show="expandState.preview" class="section-content">
         <keep-alive>
           <preview-alert
-            style="height: 100%;"
+            style="height: 100%"
             ref="previewAlertRef"
             :formData="formData"
             :query="previewQuery"
@@ -88,7 +101,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
         @click="toggleSummary"
       >
-        <span class="tw:text-sm tw:font-semibold">{{ t('alerts.summary.title') }}</span>
+        <span class="tw:text-sm tw:font-semibold">{{
+          t("alerts.summary.title")
+        }}</span>
         <q-btn
           flat
           dense
@@ -101,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-show="expandState.summary" class="summary-section-content">
         <alert-summary
-          style="height: 100%; overflow: auto;"
+          style="height: 100%; overflow: auto"
           :formData="formData"
           :destinations="destinations"
           :focusManager="focusManager"
@@ -115,7 +130,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, reactive, watch, onMounted, onUnmounted, type PropType } from "vue";
+import {
+  defineComponent,
+  ref,
+  computed,
+  reactive,
+  watch,
+  onMounted,
+  onUnmounted,
+  type PropType,
+} from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import PreviewAlert from "./PreviewAlert.vue";
@@ -184,23 +208,26 @@ export default defineComponent({
       (newStatus) => {
         evaluationStatus.value = newStatus;
       },
-      { deep: true, immediate: true }
+      { deep: true, immediate: true },
     );
 
     // Computed property to check if this is a real-time alert
     const isRealTime = computed(() => {
-      return props.formData.is_real_time === "true" || props.formData.is_real_time === true;
+      return (
+        props.formData.is_real_time === "true" ||
+        props.formData.is_real_time === true
+      );
     });
 
     // Load saved state from localStorage or use defaults
     const loadExpandState = () => {
       try {
-        const saved = localStorage.getItem('alertWizardExpandState');
+        const saved = localStorage.getItem("alertWizardExpandState");
         if (saved) {
           return JSON.parse(saved);
         }
       } catch (e) {
-        console.error('Failed to load expand state:', e);
+        console.error("Failed to load expand state:", e);
       }
       return { preview: true, summary: true };
     };
@@ -211,12 +238,15 @@ export default defineComponent({
     // Save state to localStorage
     const saveExpandState = () => {
       try {
-        localStorage.setItem('alertWizardExpandState', JSON.stringify({
-          preview: expandState.preview,
-          summary: expandState.summary,
-        }));
+        localStorage.setItem(
+          "alertWizardExpandState",
+          JSON.stringify({
+            preview: expandState.preview,
+            summary: expandState.summary,
+          }),
+        );
       } catch (e) {
-        console.error('Failed to save expand state:', e);
+        console.error("Failed to save expand state:", e);
       }
     };
 
@@ -237,11 +267,11 @@ export default defineComponent({
         // Preview collapsed: only show header
         return { flex: "0 0 auto" };
       } else if (expandState.summary) {
-        // Both expanded: 50% each
-        return { flex: "1", minHeight: "250px" };
+        // Both expanded: preview gets larger share
+        return { flex: "0 0 420px", minHeight: "420px" };
       } else {
         // Preview expanded, summary collapsed: take all space
-        return { flex: "1", minHeight: "250px" };
+        return { flex: "1", minHeight: "400px" };
       }
     });
 
@@ -250,14 +280,13 @@ export default defineComponent({
         // Summary collapsed: only show header
         return { flex: "0 0 auto" };
       } else if (expandState.preview) {
-        // Both expanded: 50% each
-        return { flex: "1", minHeight: "250px" };
+        // Both expanded: summary takes remaining space
+        return { flex: "1", minHeight: "0" };
       } else {
         // Summary expanded, preview collapsed: take all space
-        return { flex: "1", minHeight: "250px" };
+        return { flex: "1", minHeight: "400px" };
       }
     });
-
 
     // Expose refreshData method from PreviewAlert
     const refreshData = () => {
@@ -295,12 +324,12 @@ export default defineComponent({
 
     // Setup resize listener on mount
     onMounted(() => {
-      window.addEventListener('resize', handleResize);
+      window.addEventListener("resize", handleResize);
     });
 
     // Cleanup resize listener on unmount
     onUnmounted(() => {
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener("resize", handleResize);
       clearTimeout(resizeTimeout);
     });
 
@@ -364,14 +393,12 @@ export default defineComponent({
     flex-direction: column;
   }
 
-
   .summary-section-content {
     flex: 1;
     overflow: hidden;
     display: flex;
     flex-direction: column;
   }
-
 
   .expand-toggle-btn {
     opacity: 0.5;
