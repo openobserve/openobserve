@@ -22,7 +22,7 @@
       </div>
     </div>
 
-    <div :class="[`  tw:px-2 tw:mb-2 el-border tw:mt-6 el-border-radius `,
+    <div :class="[`  tw:mb-2 el-border tw:mt-2 el-border-radius `,
         store.state.isAiChatEnabled ? `tw:w-full tw:ml-[${depth * 10}px]` : `xl:tw:w-fit tw:ml-[${depth * 20}px]`
     ]"
     :style="{
@@ -41,14 +41,12 @@
           @update:active-tab="toggleLabel"
         />
       </div>
-      <!-- Spacer for root group to maintain consistent spacing -->
-      <div v-else class="tw:h-[14px]"></div>
-
+      
       <!-- Group content -->
 
       <div v-if="isOpen" class="tw:overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
         <!-- Items in group (V2 uses 'conditions' array) -->
-        <div class="tw:ml-2 tw:whitespace-nowrap " v-for="(item, index) in props.group.conditions" :key="index">
+        <div class="tw:whitespace-nowrap" v-for="(item, index) in props.group.conditions" :key="index">
           <FilterGroup
             v-if="isGroup(item)"
             :group="item"
@@ -66,7 +64,7 @@
           <div
             v-else
             class="tw:flex tw:items-center tw:gap-2  "
-            :class="store.state.isAiChatEnabled ? 'tw:pl-0' : 'tw:pl-4'"
+            :class="store.state.isAiChatEnabled ? 'tw:pl-0' : 'tw:pl-1'"
             >
             <FilterCondition
                 :condition="item"
@@ -87,7 +85,7 @@
         </div>
         <!-- Action buttons -->
 
-        <div class="flex justify-start items-center tw:ml-4"
+        <div class="flex justify-start items-center"
         >
         <q-btn
             data-test="alert-conditions-add-condition-btn"

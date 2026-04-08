@@ -16,12 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="step-query-config" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw:px-3 tw:py-4">
+    <div class="step-content tw:px-1 tw:pt-0 tw:pb-2">
       <!-- Step intro -->
-      <p class="step-intro-hint tw:mb-4">{{ t('alerts.stepIntro.conditions') }}</p>
+      <p class="step-intro-hint tw:mb-5">{{ t('alerts.stepIntro.conditions') }}</p>
 
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
-      <div v-if="shouldShowTabs" class="tw:mb-4 tw:flex tw:items-center tw:justify-between">
+      <div v-if="shouldShowTabs" class="tw:mb-3 tw:flex tw:items-center tw:justify-between">
         <div class="flex items-center app-tabs-container tw:h-[36px] tw:w-fit">
           <AppTabs
             data-test="step2-query-tabs"
@@ -63,16 +63,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Aggregation Section (only for custom mode and scheduled alerts) -->
-          <div v-if="isRealTime === 'false'" class="tw:mt-6 tw:pt-6" :style="store.state.theme === 'dark' ? 'border-top: 2px solid #343434' : 'border-top: 2px solid #e6e6e6'">
+          <div v-if="isRealTime === 'false'" class="tw:mt-4 tw:pt-4" :style="store.state.theme === 'dark' ? 'border-top: 1px solid #343434' : 'border-top: 1px solid #e6e6e6'">
             <!-- Aggregation Toggle -->
-            <div class="flex justify-start items-center tw:font-semibold tw:mb-4">
-              <div class="flex items-center" style="width: 190px; height: 36px">
-                {{ t("common.aggregation") }}
+            <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
+              <div class="tw:flex tw:items-center tw:gap-1.5">
+                <span class="tw:text-sm tw:font-semibold">{{ t("common.aggregation") }}</span>
                 <q-icon
                   name="info"
-                  size="17px"
-                  class="q-ml-xs cursor-pointer"
-                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                  size="15px"
+                  class="cursor-pointer"
+                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-6'"
                 >
                   <q-tooltip anchor="center right" self="center left" max-width="300px">
                     <span style="font-size: 14px">
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-toggle
                 v-model="localIsAggregationEnabled"
                 size="30px"
-                class="text-bold o2-toggle-button-xs"
+                class="o2-toggle-button-xs"
                 @update:model-value="toggleAggregation"
               />
             </div>
@@ -893,21 +893,18 @@ export default defineComponent({
   overflow: auto;
 
   .step-content {
-    border-radius: 8px;
     min-height: 100%;
   }
 
   &.dark-mode {
     .step-content {
-      background-color: #212121;
-      border: 1px solid #343434;
+      background-color: transparent;
     }
   }
 
   &.light-mode {
     .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
+      background-color: transparent;
     }
   }
 }
