@@ -877,8 +877,8 @@ export default defineComponent({
 
     // Toggle aggregation
     const toggleAggregation = () => {
-      // Initialize aggregation object when enabling
-      if (localIsAggregationEnabled.value && !props.inputData.aggregation) {
+      if (localIsAggregationEnabled.value) {
+        // Enabling — initialize with defaults
         props.inputData.aggregation = {
           group_by: [""],
           function: "avg",
@@ -888,18 +888,13 @@ export default defineComponent({
             value: "",
           },
         };
-      }
-
-      // Also initialize if aggregation exists but doesn't have function property
-      if (
-        localIsAggregationEnabled.value &&
-        props.inputData.aggregation &&
-        !props.inputData.aggregation.function
-      ) {
-        props.inputData.aggregation.function = "avg";
+      } else {
+        // Disabling — reset/clear the aggregation data
+        props.inputData.aggregation = null;
       }
 
       emit("update:isAggregationEnabled", localIsAggregationEnabled.value);
+      emit("update:aggregation", props.inputData.aggregation);
     };
 
     // Add group by column

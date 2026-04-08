@@ -3900,6 +3900,14 @@ export default defineComponent({
       margin-top: 0.125rem;
     }
   }
+
+  .q-stepper--vertical .q-stepper__step-inner {
+    padding: 0 24px 32px 50px;
+  }
+
+  .q-stepper--vertical .q-stepper__tab {
+    padding: 12px 12px;
+  }
 }
 
 .wizard-view-container {
