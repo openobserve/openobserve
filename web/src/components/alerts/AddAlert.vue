@@ -716,7 +716,7 @@ const defaultValue: any = () => {
       frequency: 10,
       cron: "",
       threshold: 3,
-      silence: 10,
+      silence: 0,
       frequency_type: "minutes",
       timezone: "UTC",
     },
@@ -3141,13 +3141,16 @@ export default defineComponent({
       await this.loadPatternDataIfPresent(); // Load pattern data and set correct type
     }
 
-    // Set default frequency to min_auto_refresh_interval
+    // Set default frequency to match the period (time window), respecting the min_auto_refresh_interval floor
     // Skip when coming from a pattern or panel — those loaders set their own frequency
     if (!isFromPattern && !isFromPanel) {
-      if (this.store.state?.zoConfig?.min_auto_refresh_interval)
-        this.formData.trigger_condition.frequency = Math.ceil(
-          this.store.state?.zoConfig?.min_auto_refresh_interval / 60 || 10,
-        );
+      const minFrequency = this.store.state?.zoConfig?.min_auto_refresh_interval
+        ? Math.ceil(this.store.state.zoConfig.min_auto_refresh_interval / 60)
+        : 1;
+      this.formData.trigger_condition.frequency = Math.max(
+        minFrequency,
+        this.formData.trigger_condition.period,
+      );
     }
 
     this.beingUpdated = this.isUpdated;

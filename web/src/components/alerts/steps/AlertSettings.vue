@@ -143,115 +143,137 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <!-- Check Interval (Frequency) -->
-            <div class="as-field">
-              <div class="tw:flex tw:items-center tw:gap-1 tw:mb-0.5">
-                <span class="as-field-label">{{ t('alerts.alertSettings.checkIntervalLabel') }} *</span>
-                <template v-if="formData.trigger_condition.frequency_type === 'cron' && showTimezoneWarning">
-                  <q-icon name="warning" size="16px" class="tw:text-orange-500 tw:cursor-pointer">
-                    <q-tooltip anchor="center right" self="center left" max-width="260px" class="tw:text-[13px]">
-                      {{ t('alerts.alertSettings.timezoneWarning') }}
-                    </q-tooltip>
-                  </q-icon>
-                </template>
-              </div>
-              <p class="as-field-desc tw:mb-2">
-                <template v-if="formData.trigger_condition.frequency_type === 'cron'">{{ t('alerts.alertSettings.checkIntervalDescCron') }}</template>
-                <template v-else>{{ t('alerts.alertSettings.checkIntervalDescInterval') }}</template>
-              </p>
-              <div class="tw:flex tw:flex-col" style="min-height: 78px">
-                <div class="tw:flex frequency-toggle-group tw:mb-3">
-                  <q-btn
-                    :label="t('alerts.interval')"
-                    :outline="formData.trigger_condition.frequency_type === 'cron'"
-                    :unelevated="formData.trigger_condition.frequency_type === 'minutes'"
-                    :color="formData.trigger_condition.frequency_type === 'minutes' ? 'primary' : 'grey-7'"
-                    no-caps size="sm"
-                    class="tw:px-4 frequency-toggle-btn frequency-toggle-left"
-                    :class="formData.trigger_condition.frequency_type === 'minutes' ? 'active' : 'inactive'"
-                    style="min-width: 90px"
-                    @click="handleFrequencyTypeChange('minutes')"
-                  />
-                  <q-btn
-                    :label="t('alerts.alertSettings.cronSchedule')"
-                    :outline="formData.trigger_condition.frequency_type === 'minutes'"
-                    :unelevated="formData.trigger_condition.frequency_type === 'cron'"
-                    :color="formData.trigger_condition.frequency_type === 'cron' ? 'primary' : 'grey-7'"
-                    no-caps size="sm"
-                    class="tw:px-4 frequency-toggle-btn frequency-toggle-right"
-                    :class="formData.trigger_condition.frequency_type === 'cron' ? 'active' : 'inactive'"
-                    style="min-width: 130px"
-                    @click="handleFrequencyTypeChange('cron')"
-                  />
+            <!-- Additional Configuration (collapsible card) -->
+            <div
+              class="as-sub-card tw:rounded tw:mt-4"
+              :class="store.state.theme === 'dark' ? 'as-sub-card-dark' : 'as-sub-card-light'"
+            >
+              <!-- Card header -->
+              <div
+                class="as-sub-card-header tw:flex tw:items-start tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
+                @click="additionalConfigExpanded = !additionalConfigExpanded"
+              >
+                <div class="tw:flex tw:items-start tw:gap-3 tw:flex-1 tw:min-w-0">
+                  <q-icon name="tune" size="18px" class="as-sub-card-icon tw:mt-0.5 tw:shrink-0" />
+                  <div class="tw:flex-1 tw:min-w-0">
+                    <span class="as-sub-card-title">{{ t('alerts.alertSettings.sectionAdditionalConfig') }}</span>
+                    <p class="as-sub-card-desc tw:mt-1 tw:mb-0">{{ t('alerts.alertSettings.sectionAdditionalConfigDesc') }}</p>
+                  </div>
                 </div>
-                <div class="tw:flex tw:items-start" style="min-height: 36px">
-                  <div v-if="formData.trigger_condition.frequency_type === 'minutes'" class="tw:flex tw:items-center">
-                    <div style="width: 87px; margin-left: 0 !important">
-                      <q-input v-model.number="formData.trigger_condition.frequency" type="number" dense borderless min="1" style="background: none" debounce="300" @update:model-value="emitTriggerUpdate" />
+                <q-icon
+                  :name="additionalConfigExpanded ? 'expand_less' : 'expand_more'"
+                  size="sm"
+                  class="as-sub-card-icon tw:ml-2 tw:shrink-0 tw:mt-0.5"
+                />
+              </div>
+
+              <div v-if="additionalConfigExpanded">
+                <q-separator class="as-sub-card-separator" />
+                <div class="tw:px-4 tw:py-4 tw:flex tw:flex-col tw:gap-5">
+
+                <!-- Check Interval (Frequency) -->
+                <div class="as-field">
+                  <div class="tw:flex tw:items-center tw:gap-1 tw:mb-0.5">
+                    <span class="as-field-label">{{ t('alerts.alertSettings.checkIntervalLabel') }} *</span>
+                    <template v-if="formData.trigger_condition.frequency_type === 'cron' && showTimezoneWarning">
+                      <q-icon name="warning" size="16px" class="tw:text-orange-500 tw:cursor-pointer">
+                        <q-tooltip anchor="center right" self="center left" max-width="260px" class="tw:text-[13px]">
+                          {{ t('alerts.alertSettings.timezoneWarning') }}
+                        </q-tooltip>
+                      </q-icon>
+                    </template>
+                  </div>
+                  <p class="as-field-desc tw:mb-2">
+                    <template v-if="formData.trigger_condition.frequency_type === 'cron'">{{ t('alerts.alertSettings.checkIntervalDescCron') }}</template>
+                    <template v-else>{{ t('alerts.alertSettings.checkIntervalDescInterval') }}</template>
+                  </p>
+                  <div class="tw:flex tw:flex-col" style="min-height: 78px">
+                    <div class="tw:flex frequency-toggle-group tw:mb-3">
+                      <q-btn
+                        :label="t('alerts.interval')"
+                        :outline="formData.trigger_condition.frequency_type === 'cron'"
+                        :unelevated="formData.trigger_condition.frequency_type === 'minutes'"
+                        :color="formData.trigger_condition.frequency_type === 'minutes' ? 'primary' : 'grey-7'"
+                        no-caps size="sm"
+                        class="tw:px-4 frequency-toggle-btn frequency-toggle-left"
+                        :class="formData.trigger_condition.frequency_type === 'minutes' ? 'active' : 'inactive'"
+                        style="min-width: 90px"
+                        @click="handleFrequencyTypeChange('minutes')"
+                      />
+                      <q-btn
+                        :label="t('alerts.alertSettings.cronSchedule')"
+                        :outline="formData.trigger_condition.frequency_type === 'minutes'"
+                        :unelevated="formData.trigger_condition.frequency_type === 'cron'"
+                        :color="formData.trigger_condition.frequency_type === 'cron' ? 'primary' : 'grey-7'"
+                        no-caps size="sm"
+                        class="tw:px-4 frequency-toggle-btn frequency-toggle-right"
+                        :class="formData.trigger_condition.frequency_type === 'cron' ? 'active' : 'inactive'"
+                        style="min-width: 130px"
+                        @click="handleFrequencyTypeChange('cron')"
+                      />
                     </div>
-                    <div style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'" class="flex justify-center items-center">
-                      {{ t("alerts.minutes") }}
+                    <div class="tw:flex tw:items-start" style="min-height: 36px">
+                      <div v-if="formData.trigger_condition.frequency_type === 'minutes'" class="tw:flex tw:items-center">
+                        <div style="width: 87px; margin-left: 0 !important">
+                          <q-input v-model.number="formData.trigger_condition.frequency" type="number" dense borderless min="1" style="background: none" debounce="300" @update:model-value="emitTriggerUpdate" />
+                        </div>
+                        <div style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'" class="flex justify-center items-center">
+                          {{ t("alerts.minutes") }}
+                        </div>
+                      </div>
+                      <div v-else class="tw:flex tw:items-center tw:gap-2">
+                        <q-input v-model="formData.trigger_condition.cron" dense borderless placeholder="Cron Expression *" style="background: none; width: 180px" debounce="300" @update:model-value="emitTriggerUpdate" />
+                        <q-select
+                          v-model="formData.trigger_condition.timezone"
+                          :options="filteredTimezone"
+                          @blur="browserTimezone = browserTimezone === '' ? Intl.DateTimeFormat().resolvedOptions().timeZone : browserTimezone"
+                          use-input @filter="timezoneFilterFn" input-debounce="0"
+                          dense borderless emit-value fill-input hide-selected
+                          :title="formData.trigger_condition.timezone"
+                          placeholder="Timezone *"
+                          :display-value="`${browserTimezone || 'Select timezone'}`"
+                          style="width: 210px"
+                          @update:model-value="emitTriggerUpdate"
+                        />
+                      </div>
+                    </div>
+                    <div
+                      v-if="(formData.trigger_condition.frequency_type === 'minutes' && !Number(formData.trigger_condition.frequency)) || (formData.trigger_condition.frequency_type === 'cron' && (!formData.trigger_condition.cron || !formData.trigger_condition.timezone)) || cronJobError"
+                      class="text-red-8 tw:mt-1" style="font-size: 11px; line-height: 12px"
+                    >
+                      {{ cronJobError || "Field is required!" }}
                     </div>
                   </div>
-                  <div v-else class="tw:flex tw:items-center tw:gap-2">
-                    <q-input v-model="formData.trigger_condition.cron" dense borderless placeholder="Cron Expression *" style="background: none; width: 180px" debounce="300" @update:model-value="emitTriggerUpdate" />
-                    <q-select
-                      v-model="formData.trigger_condition.timezone"
-                      :options="filteredTimezone"
-                      @blur="browserTimezone = browserTimezone === '' ? Intl.DateTimeFormat().resolvedOptions().timeZone : browserTimezone"
-                      use-input @filter="timezoneFilterFn" input-debounce="0"
-                      dense borderless emit-value fill-input hide-selected
-                      :title="formData.trigger_condition.timezone"
-                      placeholder="Timezone *"
-                      :display-value="`${browserTimezone || 'Select timezone'}`"
-                      style="width: 210px"
-                      @update:model-value="emitTriggerUpdate"
-                    />
+                </div>
+
+                <!-- Cooldown Period -->
+                <div class="as-field">
+                  <div class="as-field-label tw:mb-0.5">{{ t('alerts.alertSettings.cooldownLabel') }} *</div>
+                  <p class="as-field-desc tw:mb-2">{{ t('alerts.alertSettings.cooldownDescScheduled') }}</p>
+                  <div>
+                    <div ref="silenceFieldRef" class="tw:flex tw:items-center" style="width: fit-content">
+                      <div style="width: 87px; margin-left: 0 !important">
+                        <q-input v-model.number="formData.trigger_condition.silence" type="number" dense borderless min="0" debounce="300" @update:model-value="emitTriggerUpdate" />
+                      </div>
+                      <div style="min-width: 90px; margin-left: 0 !important; height: 36px;" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'" class="flex justify-center items-center">
+                        {{ t("alerts.minutes") }}
+                      </div>
+                    </div>
+                    <div v-if="formData.trigger_condition.silence < 0 || formData.trigger_condition.silence === undefined || formData.trigger_condition.silence === null || formData.trigger_condition.silence === ''" class="text-red-8 q-pt-xs" style="font-size: 11px; line-height: 12px">
+                      Field is required!
+                    </div>
                   </div>
                 </div>
-                <div
-                  v-if="(formData.trigger_condition.frequency_type === 'minutes' && !Number(formData.trigger_condition.frequency)) || (formData.trigger_condition.frequency_type === 'cron' && (!formData.trigger_condition.cron || !formData.trigger_condition.timezone)) || cronJobError"
-                  class="text-red-8 tw:mt-1" style="font-size: 11px; line-height: 12px"
-                >
-                  {{ cronJobError || "Field is required!" }}
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <q-separator class="as-divider tw:mb-6" />
+                </div><!-- end tw:px-4 body -->
+              </div><!-- end v-if expanded -->
+            </div><!-- end as-sub-card -->
+          </div><!-- end as-section -->
 
-          <!-- ── Section 2: Cooldown — After It Fires ── -->
-          <div class="as-section tw:mb-6">
-            <div class="as-section-header tw:flex tw:items-center tw:gap-2 tw:mb-1">
-              <q-icon name="schedule_send" size="18px" class="as-section-icon" />
-              <span class="as-section-title">{{ t('alerts.alertSettings.sectionCooldown') }}</span>
-            </div>
-            <p class="as-section-desc tw:mb-4">{{ t('alerts.alertSettings.sectionCooldownDescScheduled') }}</p>
-
-            <div class="as-field">
-              <div class="as-field-label tw:mb-0.5">{{ t('alerts.alertSettings.cooldownLabel') }} *</div>
-              <p class="as-field-desc tw:mb-2">{{ t('alerts.alertSettings.cooldownDescScheduled') }}</p>
-              <div>
-                <div ref="silenceFieldRef" class="tw:flex tw:items-center" style="width: fit-content">
-                  <div style="width: 87px; margin-left: 0 !important">
-                    <q-input v-model.number="formData.trigger_condition.silence" type="number" dense borderless min="0" debounce="300" @update:model-value="emitTriggerUpdate" />
-                  </div>
-                  <div style="min-width: 90px; margin-left: 0 !important; height: 36px;" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'" class="flex justify-center items-center">
-                    {{ t("alerts.minutes") }}
-                  </div>
-                </div>
-                <div v-if="formData.trigger_condition.silence < 0 || formData.trigger_condition.silence === undefined || formData.trigger_condition.silence === null || formData.trigger_condition.silence === ''" class="text-red-8 q-pt-xs" style="font-size: 11px; line-height: 12px">
-                  Field is required!
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <q-separator class="as-divider tw:mb-6" />
+          <q-separator class="as-divider" />
 
           <!-- ── Section 3: Where to Send Notifications ── -->
-          <div class="as-section">
+          <div class="as-section tw:mt-3">
             <div class="as-section-header tw:flex tw:items-center tw:gap-2 tw:mb-1">
               <q-icon name="send" size="18px" class="as-section-icon" />
               <span class="as-section-title">{{ t('alerts.alertSettings.sectionNotify') }}</span>
@@ -568,6 +590,9 @@ export default defineComponent({
     const browserTimezone = ref("");
     const filteredTimezone = ref<string[]>([]);
     const showTimezoneWarning = ref(false);
+
+    // Additional config section expand state
+    const additionalConfigExpanded = ref(false);
 
     // Cron validation
     const cronJobError = ref("");
@@ -1274,6 +1299,7 @@ export default defineComponent({
       filteredTimezone,
       showTimezoneWarning,
       timezoneFilterFn,
+      additionalConfigExpanded,
       // Cron validation
       cronJobError,
       validateFrequency,
@@ -1398,6 +1424,40 @@ export default defineComponent({
 .as-field-label {
   font-size: 0.875rem;
   font-weight: 600;
+}
+
+/* ── Additional config sub-card (matches Advanced.vue adv-section style) ── */
+.as-sub-card {
+  border-radius: 6px;
+  overflow: hidden;
+
+  &.as-sub-card-dark {
+    border: 1px solid #343434;
+    .as-sub-card-header   { background-color: #2a2a2a; }
+    .as-sub-card-title    { color: #e0e0e0; }
+    .as-sub-card-icon     { color: #9e9e9e; }
+    .as-sub-card-desc     { color: #888888; }
+    .as-sub-card-separator { border-color: #343434; }
+  }
+
+  &.as-sub-card-light {
+    border: 1px solid #e0e0e0;
+    .as-sub-card-header   { background-color: #f5f5f5; }
+    .as-sub-card-title    { color: #2d2d2d; }
+    .as-sub-card-icon     { color: #666666; }
+    .as-sub-card-desc     { color: #666666; }
+    .as-sub-card-separator { border-color: #e0e0e0; }
+  }
+}
+
+.as-sub-card-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.as-sub-card-desc {
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 
 .as-field-desc {
