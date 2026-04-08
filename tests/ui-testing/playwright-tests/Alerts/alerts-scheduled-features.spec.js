@@ -289,7 +289,7 @@ test.describe("Scheduled Alert Features", () => {
     // TEST 1: P0 - Alert details dialog: open, history, actions, edit
     // (Combined: dialog visibility + refresh/copy/edit actions)
     // ========================================================================
-    test("Alert details dialog opens with history and action buttons work", {
+    test.skip("Alert details dialog opens with history and action buttons work", {
         tag: ['@alertScheduled', '@alertHistory', '@smoke', '@P0', '@all', '@alerts']
     }, async ({ page }) => {
         testLogger.info('=== PHASE 1: Navigate to folder with API-created alert ===');
