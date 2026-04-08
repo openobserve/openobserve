@@ -1983,18 +1983,17 @@ pub async fn result_schema(
             Err(_) => vec![],
         };
 
-        // Load stream-level cross-links (use first stream name)
-        let stream_links = if let Some(stream_name) = resolve_stream_names(&req.query.sql)
-            .ok()
-            .and_then(|names| names.into_iter().next())
-        {
-            infra::schema::get_settings(&org_id, &stream_name, stream_type)
+        // Load stream-level cross-links for all streams in the query
+        let stream_names = resolve_stream_names(&req.query.sql).unwrap_or_default();
+        let mut stream_links = Vec::new();
+        for stream_name in &stream_names {
+            if let Some(links) = infra::schema::get_settings(&org_id, stream_name, stream_type)
                 .await
                 .map(|s| s.cross_links.clone())
-                .unwrap_or_default()
-        } else {
-            vec![]
-        };
+            {
+                stream_links.extend(links);
+            }
+        }
 
         // Filter and populate alias for stream cross-links
         let filtered_stream: Vec<_> = stream_links

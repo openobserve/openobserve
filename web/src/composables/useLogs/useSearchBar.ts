@@ -449,30 +449,52 @@ export const useSearchBar = () => {
         // Store the built query so resolveCrossLinkUrl can use it (searchObj.data.query is empty in non-SQL mode)
         searchObj.data.crossLinkQuery = crossLinkQuery || "";
         if (crossLinkQuery) {
-          searchService
-            .result_schema(
-              {
-                org_identifier: store.state.selectedOrganization.identifier,
-                query: {
-                  query: {
-                    sql: crossLinkQuery,
-                    query_fn: null,
-                    size: -1,
-                    streaming_output: false,
-                    streaming_id: null,
+          const orgId = store.state.selectedOrganization.identifier;
+          const pageType = searchObj.data.stream.streamType || "logs";
+          const sqlQueries: string[] = Array.isArray(crossLinkQuery)
+            ? crossLinkQuery
+            : [crossLinkQuery];
+
+          Promise.all(
+            sqlQueries.map((sql: string) =>
+              searchService
+                .result_schema(
+                  {
+                    org_identifier: orgId,
+                    query: {
+                      query: {
+                        sql,
+                        query_fn: null,
+                        size: -1,
+                        streaming_output: false,
+                        streaming_id: null,
+                      },
+                    },
+                    page_type: pageType,
+                    is_streaming: false,
+                    cross_linking: true,
                   },
-                },
-                page_type: searchObj.data.stream.streamType || "logs",
-                is_streaming: false,
-                cross_linking: true,
-              },
-              "ui",
-            )
-            .then((response: any) => {
-              searchObj.data.crossLinks = response.data?.cross_links || {
+                  "ui",
+                )
+                .catch(() => null),
+            ),
+          )
+            .then((responses: any[]) => {
+              const mergedLinks: any = {
                 stream_links: [],
                 org_links: [],
               };
+              for (const res of responses) {
+                if (!res?.data?.cross_links) continue;
+                mergedLinks.stream_links.push(
+                  ...res.data.cross_links.stream_links,
+                );
+                // org_links are common across all streams, take from first response
+                if (mergedLinks.org_links.length === 0) {
+                  mergedLinks.org_links = res.data.cross_links.org_links;
+                }
+              }
+              searchObj.data.crossLinks = mergedLinks;
             })
             .catch(() => {
               searchObj.data.crossLinks = {
