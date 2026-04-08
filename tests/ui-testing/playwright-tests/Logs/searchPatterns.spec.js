@@ -615,6 +615,9 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         // Get all pattern templates
         const patternTemplates = [];
         for (let i = 0; i < cardCount; i++) {
+            // Wait for the template element to be visible before getting its text
+            const templateLocator = page.locator(`[data-test="pattern-card-${i}-template"]`);
+            await templateLocator.waitFor({ state: 'visible', timeout: 10000 });
             const template = await pm.logsPage.getPatternCardTemplateText(i);
             patternTemplates.push(template);
         }
