@@ -747,7 +747,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="0.875rem"
                             class="tw:mr-0.5"
                           />
-                          <component v-if="typeof group.icon !== 'string'" :is="group.icon" class="" />
+                          <component
+                            v-if="typeof group.icon !== 'string'"
+                            :is="group.icon"
+                            class=""
+                          />
                           <q-icon
                             v-if="typeof group.icon === 'string'"
                             :name="group.icon"
@@ -868,7 +872,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex-none!"
                 >
                   <div class="tw:flex tw:items-center tw:gap-1 tw:px-1">
-                    <component v-if="typeof group.icon !== 'string'" :is="group.icon" />
+                    <component
+                      v-if="typeof group.icon !== 'string'"
+                      :is="group.icon"
+                    />
                     <q-icon
                       v-if="typeof group.icon === 'string'"
                       :name="group.icon"
@@ -1274,12 +1281,12 @@ const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );
 
-interface TimeRange {
+export interface TimeRange {
   startTime: number;
   endTime: number;
 }
 
-interface Props {
+export interface TelemetryCorrelationDashboardProps {
   serviceName: string;
   matchedDimensions: Record<string, string>;
   additionalDimensions?: Record<string, string>; // Unstable dimensions (pod-id, etc.) - shown with _o2_all option
@@ -1301,7 +1308,7 @@ interface Props {
   logsPanelHeight?: number; // Override default panel height (grid units) for logs panel
 }
 
-const props = withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<TelemetryCorrelationDashboardProps>(), {
   mode: "dialog",
   externalActiveTab: "logs",
   metricGroupDefinitions: () => DEFAULT_METRIC_GROUP_DEFINITIONS,
@@ -2069,7 +2076,9 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
       // Preserve original layout properties (w, h) from generateDashboard or cache
       panel.layout = {
         ...panel.layout,
-        x: (index % Math.floor(grid / (props.panelWidth ?? 64))) * (props.panelWidth ?? 64),
+        x:
+          (index % Math.floor(grid / (props.panelWidth ?? 64))) *
+          (props.panelWidth ?? 64),
         y: maxY + Math.floor(index / 3) * (props.panelHeight ?? 16),
         i: uniqueId,
       };

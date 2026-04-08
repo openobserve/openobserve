@@ -1867,6 +1867,10 @@ const handleServiceGraphViewTraces = (data: any) => {
       const escapedPodName = escapeSingleQuotes(data.podName);
       filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
     }
+    if (data.resourceFilter?.field && data.resourceFilter?.value) {
+      const escapedValue = escapeSingleQuotes(data.resourceFilter.value);
+      filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
+    }
     if (data.errorsOnly) {
       filterQuery += ` AND span_status = 'ERROR'`;
     }
