@@ -369,6 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :rowTemplateType="formData.row_template_type"
                 :isRealTime="formData.is_real_time"
                 :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
                 :multiTimeRange="formData.query_condition.multi_time_range"
                 :period="formData.trigger_condition.period"
                 :frequency="formData.trigger_condition.frequency"
