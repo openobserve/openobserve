@@ -503,6 +503,20 @@ pub struct IncidentStats {
 
 // ==================== INCIDENT EVENTS ====================
 
+/// Classification of how AI/RCA analysis was triggered
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AnalysisTriggerType {
+    /// Triggered automatically when new incident is created
+    AutomaticNewIncident,
+    /// Triggered automatically when alert is added to existing incident
+    AutomaticReanalysis,
+    /// Triggered manually by user via API
+    Manual,
+    /// Triggered automatically when incident is reopened
+    AutomaticReopened,
+}
+
 /// A single event in an incident's lifecycle timeline
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct IncidentEvent {
@@ -593,6 +607,17 @@ pub enum IncidentEventType {
     /// AI/RCA analysis completed
     #[serde(rename = "ai_analysis_complete")]
     AIAnalysisComplete,
+
+    /// AI/RCA analysis failed
+    #[serde(rename = "ai_analysis_failed")]
+    AIAnalysisFailed {
+        /// Reason for the failure
+        reason: String,
+        /// Context in which the analysis was triggered
+        trigger_type: AnalysisTriggerType,
+        /// Optional error details for debugging
+        error_details: Option<String>,
+    },
 }
 
 impl IncidentEvent {
@@ -694,6 +719,18 @@ impl IncidentEvent {
 
     pub fn ai_analysis_complete() -> Self {
         Self::now(IncidentEventType::AIAnalysisComplete)
+    }
+
+    pub fn ai_analysis_failed(
+        reason: impl Into<String>,
+        trigger_type: AnalysisTriggerType,
+        error_details: Option<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::AIAnalysisFailed {
+            reason: reason.into(),
+            trigger_type,
+            error_details,
+        })
     }
 
     /// Increment alert count if this is an Alert event for the given alert_id.
