@@ -23,9 +23,9 @@ use config::{
     meta::dashboards::{
         datetime_now,
         reports::{
-            HttpReportPayload, Report, ReportDashboard, ReportDestination, ReportEmailDetails,
-            ReportEmailAttachmentType, ReportFrequencyType, ReportListFilters, ReportMediaType,
-            ReportTimerangeType,
+            HttpReportPayload, Report, ReportDashboard, ReportDestination,
+            ReportEmailAttachmentType, ReportEmailDetails, ReportFrequencyType, ReportListFilters,
+            ReportMediaType, ReportTimerangeType,
         },
     },
     utils::time::now_micros,
