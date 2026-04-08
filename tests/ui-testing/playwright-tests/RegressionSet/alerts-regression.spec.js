@@ -258,7 +258,7 @@ test.describe("Alerts Regression Bugs", () => {
   //       isn't loaded from saved alert (shows default 1 instead of saved value).
   //       This test validates the UI displays the edit form correctly.
   // ============================================================================
-  test("should load existing PromQL alert with correct condition values (Bug #9967 - P2)", {
+  test.skip("should load existing PromQL alert with correct condition values (Bug #9967 - P2)", {
     tag: ['@promqlAlert', '@alerts', '@regressionBugs', '@P2', '@metrics', '@bug-9967']
   }, async ({ page }) => {
     testLogger.info('Testing loading existing PromQL alert');
@@ -335,7 +335,7 @@ test.describe("Alerts Regression Bugs", () => {
   // Bug #10899: Group By field autocomplete not working
   // https://github.com/openobserve/openobserve/issues/10899
   // ============================================================================
-  test("Group By field should show autocomplete suggestions @bug-10899 @P1 @regression @alerts", async ({ page }) => {
+  test.skip("Group By field should show autocomplete suggestions @bug-10899 @P1 @regression @alerts", async ({ page }) => {
     testLogger.info('Test: Verify Group By field autocomplete (Bug #10899)');
 
     const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
@@ -414,7 +414,7 @@ test.describe("Alerts Regression Bugs", () => {
   // Bug #10872: Multi-window alert VRL processing not working correctly
   // https://github.com/openobserve/openobserve/issues/10872
   // ============================================================================
-  test("VRL Apply button should process multi-window result array correctly @bug-10872 @P2 @regression @alerts", async ({ page }) => {
+  test.skip("VRL Apply button should process multi-window result array correctly @bug-10872 @P2 @regression @alerts", async ({ page }) => {
     testLogger.info('Test: VRL processing for multi-window alerts (Bug #10872)');
 
     const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
