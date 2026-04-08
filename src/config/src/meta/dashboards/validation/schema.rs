@@ -26,7 +26,7 @@ use serde_json::Value;
 /// The JSON Schema for v8 dashboards.
 /// Loaded once at startup via include_str! — same file used by FE.
 static SCHEMA_V8: Lazy<jsonschema::Validator> = Lazy::new(|| {
-    let schema_str = include_str!("../../../../../../../schemas/dashboard-v8.schema.json");
+    let schema_str = include_str!("../../../../../../schemas/dashboard-v8.schema.json");
     let schema_value: Value =
         serde_json::from_str(schema_str).expect("Invalid dashboard-v8.schema.json");
     jsonschema::validator_for(&schema_value).expect("Failed to compile dashboard JSON Schema")
@@ -34,29 +34,26 @@ static SCHEMA_V8: Lazy<jsonschema::Validator> = Lazy::new(|| {
 
 /// Shared error messages — loaded from the SAME errorMessages.json used by FE.
 static ERROR_MESSAGES: Lazy<Value> = Lazy::new(|| {
-    let json_str = include_str!("../../../../../../../schemas/errorMessages.json");
+    let json_str = include_str!("../../../../../../schemas/errorMessages.json");
     serde_json::from_str(json_str).expect("Invalid errorMessages.json")
 });
 
 /// Validates dashboard JSON against the v8 JSON Schema.
 /// Same schema file used by FE (ajv). Identical rules for the ~70% that schema can express.
 pub fn validate(json: &Value) -> Vec<super::ValidationError> {
-    let result = SCHEMA_V8.validate(json);
-    match result {
-        Ok(()) => vec![],
-        Err(errors) => errors
-            .map(|e| {
-                let path = e.instance_path.to_string();
-                let keyword = format!("{:?}", e.kind);
-                let message = map_error_message(&path, &keyword, &e.to_string(), json);
-                super::ValidationError {
-                    path,
-                    message,
-                    code: "SCHEMA_VALIDATION".into(),
-                }
-            })
-            .collect(),
-    }
+    SCHEMA_V8
+        .iter_errors(json)
+        .map(|e| {
+            let path = e.instance_path.to_string();
+            let keyword = format!("{:?}", e.kind);
+            let message = map_error_message(&path, &keyword, &e.to_string(), json);
+            super::ValidationError {
+                path,
+                message,
+                code: "SCHEMA_VALIDATION".into(),
+            }
+        })
+        .collect()
 }
 
 /// Maps raw jsonschema errors to user-friendly messages using errorMessages.json.
