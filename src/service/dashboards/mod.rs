@@ -616,23 +616,42 @@ async fn put(
 
     // Validate v8 dashboards against shared JSON Schema + native rules
     if dashboard.version == 8 {
-        if let Ok(json_value) = serde_json::to_value(&dashboard) {
-            // Extract the inner v8 data for validation
-            if let Some(v8_json) = json_value.get("v8") {
-                let validation_errors =
-                    config::meta::dashboards::validation::validate_dashboard(v8_json);
-                if !validation_errors.is_empty() {
-                    let error_messages: Vec<String> = validation_errors
-                        .iter()
-                        .map(|e| e.message.clone())
-                        .collect();
-                    log::warn!(
-                        "Dashboard validation errors for {}: {:?}",
-                        dashboard_id,
-                        error_messages
+        match serde_json::to_value(&dashboard) {
+            Ok(json_value) => {
+                if let Some(v8_json) = json_value.get("v8") {
+                    let validation_errors =
+                        config::meta::dashboards::validation::validate_dashboard(v8_json);
+                    if !validation_errors.is_empty() {
+                        let error_messages: Vec<String> = validation_errors
+                            .iter()
+                            .map(|e| e.message.clone())
+                            .collect();
+                        log::warn!(
+                            "Dashboard validation errors for {}: {:?}",
+                            dashboard_id,
+                            error_messages
+                        );
+                        return Err(DashboardError::PutValidationFailed(error_messages));
+                    }
+                } else {
+                    log::error!(
+                        "Dashboard {} serialized without 'v8' key, skipping validation",
+                        dashboard_id
                     );
-                    return Err(DashboardError::PutValidationFailed(error_messages));
+                    return Err(DashboardError::PutValidationFailed(vec![
+                        "Internal error: dashboard missing v8 data for validation".into(),
+                    ]));
                 }
+            }
+            Err(e) => {
+                log::error!(
+                    "Failed to serialize dashboard {} for validation: {}",
+                    dashboard_id,
+                    e
+                );
+                return Err(DashboardError::PutValidationFailed(vec![format!(
+                    "Internal error: failed to serialize dashboard for validation: {e}"
+                )]));
             }
         }
     }

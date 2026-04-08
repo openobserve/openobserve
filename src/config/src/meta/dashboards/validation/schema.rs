@@ -19,7 +19,8 @@
 //! Note: The schema contains custom keywords (uniqueTabIds, validateFunctionArgs, etc.)
 //! that the jsonschema crate will ignore. Those are handled by native.rs (Layer 2).
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock as Lazy;
+
 use serde_json::Value;
 
 /// The JSON Schema for v8 dashboards.

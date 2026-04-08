@@ -113,6 +113,8 @@ fn validate_table_fields(dashboard: &Value, errors: &mut Vec<super::ValidationEr
                     continue;
                 }
 
+                // Currently table panels only use the first query for validation.
+                // Multi-query table panels are not supported yet.
                 let query = match panel.get("queries").and_then(|q| q.get(0)) {
                     Some(q) => q,
                     None => continue,
