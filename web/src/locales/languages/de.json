@@ -2396,7 +2396,7 @@
       "clickToViewSuggestions": "Klicken Sie hier, um Vorschläge zur Verbesserung der Korrelation anzuzeigen",
       "byService": "Von Service",
       "byStream": "Von Stream",
-      "searchServiceName": "Dienstname suchen...",
+      "searchServiceName": "Service- oder Stream-Name suchen...",
       "searchStreamName": "Stream-Namen suchen...",
       "allServices": "Alle Dienste",
       "missingTelemetry": "Fehlende Telemetrie",
@@ -2666,7 +2666,8 @@
     "errorGettingResults": "Fehler beim Abrufen der Ergebnisse",
     "discardChangesTitle": "Änderungen verwerfen",
     "deleteNodeTitle": "Knoten löschen",
-    "deleteNodeLlmEvalConfirm": "Möchten Sie diesen LLM-Evaluierungsknoten wirklich löschen?"
+    "deleteNodeLlmEvalConfirm": "Möchten Sie diesen LLM-Evaluierungsknoten wirklich löschen?",
+    "evalTemplates": "Vorlagen für Evaluierungen"
   },
   "reports": {
     "header": "Berichte",
