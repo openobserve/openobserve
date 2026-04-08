@@ -20,6 +20,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step intro -->
       <p class="step-intro-hint tw:mb-4">{{ t('alerts.stepIntro.advanced') }}</p>
 
+      <!-- Compare with Past (Scheduled only) -->
+      <div
+        v-if="isRealTime === 'false'"
+        class="section-group tw:rounded tw:mb-4"
+        :class="store.state.theme === 'dark' ? 'section-group-dark' : 'section-group-light'"
+      >
+        <div
+          class="section-group-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2"
+          :class="isSqlMode ? 'tw:cursor-pointer' : ''"
+          @click="isSqlMode && toggleCompareWithPast()"
+        >
+          <div class="tw:flex tw:items-center tw:gap-1.5">
+            <span class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide section-group-label">
+              {{ t('alerts.steps.compareWithPast') }}
+            </span>
+          </div>
+          <q-icon
+            v-if="isSqlMode"
+            :name="compareWithPastExpanded ? 'expand_less' : 'expand_more'"
+            size="sm"
+            class="section-expand-icon"
+          />
+        </div>
+        <!-- Non-SQL mode note -->
+        <div
+          v-if="!isSqlMode"
+          class="tw:px-3 tw:py-2 tw:flex tw:items-center tw:gap-1.5 tw:text-xs section-note"
+        >
+          <q-icon name="info_outline" size="14px" />
+          <span>{{ t('alerts.compareWithPast.sqlModeOnlyNote') }}</span>
+        </div>
+        <!-- Content when SQL mode and expanded -->
+        <div v-if="isSqlMode && compareWithPastExpanded">
+          <CompareWithPast
+            :multiTimeRange="multiTimeRange"
+            :period="period"
+            :frequency="frequency"
+            :frequencyType="frequencyType"
+            :cron="cron"
+            :selectedTab="selectedTab"
+            @update:multiTimeRange="$emit('update:multiTimeRange', $event)"
+            @goToSqlEditor="$emit('goToSqlEditor')"
+          />
+        </div>
+      </div>
+
+      <!-- Deduplication (Scheduled only) -->
+      <div
+        v-if="isRealTime === 'false'"
+        class="section-group tw:rounded tw:mb-4"
+        :class="store.state.theme === 'dark' ? 'section-group-dark' : 'section-group-light'"
+      >
+        <div
+          class="section-group-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2 tw:cursor-pointer"
+          @click="toggleDeduplication"
+        >
+          <span class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide section-group-label">
+            {{ t('alerts.steps.deduplication') }}
+          </span>
+          <q-icon
+            :name="deduplicationExpanded ? 'expand_less' : 'expand_more'"
+            size="sm"
+            class="section-expand-icon"
+          />
+        </div>
+        <div v-if="deduplicationExpanded">
+          <Deduplication
+            :deduplication="deduplication"
+            :columns="columns"
+            @update:deduplication="$emit('update:deduplication', $event)"
+          />
+        </div>
+      </div>
+
       <!-- Context Variables -->
       <div class="tw:mb-4">
         <div class="tw:pb-2 custom-input-label text-bold">
@@ -194,6 +268,8 @@ import { defineComponent, ref, computed, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
+import CompareWithPast from "./CompareWithPast.vue";
+import Deduplication from "./Deduplication.vue";
 
 export interface Variable {
   id: string;
@@ -202,7 +278,11 @@ export interface Variable {
 }
 
 export default defineComponent({
-  name: "Step6Advanced",
+  name: "Step4Advanced",
+  components: {
+    CompareWithPast,
+    Deduplication,
+  },
   props: {
     contextAttributes: {
       type: Array as PropType<Variable[]>,
@@ -220,8 +300,56 @@ export default defineComponent({
       type: String,
       default: "String",
     },
+    isRealTime: {
+      type: String,
+      default: "false",
+    },
+    selectedTab: {
+      type: String,
+      default: "custom",
+    },
+    multiTimeRange: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
+    period: {
+      type: Number,
+      default: 10,
+    },
+    frequency: {
+      type: Number,
+      default: 10,
+    },
+    frequencyType: {
+      type: String,
+      default: "minutes",
+    },
+    cron: {
+      type: String,
+      default: "",
+    },
+    deduplication: {
+      type: Object as PropType<any>,
+      default: () => ({
+        enabled: true,
+        fingerprint_fields: [],
+        time_window_minutes: undefined,
+      }),
+    },
+    columns: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
   },
-  emits: ["update:contextAttributes", "update:description", "update:rowTemplate", "update:rowTemplateType"],
+  emits: [
+    "update:contextAttributes",
+    "update:description",
+    "update:rowTemplate",
+    "update:rowTemplateType",
+    "update:multiTimeRange",
+    "update:deduplication",
+    "goToSqlEditor",
+  ],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -230,6 +358,20 @@ export default defineComponent({
     const localDescription = ref(props.description);
     const localRowTemplate = ref(props.rowTemplate);
     const localRowTemplateType = ref(props.rowTemplateType);
+
+    // Collapsible section state
+    const compareWithPastExpanded = ref(false);
+    const deduplicationExpanded = ref(false);
+
+    const isSqlMode = computed(() => props.selectedTab === "sql");
+
+    const toggleCompareWithPast = () => {
+      compareWithPastExpanded.value = !compareWithPastExpanded.value;
+    };
+
+    const toggleDeduplication = () => {
+      deduplicationExpanded.value = !deduplicationExpanded.value;
+    };
 
     const rowTemplateTypeOptions = [
       {
@@ -310,6 +452,11 @@ export default defineComponent({
       localRowTemplateType,
       rowTemplateTypeOptions,
       rowTemplatePlaceholder,
+      compareWithPastExpanded,
+      deduplicationExpanded,
+      isSqlMode,
+      toggleCompareWithPast,
+      toggleDeduplication,
       addVariable,
       removeVariable,
       emitUpdate,
@@ -344,6 +491,51 @@ export default defineComponent({
     .step-content {
       background-color: #ffffff;
       border: 1px solid #e6e6e6;
+    }
+  }
+}
+
+.section-group {
+  border-radius: 6px;
+  overflow: hidden;
+
+  &.section-group-dark {
+    border: 1px solid #343434;
+
+    .section-group-header {
+      background-color: #2a2a2a;
+    }
+
+    .section-group-label {
+      color: #b0b0b0;
+    }
+
+    .section-expand-icon {
+      color: #b0b0b0;
+    }
+
+    .section-note {
+      color: #888888;
+    }
+  }
+
+  &.section-group-light {
+    border: 1px solid #e0e0e0;
+
+    .section-group-header {
+      background-color: #f5f5f5;
+    }
+
+    .section-group-label {
+      color: #555555;
+    }
+
+    .section-expand-icon {
+      color: #666666;
+    }
+
+    .section-note {
+      color: #888888;
     }
   }
 }

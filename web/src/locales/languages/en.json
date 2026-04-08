@@ -2531,7 +2531,8 @@
       "comparingText": "Comparing current window query result with query result from previous {offset}.",
       "addComparisonWindow": "Add Comparison Window",
       "goToConditions": "Go to Conditions",
-      "goToConditionsTooltip": "Click on \"Go to Conditions\" to verify the events for selected comparison windows"
+      "goToConditionsTooltip": "Click on \"Go to Conditions\" to verify the events for selected comparison windows",
+      "sqlModeOnlyNote": "Compare with Past is only available in SQL mode. Switch to SQL in the Query Config step to use this feature."
     },
     "alertSettings": {
       "cronSchedule": "Cron Schedule",

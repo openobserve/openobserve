@@ -268,43 +268,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </q-step>
 
-            <!-- Step 3: Compare with Past (Scheduled only) -->
-            <q-step
-              v-if="formData.is_real_time === 'false'"
-              :name="3"
-              :title="t('alerts.steps.compareWithPast')"
-              caption=""
-              icon="compare_arrows"
-              :done="wizardStep > 3"
-              :disable="3 > lastValidStep"
-            >
-              <CompareWithPast
-                ref="step3Ref"
-                :multiTimeRange="
-                  formData.query_condition.multi_time_range
-                "
-                :period="formData.trigger_condition.period"
-                :frequency="formData.trigger_condition.frequency"
-                :frequencyType="formData.trigger_condition.frequency_type"
-                :cron="formData.trigger_condition.cron"
-                :selectedTab="formData.query_condition.type || 'custom'"
-                @update:multiTimeRange="
-                  (val) =>
-                    (formData.query_condition.multi_time_range = val)
-                "
-                @goToSqlEditor="handleGoToSqlEditor"
-              />
-            </q-step>
-
-            <!-- Step 4: Alert Settings (Scheduled / Real-Time alerts only) -->
+            <!-- Step 3: Alert Settings (Scheduled / Real-Time alerts only) -->
             <q-step
               v-if="!isAnomalyMode"
-              :name="4"
+              :name="3"
               :title="t('alerts.steps.alertSettings') + ' *'"
               caption=""
               icon="tune"
-              :done="wizardStep > 4"
-              :disable="4 > lastValidStep"
+              :done="wizardStep > 3"
+              :disable="3 > lastValidStep"
             >
               <AlertSettings
                 ref="step4Ref"
@@ -336,40 +308,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </q-step>
 
-            <!-- Step 5: Deduplication (Scheduled only) -->
-            <q-step
-              v-if="formData.is_real_time === 'false'"
-              :name="5"
-              :title="t('alerts.steps.deduplication')"
-              caption=""
-              icon="filter_list"
-              :done="wizardStep > 5"
-              :disable="5 > lastValidStep"
-            >
-              <Deduplication
-                :deduplication="formData.deduplication"
-                :columns="filteredColumns"
-                @update:deduplication="
-                  (val) => (formData.deduplication = val)
-                "
-              />
-            </q-step>
-
-            <!-- Step 6: Advanced Settings (Scheduled / Real-Time alerts only) -->
+            <!-- Step 4: Advanced Settings (Scheduled / Real-Time alerts only) -->
             <q-step
               v-if="!isAnomalyMode"
-              :name="6"
+              :name="4"
               :title="t('alerts.steps.advanced')"
               caption=""
               icon="settings_applications"
               :done="false"
-              :disable="6 > lastValidStep"
+              :disable="4 > lastValidStep"
             >
               <Advanced
                 :contextAttributes="formData.context_attributes"
                 :description="formData.description"
                 :rowTemplate="formData.row_template"
                 :rowTemplateType="formData.row_template_type"
+                :isRealTime="formData.is_real_time"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :multiTimeRange="formData.query_condition.multi_time_range"
+                :period="formData.trigger_condition.period"
+                :frequency="formData.trigger_condition.frequency"
+                :frequencyType="formData.trigger_condition.frequency_type"
+                :cron="formData.trigger_condition.cron"
+                :deduplication="formData.deduplication"
+                :columns="filteredColumns"
                 @update:contextAttributes="
                   (val) => (formData.context_attributes = val)
                 "
@@ -382,18 +344,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:rowTemplateType="
                   (val) => (formData.row_template_type = val)
                 "
+                @update:multiTimeRange="
+                  (val) => (formData.query_condition.multi_time_range = val)
+                "
+                @update:deduplication="
+                  (val) => (formData.deduplication = val)
+                "
+                @goToSqlEditor="handleGoToSqlEditor"
               />
             </q-step>
 
-            <!-- Step 7: Name & Organize (non-anomaly alerts only) -->
+            <!-- Step 5: Name & Organize (non-anomaly alerts only) -->
             <q-step
               v-if="!isAnomalyMode"
-              :name="7"
+              :name="5"
               :title="t('alerts.steps.nameAndOrganize')"
               caption=""
               icon="label"
               :done="false"
-              :disable="7 > lastValidStep"
+              :disable="5 > lastValidStep"
             >
               <div class="tw:flex tw:flex-col tw:gap-4 tw:max-w-lg">
                 <q-input
@@ -688,8 +657,6 @@ import HorizontalStepper from "./HorizontalStepper.vue";
 import AlertSetup from "./steps/AlertSetup.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
 import AlertSettings from "./steps/AlertSettings.vue";
-import CompareWithPast from "./steps/CompareWithPast.vue";
-import Deduplication from "./steps/Deduplication.vue";
 import Advanced from "./steps/Advanced.vue";
 import AlertWizardRightColumn from "./AlertWizardRightColumn.vue";
 import AnomalyDetectionConfig from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.vue";
@@ -832,8 +799,7 @@ export default defineComponent({
     AlertSetup,
     QueryConfig,
     AlertSettings,
-    CompareWithPast,
-    Deduplication,
+
     Advanced,
     AlertWizardRightColumn,
     AnomalyDetectionConfig,
@@ -1063,19 +1029,16 @@ export default defineComponent({
     const wizardStepper = ref(null);
     const step1Ref = ref(null);
     const step2Ref = ref(null);
-    const step3Ref = ref(null);
     const step4Ref = ref(null);
-    const lastValidStep = ref(7); // All steps accessible by default
+    const lastValidStep = ref(5); // All steps accessible by default
 
     // Computed property for step captions to avoid flickering
     const currentStepCaption = computed(() => {
       const captions: Record<number, string> = {
         1: t("alerts.stepCaptions.alertSetup"),
         2: t("alerts.stepCaptions.conditions"),
-        3: t("alerts.stepCaptions.compareWithPast"),
-        4: t("alerts.stepCaptions.alertSettings"),
-        5: t("alerts.stepCaptions.deduplication"),
-        6: t("alerts.stepCaptions.advanced"),
+        3: t("alerts.stepCaptions.alertSettings"),
+        4: t("alerts.stepCaptions.advanced"),
       };
       return captions[wizardStep.value] || "";
     });
@@ -1340,8 +1303,8 @@ export default defineComponent({
               focusManager.registerField("period", {
                 ref: newVal.periodFieldRef,
                 onBeforeFocus: () => {
-                  if (wizardStep.value !== 4) {
-                    wizardStep.value = 4;
+                  if (wizardStep.value !== 3) {
+                    wizardStep.value = 3;
                   }
                 },
               });
@@ -1350,8 +1313,8 @@ export default defineComponent({
               focusManager.registerField("threshold", {
                 ref: newVal.thresholdFieldRef,
                 onBeforeFocus: () => {
-                  if (wizardStep.value !== 4) {
-                    wizardStep.value = 4;
+                  if (wizardStep.value !== 3) {
+                    wizardStep.value = 3;
                   }
                 },
               });
@@ -1360,8 +1323,8 @@ export default defineComponent({
               focusManager.registerField("silence", {
                 ref: newVal.silenceFieldRef,
                 onBeforeFocus: () => {
-                  if (wizardStep.value !== 4) {
-                    wizardStep.value = 4;
+                  if (wizardStep.value !== 3) {
+                    wizardStep.value = 3;
                   }
                 },
               });
@@ -1370,8 +1333,8 @@ export default defineComponent({
               focusManager.registerField("destinations", {
                 ref: newVal.destinationsFieldRef,
                 onBeforeFocus: () => {
-                  if (wizardStep.value !== 4) {
-                    wizardStep.value = 4;
+                  if (wizardStep.value !== 3) {
+                    wizardStep.value = 3;
                   }
                 },
               });
@@ -1414,26 +1377,6 @@ export default defineComponent({
                 },
               });
             }
-          });
-        }
-      },
-      { immediate: true },
-    );
-
-    // Watch for step3Ref (CompareWithPast) to register multiwindow field
-    watch(
-      step3Ref,
-      (newVal) => {
-        if (newVal && newVal.multiWindowContainerRef) {
-          nextTick(() => {
-            focusManager.registerField("multiwindow", {
-              ref: newVal.multiWindowContainerRef,
-              onBeforeFocus: () => {
-                if (wizardStep.value !== 3) {
-                  wizardStep.value = 3;
-                }
-              },
-            });
           });
         }
       },
@@ -2747,19 +2690,8 @@ export default defineComponent({
         return;
       }
 
-      if (formData.value.is_real_time === "true") {
-        // For real-time alerts: 1 -> 2 -> 4 -> 6 (skip 3 and 5)
-        if (wizardStep.value === 2) {
-          wizardStep.value = 4;
-        } else if (wizardStep.value === 4) {
-          wizardStep.value = 6;
-        } else {
-          wizardStep.value = wizardStep.value + 1;
-        }
-      } else {
-        // For scheduled alerts: normal progression 1 -> 2 -> 3 -> 4 -> 5 -> 6
-        wizardStep.value = wizardStep.value + 1;
-      }
+      // Normal progression: 1 -> 2 -> 3 -> 4 -> 5 (same for all alert types)
+      wizardStep.value = wizardStep.value + 1;
 
       // Only update lastValidStep if moving forward (don't reduce it when editing)
       if (wizardStep.value > lastValidStep.value) {
@@ -2850,9 +2782,7 @@ export default defineComponent({
       }
 
       // Add validation for other steps here in the future
-      // Step 3: Compare with Past (skipped - optional)
-      // Step 5: Deduplication
-      // Step 6: Advanced
+      // Step 4: Advanced (includes Compare with Past + Deduplication — optional)
 
       return true;
     };
@@ -2887,27 +2817,16 @@ export default defineComponent({
         if (wizardStep.value > 1) wizardStep.value = wizardStep.value - 1;
         return;
       }
-      if (formData.value.is_real_time === "true") {
-        // For real-time alerts: 6 -> 4 -> 2 -> 1 (skip 5 and 3)
-        if (wizardStep.value === 6) {
-          wizardStep.value = 4;
-        } else if (wizardStep.value === 4) {
-          wizardStep.value = 2;
-        } else {
-          wizardStep.value = wizardStep.value - 1;
-        }
-      } else {
-        // For scheduled alerts: normal progression 6 -> 5 -> 4 -> 3 -> 2 -> 1
-        wizardStep.value = wizardStep.value - 1;
-      }
+      // Normal progression: 5 -> 4 -> 3 -> 2 -> 1 (same for all alert types)
+      wizardStep.value = wizardStep.value - 1;
     };
 
     const isLastStep = computed(() => {
       if (formData.value.is_real_time === "anomaly") {
         return wizardStep.value === 3;
       }
-      // Both real-time and scheduled: step 7 (Name & Organize) is last
-      return wizardStep.value === 7;
+      // Both real-time and scheduled: step 5 (Name & Organize) is last
+      return wizardStep.value === 5;
     });
 
     // Allow saving after completing all required steps
@@ -2922,9 +2841,9 @@ export default defineComponent({
         }
         return true;
       }
-      // Required steps: 1 (Alert Setup), 2 (Conditions), 4 (Alert Settings)
-      // Optional steps: 3 (Compare Past), 5 (Deduplication), 6 (Advanced)
-      return wizardStep.value >= 4;
+      // Required steps: 1 (Alert Setup), 2 (Conditions), 3 (Alert Settings)
+      // Optional steps: 4 (Advanced — includes Compare Past + Deduplication)
+      return wizardStep.value >= 3;
     });
 
     // ── Anomaly Detection save ──────────────────────────────────────────────
@@ -3164,7 +3083,6 @@ export default defineComponent({
       isLastStep,
       canSaveAlert,
       step2Ref,
-      step3Ref,
       step4Ref,
       lastValidStep,
       clearMultiWindows,
