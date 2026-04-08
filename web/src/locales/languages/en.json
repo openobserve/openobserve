@@ -2551,7 +2551,7 @@
       "sectionDetection": "When Should the Alert Fire?",
       "sectionDetectionDescRows": "Set the trigger threshold, how far back to scan data on each run, and how often to run the check.",
       "sectionDetectionDescAggregate": "Set the trigger threshold based on grouped results, how far back to scan data on each run, and how often to run the check.",
-      "alertIfLabel": "Alert if",
+      "alertIfLabel": "Alert when",
       "alertIfDescRows": "Fire the alert when the count of matching records meets this condition. The check runs over your detection window.",
       "alertIfDescAggregate": "Fire the alert when the number of distinct groups (e.g. services, hosts) meeting your condition reaches this threshold.",
       "alertIfDescPromQL": "Fire the alert when the number of matching time series from your PromQL query exceeds this threshold.",

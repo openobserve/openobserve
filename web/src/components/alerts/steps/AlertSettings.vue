@@ -338,9 +338,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Creates Incident -->
             <div class="as-field">
-              <div class="as-field-label tw:mb-0.5">{{ t('alerts.alertSettings.createsIncidentLabel') }}</div>
-              <p class="as-field-desc tw:mb-2">{{ t('alerts.alertSettings.createsIncidentDesc') }}</p>
-              <q-toggle v-model="formData.creates_incident" data-test="alert-creates-incident-toggle" color="primary" size="30px" class="o2-toggle-button-xs" />
+              <div class="tw:flex tw:items-center tw:gap-2 tw:mb-0.5">
+                <div class="as-field-label">{{ t('alerts.alertSettings.createsIncidentLabel') }}</div>
+                <q-toggle v-model="formData.creates_incident" data-test="alert-creates-incident-toggle" color="primary" size="30px" class="o2-toggle-button-xs" />
+              </div>
+              <p class="as-field-desc tw:mb-0">{{ t('alerts.alertSettings.createsIncidentDesc') }}</p>
             </div>
           </div>
 
