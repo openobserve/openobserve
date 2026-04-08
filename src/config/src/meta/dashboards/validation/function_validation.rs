@@ -17,7 +17,8 @@
 //! Same logic as FE custom ajv keyword: validateFunctionArgs.
 //! Same data file: schemas/functions/functionValidation.json.
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock as Lazy;
+
 use serde::Deserialize;
 use serde_json::Value;
 
