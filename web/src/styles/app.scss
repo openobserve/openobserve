@@ -1266,20 +1266,20 @@ body {
    ============================================================================ */
 
 .q-input {
-  min-height: 2.25rem;
+  min-height: 28px;
   font-size: 0.813rem;
   .q-field__control {
     @extend .el-border;
     @extend .el-border-radius;
-    min-height: 2.25rem;
-    max-height: 2.25rem;
+    min-height: 28px;
+    max-height: 28px;
     background-color: transparent;
     line-height: 1.5rem;
     padding: 0rem 0.75rem !important;
   }
   .q-field__control-container{
       .q-field__native{
-       height: 2.25rem !important;
+       height: 28px !important;
     }
   }
   &:hover .q-field__control {
@@ -1294,11 +1294,11 @@ body {
    ============================================================================ */
 
 .q-select {
-  min-height: 2.25rem !important;
+  min-height: 28px !important;
   font-size: 0.813rem;
   .q-field__inner {
-    min-height: 2.25rem !important;
-    max-height: 2.25rem !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
   }
 
 
@@ -1306,9 +1306,9 @@ body {
   .q-field__control {
     @extend .el-border;
     @extend .el-border-radius;
-    min-height: 2.25rem !important;
-    max-height: 2.25rem !important;
-    height: 2.25rem !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    height: 28px !important;
     background-color: transparent;
     line-height: 1.5rem;
     padding: 0rem 0.75rem !important;
@@ -1321,21 +1321,21 @@ body {
 
   .q-field__control-container{
       .q-field__native{
-        min-height: 2.25rem;
-       height: 2.25rem;
+        min-height:28px;
+       height: 28px;
     }
   }
 
   .q-field__control-container{
       .q-field__native{
-        min-height: 2.25rem !important;
-       height: 2.25rem !important;
+        min-height: 28px !important;
+       height: 28px !important;
        padding: 0px !important;
     }
   }
 
   .q-field__marginal {
-    height: 2.25rem !important;
+    height: 28px !important;
   }
 
   &:not(.q-field--disabled):hover .q-field__control {
@@ -1344,7 +1344,7 @@ body {
 
   .q-field__append {
     align-items: center;
-    height: 2.25rem !important;
+    height: 28px !important;
   }
 
   .q-field__append .q-icon:not(.q-select__dropdown-icon) {

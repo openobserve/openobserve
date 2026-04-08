@@ -1,28 +1,22 @@
 <template>
     <!-- Preview Section (only for root level) -->
-    <div v-if="depth === 0 && previewString"
-         class="tw:mb-2 tw:p-2 tw:rounded tw:border tw:w-full"
+    <div v-if="depth === 0 && showSqlPreview && previewString"
+         class="tw:mb-2 tw:p-2 tw:rounded tw:border tw:w-full tw:max-h-[3.2em] tw:overflow-y-auto"
          :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-gray-700' : 'tw:bg-gray-50 tw:border-gray-300'">
-      <div class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:min-w-0" @click="showPreview = !showPreview">
-        <q-icon
-          :name="showPreview ? 'expand_more' : 'chevron_right'"
-          size="16px"
-          class="tw:flex-shrink-0"
-          :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
-        />
-        <span class="tw:font-medium tw:text-xs tw:flex-shrink-0"
+      <div class="tw:flex tw:items-start tw:gap-1 tw:min-w-0">
+        <span class="tw:font-medium tw:text-xs tw:flex-shrink-0 tw:leading-[1.3]"
               :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'">
           Preview:
         </span>
-        <span v-if="showPreview"
-              class="tw:text-[10px] tw:font-mono tw:leading-[1.3] tw:min-w-0 tw:break-words"
+        <span class="tw:text-[10px] tw:font-mono tw:leading-[1.3] tw:min-w-0 tw:break-words"
               :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'">
           {{ previewString }}
         </span>
       </div>
     </div>
 
-    <div :class="[`  tw:px-2 tw:mb-2 el-border tw:mt-6 el-border-radius `,
+    <div :class="[`  tw:px-2 tw:mb-2 el-border el-border-radius `,
+        'tw:mt-4',
         store.state.isAiChatEnabled ? `tw:w-full tw:ml-[${depth * 10}px]` : `xl:tw:w-fit tw:ml-[${depth * 20}px]`
     ]"
     :style="{
@@ -32,14 +26,17 @@
     >
       <!-- V2: Group-level toggle only for nested groups (depth > 0) -->
       <!-- Root group (depth 0) doesn't need toggle - its logicalOperator is dummy -->
-      <div v-if="depth > 0" class="tw:w-fit condition-tabs el-border">
-        <AppTabs
-          data-test="scheduled-alert-tabs"
-          :tabs="tabOptions"
-          class="tw:h-[20px] custom-tabs-selection-container"
-          v-model:active-tab="label"
-          @update:active-tab="toggleLabel"
-        />
+      <div v-if="depth > 0" class="tw:w-fit operator-toggle-tabs" :class="store.state.theme === 'dark' ? 'dark-mode' : ''">
+        <button
+          v-for="tab in tabOptions"
+          :key="tab.value"
+          type="button"
+          class="operator-toggle-tab"
+          :class="{ active: label === tab.value }"
+          @click="toggleLabel(tab.value)"
+        >
+          {{ tab.label }}
+        </button>
       </div>
       <!-- Spacer for root group to maintain consistent spacing -->
       <div v-else class="tw:h-[14px]"></div>
@@ -65,7 +62,7 @@
           />
           <div
             v-else
-            class="tw:flex tw:items-center tw:gap-2  "
+            class="tw:flex tw:items-center tw:gap-2  tw:mb-2 "
             :class="store.state.isAiChatEnabled ? 'tw:pl-0' : 'tw:pl-4'"
             >
             <FilterCondition
@@ -80,9 +77,7 @@
                 :allow-custom-columns="props.allowCustomColumns"
                 :module="props.module"
             />
-            <div class="tw:mb-3">
                 <q-btn data-test="alert-conditions-delete-condition-btn" icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
-            </div>
                 </div>
         </div>
         <!-- Action buttons -->
@@ -91,7 +86,7 @@
         >
         <q-btn
             data-test="alert-conditions-add-condition-btn"
-            class="q-ml-xs flex justify-between items-center"
+            class="q-ml-md flex justify-between items-center"
             :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
             padding="sm"
             unelevated
@@ -100,8 +95,8 @@
             @click="addCondition(props.group.groupId)"
             color="primary"
             >
-            <q-icon color="primary" class="q-mr-xs text-bold" size="12px" style="border-radius: 50%;  border: 1px solid;" name="add" />
-            <span class="text-bold">{{ t('alerts.conditions.condition') }}</span>
+            <q-icon color="primary" class="q-mr-xs text-bold" size="10px" style="border-radius: 50%;  border: 1px solid;" name="add" />
+            <span class="tw:text-[12px]">Condition</span>
             <q-tooltip :delay="300">
               {{ t('alerts.conditions.addConditionTooltip') }}
             </q-tooltip>
@@ -162,7 +157,6 @@
     import { useStore } from 'vuex';
     import { useI18n } from 'vue-i18n';
     import { getUUID } from '@/utils/zincutils';
-    import AppTabs from '../common/AppTabs.vue';
     import ConfirmDialog from '@/components/ConfirmDialog.vue';
     import { buildConditionsString } from '@/utils/alerts/conditionsFormatter';
     const props = defineProps({
@@ -323,6 +317,13 @@
     } else {
       groups.value.logicalOperator = groups.value.logicalOperator === 'AND' ? 'OR' : 'AND';
     }
+    // Update all child conditions to match the group's operator
+    const newOp = groups.value.logicalOperator;
+    groups.value.conditions.forEach((item: any) => {
+      if (item.filterType !== 'group') {
+        item.logicalOperator = newOp;
+      }
+    });
     emit('add-group', groups.value); // optional, sync with parent
     emit('input:update', 'conditions', groups.value);
   };
@@ -584,36 +585,50 @@ defineExpose({
       }
     }
     
-  .condition-tabs{
+  .operator-toggle-tabs {
     position: relative;
     bottom: 14px;
-    border-radius: 4px;
-    height: 28px;
-    padding: 2px;
-    background-color: var(--o2-card-bg);
-  }
-  .custom-tabs-selection-container{
-    border: none;
-    border-radius: none;
-    .o2-tab{
+    display: flex;
+    gap: 2px;
+    background: #ebebeb;
+    border-radius: 6px;
+    padding: 3px;
+
+    .operator-toggle-tab {
+      padding: 3px 10px;
       border-radius: 4px;
-      height: 22px;
-      padding: 4px 12px;
-      border-bottom: none;
-      white-space: normal;
-      line-height: 1rem;
+      border: none;
+      background: transparent;
+      color: rgba(0, 0, 0, 0.4);
       font-size: 10px;
-      border-bottom: none !important;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      line-height: 1.4;
+
+      &:hover { color: rgba(0, 0, 0, 0.7); }
+
+      &.active {
+        background: #fff;
+        color: #1a1a1a;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+      }
     }
-    .o2-tab.active{
-      background-color: var(--o2-primary-btn-bg) !important;
-      color: rgba(255,255,255) !important;
-    }
-    .o2-tab:hover{
-      background-color: var(--o2-hover-accent) !important;
-    }
-    .o2-tab.active:hover{
-      background-color: var(--o2-primary-btn-bg) !important;
+
+    &.dark-mode {
+      background: #333;
+
+      .operator-toggle-tab {
+        color: rgba(255, 255, 255, 0.6);
+
+        &:hover { color: rgba(255, 255, 255, 0.85); }
+
+        &.active {
+          background: #374151;
+          color: #e4e7eb;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+        }
+      }
     }
   }
 

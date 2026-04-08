@@ -2,8 +2,8 @@
     <div class=" tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap ">
       <!-- V2: Fixed-width left column for alignment -->
       <!-- All conditions have the same width for the operator/label section -->
-      <div class="tw:flex tw:items-center tw:justify-center tw:mt-2 tw:min-w-[60px]">
-        <!-- First condition in root group: show "if" centered -->
+      <div class="tw:flex tw:items-center tw:justify-center tw:mt-1 tw:min-w-[60px]">
+        <!-- First condition in root group -->
         <template v-if="index === 0 && depth === 0">
           <span class="tw:text-sm">if</span>
         </template>
@@ -18,8 +18,9 @@
           <span class="tw:text-sm tw:font-medium tw:min-w-[30px] tw:lowercase">
             {{ computedLabel }}
           </span>
-          <!-- Toggle AND/OR button after label -->
+          <!-- Toggle AND/OR button (hidden for alerts — AND-only) -->
           <q-btn
+            v-if="props.module !== 'alerts'"
             data-test="alert-conditions-toggle-operator-btn"
             flat
             dense
@@ -37,7 +38,7 @@
       </div>
         <div
           data-test="alert-conditions-select-column"
-          class="q-ml-none tw:mb-2"
+          class="q-ml-none"
         >
           <q-select
             v-model="condition.column"
@@ -52,7 +53,6 @@
             hide-bottom-space
             :input-debounce="400"
             :placeholder="t('alerts.column')"
-            class="tw:mb-2"
             @filter="filterColumns"
             behavior="menu"
             :rules="[

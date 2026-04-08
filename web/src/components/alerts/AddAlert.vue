@@ -18,109 +18,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="full-width q-mx-lg q-pt-xs">
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- ANOMALY MODE: Keep original stepper layout                        -->
+    <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <template v-if="isAnomalyMode">
-      <div
-        class="row items-center no-wrap card-container tw:mx-[0.625rem] tw:mb-[0.625rem]"
-      >
-        <div
-          class="flex items-center justify-between tw:w-full card-container tw:h-[68px] tw:px-2 tw:py-3"
-        >
-          <div class="flex items-center">
+      <div class="tw:flex tw:flex-col" style="height: calc(100vh - 50px);">
+      <!-- TIER 1: Top Bar -->
+      <div class="alert-v3-topbar card-container tw:mx-[0.625rem] tw:mb-2 tw:shrink-0">
+        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[48px]">
+
+          <!-- Back + Title -->
+          <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
             <div
               data-test="add-alert-back-btn"
-              class="flex justify-center items-center q-mr-md cursor-pointer"
-              style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
+              class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer tw:opacity-60 hover:tw:opacity-100 tw:transition-opacity"
+              style="border: 1.5px solid; border-radius: 50%; width: 18px; height: 18px;"
               title="Go Back"
               @click="router.back()"
             >
-              <q-icon name="arrow_back_ios_new" size="14px" />
+              <q-icon name="arrow_back_ios_new" size="10px" class="tw:font-semibold" />
             </div>
-            <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2" data-test="add-alert-title">
+            <span v-if="!isAnomalyMode" class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">{{ beingUpdated ? 'Edit Alert' : 'New Alert' }}</span>
+            <template v-else>
+              <span class="tw:text-xs tw:font-medium tw:whitespace-nowrap">{{ anomalyEditMode ? t("alerts.updateAnomalyDetection") : t("alerts.newAnomalyDetection") }}</span>
               <template v-if="anomalyEditMode">
-                <span class="text-h6">{{ t("alerts.updateAnomalyDetection") }}</span>
                 <span
-                  :class="['text-subtitle2 tw:font-medium tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
-                    store.state.theme === 'dark' ? 'tw:text-blue-400 tw:bg-blue-900/50' : 'tw:text-blue-600 tw:bg-blue-50']"
+                  class="tw:text-xs tw:font-medium tw:px-1.5 tw:py-0.5 tw:rounded tw:max-w-[150px] tw:truncate tw:inline-block"
+                  :class="store.state.theme === 'dark' ? 'tw:text-blue-400 tw:bg-blue-900/50' : 'tw:text-blue-600 tw:bg-blue-50'"
                 >
                   {{ anomalyConfig.name }}
-                  <q-tooltip v-if="anomalyConfig.name?.length > 25" class="tw:text-sm">{{ anomalyConfig.name }}</q-tooltip>
+                  <q-tooltip v-if="anomalyConfig.name?.length > 15" class="tw:text-sm">{{ anomalyConfig.name }}</q-tooltip>
                 </span>
                 <q-badge v-if="anomalyConfig.status" :color="anomalyStatusColor" :label="anomalyConfig.status" class="text-caption" />
                 <span
                   v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
-                  class="text-caption"
-                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                  class="tw:text-[11px] tw:whitespace-nowrap"
+                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                 >
                   Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
                 </span>
-                <q-btn v-if="anomalyConfig.status === 'failed'" flat no-caps dense size="sm" color="negative" icon="replay" label="Retry Training" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" />
-                <span v-if="anomalyConfig.status === 'failed' && anomalyConfig.last_error" class="text-caption text-negative tw:max-w-xs tw:truncate tw:inline-block tw:cursor-default">
-                  {{ anomalyConfig.last_error }}
-                  <q-tooltip class="tw:text-sm" max-width="400px">{{ anomalyConfig.last_error }}</q-tooltip>
-                </span>
+                <q-btn v-if="anomalyConfig.status === 'failed'" flat no-caps dense size="xs" color="negative" icon="replay" label="Retry" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" />
               </template>
-              <template v-else>
-                <span class="text-h6">{{ t("alerts.newAnomalyDetection") }}</span>
-              </template>
-            </div>
-          </div>
-          <div class="flex items-center tw:gap-2">
-            <q-btn outline class="pipeline-icons q-px-sm hideOnPrintMode" size="sm" no-caps icon="code" data-test="pipeline-json-edit-btn" @click="openJsonEditor">
-              <q-tooltip>{{ t("alerts.editJson") }}</q-tooltip>
-            </q-btn>
-          </div>
-        </div>
-      </div>
-    </template>
-
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- STANDARD ALERTS: V3 "Single Pane of Glass" Layout                 -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <template v-else>
-      <div class="tw:flex tw:flex-col" style="height: calc(100vh - 50px);">
-      <!-- TIER 1: Top Bar -->
-      <div class="alert-v3-topbar card-container tw:mx-[0.625rem] tw:mb-2 tw:shrink-0">
-        <div class="tw:flex tw:items-end tw:gap-3 tw:px-2 tw:py-2">
-
-          <!-- Alert Name -->
-          <div class="alert-v3-field-group" style="flex: 1 1 auto; min-width: 150px;">
-            <label class="alert-v3-label">Alert Name <span class="tw:text-red-500">*</span></label>
-            <q-input
-              ref="step1Ref"
-              data-test="add-alert-name-input"
-              v-model="formData.name"
-              dense
-              borderless
-              :readonly="beingUpdated"
-              :disable="beingUpdated"
-              hide-bottom-space
-              class="alert-v3-field"
-            />
+            </template>
           </div>
 
-          <!-- Scheduled / Real-Time toggle -->
-          <div class="alert-v3-field-group tw:shrink-0">
-            <label class="alert-v3-label">{{ t("alerts.scheduled") }} / {{ t("alerts.realTime") }}</label>
-            <q-btn-toggle
-              v-model="formData.is_real_time"
-              no-caps
-              dense
-              unelevated
-              toggle-color="primary"
-              :disable="beingUpdated"
-              class="alert-v3-toggle"
-              :options="[
-                { label: t('alerts.scheduled'), value: 'false' },
-                { label: t('alerts.realTime'), value: 'true' },
-              ]"
-            />
-          </div>
+          <!-- Push everything to the right -->
+          <div class="tw:flex-1" />
 
           <!-- Stream Type -->
-          <div class="alert-v3-field-group tw:shrink-0">
-            <label class="alert-v3-label">{{ t("alerts.streamType") }} <span class="tw:text-red-500">*</span></label>
+          <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
+            <label class="alert-v3-inline-label tw:opacity-80 tw:font-semibold">{{ t("alerts.streamType") }} <span class="tw:text-red-500">*</span></label>
             <q-select
               data-test="add-alert-stream-type-select-dropdown"
               v-model="formData.stream_type"
@@ -139,13 +84,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filter="(val, update) => update(() => {})"
               @update:model-value="updateStreams()"
               behavior="menu"
-              style="width: 200px;"
+              style="width: 150px;"
             />
           </div>
 
           <!-- Stream Name -->
-          <div class="alert-v3-field-group tw:shrink-0">
-            <label class="alert-v3-label">{{ t("alerts.stream_name") }} <span class="tw:text-red-500">*</span></label>
+          <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
+            <label class="alert-v3-inline-label tw:opacity-80 tw:font-semibold">{{ t("alerts.stream_name") }} <span class="tw:text-red-500">*</span></label>
             <q-select
               data-test="add-alert-stream-name-select-dropdown"
               v-model="formData.stream_name"
@@ -161,35 +106,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               fill-input
               :input-debounce="400"
               :readonly="beingUpdated"
-              :disable="beingUpdated"
+              :disable="beingUpdated || !formData.stream_type"
               @filter="filterStreams"
               @update:model-value="updateStreamFields"
               behavior="menu"
-              style="width: 200px;"
+              style="width: 150px;"
             />
+            <q-tooltip v-if="!formData.stream_type">Select a stream type first</q-tooltip>
           </div>
 
-          <!-- Folder -->
-          <div class="alert-v3-field-group tw:shrink-0" style="width: 200px;">
-            <label class="alert-v3-label">Folder</label>
-            <div class="tw:flex tw:items-center tw:gap-1">
-              <div class="alert-v3-folder tw:flex-1">
-                <SelectFolderDropDown
-                  ref="folderDropdownRef"
-                  :disableDropdown="beingUpdated"
-                  type="alerts"
-                  @folder-selected="updateActiveFolderId"
-                  :activeFolderId="activeFolderId"
-                />
-              </div>
-              <q-btn
-                dense flat no-caps
-                :disable="beingUpdated"
-                class="alert-v3-add-folder-btn o2-secondary-button"
-                @click="$refs.folderDropdownRef && ($refs.folderDropdownRef.showAddFolderDialog = true)"
+          <!-- Separator before Alert Type -->
+          <div class="tw:w-px tw:h-5 tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600/50' : 'tw:bg-gray-300'" />
+
+          <!-- Alert Type (right-aligned) -->
+          <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
+            <label class="alert-v3-inline-label">{{ t("alerts.alertType") || 'Alert Type' }}</label>
+            <div class="alert-type-tabs">
+              <button
+                v-for="tab in [
+                  { key: 'false', label: t('alerts.scheduled') },
+                  { key: 'true', label: t('alerts.realTime') },
+                  { key: 'anomaly', label: t('alerts.anomalyDetection') },
+                ]"
+                :key="tab.key"
+                class="alert-type-tab"
+                :class="{ active: formData.is_real_time === tab.key }"
+                :disabled="beingUpdated"
+                @click="formData.is_real_time = tab.key"
               >
-                <q-icon name="add" size="xs" />
-              </q-btn>
+                {{ tab.label }}
+              </button>
             </div>
           </div>
 
@@ -202,42 +148,147 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :style="{ height: chartCollapsed ? '40px' : '260px' }"
       >
         <div
-          class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:h-[40px] tw:cursor-pointer tw:select-none tw:border-b tw:shrink-0"
+          class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:h-[40px] tw:select-none tw:border-b tw:shrink-0"
           :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
-          @click="chartCollapsed = !chartCollapsed"
         >
-          <span class="tw:text-sm tw:font-medium">{{ t("alerts.preview") || "Preview" }} &amp; Summary</span>
-          <q-icon :name="chartCollapsed ? 'expand_more' : 'expand_less'" size="20px" />
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="tw:flex tw:items-center tw:gap-2 tw:cursor-pointer" @click="chartCollapsed = !chartCollapsed">
+              <q-icon :name="chartCollapsed ? 'expand_more' : 'expand_less'" size="20px" />
+              <span class="tw:text-sm tw:font-medium">{{ isAnomalyMode ? t("alerts.sqlPreview") : (t("alerts.preview") || "Preview") }}</span>
+            </div>
+            <!-- Alert trigger status (standard alerts only) — use floating ref when active -->
+            <template v-if="!isAnomalyMode && !chartCollapsed && activeEvaluationStatus">
+              <div class="tw:w-px tw:h-4" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" />
+              <div class="tw:flex tw:items-center tw:gap-1.5">
+                <q-icon
+                  :name="activeEvaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'"
+                  :color="activeEvaluationStatus.wouldTrigger ? 'positive' : 'grey-5'"
+                  size="16px"
+                />
+                <span
+                  class="tw:text-xs tw:font-semibold"
+                  :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-green-600' : 'tw:text-gray-400'"
+                >
+                  {{ activeEvaluationStatus.wouldTrigger ? 'Would Trigger' : 'Would Not Trigger' }}
+                </span>
+                <span class="tw:text-xs tw:opacity-60">{{ activeEvaluationStatus.reason }}</span>
+              </div>
+            </template>
+          </div>
+          <div v-show="!chartCollapsed && !isAnomalyMode" class="tw:flex tw:items-center tw:gap-1" @click.stop>
+            <q-btn
+              flat dense round
+              size="sm"
+              icon="picture_in_picture_alt"
+              class="tw:opacity-50 hover:tw:opacity-100"
+              @click="floatingPreview = true; chartCollapsed = true"
+            >
+              <q-tooltip :delay="300" anchor="bottom middle" self="top middle">
+                Minimize preview into a floating window
+              </q-tooltip>
+            </q-btn>
+            <DateTimePicker
+              v-model="previewDateTimeValue"
+              class="alert-preview-datetime"
+            />
+          </div>
         </div>
-        <div v-show="!chartCollapsed" class="tw:flex tw:h-[calc(100%-40px)]">
-          <!-- Preview (60%) -->
-          <div class="alert-v3-chart" style="width: 60%; height: 100%;">
+        <div v-show="!chartCollapsed" class="tw:h-[calc(100%-40px)]">
+          <!-- Anomaly: SQL Preview -->
+          <template v-if="isAnomalyMode">
+            <div style="height: 100%; overflow: hidden;">
+              <QueryEditor
+                editor-id="anomaly-sql-preview"
+                language="sql"
+                :read-only="true"
+                :show-auto-complete="false"
+                :hide-nl-toggle="true"
+                :query="anomalyPreviewSql"
+                style="height: 100%"
+              />
+            </div>
+          </template>
+          <!-- Standard: Chart Preview or Empty State -->
+          <template v-else>
+            <!-- Empty state when no stream selected -->
+            <div
+              v-if="!formData.stream_name"
+              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2"
+            >
+              <q-icon name="query_stats" size="36px" class="tw:opacity-20" />
+              <span
+                class="tw:text-sm tw:font-medium"
+                :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+              >
+                Select a stream type and stream name to see a preview
+              </span>
+            </div>
+            <!-- Chart preview when stream is selected -->
             <preview-alert
+              v-else
               ref="previewAlertRef"
-              style="height: 100%;"
+              style="width: 100%; height: 100%;"
               :formData="formData"
               :query="previewQuery"
               :selectedTab="formData.query_condition.type || 'custom'"
               :isAggregationEnabled="isAggregationEnabled"
               :isUsingBackendSql="isUsingBackendSql"
               :isEditorOpen="isEditorOpen"
+              :previewDateTime="previewDateTimeValue"
             />
+          </template>
+        </div>
+      </div>
+
+      <!-- Floating mini preview widget -->
+      <div
+        v-if="floatingPreview && formData.stream_name && !isAnomalyMode"
+        ref="floatingWidgetRef"
+        class="floating-preview-widget"
+        :class="store.state.theme === 'dark' ? 'floating-preview-widget--dark' : 'floating-preview-widget--light'"
+        :style="floatingWidgetStyle"
+      >
+        <div
+          class="floating-preview-widget__header"
+          :class="store.state.theme === 'dark' ? 'floating-preview-widget__header--dark' : 'floating-preview-widget__header--light'"
+          @mousedown.prevent="onFloatingDragStart"
+        >
+          <div class="tw:flex tw:items-center tw:gap-1.5 tw:overflow-hidden tw:min-w-0">
+            <q-icon name="query_stats" size="14px" class="tw:opacity-60 tw:shrink-0" />
+            <!-- Trigger status in floating header -->
+            <template v-if="floatingPreviewRef?.evaluationStatus">
+              <q-icon
+                :name="floatingPreviewRef.evaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'"
+                :color="floatingPreviewRef.evaluationStatus.wouldTrigger ? 'positive' : 'grey-5'"
+                size="12px"
+                class="tw:shrink-0"
+              />
+              <span
+                class="tw:text-[11px] tw:font-semibold tw:truncate"
+                :class="floatingPreviewRef.evaluationStatus.wouldTrigger ? 'tw:text-green-600' : 'tw:text-gray-400'"
+              >
+                {{ floatingPreviewRef.evaluationStatus.wouldTrigger ? 'Would Trigger' : 'Would Not Trigger' }}
+              </span>
+              <span class="tw:text-[10px] tw:opacity-50 tw:truncate">{{ floatingPreviewRef.evaluationStatus.reason }}</span>
+            </template>
           </div>
-          <!-- Divider -->
-          <div
-            class="tw:w-px tw:self-stretch tw:my-2"
-            :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-200'"
-          ></div>
-          <!-- Summary (40%) -->
-          <div style="width: 40%; height: 100%; overflow: auto;">
-            <alert-summary
-              style="height: 100%;"
-              :formData="formData"
-              :destinations="destinations"
-              :previewQuery="previewQuery"
-              :generatedSqlQuery="generatedSqlQuery"
-            />
+          <div class="tw:flex tw:items-center tw:gap-0.5 tw:shrink-0">
+            <q-btn flat dense round size="xs" icon="open_in_full" title="expand preview" @click.stop="floatingPreview = false; chartCollapsed = false" />
+            <q-btn flat dense round size="xs" icon="close" title="close" @click.stop="floatingPreview = false" />
           </div>
+        </div>
+        <div class="floating-preview-widget__body">
+          <preview-alert
+            ref="floatingPreviewRef"
+            style="width: 100%; height: 100%;"
+            :formData="formData"
+            :query="previewQuery"
+            :selectedTab="formData.query_condition.type || 'custom'"
+            :isAggregationEnabled="isAggregationEnabled"
+            :isUsingBackendSql="isUsingBackendSql"
+            :isEditorOpen="isEditorOpen"
+            :previewDateTime="previewDateTimeValue"
+          />
         </div>
       </div>
 
@@ -246,13 +297,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Tab Headers -->
         <div class="tw:flex tw:border-b tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'">
           <div
-            v-for="tab in [
-              { key: 'condition', label: t('alerts.steps.conditions'), required: true },
-              { key: 'rules', label: t('alerts.steps.alertSettings'), required: true },
+            v-for="tab in (isAnomalyMode ? [
+              { key: 'anomaly-config', label: t('alerts.anomalyDetectionConfig'), required: true },
+              { key: 'anomaly-alerting', label: t('alerts.alerting') || 'Alerting', required: anomalyConfig.alert_enabled },
+            ] : [
+              { key: 'condition', label: 'Alert Rules', required: true },
               { key: 'compare', label: t('alerts.steps.compareWithPast'), show: formData.is_real_time === 'false' },
               { key: 'dedup', label: t('alerts.steps.deduplication'), show: formData.is_real_time === 'false' },
               { key: 'advanced', label: t('alerts.steps.advanced') },
-            ].filter(t => t.show !== false)"
+            ]).filter(t => t.show !== false)"
             :key="tab.key"
             class="tw:px-4 tw:py-2.5 tw:cursor-pointer tw:text-sm tw:font-medium tw:relative tw:select-none tw:transition-colors"
             :class="[
@@ -273,9 +326,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Tab Content -->
         <q-form ref="addAlertForm" class="tw:flex-1 tw:overflow-auto" @submit="onSubmit">
-          <!-- Condition Tab -->
-          <div v-show="activeTab === 'condition'" class="tw:p-3">
-            <QueryConfig
+          <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
+          <div v-show="activeTab === 'condition'" class="tw:p-3 tw:flex tw:flex-col tw:gap-4">
+            <div>
+              <QueryConfig
               ref="step2Ref"
               :tab="formData.query_condition.type || 'custom'"
               :multiTimeRange="formData.query_condition.multi_time_range"
@@ -292,6 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :sqlQueryErrorMsg="sqlQueryErrorMsg"
               :isAggregationEnabled="isAggregationEnabled"
               :promqlCondition="formData.query_condition.promql_condition"
+              :triggerCondition="formData.trigger_condition"
               @update:tab="updateTab"
               @update-group="updateGroup"
               @remove-group="removeConditionGroup"
@@ -306,12 +361,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:isAggregationEnabled="(value) => (isAggregationEnabled = value)"
               @update:aggregation="(value) => (formData.query_condition.aggregation = value)"
               @update:promqlCondition="(val) => (formData.query_condition.promql_condition = val)"
+              @update:triggerCondition="(val) => (formData.trigger_condition = val)"
             />
-          </div>
+            </div>
 
-          <!-- Rules & Routing Tab -->
-          <div v-show="activeTab === 'rules'" class="tw:p-3">
-            <AlertSettings
+            <div>
+              <AlertSettings
               ref="step4Ref"
               :formData="formData"
               :isRealTime="formData.is_real_time"
@@ -319,17 +374,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :formattedDestinations="getFormattedDestinations"
-              :template="formData.template"
-              :templates="templates"
               @update:trigger="(val) => (formData.trigger_condition = val)"
               @update:aggregation="(val) => (formData.query_condition.aggregation = val)"
               @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
               @update:promqlCondition="(val) => (formData.query_condition.promql_condition = val)"
               @update:destinations="updateDestinations"
-              @update:template="(val) => (formData.template = val)"
               @refresh:destinations="refreshDestinations"
-              @refresh:templates="refreshTemplates"
             />
+            </div>
           </div>
 
           <!-- Compare with Past Tab (Scheduled only) -->
@@ -359,14 +411,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Advanced Tab -->
           <div v-show="activeTab === 'advanced'" class="tw:p-3">
             <Advanced
+              :template="formData.template"
+              :templates="templates"
               :contextAttributes="formData.context_attributes"
               :description="formData.description"
               :rowTemplate="formData.row_template"
               :rowTemplateType="formData.row_template_type"
+              @update:template="(val) => (formData.template = val)"
+              @refresh:templates="refreshTemplates"
               @update:contextAttributes="(val) => (formData.context_attributes = val)"
               @update:description="(val) => (formData.description = val)"
               @update:rowTemplate="(val) => (formData.row_template = val)"
               @update:rowTemplateType="(val) => (formData.row_template_type = val)"
+            />
+          </div>
+
+          <!-- Anomaly Detection Config Tab -->
+          <div v-show="activeTab === 'anomaly-config'" class="tw:p-3">
+            <AnomalyDetectionConfig
+              ref="anomalyStep2Ref"
+              :config="anomalyConfig"
+            />
+          </div>
+
+          <!-- Anomaly Alerting Tab -->
+          <div v-show="activeTab === 'anomaly-alerting'" class="tw:p-3">
+            <AnomalyAlerting
+              :config="anomalyConfig"
+              :destinations="destinations"
+              @refresh:destinations="$emit('refresh:destinations')"
             />
           </div>
         </q-form>
@@ -393,9 +466,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="add-alert-submit-btn"
             class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('alerts.save')"
+            :label="isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save')"
             no-caps
             flat
+            :loading="isAnomalyMode ? anomalySaving : false"
+            :disable="isAnomalyMode ? !canSaveAlert : false"
             :class="
               store.state.theme === 'dark'
                 ? 'o2-primary-button-dark'
@@ -406,658 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       </div><!-- end flex column wrapper -->
-    </template>
 
-    <!-- WIZARD VIEW (Anomaly mode only) -->
-    <div
-      v-if="isAnomalyMode"
-      class="wizard-view-container tw:mb-2"
-      style="
-        max-height: calc(100vh - 194px);
-        overflow-y: auto;
-        scroll-behavior: smooth;
-      "
-    >
-      <div
-        class="card-container tw:px-2 tw:mx-[0.675rem] tw:py-2"
-        style="position: relative"
-      >
-        <!-- Stepper Header (Full Width) -->
-        <q-form class="add-alert-form" ref="addAlertForm"
-@submit="onSubmit">
-          <q-stepper
-            v-model="wizardStep"
-            ref="wizardStepper"
-            color="primary"
-            flat
-            class="alert-wizard-stepper"
-            header-nav
-            keep-alive
-          >
-            <!-- Persistent Step Caption (Between Header and Content) -->
-            <template v-slot:message>
-              <div
-                v-if="currentStepCaption"
-                class="persistent-step-caption tw:px-3 tw:py-1 tw:mb-1 tw:mt-2"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'dark-mode-caption'
-                    : 'light-mode-caption'
-                "
-              >
-                {{ currentStepCaption }}
-              </div>
-            </template>
-
-            <!-- Step 1: Alert Setup -->
-            <q-step
-              :name="1"
-              :title="t('alerts.steps.alertSetup') + ' *'"
-              caption=""
-              icon="settings"
-              :done="wizardStep > 1"
-              :disable="1 > lastValidStep"
-            >
-              <!-- Wrapper with flex container -->
-              <div
-                style="
-                  display: flex;
-                  gap: 0.625rem;
-                  height: calc(100vh - 302px);
-                "
-              >
-                <!-- Left Column Only: Step Content (60%) -->
-                <div
-                  style="
-                    flex: 0 0 62%;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                  "
-                >
-                  <div style="flex: 1; overflow: auto">
-                    <AlertSetup
-                      ref="step1Ref"
-                      :formData="formData"
-                      :beingUpdated="beingUpdated || anomalyEditMode"
-                      :streamTypes="streamTypes"
-                      :filteredStreams="filteredStreams"
-                      :isFetchingStreams="isFetchingStreams"
-                      :activeFolderId="
-                        Array.isArray(activeFolderId)
-                          ? activeFolderId[0]
-                          : activeFolderId
-                      "
-                      :streamFieldRef="streamFieldRef"
-                      :streamTypeFieldRef="streamTypeFieldRef"
-                      @update:streams="updateStreams()"
-                      @filter:streams="filterStreams"
-                      @update:stream-name="updateStreamFields"
-                      @update:active-folder-id="updateActiveFolderId"
-                    />
-                  </div>
-                </div>
-                <!-- Right column space (40%) - empty but reserves space -->
-                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
-              </div>
-            </q-step>
-
-            <!-- Step 2: Query Configuration (Scheduled / Real-Time alerts only) -->
-            <q-step
-              v-if="!isAnomalyMode"
-              :name="2"
-              :title="t('alerts.steps.conditions') + ' *'"
-              caption=""
-              icon="search"
-              :done="wizardStep > 2"
-              :disable="2 > lastValidStep"
-            >
-              <!-- Wrapper with flex container -->
-              <div
-                style="
-                  display: flex;
-                  gap: 0.625rem;
-                  height: calc(100vh - 302px);
-                "
-              >
-                <!-- Left Column Only: Step Content (60%) -->
-                <div
-                  style="
-                    flex: 0 0 62%;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                  "
-                >
-                  <div style="flex: 1; overflow: auto">
-                    <QueryConfig
-                      ref="step2Ref"
-                      :tab="formData.query_condition.type || 'custom'"
-                      :multiTimeRange="
-                        formData.query_condition.multi_time_range
-                      "
-                      :columns="filteredColumns"
-                      :streamFieldsMap="streamFieldsMap"
-                      :generatedSqlQuery="generatedSqlQuery"
-                      :inputData="formData.query_condition"
-                      :streamType="formData.stream_type"
-                      :isRealTime="formData.is_real_time"
-                      :sqlQuery="formData.query_condition.sql"
-                      :promqlQuery="formData.query_condition.promql"
-                      :vrlFunction="decodedVrlFunction"
-                      :streamName="formData.stream_name"
-                      :sqlQueryErrorMsg="sqlQueryErrorMsg"
-                      :isAggregationEnabled="isAggregationEnabled"
-                      :promqlCondition="
-                        formData.query_condition.promql_condition
-                      "
-                      @update:tab="updateTab"
-                      @update-group="updateGroup"
-                      @remove-group="removeConditionGroup"
-                      @input:update="onInputUpdate"
-                      @update:sqlQuery="
-                        (value) => (formData.query_condition.sql = value)
-                      "
-                      @update:promqlQuery="
-                        (value) => (formData.query_condition.promql = value)
-                      "
-                      @update:vrlFunction="
-                        (value) =>
-                          (formData.query_condition.vrl_function = value)
-                      "
-                      @validate-sql="validateSqlQuery"
-                      @clear-multi-windows="clearMultiWindows"
-                      @editor-closed="handleEditorClosed"
-                      @editor-state-changed="handleEditorStateChanged"
-                      @update:isAggregationEnabled="
-                        (value) => (isAggregationEnabled = value)
-                      "
-                      @update:aggregation="
-                        (value) =>
-                          (formData.query_condition.aggregation = value)
-                      "
-                      @update:promqlCondition="
-                        (val) =>
-                          (formData.query_condition.promql_condition = val)
-                      "
-                    />
-                  </div>
-                </div>
-                <!-- Right column space (40%) - empty but reserves space -->
-                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
-              </div>
-            </q-step>
-
-            <!-- Step 3: Compare with Past (Scheduled only) -->
-            <q-step
-              v-if="formData.is_real_time === 'false'"
-              :name="3"
-              :title="t('alerts.steps.compareWithPast')"
-              caption=""
-              icon="compare_arrows"
-              :done="wizardStep > 3"
-              :disable="3 > lastValidStep"
-            >
-              <!-- Wrapper with flex container -->
-              <div
-                style="
-                  display: flex;
-                  gap: 0.625rem;
-                  height: calc(100vh - 302px);
-                "
-              >
-                <!-- Left Column Only: Step Content (60%) -->
-                <div
-                  style="
-                    flex: 0 0 62%;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                  "
-                >
-                  <div style="flex: 1; overflow: auto">
-                    <CompareWithPast
-                      ref="step3Ref"
-                      :multiTimeRange="
-                        formData.query_condition.multi_time_range
-                      "
-                      :period="formData.trigger_condition.period"
-                      :frequency="formData.trigger_condition.frequency"
-                      :frequencyType="formData.trigger_condition.frequency_type"
-                      :cron="formData.trigger_condition.cron"
-                      :selectedTab="formData.query_condition.type || 'custom'"
-                      @update:multiTimeRange="
-                        (val) =>
-                          (formData.query_condition.multi_time_range = val)
-                      "
-                      @goToSqlEditor="handleGoToSqlEditor"
-                    />
-                  </div>
-                </div>
-                <!-- Right column space (40%) - empty but reserves space -->
-                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
-              </div>
-            </q-step>
-
-            <!-- Step 4: Alert Settings (Scheduled / Real-Time alerts only) -->
-            <q-step
-              v-if="!isAnomalyMode"
-              :name="4"
-              :title="t('alerts.steps.alertSettings') + ' *'"
-              caption=""
-              icon="tune"
-              :done="wizardStep > 4"
-              :disable="4 > lastValidStep"
-            >
-              <!-- Wrapper with flex container -->
-              <div
-                style="
-                  display: flex;
-                  gap: 0.625rem;
-                  height: calc(100vh - 302px);
-                "
-              >
-                <!-- Left Column Only: Step Content (60%) -->
-                <div
-                  style="
-                    flex: 0 0 62%;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                  "
-                >
-                  <div style="flex: 1; overflow: auto">
-                    <AlertSettings
-                      ref="step4Ref"
-                      :formData="formData"
-                      :isRealTime="formData.is_real_time"
-                      :columns="filteredColumns"
-                      :isAggregationEnabled="isAggregationEnabled"
-                      :destinations="formData.destinations"
-                      :formattedDestinations="getFormattedDestinations"
-                      :template="formData.template"
-                      :templates="templates"
-                      @update:trigger="
-                        (val) => (formData.trigger_condition = val)
-                      "
-                      @update:aggregation="
-                        (val) => (formData.query_condition.aggregation = val)
-                      "
-                      @update:isAggregationEnabled="
-                        (val) => (isAggregationEnabled = val)
-                      "
-                      @update:promqlCondition="
-                        (val) =>
-                          (formData.query_condition.promql_condition = val)
-                      "
-                      @update:destinations="updateDestinations"
-                      @update:template="(val) => (formData.template = val)"
-                      @refresh:destinations="refreshDestinations"
-                      @refresh:templates="refreshTemplates"
-                    />
-                  </div>
-                </div>
-                <!-- Right column space (40%) - empty but reserves space -->
-                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
-              </div>
-            </q-step>
-
-            <!-- Step 5: Deduplication (Scheduled only) -->
-            <q-step
-              v-if="formData.is_real_time === 'false'"
-              :name="5"
-              :title="t('alerts.steps.deduplication')"
-              caption=""
-              icon="filter_list"
-              :done="wizardStep > 5"
-              :disable="5 > lastValidStep"
-            >
-              <!-- Wrapper with flex container -->
-              <div
-                style="
-                  display: flex;
-                  gap: 0.625rem;
-                  height: calc(100vh - 302px);
-                "
-              >
-                <!-- Left Column Only: Step Content (60%) -->
-                <div
-                  style="
-                    flex: 0 0 62%;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                  "
-                >
-                  <div style="flex: 1; overflow: auto">
-                    <Deduplication
-                      :deduplication="formData.deduplication"
-                      :columns="filteredColumns"
-                      @update:deduplication="
-                        (val) => (formData.deduplication = val)
-                      "
-                    />
-                  </div>
-                </div>
-                <!-- Right column space (40%) - empty but reserves space -->
-                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
-              </div>
-            </q-step>
-
-            <!-- Step 6: Advanced Settings (Scheduled / Real-Time alerts only) -->
-            <q-step
-              v-if="!isAnomalyMode"
-              :name="6"
-              :title="t('alerts.steps.advanced')"
-              caption=""
-              icon="settings_applications"
-              :done="false"
-              :disable="6 > lastValidStep"
-            >
-              <!-- Wrapper with flex container -->
-              <div
-                style="
-                  display: flex;
-                  gap: 0.625rem;
-                  height: calc(100vh - 302px);
-                "
-              >
-                <!-- Left Column Only: Step Content (60%) -->
-                <div
-                  style="
-                    flex: 0 0 62%;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                  "
-                >
-                  <div style="flex: 1; overflow: auto">
-                    <Advanced
-                      :contextAttributes="formData.context_attributes"
-                      :description="formData.description"
-                      :rowTemplate="formData.row_template"
-                      :rowTemplateType="formData.row_template_type"
-                      @update:contextAttributes="
-                        (val) => (formData.context_attributes = val)
-                      "
-                      @update:description="
-                        (val) => (formData.description = val)
-                      "
-                      @update:rowTemplate="
-                        (val) => (formData.row_template = val)
-                      "
-                      @update:rowTemplateType="
-                        (val) => (formData.row_template_type = val)
-                      "
-                    />
-                  </div>
-                </div>
-                <!-- Right column space (40%) - empty but reserves space -->
-                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
-              </div>
-            </q-step>
-            <!-- Step 2: Anomaly Detection Config -->
-            <q-step
-              v-if="isAnomalyMode"
-              :name="2"
-              :title="t('alerts.anomalyDetectionConfig') + ' *'"
-              caption=""
-              icon="manage_search"
-              :done="wizardStep > 2"
-              :disable="2 > lastValidStep"
-            >
-              <div
-                style="
-                  display: flex;
-                  gap: 0.625rem;
-                  height: calc(100vh - 302px);
-                "
-              >
-                <div
-                  style="
-                    flex: 0 0 62%;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                  "
-                >
-                  <div style="flex: 1; overflow: auto">
-                    <AnomalyDetectionConfig
-                      ref="anomalyStep2Ref"
-                      :config="anomalyConfig"
-                    />
-                  </div>
-                </div>
-                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
-              </div>
-            </q-step>
-
-            <!-- Step 3: Anomaly Alerting -->
-            <q-step
-              v-if="isAnomalyMode"
-              :name="3"
-              :title="t('alerts.alerting') + (anomalyConfig.alert_enabled ? ' *' : '')"
-              caption=""
-              icon="notifications"
-              :done="false"
-              :disable="3 > lastValidStep"
-            >
-              <div
-                style="
-                  display: flex;
-                  gap: 0.625rem;
-                  height: calc(100vh - 302px);
-                "
-              >
-                <div
-                  style="
-                    flex: 0 0 62%;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                  "
-                >
-                  <div style="flex: 1; overflow: auto">
-                    <AnomalyAlerting
-                      :config="anomalyConfig"
-                      :destinations="destinations"
-                      @refresh:destinations="$emit('refresh:destinations')"
-                    />
-                  </div>
-                </div>
-                <div style="flex: 0 0 calc(35% - 0.625rem)"></div>
-              </div>
-            </q-step>
-          </q-stepper>
-
-          <!-- Persistent Right Column (Outside Stepper) -->
-          <div>
-            <!-- Standard alert right column -->
-            <div
-              v-if="!isAnomalyMode"
-              class="alert-wizard-right-column-persistent"
-              style="
-                position: absolute;
-                top: 86px;
-                right: 4px;
-                width: calc(39% - 1.5rem);
-                height: calc(100vh - 302px);
-                pointer-events: auto;
-                z-index: 10;
-              "
-            >
-              <AlertWizardRightColumn
-                ref="previewAlertRef"
-                :formData="formData"
-                :previewQuery="previewQuery"
-                :generatedSqlQuery="generatedSqlQuery"
-                :selectedTab="formData.query_condition.type || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-                :destinations="formData.destinations"
-                :focusManager="focusManager"
-                :wizardStep="wizardStep"
-                :isUsingBackendSql="isUsingBackendSql"
-                :isEditorOpen="isEditorOpen"
-              />
-            </div>
-
-            <!-- Anomaly detection right column -->
-            <div
-              v-else
-              class="anomaly-right-column"
-              style="
-                position: absolute;
-                top: 86px;
-                right: 4px;
-                width: calc(39% - 1.5rem);
-                height: calc(100vh - 302px);
-                pointer-events: auto;
-                z-index: 10;
-                display: flex;
-                flex-direction: column;
-                gap: 0.5rem;
-                overflow: hidden;
-              "
-            >
-              <!-- SQL Preview -->
-              <div
-                class="preview-box card-container"
-                style="
-                  flex: 1;
-                  min-height: 150px;
-                  overflow: hidden;
-                  display: flex;
-                  flex-direction: column;
-                "
-              >
-                <div
-                  class="preview-header tw:flex tw:items-center tw:px-3 tw:py-2"
-                >
-                  <span class="preview-title tw:text-sm tw:font-semibold">{{
-                    t("alerts.sqlPreview")
-                  }}</span>
-                </div>
-                <div style="flex: 1; overflow: hidden; min-height: 0">
-                  <QueryEditor
-                    editor-id="anomaly-sql-preview"
-                    language="sql"
-                    :read-only="true"
-                    :show-auto-complete="false"
-                    :hide-nl-toggle="true"
-                    :query="anomalyPreviewSql"
-                    style="height: 100%"
-                  />
-                </div>
-              </div>
-
-              <!-- Summary -->
-              <div
-                class="collapsible-section card-container"
-                :style="anomalySummarySectionStyle"
-              >
-                <div
-                  class="section-header tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer"
-                  @click="showAnomalySummary = !showAnomalySummary"
-                >
-                  <span class="tw:text-sm tw:font-semibold">{{
-                    t("alerts.summary.title")
-                  }}</span>
-                  <q-btn
-                    flat
-                    dense
-                    round
-                    size="xs"
-                    :icon="showAnomalySummary ? 'expand_less' : 'expand_more'"
-                    @click.stop
-                  />
-                </div>
-                <div
-                  v-show="showAnomalySummary"
-                  style="overflow: auto; flex: 1"
-                >
-                  <AnomalySummary
-                    style="height: 100%; overflow: auto"
-                    :config="anomalyConfig"
-                    :destinations="destinations"
-                    :wizard-step="wizardStep"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </q-form>
-      </div>
-    </div>
-    <div v-if="isAnomalyMode" class="tw:mx-2">
-      <div
-        class="flex q-px-md full-width tw:py-3 card-container tw:justify-end"
-        style="position: sticky; bottom: 0px; z-index: 2"
-      >
-        <!-- All Buttons (Right Side) -->
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <!-- Wizard Navigation Buttons -->
-          <q-btn
-            flat
-            :label="t('alerts.back')"
-            class="o2-secondary-button tw:h-[36px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            :disable="wizardStep === 1"
-            no-caps
-            @click="goToPreviousStep"
-          />
-          <q-btn
-            flat
-            :label="t('alerts.continue')"
-            class="o2-secondary-button tw:h-[36px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            :disable="isLastStep"
-            no-caps
-            @click="goToNextStep"
-          />
-          <q-separator vertical class="tw:mx-2"
-style="height: 36px" />
-
-          <!-- Cancel and Save Buttons -->
-          <q-btn
-            data-test="add-alert-cancel-btn"
-            v-close-popup="true"
-            class="o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            no-caps
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            @click="$emit('cancel:hideform')"
-          />
-          <q-btn
-            data-test="add-alert-submit-btn"
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save')"
-            no-caps
-            flat
-            :loading="anomalySaving"
-            :disable="!canSaveAlert"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            @click="handleSave"
-          />
-        </div>
-      </div>
-    </div>
   </div>
 
   <q-dialog
@@ -1080,7 +504,7 @@ style="height: 36px" />
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, reactive, computed, watch, onBeforeUnmount } from "vue";
 
 import JsonEditor from "../common/JsonEditor.vue";
 import HorizontalStepper from "./HorizontalStepper.vue";
@@ -1094,6 +518,7 @@ import AlertWizardRightColumn from "./AlertWizardRightColumn.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
+import DateTimePicker from "@/components/DateTimePicker.vue";
 import AnomalyDetectionConfig from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.vue";
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
@@ -1139,6 +564,7 @@ export default defineComponent({
     PreviewAlert,
     AlertSummary,
     SelectFolderDropDown,
+    DateTimePicker,
     AnomalyDetectionConfig,
     AnomalyAlerting,
     AnomalySummary,
@@ -1147,9 +573,75 @@ export default defineComponent({
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
 
-    // Re-export everything from the composable for template access
+    // Auto-expand preview when stream name is selected, collapse when cleared
+    watch(
+      () => alertForm.formData.value.stream_name,
+      (newVal) => {
+        alertForm.chartCollapsed.value = !newVal;
+      }
+    );
+
+    // Switch activeTab when alert type changes to/from anomaly
+    watch(
+      () => alertForm.formData.value.is_real_time,
+      (newVal) => {
+        if (newVal === 'anomaly') {
+          alertForm.activeTab.value = 'anomaly-config';
+        } else if (alertForm.activeTab.value.startsWith('anomaly-')) {
+          alertForm.activeTab.value = 'condition';
+        }
+      }
+    );
+
+    // ── Floating preview widget ──
+    const floatingPreview = ref(false);
+    const floatingPreviewRef = ref<any>(null);
+
+    // Use floating preview's status when it's active, otherwise use inline
+    const activeEvaluationStatus = computed(() => {
+      if (floatingPreview.value && floatingPreviewRef.value?.evaluationStatus) {
+        return floatingPreviewRef.value.evaluationStatus;
+      }
+      return alertForm.previewAlertRef.value?.evaluationStatus || null;
+    });
+    const floatingWidgetRef = ref<HTMLElement | null>(null);
+    const floatingPos = reactive({
+      x: typeof window !== 'undefined' ? window.innerWidth - 470 : 600,
+      y: 100,
+    });
+    const floatingWidgetStyle = computed(() => ({
+      left: `${floatingPos.x}px`,
+      top: `${floatingPos.y}px`,
+    }));
+
+    let dragOffset = { x: 0, y: 0 };
+    const onFloatingDragStart = (e: MouseEvent) => {
+      dragOffset.x = e.clientX - floatingPos.x;
+      dragOffset.y = e.clientY - floatingPos.y;
+      document.addEventListener('mousemove', onFloatingDragMove);
+      document.addEventListener('mouseup', onFloatingDragEnd);
+    };
+    const onFloatingDragMove = (e: MouseEvent) => {
+      floatingPos.x = Math.max(0, Math.min(e.clientX - dragOffset.x, window.innerWidth - 420));
+      floatingPos.y = Math.max(0, Math.min(e.clientY - dragOffset.y, window.innerHeight - 240));
+    };
+    const onFloatingDragEnd = () => {
+      document.removeEventListener('mousemove', onFloatingDragMove);
+      document.removeEventListener('mouseup', onFloatingDragEnd);
+    };
+    onBeforeUnmount(() => {
+      document.removeEventListener('mousemove', onFloatingDragMove);
+      document.removeEventListener('mouseup', onFloatingDragEnd);
+    });
+
     return {
       ...alertForm,
+      floatingPreview,
+      floatingPreviewRef,
+      activeEvaluationStatus,
+      floatingWidgetRef,
+      floatingWidgetStyle,
+      onFloatingDragStart,
     };
   },
 
@@ -1162,6 +654,7 @@ export default defineComponent({
   min-height: 5rem;
   resize: both;
 }
+
 
 // V3 Top Bar Styles
 .alert-v3-field-group {
@@ -1178,6 +671,13 @@ export default defineComponent({
   white-space: nowrap;
 }
 
+.alert-v3-inline-label {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
 .alert-v3-field {
   height: 28px !important;
   min-height: 28px !important;
@@ -1185,7 +685,10 @@ export default defineComponent({
   :deep(.q-field__control) {
     height: 28px !important;
     min-height: 28px !important;
-    border-radius: 4px;
+    border-radius: 4px !important;
+    border: 1px solid rgba(0, 0, 0, 0.2) !important;
+    background: rgba(0, 0, 0, 0.03) !important;
+    padding: 0 8px !important;
   }
   :deep(.q-field__native) {
     padding: 0 0px !important;
@@ -1215,6 +718,13 @@ export default defineComponent({
   }
 }
 
+.body--dark .alert-v3-field {
+  :deep(.q-field__control) {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+  }
+}
+
 .alert-v3-toggle {
   height: 28px !important;
   overflow: visible;
@@ -1227,6 +737,58 @@ export default defineComponent({
     font-weight: 500;
     line-height: 28px;
     border-radius: 4px !important;
+  }
+}
+
+.alert-type-tabs {
+  display: flex;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  padding: 3px;
+
+  .alert-type-tab {
+    padding: 4px 12px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: rgba(0, 0, 0, 0.4);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    line-height: 1.4;
+
+    &:hover {
+      color: rgba(0, 0, 0, 0.7);
+    }
+
+    &.active {
+      background: #ffffff;
+      color: #202124;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.body--dark .alert-type-tabs {
+  background: rgba(255, 255, 255, 0.05);
+
+  .alert-type-tab {
+    color: rgba(255, 255, 255, 0.45);
+
+    &:hover { color: rgba(255, 255, 255, 0.75); }
+
+    &.active {
+      background: #374151;
+      color: #e4e7eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    }
   }
 }
 
@@ -1306,6 +868,64 @@ export default defineComponent({
 
   .__operator {
     width: 100px;
+  }
+}
+
+.alert-preview-datetime {
+  :deep(.q-btn) {
+    height: 26px !important;
+    min-height: 26px !important;
+    font-size: 11px;
+    padding: 0 8px !important;
+    border-radius: 1rem !important;
+  }
+}
+
+.floating-preview-widget {
+  position: fixed;
+  z-index: 9999;
+  width: 420px;
+  height: 240px;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  &--light {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+  }
+  &--dark {
+    background: #1e1e1e;
+    border: 1px solid #424242;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 32px;
+    padding: 0 4px 0 10px;
+    cursor: grab;
+    user-select: none;
+    flex-shrink: 0;
+    &:active { cursor: grabbing; }
+
+    &--light {
+      background: #f5f5f5;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    &--dark {
+      background: #2a2a2a;
+      border-bottom: 1px solid #424242;
+    }
+  }
+
+  &__body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
 }
 </style>

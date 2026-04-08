@@ -2546,7 +2546,7 @@
     },
     "alertSettings": {
       "cronSchedule": "Cron Schedule",
-      "addNewDestination": "Add New Destination",
+      "addNewDestination": "Add Destination",
       "cooldownTooltip": "If the alert triggers then how long should it wait before sending another notification. e.g. if the alert triggers at 4:00 PM and the silence notification is set to 10 minutes then it will not send another notification until 4:10 PM even if the alert is still after 1 minute. This is to avoid spamming the user with notifications.",
       "thresholdTooltip": "Defines when the alert should trigger based on the event count or aggregated value. Example: If set to \"> 100\", the alert triggers when the count exceeds 100 events.",
       "periodTooltip": "Period for which the query should run. e.g. 10 minutes means that whenever the query will run it will use the last 10 minutes of data.",
