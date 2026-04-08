@@ -111,14 +111,12 @@ impl std::fmt::Display for RequestEncoding {
 #[schema(as = SearchQuery)]
 pub struct Query {
     pub sql: String,
+    pub start_time: i64,
+    pub end_time: i64,
     #[serde(default)]
     pub from: i64,
     #[serde(default = "default_size")]
     pub size: i64,
-    #[serde(default)]
-    pub start_time: i64,
-    #[serde(default)]
-    pub end_time: i64,
     #[serde(default)]
     pub quick_mode: bool,
     #[serde(default)]
