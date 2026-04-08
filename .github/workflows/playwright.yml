@@ -183,6 +183,7 @@ jobs:
                 "dashboard-promql-suggestions.spec.js",
                 "dashboard-share-link.spec.js",
                 "crossLinking.spec.js",
+                "dashboard-table-histogram-timestamp.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"

@@ -800,10 +800,10 @@ export default defineComponent({
           // For new panels: set based on field name
           // For timestamp fields: treatAsNonTimestamp = false (unchecked)
           // For non-timestamp fields: treatAsNonTimestamp = true (checked)
+          // Fall back to args[0].value.field since field.column is not always set
+          const fieldName = field.column ?? field.args?.[0]?.value?.field ?? "";
           field.treatAsNonTimestamp =
-            field.column === store.state.zoConfig.timestamp_column
-              ? false
-              : true;
+            fieldName === store.state.zoConfig.timestamp_column ? false : true;
         } else {
           // For existing panels: only set if treatAsNonTimestamp is not already defined
           // This preserves the saved values from the database
