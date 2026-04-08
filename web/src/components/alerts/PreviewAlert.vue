@@ -526,8 +526,8 @@ const fetchQuerySchema = async () => {
               ? b64EncodeUnicode(props.query)
               : props.query,
             query_fn: null,
-            start_time: new Date(startTime).getTime() * 1000, // Convert to microseconds
-            end_time: new Date(endTime).getTime() * 1000,
+            start_time: (Date.now() - 3600000) * 1000,
+            end_time: Date.now() * 1000,
             size: -1,
             histogram_interval: undefined,
             streaming_output: false,
