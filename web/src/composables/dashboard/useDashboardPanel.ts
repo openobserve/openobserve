@@ -1292,8 +1292,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               ? b64EncodeUnicode(query)
               : query,
             query_fn: null,
-            start_time: startISOTimestamp,
-            end_time: endISOTimestamp,
+            start_time: (Date.now() - 3600000) * 1000,
+            end_time: Date.now() * 1000,
             size: -1,
             histogram_interval: undefined,
             streaming_output: false,
