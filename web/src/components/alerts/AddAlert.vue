@@ -121,38 +121,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-tooltip>{{ t("alerts.editJson") }}</q-tooltip>
           </q-btn>
-          <q-separator vertical style="height: 28px" />
-          <q-btn
-            data-test="add-alert-cancel-btn"
-            v-close-popup="true"
-            class="o2-secondary-button tw:h-[32px]"
-            :label="t('alerts.cancel')"
-            no-caps
-            flat
-            size="sm"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            @click="$emit('cancel:hideform')"
-          />
-          <q-btn
-            data-test="add-alert-submit-btn"
-            class="o2-primary-button no-border tw:h-[32px]"
-            :label="isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save')"
-            no-caps
-            flat
-            size="sm"
-            :loading="anomalySaving"
-            :disable="!canSaveAlert"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            @click="handleSave"
-          />
         </div>
       </div>
     </div>
@@ -437,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Stepper navigation footer -->
-          <div class="stepper-nav-footer tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:border-t">
+          <div class="stepper-nav-footer tw:flex tw:items-center tw:justify-end tw:px-4 tw:py-2 tw:border-t tw:gap-2">
             <q-btn
               v-if="wizardStep > 1"
               flat
@@ -450,18 +418,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-wizard-back-btn"
               @click="goToPreviousStep"
             />
-            <div v-else />
             <q-btn
               v-if="!isLastStep"
               flat
               no-caps
               size="sm"
-              class="o2-primary-button"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              class="o2-secondary-button"
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               icon-right="arrow_forward"
               label="Continue"
               data-test="alert-wizard-continue-btn"
               @click="goToNextStep"
+            />
+            <q-separator v-if="!isLastStep" vertical style="height: 28px" class="tw:mx-1" />
+            <q-btn
+              data-test="add-alert-cancel-btn"
+              v-close-popup="true"
+              class="o2-secondary-button"
+              :label="t('alerts.cancel')"
+              no-caps
+              flat
+              size="sm"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-secondary-button-dark'
+                  : 'o2-secondary-button-light'
+              "
+              @click="$emit('cancel:hideform')"
+            />
+            <q-btn
+              data-test="add-alert-submit-btn"
+              class="o2-primary-button no-border"
+              :label="isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save')"
+              no-caps
+              flat
+              :loading="anomalySaving"
+              :disable="!canSaveAlert"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-primary-button-dark'
+                  : 'o2-primary-button-light'
+              "
+              @click="handleSave"
             />
           </div>
         </div>
