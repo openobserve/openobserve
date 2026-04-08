@@ -382,7 +382,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disable-ai-reason="t('search.selectStreamForAI')"
                 editor-height="280px"
                 data-test-prefix="alert-inline"
-                @update:query="updateMainQuery"
+                @update:query="
+                  localTab === 'sql'
+                    ? updateSqlQuery($event)
+                    : updatePromqlQuery($event)
+                "
               />
             </div>
           </div>
@@ -401,6 +405,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="preview-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2"
             >
               <span class="preview-title">VRL Function</span>
+              <div class="tw:flex tw:items-center tw:gap-2">
+                <q-select
+                  v-model="selectedVrlFunction"
+                  :options="filteredFunctionOptions"
+                  data-test="alert-inline-saved-vrl-function-select"
+                  input-debounce="0"
+                  behavior="menu"
+                  use-input
+                  borderless
+                  dense
+                  hide-selected
+                  fill-input
+                  option-label="name"
+                  option-value="name"
+                  @filter="filterInlineFunctionOptions"
+                  @update:model-value="onInlineFunctionSelect"
+                  clearable
+                  @clear="onInlineFunctionClear"
+                  style="width: 150px"
+                  :placeholder="t('alerts.placeholders.savedFunctions')"
+                  class="o2-select-input"
+                >
+                  <template #no-option>
+                    <q-item dense>
+                      <q-item-section>{{
+                        t("search.noResult")
+                      }}</q-item-section>
+                    </q-item>
+                  </template>
+                </q-select>
+                <q-btn
+                  data-test="alert-inline-apply-vrl-btn"
+                  size="sm"
+                  no-caps
+                  style="height: 28px"
+                  class="text-bold add-variable no-border q-py-sm"
+                  color="primary"
+                  :disable="!vrlFunctionContent"
+                  @click="$emit('apply-vrl')"
+                >
+                  <q-icon name="search" size="16px" />
+                  <span class="tw:text-[12px] tw:font-[400] tw:ml-1">{{
+                    t("alerts.applyVRL")
+                  }}</span>
+                </q-btn>
+              </div>
             </div>
             <div style="height: 200px">
               <UnifiedQueryEditor
@@ -658,6 +708,7 @@ export default defineComponent({
     "update:isAggregationEnabled",
     "update:aggregation",
     "update:promqlCondition",
+    "apply-vrl",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -745,6 +796,44 @@ export default defineComponent({
     const functionsList = computed(
       () => store.state.organizationData.functions || [],
     );
+
+    // Inline VRL function selector state
+    const selectedVrlFunction = ref<any>(null);
+    const filteredFunctionOptions = ref<any[]>([]);
+
+    watch(
+      functionsList,
+      (newList) => {
+        filteredFunctionOptions.value = [...newList];
+      },
+      { immediate: true },
+    );
+
+    const filterInlineFunctionOptions = (val: string, update: any) => {
+      update(() => {
+        if (val === "") {
+          filteredFunctionOptions.value = [...functionsList.value];
+        } else {
+          const needle = val.toLowerCase();
+          filteredFunctionOptions.value = functionsList.value.filter((f: any) =>
+            f.name.toLowerCase().includes(needle),
+          );
+        }
+      });
+    };
+
+    const onInlineFunctionSelect = (func: any) => {
+      if (func && func.function) {
+        vrlFunctionContent.value = func.function;
+        emit("update:vrlFunction", func.function);
+      }
+    };
+
+    const onInlineFunctionClear = () => {
+      selectedVrlFunction.value = null;
+      vrlFunctionContent.value = "";
+      emit("update:vrlFunction", "");
+    };
 
     // Compute tab options based on stream type and alert type
     const tabOptions = computed(() => {
@@ -893,15 +982,6 @@ export default defineComponent({
       emit("update:promqlQuery", value);
     };
 
-    // Routes inline editor updates to the correct query handler based on active tab
-    const updateMainQuery = (value: string) => {
-      if (localTab.value === "sql") {
-        updateSqlQuery(value);
-      } else {
-        updatePromqlQuery(value);
-      }
-    };
-
     // Handler for VRL function updates from QueryEditorDialog
     // The dialog now emits plain text VRL (encoding happens once at save time)
     const handleVrlFunctionUpdate = (vrlValue: string) => {
@@ -1005,28 +1085,6 @@ export default defineComponent({
       },
     );
 
-    // Sync local refs when parent prop changes (e.g. after full view dialog saves)
-    watch(
-      () => props.sqlQuery,
-      (newVal) => {
-        localSqlQuery.value = newVal;
-      },
-    );
-
-    watch(
-      () => props.promqlQuery,
-      (newVal) => {
-        localPromqlQuery.value = newVal;
-      },
-    );
-
-    watch(
-      () => props.vrlFunction,
-      (newVal) => {
-        vrlFunctionContent.value = newVal;
-      },
-    );
-
     // Validation function for Step 2
     const validate = async () => {
       // Custom mode: Check if conditions have empty columns or values
@@ -1122,11 +1180,15 @@ export default defineComponent({
       vrlFunctionContent,
       updateSqlQuery,
       updatePromqlQuery,
-      updateMainQuery,
       handleVrlFunctionUpdate,
       handleVrlEditorUpdate,
       handleValidateSql,
       functionsList,
+      selectedVrlFunction,
+      filteredFunctionOptions,
+      filterInlineFunctionOptions,
+      onInlineFunctionSelect,
+      onInlineFunctionClear,
       validate,
       customConditionsForm,
       // Field refs for focus manager
