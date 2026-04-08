@@ -110,8 +110,6 @@ mod m20260318_000005_add_all_dimensions_to_service_streams;
 mod m20260326_000001_add_field_name_mapping_to_service_streams;
 mod m20260331_000001_create_sys_rca_agent_service_accounts;
 mod m20260402_000001_reports_add_image_fields;
-mod m20260312_000001_create_eval_templates_table;
-mod m20260317_000001_add_anomaly_detection_config_columns;
 
 pub struct Migrator;
 
@@ -211,7 +209,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20260326_000001_add_field_name_mapping_to_service_streams::Migration),
             Box::new(m20260331_000001_create_sys_rca_agent_service_accounts::Migration),
             Box::new(m20260402_000001_reports_add_image_fields::Migration),
-            Box::new(m20260312_000001_create_eval_templates_table::Migration),
         ]
     }
 }

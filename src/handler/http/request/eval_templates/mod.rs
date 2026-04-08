@@ -301,7 +301,19 @@ pub async fn update(
                             updated_at: now,
                         };
 
-                    // Save to database
+                    // Update manager first; only persist to DB on success to avoid state divergence
+                    if let Err(e) = manager.update_template(template.clone()).await {
+                        log::error!("Failed to update template in manager: {}", e);
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(HttpResponse::error(
+                                500u16,
+                                format!("Failed to update template: {}", e),
+                            )),
+                        )
+                            .into_response();
+                    }
+
                     let db_template = db_eval_templates::EvalTemplate {
                         id: template.id.clone(),
                         org_id: template.org_id.clone(),
@@ -318,19 +330,7 @@ pub async fn update(
                         updated_at: template.updated_at,
                     };
 
-                    if let Err(e) = db_eval_templates::update(&db_template).await {
-                        log::error!("Failed to save template to database: {}", e);
-                        return (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            Json(HttpResponse::error(
-                                500u16,
-                                format!("Failed to save template: {}", e),
-                            )),
-                        )
-                            .into_response();
-                    }
-
-                    match manager.update_template(template.clone()).await {
+                    match db_eval_templates::update(&db_template).await {
                         Ok(_) => {
                             let response = TemplateResponse {
                                 id: template.id,
@@ -348,12 +348,12 @@ pub async fn update(
                             (StatusCode::OK, Json(response)).into_response()
                         }
                         Err(e) => {
-                            log::error!("Failed to update template in manager: {}", e);
+                            log::error!("Failed to save template to database: {}", e);
                             (
                                 StatusCode::INTERNAL_SERVER_ERROR,
                                 Json(HttpResponse::error(
                                     500u16,
-                                    format!("Failed to update template: {}", e),
+                                    format!("Failed to save template: {}", e),
                                 )),
                             )
                                 .into_response()
