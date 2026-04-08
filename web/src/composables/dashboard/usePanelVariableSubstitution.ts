@@ -651,14 +651,8 @@ export const usePanelVariableSubstitution = ({
           // For singlequote form, the variable value will be wrapped with single quotes.
           query = query.replaceAll(`{{${variable.name}:csv}}`, variableValue);
           query = query.replaceAll(`{{${variable.name}:pipe}}`, variableValue);
-          query = query.replaceAll(
-            `{{${variable.name}:doublequote}}`,
-            variableValue,
-          );
-          query = query.replaceAll(
-            `{{${variable.name}:singlequote}}`,
-            variableValue,
-          );
+          query = query.replaceAll(`{{${variable.name}:doublequote}}`, `"${variableValue}"`);
+          query = query.replaceAll(`{{${variable.name}:singlequote}}`, `'${variableValue}'`);
           query = query.replaceAll(mustachePlaceholder, variableValue);
           query = query.replaceAll(variableNameWithBrackets, variableValue);
           query = query.replaceAll(variableName, variableValue);
