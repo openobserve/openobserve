@@ -1543,7 +1543,7 @@ test.describe("Cross-Linking testcases", () => {
         }
     });
 
-    // Cleanup: remove org-level cross-links after org tests
+    // Cleanup: remove org-level cross-links after org tests.
     test("should clean up org-level cross-links", {
         tag: ['@crossLinking', '@cleanup', '@all']
     }, async ({ page }) => {
