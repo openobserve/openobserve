@@ -39,18 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="panel-header-actions">
           <q-btn
-            unelevated
-            no-caps
-            dense
-            size="sm"
-            label="Show telemetry"
-            icon="manage_search"
-            @click="handleShowTelemetry"
-            data-test="service-graph-side-panel-show-telemetry-btn"
-            class="telemetry-btn"
-            :loading="correlationLoading"
-          />
-          <q-btn
             flat
             dense
             round
@@ -160,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             inline-label
             align="left"
-            class="text-bold q-mx-sm tw:mb-[0.375rem]"
+            class="text-bold q-mx-sm tw:mb-[0.375rem] tw:border-b tw:border-b-[var(--o2-border-color)]"
             data-test="service-graph-node-panel-tabs"
           >
             <q-tab
@@ -188,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-graph-node-panel-tab-metrics"
             />
           </q-tabs>
-          <q-tab-panels v-model="activeTab" animated>
+          <q-tab-panels v-model="activeTab" animated class="tw:h-full!">
             <!-- Operations Tab -->
             <q-tab-panel
               name="operations"
@@ -561,7 +549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Metrics Tab -->
             <q-tab-panel
               name="metrics"
-              class="tw:p-0! panel-section tw:mb-0!"
+              class="tw:p-0! panel-section tw:mb-0! tw:h-full!"
               data-test="service-graph-side-panel-metrics"
             >
               <!-- Loading state -->
@@ -612,6 +600,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 source-type="traces"
                 :time-range="telemetryTimeRange"
                 :hide-dimension-filters="true"
+                :metric-group-definitions="metricGroupResources"
                 data-test="service-graph-side-panel-metrics-dashboard"
               />
 
@@ -642,6 +631,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :metric-streams="correlationData.metricStreams"
     :trace-streams="correlationData.traceStreams"
     :time-range="telemetryTimeRange"
+    :metric-group-definitions="metricGroupResources"
     @close="showTelemetryDialog = false"
   />
 </template>
@@ -667,6 +657,8 @@ import {
 } from "@/utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics/metrics.json";
+import { type MetricGroupDefinition } from "@/utils/metrics/metricGrouping";
+import DeployedCode from "@/components/icons/DeployedCode.vue";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -907,6 +899,15 @@ export default defineComponent({
 
       navigateToTraces({ errorsOnly, minDurationMicros, maxDurationMicros });
     };
+
+    // Metric group definitions — controls which category tabs appear in the metrics dashboard.
+    // Defaults to pods + nodes + others for service-graph workloads. Consumers can extend
+    // this list by pushing entries whose ids are registered in METRIC_GROUP_PATTERNS.
+    const metricGroupResources = ref<MetricGroupDefinition[]>([
+      { id: "pods", label: "Pods", icon: DeployedCode },
+      { id: "nodes", label: "Nodes", icon: "dns" },
+      { id: "others", label: "Others", icon: "category" },
+    ]);
 
     // Metrics Correlation State
     const showTelemetryDialog = ref(false);
@@ -1837,6 +1838,7 @@ export default defineComponent({
       metricsCorrelationData,
       metricsCorrelationLoaded,
       fetchMetricsCorrelation,
+      metricGroupResources,
     };
   },
 });
@@ -2672,6 +2674,12 @@ export default defineComponent({
       padding: 0 0.0625rem !important;
     }
   }
+}
+
+:deep(
+  .metrics-correlation-dashboard .q-splitter--vertical > .q-splitter__separator
+) {
+  height: 100% !important;
 }
 </style>
 

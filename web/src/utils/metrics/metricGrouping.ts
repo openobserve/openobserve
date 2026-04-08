@@ -18,30 +18,35 @@ import type { StreamInfo } from "@/services/service_streams";
 /**
  * Metric Group Classification Utility
  *
- * Generic functions to classify and group metric streams by category:
- * - Infra:   Container, pod, node, and other infrastructure resource metrics
- * - Network: Network traffic, latency, packet, and networking metrics
- * - Others:  Metrics that do not belong to Infra or Network groups
+ * Generic functions to classify and group metric streams by category.
+ * Classification patterns are stored in an internal registry (METRIC_GROUP_PATTERNS).
+ * Groups are configured via MetricGroupDefinition objects that carry only display
+ * metadata (id, label, icon) — no patterns. To add a new group, add its entry to
+ * METRIC_GROUP_PATTERNS and reference it by id in MetricGroupDefinition arrays.
  *
  * Designed to be reusable across multiple pages
  * (logs correlation tab, traces correlation tab, metrics explorer, etc.)
  */
 
-export type MetricGroupId = "infra" | "network" | "others";
+export type MetricGroupId = string;
+
+export interface MetricGroupDefinition {
+  id: string;
+  label: string;
+  icon: string | {};
+}
 
 export interface MetricGroupConfig {
-  id: MetricGroupId;
+  id: string;
   label: string;
   icon: string;
   streams: StreamInfo[];
 }
 
 export interface GroupedMetricStreams {
-  infra: StreamInfo[];
-  network: StreamInfo[];
-  others: StreamInfo[];
+  byGroup: Record<string, StreamInfo[]>;
   /**
-   * Ordered list of all groups (Infra → Network → Others).
+   * Ordered list of all groups (in definition order).
    * Empty groups are still included so consumers can decide whether to show them.
    */
   groups: MetricGroupConfig[];
@@ -134,73 +139,117 @@ const INFRA_PATTERNS: RegExp[] = [
   /^disk_/,
 ];
 
-/** Metadata config for each group (icon used in UI). */
-const GROUP_META: Record<MetricGroupId, { label: string; icon: string }> = {
-  infra: { label: "Infra", icon: "dns" },
-  network: { label: "Network", icon: "wifi" },
-  others: { label: "Others", icon: "category" },
+/**
+ * Patterns for Pod metric classification.
+ * Covers Kubernetes pod-level metrics from Prometheus and OTel conventions.
+ */
+const POD_PATTERNS: RegExp[] = [/^kube_pod/, /^k8s_pod/, /\bpod\b/];
+
+/**
+ * Patterns for Node metric classification.
+ * Covers Kubernetes node-level and host/machine metrics.
+ */
+const NODE_PATTERNS: RegExp[] = [
+  /^kube_node/,
+  /^k8s_node/,
+  /^node_/,
+  /^host_/,
+  /^machine_/,
+];
+
+/**
+ * Central registry mapping group ids to their classification patterns.
+ * Groups with no entry (or an empty array) here are treated as catch-all buckets.
+ *
+ * To add a new group (e.g., "database"):
+ *   1. Add its patterns here:  database: [/^pg_/, /^mysql_/, /^redis_/]
+ *   2. Reference the id in a MetricGroupDefinition array passed as a prop.
+ *   No other changes are needed.
+ */
+const METRIC_GROUP_PATTERNS: Record<string, RegExp[]> = {
+  network: NETWORK_PATTERNS,
+  infra: INFRA_PATTERNS,
+  pods: POD_PATTERNS,
+  nodes: NODE_PATTERNS,
 };
+
+/**
+ * Default group definitions used when no metricGroupDefinitions prop is provided.
+ * Ordering matters — classifyMetric checks groups in this order (first match wins).
+ */
+export const DEFAULT_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
+  { id: "network", label: "Network", icon: "wifi" },
+  { id: "infra", label: "Infra", icon: "dns" },
+  { id: "others", label: "Others", icon: "category" },
+];
 
 /**
  * Classify a single metric stream name into a group.
  *
- * Classification order (higher priority first):
- * 1. Network — matches any NETWORK_PATTERNS
- * 2. Infra   — matches any INFRA_PATTERNS
- * 3. Others  — everything else
+ * Classification order: groups are checked in the order of `groupDefs`.
+ * The first group whose registered patterns match the metric name wins.
+ * Groups with no patterns in METRIC_GROUP_PATTERNS act as catch-all buckets.
  *
  * @param metricName - The metric stream name (case-insensitive matching)
- * @returns The group ID: "infra" | "network" | "others"
+ * @param groupDefs  - Ordered group definitions (controls priority)
+ * @returns The id of the matched group
  */
-export function classifyMetric(metricName: string): MetricGroupId {
+export function classifyMetric(
+  metricName: string,
+  groupDefs: MetricGroupDefinition[],
+): string {
   const nameLower = metricName.toLowerCase();
 
-  for (const pattern of NETWORK_PATTERNS) {
-    if (pattern.test(nameLower)) return "network";
+  for (const group of groupDefs) {
+    const patterns = METRIC_GROUP_PATTERNS[group.id];
+    if (!patterns?.length) continue; // no patterns = catch-all, skip in priority pass
+    for (const pattern of patterns) {
+      if (pattern.test(nameLower)) return group.id;
+    }
   }
 
-  for (const pattern of INFRA_PATTERNS) {
-    if (pattern.test(nameLower)) return "infra";
-  }
-
-  return "others";
+  // Fall back to first group with no registered patterns (catch-all)
+  return (
+    groupDefs.find((g) => !METRIC_GROUP_PATTERNS[g.id]?.length)?.id ??
+    groupDefs[groupDefs.length - 1]?.id ??
+    "others"
+  );
 }
 
 /**
- * Group an array of metric streams into Infra, Network, and Others categories.
+ * Group an array of metric streams into categories defined by `groupDefs`.
  *
- * @param streams - Array of StreamInfo objects to group
- * @returns Grouped metrics with `infra`, `network`, `others` arrays
- *          and an ordered `groups` list ready for UI rendering.
+ * @param streams   - Array of StreamInfo objects to group
+ * @param groupDefs - Ordered group definitions (controls priority and display)
+ * @returns Grouped metrics with a `byGroup` record and an ordered `groups` list
+ *          ready for UI rendering.
  *
  * @example
  * const grouped = groupMetricsByCategory(streams);
- * // grouped.infra   → [container_cpu_usage_seconds_total, kube_pod_status_ready, ...]
- * // grouped.network → [node_network_transmit_bytes_total, container_network_receive_bytes_total, ...]
- * // grouped.others  → [http_server_request_duration_seconds, ...]
+ * // grouped.byGroup['infra']   → [container_cpu_usage_seconds_total, ...]
+ * // grouped.byGroup['network'] → [node_network_transmit_bytes_total, ...]
+ * // grouped.byGroup['others']  → [http_server_request_duration_seconds, ...]
  * //
- * // grouped.groups  → [{id:'infra',...}, {id:'network',...}, {id:'others',...}]
+ * // grouped.groups → [{id:'network',...}, {id:'infra',...}, {id:'others',...}]
  */
-export function groupMetricsByCategory(streams: StreamInfo[]): GroupedMetricStreams {
-  const infra: StreamInfo[] = [];
-  const network: StreamInfo[] = [];
-  const others: StreamInfo[] = [];
+export function groupMetricsByCategory(
+  streams: StreamInfo[],
+  groupDefs: MetricGroupDefinition[] = DEFAULT_METRIC_GROUP_DEFINITIONS,
+): GroupedMetricStreams {
+  const buckets: Record<string, StreamInfo[]> = {};
+  for (const g of groupDefs) buckets[g.id] = [];
 
   for (const stream of streams) {
-    const groupId = classifyMetric(stream.stream_name);
-    if (groupId === "infra") infra.push(stream);
-    else if (groupId === "network") network.push(stream);
-    else others.push(stream);
+    const gId = classifyMetric(stream.stream_name, groupDefs);
+    (buckets[gId] ??= []).push(stream);
   }
 
-  const groups: MetricGroupConfig[] = (
-    ["infra", "network", "others"] as MetricGroupId[]
-  ).map((id) => ({
-    id,
-    label: GROUP_META[id].label,
-    icon: GROUP_META[id].icon,
-    streams: id === "infra" ? infra : id === "network" ? network : others,
+  const groups: MetricGroupConfig[] = groupDefs.map((def) => ({
+    id: def.id,
+    label: def.label,
+    icon: def.icon,
+    streams: buckets[def.id] ?? [],
   }));
 
-  return { infra, network, others, groups };
+  return { byGroup: buckets, groups };
 }
