@@ -17,9 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="step-deduplication" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
     <div class="step-content card-container tw:px-3 tw:py-4">
-      <!-- Step intro -->
-      <p class="step-intro-hint tw:mb-4">{{ t('alerts.stepIntro.deduplication') }}</p>
-
       <!-- Fingerprint Fields -->
       <div class="tw:mb-4">
         <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">

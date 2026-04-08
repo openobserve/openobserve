@@ -2533,7 +2533,7 @@
       "addComparisonWindow": "Add Comparison Window",
       "goToConditions": "Go to Conditions",
       "goToConditionsTooltip": "Click on \"Go to Conditions\" to verify the events for selected comparison windows",
-      "sqlModeOnlyNote": "Compare with Past is only available in SQL mode. Switch to SQL in the Query Config step to use this feature."
+      "sqlModeOnlyNote": "Compare with Past is only available in SQL mode. Switch to SQL in the Define Query step to use this feature."
     },
     "alertSettings": {
       "cronSchedule": "Cron Schedule",
@@ -2586,9 +2586,9 @@
       "scheduledOnly": "Scheduled only",
       "sqlModeRequired": "SQL mode required",
       "deduplicationTitle": "Avoid Duplicate Notifications",
-      "deduplicationDesc": "If the same issue keeps firing, only the first notification is sent. Later alerts with the same fingerprint are silently suppressed during the time window you set — so your team isn't flooded with repeated messages for the same problem.",
+      "deduplicationDesc": "Alerts with the same fingerprint are grouped together instead of firing separately.",
       "compareWithPastTitle": "Compare Against Past Data",
-      "compareWithPastDesc": "Only fire this alert when current results are worse than a previous time window. Example: alert only if today's error count is higher than yesterday's. Requires SQL mode in the Conditions step.",
+      "compareWithPastDesc": "Fire only when current results exceed a past time window — e.g. more errors than yesterday. Requires SQL mode.",
       "notificationContentTitle": "Customize Notification Content",
       "notificationContentDesc": "Control what information appears in your alert notifications. All fields below are optional.",
       "variablesTitle": "Extra Variables",

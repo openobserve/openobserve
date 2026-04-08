@@ -151,8 +151,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Expanded content -->
       <div v-if="variablesExpanded" class="adv-section-body tw:px-4 tw:py-4 tw:flex tw:flex-col tw:gap-6">
-        <q-separator class="adv-separator tw:-mx-4 tw:mb-2" />
-
         <!-- ── 3a. Extra Variables ── -->
         <div>
           <div class="adv-field-label tw:mb-0.5">
