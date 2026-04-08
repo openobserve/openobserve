@@ -2552,7 +2552,8 @@
       "addVariable": "Add Variable",
       "variablesTooltip": "Variables are used to pass data from the alert to the destination.",
       "rowTemplateTooltip": "Row Template is used to format the alert message.",
-      "templateType": "Template Type:"
+      "templateType": "Template Type:",
+      "notificationCustomization": "Notification, Variables & Row Template"
     },
     "editJson": "Edit Alert JSON"
   },

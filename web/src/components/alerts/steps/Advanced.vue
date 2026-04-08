@@ -16,10 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="step-advanced" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw:px-3 tw:py-4">
-      <!-- Step intro -->
-      <p class="step-intro-hint tw:mb-4">{{ t('alerts.stepIntro.advanced') }}</p>
-
+    <div>
       <!-- Compare with Past (Scheduled only) -->
       <div
         v-if="isRealTime === 'false'"
@@ -94,170 +91,195 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Context Variables -->
-      <div class="tw:mb-4">
-        <div class="tw:pb-2 custom-input-label text-bold">
-          <span>{{ t("alerts.additionalVariables") }}</span>
-          <q-btn
-            style="color: #A0A0A0;"
-            no-caps
-            padding="xs"
-            class="q-ml-xs"
+      <!-- Variables, Description & Row Template -->
+      <div
+        class="section-group tw:rounded tw:mb-4"
+        :class="store.state.theme === 'dark' ? 'section-group-dark' : 'section-group-light'"
+      >
+        <div
+          class="section-group-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2 tw:cursor-pointer"
+          @click="toggleVariables"
+        >
+          <span class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide section-group-label">
+            {{ t('alerts.advanced.notificationCustomization') }}
+          </span>
+          <q-icon
+            :name="variablesExpanded ? 'expand_less' : 'expand_more'"
             size="sm"
-            flat
-            icon="info_outline"
-          >
-            <q-tooltip>
-              {{ t('alerts.advanced.variablesTooltip') }}
-            </q-tooltip>
-          </q-btn>
+            class="section-expand-icon"
+          />
         </div>
 
-        <!-- Variables List -->
-        <template v-if="!localVariables.length">
-          <q-btn
-            data-test="alert-variables-add-btn"
-            size="sm"
-            class="no-border o2-secondary-button tw:h-[36px]"
-            flat
-            no-caps
-            @click="addVariable"
-          >
-            <span>{{ t('alerts.advanced.addVariable') }}</span>
-          </q-btn>
-        </template>
-        <template v-else>
-          <div
-            v-for="(variable, index) in localVariables"
-            :key="variable.id"
-            class="tw:flex tw:items-center tw:mb-2"
-            :data-test="`alert-variables-${index + 1}`"
-          >
+        <div v-if="variablesExpanded" class="tw:px-3 tw:py-3 tw:flex tw:flex-col tw:gap-4">
+          <!-- Hint text -->
+          <p class="tw:text-xs tw:leading-relaxed section-note tw:m-0 tw:mb-0!">
+            {{ t('alerts.stepIntro.advanced') }}
+          </p>
+
+          <!-- Context Variables -->
+          <div>
+            <div class="tw:pb-2 custom-input-label text-bold tw:flex tw:items-center">
+              <span>{{ t("alerts.additionalVariables") }}</span>
+              <q-btn
+                style="color: #A0A0A0;"
+                no-caps
+                padding="xs"
+                class="q-ml-xs"
+                size="sm"
+                flat
+                icon="info_outline"
+              >
+                <q-tooltip>
+                  {{ t('alerts.advanced.variablesTooltip') }}
+                </q-tooltip>
+              </q-btn>
+            </div>
+            <template v-if="!localVariables.length">
+              <q-btn
+                data-test="alert-variables-add-btn"
+                size="sm"
+                class="no-border o2-secondary-button tw:h-[36px]"
+                flat
+                no-caps
+                @click="addVariable"
+              >
+                <span>{{ t('alerts.advanced.addVariable') }}</span>
+              </q-btn>
+            </template>
+            <template v-else>
+              <div
+                v-for="(variable, index) in localVariables"
+                :key="variable.id"
+                class="tw:flex tw:items-center tw:mb-2"
+                :data-test="`alert-variables-${index + 1}`"
+              >
+                <q-input
+                  data-test="alert-variables-key-input"
+                  v-model="variable.key"
+                  :placeholder="t('common.name')"
+                  dense
+                  stack-label
+                  borderless
+                  tabindex="0"
+                  @update:model-value="emitUpdate"
+                />
+                <q-input
+                  data-test="alert-variables-value-input"
+                  v-model="variable.value"
+                  :placeholder="t('common.value')"
+                  dense
+                  stack-label
+                  borderless
+                  tabindex="0"
+                  style="min-width: 250px"
+                  @update:model-value="emitUpdate"
+                />
+                <q-btn
+                  data-test="alert-variables-delete-variable-btn"
+                  icon="delete_outline"
+                  class="q-ml-xs iconHoverBtn"
+                  :class="store.state.theme === 'dark' ? 'icon-dark' : ''"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  @click="removeVariable(variable)"
+                />
+                <q-btn
+                  data-test="alert-variables-add-variable-btn"
+                  v-if="index === localVariables.length - 1"
+                  icon="add"
+                  class="q-ml-xs iconHoverBtn"
+                  :class="store.state.theme === 'dark' ? 'icon-dark' : ''"
+                  padding="sm"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  @click="addVariable"
+                />
+              </div>
+            </template>
+          </div>
+
+          <!-- Description -->
+          <div>
+            <div class="flex items-center q-mb-sm">
+              <span class="text-bold custom-input-label">{{ t("alerts.description") }}</span>
+            </div>
             <q-input
-              data-test="alert-variables-key-input"
-              v-model="variable.key"
-              :placeholder="t('common.name')"
-              dense
+              v-model="localDescription"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop q-mb-sm q-text-area-input"
               stack-label
+              outlined
               borderless
+              dense
               tabindex="0"
+              style="width: 100%; resize: none;"
+              type="textarea"
+              :placeholder="t('alerts.placeholders.typeSomething')"
+              rows="5"
               @update:model-value="emitUpdate"
             />
+          </div>
+
+          <!-- Row Template -->
+          <div>
+            <div class="flex items-center justify-between q-mb-sm">
+              <div class="flex items-center">
+                <span class="text-bold custom-input-label">{{ t("alerts.row") }}</span>
+                <q-btn
+                  data-test="add-alert-row-input-info-btn"
+                  style="color: #A0A0A0;"
+                  no-caps
+                  padding="xs"
+                  class="q-ml-xs"
+                  size="sm"
+                  flat
+                  icon="info_outline"
+                >
+                  <q-tooltip>
+                    {{ t('alerts.advanced.rowTemplateTooltip') }}
+                  </q-tooltip>
+                </q-btn>
+              </div>
+              <div class="flex items-center">
+                <span class="text-caption q-mr-sm">{{ t('alerts.advanced.templateType') }}</span>
+                <q-btn-toggle
+                  data-test="add-alert-row-template-type-toggle"
+                  v-model="localRowTemplateType"
+                  toggle-color="primary"
+                  :options="rowTemplateTypeOptions"
+                  dense
+                  no-caps
+                  unelevated
+                  size="sm"
+                  @update:model-value="emitUpdate"
+                />
+              </div>
+            </div>
             <q-input
-              data-test="alert-variables-value-input"
-              v-model="variable.value"
-              :placeholder="t('common.value')"
-              dense
+              data-test="add-alert-row-input-textarea"
+              v-model="localRowTemplate"
+              color="input-border"
+              bg-color="input-bg"
+              class="row-template-input"
               stack-label
+              outlined
               borderless
-              tabindex="0"
-              style="min-width: 250px"
-              @update:model-value="emitUpdate"
-            />
-            <q-btn
-              data-test="alert-variables-delete-variable-btn"
-              icon="delete_outline"
-              class="q-ml-xs iconHoverBtn"
-              :class="store.state.theme === 'dark' ? 'icon-dark' : ''"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click="removeVariable(variable)"
-            />
-            <q-btn
-              data-test="alert-variables-add-variable-btn"
-              v-if="index === localVariables.length - 1"
-              icon="add"
-              class="q-ml-xs iconHoverBtn"
-              :class="store.state.theme === 'dark' ? 'icon-dark' : ''"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              @click="addVariable"
-            />
-          </div>
-        </template>
-      </div>
-
-      <!-- Description -->
-      <div class="tw:mb-4">
-        <div class="flex items-center q-mb-sm">
-          <span class="text-bold custom-input-label">{{ t("alerts.description") }}</span>
-        </div>
-        <q-input
-          v-model="localDescription"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop q-mb-sm q-text-area-input"
-          stack-label
-          outlined
-          borderless
-          dense
-          tabindex="0"
-          style="width: 100%; resize: none;"
-          type="textarea"
-          :placeholder="t('alerts.placeholders.typeSomething')"
-          rows="5"
-          @update:model-value="emitUpdate"
-        />
-      </div>
-
-      <!-- Row Template -->
-      <div class="tw:mb-4">
-        <div class="flex items-center justify-between q-mb-sm">
-          <div class="flex items-center">
-            <span class="text-bold custom-input-label">{{ t("alerts.row") }}</span>
-            <q-btn
-              data-test="add-alert-row-input-info-btn"
-              style="color: #A0A0A0;"
-              no-caps
-              padding="xs"
-              class="q-ml-xs"
-              size="sm"
-              flat
-              icon="info_outline"
-            >
-              <q-tooltip>
-                {{ t('alerts.advanced.rowTemplateTooltip') }}
-              </q-tooltip>
-            </q-btn>
-          </div>
-          <div class="flex items-center">
-            <span class="text-caption q-mr-sm">{{ t('alerts.advanced.templateType') }}</span>
-            <q-btn-toggle
-              data-test="add-alert-row-template-type-toggle"
-              v-model="localRowTemplateType"
-              toggle-color="primary"
-              :options="rowTemplateTypeOptions"
               dense
-              no-caps
-              unelevated
-              size="sm"
+              tabindex="0"
+              style="width: 100%; resize: none;"
+              type="textarea"
+              :placeholder="rowTemplatePlaceholder"
+              rows="5"
               @update:model-value="emitUpdate"
             />
           </div>
         </div>
-        <q-input
-          data-test="add-alert-row-input-textarea"
-          v-model="localRowTemplate"
-          color="input-border"
-          bg-color="input-bg"
-          class="row-template-input"
-          stack-label
-          outlined
-          borderless
-          dense
-          tabindex="0"
-          style="width: 100%; resize: none;"
-          type="textarea"
-          :placeholder="rowTemplatePlaceholder"
-          rows="5"
-          @update:model-value="emitUpdate"
-        />
       </div>
     </div>
   </div>
@@ -362,6 +384,7 @@ export default defineComponent({
     // Collapsible section state
     const compareWithPastExpanded = ref(false);
     const deduplicationExpanded = ref(false);
+    const variablesExpanded = ref(false);
 
     const isSqlMode = computed(() => props.selectedTab === "sql");
 
@@ -371,6 +394,10 @@ export default defineComponent({
 
     const toggleDeduplication = () => {
       deduplicationExpanded.value = !deduplicationExpanded.value;
+    };
+
+    const toggleVariables = () => {
+      variablesExpanded.value = !variablesExpanded.value;
     };
 
     const rowTemplateTypeOptions = [
@@ -454,9 +481,11 @@ export default defineComponent({
       rowTemplatePlaceholder,
       compareWithPastExpanded,
       deduplicationExpanded,
+      variablesExpanded,
       isSqlMode,
       toggleCompareWithPast,
       toggleDeduplication,
+      toggleVariables,
       addVariable,
       removeVariable,
       emitUpdate,
