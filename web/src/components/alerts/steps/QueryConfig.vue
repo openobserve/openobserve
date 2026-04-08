@@ -372,15 +372,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="preview-title">{{
                 localTab === "sql" ? "SQL" : "PromQL"
               }}</span>
+              <q-btn
+                :icon="sqlExpanded ? 'fullscreen_exit' : 'fullscreen'"
+                flat
+                dense
+                round
+                size="sm"
+                data-test="alert-inline-sql-expand-btn"
+                @click="toggleSqlExpand"
+              />
             </div>
-            <div style="height: 280px">
+            <div :style="{ height: sqlExpanded ? 'calc(70vh - 40px)' : '280px' }">
               <UnifiedQueryEditor
                 :languages="localTab === 'sql' ? ['sql'] : ['promql']"
                 :default-language="localTab"
                 :query="sqlOrPromqlQuery"
                 :disable-ai="!streamName"
                 :disable-ai-reason="t('search.selectStreamForAI')"
-                editor-height="280px"
+                :editor-height="sqlExpanded ? 'calc(70vh - 40px)' : '280px'"
                 data-test-prefix="alert-inline"
                 @update:query="
                   localTab === 'sql'
@@ -394,6 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- VRL Function Editor (full width, below SQL) -->
           <div
             v-if="showVrlEditor && localTab !== 'promql'"
+            ref="vrlEditorRef"
             class="query-editor-box"
             :class="
               store.state.theme === 'dark'
@@ -450,16 +460,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("alerts.applyVRL")
                   }}</span>
                 </q-btn>
+                <q-btn
+                  :icon="vrlExpanded ? 'fullscreen_exit' : 'fullscreen'"
+                  flat
+                  dense
+                  round
+                  size="sm"
+                  data-test="alert-inline-vrl-expand-btn"
+                  @click="toggleVrlExpand"
+                />
               </div>
             </div>
-            <div style="height: 200px">
+            <div :style="{ height: vrlExpanded ? 'calc(70vh - 40px)' : '200px' }">
               <UnifiedQueryEditor
                 :languages="['vrl']"
                 default-language="vrl"
                 :query="vrlFunctionContent"
                 :disable-ai="!streamName"
                 :disable-ai-reason="t('search.selectStreamForAI')"
-                editor-height="200px"
+                :editor-height="vrlExpanded ? 'calc(70vh - 40px)' : '200px'"
                 data-test-prefix="alert-vrl-inline"
                 @update:query="handleVrlEditorUpdate"
               />
@@ -722,8 +741,35 @@ export default defineComponent({
     const pendingTab = ref<string | null>(null);
 
     // Field refs for focus manager
-    const customPreviewRef = ref(null);
-    const sqlPromqlPreviewRef = ref(null);
+    const customPreviewRef = ref<HTMLElement | null>(null);
+    const sqlPromqlPreviewRef = ref<HTMLElement | null>(null);
+    const vrlEditorRef = ref<HTMLElement | null>(null);
+
+    // Expand/collapse state for inline editors
+    const sqlExpanded = ref(false);
+    const vrlExpanded = ref(false);
+
+    const toggleSqlExpand = async () => {
+      sqlExpanded.value = !sqlExpanded.value;
+      await nextTick();
+      if (sqlExpanded.value && sqlPromqlPreviewRef.value) {
+        sqlPromqlPreviewRef.value.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    };
+
+    const toggleVrlExpand = async () => {
+      vrlExpanded.value = !vrlExpanded.value;
+      await nextTick();
+      if (vrlExpanded.value && vrlEditorRef.value) {
+        vrlEditorRef.value.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    };
 
     // Local query values
     const localSqlQuery = ref(props.sqlQuery);
@@ -1194,6 +1240,12 @@ export default defineComponent({
       // Field refs for focus manager
       customPreviewRef,
       sqlPromqlPreviewRef,
+      vrlEditorRef,
+      // Expand/collapse
+      sqlExpanded,
+      vrlExpanded,
+      toggleSqlExpand,
+      toggleVrlExpand,
       // Multi-window dialog
       showMultiWindowDialog,
       pendingTab,
