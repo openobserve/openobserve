@@ -130,16 +130,17 @@ async fn extract_filtered_semantic_dimensions(
             // Find first matching field from this semantic group
             for field_name in &alias_group.fields {
                 if let Some(value) = labels.get(field_name)
-                    && !value.is_empty() {
-                        group_values.insert(group_id.clone(), value.clone());
-                        log::debug!(
-                            "[incidents] Mapped field '{}' → '{}' = '{}'",
-                            field_name,
-                            group_id,
-                            value
-                        );
-                        break; // Take first match from this group
-                    }
+                    && !value.is_empty()
+                {
+                    group_values.insert(group_id.clone(), value.clone());
+                    log::debug!(
+                        "[incidents] Mapped field '{}' → '{}' = '{}'",
+                        field_name,
+                        group_id,
+                        value
+                    );
+                    break; // Take first match from this group
+                }
             }
         } else {
             log::debug!(
@@ -276,14 +277,15 @@ fn extract_service_name_parallel(
     // Priority 2: Extract from labels using standard service field names
     for field in ["service", "service_name", "svc", "app"] {
         if let Some(service) = labels.get(field)
-            && !service.is_empty() {
-                log::debug!(
-                    "[incidents] Extracted service name from field '{}': '{}'",
-                    field,
-                    service
-                );
-                return service.clone();
-            }
+            && !service.is_empty()
+        {
+            log::debug!(
+                "[incidents] Extracted service name from field '{}': '{}'",
+                field,
+                service
+            );
+            return service.clone();
+        }
     }
 
     // Priority 3: Default fallback
