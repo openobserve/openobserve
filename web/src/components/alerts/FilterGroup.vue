@@ -44,9 +44,9 @@
       
       <!-- Group content -->
 
-      <div v-if="isOpen" class="tw:overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
+      <div v-if="isOpen" class="tw:overflow-x-auto group-container tw:px-3 tw:pt-3 tw:pb-1" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
         <!-- Items in group (V2 uses 'conditions' array) -->
-        <div class="tw:whitespace-nowrap" v-for="(item, index) in props.group.conditions" :key="index">
+        <div class="tw:whitespace-nowrap tw:mb-2" v-for="(item, index) in props.group.conditions" :key="index">
           <FilterGroup
             v-if="isGroup(item)"
             :group="item"
@@ -63,29 +63,29 @@
           />
           <div
             v-else
-            class="tw:flex tw:items-center tw:gap-2  "
+            class="tw:flex tw:items-center tw:gap-2"
             :class="store.state.isAiChatEnabled ? 'tw:pl-0' : 'tw:pl-1'"
-            >
+          >
             <FilterCondition
-                :condition="item"
-                :stream-fields="props.streamFields"
-                @input:update="(name, field) => inputUpdate(name, field)"
-                :index="index"
-                :label="group.logicalOperator?.toLowerCase() || 'and'"
-                :depth="depth"
-                :input-width="props.conditionInputWidth"
-                :is-first-in-group="index === 0"
-                :allow-custom-columns="props.allowCustomColumns"
-                :module="props.module"
+              :condition="item"
+              :stream-fields="props.streamFields"
+              @input:update="(name, field) => inputUpdate(name, field)"
+              :index="Number(index)"
+              :label="group.logicalOperator?.toLowerCase() || 'and'"
+              :depth="depth"
+              :input-width="props.conditionInputWidth"
+              :is-first-in-group="index === 0"
+              :allow-custom-columns="props.allowCustomColumns"
+              :module="props.module"
             />
             <div class="tw:mb-3">
-                <q-btn data-test="alert-conditions-delete-condition-btn" icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
+              <q-btn data-test="alert-conditions-delete-condition-btn" icon="close" size="10px" flat border-less @click="removeCondition(item.id)" />
             </div>
-                </div>
+          </div>
         </div>
         <!-- Action buttons -->
 
-        <div class="flex justify-start items-center"
+        <div class="flex justify-start items-center tw:pt-1 tw:pb-2"
         >
         <q-btn
             data-test="alert-conditions-add-condition-btn"
