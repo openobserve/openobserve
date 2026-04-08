@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width q-mx-lg q-pt-xs">
+  <div class="full-width q-mx-sm q-pt-xs">
     <div
       class="row items-center no-wrap card-container tw:mx-[0.625rem] tw:mb-[0.625rem]"
     >
@@ -163,11 +163,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="height: calc(100vh - 130px); overflow: hidden;"
     >
       <div
-        class="card-container tw:px-2 tw:mx-[0.675rem] tw:py-2"
-        style="height: 100%; display: flex; gap: 0.75rem;"
+        class="card-container tw:px-1 tw:mx-[0.375rem] tw:py-1"
+        style="height: 100%; display: flex; gap: 0.5rem;"
       >
         <!-- LEFT: Vertical Stepper (~60%) -->
-        <div style="flex: 0 0 60%; min-width: 0; height: 100%; overflow-y: auto;">
+        <div class="card-container alert-stepper-left-panel" style="flex: 0 0 60%; min-width: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden;">
+          <div style="flex: 1; overflow-y: auto; min-height: 0; padding: 0.25rem 0.5rem 0.25rem 0.25rem;">
           <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
             <q-stepper
               v-model="wizardStep"
@@ -462,6 +463,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-stepper>
 
         </q-form>
+          </div>
+
+          <!-- Stepper navigation footer -->
+          <div class="stepper-nav-footer tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:border-t">
+            <q-btn
+              v-if="wizardStep > 1"
+              flat
+              no-caps
+              size="sm"
+              class="o2-secondary-button"
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              icon="arrow_back"
+              label="Back"
+              data-test="alert-wizard-back-btn"
+              @click="goToPreviousStep"
+            />
+            <div v-else />
+            <q-btn
+              v-if="!isLastStep"
+              flat
+              no-caps
+              size="sm"
+              class="o2-primary-button"
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              icon-right="arrow_forward"
+              label="Continue"
+              data-test="alert-wizard-continue-btn"
+              @click="goToNextStep"
+            />
+          </div>
         </div>
 
         <!-- RIGHT: Preview / Summary Panel (~40%) -->
@@ -1033,7 +1064,7 @@ export default defineComponent({
     const step2Ref = ref(null);
     const step3Ref = ref(null);
     const step4Ref = ref(null);
-    const lastValidStep = ref(1); // Track the last successfully validated step
+    const lastValidStep = ref(7); // All steps accessible by default
 
     // Computed property for step captions to avoid flickering
     const currentStepCaption = computed(() => {
@@ -3796,22 +3827,34 @@ export default defineComponent({
 // Wizard Stepper Styles — Vertical Mode
 .alert-wizard-stepper {
   box-shadow: none;
+  padding: 0 !important;
+
+  // Remove default stepper left padding
+  :deep(.q-stepper__header) {
+    padding-left: 0 !important;
+  }
+
+  :deep(.q-stepper__step) {
+    padding-left: 0 !important;
+  }
 
   // Step content area
-  :deep(.q-stepper__step-inner) {
-    padding: 0.25rem 0.5rem 0.5rem 0.25rem !important;
+  :deep(.q-stepper--vertical .q-stepper__step-inner) {
+    padding: 0 24px 32px 50px !important;
   }
 
   // Step tab (the header row with dot + title)
-  :deep(.q-stepper__tab) {
-    padding: 0.375rem 0.5rem;
-    min-height: 2.25rem;
+  :deep(.q-stepper--vertical .q-stepper__tab) {
+    padding: 12px 12px !important;
+    min-height: 2rem;
   }
 
-  // Active step — highlight title
+  // Active step — secondary background + primary text
   :deep(.q-stepper__tab--active) {
     color: var(--o2-primary-color);
     font-weight: 600;
+    background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
+    border-radius: 0.375rem;
   }
 
   // Done step
@@ -3820,11 +3863,20 @@ export default defineComponent({
     cursor: pointer;
   }
 
-  // Step number dot
+  // Step number dot — use secondary background for active dot
   :deep(.q-stepper__dot) {
-    width: 2rem;
-    height: 2rem;
-    font-size: 0.875rem;
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 0.8125rem;
+  }
+
+  // Override active dot to use secondary (soft) color — matches o2-secondary-button
+  :deep(.q-stepper__tab--active .q-stepper__dot) {
+    background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%) !important;
+    border: 1.5px solid var(--o2-primary-color) !important;
+    span, .q-icon {
+      color: var(--o2-primary-color) !important;
+    }
   }
 
   // Step title text
@@ -3854,6 +3906,16 @@ export default defineComponent({
   .q-stepper {
     background: transparent !important;
   }
+}
+
+.alert-stepper-left-panel {
+  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.08));
+}
+
+.stepper-nav-footer {
+  flex-shrink: 0;
+  border-top-color: var(--o2-border-color, rgba(0, 0, 0, 0.08));
+  min-height: 3rem;
 }
 
 // Dark mode adjustments

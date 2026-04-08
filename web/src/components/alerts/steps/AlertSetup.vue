@@ -50,8 +50,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
+          <!-- Pipe separator -->
+          <div class="stream-field-pipe tw:flex-shrink-0 tw:flex tw:items-end tw:pb-1">|</div>
+
           <!-- Stream Name -->
-          <div class="tw:flex-1 tw:min-w-0">
+          <div class="tw:min-w-0" style="max-width: 27rem;">
             <div class="tw:text-xs tw:font-medium tw:mb-2 stream-type-label">
               {{ t('alerts.stream_name') }} *
             </div>
@@ -310,14 +313,14 @@ export default defineComponent({
       position: relative;
 
       &:hover:not(.card-disabled) {
-        border-color: var(--o2-primary-color);
-        box-shadow: 0 0 0 3px rgba(var(--o2-primary-color-rgb, 99, 102, 241), 0.08);
+        border-color: var(--o2-primary-btn-bg);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--o2-primary-btn-bg) 15%, transparent);
       }
 
       &.card-selected {
-        border-color: var(--o2-primary-color);
-        box-shadow: 0 0 0 3px rgba(var(--o2-primary-color-rgb, 99, 102, 241), 0.1);
-        background-color: var(--o2-primary-background);
+        border-color: var(--o2-primary-btn-bg);
+        border-width: 2px;
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--o2-primary-btn-bg) 20%, transparent);
       }
 
       &.card-disabled {
@@ -351,7 +354,7 @@ export default defineComponent({
       }
 
       .card-check-icon {
-        color: var(--o2-primary-color);
+        color: var(--o2-primary-btn-bg);
         flex-shrink: 0;
         margin-top: 0.125rem;
       }
@@ -398,16 +401,17 @@ export default defineComponent({
       }
 
       &:hover:not(:disabled) {
-        background-color: var(--o2-primary-background);
+        background: color-mix(in srgb, var(--o2-primary-btn-bg) 10%, white 6%);
         color: var(--o2-primary-color);
       }
 
       &.btn-active {
-        background-color: var(--o2-primary-color);
-        color: #fff;
+        background: var(--o2-primary-btn-bg);
+        color: var(--o2-primary-btn-text);
+        font-weight: 600;
 
         .q-icon {
-          color: #fff;
+          color: var(--o2-primary-btn-text);
         }
       }
 
@@ -419,6 +423,26 @@ export default defineComponent({
 
   .form-field {
     width: 100%;
+  }
+
+  .stream-field-pipe {
+    font-size: 1.25rem;
+    color: var(--o2-border);
+    line-height: 2rem;
+    padding-top: 1.375rem;
+    user-select: none;
+  }
+
+  // Match stream name select border to stream type toggle border width/style
+  .stream-name-select {
+    :deep(.q-field__control) {
+      border: 1.5px solid var(--o2-border) !important;
+      border-radius: 0.5rem !important;
+    }
+
+    :deep(.q-field--focused .q-field__control) {
+      border-color: var(--o2-primary-color) !important;
+    }
   }
 }
 </style>
