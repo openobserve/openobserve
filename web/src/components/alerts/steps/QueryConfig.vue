@@ -893,6 +893,15 @@ export default defineComponent({
       emit("update:promqlQuery", value);
     };
 
+    // Routes inline editor updates to the correct query handler based on active tab
+    const updateMainQuery = (value: string) => {
+      if (localTab.value === "sql") {
+        updateSqlQuery(value);
+      } else {
+        updatePromqlQuery(value);
+      }
+    };
+
     // Handler for VRL function updates from QueryEditorDialog
     // The dialog now emits plain text VRL (encoding happens once at save time)
     const handleVrlFunctionUpdate = (vrlValue: string) => {
@@ -996,6 +1005,28 @@ export default defineComponent({
       },
     );
 
+    // Sync local refs when parent prop changes (e.g. after full view dialog saves)
+    watch(
+      () => props.sqlQuery,
+      (newVal) => {
+        localSqlQuery.value = newVal;
+      },
+    );
+
+    watch(
+      () => props.promqlQuery,
+      (newVal) => {
+        localPromqlQuery.value = newVal;
+      },
+    );
+
+    watch(
+      () => props.vrlFunction,
+      (newVal) => {
+        vrlFunctionContent.value = newVal;
+      },
+    );
+
     // Validation function for Step 2
     const validate = async () => {
       // Custom mode: Check if conditions have empty columns or values
@@ -1091,6 +1122,7 @@ export default defineComponent({
       vrlFunctionContent,
       updateSqlQuery,
       updatePromqlQuery,
+      updateMainQuery,
       handleVrlFunctionUpdate,
       handleVrlEditorUpdate,
       handleValidateSql,
