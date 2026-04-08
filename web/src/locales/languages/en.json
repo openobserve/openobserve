@@ -2298,11 +2298,11 @@
     },
     "steps": {
       "alertSetup": "What to Monitor",
-      "conditions": "Detect Events",
+      "conditions": "Define Query",
       "compareWithPast": "Compare with Past",
-      "alertSettings": "Rules & Notifications",
+      "alertSettings": "Conditions & Actions",
       "deduplication": "Deduplication",
-      "advanced": "Fine-tune",
+      "advanced": "Advanced Settings",
       "nameAndOrganize": "Name & Save"
     },
     "stepIntro": {
@@ -2315,12 +2315,12 @@
     },
     "stepCaptions": {
       "alertSetup": "Pick data stream & alert type",
-      "conditions": "Query the events you want to watch",
+      "conditions": "Write the query that defines what to watch",
       "compareWithPast": "Compare against a historical baseline",
-      "alertSettings": "Threshold, frequency & notification channels",
+      "alertSettings": "Set threshold conditions & notification channels",
       "deduplication": "Suppress repeated notifications",
       "nameAndOrganize": "Name your alert & pick a folder",
-      "advanced": "Deduplication, templates & extras"
+      "advanced": "Deduplication, templates & optional extras"
     },
     "setup": {
       "whatToMonitor": "What are you monitoring?",
