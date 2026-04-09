@@ -2303,7 +2303,7 @@
       "alertSettings": "Conditions & Actions",
       "deduplication": "Deduplication",
       "advanced": "Advanced Settings",
-      "nameAndOrganize": "Name & Save"
+      "nameAndOrganize": "Name & Folder"
     },
     "stepIntro": {
       "conditions": "Write a query to define what data this alert watches. Use Builder to get started quickly, SQL for advanced log queries, or PromQL for metrics.",
