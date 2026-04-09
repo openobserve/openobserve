@@ -128,12 +128,21 @@ const search = {
         ? (window as any).use_cache
         : true;
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
-    let url = `/api/${org_identifier}/result_schema?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&is_streaming=${is_streaming}`;
-    if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
-    if (folder_id) url += `&folder_id=${folder_id}`;
-    if (cross_linking) url += `&cross_linking=true`;
+    const queryParams = new URLSearchParams({
+      type: page_type,
+      search_type,
+      use_cache: String(use_cache),
+    });
+
+    queryParams.set("is_streaming", String(is_streaming));
+    if (dashboard_id) queryParams.set("dashboard_id", dashboard_id);
+    if (folder_id) queryParams.set("folder_id", folder_id);
+    if (cross_linking) queryParams.set("cross_linking", "true");
+
+    let url = `/api/${org_identifier}/result_schema?${queryParams.toString()}`;
     if (typeof query.query.sql != "string") {
-      url = `/api/${org_identifier}/result_schema_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
+      queryParams.delete("is_streaming");
+      url = `/api/${org_identifier}/result_schema_multi?${queryParams.toString()}`;
       if (query.hasOwnProperty("aggs")) {
         return http({ headers: { traceparent } }).post(url, {
           ...query.query,

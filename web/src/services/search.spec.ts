@@ -300,6 +300,26 @@ describe("Search Service", () => {
         { ...params.query.query, aggs: params.query.aggs }
       );
     });
+
+    it("should preserve cross linking parameters for multi stream result schema", async () => {
+      const params = {
+        org_identifier: "test-org",
+        query: {
+          query: { sql: ["SELECT * FROM logs1", "SELECT * FROM logs2"] },
+        },
+        page_type: "logs",
+        cross_linking: true,
+        dashboard_id: "dash-123",
+        folder_id: "folder-456",
+      };
+
+      await search.result_schema(params);
+
+      expect(mockHttp.post).toHaveBeenCalledWith(
+        "/api/test-org/result_schema_multi?type=logs&search_type=ui&use_cache=true&dashboard_id=dash-123&folder_id=folder-456&cross_linking=true",
+        params.query.query
+      );
+    });
   });
 
   describe("search_around", () => {
