@@ -251,6 +251,11 @@ export default defineComponent({
   position: relative;
 }
 
+// Remove border-radius from the shared .container class (logs uses rounded corners)
+:deep(.container) {
+  border-radius: 0;
+}
+
 // Dashboard table cells should not use the monospace font from tenstack-table.scss
 // (that scss is shared with logs, which intentionally uses monospace for log data)
 :deep(td) {
@@ -304,9 +309,9 @@ export default defineComponent({
   opacity: 1 !important;
 }
 
-// Sticky total column visual separator
+// Sticky total column visual separator — shadow with blur matching the bottom total row
 :deep(.pivot-total-col) {
-  box-shadow: -2px 0 0 rgba(0, 0, 0, 0.12) !important;
+  box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1) !important;
 }
 
 @media print {
