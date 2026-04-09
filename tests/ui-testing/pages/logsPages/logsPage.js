@@ -5842,11 +5842,16 @@ export class LogsPage {
             state: 'visible',
             timeout: 15000,
         });
+        // Monaco lazy-loads its bundle (~3MB). CodeQueryEditor.vue sets window.monaco after the
+        // bundle is ready and before calling monaco.editor.create(). Waiting for window.monaco
+        // is more reliable than a fixed timeout — once it's set, the .inputarea appears within ms.
+        await this.page.waitForFunction(
+            () => !!(window.monaco && window.monaco.editor),
+            { timeout: 90000 }
+        );
         // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass.
-        // Monaco lazy-loads its bundle (~3MB) on first render, which can take 30+ seconds in CI
-        // even though the Vue container becomes visible immediately. Use a generous timeout.
         const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
-        await inputArea.waitFor({ state: 'attached', timeout: 45000 });
+        await inputArea.waitFor({ state: 'attached', timeout: 30000 });
         await inputArea.click({ force: true });
         await inputArea.fill(query);
         // Wait for Monaco to render the new content in the view-line
