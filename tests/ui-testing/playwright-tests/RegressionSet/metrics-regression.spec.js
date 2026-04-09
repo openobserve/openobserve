@@ -11,10 +11,16 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
+const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
 test.describe("Metrics Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
+
+  // Ensure metrics are ingested once for all tests
+  test.beforeAll(async () => {
+    await ensureMetricsIngested();
+  });
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
