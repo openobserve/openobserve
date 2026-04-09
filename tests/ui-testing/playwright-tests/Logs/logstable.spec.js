@@ -431,78 +431,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     testLogger.info('✓ Include/exclude search terms preserved in open log details after query run - bug is fixed!');
   });
 
-  /**
-   * Test for issue #11041 - Multi-select behavior incorrect from sidebar
-   * Tests that:
-   * 1. Sidebar values refresh after query execution
-   * 2. Include button is disabled for already-included field values
-   * 3. Multi-select checkbox behavior works correctly
-   */
-  test("should disable include button for already-included field values @bug-11041", {
-    tag: ['@logsTable', '@all', '@logs', '@includeExclude', '@multiSelect', '@regression', '@P2']
-  }, async ({ page }) => {
-    testLogger.info('Testing multi-select sidebar behavior (Bug #11041)');
-
-    // Run initial query to get log results
-    await pageManager.logsPage.clickSearchBarRefreshButton();
-    await page.waitForTimeout(2000);
-
-    // Verify logs table is visible
-    await pageManager.logsPage.expectLogsSearchResultLogsTableVisible();
-    testLogger.info('✓ Initial query completed, logs table visible');
-
-    // STRONG ASSERTION: Bug #11041 requires testing field include/exclude behavior
-    // The level field must be visible to properly test this bug
-    const levelField = pageManager.logsPage.getFieldExpandButton('level');
-    await expect(levelField, 'Bug #11041: level field must be visible for include/exclude testing').toBeVisible({ timeout: 5000 });
-    await levelField.click();
-    await page.waitForTimeout(500);
-    testLogger.info('✓ Expanded level field in sidebar');
-
-    // Find and click include button for a field value
-    const includeBtn = pageManager.logsPage.getSubfieldListEqualButton('level').first();
-    await expect(includeBtn, 'Bug #11041: Include button must be visible').toBeVisible({ timeout: 5000 });
-    await includeBtn.click();
-    await page.waitForTimeout(500);
-
-    // Click "Include Search Term" from the menu
-    const includeMenuItem = pageManager.logsPage.getIncludeSearchTermMenuItem();
-    await expect(includeMenuItem, 'Bug #11041: Include menu item must be visible').toBeVisible({ timeout: 3000 });
-    await includeMenuItem.click();
-    testLogger.info('✓ Added first include search term');
-
-    // Run the query with the include filter
-    await pageManager.logsPage.clickSearchBarRefreshButton();
-    await page.waitForTimeout(2000);
-
-    // BUG CHECK: The include button should now be disabled or show different state
-    // for the already-included value
-    const queryEditor = pageManager.logsPage.getQueryEditorLocator();
-    const queryText = await queryEditor.textContent();
-    testLogger.info(`Query editor contains: ${queryText}`);
-
-    // STRONG ASSERTION: Verify the include term is in the query
-    expect(queryText, 'Bug #11041: Query must contain level filter').toContain('level');
-    testLogger.info('✓ Include term is present in query');
-
-    // Try clicking the same include button again - it should either:
-    // 1. Be disabled, OR
-    // 2. Not add duplicate entries
-    await levelField.click().catch(() => {});
-    await page.waitForTimeout(500);
-
-    // Check if we can still click the same value's include button
-    // (This tests if spamming is prevented)
-    const includeBtn2 = pageManager.logsPage.getSubfieldListEqualButton('level').first();
-    await expect(includeBtn2, 'Bug #11041: Include button must be visible').toBeVisible({ timeout: 5000 });
-    const isDisabled = await includeBtn2.isDisabled().catch(() => false);
-    testLogger.info(`Include button disabled state: ${isDisabled}`);
-
-    // STRONG ASSERTION: The button must be disabled for already-included values
-    expect(isDisabled, 'Bug #11041: include button must be disabled for already-included value').toBe(true);
-
-    testLogger.info('✓ Multi-select sidebar behavior test completed');
-  });
+  // Bug #11041 test moved to RegressionSet/logs-regression-bugs.spec.js
 
   test("should make exactly one search call and one histogram call when using cmd+enter with histogram enabled", {
     tag: ['@logsTable', '@all', '@logs', '@cmdEnter', '@apiCalls', '@histogram']
