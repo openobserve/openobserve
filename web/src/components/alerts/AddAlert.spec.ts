@@ -2521,6 +2521,8 @@ describe("AddAlert Component", () => {
         }
       });
       await nextTick();
+      await flushPromises();
+      await nextTick();
     });
 
     afterEach(() => {
@@ -2531,10 +2533,11 @@ describe("AddAlert Component", () => {
       // Initially promql_condition should be null
       expect(w.vm.formData.query_condition.promql_condition).toBeNull();
 
-      // Switch to promql mode
-      w.vm.formData.query_condition.type = 'promql';
+      // Switch to promql mode via the component's updateTab method
+      w.vm.updateTab('promql');
       await nextTick();
       await flushPromises();
+      await nextTick();
 
       // promql_condition should be initialized with all required fields
       expect(w.vm.formData.query_condition.promql_condition).toBeDefined();
@@ -2555,6 +2558,7 @@ describe("AddAlert Component", () => {
       w.vm.formData.query_condition.type = 'promql';
       await nextTick();
       await flushPromises();
+      await nextTick();
 
       // Should preserve existing values
       expect(w.vm.formData.query_condition.promql_condition.operator).toBe('>');

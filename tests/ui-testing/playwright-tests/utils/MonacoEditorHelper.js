@@ -22,8 +22,8 @@ class MonacoEditorHelper {
             editor: '.monaco-editor',
             viewLines: '.monaco-editor .view-lines',
             inputArea: '.monaco-editor textarea.inputarea',
-            suggestWidget: '.monaco-editor .suggest-widget',
-            suggestionRows: '.monaco-editor .suggest-widget .monaco-list-row',
+            suggestWidget: '.monaco-editor .suggest-widget, .editor-widget.suggest-widget, .suggest-widget',
+            suggestionRows: '.monaco-editor .suggest-widget .monaco-list-row, .editor-widget.suggest-widget .monaco-list-row, .suggest-widget .monaco-list-row',
             suggestionLabel: '.label-name, .monaco-icon-label-container',
         };
     }
@@ -110,11 +110,35 @@ class MonacoEditorHelper {
     /**
      * Wait for the suggestions widget to be visible
      * @param {number} timeout - Timeout in milliseconds (default 5000)
+     * @param {import('@playwright/test').Locator|null} container - Optional editor container to
+     *   re-focus before the retry trigger. Without this, Ctrl+Space on retry may go to a
+     *   different element if focus drifted during the initial wait (e.g. due to Vue reactive
+     *   re-renders when stream fields load on cold start).
      * @returns {Promise<import('@playwright/test').Locator>}
      */
-    async waitForSuggestions(timeout = 5000) {
+    async waitForSuggestions(timeout = 5000, container = null) {
         const suggestWidget = this.page.locator(this.selectors.suggestWidget);
-        await suggestWidget.waitFor({ state: 'visible', timeout });
+        const suggestionRows = this.page.locator(this.selectors.suggestionRows);
+
+        // Use a short initial wait before retrying. This is important because
+        // if Ctrl+Space was already pressed before calling this method (e.g. the
+        // test pressed it manually), it may have CLOSED the widget if suggestions
+        // were already showing from auto-trigger during typing. We detect that
+        // quickly and re-open via retry rather than waiting the full timeout.
+        const shortTimeout = Math.min(timeout, 2000);
+        try {
+            await suggestionRows.first().waitFor({ state: 'visible', timeout: shortTimeout });
+        } catch (error) {
+            // Retry once by retriggering suggestions (handles cold start, toggle-closed widget).
+            // Re-focus the editor first — focus may have drifted during the initial wait
+            // (e.g. a Vue re-render triggered by stream-field loading on cold start).
+            if (container) {
+                await this.focus(container);
+            }
+            await this.triggerSuggestions();
+            await suggestionRows.first().waitFor({ state: 'visible', timeout });
+        }
+
         return suggestWidget;
     }
 
@@ -130,11 +154,14 @@ class MonacoEditorHelper {
     /**
      * Get all suggestion labels from the autocomplete widget
      * @param {number} timeout - Timeout to wait for suggestions (default 5000)
+     * @param {import('@playwright/test').Locator|null} container - Optional editor container
+     *   forwarded to waitForSuggestions for focus recovery on retry.
      * @returns {Promise<string[]>}
      */
-    async getSuggestionLabels(timeout = 5000) {
+    async getSuggestionLabels(timeout = 5000, container = null) {
+        await this.waitForSuggestions(timeout, container);
+
         const suggestionRows = this.page.locator(this.selectors.suggestionRows);
-        await suggestionRows.first().waitFor({ state: 'visible', timeout });
 
         const labels = await suggestionRows
             .locator(this.selectors.suggestionLabel)

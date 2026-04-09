@@ -67,6 +67,12 @@ const loadMonaco = async () => {
   if (!monaco) {
     await import("monaco-editor/esm/vs/editor/editor.all.js");
     monaco = await import("monaco-editor/esm/vs/editor/editor.api");
+    // Expose Monaco globally so E2E tests can access editor instances via
+    // window.monaco.editor.getEditors(). Monaco is loaded as an ESM module
+    // and does not set window.monaco automatically.
+    if (!(window as any).monaco) {
+      (window as any).monaco = monaco;
+    }
   }
   return monaco;
 };

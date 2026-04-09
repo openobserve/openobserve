@@ -923,9 +923,11 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await page.locator('[data-test="dashboard-sql-query-type"]').click();
     await page.locator('[data-test="dashboard-custom-query-type"]').click();
 
-    // Focus on the editor
+    // Focus on the editor and type query using keyboard (Monaco's textarea is readonly)
     await page.locator('[data-test="dashboard-panel-query-editor"]').getByRole('code').click();
-    await page.locator('[data-test="dashboard-panel-query-editor"]').locator('.inputarea').fill(
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type(
       'SELECT kubernetes_container_name, count(*) as count FROM "e2e_automate" GROUP BY kubernetes_container_name'
     );
 

@@ -320,18 +320,19 @@ abc, err = get_enrichment_table_record("${fileName}", {
             }
             
             // Wait for VRL editor to be ready
-            await this.page.waitForSelector(this.vrlEditor, { 
+            await this.page.waitForSelector(this.vrlEditor, {
                 state: 'visible',
-                timeout: 30000 
+                timeout: 30000
             });
-            
-            // Get textbox using the original working approach
-            const textbox = this.page.locator(this.vrlEditor).locator('.inputarea');
-            await textbox.waitFor({ state: 'visible', timeout: 15000 });
-            
-            // Fill the VRL query
-            await textbox.clear();
-            await textbox.fill(fullQuery);
+
+            // Click the editor to focus it
+            await this.page.locator(this.vrlEditor).first().click({ force: true }).catch(() => {});
+
+            // Monaco may render a native-edit-context div (role=textbox) in Chrome 121+
+            // which does NOT support Playwright fill(). Use keyboard interaction instead.
+            await this.page.keyboard.press('Control+A');
+            await this.page.keyboard.press('Delete');
+            await this.page.keyboard.type(fullQuery);
             
             // Critical: Wait for VRL query validation and processing before proceeding
             // The VRL editor needs time to parse and validate the query syntax
@@ -578,15 +579,15 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const fnEditorParam = currentUrl.searchParams.get('fn_editor');
         testLogger.debug('fn_editor URL parameter', { fnEditorParam });
         
-        // If fn_editor is explicitly false, enable it via URL modification
-        if (fnEditorParam === 'false') {
-            testLogger.debug('VRL editor disabled via URL parameter, enabling via URL modification');
-            
+        // Enable the VRL editor if fn_editor is not explicitly true (handles both null and 'false')
+        if (fnEditorParam !== 'true') {
+            testLogger.debug('VRL editor not enabled via URL parameter, enabling via URL modification', { fnEditorParam });
+
             // Modify URL to enable VRL editor
             currentUrl.searchParams.set('fn_editor', 'true');
             const newUrl = currentUrl.toString();
             testLogger.debug('Navigating to URL with fn_editor=true', { newUrl });
-            
+
             // Navigate to the modified URL
             await this.page.goto(newUrl);
             await this.page.waitForLoadState('domcontentloaded');

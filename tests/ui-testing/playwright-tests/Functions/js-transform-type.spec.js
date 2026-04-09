@@ -66,9 +66,8 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       testLogger.info(`JavaScript function created in _meta org: ${functionName}`);
 
       // Step 3: Verify function appears in list
-      await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(1000);
+      // clickSaveButton() already navigates back to the list and triggers getJSTransforms().
+      // expectFunctionInList's 30s timeout handles waiting for the reactive data update.
       await pm.functionsPage.searchFunction(functionName);
       await pm.functionsPage.expectFunctionInList(functionName);
       testLogger.info('Function visible in functions list');
@@ -177,7 +176,8 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.selectJavaScriptType();
       await pm.functionsPage.enterFunctionCode(invalidCode);
 
-      await pm.functionsPage.clickSaveButton();
+      // Save is expected to fail (compilation error) — form stays open, use error variant.
+      await pm.functionsPage.clickSaveButtonExpectError();
 
       const pageContent = await page.content();
       const hasErrorIndicator = pageContent.toLowerCase().includes('error') ||
@@ -197,10 +197,12 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.selectJavaScriptType();
       await pm.functionsPage.enterFunctionCode(emptyCode);
 
-      await pm.functionsPage.clickSaveButton();
+      // Empty code may succeed or fail — use the error variant which doesn't require
+      // navigating back to the list page.
+      await pm.functionsPage.clickSaveButtonExpectError();
       testLogger.info('Empty function handling tested');
 
-      // Cancel if save failed
+      // Cancel if still on the form (save failed or was rejected)
       if (await pm.functionsPage.isCancelButtonVisible()) {
         await pm.functionsPage.clickCancelButton();
       }
@@ -252,10 +254,8 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       await pm.functionsPage.enterFunctionCode(vrlCode);
       await pm.functionsPage.clickSaveButton();
 
-      // Navigate back to functions list and search for the function
-      await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${nonMetaOrg}`);
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(1000);
+      // clickSaveButton() already navigates back to the list and triggers getJSTransforms().
+      // expectFunctionInList's 30s timeout handles waiting for the reactive data update.
       await pm.functionsPage.searchFunction(functionName);
       await pm.functionsPage.expectFunctionInList(functionName);
       testLogger.info(`VRL function created successfully in ${nonMetaOrg} org`);

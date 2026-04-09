@@ -418,28 +418,20 @@ export class TracesPage {
   }
 
   async enterSQLQuery(query) {
-    // Try different editor selectors - check visibility for each
-    // Note: Use .fill() to avoid pointer interception issues
-    const editorSelectors = [
-      this.page.locator('.monaco-editor .inputarea').first(),
-      this.page.locator('.monaco-editor textarea').first(),
-      this.page.locator(this.queryEditor).locator('.inputarea, textarea').first()
-    ];
+    // After Monaco upgrade, .inputarea resolves to a readonly IME textarea.
+    // Use .view-lines click + keyboard.insertText() instead of .fill().
+    const queryEditor = this.page.locator(this.queryEditor);
+    const viewLines = queryEditor.locator('.view-lines').first();
 
-    let editor = null;
-    for (const selector of editorSelectors) {
-      if (await selector.isVisible({ timeout: 2000 }).catch(() => false)) {
-        editor = selector;
-        break;
-      }
-    }
-
-    if (!editor) {
+    if (!(await viewLines.isVisible({ timeout: 5000 }).catch(() => false))) {
       throw new Error('No visible editor input found');
     }
 
-    // Use fill() instead of click + type to avoid pointer interception
-    await editor.fill(query);
+    await viewLines.click();
+    const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+    await this.page.keyboard.press(selectAllKey);
+    await this.page.keyboard.press('Backspace');
+    await this.page.keyboard.insertText(query);
   }
 
   async runQuery() {
@@ -666,13 +658,14 @@ export class TracesPage {
     try {
       await expect(queryEditor).toBeVisible({ timeout: 5000 });
 
-      // Use .fill() method to avoid pointer interception issues
-      // Try different selectors: .inputarea (Monaco's input area) or textarea (fallback)
-      const monacoInput = queryEditor.locator('.inputarea, textarea').first();
-      await expect(monacoInput).toBeVisible({ timeout: 3000 });
-
-      // Fill directly without clicking to avoid pointer interception
-      await monacoInput.fill(query);
+      // After Monaco upgrade, .inputarea resolves to a readonly IME textarea.
+      // Use .view-lines click + keyboard.insertText() instead of .fill().
+      const viewLines = queryEditor.locator('.view-lines').first();
+      await viewLines.click();
+      const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+      await this.page.keyboard.press(selectAllKey);
+      await this.page.keyboard.press('Backspace');
+      await this.page.keyboard.insertText(query);
       await this.page.waitForTimeout(500);
 
     } catch (error) {

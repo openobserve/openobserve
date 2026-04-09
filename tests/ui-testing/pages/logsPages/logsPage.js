@@ -754,6 +754,34 @@ export class LogsPage {
         await this.page.waitForTimeout(1000);
     }
 
+    // Helper method to resolve Monaco/Text editor input reliably
+    async waitForEditorInputArea(editorSelector, timeout = 15000) {
+        const editor = this.page.locator(editorSelector).first();
+        await editor.waitFor({ state: 'visible', timeout });
+
+        // Focus editor so Monaco mounts/activates the hidden textarea
+        await editor.click({ force: true }).catch(() => {});
+
+        // Prefer attached over visible because Monaco inputarea can be visually tiny/hidden
+        const inputArea = editor.locator('.inputarea, textarea, [role="textbox"]').first();
+        await inputArea.waitFor({ state: 'attached', timeout });
+        return inputArea;
+    }
+
+    async fillEditorContent(editorSelector, query, timeout = 15000) {
+        const inputArea = await this.waitForEditorInputArea(editorSelector, timeout);
+
+        try {
+            await inputArea.fill(query, { timeout: Math.min(timeout, 10000) });
+        } catch (error) {
+            testLogger.warn(`fillEditorContent: .fill() fallback for ${editorSelector}: ${error.message}`);
+            const editor = this.page.locator(editorSelector).first();
+            await editor.click({ force: true });
+            await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+            await this.page.keyboard.type(query);
+        }
+    }
+
     // Query execution methods
     async selectRunQuery() {
         // Ensure query editor is ready
@@ -864,15 +892,13 @@ export class LogsPage {
         // Use .inputarea.fill() directly - this is more reliable than keyboard.type()
         // as it avoids Monaco editor line number interference (the "1 SELECT" bug)
         // The .fill() method will replace the selected content
-        const inputArea = this.page.locator(this.queryEditor).locator('.inputarea');
-        await inputArea.waitFor({ state: 'visible', timeout: 5000 });
-        await inputArea.fill(query);
+        await this.fillEditorContent(this.queryEditor, query);
     }
 
     async typeQuery(query) {
         await this.page.locator(this.queryEditor).click();
         await this.page.locator(this.queryEditor).press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
+        await this.fillEditorContent(this.queryEditor, query);
     }
 
     async executeQueryWithKeyboardShortcut() {
@@ -1758,7 +1784,7 @@ export class LogsPage {
     }
 
     async fillQueryEditor(query) {
-        return await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
+        return await this.fillEditorContent(this.queryEditor, query);
     }
 
     async clearQueryEditor() {
@@ -2120,7 +2146,7 @@ export class LogsPage {
     }
 
     async waitForQueryEditorTextbox() {
-        return await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: "visible" });
+        return await this.waitForEditorInputArea(this.queryEditor);
     }
 
     async getQueryEditorText() {
@@ -2707,7 +2733,7 @@ export class LogsPage {
     }
 
     async clickVrlEditor() {
-        return await this.page.locator(this.vrlEditor).locator('.inputarea').fill('.a=2');
+        return await this.fillEditorContent(this.vrlEditor, '.a=2');
     }
 
     async waitForTimeout(milliseconds) {
@@ -2817,7 +2843,7 @@ export class LogsPage {
     }
 
     async isVrlEditorInputVisible() {
-        return await this.page.locator(this.fnEditor).locator('.inputarea').isVisible().catch(() => false);
+        return await this.page.locator(this.fnEditor).first().locator('.inputarea, textarea, [role="textbox"]').first().isVisible().catch(() => false);
     }
 
     async clickPast6DaysButton() {
@@ -5565,9 +5591,7 @@ export class LogsPage {
     async typeInVrlEditor(text) {
         const vrlEditor = this.page.locator('[data-test="logs-vrl-function-editor"], #fnEditor, .monaco-editor');
         await vrlEditor.first().waitFor({ state: 'visible', timeout: 10000 });
-        const textbox = vrlEditor.first().locator('.inputarea');
-        await textbox.waitFor({ state: 'visible', timeout: 5000 });
-        await textbox.fill(text);
+        await this.fillEditorContent('[data-test="logs-vrl-function-editor"], #fnEditor, .monaco-editor', text);
         testLogger.info('Typed text into VRL editor');
     }
 
@@ -5833,12 +5857,27 @@ export class LogsPage {
      * @param {string} query - The SQL query to set
      */
     async setQueryEditorContent(query) {
-        // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass
+        // Wait for the Monaco editor container to be visible before interacting.
+        // enableSqlModeIfNeeded() only waits for the toggle to flip; the editor
+        // renders asynchronously after that, so we must wait here too.
+        await this.page.locator('[data-test="logs-search-bar-query-editor"]').waitFor({
+            state: 'visible',
+            timeout: 15000,
+        });
+        // Monaco lazy-loads its bundle (~3MB). CodeQueryEditor.vue sets window.monaco after the
+        // bundle is ready and before calling monaco.editor.create(). Waiting for window.monaco
+        // is more reliable than a fixed timeout — once it's set, the .inputarea appears within ms.
+        await this.page.waitForFunction(
+            () => !!(window.monaco && window.monaco.editor),
+            { timeout: 90000 }
+        );
+        // Monaco's .inputarea is behind the .view-line overlay, so use force:true to bypass.
         const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
+        await inputArea.waitFor({ state: 'attached', timeout: 30000 });
         await inputArea.click({ force: true });
         await inputArea.fill(query);
         // Wait for Monaco to render the new content in the view-line
-        await this.page.locator('[data-test="logs-search-bar-query-editor"] .view-line').first().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[data-test="logs-search-bar-query-editor"] .view-line').first().waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info(`Query editor set to: "${query.substring(0, 60)}"`);
     }
 

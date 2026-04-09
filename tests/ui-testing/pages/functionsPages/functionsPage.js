@@ -102,19 +102,57 @@ class FunctionsPage {
   }
 
   async enterFunctionCode(code) {
-    // Focus the actual textarea inside the Monaco editor (not the container div).
-    // On headless Linux, clicking the wrapper div doesn't transfer focus to Monaco's
-    // internal textarea, so keyboard.type() sends keystrokes to nothing.
-    const textarea = this.page.locator(`${this.functionEditor} textarea`);
-    await textarea.focus();
-    await this.page.waitForTimeout(300);
+    // Set Monaco editor content programmatically to avoid keyboard/auto-completion
+    // issues in headless CI. Same pattern used in pipelinesEP.js.
+    await this.page.locator(this.functionEditor).waitFor({ state: 'visible' });
+    await this.page.waitForTimeout(500);
 
-    // Clear existing content and type new code
-    const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
-    await this.page.keyboard.press(selectAll);
-    await this.page.keyboard.press('Backspace');
-    await this.page.waitForTimeout(200);
-    await this.page.keyboard.type(code);
+    const success = await this.page.evaluate((args) => {
+      const [selector, value] = args;
+      const container = document.querySelector(selector);
+      if (!container) return false;
+
+      // 1. Try getEditorByDomElement — scoped to our container (most reliable)
+      const monacoEditorEl = container.querySelector('.monaco-editor');
+      if (monacoEditorEl) {
+        const editor = window.monaco?.editor?.getEditorByDomElement?.(monacoEditorEl);
+        if (editor) {
+          editor.setValue(value);
+          return true;
+        }
+        // 2. Try __vscode_monaco_editor__ property on the DOM element
+        if (monacoEditorEl.__vscode_monaco_editor__) {
+          monacoEditorEl.__vscode_monaco_editor__.setValue(value);
+          return true;
+        }
+      }
+
+      // 3. Iterate all editors and find the one whose DOM node is inside our container
+      const editors = window.monaco?.editor?.getEditors?.();
+      if (editors && editors.length > 0) {
+        for (const ed of editors) {
+          if (container.contains(ed.getDomNode?.())) {
+            ed.setValue(value);
+            return true;
+          }
+        }
+      }
+
+      return false;
+    }, [this.functionEditor, code]);
+
+    if (!success) {
+      // Fallback to keyboard typing if programmatic approach fails
+      const textarea = this.page.locator(`${this.functionEditor} textarea`);
+      await textarea.focus();
+      await this.page.waitForTimeout(300);
+      const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+      await this.page.keyboard.press(selectAll);
+      await this.page.keyboard.press('Backspace');
+      await this.page.waitForTimeout(200);
+      await this.page.keyboard.type(code);
+    }
+
     // Wait longer than the Monaco editor's 500ms debounce so formData syncs via v-model
     await this.page.waitForTimeout(1000);
   }
@@ -122,7 +160,31 @@ class FunctionsPage {
   async clickSaveButton() {
     const saveButton = this.page.locator(this.saveButton);
     await saveButton.click();
-    await this.page.waitForTimeout(2000);
+
+    // Wait for any notification to appear (success or error).
+    // Use a broad selector — the backend message text varies, so avoid text filters.
+    const notification = this.page.locator('.q-notification').first();
+    await notification.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+
+    // Wait for the Add Function button to reappear (indicates save completed and we're back on list).
+    // No .catch here — if this times out the save did not complete and the test should fail clearly.
+    const addButton = this.page.locator(this.addFunctionButton);
+    await expect(addButton).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Click save and wait for an error notification to appear.
+   * Use this instead of clickSaveButton() when the save is expected to fail
+   * (e.g. invalid/empty code) so the form stays open and the list-page add
+   * button never reappears.
+   */
+  async clickSaveButtonExpectError() {
+    const saveButton = this.page.locator(this.saveButton);
+    await saveButton.click();
+
+    // Wait for an error notification; .catch keeps the test flowing if none appears.
+    const notification = this.page.locator('.q-notification').first();
+    await notification.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
   }
 
   async clickCancelButton() {
@@ -149,10 +211,12 @@ class FunctionsPage {
   }
 
   async clickFunctionByName(name) {
-    // Find the row containing the function name
+    // Find the row containing the function name and click its edit button.
+    // 30 s timeout: the reactive filter re-applies when data arrives, so this correctly
+    // handles slow CI where the list API responds after the search field is filled.
     const functionRow = this.page.locator('tr').filter({ hasText: name }).first();
-    // Click the edit button in that row (Quasar icon button with edit icon)
-    const editButton = functionRow.getByRole('button').filter({ has: this.page.locator('.q-icon').filter({ hasText: 'edit' }) });
+    await expect(functionRow).toBeVisible({ timeout: 30000 });
+    const editButton = functionRow.locator('[data-test="function-list-edit-btn"]');
     await editButton.click();
     await this.page.waitForTimeout(1000);
   }
@@ -175,18 +239,56 @@ class FunctionsPage {
   // ==================== Test Function Methods ====================
 
   async enterTestEvent(eventJson) {
-    // Focus the actual textarea inside the Monaco editor (not the container div).
-    // Using .focus() ensures keyboard shortcuts work correctly in Monaco.
-    const textarea = this.page.locator(`${this.testEventsEditor} textarea`);
-    await textarea.focus();
-    await this.page.waitForTimeout(300);
+    // Set Monaco editor content programmatically to avoid keyboard issues in headless CI.
+    await this.page.locator(this.testEventsEditor).waitFor({ state: 'visible' });
+    await this.page.waitForTimeout(500);
 
-    // Select all existing content, delete it, then type new content
-    const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
-    await this.page.keyboard.press(selectAll);
-    await this.page.keyboard.press('Backspace');
-    await this.page.waitForTimeout(200);
-    await this.page.keyboard.type(eventJson);
+    const success = await this.page.evaluate((args) => {
+      const [selector, value] = args;
+      const container = document.querySelector(selector);
+      if (!container) return false;
+
+      // 1. Try getEditorByDomElement — scoped to our container (most reliable)
+      const monacoEditorEl = container.querySelector('.monaco-editor');
+      if (monacoEditorEl) {
+        const editor = window.monaco?.editor?.getEditorByDomElement?.(monacoEditorEl);
+        if (editor) {
+          editor.setValue(value);
+          return true;
+        }
+        // 2. Try __vscode_monaco_editor__ property on the DOM element
+        if (monacoEditorEl.__vscode_monaco_editor__) {
+          monacoEditorEl.__vscode_monaco_editor__.setValue(value);
+          return true;
+        }
+      }
+
+      // 3. Iterate all editors and find the one whose DOM node is inside our container
+      const editors = window.monaco?.editor?.getEditors?.();
+      if (editors && editors.length > 0) {
+        for (const ed of editors) {
+          if (container.contains(ed.getDomNode?.())) {
+            ed.setValue(value);
+            return true;
+          }
+        }
+      }
+
+      return false;
+    }, [this.testEventsEditor, eventJson]);
+
+    if (!success) {
+      // Fallback to keyboard typing
+      const textarea = this.page.locator(`${this.testEventsEditor} textarea`);
+      await textarea.focus();
+      await this.page.waitForTimeout(300);
+      const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+      await this.page.keyboard.press(selectAll);
+      await this.page.keyboard.press('Backspace');
+      await this.page.waitForTimeout(200);
+      await this.page.keyboard.type(eventJson);
+    }
+
     // Wait for Monaco editor v-model debounce to sync
     await this.page.waitForTimeout(600);
   }
@@ -247,8 +349,11 @@ class FunctionsPage {
   }
 
   async expectFunctionInList(functionName) {
-    const functionRow = this.page.locator(`text=${functionName}`);
-    await expect(functionRow).toBeVisible({ timeout: 10000 });
+    // Use a table row locator for more reliable matching.
+    // 30 s timeout: the reactive filter re-applies when data arrives, so this correctly
+    // handles slow CI where the list API responds after the search field is filled.
+    const functionRow = this.page.locator('tr').filter({ hasText: functionName }).first();
+    await expect(functionRow).toBeVisible({ timeout: 30000 });
   }
 
   async isCancelButtonVisible() {
@@ -355,6 +460,12 @@ class FunctionsPage {
    * @returns {Promise<'js'|'vrl'|null>} Function type
    */
   async openFunctionAndCheckType(functionName) {
+    // Wait for the functions table to have at least one data row before searching.
+    // After page navigation, getJSTransforms() is async — the list may not be
+    // populated yet even after waitForLoadState+2s in the spec.
+    const anyDataRow = this.page.locator('tbody tr').first();
+    await anyDataRow.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
+
     await this.searchFunction(functionName);
     await this.clickFunctionByName(functionName);
 
