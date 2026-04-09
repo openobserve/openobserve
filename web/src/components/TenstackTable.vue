@@ -34,7 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :style="{
           minWidth: '100%',
           ...columnSizeVars,
-          minHeight: showPagination || !useVirtualScroll ? undefined : totalSize + 'px',
+          minHeight:
+            showPagination || !useVirtualScroll ? undefined : totalSize + 'px',
           width: !useVirtualScroll
             ? '100%'
             : !defaultColumns
@@ -52,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:sticky tw:top-0 tw:z-10"
         >
           <tr
-            v-for="(level, levelIdx) in (pivotHeaderLevels as any[])"
+            v-for="(level, levelIdx) in pivotHeaderLevels as any[]"
             :key="'hl_' + levelIdx"
             style="max-height: 28px; height: 28px"
           >
@@ -137,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               // Flex only for virtual-scroll mode (logs/traces) for drag-reorder + alignment
               // Non-virtual (dashboard) uses table-layout:auto — no flex so browser auto-sizes columns
               useVirtualScroll ? 'tw:flex items-center' : '',
-                enableColumnReorder && table.getState().columnOrder.length
+              enableColumnReorder && table.getState().columnOrder.length
                 ? 'tw:cursor-move!'
                 : '',
             ]"
@@ -205,14 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-if="!header.isPlaceholder"
                   :data-test="`o2-table-th-sort-${header.id}`"
-                  :class="[
-                    'text-left',
-                    header.column.getCanSort() ||
-                    (sortBy !== undefined &&
-                      (header.column.columnDef.meta as any)?.sortable)
-                      ? 'cursor-pointer tw:gap-1'
-                      : 'cursor-pointer tw:gap-1',
-                  ]"
+                  :class="['text-left', 'cursor-pointer tw:gap-1']"
                   @click="
                     handleHeaderSortClick(
                       $event,
@@ -370,8 +364,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </tr>
         </thead>
         <!-- tw:relative is only needed for virtual-scroll absolute rows (logs/traces).
-           In dashboard mode (regular DOM rows) it must be absent so that
-           position:sticky on <thead> works correctly. -->
+          In dashboard mode (regular DOM rows) it must be absent so that
+          position:sticky on <thead> works correctly. -->
         <tbody
           data-test="o2-table-body"
           ref="tableBodyRef"
@@ -379,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- ── Dashboard: regular DOM rows (no virtual scroll) ──────────────── -->
           <!-- Used when `data` prop is present (dashboard mode) OR pagination is
-             enabled. Virtual scroll (below) is only for logs/traces. -->
+            enabled. Virtual scroll (below) is only for logs/traces. -->
           <template v-if="showPagination || !useVirtualScroll">
             <tr
               v-for="(row, rowIdx) in pagedRows"
@@ -605,11 +599,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`o2-table-expanded-row-${virtualRow.index}`"
                 class="tw:w-full tw:relative"
               >
-                <json-preview
-                  :value="tableRows[virtualRow.index - 1] as any"
-                  show-copy-button
-                  class="tw:py-[0.375rem]"
-                  mode="expanded"
+                <slot
+                  name="expanded-row"
+                  :row="tableRows[virtualRow.index - 1]"
                   :index="calculateActualIndex(virtualRow.index - 1)"
                   :highlight-query="highlightQuery"
                   :hide-view-related="hideViewRelatedButton"
@@ -870,37 +862,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </tr>
         </tbody>
 
-      <!-- ── Dashboard: sticky grand-total row ──────────────────────────────── -->
-      <tfoot
-        v-if="stickyTotalRow"
-        style="position: sticky; bottom: 0; z-index: 10"
-      >
-        <tr class="pivot-total-row pivot-sticky-total-row">
-          <td
-            v-for="col in ((columns as any[]) || [])"
-            :key="'ft_' + col.name"
-            class="tw:px-2"
-            :class="[
-              col.align === 'right' ? 'tw:text-right' : col.align === 'center' ? 'tw:text-center' : 'tw:text-left',
-              { 'sticky-column': col.sticky },
-              { 'pivot-total-col': stickyColTotals && col._isTotalColumn },
-            ]"
-            :style="([getStickyTotalColumnStyle(col), getStickyColumnStyle(col)] as any)"
-          >
-            {{
-              stickyTotalRow[col.field] === undefined ||
-              stickyTotalRow[col.field] === null
-                ? ''
-                : col.format
-                  ? col.format(stickyTotalRow[col.field], stickyTotalRow)
-                  : stickyTotalRow[col.field]
-            }}
-          </td>
-        </tr>
-      </tfoot>
-    </table>
-
-  </div><!-- end scroll container -->
+        <!-- ── Dashboard: sticky grand-total row ──────────────────────────────── -->
+        <tfoot
+          v-if="stickyTotalRow"
+          style="
+            position: sticky;
+            bottom: 0;
+            z-index: 10;
+            box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+          "
+        >
+          <tr class="pivot-total-row pivot-sticky-total-row">
+            <td
+              v-for="col in (columns as any[]) || []"
+              :key="'ft_' + col.name"
+              class="tw:px-2"
+              :class="[
+                col.align === 'right'
+                  ? 'tw:text-right'
+                  : col.align === 'center'
+                    ? 'tw:text-center'
+                    : 'tw:text-left',
+                { 'sticky-column': col.sticky },
+                { 'pivot-total-col': stickyColTotals && col._isTotalColumn },
+              ]"
+              :style="
+                [
+                  getStickyTotalColumnStyle(col),
+                  getStickyColumnStyle(col),
+                ] as any
+              "
+            >
+              {{
+                stickyTotalRow[col.field] === undefined ||
+                stickyTotalRow[col.field] === null
+                  ? ""
+                  : col.format
+                    ? col.format(stickyTotalRow[col.field], stickyTotalRow)
+                    : stickyTotalRow[col.field]
+              }}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <!-- end scroll container -->
 
     <!-- ── Bottom slot: pagination footer or custom footer ──── -->
     <!-- Lives OUTSIDE the scroll container so it's always visible -->
@@ -921,8 +927,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :isLastPage="currentPage >= pagesNumber"
         :firstPage="() => (currentPage = 1)"
         :prevPage="() => (currentPage = Math.max(1, currentPage - 1))"
-        :nextPage="() => { currentPage = Math.min(pagesNumber, currentPage + 1); }"
-        :lastPage="() => { currentPage = pagesNumber; }"
+        :nextPage="
+          () => {
+            currentPage = Math.min(pagesNumber, currentPage + 1);
+          }
+        "
+        :lastPage="
+          () => {
+            currentPage = pagesNumber;
+          }
+        "
       />
     </template>
   </div>
@@ -1199,24 +1213,24 @@ const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
   return (props.columns as any[])
     .filter((col: any) => col.name != null && String(col.name) !== "")
     .map((col: any) => ({
-    id: String(col.name),
-    header: String(col.label ?? col.name),
-    ...(typeof col.field === "function"
-      ? { accessorFn: col.field }
-      : { accessorKey: String(col.field ?? col.name) }),
-    meta: {
-      align: col.align,
-      format: col.format,
-      sticky: col.sticky,
-      colorMode: col.colorMode,
-      showFieldAsJson: col.showFieldAsJson,
-      _isRowField: col._isRowField,
-      _isTotalColumn: col._isTotalColumn,
-      _totalColRightIndex: col._totalColRightIndex,
-      _col: col, // reference to original Quasar column for style helpers
-      sortable: col.sortable, // mirrors Quasar column flag — drives sort icon visibility
-    },
-  }));
+      id: String(col.name),
+      header: String(col.label ?? col.name),
+      ...(typeof col.field === "function"
+        ? { accessorFn: col.field }
+        : { accessorKey: String(col.field ?? col.name) }),
+      meta: {
+        align: col.align,
+        format: col.format,
+        sticky: col.sticky,
+        colorMode: col.colorMode,
+        showFieldAsJson: col.showFieldAsJson,
+        _isRowField: col._isRowField,
+        _isTotalColumn: col._isTotalColumn,
+        _totalColRightIndex: col._totalColRightIndex,
+        _col: col, // reference to original Quasar column for style helpers
+        sortable: col.sortable, // mirrors Quasar column flag — drives sort icon visibility
+      },
+    }));
 });
 
 // ── Dashboard: pivot helpers ─────────────────────────────────────────────────
@@ -1250,13 +1264,17 @@ watch(
   () => pivotSortState.value,
   () => {
     if (!isPivotMode.value) return;
-    const rows = ((props.rows as any[]) || []).filter((r: any) => !r.__isTotalRow);
+    const rows = ((props.rows as any[]) || []).filter(
+      (r: any) => !r.__isTotalRow,
+    );
     const { sortBy, descending } = pivotSortState.value;
     if (!sortBy) {
       tableRows.value = [...rows];
       return;
     }
-    const col = ((props.columns as any[]) || []).find((c: any) => c.name === sortBy);
+    const col = ((props.columns as any[]) || []).find(
+      (c: any) => c.name === sortBy,
+    );
     tableRows.value = [...rows].sort((a: any, b: any) => {
       const va = a[sortBy];
       const vb = b[sortBy];
@@ -1270,7 +1288,6 @@ watch(
   },
   { deep: true },
 );
-
 
 // ── Dashboard: pivot merge map ───────────────────────────────────────────────
 const pivotMergeMap = computed(() => {
@@ -1350,8 +1367,8 @@ const getStickyTotalColumnStyle = (col: any) => {
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     "min-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     "max-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-    "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
-    "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
+    "background-color": store.state.theme === "dark" ? "#565656" : "#E0E0E0",
+    "box-shadow": "-4px 0 6px rgba(0, 0, 0, 0.15)",
     "white-space": "normal",
     "word-break": "break-word",
   };
@@ -1367,7 +1384,8 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
   return {
     position: "sticky",
     right: `${rightOffset}px`,
-    "z-index": 3,
+    top: 0,
+    "z-index": 11,
     width: `${width}px`,
     "min-width": `${width}px`,
     "max-width": `${width}px`,
@@ -1444,7 +1462,7 @@ const paginationOptions = computed(() => {
 const pagesNumber = computed(() =>
   localRowsPerPage.value === 0
     ? 1
-    : Math.ceil(tableRows.value.length / localRowsPerPage.value) || 1
+    : Math.ceil(tableRows.value.length / localRowsPerPage.value) || 1,
 );
 
 // pagedRows is defined after formattedRows below — see declaration near virtualizer.
@@ -1515,7 +1533,8 @@ watch(
         const vb = b[sortBy];
         let result: number;
         if (col?.sort) result = col.sort(va, vb, a, b);
-        else if (typeof va === "number" && typeof vb === "number") result = va - vb;
+        else if (typeof va === "number" && typeof vb === "number")
+          result = va - vb;
         else result = String(va ?? "").localeCompare(String(vb ?? ""));
         return descending ? -result : result;
       });
@@ -2024,17 +2043,25 @@ defineExpose({
 
 // ── Dashboard / pivot table styles ──────────────────────────────────────────
 
-// Pivot multi-level header cells
+// Pivot multi-level header cells - sticky with border and shadow
 .pivot-group-header {
   text-align: center;
   font-weight: 600;
   border-bottom: 2px solid rgba(0, 0, 0, 0.12);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .pivot-value-header {
   text-align: center;
   font-weight: 500;
   font-size: 0.85em;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 // Column separator between pivot sections
@@ -2061,9 +2088,15 @@ defineExpose({
 // Sticky total row at bottom
 .pivot-sticky-total-row {
   font-weight: bold;
+  position: sticky;
+  bottom: 0;
+  z-index: 9;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
 
   td {
     background-color: var(--q-color-grey-2, #f5f5f5);
+    position: sticky;
+    bottom: 0;
   }
 }
 
