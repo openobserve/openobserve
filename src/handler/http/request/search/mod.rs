@@ -340,7 +340,9 @@ pub async fn search(
                 converted_histogram_query = Some(req.query.sql.clone());
             }
             Err(e) => {
-                log::error!("[trace_id {trace_id}] http->search: error converting to histogram query: {e}");
+                log::error!(
+                    "[trace_id {trace_id}] http->search: error converting to histogram query: {e}"
+                );
                 return map_error_to_http_response(&(e), Some(trace_id));
             }
         }
