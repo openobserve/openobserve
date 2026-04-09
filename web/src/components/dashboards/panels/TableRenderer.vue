@@ -309,9 +309,9 @@ export default defineComponent({
   opacity: 1 !important;
 }
 
-// Sticky total column visual separator — shadow with blur matching the bottom total row
+// Sticky total column visual separator — inset shadow on left edge matching the bottom total row
 :deep(.pivot-total-col) {
-  box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
 }
 
 @media print {

@@ -127,12 +127,12 @@ export function useStickyColumns(props: any, store: any) {
         box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1) !important;
       }
 
-      /* Right-sticky total column body cells — shadow matches bottom total row */
+      /* Right-sticky total column body cells — inset shadow on left edge matching bottom total row */
       ${scope} tbody td.pivot-total-col {
         position: sticky !important;
         z-index: 2 !important;
         background-color: ${bgColor} !important;
-        box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1) !important;
+        box-shadow: inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
       }
 
       /* Sticky total row (bottom sticky) */
