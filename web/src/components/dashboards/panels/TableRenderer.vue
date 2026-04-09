@@ -306,7 +306,7 @@ export default defineComponent({
 
 // Sticky total column visual separator
 :deep(.pivot-total-col) {
-  border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
+  box-shadow: -2px 0 0 rgba(0, 0, 0, 0.12) !important;
 }
 
 @media print {
