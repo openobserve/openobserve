@@ -89,4 +89,16 @@ mod tests {
             "Expected errors for pie with wrong field counts"
         );
     }
+
+    #[test]
+    fn test_valid_promql_dashboard() {
+        let json_str = include_str!("../../../../../../test-fixtures/valid/promql-dashboard.json");
+        let json: Value = serde_json::from_str(json_str).unwrap();
+        let errors = validate_dashboard(&json);
+        assert!(
+            errors.is_empty(),
+            "Expected valid PromQL dashboard, got errors: {:?}",
+            errors
+        );
+    }
 }
