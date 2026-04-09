@@ -129,6 +129,7 @@ import {
   generateTraceContext,
 } from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUtils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { getVariableKey } from "@/composables/dashboard/useVariablesManager";
@@ -696,12 +697,13 @@ export default defineComponent({
 
       const varLookup = resolvedVarLookup.value;
 
-      // Replace all variable references ($variableName) with their resolved values.
+      // Replace all variable references ($variableName and {{variableName}}) with their resolved values.
       // Using replace callback avoids regex exec loop risks and handles
       // special replacement patterns ($1, $&, etc.) safely.
       return value.replace(
-        /\$([a-zA-Z0-9_-]+)/g,
-        (fullMatch, varName) => {
+        /(?:\$\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\})|(?:\$([a-zA-Z0-9_-]+))|(?:\{\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\}\})/g,
+        (fullMatch, dollarBraceVarName, dollarVarName, mustacheVarName) => {
+          const varName = dollarBraceVarName || dollarVarName || mustacheVarName;
           if (varName in varLookup) {
             let varValue = varLookup[varName];
 
@@ -2007,6 +2009,9 @@ export default defineComponent({
           variablesData.values;
       }
 
+      // Normalize spaces inside variable syntax before replacement
+      queryContext = normalizeVariableSyntax(queryContext);
+
       for (const variable of variablesToResolve) {
         // Skip dynamic_filters as they don't participate in standard variable replacement
         // and their value structure (array of objects) causes issues with escapeSingleQuotes
@@ -2022,7 +2027,11 @@ export default defineComponent({
               .map((value: any) => `'${escapeSingleQuotes(value)}'`)
               .join(", ");
 
-            // Create regex patterns to replace all occurrences
+            // Mustache patterns: {{variable}} and {{variable:format}}
+            const mustachePattern = new RegExp(`\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`, 'g');
+            queryContext = queryContext.replace(mustachePattern, arrayValues);
+
+            // Dollar-sign patterns (existing)
             // Pattern 1: Unquoted placeholder like IN($variable) -> IN('val1', 'val2')
             const unquotedPattern = new RegExp(`\\$${escapedVarName}(?!')`, 'g');
             // Pattern 2: Quoted placeholder like '$variable' -> 'val1', 'val2'
@@ -2041,6 +2050,12 @@ export default defineComponent({
           } else if (variable.value !== null && variable.value !== undefined) {
             // Replace single values with regex to replace all occurrences
             const replacedValue = escapeSingleQuotes(variable.value);
+
+            // Mustache pattern
+            const mustachePattern = new RegExp(`\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`, 'g');
+            queryContext = queryContext.replace(mustachePattern, replacedValue);
+
+            // Dollar-sign pattern (existing)
             const pattern = new RegExp(`\\$${escapedVarName}`, 'g');
             queryContext = queryContext.replace(
               pattern,

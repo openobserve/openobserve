@@ -931,6 +931,27 @@ export class StreamsPage {
     }
 
     /**
+     * Navigate directly to streams page with explicit org identifier.
+     * Uses page.goto instead of menu click to avoid cloud _meta org redirect bug.
+     */
+    async navigateToStreamsPage(baseUrl, orgId) {
+        await this.page.goto(`${baseUrl}/web/streams?org_identifier=${orgId}`);
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
+
+    /**
+     * Assert an exact-match stream name cell is visible in the streams table.
+     * Uses getByRole('cell', { exact: true }) to avoid strict mode violations
+     * when multiple streams share a common prefix (e.g. e2e_automate, e2e_automate1).
+     */
+    async expectExactStreamCellVisible(streamName, timeout = 10000) {
+        await expect(
+            this.page.getByRole('cell', { name: streamName, exact: true }).first()
+        ).toBeVisible({ timeout });
+        testLogger.info(`Stream cell visible: ${streamName}`);
+    }
+
+    /**
      * Check if stream is visible
      * Bug #9354 - FTS auto-add
      */

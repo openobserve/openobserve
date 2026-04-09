@@ -15,7 +15,8 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
-const { ingestTestData } = require('../utils/data-ingestion.js');
+const { ingestTestData, sendRequest, getHeaders, getIngestionUrl } = require('../utils/data-ingestion.js');
+const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 test.describe("Logs Regression Bug Fixes", () => {
   // Changed from serial to parallel - tests are independent (each gets own page/PM in beforeEach)
@@ -89,7 +90,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     });
 
     // Navigate to logs page
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     const initialCallCount = searchApiCalls.length;
     testLogger.info(`Initial API calls: ${initialCallCount}`);
@@ -159,7 +160,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should display search bar with required UI elements @bug-8928 @P1 @ui @regression", async ({ page }) => {
     testLogger.info('Test: Verify search bar UI consistency (Bug #8928)');
 
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
     await pm.logsPage.clickRefreshButton();
@@ -185,7 +186,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should render histogram without cropping @bug-8928 @P1 @ui @histogram @regression", async ({ page }) => {
     testLogger.info('Test: Verify histogram renders correctly (Bug #8928)');
 
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
     await pm.logsPage.clickRefreshButton();
@@ -220,7 +221,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Test: Verify quick mode query is preserved when selecting new interesting field');
 
     // Navigate to logs page
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Select stream
@@ -269,7 +270,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Test: Verify pagination shows when histogram and SQL mode are disabled');
 
     // Navigate to logs page
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Select stream
@@ -313,7 +314,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Test: Verify error message correctly identifies the problematic field');
 
     // Navigate to logs page
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Select stream
@@ -361,32 +362,56 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should fetch fresh field values when switching streams @fieldValuesCache @P1 @regression", async ({ page }) => {
     testLogger.info('Test: Field values should refresh when switching between streams');
 
-    const stream1Name = 'e2e_field_cache_stream1';
-    const stream2Name = 'e2e_field_cache_stream2';
-    // Register streams for cleanup in afterEach
-    fieldCacheStreamsToCleanup = [stream1Name, stream2Name];
+    // Strategy: use existing e2e_automate stream (always available) + ONE new stream.
+    // Alpha1 cloud has a backend bug where creating 2 new streams in quick succession
+    // causes the second stream's metadata to never appear in the streams API.
+    // By reusing e2e_automate, we only create 1 new stream (which always works).
+    const stream1Name = 'e2e_automate'; // existing stream from global setup
+    const runId = Date.now();
+    const stream2Name = `e2e_svctest_${runId}`;
+    // Only the new stream needs cleanup
+    fieldCacheStreamsToCleanup = [stream2Name];
     const testFieldName = 'service_name';
-    const stream1Value = 'service-from-stream1-unique';
-    const stream2Value = 'service-from-stream2-unique';
+    const stream1Value = `svc-automate-${runId}`;
+    const stream2Value = `svc-newstream-${runId}`;
 
-    // Step 1: Ingest data into stream1 with unique service_name value
+    const streamWaitMs = isCloudEnvironment() ? 150000 : 30000;
+
+    // Step 1: Ingest data with unique service_name into e2e_automate (stream already exists)
+    // IMPORTANT: Use sendRequest (page.request.post) instead of pm.logsPage.ingestData (node-fetch).
+    // On cloud, streams ingested via node-fetch never appear in the streams API keyword search,
+    // while streams ingested via page.request are indexed immediately.
+    const orgId = getOrgIdentifier() || 'default';
+    const headers = getHeaders();
     testLogger.info(`Ingesting data into ${stream1Name} with ${testFieldName}=${stream1Value}`);
     const timestamp1 = Date.now() * 1000;
-    await pm.logsPage.ingestData(stream1Name, [
-      { [testFieldName]: stream1Value, level: 'info', message: 'Test log stream1', _timestamp: timestamp1 },
-      { [testFieldName]: stream1Value, level: 'info', message: 'Test log stream1 2', _timestamp: timestamp1 + 1000000 },
-    ]);
+    const stream1Url = getIngestionUrl(orgId, stream1Name);
+    const stream1Response = await sendRequest(page, stream1Url, [
+      { [testFieldName]: stream1Value, level: 'info', message: 'Field cache test stream1', _timestamp: timestamp1 },
+      { [testFieldName]: stream1Value, level: 'info', message: 'Field cache test stream1 2', _timestamp: timestamp1 + 1000000 },
+    ], headers);
+    testLogger.info(`Stream1 ingestion response: ${JSON.stringify(stream1Response)}`);
 
-    // Step 2: Ingest data into stream2 with different unique service_name value
-    // Use offset from timestamp1 to guarantee uniqueness
-    testLogger.info(`Ingesting data into ${stream2Name} with ${testFieldName}=${stream2Value}`);
+    // Step 2: Create new stream by ingesting standard test data first (ensures proper stream registration),
+    // then ingest custom records with distinct service_name for the field values cache test.
+    testLogger.info(`Creating stream ${stream2Name} with standard test data`);
+    await ingestTestData(page, stream2Name);
+    testLogger.info(`Ingesting custom data into ${stream2Name} with ${testFieldName}=${stream2Value}`);
     const timestamp2 = timestamp1 + 2000000;
-    await pm.logsPage.ingestData(stream2Name, [
-      { [testFieldName]: stream2Value, level: 'info', message: 'Test log stream2', _timestamp: timestamp2 },
-      { [testFieldName]: stream2Value, level: 'info', message: 'Test log stream2 2', _timestamp: timestamp2 + 1000000 },
-    ]);
+    const stream2Url = getIngestionUrl(orgId, stream2Name);
+    const stream2Response = await sendRequest(page, stream2Url, [
+      { [testFieldName]: stream2Value, level: 'info', log: 'Field cache test stream2', _timestamp: timestamp2 },
+      { [testFieldName]: stream2Value, level: 'info', log: 'Field cache test stream2 2', _timestamp: timestamp2 + 1000000 },
+    ], headers);
+    testLogger.info(`Stream2 custom ingestion response: ${JSON.stringify(stream2Response)}`);
 
-    // Step 3: Navigate to logs and select stream1
+    // Wait for the new stream to be indexed (e2e_automate already exists)
+    testLogger.info(`Waiting for ${stream2Name} to be indexed...`);
+    const stream2Available = await pm.logsPage.waitForStreamAvailable(stream2Name, streamWaitMs, 3000);
+    expect(stream2Available, `Stream ${stream2Name} should be available via API`).toBeTruthy();
+    testLogger.info(`Stream ${stream2Name} confirmed available via API`);
+
+    // Step 3: Navigate to logs and select stream1 (e2e_automate — always available)
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.selectStream(stream1Name);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -402,6 +427,8 @@ test.describe("Logs Regression Bug Fixes", () => {
     );
     await pm.logsPage.clickRefreshButton();
     await searchResponsePromise1;
+    // Wait for results table to fully render before field interaction
+    await page.waitForTimeout(3000);
 
     // Step 4: Expand the service_name field and capture values from stream1
     testLogger.info(`Expanding ${testFieldName} field in ${stream1Name}`);
@@ -415,7 +442,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     );
     await pm.logsPage.clickFieldExpandButton(testFieldName);
     await valuesResponsePromise1;
-    await pm.logsPage.waitForFieldValues(testFieldName);
+    await pm.logsPage.waitForFieldValues(testFieldName, 15000);
 
     // Get field values from stream1
     const stream1FieldValues = await pm.logsPage.getFieldValuesText(testFieldName);
@@ -441,6 +468,8 @@ test.describe("Logs Regression Bug Fixes", () => {
     );
     await pm.logsPage.clickRefreshButton();
     await searchResponsePromise2;
+    // Wait for results table to fully render before field interaction
+    await page.waitForTimeout(3000);
 
     // Step 6: Expand the same service_name field in stream2
     testLogger.info(`Expanding ${testFieldName} field in ${stream2Name}`);
@@ -454,7 +483,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     );
     await pm.logsPage.clickFieldExpandButton(testFieldName);
     await valuesResponsePromise2;
-    await pm.logsPage.waitForFieldValues(testFieldName);
+    await pm.logsPage.waitForFieldValues(testFieldName, 15000);
 
     // Get field values from stream2
     const stream2FieldValues = await pm.logsPage.getFieldValuesText(testFieldName);
@@ -474,7 +503,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   });
 
   test.afterEach(async () => {
-    // Cleanup streams created by field cache test
+    // Cleanup new stream created by field cache test (e2e_automate is never deleted)
     if (fieldCacheStreamsToCleanup.length > 0 && pm) {
       testLogger.info('Cleaning up test streams');
       for (const streamName of fieldCacheStreamsToCleanup) {

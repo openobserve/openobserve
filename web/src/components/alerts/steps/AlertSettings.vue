@@ -933,6 +933,8 @@ export default defineComponent({
           {
             org_identifier: store.state.selectedOrganization.identifier,
             query,
+            start_time: (Date.now() - 3600000) * 1000,
+            end_time: Date.now() * 1000,
             page_type: props.formData.stream_type || "logs",
             is_streaming: false,
           },

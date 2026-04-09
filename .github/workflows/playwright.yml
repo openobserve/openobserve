@@ -185,6 +185,7 @@ jobs:
                 "dashboard-promql-suggestions.spec.js",
                 "dashboard-share-link.spec.js",
                 "crossLinking.spec.js",
+                "crossLinkMultiStream.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
@@ -310,6 +311,7 @@ jobs:
                 "dashboard-variables-default-values-chain.spec.js",
                 "dashboard-variables-custom-parents.spec.js",
                 "dashboard-variables-stream-field.spec.js",
+                "dashboard-mustache-variables.spec.js",
               ]
           - testfolder: "Dashboard-Table-Pagination"
             browser: "chrome"
