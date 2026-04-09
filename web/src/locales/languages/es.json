@@ -119,7 +119,9 @@
     "copyError": "No se pudo copiar al portapapeles",
     "goBack": "Regresar",
     "stopGenerating": "Deja de generar",
-    "redirectingHome": "Redirigiendo a casa en {countdown} segundos..."
+    "redirectingHome": "Redirigiendo a casa en {countdown} segundos...",
+    "version": "Versión",
+    "create": "Crear"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -2399,7 +2401,7 @@
       "clickToViewSuggestions": "Haga clic para ver las sugerencias de mejora de la correlación",
       "byService": "Por servicio",
       "byStream": "Por Stream",
-      "searchServiceName": "Nombre del servicio de búsqueda...",
+      "searchServiceName": "Buscar nombre de servicio o stream...",
       "searchStreamName": "Nombre de la secuencia de búsqueda...",
       "allServices": "Todos los servicios",
       "missingTelemetry": "Falta telemetría",
@@ -2669,7 +2671,12 @@
     "errorGettingResults": "Error al obtener los resultados",
     "discardChangesTitle": "Descartar cambios",
     "deleteNodeTitle": "Eliminar nodo",
-    "deleteNodeLlmEvalConfirm": "¿Está seguro de que desea eliminar este nodo de evaluación de LLM?"
+    "deleteNodeLlmEvalConfirm": "¿Está seguro de que desea eliminar este nodo de evaluación de LLM?",
+    "evalTemplates": "Plantillas de evaluación",
+    "evaluationTemplate": "Plantilla de evaluación",
+    "evaluationTemplateHelp": "Seleccione una plantilla de evaluación que defina los criterios y las dimensiones del juez del LLM.",
+    "noTemplatesFound": "No se ha encontrado ninguna plantilla de evaluación. Cree una en la página de plantillas de evaluación.",
+    "evalTemplatesRefreshed": "Las plantillas de evaluación se actualizaron correctamente"
   },
   "reports": {
     "header": "Informes",
@@ -2694,7 +2701,14 @@
     "cached": "En caché",
     "cachedReport": "Informe en caché",
     "destination": "Destino",
-    "scheduled": "Programado"
+    "scheduled": "Programado",
+    "reportFormat": "Formato del informe",
+    "reportType": "Tipo de informe",
+    "attachmentType": "Estilo de apego",
+    "dimensionWidth": "Anchura (px)",
+    "dimensionHeight": "Altura (px)",
+    "imagePreview": "Incluir una imagen de vista previa del panel de control en línea",
+    "customDimensions": "Dimensiones personalizadas (avanzadas)"
   },
   "queries": {
     "runningQueries": "Consultas en ejecución",
@@ -3260,5 +3274,40 @@
     "guideQuery": "Consulta SQL actual",
     "guideQueryEncoded": "Consulta SQL codificada en Base64",
     "guideExampleHeader": "Ejemplo"
+  },
+  "evalTemplate": {
+    "header": "Plantillas de evaluación",
+    "newTemplate": "Nueva plantilla",
+    "editTemplate": "Editar plantilla de evaluación",
+    "createTemplate": "Crear una nueva plantilla de evaluación",
+    "noTemplatesFound": "No se ha encontrado ninguna plantilla de evaluación",
+    "templateName": "Nombre de plantilla",
+    "responseType": "Tipo de respuesta",
+    "dimensions": "Dimensiones de la evaluación",
+    "promptTemplate": "Plantilla Prompt",
+    "statsTitle": "Estadísticas de plantillas",
+    "avgQualityScore": "Puntuación media de calidad",
+    "usageStats": "Estadísticas de uso",
+    "totalEvaluations": "Total de evaluaciones",
+    "lastUsed": "Utilizado por última vez",
+    "deleteTemplate": "Eliminar plantilla",
+    "deleteConfirmation": "¿Estás seguro de que quieres eliminar «{name}»?",
+    "loadFailed": "No se pudieron cargar las plantillas",
+    "saveRequiredFields": "Rellene todos los campos obligatorios",
+    "updateSuccess": "La plantilla se actualizó correctamente",
+    "createSuccess": "La plantilla se creó correctamente",
+    "updateFailed": "No se pudo actualizar la plantilla",
+    "createFailed": "No se pudo crear la plantilla",
+    "deleteSuccess": "La plantilla se ha eliminado correctamente",
+    "deleteFailed": "No se pudo eliminar la plantilla",
+    "statsLoadFailed": "No se pudieron cargar las estadísticas de la plantilla",
+    "nameRequired": "El nombre es obligatorio",
+    "responseTypeRequired": "El tipo de respuesta es obligatorio",
+    "dimensionRequired": "Se requiere al menos una dimensión",
+    "contentRequired": "El contenido es obligatorio",
+    "never": "Nunca",
+    "typeScore": "Puntuación numérica (p. ej., 0.0 - 1.0)",
+    "typeBoolean": "Binario/Fallo de aprobación (booleano)",
+    "typeCustom": "Texto categórico/personalizado"
   }
 }

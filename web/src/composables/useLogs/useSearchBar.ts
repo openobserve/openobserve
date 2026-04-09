@@ -459,6 +459,8 @@ export const useSearchBar = () => {
                 query: {
                   query: {
                     sql: crossLinkQuery,
+                    start_time: (Date.now() - 3600000) * 1000,
+                    end_time: Date.now() * 1000,
                     query_fn: null,
                     size: -1,
                     streaming_output: false,

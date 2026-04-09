@@ -73,22 +73,56 @@ pub async fn write_sql_aggregated_edges(
         bulk_body.push('\n');
     }
 
-    // Write to stream
+    // Write to stream via HTTP POST to an ingester node.
+    // The alertmanager is not an ingester so we cannot call logs::bulk::ingest
+    // directly — forward the write to an online ingester instead (same pattern
+    // as write_anomalies_to_stream in anomaly_detection.rs).
     if !bulk_body.is_empty() {
-        use crate::common::meta::ingestion::{IngestUser, SystemJobType};
+        let ingester = infra::cluster::get_cached_online_ingester_nodes()
+            .await
+            .and_then(|nodes| nodes.into_iter().next())
+            .ok_or_else(|| {
+                anyhow::anyhow!("No online ingester node available to write _o2_service_graph")
+            })?;
 
-        let data = bytes::Bytes::from(bulk_body.into_bytes());
+        let cfg = config::get_config();
+        let url = format!(
+            "{}{}/api/{org_id}/_bulk",
+            ingester.http_addr, cfg.common.base_uri,
+        );
 
-        crate::service::logs::bulk::ingest(
-            0,
-            org_id,
-            data,
-            IngestUser::SystemJob(SystemJobType::ServiceGraph),
-        )
-        .await
-        .inspect_err(|e| {
+        let client = reqwest::Client::new();
+        let resp = client
+            .post(&url)
+            .header("Content-Type", "application/x-ndjson")
+            .header(
+                "Authorization",
+                format!(
+                    "Basic {}",
+                    base64::Engine::encode(
+                        &base64::engine::general_purpose::STANDARD,
+                        format!(
+                            "{}:{}",
+                            cfg.auth.root_user_email, cfg.auth.root_user_password
+                        )
+                    )
+                ),
+            )
+            .body(bulk_body)
+            .send()
+            .await
+            .map_err(|e| anyhow::anyhow!("HTTP request to ingester failed: {e}"))
+            .inspect_err(|e| {
+                log::error!("[ServiceGraph] Failed to write SQL-aggregated edges: {e}");
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            let e = anyhow::anyhow!("Ingester returned {status} writing _o2_service_graph: {body}");
             log::error!("[ServiceGraph] Failed to write SQL-aggregated edges: {e}");
-        })?;
+            return Err(e);
+        }
     }
 
     log::info!(

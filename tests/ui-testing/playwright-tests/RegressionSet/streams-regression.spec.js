@@ -3,6 +3,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ingestTestData, getHeaders, getIngestionUrl, sendRequest } = require('../utils/data-ingestion.js');
 const logData = require("../../fixtures/log.json");
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe("Streams Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -23,7 +24,7 @@ test.describe("Streams Regression Bugs", () => {
   });
 
   test("should allow query expand icon to work after navigating from stream explorer (#9337)", {
-    tag: ['@queryExpand', '@streamExplorer', '@regressionBugs', '@P0', '@logs']
+    tag: ['@queryExpand', '@streamExplorer', '@regressionBugs', '@streamsRegression', '@P0', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing query expand icon functionality after stream explorer navigation');
 
@@ -31,16 +32,16 @@ test.describe("Streams Regression Bugs", () => {
     await ingestTestData(page);
     await page.waitForLoadState('domcontentloaded');
 
-    // Navigate to streams page (same pattern as working tests in logsqueries.spec.js)
-    await pm.logsPage.clickStreamsMenuItem();
-    await pm.logsPage.clickSearchStreamInput();
-    await pm.logsPage.fillSearchStreamInput('e2e_automate');
+    // Wait for stream to be indexed before navigating
+    await pm.logsPage.waitForStreamAvailable('e2e_automate', 90000, 3000);
 
-    // Wait for stream search DOM stabilization
-    await page.waitForTimeout(500);
+    // Navigate directly to streams page with correct org (menu click uses _meta org on cloud)
+    const orgId9337 = getOrgIdentifier() || 'default';
+    await pm.streamsPage.navigateToStreamsPage(process.env.ZO_BASE_URL, orgId9337);
 
-    // Click explore button
-    await pm.logsPage.clickExploreButton();
+    // Search for the stream and click Explore
+    await pm.streamsPage.searchStream('e2e_automate');
+    await pm.streamsPage.exploreStream();
 
     // Wait for navigation to stream explorer
     await page.waitForTimeout(2000);
@@ -67,7 +68,9 @@ test.describe("Streams Regression Bugs", () => {
   // ============================================================================
   // Bug #7468: Multi-stream selection should display ellipsis with tooltip
   // https://github.com/openobserve/openobserve/issues/7468
-  test('should display ellipsis with tooltip when multiple streams selected @bug-7468 @P1 @regression', async ({ page }) => {
+  test('should display ellipsis with tooltip when multiple streams selected', {
+    tag: ['@bug7468', '@P1', '@regression', '@streamsRegression', '@logs']
+  }, async ({ page }) => {
     testLogger.info('Test: Verify ellipsis and tooltip for multiple stream selection with long names (Bug #7468)');
 
     // Use streams with extremely long names to trigger ellipsis
@@ -79,7 +82,7 @@ test.describe("Streams Regression Bugs", () => {
       'fifth_exceptionally_long_stream_name_for_comprehensive_ellipsis_testing_scenario_number_five_epsilon'
     ];
 
-    const orgId = process.env["ORGNAME"];
+    const orgId = getOrgIdentifier() || 'default';
     const headers = getHeaders();
 
     // Ingest 1 line to each long-named stream in parallel
@@ -195,13 +198,11 @@ test.describe("Streams Regression Bugs", () => {
 
     testLogger.info(`Found ${foundCount} out of ${longStreamNames.length} streams in display text`);
 
-    if (foundCount === 0) {
-      testLogger.info('Stream names may be truncated or hidden - checking if ellipsis/overflow is present');
-      expect(isTextTruncated || hasEllipsisStyle).toBeTruthy();
-      testLogger.info('✓ TERTIARY CHECK PASSED: Overflow handling verified (names not fully visible but ellipsis present)');
-    } else {
-      testLogger.info('✓ TERTIARY CHECK PASSED: Multiple streams selected and visible');
-    }
+    // Either streams are visible in display text, or overflow/ellipsis is present —
+    // one of these must be true: the UI must handle multiple long stream names.
+    const streamsVisibleOrOverflowing = foundCount > 0 || isTextTruncated || hasEllipsisStyle;
+    expect(streamsVisibleOrOverflowing).toBeTruthy();
+    testLogger.info(`✓ TERTIARY CHECK PASSED: foundCount=${foundCount}, isTextTruncated=${isTextTruncated}, hasEllipsisStyle=${hasEllipsisStyle}`);
 
     testLogger.info('Multiple stream selection ellipsis and tooltip test completed for Bug #7468');
   });
@@ -210,37 +211,35 @@ test.describe("Streams Regression Bugs", () => {
   // Bug #9354: Auto add fts, secondary index fields to uds on creation
   // https://github.com/openobserve/openobserve/issues/9354
   // ==========================================================================
-  test("should access stream settings with FTS configuration @bug-9354 @P1 @fts @regression", async ({ page }) => {
+  test("should access stream settings with FTS configuration", {
+    tag: ['@bug9354', '@P1', '@fts', '@regression', '@streamsRegression', '@logs']
+  }, async ({ page }) => {
     testLogger.info('Test: Verify FTS fields access (Bug #9354)');
 
     // Ingest test data first
     await ingestTestData(page);
     await page.waitForLoadState('domcontentloaded');
 
-    // Navigate to streams page
-    await pm.logsPage.clickMenuLinkStreamsItem();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
+    // Wait for stream to be indexed before navigating
+    await pm.logsPage.waitForStreamAvailable('e2e_automate', 90000, 3000);
+
+    // Navigate directly to streams page with correct org (menu click uses _meta org on cloud)
+    const orgId9354 = getOrgIdentifier() || 'default';
+    await pm.streamsPage.navigateToStreamsPage(process.env.ZO_BASE_URL, orgId9354);
 
     // STRONG ASSERTION: Streams page should be accessible
     await pm.streamsPage.expectStreamsPageVisible();
 
-    // Search for test stream
+    // Search for test stream and verify it is visible (exact cell match to avoid matching e2e_automate1, etc.)
     await pm.streamsPage.searchStream('e2e_automate');
-    await page.waitForTimeout(1000);
+    await pm.streamsPage.expectExactStreamCellVisible('e2e_automate');
 
-    // STRONG ASSERTION: Stream should be found
-    const streamFound = await pm.streamsPage.isStreamVisible('e2e_automate');
-    expect(streamFound).toBeTruthy();
-
-    if (streamFound) {
-      // Click on stream to view details
-      await pm.streamsPage.clickStream('e2e_automate');
-      await page.waitForTimeout(1500);
-
-      // STRONG ASSERTION: Stream details should be accessible
-      await pm.streamsPage.expectStreamDetailsVisible();
-    }
+    // CORE ASSERTION for Bug #9354: Open stream schema and verify schema/details panel is accessible.
+    // Bug #9354 was about FTS/secondary index fields being auto-added to UDS on stream creation —
+    // verifying the schema dialog opens confirms the stream was created with accessible field settings.
+    await pm.streamsPage.clickStream('e2e_automate');
+    await pm.streamsPage.expectStreamDetailsVisible();
+    testLogger.info('✓ Stream schema/details panel accessible — FTS fields reachable');
 
     testLogger.info('✓ PASSED: FTS auto-add verified');
   });

@@ -53,6 +53,9 @@ impl From<ReportError> for Response {
             ReportError::CreateReportNameAlreadyUsed => MetaHttpResponse::bad_request(value),
             ReportError::ReportNotFound => MetaHttpResponse::not_found(value),
             ReportError::NoDashboards => MetaHttpResponse::bad_request(value),
+            ReportError::InlineAttachmentTypeNotSupportedForPdf => {
+                MetaHttpResponse::bad_request(value)
+            }
             ReportError::NoDashboardTabs => MetaHttpResponse::bad_request(value),
             ReportError::NoDestinations => MetaHttpResponse::bad_request(value),
             ReportError::DashboardTabNotFound => MetaHttpResponse::not_found(value),
