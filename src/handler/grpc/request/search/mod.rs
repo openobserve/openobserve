@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,17 +19,24 @@ use config::{
 };
 use proto::cluster_rpc::{
     CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
-    GetResultRequest, GetResultResponse, GetTableRequest, GetTableResponse, QueryStatusRequest,
-    QueryStatusResponse, SearchPartitionRequest, SearchPartitionResponse, SearchRequest,
-    SearchResponse, search_server::Search,
+    GetResultRequest, GetResultResponse, GetSourcemapFileRequest, GetSourcemapFileResponse,
+    GetTableRequest, GetTableResponse, QueryStatusRequest, QueryStatusResponse,
+    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
+    search_server::Search,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    config::meta::search::ScanStats,
-    config::metrics,
-    o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup},
+    config::{meta::search::ScanStats, metrics},
+    o2_enterprise::enterprise::search::{
+        QueryManager, TaskStatus, WorkGroup, admission::ledger::NODE_LEDGER,
+    },
+    proto::cluster_rpc::{
+        ReleaseQueryRequest, ReleaseQueryResponse, StartQueryRequest, StartQueryResponse,
+        TryAcquireRequest, TryAcquireResponse,
+    },
+    std::str::FromStr,
 };
 
 use crate::{handler::grpc::MetadataMap, service::search as SearchService};
@@ -377,6 +384,104 @@ impl Search for Searcher {
         &self,
         _req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    async fn get_sourcemap_file(
+        &self,
+        req: Request<GetSourcemapFileRequest>,
+    ) -> Result<Response<GetSourcemapFileResponse>, Status> {
+        let req = req.into_inner();
+        log::info!(
+            "got get request for sourcemap file : {}/{} at {}",
+            req.org_id,
+            req.original_name,
+            req.path
+        );
+
+        let res = infra::storage::get_bytes("", &req.path)
+            .await
+            .map_err(|e| {
+                Status::internal(format!(
+                    "failed to get sourcemap for {}/{} at path {}: {e}",
+                    req.org_id, req.original_name, req.path
+                ))
+            })?;
+        Ok(Response::new(GetSourcemapFileResponse {
+            file_data: res.to_vec(),
+        }))
+    }
+
+    // --- Slot-based admission RPCs ---
+
+    #[cfg(feature = "enterprise")]
+    async fn try_acquire(
+        &self,
+        req: Request<TryAcquireRequest>,
+    ) -> Result<Response<TryAcquireResponse>, Status> {
+        let r = req.into_inner();
+        let wg = WorkGroup::from_str(&r.work_group).unwrap_or(WorkGroup::Short);
+        match NODE_LEDGER.try_acquire(&r.trace_id, &wg, r.ttl_ms) {
+            Ok(()) => Ok(Response::new(TryAcquireResponse {
+                success: true,
+                reason: String::new(),
+            })),
+            Err(reason) => Ok(Response::new(TryAcquireResponse {
+                success: false,
+                reason,
+            })),
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn try_acquire(
+        &self,
+        _req: Request<proto::cluster_rpc::TryAcquireRequest>,
+    ) -> Result<Response<proto::cluster_rpc::TryAcquireResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn start_query(
+        &self,
+        req: Request<StartQueryRequest>,
+    ) -> Result<Response<StartQueryResponse>, Status> {
+        let trace_id = req.into_inner().trace_id;
+        match NODE_LEDGER.start(&trace_id) {
+            Ok(()) => Ok(Response::new(StartQueryResponse {
+                success: true,
+                reason: String::new(),
+            })),
+            Err(reason) => Ok(Response::new(StartQueryResponse {
+                success: false,
+                reason,
+            })),
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn start_query(
+        &self,
+        _req: Request<proto::cluster_rpc::StartQueryRequest>,
+    ) -> Result<Response<proto::cluster_rpc::StartQueryResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn release_query(
+        &self,
+        req: Request<ReleaseQueryRequest>,
+    ) -> Result<Response<ReleaseQueryResponse>, Status> {
+        let trace_id = req.into_inner().trace_id;
+        NODE_LEDGER.release(&trace_id);
+        Ok(Response::new(ReleaseQueryResponse { success: true }))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn release_query(
+        &self,
+        _req: Request<proto::cluster_rpc::ReleaseQueryRequest>,
+    ) -> Result<Response<proto::cluster_rpc::ReleaseQueryResponse>, Status> {
         Err(Status::unimplemented("Not Supported"))
     }
 }

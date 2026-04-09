@@ -2105,10 +2105,10 @@ mod tests {
             .as_ref()
             .and_then(|v| base64::decode_url(v).ok());
 
-        if let Some(vrl_function) = &top_level_query_fn {
-            if !vrl_function.trim().ends_with('.') {
-                top_level_query_fn = Some(format!("{vrl_function} \n ."));
-            }
+        if let Some(vrl_function) = &top_level_query_fn
+            && !vrl_function.trim().ends_with('.')
+        {
+            top_level_query_fn = Some(format!("{vrl_function} \n ."));
         }
 
         let is_result_array_vrl = top_level_query_fn
@@ -2178,10 +2178,10 @@ mod tests {
             .as_ref()
             .and_then(|v| base64::decode_url(v).ok());
 
-        if let Some(vrl_function) = &top_level_query_fn {
-            if !vrl_function.trim().ends_with('.') {
-                top_level_query_fn = Some(format!("{vrl_function} \n ."));
-            }
+        if let Some(vrl_function) = &top_level_query_fn
+            && !vrl_function.trim().ends_with('.')
+        {
+            top_level_query_fn = Some(format!("{vrl_function} \n ."));
         }
 
         let is_result_array_vrl = top_level_query_fn

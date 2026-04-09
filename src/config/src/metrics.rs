@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::LazyLock as Lazy};
 
-use once_cell::sync::Lazy;
 use prometheus::{
     CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts,
     Registry, TextEncoder,
@@ -1571,11 +1570,11 @@ pub static SERVICE_STREAMS_CLEANUP_RUNS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "service_streams_cleanup_runs_total",
-            "Number of cleanup runs by type",
+            "Number of cleanup runs by status",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["cleanup_type"], // "cache", "pattern_learner", "dimension_tracker"
+        &["status"], // "success", "error"
     )
     .expect("Metric created")
 });
@@ -1589,6 +1588,33 @@ pub static SERVICE_STREAMS_CLEANUP_REMOVED: Lazy<IntCounterVec> = Lazy::new(|| {
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &["cleanup_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_CLEANUP_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "service_streams_cleanup_duration_seconds",
+            "Duration of service streams cleanup per organization in seconds",
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0])
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+pub static SERVICE_STREAMS_CLEANUP_ROWS_EVICTED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "service_streams_cleanup_rows_evicted_total",
+            "Total rows evicted during service streams cleanup",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
     )
     .expect("Metric created")
 });
@@ -2009,6 +2035,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SERVICE_STREAMS_CLEANUP_REMOVED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_CLEANUP_DURATION_SECONDS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SERVICE_STREAMS_CLEANUP_ROWS_EVICTED.clone()))
         .expect("Metric registered");
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -48,7 +48,7 @@ impl PartitionGenerator {
     /// * `order_by` - Sort order for partitions
     /// * `is_aggregate` - Whether this is an aggregate query
     /// * `add_mini_partition` - Whether to add a mini partition for faster initial results
-    /// * `cache_strategy` - Optional cache-aware partition strategy (enterprise only)
+    /// * `cache_strategy` - Optional cache-aware partition strategy
     ///
     /// # Returns
     /// Vector of [start, end] time ranges in microseconds
@@ -65,7 +65,7 @@ impl PartitionGenerator {
             StreamingAggsPartitionStrategy,
         >,
     ) -> Vec<[i64; 2]> {
-        // If cache-aware strategy is provided, use it (enterprise only)
+        // If cache-aware strategy is provided, use it
         #[cfg(feature = "enterprise")]
         if let Some(strategy) = streaming_aggs_cache_strategy {
             return strategy.to_time_partitions(order_by);

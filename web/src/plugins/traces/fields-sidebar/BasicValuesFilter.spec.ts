@@ -85,10 +85,27 @@ installQuasar({});
 
 // ─── Mount helper ─────────────────────────────────────────────────────────────
 
-const mountComponent = (fieldName: string, dataType = "Utf8") =>
-  mount(BasicValuesFilter, {
+interface MountOptions {
+  dataType?: string;
+  selectedFields?: string[];
+  showVisibilityToggle?: boolean;
+}
+
+const mountComponent = (fieldName: string, options: MountOptions = {}) => {
+  const {
+    dataType = "Utf8",
+    selectedFields,
+    showVisibilityToggle,
+  } = options;
+
+  const props: Record<string, unknown> = { row: { name: fieldName, dataType } };
+  if (selectedFields !== undefined) props.selectedFields = selectedFields;
+  if (showVisibilityToggle !== undefined)
+    props.showVisibilityToggle = showVisibilityToggle;
+
+  return mount(BasicValuesFilter, {
     attachTo: "#app",
-    props: { row: { name: fieldName, dataType } },
+    props,
     global: {
       provide: { store },
       plugins: [i18n],
@@ -98,6 +115,7 @@ const mountComponent = (fieldName: string, dataType = "Utf8") =>
       },
     },
   });
+};
 
 // ─── buildSql() ───────────────────────────────────────────────────────────────
 
@@ -398,5 +416,142 @@ describe("BasicValuesFilter — openFilterCreator", () => {
     expect(mockFetchPercentiles).toHaveBeenCalledWith(
       expect.objectContaining({ whereClause: "" }),
     );
+  });
+});
+
+// ─── Visibility toggle ────────────────────────────────────────────────────────
+
+describe("BasicValuesFilter — visibility toggle", () => {
+  let wrapper: any;
+
+  beforeEach(() => {
+    mockSearchObj.data.editorValue = "";
+    mockSearchObj.data.stream.selectedStream = {
+      label: "test_traces",
+      value: "test_traces",
+    };
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+  });
+
+  describe("when showVisibilityToggle=true and the field is NOT selected", () => {
+    beforeEach(async () => {
+      wrapper = mountComponent("service_name", {
+        showVisibilityToggle: true,
+        selectedFields: [],
+      });
+      await flushPromises();
+    });
+
+    it("should show the add-visibility icon", () => {
+      const addBtn = wrapper.find(
+        '[data-test="log-search-index-list-add-service_name-field-btn"]',
+      );
+      expect(addBtn.exists()).toBe(true);
+    });
+
+    it("should not show the remove-visibility icon", () => {
+      const removeBtn = wrapper.find(
+        '[data-test="log-search-index-list-remove-service_name-field-btn"]',
+      );
+      expect(removeBtn.exists()).toBe(false);
+    });
+
+    it("should emit toggle-field with the row when the add-visibility icon is clicked", async () => {
+      const addBtn = wrapper.find(
+        '[data-test="log-search-index-list-add-service_name-field-btn"]',
+      );
+      expect(addBtn.exists()).toBe(true);
+      await addBtn.trigger("click");
+      const emitted = wrapper.emitted("toggle-field");
+      expect(emitted).toBeTruthy();
+      expect(emitted![0][0]).toMatchObject({ name: "service_name" });
+    });
+  });
+
+  describe("when showVisibilityToggle=true and the field IS selected", () => {
+    beforeEach(async () => {
+      wrapper = mountComponent("service_name", {
+        showVisibilityToggle: true,
+        selectedFields: ["service_name"],
+      });
+      await flushPromises();
+    });
+
+    it("should show the remove-visibility icon", () => {
+      const removeBtn = wrapper.find(
+        '[data-test="log-search-index-list-remove-service_name-field-btn"]',
+      );
+      expect(removeBtn.exists()).toBe(true);
+    });
+
+    it("should not show the add-visibility icon", () => {
+      const addBtn = wrapper.find(
+        '[data-test="log-search-index-list-add-service_name-field-btn"]',
+      );
+      expect(addBtn.exists()).toBe(false);
+    });
+
+    it("should emit toggle-field with the row when the remove-visibility icon is clicked", async () => {
+      const removeBtn = wrapper.find(
+        '[data-test="log-search-index-list-remove-service_name-field-btn"]',
+      );
+      expect(removeBtn.exists()).toBe(true);
+      await removeBtn.trigger("click");
+      const emitted = wrapper.emitted("toggle-field");
+      expect(emitted).toBeTruthy();
+      expect(emitted![0][0]).toMatchObject({ name: "service_name" });
+    });
+  });
+
+  describe("when showVisibilityToggle=false", () => {
+    beforeEach(async () => {
+      wrapper = mountComponent("service_name", {
+        showVisibilityToggle: false,
+        selectedFields: [],
+      });
+      await flushPromises();
+    });
+
+    it("should not show the add-visibility icon", () => {
+      const addBtn = wrapper.find(
+        '[data-test="log-search-index-list-add-service_name-field-btn"]',
+      );
+      expect(addBtn.exists()).toBe(false);
+    });
+
+    it("should not show the remove-visibility icon", () => {
+      const removeBtn = wrapper.find(
+        '[data-test="log-search-index-list-remove-service_name-field-btn"]',
+      );
+      expect(removeBtn.exists()).toBe(false);
+    });
+  });
+
+  describe("when showVisibilityToggle=false and the field IS selected", () => {
+    beforeEach(async () => {
+      wrapper = mountComponent("service_name", {
+        showVisibilityToggle: false,
+        selectedFields: ["service_name"],
+      });
+      await flushPromises();
+    });
+
+    it("should not show the add-visibility icon", () => {
+      const addBtn = wrapper.find(
+        '[data-test="log-search-index-list-add-service_name-field-btn"]',
+      );
+      expect(addBtn.exists()).toBe(false);
+    });
+
+    it("should not show the remove-visibility icon", () => {
+      const removeBtn = wrapper.find(
+        '[data-test="log-search-index-list-remove-service_name-field-btn"]',
+      );
+      expect(removeBtn.exists()).toBe(false);
+    });
   });
 });

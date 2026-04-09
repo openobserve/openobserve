@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -34,6 +34,7 @@ pub mod distinct_values;
 pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod entity;
+pub mod eval_templates;
 pub mod folders;
 pub mod incident_events;
 pub mod kv_store;
@@ -47,9 +48,9 @@ pub mod reports;
 pub mod search_job;
 pub mod search_queue;
 pub mod service_streams;
-pub mod service_streams_dimensions;
 pub mod sessions;
 pub mod short_urls;
+pub mod source_maps;
 pub mod system_prompts;
 pub mod system_settings;
 pub mod templates;
@@ -61,8 +62,6 @@ pub mod users;
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
     short_urls::init().await?;
-    service_streams::init().await?;
-    service_streams_dimensions::init().await?;
     Ok(())
 }
 

@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -179,7 +179,7 @@ const store = useStore();
 const $q = useQuasar();
 const { t } = useI18n();
 
-interface SemanticFieldGroup {
+interface FieldAlias {
   id: string;
   display: string;
   group?: string;
@@ -193,7 +193,6 @@ interface OrganizationDeduplicationConfig {
   alert_dedup_enabled?: boolean;
   alert_fingerprint_groups?: string[];
   time_window_minutes?: number;
-  fqn_priority_dimensions?: string[];
 }
 
 interface Props {
@@ -217,10 +216,9 @@ const localConfig = ref<OrganizationDeduplicationConfig>({
   alert_dedup_enabled: props.config?.alert_dedup_enabled ?? false,
   alert_fingerprint_groups: props.config?.alert_fingerprint_groups ?? [],
   time_window_minutes: props.config?.time_window_minutes ?? undefined,
-  fqn_priority_dimensions: props.config?.fqn_priority_dimensions,
 });
 
-const localSemanticGroups = ref<SemanticFieldGroup[]>([]);
+const localSemanticGroups = ref<FieldAlias[]>([]);
 
 const toggleFingerprintGroup = (groupId: string, checked: boolean) => {
   if (!localConfig.value.alert_fingerprint_groups) {
@@ -303,7 +301,6 @@ const loadConfig = async () => {
         alert_dedup_enabled: config.alert_dedup_enabled ?? false,
         alert_fingerprint_groups: config.alert_fingerprint_groups ?? [],
         time_window_minutes: config.time_window_minutes ?? undefined,
-        fqn_priority_dimensions: config.fqn_priority_dimensions,
       };
     } catch (error) {
       // No dedup config exists yet — use defaults
@@ -312,7 +309,6 @@ const loadConfig = async () => {
         alert_dedup_enabled: false,
         alert_fingerprint_groups: [],
         time_window_minutes: undefined,
-        fqn_priority_dimensions: undefined,
       };
     }
 
@@ -340,7 +336,6 @@ watch(
         alert_dedup_enabled: newVal.alert_dedup_enabled ?? false,
         alert_fingerprint_groups: newVal.alert_fingerprint_groups ?? [],
         time_window_minutes: newVal.time_window_minutes ?? undefined,
-        fqn_priority_dimensions: newVal.fqn_priority_dimensions,
       };
     }
   },

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           round
           size="xs"
           :icon="expandState.preview ? 'expand_less' : 'expand_more'"
-          @click.stop
+          @click.stop="togglePreview"
           class="expand-toggle-btn"
         />
       </div>
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           round
           size="xs"
           :icon="expandState.summary ? 'expand_less' : 'expand_more'"
-          @click.stop
+          @click.stop="toggleSummary"
           class="expand-toggle-btn"
         />
       </div>

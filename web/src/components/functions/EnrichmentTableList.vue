@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -1064,4 +1064,10 @@ export default defineComponent({
 }
 
 /* No custom styles needed - using Quasar components */
+
+.app-tabs-container .o2-tab {
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+  min-width: auto !important;
+}
 </style>

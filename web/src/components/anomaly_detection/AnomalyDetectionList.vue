@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -323,7 +323,7 @@ export default defineComponent({
     const statusColor = (row: any) => {
       if (!row.enabled) return "grey";
       switch (row.status) {
-        case "active":    return "positive";
+        case "ready":     return "positive";
         case "training":  return "info";
         case "failed":    return "negative";
         case "waiting":   return "grey";

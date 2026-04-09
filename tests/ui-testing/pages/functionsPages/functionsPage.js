@@ -32,7 +32,6 @@ class FunctionsPage {
   // ==================== Navigation Methods ====================
 
   async navigate(org = null) {
-    // Functions is under Pipeline menu
     const targetOrg = org || process.env.ORGID;
     await this.page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${targetOrg}`);
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});

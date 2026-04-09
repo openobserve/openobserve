@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -188,6 +188,25 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
     }
 
     pipeline::update(&pipeline, prev_source_stream).await?;
+
+    // Evict any live LLM evaluation buffer tasks for this pipeline so they
+    // are re-created with the updated config (e.g. new eval_template id) on
+    // the next ingestion batch.
+    #[cfg(feature = "enterprise")]
+    {
+        let pipeline_id = &pipeline.id;
+        for node in &pipeline.nodes {
+            if matches!(node.data, NodeData::LlmEvaluation(_)) {
+                let buffer_key = format!("{}:{}", pipeline_id, node.id);
+                o2_enterprise::enterprise::pipeline::llm_evaluation_node::LlmEvaluationNode::remove_buffer(&buffer_key).await;
+                log::info!(
+                    "[Pipeline] Evicted LLM evaluation buffer for key={} after pipeline update",
+                    buffer_key
+                );
+            }
+        }
+    }
+
     Ok(())
 }
 

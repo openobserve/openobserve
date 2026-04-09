@@ -19,7 +19,7 @@ use axum::{Json, extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use config::meta::alerts::deduplication::GlobalDeduplicationConfig;
 #[cfg(feature = "enterprise")]
-use config::meta::correlation::SemanticFieldGroup;
+use config::meta::correlation::FieldAlias;
 
 #[cfg(feature = "enterprise")]
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
@@ -221,20 +221,20 @@ pub async fn delete_config(_org_id: Path<String>) -> Response {
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct SemanticGroupDiff {
     /// Groups that exist in the imported JSON but not in DB (new)
-    pub additions: Vec<SemanticFieldGroup>,
+    pub additions: Vec<FieldAlias>,
     /// Groups that exist in both but have different content
     pub modifications: Vec<SemanticGroupModification>,
     /// Groups that are identical in both
-    pub unchanged: Vec<SemanticFieldGroup>,
+    pub unchanged: Vec<FieldAlias>,
 }
 
 #[cfg(feature = "enterprise")]
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct SemanticGroupModification {
     /// Current version in DB
-    pub current: SemanticFieldGroup,
+    pub current: FieldAlias,
     /// New version from import
-    pub proposed: SemanticFieldGroup,
+    pub proposed: FieldAlias,
 }
 
 /// Get semantic field groups for an organization
@@ -250,7 +250,7 @@ pub struct SemanticGroupModification {
         ("org_id" = String, Path, description = "Organization ID"),
     ),
     responses(
-        (status = 200, description = "Success", body = Vec<SemanticFieldGroup>),
+        (status = 200, description = "Success", body = Vec<FieldAlias>),
         (status = 500, description = "Internal server error"),
     ),
 )]
@@ -308,7 +308,7 @@ pub async fn get_semantic_groups(_org_id: Path<String>) -> Response {
     params(
         ("org_id" = String, Path, description = "Organization ID"),
     ),
-    request_body(content = Vec<SemanticFieldGroup>, description = "Semantic groups to compare", content_type = "application/json"),
+    request_body(content = Vec<FieldAlias>, description = "Semantic groups to compare", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", body = SemanticGroupDiff),
         (status = 400, description = "Bad request - Invalid semantic groups"),
@@ -320,11 +320,11 @@ pub async fn get_semantic_groups(_org_id: Path<String>) -> Response {
 )]
 pub async fn preview_semantic_groups_diff(
     Path(org_id): Path<String>,
-    Json(proposed_groups): Json<Vec<SemanticFieldGroup>>,
+    Json(proposed_groups): Json<Vec<FieldAlias>>,
 ) -> Response {
     // Validate all group IDs
     for group in &proposed_groups {
-        if !SemanticFieldGroup::validate_id(&group.id) {
+        if !FieldAlias::validate_id(&group.id) {
             return axum::response::Response::builder()
                 .status(axum::http::StatusCode::BAD_REQUEST)
                 .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -342,7 +342,7 @@ pub async fn preview_semantic_groups_diff(
         crate::service::db::system_settings::get_semantic_field_groups(&org_id).await;
 
     // Build a map of current groups by ID
-    let current_map: std::collections::HashMap<String, &SemanticFieldGroup> =
+    let current_map: std::collections::HashMap<String, &FieldAlias> =
         current_groups.iter().map(|g| (g.id.clone(), g)).collect();
 
     let mut additions = Vec::new();
@@ -433,7 +433,7 @@ pub async fn preview_semantic_groups_diff(
     params(
         ("org_id" = String, Path, description = "Organization ID"),
     ),
-    request_body(content = Vec<SemanticFieldGroup>, description = "Semantic groups to save (merged with existing)", content_type = "application/json"),
+    request_body(content = Vec<FieldAlias>, description = "Semantic groups to save (merged with existing)", content_type = "application/json"),
     responses(
         (status = 200, description = "Success"),
         (status = 400, description = "Bad request - Invalid semantic groups"),
@@ -445,7 +445,7 @@ pub async fn preview_semantic_groups_diff(
 )]
 pub async fn save_semantic_groups(
     Path(org_id): Path<String>,
-    Json(groups): Json<Vec<SemanticFieldGroup>>,
+    Json(groups): Json<Vec<FieldAlias>>,
 ) -> Response {
     use config::meta::system_settings::{
         SettingCategory, SystemSetting, keys::SEMANTIC_FIELD_GROUPS,
@@ -455,7 +455,7 @@ pub async fn save_semantic_groups(
 
     // Validate all group IDs
     for group in &incoming_groups {
-        if !SemanticFieldGroup::validate_id(&group.id) {
+        if !FieldAlias::validate_id(&group.id) {
             return axum::response::Response::builder()
                 .status(axum::http::StatusCode::BAD_REQUEST)
                 .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -474,13 +474,13 @@ pub async fn save_semantic_groups(
 
     // Merge incoming groups with existing ones
     // Build a map of incoming groups by ID for quick lookup
-    let incoming_map: std::collections::HashMap<String, SemanticFieldGroup> = incoming_groups
+    let incoming_map: std::collections::HashMap<String, FieldAlias> = incoming_groups
         .into_iter()
         .map(|g| (g.id.clone(), g))
         .collect();
 
     // Update existing groups if they're in incoming, keep others unchanged
-    let mut merged_groups: Vec<SemanticFieldGroup> = existing_groups
+    let mut merged_groups: Vec<FieldAlias> = existing_groups
         .into_iter()
         .map(|existing| {
             if let Some(updated) = incoming_map.get(&existing.id) {

@@ -5,6 +5,7 @@ const logsdata = require("../../../test-data/logs_data.json");
 const testLogger = require('./test-logger.js');
 const metricsIngestion = require('./metrics-ingestion.js');
 const { ingestTraces } = require('./trace-ingestion.js');
+const { ingestRumErrors } = require('./rum-error-ingestion.js');
 
 /**
  * Global setup for all tests - handles authentication and test data ingestion
@@ -115,6 +116,11 @@ async function globalSetup() {
       testLogger.info('Starting trace data ingestion');
       await ingestTraces(page, 20); // Ingest 20 test traces
       testLogger.info('Trace data ingestion completed');
+
+      // Perform RUM error data ingestion
+      testLogger.info('Starting RUM error data ingestion');
+      await ingestRumErrors(page, 3); // Ingest 3 different error types
+      testLogger.info('RUM error data ingestion completed');
     }
     
   } catch (error) {

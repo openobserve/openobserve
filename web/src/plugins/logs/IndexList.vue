@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter-field="searchObj.data.stream.filterField"
         :filter-field-fn="filterFieldFn"
         :pagination="pagination"
-        @update:pagination="pagination = $event"
+        @update:pagination="onPaginationUpdate"
         @update:filter-field="searchObj.data.stream.filterField = $event"
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
         :loading-stream="searchObj.loadingStream"
@@ -133,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @toggle-interesting="addToInterestingFieldList"
         @add-search-term="addSearchTerm"
         @add-multiple-search-terms="addMultipleSearchTerms"
+        @remove-field-filter="removeFieldFilter"
         @search-field-values="searchFieldValues"
         @load-more-values="loadMoreFieldValues"
         @before-show="openFilterCreator"
@@ -195,6 +196,8 @@ import { useSearchBar } from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
+import { captureFromValuesApi } from "@/composables/useFieldValueStore";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 
 interface Filter {
   fieldName: string;
@@ -673,6 +676,16 @@ export default defineComponent({
     };
 
     const addToFilter = (field: any) => {
+      if (searchObj.meta.sqlMode === true && typeof field === "string") {
+        const fieldAndOperator = field.match(
+          /^([^=!<>\s()"]+)(\s*(?:!=|=)\s*.*)$/,
+        );
+        if (fieldAndOperator) {
+          searchObj.data.stream.addToFilter =
+            `${quoteSqlIdentifierIfNeeded(fieldAndOperator[1])}${fieldAndOperator[2]}`;
+          return;
+        }
+      }
       searchObj.data.stream.addToFilter = field;
     };
 
@@ -1033,6 +1046,10 @@ export default defineComponent({
           : expressions[0];
 
       searchObj.data.stream.addToFilter = combined;
+    };
+
+    const removeFieldFilter = (fieldName: string) => {
+      searchObj.data.stream.removeFilterField = fieldName;
     };
 
     const loadMoreFieldValues = (fieldName: string) => {
@@ -1546,6 +1563,19 @@ export default defineComponent({
             });
           });
 
+          // [NEW] Background capture into IndexedDB — does not block return
+          if (streamValues.length > 0 && fieldName) {
+            captureFromValuesApi(
+              {
+                org: store.state.selectedOrganization.identifier,
+                streamType: searchObj.data.stream.streamType ?? "logs",
+                streamName: streamName ?? "",
+              },
+              fieldName,
+              streamValues,
+            );
+          }
+
           // Append to existing stream values in paginated mode; replace on fresh load.
           if (isAppend) {
             const existing =
@@ -1701,6 +1731,24 @@ export default defineComponent({
       }
     };
 
+    const onPaginationUpdate = (newPagination: {
+      page: number;
+      rowsPerPage: number;
+    }) => {
+      // When extractFields() temporarily clears the field list, Quasar's
+      // q-table recalculates pages and emits page=1.  Ignore that automatic
+      // reset while the stream fields are still loading so the user stays on
+      // their current page after the query completes.
+      if (
+        (searchObj as any).loadingStream &&
+        newPagination.page === 1 &&
+        pagination.value.page !== 1
+      ) {
+        return;
+      }
+      pagination.value = newPagination;
+    };
+
     const setPage = (page) => {
       pagination.value = { ...pagination.value, page };
     };
@@ -1715,6 +1763,7 @@ export default defineComponent({
       addToFilter,
       clickFieldFn,
       addMultipleSearchTerms,
+      removeFieldFilter,
       searchFieldValues,
       loadMoreFieldValues,
       getImageURL,
@@ -1733,6 +1782,7 @@ export default defineComponent({
       userDefinedSchemaBtnGroupOption,
       selectedFieldsBtnGroupOption,
       pagination,
+      onPaginationUpdate,
       toggleSchema,
       toggleInterestingFields,
       fieldListRef,

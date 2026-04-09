@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -38,7 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="props.row.name === 'no-fields-found'"
         class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center"
       >
-        <q-icon name="info" color="primary" size="xs" />
+        <q-icon name="info" color="primary"
+size="xs" />
         <span class="tw:pl-[0.375rem]">No matching fields found.</span>
       </q-tr>
 
@@ -112,8 +113,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <FieldExpansion
                 :field="field"
                 :field-values="fieldValues[field.name]"
-                :active-include-values="activeIncludeFieldValues?.[field.name] ?? []"
-                :active-exclude-values="activeExcludeFieldValues?.[field.name] ?? []"
+                :active-include-values="
+                  activeIncludeFieldValues?.[field.name] ?? []
+                "
+                :active-exclude-values="
+                  activeExcludeFieldValues?.[field.name] ?? []
+                "
                 :expanded="expandedFields?.[field.name] ?? false"
                 :selected-fields="selectedFields"
                 :selected-streams-count="selectedStreamsCount"
@@ -132,7 +137,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 @add-multiple-search-terms="
                   (fieldName, values, action) =>
-                    $emit('add-multiple-search-terms', fieldName, values, action)
+                    $emit(
+                      'add-multiple-search-terms',
+                      fieldName,
+                      values,
+                      action,
+                    )
+                "
+                @remove-field-filter="
+                  (fieldName) => $emit('remove-field-filter', fieldName)
                 "
                 @before-show="
                   (event, field) => $emit('before-show', event, field)
@@ -142,7 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (fieldName, searchTerm) =>
                     $emit('search-field-values', fieldName, searchTerm)
                 "
-                @load-more-values="(fieldName) => $emit('load-more-values', fieldName)"
+                @load-more-values="
+                  (fieldName) => $emit('load-more-values', fieldName)
+                "
               />
             </template>
           </FieldRow>
@@ -165,11 +180,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="indexlist-search-input tw:mb-[0.25rem]"
         >
           <template #prepend>
-            <q-icon name="search" size="1.25rem" class="o2-search-input-icon" />
+            <q-icon name="search" size="1.25rem"
+class="o2-search-input-icon" />
           </template>
         </q-input>
         <q-tr v-if="loadingStream == true">
-          <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
+          <q-td colspan="100%" class="text-bold"
+style="opacity: 0.7">
             <div class="text-subtitle2 text-weight-bold">
               <q-spinner-hourglass size="1.25rem" />
               {{ t("confirmDialog.loading") }}
@@ -256,6 +273,7 @@ defineEmits<{
     values: string[],
     action: string,
   ];
+  "remove-field-filter": [fieldName: string];
   "search-field-values": [fieldName: string, searchTerm: string];
   "load-more-values": [fieldName: string];
   "before-show": [event: any, field: any];

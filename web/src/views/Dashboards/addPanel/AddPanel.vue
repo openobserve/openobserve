@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -1637,8 +1637,6 @@ export default defineComponent({
      * Handles saving a variable - reloads dashboard to reflect the saved variable
      */
     const handleSaveVariable = async (payload: any) => {
-      isAddVariableOpen.value = false;
-
       const { variableData, isEdit, oldVariableName } = payload || {};
 
       // If payload is missing, return (should not happen)
@@ -1685,6 +1683,8 @@ export default defineComponent({
           variablesCreatedInSession.value.push(variableData.name);
         }
       }
+
+      isAddVariableOpen.value = false;
 
       // Update variablesWithCurrentPanel tracking
       const usesCurrentPanel =

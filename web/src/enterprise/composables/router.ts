@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,6 +19,7 @@ import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue"
 import Usage from "@/enterprise/components/billings/usage.vue";
 import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
+import EvalTemplateManager from "@/enterprise/components/EvalTemplateManager.vue";
 
 const useEnvRoutes = () => {
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
@@ -78,7 +79,20 @@ const useEnvRoutes = () => {
     },
   ];
 
-  return { parentRoutes, homeChildRoutes };
+  // Child routes to merge under pipeline/pipelines path
+  const pipelineChildren = [
+    {
+      path: "eval-templates",
+      name: "evalTemplates",
+      component: EvalTemplateManager,
+      meta: {
+        title: "Evaluation Templates",
+        keepAlive: false,
+      },
+    },
+  ];
+
+  return { parentRoutes, homeChildRoutes, pipelineChildren };
 };
 
 export default useEnvRoutes;

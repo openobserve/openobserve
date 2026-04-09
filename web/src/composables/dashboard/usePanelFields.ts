@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -33,9 +33,11 @@ const colors = [
 export const usePanelFields = ({
   dashboardPanelData,
   store,
+  pageKey = "dashboard",
 }: {
   dashboardPanelData: any;
   store: any;
+  pageKey?: string;
 }) => {
   const promqlMode = computed(
     () => dashboardPanelData.data.queryType == "promql",
@@ -259,7 +261,10 @@ export const usePanelFields = ({
       havingConditions: [],
       treatAsNonTimestamp:
         row.name === store.state.zoConfig.timestamp_column ? false : true,
-      showFieldAsJson: false,
+      showFieldAsJson:
+        pageKey === "logs"
+          ? (store?.state?.zoConfig?.dashboard_show_field_as_json_enabled ?? false)
+          : false,
     });
 
     updateArrayAlias();
@@ -399,7 +404,10 @@ export const usePanelFields = ({
       havingConditions: [],
       treatAsNonTimestamp:
         row.name === store.state.zoConfig.timestamp_column ? false : true,
-      showFieldAsJson: false,
+      showFieldAsJson:
+        pageKey === "logs"
+          ? (store?.state?.zoConfig?.dashboard_show_field_as_json_enabled ?? false)
+          : false,
     });
     updateArrayAlias();
   };

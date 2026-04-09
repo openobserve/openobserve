@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,6 +14,45 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const quoteSqlIdentifierForTest = (field: string) =>
+  field === "user" ? `"${field}"` : field;
+
+const getFieldFromExpressionForTest = (expression: string): string | null => {
+  const cleaned = expression.trim().replace(/^\(\s*/, "");
+  const match =
+    cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
+    cleaned.match(/^"?(\w+)"?\s*(?:=|!=|is)/i);
+
+  return match ? match[1] : null;
+};
+
+const replaceExistingFieldConditionForTest = (
+  queryStr: string,
+  fieldName: string,
+  newExpression: string,
+): string => {
+  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const opPat = `(?:=|!=|is(?:\\s+not)?)`;
+  const fieldPat = `(?:"${esc}"|${esc})`;
+  const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
+
+  const multiRegex = new RegExp(
+    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
+    "gi",
+  );
+  if (multiRegex.test(queryStr)) {
+    return queryStr.replace(multiRegex, newExpression);
+  }
+
+  const singleRegex = new RegExp(condPat, "gi");
+  if (singleRegex.test(queryStr)) {
+    return queryStr.replace(singleRegex, newExpression);
+  }
+
+  return queryStr;
+};
 
 // Mock all external services at the top level
 vi.mock("@/services/search", () => ({
@@ -282,8 +321,8 @@ describe("SearchBar.vue Methods", () => {
     expect(searchBarInstance.searchObj.meta.sqlMode).toBe(false);
   });
 
-  // Test 11: toggleHistogram method
-  it("should toggle histogram visibility", () => {
+  // Test 11: toggleHistogram method (histogram toggle is on the toolbar, not in menu)
+  it("should toggle histogram visibility via toolbar toggle", () => {
     const initialValue = searchBarInstance.searchObj.meta.showHistogram;
     searchBarInstance.toggleHistogram();
     expect(searchBarInstance.searchObj.meta.showHistogram).toBe(!initialValue);
@@ -423,10 +462,10 @@ describe("SearchBar.vue Reactive Properties", () => {
     expect(instance.searchObj.data.datetime.relativeTimePeriod).toBe("1h");
   });
 
-  // Test 24: Histogram visibility state
-  it("should validate histogram visibility state", () => {
+  // Test 24: Histogram visibility state (toolbar toggle, not menu item)
+  it("should validate histogram visibility state from toolbar toggle", () => {
     expect(instance.searchObj.meta.showHistogram).toBe(true);
-    
+
     instance.searchObj.meta.showHistogram = false;
     expect(instance.searchObj.meta.showHistogram).toBe(false);
   });
@@ -1654,7 +1693,14 @@ describe("SearchBar.vue Actual Component Methods", () => {
         const template = 'SELECT [FIELD_LIST] FROM "[STREAM_NAME]"';
         return template
           .replace("[STREAM_NAME]", stream)
-          .replace("[FIELD_LIST]", fieldList && fieldList.length > 0 && isQuickMode ? fieldList.join(",") : "*");
+          .replace(
+            "[FIELD_LIST]",
+            fieldList && fieldList.length > 0 && isQuickMode
+              ? fieldList
+                  .map((field: string) => quoteSqlIdentifierForTest(field))
+                  .join(",")
+              : "*",
+          );
       }),
       
       resetFilters: vi.fn(() => {
@@ -1731,7 +1777,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
       }),
       
       handleHistogramMode: vi.fn(() => {
-        // Mock histogram mode logic
+        // Mock histogram mode logic (toggle is on toolbar, not in menu)
       }),
       
       handleRunQueryFn: vi.fn(() => {
@@ -2271,6 +2317,58 @@ describe("SearchBar.vue Actual Component Methods", () => {
     const result = componentInstance.buildStreamQuery("logs", ["field1", "field2"], true);
     
     expect(result).toBe('SELECT field1,field2 FROM "logs"');
+  });
+
+  it("should quote reserved fields when building stream query", () => {
+    const result = componentInstance.buildStreamQuery("logs", ["user"], true);
+
+    expect(result).toBe('SELECT "user" FROM "logs"');
+  });
+
+  it("should keep non-reserved fields unquoted when replacing an existing condition", () => {
+    const newExpression = "firstName = 'alice'";
+    const fieldName = getFieldFromExpressionForTest(newExpression);
+
+    const result = replaceExistingFieldConditionForTest(
+      `SELECT * FROM "logs" WHERE firstName = 'bob'`,
+      fieldName!,
+      newExpression,
+    );
+
+    expect(fieldName).toBe("firstName");
+    expect(result).toContain("WHERE firstName = 'alice'");
+    expect(result).not.toContain("firstName = 'bob'");
+  });
+
+  it("should preserve quoted reserved fields when replacing an existing condition", () => {
+    const newExpression = `"user" = 'alice'`;
+    const fieldName = getFieldFromExpressionForTest(newExpression);
+
+    const result = replaceExistingFieldConditionForTest(
+      `SELECT * FROM "logs" WHERE "user" = 'bob'`,
+      fieldName!,
+      newExpression,
+    );
+
+    expect(fieldName).toBe("user");
+    expect(result).toContain(`WHERE "user" = 'alice'`);
+    expect(result).not.toContain(`"user" = 'bob'`);
+  });
+
+  it("should match quoted identifiers with a stream prefix when replacing a condition", () => {
+    const newExpression = `"logs"."user" = 'alice'`;
+    const fieldName = getFieldFromExpressionForTest(newExpression);
+
+    const result = replaceExistingFieldConditionForTest(
+      `SELECT * FROM "logs" WHERE "logs"."user" = 'bob' AND level = 'info'`,
+      fieldName!,
+      newExpression,
+    );
+
+    expect(fieldName).toBe("user");
+    expect(result).toContain(`"logs"."user" = 'alice'`);
+    expect(result).toContain(`level = 'info'`);
+    expect(result).not.toContain(`"logs"."user" = 'bob'`);
   });
 
   // Test 118: buildStreamQuery method with no fields

@@ -622,6 +622,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/dashboards/bulk", delete(dashboards::delete_dashboard_bulk))
         .route("/{org_id}/folders/dashboards/{dashboard_id}", put(dashboards::move_dashboard))
         .route("/{org_id}/dashboards/move", patch(dashboards::move_dashboards))
+        .route("/{org_id}/dashboards/{dashboard_id}/panels", post(dashboards::add_panel))
+        .route("/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}", put(dashboards::update_panel).delete(dashboards::delete_panel))
 
         // Reports
         .route("/{org_id}/reports", get(dashboards::reports::list_reports).post(dashboards::reports::create_report))
@@ -742,10 +744,15 @@ pub fn service_routes() -> Router {
         // Service accounts
         .route("/{org_id}/service_accounts", get(service_accounts::list).post(service_accounts::save))
         .route("/{org_id}/service_accounts/bulk", delete(service_accounts::delete_bulk))
-        .route("/{org_id}/service_accounts/{email_id}", get(service_accounts::get_api_token).put(service_accounts::update).delete(service_accounts::delete))
+        .route("/{org_id}/service_accounts/{email_id}", put(service_accounts::update).delete(service_accounts::delete))
 
         // MCP
-        .route("/{org_id}/mcp", get(mcp::handle_mcp_get).post(mcp::handle_mcp_post));
+        .route("/{org_id}/mcp", get(mcp::handle_mcp_get).post(mcp::handle_mcp_post).delete(mcp::handle_mcp_delete))
+
+        // sourcemaps
+        .route("/{org_id}/sourcemaps",get(sourcemaps::list).post(sourcemaps::upload_maps).delete(sourcemaps::delete))
+        .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
+        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace));
 
     #[cfg(feature = "enterprise")]
     {
@@ -793,6 +800,11 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
             .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
 
+            // Evaluation Templates
+            .route("/{org_id}/eval-templates", get(eval_templates::list).post(eval_templates::create))
+            .route("/{org_id}/eval-templates/{template_id}", get(eval_templates::get).put(eval_templates::update).delete(eval_templates::delete))
+            .route("/{org_id}/eval-templates/{template_id}/stats", get(eval_templates::get_stats))
+
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))
             .route("/{org_id}/re_patterns/{pattern_id}", get(re_pattern::get).put(re_pattern::update).delete(re_pattern::delete))
@@ -814,9 +826,11 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns))
 
             // Service streams
+            .route("/{org_id}/service_streams", get(service_streams::list_services))
             .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))
             .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
-            .route("/{org_id}/service_streams/_grouped", get(service_streams::get_services_grouped));
+            .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
+            .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services));
     }
 
     #[cfg(feature = "cloud")]
@@ -1037,6 +1051,7 @@ pub fn create_app_router() -> Router {
 #[cfg(test)]
 mod tests {
     use axum::{body::Body, http::Request};
+    use serde_json::Value;
     use tower::ServiceExt;
 
     use super::*;
@@ -1056,6 +1071,28 @@ mod tests {
             response.status().is_client_error() || response.status().is_server_error(),
             "expected 4xx/5xx, got {}",
             response.status()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_config_routes_include_sql_reserved_keywords() {
+        let app = config_routes();
+
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let payload: Value = serde_json::from_slice(&body).unwrap();
+
+        assert!(
+            payload
+                .get("sql_reserved_keywords")
+                .and_then(Value::as_array)
+                .is_some_and(|keywords| !keywords.is_empty())
         );
     }
 }

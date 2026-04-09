@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -457,6 +457,20 @@ describe("ImportRegexPattern", () => {
       });
     });
 
+    it("should reset BaseImport isImporting flag when JSON string is empty", async () => {
+      wrapper.vm.activeTab = "import_json_file";
+      await nextTick();
+
+      const baseImportRef = wrapper.vm.$refs.baseImportRef;
+      if (baseImportRef) {
+        baseImportRef.isImporting = true;
+      }
+
+      await wrapper.vm.importJson({ jsonStr: "", jsonArray: [] });
+
+      expect(baseImportRef.isImporting).toBe(false);
+    });
+
     it("should show error for invalid JSON", async () => {
       const payload = {
         jsonStr: "{ invalid json }",
@@ -475,6 +489,20 @@ describe("ImportRegexPattern", () => {
         })
       );
       expect(notifySpy.mock.calls[0][0].message).toContain("JSON");
+    });
+
+    it("should reset BaseImport isImporting flag when JSON is invalid", async () => {
+      wrapper.vm.activeTab = "import_json_file";
+      await nextTick();
+
+      const baseImportRef = wrapper.vm.$refs.baseImportRef;
+      if (baseImportRef) {
+        baseImportRef.isImporting = true;
+      }
+
+      await wrapper.vm.importJson({ jsonStr: "{ invalid json }", jsonArray: [] });
+
+      expect(baseImportRef.isImporting).toBe(false);
     });
 
     it("should not navigate when some imports fail", async () => {

@@ -16,152 +16,197 @@
 /**
  * useTracesTableColumns
  *
- * Returns TanStack ColumnDef[] (metadata only — no render functions).
- * Cell rendering is handled via scoped slots on <TracesTable>:
+ * Provides a `columns` ref (ColumnDef[]) and a `buildColumns()` method.
+ * Call `buildColumns()` explicitly whenever the column list needs to be
+ * rebuilt — e.g. after loading selectedFields from localStorage, after a
+ * mode switch, or after the user adds/removes/reorders a column.
+ *
+ * Cell rendering is handled via scoped slots on <TenstackTable>:
  *   #cell-{columnId}="{ item, cell }"
  *
+ * Column order is fully driven by `selectedFields` (an ordered string[]).
+ * LLM columns (input_tokens, output_tokens, cost) are injected dynamically
+ * before `service_latency` in traces mode when `showLlmColumns` is true;
+ * they are NOT stored in `selectedFields`.
+ *
  * Usage:
- *   const columns = useTracesTableColumns(hasLlmTraces)  // Ref<boolean>
- *   // columns is a ComputedRef<ColumnDef<Record<string,any>>[]>
+ *   const { columns, buildColumns } = useTracesTableColumns()
+ *   buildColumns(showLlmColumns, searchMode, selectedFields)
  */
 
-import { computed, type Ref } from "vue";
+import { ref } from "vue";
 import { type ColumnDef } from "@tanstack/vue-table";
+import { useStore } from "vuex";
 
-export function useTracesTableColumns(
-  showLlmColumns: Ref<boolean>,
-  searchMode: Ref<"traces" | "spans">,
-) {
-  return computed<ColumnDef<Record<string, any>>[]>(() => {
-    if (searchMode.value === "spans") {
-      return [
-        {
-          id: "timestamp",
-          header: "TIMESTAMP",
-          size: 160,
-          meta: { sortable: true },
-        },
-        {
-          id: "service",
-          header: "SERVICE",
-          meta: {
-            grow: true,
-            width: 160,
-            cellClass: "tw:text-[var(--o2-text-1)]",
-          },
-        },
-        {
-          id: "operation_name",
-          header: "OPERATION NAME",
-          meta: {
-            grow: true,
-            width: 200,
-            cellClass: "tw:text-[var(--o2-text-1)]",
-          },
-        },
-        {
-          id: "duration",
-          header: "DURATION",
-          size: 120,
-          meta: { sortable: true },
-        },
-        {
-          id: "status",
-          header: "STATUS",
-          size: 120,
-          meta: { align: "center" },
-        },
-        {
-          id: "status_code",
-          header: "STATUS CODE",
-          size: 140,
-          meta: { align: "center" },
-        },
-        {
-          id: "method",
-          header: "METHOD",
-          size: 140,
-          meta: { align: "center" },
-        },
-      ];
+/** IDs of LLM columns injected at runtime — never stored in selectedFields. */
+export const LLM_COLUMN_IDS = new Set([
+  "input_tokens",
+  "output_tokens",
+  "cost",
+]);
+
+/**
+ * Known column metadata. Any field name NOT in this map gets a generic
+ * prettified header and default width.
+ */
+const KNOWN_COLUMN_META: Record<
+  string,
+  {
+    header: string;
+    size: number;
+    meta: Record<string, unknown>;
+    accessorFn?: (row: any) => any;
+    sortable?: boolean;
+  }
+> = {
+  service_name: {
+    header: "Service",
+    size: 160,
+    meta: { cellClass: "tw:text-[var(--o2-text-1)]", slot: true },
+  },
+  operation_name: {
+    header: "Operation Name",
+    size: 200,
+    meta: { cellClass: "tw:text-[var(--o2-text-1)]", slot: true },
+  },
+  duration: {
+    header: "Duration",
+    size: 120,
+    meta: {
+      sortable: true,
+      slot: true,
+      cellClass: "tw:text-[var(--o2-text-4)]!",
+    },
+    sortable: true,
+  },
+  spans: {
+    header: "Spans",
+    size: 100,
+    meta: {
+      align: "center",
+      slot: false,
+      cellClass: "tw:text-[var(--o2-text-1)]!",
+    },
+    accessorFn: (row: any) => row.spans,
+  },
+  status: {
+    header: "Status",
+    size: 120,
+    meta: { align: "center", slot: true, disableCellAction: true },
+  },
+  status_code: {
+    header: "Status Code",
+    size: 140,
+    meta: { align: "center", slot: true, closable: true },
+  },
+  method: {
+    header: "Method",
+    size: 140,
+    meta: { align: "center", slot: true, closable: true },
+  },
+  service_latency: {
+    header: "Service Latency",
+    size: 160,
+    meta: { slot: true, disableCellAction: true },
+  },
+  input_tokens: {
+    header: "Input Tokens",
+    size: 130,
+    meta: { align: "right", slot: true },
+  },
+  output_tokens: {
+    header: "Output Tokens",
+    size: 130,
+    meta: { align: "right", slot: true },
+  },
+  cost: {
+    header: "Cost",
+    size: 130,
+    meta: { align: "right", slot: true },
+  },
+};
+
+function toColumnDef(fieldName: string): ColumnDef<Record<string, any>> {
+  const known = KNOWN_COLUMN_META[fieldName];
+  if (known) {
+    return {
+      id: fieldName,
+      header: known.header,
+      size: known.size,
+      meta: known.meta,
+      ...(known.accessorFn ? { accessorFn: known.accessorFn } : {}),
+      ...(known.sortable ? { sortable: known.sortable } : {}),
+    };
+  }
+  // Generic: prettify field name as header, default size
+  const header = fieldName
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return {
+    id: fieldName,
+    header,
+    size: 160,
+    meta: { slot: false, closable: true },
+    accessorFn: (row: any) => row[fieldName],
+  };
+}
+
+export function useTracesTableColumns() {
+  /**
+   * Rebuild the `columns` ref from the given parameters.
+   * Call this whenever selectedFields, searchMode, or showLlmColumns changes.
+   */
+  const columns = ref<ColumnDef<Record<string, any>>[]>([]);
+  const store = useStore();
+
+  const buildColumns = (
+    showLlmColumns: boolean,
+    searchMode: "traces" | "spans",
+    selectedFields: string[],
+  ): ColumnDef<Record<string, any>>[] => {
+    const cols: ColumnDef<Record<string, any>>[] = selectedFields.map((field) =>
+      toColumnDef(field),
+    );
+
+    if (
+      !selectedFields.find(
+        (col) =>
+          col === (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+      )
+    )
+      cols.unshift({
+        id: store?.state?.zoConfig?.timestamp_column || "_timestamp",
+        header: "Timestamp",
+        size: 160,
+        meta: { slot: true, sortable: true },
+      });
+
+    // Inject LLM columns just before service_latency in traces mode.
+    // They are not stored in selectedFields — managed by the showLlmColumns flag.
+    if (searchMode === "traces" && showLlmColumns) {
+      const tailIdx = cols.findIndex((c) => c.id === "service_latency");
+      const llm: ColumnDef<Record<string, any>>[] = [];
+
+      if (!selectedFields.includes("input_tokens")) {
+        llm.push(toColumnDef("input_tokens"));
+      }
+      if (!selectedFields.includes("output_tokens")) {
+        llm.push(toColumnDef("output_tokens"));
+      }
+      if (!selectedFields.includes("cost")) {
+        llm.push(toColumnDef("cost"));
+      }
+
+      if (tailIdx !== -1) {
+        cols.splice(tailIdx, 0, ...llm);
+      } else {
+        cols.push(...llm);
+      }
     }
 
-    const base: ColumnDef<Record<string, any>>[] = [
-      {
-        id: "timestamp",
-        header: "TIMESTAMP",
-        size: 160,
-        meta: { sortable: true },
-      },
-      {
-        id: "service",
-        header: "SERVICE",
-        meta: {
-          grow: true,
-          width: 180,
-          cellClass: "tw:text-[var(--o2-text-1)]",
-        },
-      },
-      {
-        id: "operation_name",
-        header: "OPERATION NAME",
-        meta: {
-          grow: true,
-          width: 200,
-          cellClass: "tw:text-[var(--o2-text-1)]",
-        },
-      },
-      {
-        id: "duration",
-        header: "DURATION",
-        size: 120,
-        meta: { sortable: true },
-      },
-      {
-        id: "spans",
-        header: "SPANS",
-        size: 100,
-        meta: { align: "center" },
-      },
-      {
-        id: "status",
-        header: "STATUS",
-        size: 160,
-        meta: { align: "center" },
-      },
-    ];
+    columns.value = cols;
+    return cols;
+  };
 
-    const llm: ColumnDef<Record<string, any>>[] = showLlmColumns.value
-      ? [
-          {
-            id: "input_tokens",
-            header: "INPUT TOKENS",
-            size: 110,
-            meta: { align: "right" },
-          },
-          {
-            id: "output_tokens",
-            header: "OUTPUT TOKENS",
-            size: 110,
-            meta: { align: "right" },
-          },
-          {
-            id: "cost",
-            header: "COST",
-            size: 80,
-            meta: { align: "right" },
-          },
-        ]
-      : [];
-
-    const tail: ColumnDef<Record<string, any>>[] = [
-      {
-        id: "service_latency",
-        header: "SERVICE LATENCY",
-        size: 160,
-      },
-    ];
-
-    return [...base, ...llm, ...tail];
-  });
+  return { columns, buildColumns };
 }

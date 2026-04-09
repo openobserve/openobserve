@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, sync::Arc};
+use std::{
+    cmp::max,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
@@ -48,7 +51,6 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::unwrap_stream_settings,
 };
-use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::{self, SearchQuery};
 use sql::Sql;
@@ -69,7 +71,7 @@ use {
     o2_enterprise::enterprise::{
         common::config::get_config as get_o2_config,
         search::{
-            TaskStatus, WorkGroup,
+            TaskStatus,
             cache::streaming_agg::{
                 create_aggregation_cache_file_path, discover_cache_for_query,
                 generate_optimal_partitions, get_aggregation_cache_key_from_request,
@@ -259,13 +261,9 @@ pub async fn search(
     {
         if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await
             && let Some((_, stat)) = status.first()
+            && let Some(wg) = stat.work_group.as_ref()
         {
-            match stat.work_group.as_ref() {
-                Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
-                Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
-                Some(WorkGroup::Background) => _work_group = Some("background".to_string()),
-                None => _work_group = None,
-            }
+            _work_group = Some(wg.to_string());
         };
     }
 
@@ -832,13 +830,37 @@ pub async fn search_partition(
         return Ok(response);
     };
 
-    let nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+    let role_group = if is_http_req {
+        Some(RoleGroup::Interactive)
+    } else {
+        Some(RoleGroup::Background)
+    };
+    let nodes = get_cached_online_querier_nodes(role_group)
         .await
         .unwrap_or_default();
     if nodes.is_empty() {
         log::error!("[trace_id {trace_id}] search_partition: no querier node online");
         return Err(Error::Message("no querier node online".to_string()));
     }
+
+    // Use the configured node selection strategy so cpu_cores reflects the
+    // actual nodes this query will fan out to — not the entire cluster.
+    // With "org" or "stream" strategies only a subset of nodes are used;
+    // summing all nodes' CPU would under-estimate total_secs and create too
+    // few partitions.
+    #[cfg(feature = "enterprise")]
+    let cpu_cores = {
+        let stream_key = sql.get_first_stream_key();
+        let selected = o2_enterprise::enterprise::search::admission::node_selection::select_nodes(
+            org_id,
+            &stream_key,
+            nodes,
+            role_group,
+        )
+        .await;
+        selected.iter().map(|n| n.cpu_num).sum::<u64>() as usize
+    };
+    #[cfg(not(feature = "enterprise"))]
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
 
     let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
@@ -1136,7 +1158,7 @@ pub async fn search_partition(
         resp.streaming_id = streaming_id.clone();
     }
 
-    // Get cache strategy for streaming aggregates (enterprise only)
+    // Get cache strategy for streaming aggregates
     #[cfg(feature = "enterprise")]
     let stremaing_aggs_cache_strategy = if streaming_aggs
         && let Some(streaming_id_ref) = streaming_id.as_deref()
@@ -1286,13 +1308,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
         } else {
             "processing"
         };
-        let work_group = if result.work_group.is_none() {
-            "Unknown"
-        } else if *result.work_group.as_ref().unwrap() == 0 {
-            "Short"
-        } else {
-            "Long"
-        };
+        let work_group = result.work_group.clone().unwrap_or_default();
         let search_type: Option<search::SearchEventType> = result.search_type.map(|s_event_type| {
             search::SearchEventType::try_from(s_event_type.as_str())
                 .unwrap_or(search::SearchEventType::UI)
@@ -1307,7 +1323,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
             stream_type: result.stream_type,
             query,
             scan_stats,
-            work_group: work_group.to_string(),
+            work_group,
             search_type,
             search_event_context: result.search_event_context.map(Into::into),
         });

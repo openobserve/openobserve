@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -465,6 +465,24 @@ async fn handle_alert_triggers(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Error deleting trigger job: {e}"
             );
         }
+        publish_triggers_usage(TriggerData {
+            _timestamp: now,
+            org: trigger.org.clone(),
+            module: TriggerDataType::Alert,
+            key: format!("/{}", trigger.module_key),
+            status: TriggerDataStatus::Failed,
+            scheduler_trace_id: Some(scheduler_trace_id.clone()),
+            error: Some("Alert id is not a valid ksuid. Deleting trigger job.".to_string()),
+            time_in_queue_ms: Some(time_in_queue),
+            source_node: Some(source_node.clone()),
+            retries: trigger.retries,
+            is_realtime: trigger.is_realtime,
+            is_silenced: trigger.is_silenced,
+            start_time: now,
+            end_time: now,
+            next_run_at: now,
+            ..Default::default()
+        });
         return Err(anyhow::anyhow!(
             "Alert id is not a valid ksuid: {}",
             trigger.module_key
@@ -1488,8 +1506,6 @@ async fn handle_report_triggers(
         ReportFrequencyType::Once => {
             // Check on next week
             new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            // Disable the report
-            report.enabled = false;
             run_once = true;
         }
         ReportFrequencyType::Cron => {
@@ -1564,6 +1580,34 @@ async fn handle_report_triggers(
             // Report generation successful, update the trigger
             if run_once {
                 new_trigger.status = db::scheduler::TriggerStatus::Completed;
+                // Get the report again from db to pause it
+                match infra::table::reports::get_by_id(conn, report_id).await? {
+                    Some((folder, mut old_report)) => {
+                        // Pause the report as this is the last run
+                        if old_report.enabled {
+                            // Disable the report
+                            old_report.enabled = false;
+                        }
+                        let result = db::dashboards::reports::update_without_updating_trigger(
+                            conn,
+                            &folder.folder_id,
+                            None,
+                            old_report,
+                        )
+                        .await;
+                        if result.is_err() {
+                            log::error!(
+                                "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update report: {report_name} after trigger: {}",
+                                result.err().unwrap()
+                            );
+                        }
+                    }
+                    None => {
+                        log::error!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Report not found: {report_id} while updating run_once state"
+                        );
+                    }
+                }
             }
             db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             log::debug!(
@@ -1761,14 +1805,12 @@ async fn handle_derived_stream_triggers(
     }
 
     if !pipeline.enabled {
-        // Pipeline not enabled, check again in 5 mins
+        // Pipeline not enabled, check again next week
         let msg = format!(
-            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
+            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 7 days."
         );
-        new_trigger.next_run_at += Duration::try_minutes(5)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
+        // update trigger, check on next week
+        new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
         let trigger_data_stream = TriggerData {
             _timestamp: now_micros(),
             org: new_trigger.org.clone(),
@@ -2409,6 +2451,28 @@ async fn handle_backfill_triggers(
                 &job_id,
             )
             .await;
+            publish_triggers_usage(TriggerData {
+                _timestamp: now,
+                org: trigger.org.clone(),
+                module: TriggerDataType::Backfill,
+                key: job_id.clone(),
+                status: TriggerDataStatus::Failed,
+                scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                error: Some(format!(
+                    "Failed to fetch backfill job config: {e}. Deleting trigger job."
+                )),
+                time_in_queue_ms: Some(
+                    Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+                ),
+                source_node: Some(LOCAL_NODE.name.clone()),
+                retries: trigger.retries,
+                is_realtime: false,
+                is_silenced: false,
+                start_time: now,
+                end_time: now,
+                next_run_at: now,
+                ..Default::default()
+            });
             return Err(anyhow::anyhow!(
                 "Failed to fetch backfill job config: {}",
                 e
@@ -2443,6 +2507,53 @@ async fn handle_backfill_triggers(
                 "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to parse backfill trigger data: {e}",
                 &job_id
             );
+            let new_retries = trigger.retries + 1;
+            if new_retries >= max_retries {
+                let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
+                let _ = db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        next_run_at,
+                        retries: new_retries,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger.clone()
+                    },
+                    true,
+                    trace_id,
+                )
+                .await;
+            } else {
+                let _ = db::scheduler::update_status(
+                    &trigger.org,
+                    db::scheduler::TriggerModule::Backfill,
+                    &job_id,
+                    db::scheduler::TriggerStatus::Waiting,
+                    new_retries,
+                    None,
+                    true,
+                    trace_id,
+                )
+                .await;
+            }
+            publish_triggers_usage(TriggerData {
+                _timestamp: now,
+                org: trigger.org.clone(),
+                module: TriggerDataType::Backfill,
+                key: job_id.clone(),
+                status: TriggerDataStatus::Failed,
+                scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                error: Some(format!("Failed to parse backfill trigger data: {e}")),
+                time_in_queue_ms: Some(
+                    Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+                ),
+                source_node: Some(LOCAL_NODE.name.clone()),
+                retries: new_retries,
+                is_realtime: false,
+                is_silenced: false,
+                start_time: now,
+                end_time: now,
+                next_run_at: now,
+                ..Default::default()
+            });
             return Err(anyhow::anyhow!("Failed to parse trigger data: {}", e));
         }
     };
@@ -2454,6 +2565,53 @@ async fn handle_backfill_triggers(
                 "[SCHEDULER trace_id {trace_id}] [job_id: {}] Missing backfill job data in trigger",
                 &job_id
             );
+            let new_retries = trigger.retries + 1;
+            if new_retries >= max_retries {
+                let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
+                let _ = db::scheduler::update_trigger(
+                    db::scheduler::Trigger {
+                        next_run_at,
+                        retries: new_retries,
+                        status: db::scheduler::TriggerStatus::Waiting,
+                        ..trigger.clone()
+                    },
+                    true,
+                    trace_id,
+                )
+                .await;
+            } else {
+                let _ = db::scheduler::update_status(
+                    &trigger.org,
+                    db::scheduler::TriggerModule::Backfill,
+                    &job_id,
+                    db::scheduler::TriggerStatus::Waiting,
+                    new_retries,
+                    None,
+                    true,
+                    trace_id,
+                )
+                .await;
+            }
+            publish_triggers_usage(TriggerData {
+                _timestamp: now,
+                org: trigger.org.clone(),
+                module: TriggerDataType::Backfill,
+                key: job_id.clone(),
+                status: TriggerDataStatus::Failed,
+                scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                error: Some("Missing backfill job data in trigger".to_string()),
+                time_in_queue_ms: Some(
+                    Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+                ),
+                source_node: Some(LOCAL_NODE.name.clone()),
+                retries: new_retries,
+                is_realtime: false,
+                is_silenced: false,
+                start_time: now,
+                end_time: now,
+                next_run_at: now,
+                ..Default::default()
+            });
             return Err(anyhow::anyhow!("Missing backfill job data"));
         }
     };
@@ -2475,6 +2633,28 @@ async fn handle_backfill_triggers(
                     &job_id,
                 )
                 .await;
+                publish_triggers_usage(TriggerData {
+                    _timestamp: now,
+                    org: trigger.org.clone(),
+                    module: TriggerDataType::Backfill,
+                    key: job_id.clone(),
+                    status: TriggerDataStatus::Failed,
+                    scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                    error: Some(format!(
+                        "Failed to fetch pipeline after max retries: {e}. Deleting trigger job."
+                    )),
+                    time_in_queue_ms: Some(
+                        Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+                    ),
+                    source_node: Some(LOCAL_NODE.name.clone()),
+                    retries: trigger.retries + 1,
+                    is_realtime: false,
+                    is_silenced: false,
+                    start_time: now,
+                    end_time: now,
+                    next_run_at: now,
+                    ..Default::default()
+                });
             } else {
                 let _ = db::scheduler::update_status(
                     &trigger.org,
@@ -2487,6 +2667,26 @@ async fn handle_backfill_triggers(
                     trace_id,
                 )
                 .await;
+                publish_triggers_usage(TriggerData {
+                    _timestamp: now,
+                    org: trigger.org.clone(),
+                    module: TriggerDataType::Backfill,
+                    key: job_id.clone(),
+                    status: TriggerDataStatus::Failed,
+                    scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                    error: Some(format!("Failed to fetch pipeline: {e}. Retrying.")),
+                    time_in_queue_ms: Some(
+                        Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+                    ),
+                    source_node: Some(LOCAL_NODE.name.clone()),
+                    retries: trigger.retries + 1,
+                    is_realtime: false,
+                    is_silenced: false,
+                    start_time: now,
+                    end_time: now,
+                    next_run_at: now,
+                    ..Default::default()
+                });
             }
             return Err(anyhow::anyhow!("Failed to fetch pipeline: {}", e));
         }
@@ -2508,6 +2708,26 @@ async fn handle_backfill_triggers(
                 &job_id,
             )
             .await;
+            publish_triggers_usage(TriggerData {
+                _timestamp: now,
+                org: trigger.org.clone(),
+                module: TriggerDataType::Backfill,
+                key: job_id.clone(),
+                status: TriggerDataStatus::Failed,
+                scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                error: Some("Pipeline is not scheduled. Deleting trigger job.".to_string()),
+                time_in_queue_ms: Some(
+                    Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+                ),
+                source_node: Some(LOCAL_NODE.name.clone()),
+                retries: trigger.retries,
+                is_realtime: false,
+                is_silenced: false,
+                start_time: now,
+                end_time: now,
+                next_run_at: now,
+                ..Default::default()
+            });
             return Err(anyhow::anyhow!("Pipeline is not scheduled"));
         }
     };
@@ -2526,6 +2746,28 @@ async fn handle_backfill_triggers(
                 &job_id,
             )
             .await;
+            publish_triggers_usage(TriggerData {
+                _timestamp: now,
+                org: trigger.org.clone(),
+                module: TriggerDataType::Backfill,
+                key: job_id.clone(),
+                status: TriggerDataStatus::Failed,
+                scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                error: Some(format!(
+                    "Failed to get destination streams: {e}. Deleting trigger job."
+                )),
+                time_in_queue_ms: Some(
+                    Duration::microseconds(now - trigger_start_time).num_milliseconds(),
+                ),
+                source_node: Some(LOCAL_NODE.name.clone()),
+                retries: trigger.retries,
+                is_realtime: false,
+                is_silenced: false,
+                start_time: now,
+                end_time: now,
+                next_run_at: now,
+                ..Default::default()
+            });
             return Err(e);
         }
     };

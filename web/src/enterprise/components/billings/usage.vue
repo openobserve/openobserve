@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -355,7 +355,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
       const aiIcon = computed(() =>
         store.state.theme === "dark"
           ? getImageURL("images/common/ai_icon_dark.svg")
-          : getImageURL("images/common/ai_icon.svg")
+          : getImageURL("images/common/ai_icon_gradient.svg")
       );
       //this is the example data that needs to be used to get the chart in usage page 
       //we just need to have the data in the format of the dataModel

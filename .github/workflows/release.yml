@@ -69,7 +69,7 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=8192"
         run: |
           cd web/
-          npm install
+          npm ci
           npm run build
 
       - name: Install Protoc for linux

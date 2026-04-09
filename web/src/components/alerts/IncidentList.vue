@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else-if="col.name === 'title'">
                 <div class="tw:flex tw:items-center tw:gap-1">
                   <span class="tw:font-medium">
-                    {{ props.row.title || formatDimensions(props.row.stable_dimensions) }}
+                    {{ props.row.title || formatDimensions(props.row.group_values) }}
                   </span>
                 </div>
               </template>
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex tw:flex-wrap tw:gap-1">
                   <!-- Show first 2 dimensions -->
                   <span
-                    v-for="[key, value] in getSortedDimensions(props.row.stable_dimensions).slice(0, 2)"
+                    v-for="[key, value] in getSortedDimensions(props.row.group_values).slice(0, 2)"
                     :key="key"
                     class="dimension-badge"
                     :class="getDimensionColorClass(key)"
@@ -125,14 +125,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <!-- Show +X more badge if there are more than 2 dimensions -->
                   <span
-                    v-if="getSortedDimensions(props.row.stable_dimensions).length > 2"
+                    v-if="getSortedDimensions(props.row.group_values).length > 2"
                     class="dimension-badge badge-more"
                   >
-                    +{{ getSortedDimensions(props.row.stable_dimensions).length - 2 }} more
+                    +{{ getSortedDimensions(props.row.group_values).length - 2 }} more
                     <q-tooltip :delay="300" class="tw:text-xs tw:max-w-md">
                       <div class="tw:space-y-1">
                         <div
-                          v-for="[key, value] in getSortedDimensions(props.row.stable_dimensions).slice(2)"
+                          v-for="[key, value] in getSortedDimensions(props.row.group_values).slice(2)"
                           :key="key"
                         >
                           <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
@@ -357,7 +357,7 @@ export default defineComponent({
       {
         name: "dimensions",
         label: "Dimensions",
-        field: "stable_dimensions",
+        field: "group_values",
         align: "left" as const,
         style: "width: 400px;",
       },
@@ -396,7 +396,7 @@ export default defineComponent({
 
       return incidentsList.filter((incident) => {
         // Search in title
-        const title = incident.title || formatDimensions(incident.stable_dimensions);
+        const title = incident.title || formatDimensions(incident.group_values);
         if (title.toLowerCase().includes(query)) {
           return true;
         }
@@ -412,9 +412,9 @@ export default defineComponent({
           return true;
         }
 
-        // Search in stable dimensions (key-value pairs)
-        if (incident.stable_dimensions) {
-          const dimensionsStr = Object.entries(incident.stable_dimensions)
+        // Search in group values (key-value pairs)
+        if (incident.group_values) {
+          const dimensionsStr = Object.entries(incident.group_values)
             .map(([k, v]) => `${k}=${v}`)
             .join(" ")
             .toLowerCase();

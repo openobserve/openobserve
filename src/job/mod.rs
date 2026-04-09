@@ -14,11 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{cluster::LOCAL_NODE, spawn_pausable_job};
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::config::get_config as get_enterprise_config;
-#[cfg(feature = "enterprise")]
-use o2_openfga::config::get_config as get_openfga_config;
 use regex::Regex;
+#[cfg(feature = "enterprise")]
+use {
+    o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::admission},
+    o2_openfga::config::get_config as get_openfga_config,
+};
 
 use crate::{
     common::meta::{
@@ -57,6 +58,50 @@ mod stats;
 
 pub use file_downloader::{download_from_node, queue_download};
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
+
+#[cfg(feature = "enterprise")]
+async fn backfill_sys_rca_agent_openfga_tuples() {
+    use bytes::Bytes;
+
+    // Use a dedicated system org for migration flags, separate from user orgs.
+    const MIGRATION_ORG: &str = "_migration";
+    const FLAG_KEY: &str = "sys_rca_agent_openfga_migration_v1";
+
+    // Check if already done via KV flag
+    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
+        .await
+        .is_ok()
+    {
+        return; // Already done
+    }
+
+    // Get all orgs and ensure SA exists (idempotent — creates OpenFGA tuples for existing DB rows)
+    match crate::service::db::organization::list(None).await {
+        Ok(orgs) => {
+            for org in orgs {
+                if let Err(e) =
+                    crate::service::organization::ensure_sys_rca_agent(&org.identifier).await
+                {
+                    log::warn!(
+                        "Failed to backfill SysRcaAgent OpenFGA tuples for org '{}': {e}",
+                        org.identifier
+                    );
+                }
+            }
+            // Set flag so we don't run again
+            if let Err(e) =
+                crate::service::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
+            {
+                log::error!("Failed to set OpenFGA backfill flag: {e}");
+            } else {
+                log::info!("SysRcaAgent OpenFGA tuple backfill complete");
+            }
+        }
+        Err(e) => {
+            log::error!("Failed to list orgs for OpenFGA backfill: {e}");
+        }
+    }
+}
 
 #[cfg(feature = "enterprise")]
 async fn enforce_usage_stream_retention() {
@@ -143,6 +188,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     .expect("Email regex is valid");
 
     let cfg = config::get_config();
+
     // init root user
     if !db::user::root_user_exists().await {
         if cfg.auth.root_user_email.is_empty()
@@ -240,6 +286,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         {
             log::error!("OFGA init failed: {e}");
         }
+        // Backfill OpenFGA tuples for SysRcaAgent service accounts created by DB migration
+        backfill_sys_rca_agent_openfga_tuples().await;
     }
 
     tokio::task::spawn(promql_self_consume::run());
@@ -328,7 +376,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("prom cluster leader cache failed");
 
-    // cache system settings (FQN priority, etc.)
     db::system_settings::cache()
         .await
         .expect("system settings cache failed");
@@ -380,14 +427,26 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     config_watcher::run();
+
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() && get_enterprise_config().ai.enabled {
+    if LOCAL_NODE.is_querier() && get_o2_config().ai.enabled {
         tokio::task::spawn(async move {
             o2_enterprise::enterprise::ai::agent::prompt::prompts::load_system_prompt()
                 .await
                 .expect("load system prompt failed");
         });
     }
+
+    // Initialize slot-based admission ledger on querier nodes
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_querier() && get_o2_config().work_group.max_nodes_per_query > 0 {
+        admission::init_slot_ledger(cfg.limit.real_cpu_num as f64, cfg.limit.mem_total as f64);
+        // Run the TTL sweep at ≤ 1/4 of the reservation TTL so that expired
+        // reservations are reaped promptly without spinning.
+        let sweep_ms = (get_o2_config().work_group.slot_reserved_ttl_ms / 4).max(100);
+        admission::ledger::spawn_ttl_cleanup_task(sweep_ms);
+    }
+
     tokio::task::spawn(files::run());
     tokio::task::spawn(stats::run());
     tokio::task::spawn(compactor::run());
@@ -533,11 +592,78 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "service_streams_batch_processor",
-        get_enterprise_config().service_streams.batch_flush_interval_seconds,
+        get_o2_config().service_streams.batch_flush_interval_secs,
         {
             o2_enterprise::enterprise::service_streams::batch_processor::run_once().await;
         },
-        pause_if: !get_enterprise_config().service_streams.enabled
+        pause_if: !get_o2_config().service_streams.enabled
+    );
+    #[cfg(feature = "enterprise")]
+    spawn_pausable_job!(
+        "service_streams_cleanup",
+        3600u64, // 1 hour
+        {
+            use config::metrics;
+
+            const STALE_AGE_US: i64 = 30 * 24 * 3600 * 1_000_000; // 30 days
+
+            // Leader election: smallest UUID ingester runs cleanup
+            let is_leader = match infra::cluster::get_cached_online_ingester_nodes().await {
+                Some(mut nodes) if !nodes.is_empty() => {
+                    nodes.sort_by(|a, b| a.uuid.cmp(&b.uuid));
+                    nodes[0].uuid == LOCAL_NODE.uuid
+                }
+                _ => true, // single-node fallback
+            };
+
+            if !is_leader {
+                continue;
+            }
+
+            let orgs = match infra::table::service_streams::list_distinct_orgs().await {
+                Ok(orgs) => orgs,
+                Err(e) => {
+                    log::error!("[service_streams_cleanup] Failed to list orgs: {e}");
+                    metrics::SERVICE_STREAMS_CLEANUP_RUNS
+                        .with_label_values(&["error"])
+                        .inc();
+                    continue;
+                }
+            };
+
+            let cutoff_us = chrono::Utc::now().timestamp_micros() - STALE_AGE_US;
+
+            for org_id in &orgs {
+                let start = std::time::Instant::now();
+                match infra::table::service_streams::delete_stale(org_id, cutoff_us).await {
+                    Ok(evicted) => {
+                        let duration = start.elapsed().as_secs_f64();
+                        metrics::SERVICE_STREAMS_CLEANUP_DURATION_SECONDS
+                            .with_label_values(&[org_id])
+                            .observe(duration);
+                        metrics::SERVICE_STREAMS_CLEANUP_RUNS
+                            .with_label_values(&["success"])
+                            .inc();
+                        if evicted > 0 {
+                            metrics::SERVICE_STREAMS_CLEANUP_ROWS_EVICTED
+                                .with_label_values(&[org_id])
+                                .inc_by(evicted);
+                            log::info!(
+                                "[service_streams_cleanup] org={} evicted={} duration={:.3}s",
+                                org_id, evicted, duration
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        metrics::SERVICE_STREAMS_CLEANUP_RUNS
+                            .with_label_values(&["error"])
+                            .inc();
+                        log::error!("[service_streams_cleanup] org={} error={e}", org_id);
+                    }
+                }
+            }
+        },
+        pause_if: !get_o2_config().service_streams.enabled
     );
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(pipeline::run());
@@ -614,12 +740,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
 pub async fn init_deferred() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
-        o2_enterprise::enterprise::license::start_license_check(
-            crate::service::self_reporting::search::get_usage,
-            LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role(),
-        )
-        .await;
-        tokio::task::spawn(db::license::watch());
+        // only querier nodes watch license keys
+        if LOCAL_NODE.is_querier() {
+            o2_enterprise::enterprise::license::start_license_check(
+                crate::service::self_reporting::search::get_usage,
+                LOCAL_NODE.is_single_role(),
+            )
+            .await;
+            tokio::task::spawn(db::license::watch());
+        }
     }
 
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {

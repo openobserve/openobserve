@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -549,6 +549,7 @@ import config from "@/aws-exports";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
+import { isPrebuiltType } from "@/utils/prebuilt-templates";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import DestinationTestResult from "./DestinationTestResult.vue";
@@ -819,7 +820,7 @@ const setupDestinationData = () => {
     }
 
     // Priority 1: Check metadata.prebuilt_type (most reliable for prebuilt destinations)
-    if (parsedMetadata?.prebuilt_type) {
+    if (parsedMetadata?.prebuilt_type && isPrebuiltType(parsedMetadata.prebuilt_type)) {
       formData.value.destination_type = parsedMetadata.prebuilt_type;
     }
     // Priority 2: Check if template starts with 'system-prebuilt-' AND destination structure matches
@@ -844,12 +845,14 @@ const setupDestinationData = () => {
     }
     // Priority 3: Check if template starts with 'prebuilt_' (user templates)
     else if (props.destination.template?.startsWith('prebuilt_')) {
-      formData.value.destination_type = props.destination.template.replace('prebuilt_', '');
+      const extractedType = props.destination.template.replace('prebuilt_', '');
+      formData.value.destination_type = isPrebuiltType(extractedType) ? extractedType : 'custom';
     }
     // Priority 4: Check if template includes 'prebuilt' (legacy format)
     else if (props.destination.template?.includes('prebuilt')) {
       const parts = props.destination.template.split('-');
-      formData.value.destination_type = parts[parts.length - 1];
+      const extractedType = parts[parts.length - 1];
+      formData.value.destination_type = isPrebuiltType(extractedType) ? extractedType : 'custom';
     }
     // Priority 5: Fallback to URL-based detection (for destinations created before metadata was added)
     else if (props.destination.url) {

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -1543,6 +1543,20 @@ export default defineComponent({
       addVariableForm.value.validate().then(async (valid: any) => {
         if (!valid) {
           return false;
+        }
+
+        // When in AddPanel mode, check for duplicate variable names client-side
+        // (dashboard settings relies on the server returning a 409 for this)
+        if (props.isFromAddPanel && props.dashboardVariablesList) {
+          const isDuplicate = props.dashboardVariablesList.some(
+            (v: any) =>
+              v.name === variableData.name &&
+              v.name !== props.variableName,
+          );
+          if (isDuplicate) {
+            showErrorNotification(`Variable with same name already exists.`);
+            return false;
+          }
         }
 
         // check if filter has cycle

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -49,7 +49,7 @@ const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   status: overrides.status || "open",
   severity: overrides.severity || "P1",
   title: overrides.title || "Test Incident",
-  stable_dimensions: overrides.stable_dimensions || { service: "test-service" },
+  group_values: overrides.group_values || { service: "test-service" },
   alert_count: overrides.alert_count !== undefined ? overrides.alert_count : 5,
   last_alert_at: overrides.last_alert_at || 1700000000000000,
   created_at: overrides.created_at || 1700000000000000,
@@ -805,7 +805,7 @@ describe("IncidentList.vue", () => {
       const incident = createIncident({ title: undefined as any });
 
       // Should use dimensions instead
-      const formatted = wrapper.vm.formatDimensions(incident.stable_dimensions);
+      const formatted = wrapper.vm.formatDimensions(incident.group_values);
       expect(formatted).toBeTruthy();
     });
 

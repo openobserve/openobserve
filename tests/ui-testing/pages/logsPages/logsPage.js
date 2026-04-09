@@ -533,55 +533,59 @@ export class LogsPage {
      * @param {number} pollIntervalMs - Interval between checks
      * @returns {Promise<boolean>} True if stream exists, false if timeout
      */
-    async waitForStreamAvailable(streamName, maxWaitMs = 30000, pollIntervalMs = 3000) {
-        testLogger.debug(`waitForStreamAvailable: Waiting for stream ${streamName} to be available`);
+    async waitForStreamAvailable(streamName, maxWaitMs = 30000, pollIntervalMs = 3000, streamType = 'logs') {
         const startTime = Date.now();
 
         const apiUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
-        const orgId = getOrgIdentifier();
+        const orgId = getOrgIdentifier() || 'default';
+        const url = `${apiUrl}/api/${orgId}/streams?type=${streamType}&keyword=${streamName}`;
+        testLogger.info(`waitForStreamAvailable: Waiting for stream ${streamName} (type=${streamType}, timeout=${maxWaitMs}ms)`);
+        let pollCount = 0;
 
         while (Date.now() - startTime < maxWaitMs) {
+            pollCount++;
             try {
-                // Use page.request which automatically includes browser session cookies
-                // This works on both cloud (cookie auth) and self-hosted (Basic Auth via storageState)
-                const response = await this.page.request.get(
-                    `${apiUrl}/api/${orgId}/streams`,
-                    { headers: getAuthHeaders() }
-                );
+                const response = await this.page.request.get(url, { headers: getAuthHeaders() });
+                const status = response.status();
 
                 if (response.ok()) {
                     const data = await response.json();
-                    if (data.list) {
-                        const streamExists = data.list.some(s => s.name === streamName);
-                        if (streamExists) {
-                            testLogger.debug(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
-                            return true;
-                        }
+                    const listCount = data.list ? data.list.length : 0;
+                    const streamExists = data.list && data.list.some(s => s.name === streamName);
+                    if (streamExists) {
+                        testLogger.info(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms (poll #${pollCount})`);
+                        return true;
+                    }
+                    if (pollCount <= 3 || pollCount % 10 === 0) {
+                        const names = data.list ? data.list.map(s => s.name).join(', ') : 'none';
+                        testLogger.info(`waitForStreamAvailable: poll #${pollCount} — HTTP ${status}, list=${listCount}, names=[${names}]`);
                     }
                 } else {
-                    testLogger.debug(`waitForStreamAvailable: API returned ${response.status()}, retrying...`);
+                    const bodyText = await response.text().catch(() => 'unreadable');
+                    testLogger.info(`waitForStreamAvailable: poll #${pollCount} — HTTP ${status}, body=${bodyText.substring(0, 200)}`);
                 }
 
-                testLogger.debug(`waitForStreamAvailable: Stream ${streamName} not found yet, waiting ${pollIntervalMs}ms...`);
                 await this.page.waitForTimeout(pollIntervalMs);
             } catch (e) {
-                testLogger.debug(`waitForStreamAvailable: Error checking stream: ${e.message}`);
+                testLogger.info(`waitForStreamAvailable: poll #${pollCount} — error: ${e.message}`);
                 await this.page.waitForTimeout(pollIntervalMs);
             }
         }
 
-        testLogger.warn(`waitForStreamAvailable: Stream ${streamName} not found after ${maxWaitMs}ms`);
+        testLogger.warn(`waitForStreamAvailable: Stream ${streamName} not found after ${maxWaitMs}ms (${pollCount} polls)`);
         return false;
     }
 
-    async selectStream(stream, maxRetries = 3, apiWaitMs = 30000) {
-        testLogger.info(`selectStream: Selecting stream: ${stream}`);
+    async selectStream(stream, maxRetries = 3, apiWaitMs = null) {
+        // Cloud environments need longer for streams to be indexed after ingestion
+        const effectiveApiWaitMs = apiWaitMs ?? (isCloudEnvironment() ? 90000 : 30000);
+        testLogger.info(`selectStream: Selecting stream: ${stream} (apiWait: ${effectiveApiWaitMs}ms)`);
 
         // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
-        if (apiWaitMs > 0) {
-            const streamAvailable = await this.waitForStreamAvailable(stream, apiWaitMs, 3000);
+        if (effectiveApiWaitMs > 0) {
+            const streamAvailable = await this.waitForStreamAvailable(stream, effectiveApiWaitMs, 3000);
             if (!streamAvailable) {
-                testLogger.warn(`selectStream: Stream ${stream} not found via API after ${apiWaitMs}ms, will still try UI selection`);
+                testLogger.warn(`selectStream: Stream ${stream} not found via API after ${effectiveApiWaitMs}ms, will still try UI selection`);
             } else {
                 testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
             }
@@ -613,6 +617,7 @@ export class LogsPage {
                 if (searchVisible) {
                     testLogger.info(`selectStream: Using search box to filter for: ${stream}`);
                     await searchInput.click();
+                    await searchInput.fill(''); // Clear any previous filter first
                     await searchInput.fill(stream);
                     await this.page.waitForTimeout(1500);
                 }
@@ -1121,13 +1126,15 @@ export class LogsPage {
     async clickQuickModeToggle() {
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
+        // Click the q-item directly - it has @click="handleQuickMode" handler
+        await this.page.locator(this.quickModeToggle).click();
     }
 
     // Histogram methods
     async toggleHistogram() {
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
+        // await this.page.locator(this.utilitiesMenuButton).click();
+        // await this.page.waitForTimeout(200);
+        // await this.page.locator(this.histogramToggle).click();
         await this.page.locator(this.histogramToggle).click();
     }
 
@@ -1157,13 +1164,9 @@ export class LogsPage {
     }
 
     async verifyHistogramState() {
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        const isHistogramOff = await this.page.locator(this.histogramToggle)
-            .locator('[role="switch"]')
-            .evaluate(el => el.getAttribute('aria-checked') === 'false');
-        await this.page.keyboard.press('Escape');
-        expect(isHistogramOff).toBeTruthy();
+        // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
+        const isChecked = await this.page.locator(this.histogramToggle).getAttribute('aria-checked');
+        expect(isChecked).toBe('false');
     }
 
     // Error handling methods
@@ -1501,7 +1504,7 @@ export class LogsPage {
     async kubernetesContainerName() {
         await this.page.getByLabel('Expand "kubernetes_container_name"').click();
         await this.page.waitForTimeout(5000);
-        await this.page.locator('[data-test="logs-search-subfield-add-kubernetes_container_name-ziox"] [data-test="log-search-subfield-list-equal-kubernetes_container_name-field-btn"]').click();
+        await this.page.locator('[data-test="logs-search-subfield-add-kubernetes_container_name-ziox"]').click();
     }
 
     async kubernetesContainerNameJoin() {
@@ -5475,6 +5478,7 @@ export class LogsPage {
     /**
      * Enable histogram if not already enabled
      * Bug #8928 - Histogram rendering
+     * Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
      */
     async enableHistogram() {
         await this.page.locator(this.utilitiesMenuButton).click();
@@ -6013,9 +6017,9 @@ export class LogsPage {
      * @returns {Promise<number>} Number of pattern cards
      */
     async getPatternCardCount() {
-        // Use efficient CSS selector to count all pattern cards at once
-        // Pattern cards have data-test attribute: pattern-card-{index}
-        const count = await this.page.locator('[data-test^="pattern-card-"]:not([data-test*="-template"]):not([data-test*="-frequency"]):not([data-test*="-percentage"]):not([data-test*="-include"]):not([data-test*="-exclude"]):not([data-test*="-details"]):not([data-test*="-anomaly"])').count().catch(() => 0);
+        // Count by template elements (one per card) to avoid overcounting card sub-elements
+        // that may have data-test attributes (e.g. tokenized chips) not covered by exclusions
+        const count = await this.page.locator('[data-test^="pattern-card-"][data-test$="-template"]').count().catch(() => 0);
 
         testLogger.info(`Pattern card count: ${count}`);
         return count;
@@ -6173,6 +6177,105 @@ export class LogsPage {
         // Pattern detail shows "Pattern X of Y" in the header
         await this.page.getByText(`Pattern ${expectedIndex} of`).waitFor({ state: 'visible', timeout: 5000 });
         testLogger.info(`Pattern details showing pattern ${expectedIndex}`);
+    }
+
+    /**
+     * Inspect pattern card DOM structure for debugging
+     * Returns info about styled elements, classes, and HTML structure
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async inspectPatternCardDOM(index = 0) {
+        const patternElements = await this.page.locator('tbody tr').nth(index).evaluate(el => {
+            const styledElements = el.querySelectorAll('[style*="background"], [class*="chip"], [class*="token"], [class*="highlight"], span[class*="tw:"], code');
+            return {
+                totalElements: styledElements.length,
+                classes: Array.from(styledElements).slice(0, 5).map(e => e.className).filter(c => c),
+                innerHTML: el.querySelector('td:first-child')?.innerHTML.substring(0, 200)
+            };
+        }).catch(() => ({ totalElements: 0, classes: [], innerHTML: '' }));
+        testLogger.info(`Pattern ${index} DOM inspection: ${JSON.stringify(patternElements)}`);
+        return patternElements;
+    }
+
+    /**
+     * Get wildcard chip element (for hover tests)
+     * @param {string} chipClass - Optional chip class selector
+     */
+    async getWildcardChip(chipClass = '[data-test^="pattern-card-"] .wildcard-chip, [data-test^="pattern-card-"] .q-chip') {
+        return this.page.locator(chipClass).first();
+    }
+
+    /**
+     * Get tooltip element
+     */
+    async getTooltip() {
+        return this.page.locator('.q-tooltip, .q-menu, [role="tooltip"]').first();
+    }
+
+    /**
+     * Get anomaly warning icon count
+     */
+    async getAnomalyWarningIconCount() {
+        const count = await this.page.locator('tbody tr .q-icon, tbody tr i').filter({ hasText: /warning|alert|error/ }).count();
+        testLogger.info(`Found ${count} anomaly warning icons`);
+        return count;
+    }
+
+    /**
+     * Get anomaly column data for all pattern rows
+     * Returns array of objects with hasIcon, hasWarning, content
+     */
+    async getAnomalyColumnData() {
+        const anomalyData = await this.page.evaluate(() => {
+            // Find anomaly column index by header text (more robust than hardcoded index)
+            const headers = Array.from(document.querySelectorAll('thead th'));
+            const anomalyColIndex = headers.findIndex(th =>
+                th.textContent?.trim().toLowerCase().includes('anomaly')
+            );
+
+            // Fallback to index 3 if header not found (backwards compatibility)
+            const colIndex = anomalyColIndex >= 0 ? anomalyColIndex : 3;
+
+            const rows = Array.from(document.querySelectorAll('tbody tr'));
+            return rows.map(row => {
+                const cells = Array.from(row.querySelectorAll('td'));
+                const anomalyCell = cells[colIndex];
+                return {
+                    hasIcon: anomalyCell?.querySelector('.q-icon, i') !== null,
+                    hasWarning: anomalyCell?.innerHTML.includes('warning') || anomalyCell?.innerHTML.includes('⚠'),
+                    content: anomalyCell?.textContent?.trim() || ''
+                };
+            });
+        });
+        testLogger.info(`Anomaly column data: ${JSON.stringify(anomalyData.slice(0, 3))}`);
+        return anomalyData;
+    }
+
+    /**
+     * Get pattern details dialog content
+     */
+    async getPatternDetailsDialogContent() {
+        const content = await this.page.locator('.q-dialog').innerText();
+        testLogger.info(`Dialog content length: ${content.length} chars`);
+        return content;
+    }
+
+    /**
+     * Check if pattern include button is active/selected
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async expectPatternIncludeBtnActive(index = 0) {
+        await expect(this.page.locator(this.patternCardIncludeBtn(index))).toHaveClass(/active|selected/);
+        testLogger.info(`Pattern ${index} include button is active`);
+    }
+
+    /**
+     * Check if pattern exclude button is active/selected
+     * @param {number} index - The pattern card index (0-based)
+     */
+    async expectPatternExcludeBtnActive(index = 0) {
+        await expect(this.page.locator(this.patternCardExcludeBtn(index))).toHaveClass(/active|selected/);
+        testLogger.info(`Pattern ${index} exclude button is active`);
     }
 
     // ============================================================================

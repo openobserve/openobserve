@@ -481,6 +481,8 @@ pub async fn search(
         &stream_name,
         stream_type,
         &mut res,
+        trace_id,
+        "search_fn",
     )
     .await?;
 
@@ -1199,11 +1201,14 @@ pub async fn apply_regex_to_response(
     all_streams: &str,
     stream_type: StreamType,
     res: &mut config::meta::search::Response,
+    trace_id: &str,
+    ctx: &str,
 ) -> Result<(), infra::errors::Error> {
     if res.hits.is_empty() {
         return Ok(());
     }
 
+    let start = std::time::Instant::now();
     let pattern_manager = get_pattern_manager().await?;
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
@@ -1223,14 +1228,30 @@ pub async fn apply_regex_to_response(
             sql,
         )
         .await?;
+    if projections.is_empty() {
+        return Ok(());
+    }
 
-    match pattern_manager.process_at_search(org_id, StreamType::Logs, &mut res.hits, projections) {
+    let ret = match pattern_manager.process_at_search(
+        org_id,
+        StreamType::Logs,
+        &mut res.hits,
+        projections,
+    ) {
         Ok(_) => Ok(()),
         Err(e) => {
-            log::error!("error in processing records for patterns for stream {all_streams} : {e}");
+            log::error!(
+                "[trace_id {trace_id}] SDR patterns application: error in processing records for stream: {all_streams}: {e}"
+            );
             Err(infra::errors::Error::Message(e.to_string()))
         }
-    }
+    };
+    let took = start.elapsed().as_millis();
+    log::info!(
+        "[trace_id {trace_id}] SDR patterns application: context: {ctx}, took: {took} ms, processed: {} hits",
+        res.hits.len()
+    );
+    ret
 }
 
 #[cfg(test)]

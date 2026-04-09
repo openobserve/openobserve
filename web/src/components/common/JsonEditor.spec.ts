@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -471,7 +471,7 @@ describe("JsonEditor", () => {
       wrapper = createWrapper();
       (wrapper.vm as any).isHovered = false;
       await nextTick();
-      expect((wrapper.vm as any).getBtnLogo).toContain("ai_icon.svg");
+      expect((wrapper.vm as any).getBtnLogo).toContain("ai_icon_gradient.svg");
     });
   });
 

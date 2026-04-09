@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -109,6 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="ellipsis flex items-center span-name-section-content"
                 >
+                  <img
+                    :src="spanServiceIconUrlMap.get(`${span.serviceName}/${span.style?.color ?? ''}`)"
+                    class="q-mr-xs tw:shrink-0 tw:w-[1.125rem] tw:h-[1.125rem] tw:inline-block"
+                    aria-hidden="true"
+                    alt=""
+                    :data-test="`trace-tree-span-service-icon-${span.spanId}`"
+                  />
                   <q-icon
                     v-if="span.spanStatus === 'ERROR'"
                     name="error"
@@ -254,6 +261,7 @@ import SpanBlock from "./SpanBlock.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
+import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 
 export default defineComponent({
   name: "TraceTree",
@@ -571,6 +579,25 @@ export default defineComponent({
       });
     });
 
+    const spanServiceIconUrlMap = computed(() => {
+      const isDark = store.state.theme === "dark";
+      const cache = new Map<string, string>();
+      for (const span of props.spans as any[]) {
+        const key = `${span.serviceName}/${span.style?.color ?? ""}`;
+        if (!cache.has(key)) {
+          cache.set(
+            key,
+            getServiceIconDataUrl(
+              span.serviceName,
+              isDark,
+              span.style?.color ?? "#9e9e9e",
+            ),
+          );
+        }
+      }
+      return cache;
+    });
+
     return {
       toggleSpanCollapse,
       getImageURL,
@@ -598,6 +625,7 @@ export default defineComponent({
       formatTokens,
       formatCost,
       isLLMTrace,
+      spanServiceIconUrlMap,
     };
   },
   components: { SpanBlock },

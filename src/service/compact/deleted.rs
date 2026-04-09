@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -30,12 +30,11 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
     let files_num = files.len() as i64;
 
     // delete files from storage
-    let local_mode = config::get_config().common.local_mode;
     if let Err(e) = storage::del(
         files
             .iter()
             .filter_map(|file| {
-                if !ingester::is_wal_file(local_mode, &file.file) {
+                if !ingester::is_wal_file(&file.file) {
                     Some((file.account.as_str(), file.file.as_str()))
                 } else {
                     None

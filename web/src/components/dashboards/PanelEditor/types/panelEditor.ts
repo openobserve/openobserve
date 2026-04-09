@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -253,6 +253,11 @@ export interface PanelEditorProps {
    * Triggers cache-busting when running queries.
    */
   shouldRefreshWithoutCache?: boolean;
+
+  /**
+   * Region and cluster params for super cluster queries.
+   */
+  regionClusterParams?: Record<string, any>;
 
   // ---- DateTime (passed from parent's DateTimePicker) ----
   /**

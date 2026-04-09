@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -313,7 +313,7 @@ export default defineComponent({
     const aiIcon = computed(() =>
       store.state.theme === "dark"
         ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon.svg")
+        : getImageURL("images/common/ai_icon_gradient.svg")
     );
     const aiUsageRatio = computed(() => {
       if (!aiUsage.value || !aiUsage.value.credits_limit) return 0;

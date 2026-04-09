@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -20,10 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     style="width: 100%; height: 100%"
   >
-    <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between">
+    <div
+      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+    >
       {{ t("pipeline.llmEvaluation") }}
       <div>
-        <q-btn v-close-popup="true" round flat icon="cancel"></q-btn>
+        <q-btn v-close-popup="true" round
+flat icon="cancel"></q-btn>
       </div>
     </div>
     <q-separator />
@@ -78,20 +81,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-select>
         </div>
 
+        <!-- Evaluation Template Selection -->
+        <div class="o2-input full-width q-py-sm flex items-center gap-2">
+          <q-select
+            v-model="selectedTemplate"
+            :options="availableTemplates"
+            option-value="id"
+            option-label="name"
+            :label="t('pipeline.evaluationTemplate')"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-sm showLabelOnTop no-case"
+            style="flex: 1"
+            stack-label
+            outlined
+            filled
+            dense
+            :loading="loadingTemplates"
+            data-test="llm-evaluation-template-select"
+          >
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-grey">
+                  {{ t("pipeline.noTemplatesFound") }}
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
+          <q-btn
+            round
+            flat
+            dense
+            icon="refresh"
+            @click="refreshTemplates"
+            :loading="loadingTemplates"
+            :title="t('common.refresh')"
+            data-test="llm-evaluation-template-refresh-btn"
+            class="q-mt-md"
+          />
+        </div>
+
         <!-- Enable Sampling Toggle -->
         <q-toggle
           v-model="enableSampling"
           :label="t('pipeline.enableSampling')"
           class="q-mb-sm tw:h-[36px] o2-toggle-button-lg -tw:ml-4"
           size="lg"
-          :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
           data-test="llm-evaluation-enable-sampling-toggle"
         />
 
         <!-- Sampling Rate -->
         <div v-if="enableSampling" class="q-px-xs q-mb-sm">
           <div class="text-body2 q-mb-sm">
-            {{ t("pipeline.samplingRate") }}: {{ (samplingRate * 100).toFixed(0) }}%
+            {{ t("pipeline.samplingRate") }}:
+            {{ (samplingRate * 100).toFixed(0) }}%
           </div>
           <q-slider
             v-model="samplingRate"
@@ -116,12 +164,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-secondary-button tw:h-[36px] q-mr-md"
             color="negative"
             flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             no-caps
             @click="openDeleteDialog"
           >
             <q-icon name="delete" class="q-mr-xs" />
-            {{ t('pipeline.deleteNode') }}
+            {{ t("pipeline.deleteNode") }}
           </q-btn>
           <q-btn
             data-test="llm-evaluation-cancel-btn"
@@ -129,14 +181,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('alerts.cancel')"
             no-caps
             flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
             @click="openCancelDialog"
           />
           <q-btn
             data-test="llm-evaluation-save-btn"
             :label="t('alerts.save')"
             class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             flat
             no-caps
             type="submit"
@@ -181,6 +241,9 @@ export default defineComponent({
     const streamFields = ref<{ label: string; value: string }[]>([]);
     const filteredStreamFields = ref<{ label: string; value: string }[]>([]);
     const loadingFields = ref(false);
+    const selectedTemplate = ref<{ id: string; name: string } | null>(null);
+    const availableTemplates = ref<any[]>([]);
+    const loadingTemplates = ref(false);
 
     const dialog = ref({
       show: false,
@@ -194,12 +257,14 @@ export default defineComponent({
       try {
         const allNodes = pipelineObj.currentSelectedPipeline?.nodes || [];
         const inputStreamNode: any = allNodes.find(
-          (node: any) => node.io_type === "input" && node.data.node_type === "stream",
+          (node: any) =>
+            node.io_type === "input" && node.data.node_type === "stream",
         );
 
         if (inputStreamNode) {
           const streamName =
-            inputStreamNode.data?.stream_name?.value || inputStreamNode.data?.stream_name;
+            inputStreamNode.data?.stream_name?.value ||
+            inputStreamNode.data?.stream_name;
           const streamType = inputStreamNode.data?.stream_type;
           const streams: any = await getStream(streamName, streamType, true);
 
@@ -218,14 +283,58 @@ export default defineComponent({
       }
     };
 
+    const fetchAvailableTemplates = async (forceRefresh: boolean = false) => {
+      loadingTemplates.value = true;
+      try {
+        const orgId = store.state.selectedOrganization?.identifier;
+        if (!orgId) {
+          console.warn("No organization selected");
+          return;
+        }
+
+        // Use store cache unless force refresh requested
+        if (!forceRefresh) {
+          const cached = store.state.streams.evalTemplatesByOrg[orgId];
+          if (cached && cached.length > 0) {
+            availableTemplates.value = cached;
+            return;
+          }
+        }
+
+        const { evalTemplateService } =
+          await import("@/services/eval-template.service");
+        const templates = await evalTemplateService.listTemplates(orgId);
+        availableTemplates.value = templates || [];
+
+        store.dispatch("streams/setEvalTemplates", {
+          orgId,
+          templates: templates || [],
+        });
+      } catch (e) {
+        console.error("Failed to fetch evaluation templates:", e);
+        availableTemplates.value = [];
+      } finally {
+        loadingTemplates.value = false;
+      }
+    };
+
+    const refreshTemplates = async () => {
+      await fetchAvailableTemplates(true); // Force refresh by ignoring cache
+      q.notify({
+        type: "positive",
+        message: t("pipeline.evalTemplatesRefreshed"),
+        timeout: 1500,
+      });
+    };
+
     const filterStreamFields = (val: string, update: Function) => {
       update(() => {
         if (!val) {
           filteredStreamFields.value = [...streamFields.value];
         } else {
           const needle = val.toLowerCase();
-          filteredStreamFields.value = streamFields.value.filter(
-            (field) => field.label.toLowerCase().includes(needle),
+          filteredStreamFields.value = streamFields.value.filter((field) =>
+            field.label.toLowerCase().includes(needle),
           );
         }
       });
@@ -235,12 +344,19 @@ export default defineComponent({
       if (pipelineObj.userSelectedNode) {
         pipelineObj.userSelectedNode = {};
       }
+
+      let savedTemplate: string | null = null;
       if (pipelineObj.isEditNode && pipelineObj.currentSelectedNodeData) {
         const data = pipelineObj.currentSelectedNodeData.data;
         nodeName.value = data.name || "";
         llmSpanIdentifier.value = data.llm_span_identifier || "gen_ai_system";
+        savedTemplate = data.eval_template || null;
 
-        if (data.sampling_rate !== undefined && data.sampling_rate !== null && data.sampling_rate > 0) {
+        if (
+          data.sampling_rate !== undefined &&
+          data.sampling_rate !== null &&
+          data.sampling_rate > 0
+        ) {
           enableSampling.value = true;
           samplingRate.value = data.sampling_rate;
         } else {
@@ -251,6 +367,16 @@ export default defineComponent({
       }
 
       await fetchSourceStreamFields();
+      await fetchAvailableTemplates();
+
+      if (savedTemplate) {
+        // Editing: restore saved template by ID to get full object (needed to display name)
+        const match = availableTemplates.value.find((t: any) => t.id === savedTemplate);
+        selectedTemplate.value = match || null;
+      } else if (!pipelineObj.isEditNode && availableTemplates.value.length > 0) {
+        // New node: default to first template
+        selectedTemplate.value = availableTemplates.value[0];
+      }
     });
 
     const openCancelDialog = () => {
@@ -292,6 +418,13 @@ export default defineComponent({
         sampling_rate: enableSampling.value ? samplingRate.value : 0.0,
       };
 
+      // Add template if selected, otherwise explicitly set to null (to clear any previously saved value)
+      if (selectedTemplate.value) {
+        nodeData.eval_template = selectedTemplate.value.id;
+      } else {
+        nodeData.eval_template = null;
+      }
+
       addNode(nodeData);
 
       q.notify({
@@ -313,6 +446,10 @@ export default defineComponent({
       filteredStreamFields,
       loadingFields,
       filterStreamFields,
+      selectedTemplate,
+      availableTemplates,
+      loadingTemplates,
+      refreshTemplates,
       saveLlmEvaluationNode,
       openCancelDialog,
       openDeleteDialog,

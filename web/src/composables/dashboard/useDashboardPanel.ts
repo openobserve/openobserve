@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -105,7 +105,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     removeXYFilters,
     setFieldsBasedOnChartTypeValidation,
     isPivotMode,
-  } = usePanelFields({ dashboardPanelData, store });
+  } = usePanelFields({ dashboardPanelData, store, pageKey });
 
   const { resetAggregationFunction } = usePanelAggregation({
     dashboardPanelData,
@@ -1292,8 +1292,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               ? b64EncodeUnicode(query)
               : query,
             query_fn: null,
-            start_time: startISOTimestamp,
-            end_time: endISOTimestamp,
+            start_time: (Date.now() - 3600000) * 1000,
+            end_time: Date.now() * 1000,
             size: -1,
             histogram_interval: undefined,
             streaming_output: false,

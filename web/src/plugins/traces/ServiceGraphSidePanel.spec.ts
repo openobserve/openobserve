@@ -17,227 +17,183 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers";
 import { Notify } from "quasar";
-import { nextTick } from "vue";
-import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
+import store from "@/test/unit/helpers/store";
 
 installQuasar({
   plugins: [Notify],
 });
 
-// Create a mock router instance that persists across tests
-const mockRouterPush = vi.fn();
-
-// Mock dependencies
+// vi.mock calls are hoisted — must appear before imports of mocked modules
 vi.mock("@/services/search", () => ({
   default: {
-    get_traces: vi.fn(),
+    search: vi.fn(),
   },
+}));
+
+vi.mock("@/services/service_streams", () => ({
+  correlate: vi.fn(),
 }));
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({
-    push: mockRouterPush,
+    push: vi.fn(),
   }),
 }));
 
-vi.mock("quasar", async () => {
-  const actual: any = await vi.importActual("quasar");
+vi.mock("quasar", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
   return {
     ...actual,
     useQuasar: () => ({
       notify: vi.fn(),
+      dialog: vi.fn(),
     }),
   };
 });
 
 import searchService from "@/services/search";
+import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
 
-// Mock store
-const createMockStore = (overrides = {}) => ({
-  state: {
-    theme: "dark",
-    selectedOrganization: {
-      identifier: "test-org",
-    },
-    ...overrides,
+// ---------------------------------------------------------------------------
+// Shared test fixtures
+// ---------------------------------------------------------------------------
+
+const mockNodes = [
+  {
+    id: "service-a",
+    label: "Service A",
+    name: "Service A",
+    error_rate: 2.5,
+    requests: 2000,
+    errors: 50, // 50/2000 = 2.50%
   },
-  dispatch: vi.fn(),
-  commit: vi.fn(),
-});
+  {
+    id: "service-b",
+    label: "Service B",
+    name: "Service B",
+    error_rate: 7.8,
+    requests: 1500,
+    errors: 117,
+  },
+  {
+    id: "service-c",
+    label: "Service C",
+    name: "Service C",
+    error_rate: 12.5,
+    requests: 800,
+    errors: 100,
+  },
+];
+
+const mockEdges = [
+  {
+    from: "service-upstream",
+    to: "service-a",
+    total_requests: 1000,
+    failed_requests: 20,
+    p95_latency_ns: 50000000, // 50ms
+    error_rate: 2.0,
+  },
+  {
+    from: "service-upstream-2",
+    to: "service-a",
+    total_requests: 500,
+    failed_requests: 10,
+    p95_latency_ns: 75000000, // 75ms
+    error_rate: 2.0,
+  },
+  {
+    from: "service-upstream-3",
+    to: "service-a",
+    total_requests: 800,
+    failed_requests: 27,
+    p95_latency_ns: 100000000, // 100ms — max latency for service-a
+    error_rate: 3.375,
+  },
+  {
+    from: "service-a",
+    to: "service-b",
+    total_requests: 1500,
+    failed_requests: 50,
+    p95_latency_ns: 75000000,
+    error_rate: 3.33,
+  },
+  {
+    from: "service-a",
+    to: "service-c",
+    total_requests: 800,
+    failed_requests: 100,
+    p95_latency_ns: 100000000,
+    error_rate: 12.5,
+  },
+];
+
+const mockTimeRange = {
+  startTime: 1700000000000,
+  endTime: 1700003600000,
+};
+
+// Mock response for searchService.search (operations)
+const mockSearchResponse = {
+  data: {
+    hits: [
+      {
+        operation_name: "/api/orders",
+        request_count: 500,
+        error_count: 10,
+        p50_latency: 12000,
+        p75_latency: 18000,
+        p95_latency: 25000,
+        p99_latency: 40000,
+      },
+    ],
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Mount factory
+// ---------------------------------------------------------------------------
+
+function createWrapper(props: Record<string, unknown> = {}) {
+  return mount(ServiceGraphSidePanel, {
+    props: {
+      selectedNode: mockNodes[0],
+      graphData: { nodes: mockNodes, edges: mockEdges },
+      timeRange: mockTimeRange,
+      visible: true,
+      streamFilter: "default",
+      ...props,
+    },
+    global: {
+      plugins: [store],
+      stubs: {
+        RenderDashboardCharts: { template: "<div />" },
+        TenstackTable: { template: "<div />" },
+        TelemetryCorrelationDashboard: { template: "<div />" },
+      },
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 describe("ServiceGraphSidePanel.vue", () => {
-  let wrapper: VueWrapper<any>;
-  let mockStore: any;
-  let mockRouter: any;
-
-  const mockNodes = [
-    {
-      id: "service-a",
-      label: "Service A",
-      name: "Service A",
-      error_rate: 2.5,
-      requests: 2000, // Total requests
-      errors: 50, // 2.5% of 2000 = 50 (exactly 2.50%)
-    },
-    {
-      id: "service-b",
-      label: "Service B",
-      name: "Service B",
-      error_rate: 7.8,
-      requests: 1500,
-      errors: 117, // 7.8% of 1500
-    },
-    {
-      id: "service-c",
-      label: "Service C",
-      name: "Service C",
-      error_rate: 12.5,
-      requests: 800,
-      errors: 100, // 12.5% of 800
-    },
-    {
-      id: "service-upstream",
-      label: "Service Upstream",
-      name: "Service Upstream",
-      error_rate: 2.0,
-      requests: 1000,
-      errors: 20,
-    },
-    {
-      id: "service-upstream-2",
-      label: "Service Upstream 2",
-      name: "Service Upstream 2",
-      error_rate: 2.0,
-      requests: 500,
-      errors: 10,
-    },
-    {
-      id: "service-upstream-3",
-      label: "Service Upstream 3",
-      name: "Service Upstream 3",
-      error_rate: 3.375,
-      requests: 800,
-      errors: 27,
-    },
-  ];
-
-  const mockEdges = [
-    {
-      from: "service-upstream",
-      to: "service-a",
-      total_requests: 1000,
-      failed_requests: 20,
-      p95_latency_ns: 50000000, // 50ms
-      error_rate: 2.0,
-    },
-    {
-      from: "service-upstream-2",
-      to: "service-a",
-      total_requests: 500,
-      failed_requests: 10,
-      p95_latency_ns: 75000000, // 75ms
-      error_rate: 2.0,
-    },
-    {
-      from: "service-upstream-3",
-      to: "service-a",
-      total_requests: 800,
-      failed_requests: 27,
-      p95_latency_ns: 100000000, // 100ms (max latency for service-a)
-      error_rate: 3.375,
-    },
-    {
-      from: "service-a",
-      to: "service-b",
-      total_requests: 1500,
-      failed_requests: 50,
-      p95_latency_ns: 75000000, // 75ms
-      error_rate: 3.33,
-    },
-    {
-      from: "service-a",
-      to: "service-c",
-      total_requests: 800,
-      failed_requests: 100,
-      p95_latency_ns: 100000000, // 100ms
-      error_rate: 12.5,
-    },
-  ];
-
-  const mockTimeRange = {
-    startTime: Date.now() - 3600000,
-    endTime: Date.now(),
-  };
-
-  const mockTraces = {
-    data: {
-      hits: [
-        {
-          trace_id: "trace-123456789012345678901234567890ab",
-          duration: 150000, // 150ms in microseconds
-          start_time: Date.now() * 1000000, // Convert to nanoseconds
-          spans: [5, 0], // [total spans, error spans]
-        },
-        {
-          trace_id: "trace-abcdef1234567890abcdef1234567890",
-          duration: 2500000, // 2.5s in microseconds
-          start_time: Date.now() * 1000000,
-          spans: [10, 2], // [total spans, error spans]
-        },
-      ],
-    },
-  };
-
-  const createWrapper = (props = {}, storeOverrides = {}) => {
-    mockStore = createMockStore(storeOverrides);
-    mockRouter = {
-      push: vi.fn(),
-    };
-
-    return mount(ServiceGraphSidePanel, {
-      props: {
-        selectedNode: mockNodes[0],
-        graphData: { nodes: mockNodes, edges: mockEdges },
-        timeRange: mockTimeRange,
-        visible: true,
-        streamFilter: "default",
-        ...props,
-      },
-      global: {
-        mocks: {
-          $store: mockStore,
-          $router: mockRouter,
-        },
-        provide: {
-          store: mockStore,
-          router: mockRouter,
-        },
-        stubs: {
-          QBtn: false,
-          QIcon: false,
-          QTooltip: false,
-          QSpinner: false,
-        },
-      },
-    });
-  };
+  let wrapper: VueWrapper;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockRouterPush.mockClear();
-    // Mock clipboard API
-    Object.assign(navigator, {
-      clipboard: {
-        writeText: vi.fn().mockResolvedValue(undefined),
-      },
-    });
+    vi.mocked(searchService.search).mockResolvedValue(mockSearchResponse);
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    wrapper?.unmount();
+    vi.clearAllMocks();
   });
+
+  // -------------------------------------------------------------------------
+  // Initialization
+  // -------------------------------------------------------------------------
 
   describe("Initialization", () => {
     it("should mount component successfully", () => {
@@ -247,212 +203,163 @@ describe("ServiceGraphSidePanel.vue", () => {
 
     it("should render panel when visible is true", () => {
       wrapper = createWrapper({ visible: true });
-      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
+      ).toBe(true);
     });
 
     it("should not render panel when visible is false", () => {
       wrapper = createWrapper({ visible: false });
-      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
+      ).toBe(false);
     });
 
     it("should display panel header", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-header"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel-header"]').exists(),
+      ).toBe(true);
     });
 
     it("should display service name", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-service-name"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-graph-side-panel-service-name"]').text()).toContain("Service A");
+      const nameEl = wrapper.find(
+        '[data-test="service-graph-side-panel-service-name"]',
+      );
+      expect(nameEl.exists()).toBe(true);
+      expect(nameEl.text()).toContain("Service A");
     });
 
     it("should display close button", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-close-btn"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-close-btn"]')
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("should display show-telemetry button", () => {
+      wrapper = createWrapper();
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-show-telemetry-btn"]')
+          .exists(),
+      ).toBe(true);
     });
   });
 
-  describe("Computed Properties - upstreamServices", () => {
-    it("should compute upstream services correctly", () => {
-      wrapper = createWrapper();
-      const upstream = wrapper.vm.upstreamServices;
-
-      expect(upstream).toHaveLength(3);
-      expect(upstream[0].id).toBe("service-upstream");
-      expect(upstream[0].requests).toBe(1000);
-    });
-
-    it("should return empty array when no upstream services", () => {
-      wrapper = createWrapper({
-        selectedNode: { id: "isolated-service", label: "Isolated" },
-      });
-
-      expect(wrapper.vm.upstreamServices).toHaveLength(0);
-    });
-
-    it("should calculate health status for upstream services", () => {
-      wrapper = createWrapper();
-      const upstream = wrapper.vm.upstreamServices;
-
-      expect(upstream[0].healthStatus).toBe("healthy"); // 2% error rate
-    });
-
-    it("should handle missing node labels in upstream services", () => {
-      const customEdges = [
-        {
-          from: "unknown-service",
-          to: "service-a",
-          total_requests: 100,
-          error_rate: 1.0,
-        },
-      ];
-
-      wrapper = createWrapper({
-        graphData: { nodes: mockNodes, edges: customEdges },
-      });
-
-      const upstream = wrapper.vm.upstreamServices;
-      expect(upstream[0].name).toBe("unknown-service");
-    });
-  });
-
-  describe("Computed Properties - downstreamServices", () => {
-    it("should compute downstream services correctly", () => {
-      wrapper = createWrapper();
-      const downstream = wrapper.vm.downstreamServices;
-
-      expect(downstream).toHaveLength(2);
-      expect(downstream[0].id).toBe("service-b");
-      expect(downstream[1].id).toBe("service-c");
-    });
-
-    it("should return empty array when no downstream services", () => {
-      wrapper = createWrapper({
-        selectedNode: mockNodes[1], // service-b has no downstream
-        graphData: { nodes: mockNodes, edges: mockEdges.slice(0, 2) },
-      });
-
-      const downstream = wrapper.vm.downstreamServices;
-      expect(downstream).toHaveLength(0);
-    });
-
-    it("should calculate health status for downstream services", () => {
-      wrapper = createWrapper();
-      const downstream = wrapper.vm.downstreamServices;
-
-      expect(downstream[0].healthStatus).toBe("healthy"); // 3.33% error rate
-      expect(downstream[1].healthStatus).toBe("critical"); // 12.5% error rate
-    });
-  });
+  // -------------------------------------------------------------------------
+  // Computed - serviceMetrics
+  // -------------------------------------------------------------------------
 
   describe("Computed Properties - serviceMetrics", () => {
-    it("should compute service metrics correctly", () => {
+    it("should compute error rate as percentage from node errors/requests", () => {
       wrapper = createWrapper();
-      const metrics = wrapper.vm.serviceMetrics;
-
-      expect(metrics.requestRate).toBeTruthy();
-      expect(metrics.errorRate).toBe("2.50%");
-      expect(metrics.p95Latency).toBeTruthy();
+      // 50 errors / 2000 requests = 2.50%
+      expect(wrapper.vm.serviceMetrics.errorRate).toBe("2.50%");
     });
 
-    it("should calculate total requests from outgoing edges", () => {
+    it("should format request count with K suffix for thousands", () => {
       wrapper = createWrapper();
-      const metrics = wrapper.vm.serviceMetrics;
-
-      // Total requests from node
-      expect(metrics.requestRateValue).toBe("2.0K");
+      // 2000 → "2.0K"
+      expect(wrapper.vm.serviceMetrics.requestRateValue).toBe("2.0K");
     });
 
-    it("should use node's error_rate property", () => {
-      wrapper = createWrapper();
-      const metrics = wrapper.vm.serviceMetrics;
-
-      expect(metrics.errorRate).toBe("2.50%");
+    it("should format request count with M suffix for millions", () => {
+      const highVolumeNode = {
+        ...mockNodes[0],
+        requests: 2500000,
+        errors: 62500,
+      };
+      wrapper = createWrapper({
+        selectedNode: highVolumeNode,
+        graphData: { nodes: [highVolumeNode], edges: [] },
+      });
+      expect(wrapper.vm.serviceMetrics.requestRateValue).toBe("2.5M");
     });
 
-    it("should show N/A for P95 latency when no outgoing edges", () => {
+    it("should include req/min unit in requestRate", () => {
+      wrapper = createWrapper();
+      expect(wrapper.vm.serviceMetrics.requestRate).toContain("req/min");
+    });
+
+    it("should compute P95 latency from max of incoming edges", () => {
+      wrapper = createWrapper();
+      // Incoming edges to service-a have p95: 50ms, 75ms, 100ms → max = 100ms
+      expect(wrapper.vm.serviceMetrics.p95Latency).toBe("100ms");
+    });
+
+    it("should format high P95 latency in seconds", () => {
+      const highLatencyEdges = [
+        {
+          from: "service-upstream",
+          to: "service-a",
+          total_requests: 1000,
+          p95_latency_ns: 2500000000, // 2.5s
+        },
+      ];
+      wrapper = createWrapper({
+        graphData: { nodes: mockNodes, edges: highLatencyEdges },
+      });
+      expect(wrapper.vm.serviceMetrics.p95Latency).toBe("2.50s");
+    });
+
+    it("should return N/A for P95 latency when there are no incoming edges", () => {
       wrapper = createWrapper({
         selectedNode: mockNodes[1],
         graphData: { nodes: mockNodes, edges: [] },
       });
-
-      const metrics = wrapper.vm.serviceMetrics;
-      expect(metrics.p95Latency).toBe("N/A");
+      expect(wrapper.vm.serviceMetrics.p95Latency).toBe("N/A");
     });
 
     it("should return N/A for all metrics when selectedNode is null", () => {
-      wrapper = createWrapper({
-        selectedNode: null,
-      });
-
+      wrapper = createWrapper({ selectedNode: null });
       const metrics = wrapper.vm.serviceMetrics;
       expect(metrics.requestRate).toBe("N/A");
       expect(metrics.errorRate).toBe("N/A");
       expect(metrics.p95Latency).toBe("N/A");
     });
 
-    it("should format P95 latency in milliseconds", () => {
+    it("should format error rate as a percentage string", () => {
       wrapper = createWrapper();
-      const metrics = wrapper.vm.serviceMetrics;
-
-      // Max of 75ms and 100ms = 100ms
-      expect(metrics.p95Latency).toBe("100ms");
+      expect(wrapper.vm.serviceMetrics.errorRate).toContain("%");
     });
 
-    it("should format high latency in seconds", () => {
-      const highLatencyEdges = [
-        {
-          from: "service-upstream",
-          to: "service-a",
-          total_requests: 1000,
-          p95_latency_ns: 2500000000, // 2.5 seconds
-        },
-      ];
-
-      wrapper = createWrapper({
-        graphData: { nodes: mockNodes, edges: highLatencyEdges },
-      });
-
-      const metrics = wrapper.vm.serviceMetrics;
-      expect(metrics.p95Latency).toBe("2.50s");
-    });
-
-    it("should format large request numbers with M suffix", () => {
-      const highVolumeNode = {
+    it("should handle large request numbers that format with M suffix", () => {
+      const largeNode = {
         id: "service-a",
         label: "Service A",
         name: "Service A",
         error_rate: 2.5,
-        requests: 2500000, // 2.5M requests
-        errors: 62500,
+        requests: 99999999,
+        errors: 2499999,
       };
-
       wrapper = createWrapper({
-        selectedNode: highVolumeNode,
-        graphData: { nodes: [highVolumeNode], edges: [] },
+        selectedNode: largeNode,
+        graphData: { nodes: [largeNode], edges: [] },
       });
-
-      const metrics = wrapper.vm.serviceMetrics;
-      expect(metrics.requestRateValue).toBe("2.5M");
+      expect(wrapper.vm.serviceMetrics.requestRateValue).toContain("M");
     });
   });
 
-  describe("Computed Properties - serviceHealth", () => {
-    it("should return healthy status when error rate <= 5%", () => {
-      wrapper = createWrapper();
-      const health = wrapper.vm.serviceHealth;
+  // -------------------------------------------------------------------------
+  // Computed - serviceHealth
+  // -------------------------------------------------------------------------
 
+  describe("Computed Properties - serviceHealth", () => {
+    it("should return healthy status when error_rate <= 5%", () => {
+      wrapper = createWrapper(); // service-a: error_rate = 2.5
+      const health = wrapper.vm.serviceHealth;
       expect(health.status).toBe("healthy");
       expect(health.text).toBe("Healthy");
       expect(health.color).toBe("positive");
       expect(health.icon).toBe("check_circle");
     });
 
-    it("should return degraded status when error rate > 5% and <= 10%", () => {
-      wrapper = createWrapper({
-        selectedNode: mockNodes[1], // 7.8% error rate
-      });
-
+    it("should return degraded status when error_rate > 5% and <= 10%", () => {
+      wrapper = createWrapper({ selectedNode: mockNodes[1] }); // 7.8%
       const health = wrapper.vm.serviceHealth;
       expect(health.status).toBe("degraded");
       expect(health.text).toBe("Degraded");
@@ -460,11 +367,8 @@ describe("ServiceGraphSidePanel.vue", () => {
       expect(health.icon).toBe("warning");
     });
 
-    it("should return critical status when error rate > 10%", () => {
-      wrapper = createWrapper({
-        selectedNode: mockNodes[2], // 12.5% error rate
-      });
-
+    it("should return critical status when error_rate > 10%", () => {
+      wrapper = createWrapper({ selectedNode: mockNodes[2] }); // 12.5%
       const health = wrapper.vm.serviceHealth;
       expect(health.status).toBe("critical");
       expect(health.text).toBe("Critical");
@@ -473,81 +377,27 @@ describe("ServiceGraphSidePanel.vue", () => {
     });
 
     it("should return unknown status when selectedNode is null", () => {
-      wrapper = createWrapper({
-        selectedNode: null,
-      });
-
+      wrapper = createWrapper({ selectedNode: null });
       const health = wrapper.vm.serviceHealth;
       expect(health.status).toBe("unknown");
       expect(health.text).toBe("Unknown");
     });
 
-    it("should handle missing error_rate property", () => {
+    it("should treat missing error_rate as 0 (healthy)", () => {
       wrapper = createWrapper({
         selectedNode: { id: "test", label: "Test" },
       });
-
-      const health = wrapper.vm.serviceHealth;
-      expect(health.status).toBe("healthy");
-    });
-  });
-
-  describe("Computed Properties - isAllStreamsSelected", () => {
-    it("should return true when streamFilter is 'all'", () => {
-      wrapper = createWrapper({ streamFilter: "all" });
-      expect(wrapper.vm.isAllStreamsSelected).toBe(true);
-    });
-
-    it("should return false when streamFilter is not 'all'", () => {
-      wrapper = createWrapper({ streamFilter: "default" });
-      expect(wrapper.vm.isAllStreamsSelected).toBe(false);
-    });
-  });
-
-  describe("Health Status Functionality", () => {
-    it("should correctly categorize upstream services by health", () => {
-      wrapper = createWrapper();
-      const upstream = wrapper.vm.upstreamServices;
-
-      // Upstream service has 2% error rate, should be healthy
-      expect(upstream[0].healthStatus).toBe("healthy");
-    });
-
-    it("should correctly categorize downstream services by health", () => {
-      wrapper = createWrapper();
-      const downstream = wrapper.vm.downstreamServices;
-
-      // Service B: 3.33% error rate - healthy
-      expect(downstream[0].healthStatus).toBe("healthy");
-
-      // Service C: 12.5% error rate - critical
-      expect(downstream[1].healthStatus).toBe("critical");
-    });
-
-    it("should calculate degraded health status correctly", () => {
-      // Create a service with 7.8% error rate (degraded)
-      wrapper = createWrapper({
-        selectedNode: mockNodes[1], // Service B with 7.8% error
-      });
-
-      const health = wrapper.vm.serviceHealth;
-      expect(health.status).toBe("degraded");
-    });
-
-    it("should provide health information for different error rates", () => {
-      // Test healthy status
-      wrapper = createWrapper({
-        selectedNode: { ...mockNodes[0], error_rate: 3 },
-      });
       expect(wrapper.vm.serviceHealth.status).toBe("healthy");
+    });
 
-      // Test degraded status
+    it("should categorize error_rate=8 as degraded", () => {
       wrapper = createWrapper({
         selectedNode: { ...mockNodes[0], error_rate: 8 },
       });
       expect(wrapper.vm.serviceHealth.status).toBe("degraded");
+    });
 
-      // Test critical status
+    it("should categorize error_rate=15 as critical", () => {
       wrapper = createWrapper({
         selectedNode: { ...mockNodes[0], error_rate: 15 },
       });
@@ -555,635 +405,388 @@ describe("ServiceGraphSidePanel.vue", () => {
     });
   });
 
-  describe("Helper Functions - Metric Formatting", () => {
-    it("should format request rates in service metrics", () => {
-      wrapper = createWrapper();
-      const metrics = wrapper.vm.serviceMetrics;
+  // -------------------------------------------------------------------------
+  // Computed - isAllStreamsSelected
+  // -------------------------------------------------------------------------
 
-      // Verify the formatted values are shown correctly
-      expect(metrics.requestRate).toContain("req/min");
-      expect(metrics.requestRateValue).toBeTruthy();
+  describe("Computed Properties - isAllStreamsSelected", () => {
+    it("should return true when streamFilter is 'all'", () => {
+      wrapper = createWrapper({ streamFilter: "all" });
+      expect(wrapper.vm.isAllStreamsSelected).toBe(true);
     });
 
-    it("should format latency values in service metrics", () => {
-      wrapper = createWrapper();
-      const metrics = wrapper.vm.serviceMetrics;
-
-      // P95 latency should be formatted (either in ms or s)
-      expect(metrics.p95Latency).toMatch(/(ms|s|N\/A)/);
+    it("should return false when streamFilter is 'default'", () => {
+      wrapper = createWrapper({ streamFilter: "default" });
+      expect(wrapper.vm.isAllStreamsSelected).toBe(false);
     });
 
-    it("should format error rates as percentages", () => {
-      wrapper = createWrapper();
-      const metrics = wrapper.vm.serviceMetrics;
-
-      // Error rate should be a percentage
-      expect(metrics.errorRate).toContain("%");
+    it("should return false when streamFilter is any custom stream name", () => {
+      wrapper = createWrapper({ streamFilter: "my-traces-stream" });
+      expect(wrapper.vm.isAllStreamsSelected).toBe(false);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Event Handlers - handleClose
+  // -------------------------------------------------------------------------
 
   describe("Event Handlers - handleClose", () => {
     it("should emit close event when close button is clicked", async () => {
       wrapper = createWrapper();
-      const closeBtn = wrapper.find('[data-test="service-graph-side-panel-close-btn"]');
-
-      await closeBtn.trigger("click");
-
+      await wrapper
+        .find('[data-test="service-graph-side-panel-close-btn"]')
+        .trigger("click");
       expect(wrapper.emitted("close")).toBeTruthy();
       expect(wrapper.emitted("close")).toHaveLength(1);
     });
   });
 
+  // -------------------------------------------------------------------------
+  // Event Handlers - handleShowTelemetry
+  // -------------------------------------------------------------------------
+
   describe("Event Handlers - handleShowTelemetry", () => {
-    it("should have Show telemetry button", () => {
+    it("should render show-telemetry button with correct label", () => {
       wrapper = createWrapper();
-      const showTelemetryBtn = wrapper.find('[data-test="service-graph-side-panel-show-telemetry-btn"]');
-
-      expect(showTelemetryBtn.exists()).toBe(true);
-      expect(showTelemetryBtn.text()).toContain("Show telemetry");
-    });
-
-    it("should disable view traces button when all streams selected", () => {
-      wrapper = createWrapper({ streamFilter: "all" });
-
-      // Verify isAllStreamsSelected computed property is true
-      expect(wrapper.vm.isAllStreamsSelected).toBe(true);
-    });
-
-    it("should enable view traces button when specific stream selected", () => {
-      wrapper = createWrapper({ streamFilter: "default" });
-
-      // Verify isAllStreamsSelected computed property is false
-      expect(wrapper.vm.isAllStreamsSelected).toBe(false);
+      const btn = wrapper.find(
+        '[data-test="service-graph-side-panel-show-telemetry-btn"]',
+      );
+      expect(btn.exists()).toBe(true);
+      expect(btn.text()).toContain("Show telemetry");
     });
   });
 
-  describe("Event Handlers - handleTraceClick", () => {
-    it("should have handleTraceClick method defined", () => {
-      wrapper = createWrapper();
+  // -------------------------------------------------------------------------
+  // Event Handlers - navigateToTraces
+  // -------------------------------------------------------------------------
 
-      // Verify the method exists
-      expect(typeof wrapper.vm.handleTraceClick).toBe("function");
+  describe("Event Handlers - navigateToTraces", () => {
+    it("should emit view-traces event when navigateToTraces is called", () => {
+      wrapper = createWrapper();
+      wrapper.vm.navigateToTraces({ operationName: "/api/orders" });
+      expect(wrapper.emitted("view-traces")).toBeTruthy();
     });
 
-    it("should navigate with trace data", async () => {
+    it("should include serviceName in the view-traces payload", () => {
       wrapper = createWrapper();
-
-      const mockTrace = {
-        traceId: "test-trace-id",
-      };
-
-      // Call the method (router navigation happens inside)
-      wrapper.vm.handleTraceClick(mockTrace);
-
-      // The method should be callable without errors
-      expect(wrapper.vm.handleTraceClick).toBeTruthy();
+      wrapper.vm.navigateToTraces({});
+      const payload = wrapper.emitted("view-traces")![0][0] as any;
+      expect(payload.serviceName).toBe("Service A");
     });
 
-    it("should navigate to trace details with correct query parameters", () => {
-      wrapper = createWrapper();
-
-      const mockTrace = {
-        traceId: "test-trace-12345",
-      };
-
-      wrapper.vm.handleTraceClick(mockTrace);
-
-      expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "traceDetails",
-        query: {
-          trace_id: "test-trace-12345",
-          stream: "default",
-          org_identifier: "test-org",
-          from: mockTimeRange.startTime,
-          to: mockTimeRange.endTime,
-        },
-      });
+    it("should include stream from props in the view-traces payload", () => {
+      wrapper = createWrapper({ streamFilter: "custom-stream" });
+      wrapper.vm.navigateToTraces({});
+      const payload = wrapper.emitted("view-traces")![0][0] as any;
+      expect(payload.stream).toBe("custom-stream");
     });
 
-    it("should include time range parameters in navigation", () => {
-      const customTimeRange = {
-        startTime: 1609459200000, // 2021-01-01 00:00:00
-        endTime: 1609545600000,   // 2021-01-02 00:00:00
-      };
+    it("should include timeRange from props in the view-traces payload", () => {
+      wrapper = createWrapper();
+      wrapper.vm.navigateToTraces({});
+      const payload = wrapper.emitted("view-traces")![0][0] as any;
+      expect(payload.timeRange).toEqual(mockTimeRange);
+    });
 
+    it("should pass operationName through in the view-traces payload", () => {
+      wrapper = createWrapper();
+      wrapper.vm.navigateToTraces({ operationName: "/checkout" });
+      const payload = wrapper.emitted("view-traces")![0][0] as any;
+      expect(payload.operationName).toBe("/checkout");
+    });
+
+    it("should pass errorsOnly flag through in the view-traces payload", () => {
+      wrapper = createWrapper();
+      wrapper.vm.navigateToTraces({ errorsOnly: true });
+      const payload = wrapper.emitted("view-traces")![0][0] as any;
+      expect(payload.errorsOnly).toBe(true);
+    });
+
+    it("should use node label when name is absent", () => {
       wrapper = createWrapper({
-        timeRange: customTimeRange,
+        selectedNode: { id: "svc", label: "Label Only" },
       });
-
-      const mockTrace = {
-        traceId: "trace-abc123",
-      };
-
-      wrapper.vm.handleTraceClick(mockTrace);
-
-      expect(mockRouterPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.objectContaining({
-            from: customTimeRange.startTime,
-            to: customTimeRange.endTime,
-          }),
-        })
-      );
+      wrapper.vm.navigateToTraces({});
+      const payload = wrapper.emitted("view-traces")![0][0] as any;
+      expect(payload.serviceName).toBe("Label Only");
     });
 
-    it("should use stream filter from props", () => {
+    it("should fall back to node id when name and label are absent", () => {
       wrapper = createWrapper({
-        streamFilter: "custom-stream",
+        selectedNode: { id: "fallback-id" },
       });
-
-      const mockTrace = {
-        traceId: "trace-xyz789",
-      };
-
-      wrapper.vm.handleTraceClick(mockTrace);
-
-      expect(mockRouterPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.objectContaining({
-            stream: "custom-stream",
-          }),
-        })
-      );
+      wrapper.vm.navigateToTraces({});
+      const payload = wrapper.emitted("view-traces")![0][0] as any;
+      expect(payload.serviceName).toBe("fallback-id");
     });
+  });
 
-    it("should use default stream when streamFilter is empty", () => {
-      wrapper = createWrapper({
-        streamFilter: "",
-      });
+  // -------------------------------------------------------------------------
+  // Async Operations - fetchAggregatedOperations
+  // -------------------------------------------------------------------------
 
-      const mockTrace = {
-        traceId: "trace-def456",
-      };
-
-      wrapper.vm.handleTraceClick(mockTrace);
-
-      expect(mockRouterPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.objectContaining({
-            stream: "default",
-          }),
-        })
-      );
-    });
-
-    it("should include org identifier from store", () => {
-      wrapper = createWrapper();
-
-      const mockTrace = {
-        traceId: "trace-org123",
-      };
-
-      wrapper.vm.handleTraceClick(mockTrace);
-
-      expect(mockRouterPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.objectContaining({
-            org_identifier: "test-org",
-          }),
-        })
-      );
-    });
-
-    it("should handle different org identifiers", () => {
-      wrapper = createWrapper({}, {
-        selectedOrganization: {
-          identifier: "different-org",
-        },
-      });
-
-      const mockTrace = {
-        traceId: "trace-different",
-      };
-
-      wrapper.vm.handleTraceClick(mockTrace);
-
-      expect(mockRouterPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.objectContaining({
-            org_identifier: "different-org",
-          }),
-        })
-      );
-    });
-
-    it("should navigate when trace is clicked in UI", async () => {
-      vi.mocked(searchService.get_traces).mockResolvedValue(mockTraces);
-
+  describe("Async Operations - fetchAggregatedOperations", () => {
+    it("should call searchService.search when visible=true, node set, and streamFilter is not 'all'", async () => {
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
-      await nextTick();
-
-      const traceItems = wrapper.findAll('[data-test="service-graph-side-panel-trace-item"]');
-      expect(traceItems.length).toBeGreaterThan(0);
-
-      // Click on the trace ID
-      const traceId = traceItems[0].find(".trace-id");
-      await traceId.trigger("click");
-
-      expect(mockRouterPush).toHaveBeenCalled();
-    });
-  });
-
-  describe("Event Handlers - copyTraceId", () => {
-    it("should copy trace ID to clipboard", async () => {
-      wrapper = createWrapper();
-
-      await wrapper.vm.copyTraceId("test-trace-id");
-
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test-trace-id");
+      expect(searchService.search).toHaveBeenCalled();
     });
 
-    it("should set copiedTraceId state after copying", async () => {
-      wrapper = createWrapper();
-
-      await wrapper.vm.copyTraceId("test-trace-id");
-
-      expect(wrapper.vm.copiedTraceId).toBe("test-trace-id");
-    });
-
-    it("should reset copiedTraceId after 2 seconds", async () => {
-      vi.useFakeTimers();
-      wrapper = createWrapper();
-
-      await wrapper.vm.copyTraceId("test-trace-id");
-      expect(wrapper.vm.copiedTraceId).toBe("test-trace-id");
-
-      vi.advanceTimersByTime(2000);
-      expect(wrapper.vm.copiedTraceId).toBeNull();
-
-      vi.useRealTimers();
-    });
-
-    it("should handle clipboard copy failure", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-      navigator.clipboard.writeText = vi.fn().mockRejectedValue(new Error("Copy failed"));
-
-      wrapper = createWrapper();
-
-      await wrapper.vm.copyTraceId("test-trace-id");
-      await flushPromises();
-
-      expect(consoleError).toHaveBeenCalled();
-      consoleError.mockRestore();
-    });
-  });
-
-  describe("Async Operations - fetchRecentTraces", () => {
-    it("should fetch traces when panel is visible and stream is selected", async () => {
-      vi.mocked(searchService.get_traces).mockResolvedValue(mockTraces);
-
+    it("should call searchService.search with the correct org_identifier", async () => {
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
-
-      expect(searchService.get_traces).toHaveBeenCalledWith({
-        org_identifier: "test-org",
-        stream_name: "default",
-        filter: "service_name = 'Service A'",
-        start_time: mockTimeRange.startTime,
-        end_time: mockTimeRange.endTime,
-        from: 0,
-        size: 10,
-      });
+      const call = vi.mocked(searchService.search).mock.calls[0][0] as any;
+      // Store helper uses "default" as identifier
+      expect(call.org_identifier).toBe("default");
     });
 
-    it("should not fetch traces when streamFilter is 'all'", async () => {
+    it("should call searchService.search with page_type traces", async () => {
+      wrapper = createWrapper({ visible: true, streamFilter: "default" });
+      await flushPromises();
+      const call = vi.mocked(searchService.search).mock.calls[0][0] as any;
+      expect(call.page_type).toBe("traces");
+    });
+
+    it("should NOT call searchService.search when streamFilter is 'all'", async () => {
       wrapper = createWrapper({ visible: true, streamFilter: "all" });
       await flushPromises();
-
-      expect(searchService.get_traces).not.toHaveBeenCalled();
+      expect(searchService.search).not.toHaveBeenCalled();
     });
 
-    it("should not fetch traces when panel is not visible", async () => {
+    it("should NOT call searchService.search when visible is false", async () => {
       wrapper = createWrapper({ visible: false, streamFilter: "default" });
       await flushPromises();
-
-      expect(searchService.get_traces).not.toHaveBeenCalled();
+      expect(searchService.search).not.toHaveBeenCalled();
     });
 
-    it("should manage loading state during fetch", async () => {
-      let resolvePromise: any;
-      vi.mocked(searchService.get_traces).mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            resolvePromise = () => resolve(mockTraces);
-          })
+    it("should populate recentOperations from the search response", async () => {
+      wrapper = createWrapper({ visible: true, streamFilter: "default" });
+      await flushPromises();
+      expect(wrapper.vm.recentOperations).toHaveLength(1);
+      expect(wrapper.vm.recentOperations[0].name).toBe("/api/orders");
+    });
+
+    it("should set loadingOperations to false after fetch completes", async () => {
+      wrapper = createWrapper({ visible: true, streamFilter: "default" });
+      await flushPromises();
+      expect(wrapper.vm.loadingOperations).toBe(false);
+    });
+
+    it("should keep recentOperations empty and reset loadingOperations on error", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      vi.mocked(searchService.search).mockRejectedValueOnce(
+        new Error("API Error"),
       );
 
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
-      await nextTick();
-
-      // Check loading state during fetch
-      expect(wrapper.vm.loadingTraces).toBe(true);
-
-      // Resolve the promise
-      resolvePromise();
-      await flushPromises();
-      await nextTick();
-
-      // Check loading state is false after fetch completes
-      expect(wrapper.vm.loadingTraces).toBe(false);
-    });
-
-    it("should process trace data correctly", async () => {
-      vi.mocked(searchService.get_traces).mockResolvedValue(mockTraces);
-
-      wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
 
-      expect(wrapper.vm.recentTraces).toHaveLength(2);
-      expect(wrapper.vm.recentTraces[0].status).toBe("OK");
-      expect(wrapper.vm.recentTraces[1].status).toBe("ERROR");
-    });
-
-    it("should mark slow traces correctly", async () => {
-      vi.mocked(searchService.get_traces).mockResolvedValue(mockTraces);
-
-      wrapper = createWrapper({ visible: true, streamFilter: "default" });
-      await flushPromises();
-
-      // First trace: 150ms (< 1s) - not slow
-      expect(wrapper.vm.recentTraces[0].durationClass).toBe("");
-
-      // Second trace: 2.5s (> 1s) - slow
-      expect(wrapper.vm.recentTraces[1].durationClass).toBe("duration-slow");
-    });
-
-    it("should handle fetch error gracefully", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-      vi.mocked(searchService.get_traces).mockRejectedValue(new Error("API Error"));
-
-      wrapper = createWrapper({ visible: true, streamFilter: "default" });
-      await flushPromises();
-
-      expect(wrapper.vm.recentTraces).toHaveLength(0);
-      expect(wrapper.vm.loadingTraces).toBe(false);
-      expect(consoleError).toHaveBeenCalled();
-
+      expect(wrapper.vm.recentOperations).toHaveLength(0);
+      expect(wrapper.vm.loadingOperations).toBe(false);
       consoleError.mockRestore();
     });
 
-    it("should handle empty trace response", async () => {
-      vi.mocked(searchService.get_traces).mockResolvedValue({ data: { hits: [] } });
+    it("should handle an empty hits array without errors", async () => {
+      vi.mocked(searchService.search).mockResolvedValueOnce({
+        data: { hits: [] },
+      });
 
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
 
-      expect(wrapper.vm.recentTraces).toHaveLength(0);
+      expect(wrapper.vm.recentOperations).toHaveLength(0);
     });
   });
 
-  describe("Watchers", () => {
-    it("should fetch traces when visible changes to true", async () => {
-      vi.mocked(searchService.get_traces).mockResolvedValue(mockTraces);
+  // -------------------------------------------------------------------------
+  // Watchers
+  // -------------------------------------------------------------------------
 
+  describe("Watchers", () => {
+    it("should call searchService.search when visible changes from false to true", async () => {
       wrapper = createWrapper({ visible: false, streamFilter: "default" });
       await flushPromises();
-
-      expect(searchService.get_traces).not.toHaveBeenCalled();
+      expect(searchService.search).not.toHaveBeenCalled();
 
       await wrapper.setProps({ visible: true });
       await flushPromises();
 
-      expect(searchService.get_traces).toHaveBeenCalled();
+      expect(searchService.search).toHaveBeenCalled();
     });
 
-    it("should fetch traces when selectedNode changes", async () => {
-      vi.mocked(searchService.get_traces).mockResolvedValue(mockTraces);
-
+    it("should call searchService.search again when selectedNode changes", async () => {
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
-
-      const callCount = vi.mocked(searchService.get_traces).mock.calls.length;
+      const callCount = vi.mocked(searchService.search).mock.calls.length;
 
       await wrapper.setProps({ selectedNode: mockNodes[1] });
       await flushPromises();
 
-      expect(vi.mocked(searchService.get_traces).mock.calls.length).toBeGreaterThan(callCount);
+      expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(
+        callCount,
+      );
     });
 
-    it("should fetch traces when streamFilter changes", async () => {
-      vi.mocked(searchService.get_traces).mockResolvedValue(mockTraces);
-
+    it("should call searchService.search again when streamFilter changes to another stream", async () => {
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
-
-      const callCount = vi.mocked(searchService.get_traces).mock.calls.length;
+      const callCount = vi.mocked(searchService.search).mock.calls.length;
 
       await wrapper.setProps({ streamFilter: "another-stream" });
       await flushPromises();
 
-      expect(vi.mocked(searchService.get_traces).mock.calls.length).toBeGreaterThan(callCount);
+      expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(
+        callCount,
+      );
     });
 
-    it("should not fetch traces when changing to 'all' stream", async () => {
-      vi.mocked(searchService.get_traces).mockResolvedValue(mockTraces);
-
+    it("should NOT call searchService.search when streamFilter changes to 'all'", async () => {
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
-
-      vi.mocked(searchService.get_traces).mockClear();
+      vi.mocked(searchService.search).mockClear();
 
       await wrapper.setProps({ streamFilter: "all" });
       await flushPromises();
 
-      expect(searchService.get_traces).not.toHaveBeenCalled();
+      expect(searchService.search).not.toHaveBeenCalled();
     });
   });
 
-  describe("UI Rendering - Metrics Section", () => {
-    it("should display metrics section", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-metrics"]').exists()).toBe(true);
+  // -------------------------------------------------------------------------
+  // UI Rendering - Tabs section
+  // -------------------------------------------------------------------------
+
+  describe("UI Rendering - Tabs", () => {
+    it("should show tabs when streamFilter is not 'all'", () => {
+      wrapper = createWrapper({ streamFilter: "default" });
+      expect(
+        wrapper.find('[data-test="service-graph-node-panel-tabs"]').exists(),
+      ).toBe(true);
     });
 
-    it("should display request rate metric", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-request-rate"]').exists()).toBe(true);
-    });
-
-    it("should display error rate metric", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-error-rate"]').exists()).toBe(true);
-    });
-
-    it("should display P95 latency metric", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-p95-latency"]').exists()).toBe(true);
-    });
-  });
-
-  describe("UI Rendering - Services Lists", () => {
-    it("should display upstream services section", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-upstream-services"]').exists()).toBe(true);
-    });
-
-    it("should display downstream services section", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find('[data-test="service-graph-side-panel-downstream-services"]').exists()).toBe(true);
-    });
-
-    it("should display correct upstream service count", () => {
-      wrapper = createWrapper();
-      const upstreamSection = wrapper.find('[data-test="service-graph-side-panel-upstream-services"]');
-      expect(upstreamSection.text()).toContain("(3)");
-    });
-
-    it("should display correct downstream service count", () => {
-      wrapper = createWrapper();
-      const downstreamSection = wrapper.find('[data-test="service-graph-side-panel-downstream-services"]');
-      expect(downstreamSection.text()).toContain("(2)");
-    });
-
-    it("should render upstream service items", () => {
-      wrapper = createWrapper();
-      const upstreamItems = wrapper.findAll('[data-test="service-graph-side-panel-upstream-service-item"]');
-      expect(upstreamItems.length).toBeGreaterThan(0);
-    });
-
-    it("should render downstream service items", () => {
-      wrapper = createWrapper();
-      const downstreamItems = wrapper.findAll('[data-test="service-graph-side-panel-downstream-service-item"]');
-      expect(downstreamItems.length).toBe(2);
-    });
-  });
-
-  describe("UI Rendering - Recent Traces", () => {
-    it("should display recent traces section when stream is selected", async () => {
-      vi.mocked(searchService.get_traces).mockResolvedValue(mockTraces);
-
-      wrapper = createWrapper({ visible: true, streamFilter: "default" });
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="service-graph-side-panel-recent-traces"]').exists()).toBe(true);
-    });
-
-    it("should not display recent traces section when stream is 'all'", () => {
+    it("should hide tabs when streamFilter is 'all'", () => {
       wrapper = createWrapper({ streamFilter: "all" });
-      expect(wrapper.find('[data-test="service-graph-side-panel-recent-traces"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="service-graph-node-panel-tabs"]').exists(),
+      ).toBe(false);
     });
 
-    it("should show loading spinner while fetching traces", async () => {
-      vi.mocked(searchService.get_traces).mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            setTimeout(() => resolve(mockTraces), 100);
-          })
-      );
-
-      wrapper = createWrapper({ visible: true, streamFilter: "default" });
-
-      // Should show loading immediately
-      expect(wrapper.vm.loadingTraces).toBe(true);
+    it("should render the operations tab", () => {
+      wrapper = createWrapper({ streamFilter: "default" });
+      expect(
+        wrapper
+          .find('[data-test="service-graph-node-panel-tab-operations"]')
+          .exists(),
+      ).toBe(true);
     });
 
-    it("should render trace items after loading", async () => {
-      vi.mocked(searchService.get_traces).mockResolvedValue(mockTraces);
-
-      wrapper = createWrapper({ visible: true, streamFilter: "default" });
-      await flushPromises();
-      await nextTick();
-
-      const traceItems = wrapper.findAll('[data-test="service-graph-side-panel-trace-item"]');
-      expect(traceItems.length).toBe(2);
+    it("should render the nodes tab", () => {
+      wrapper = createWrapper({ streamFilter: "default" });
+      expect(
+        wrapper
+          .find('[data-test="service-graph-node-panel-tab-nodes"]')
+          .exists(),
+      ).toBe(true);
     });
 
-    it("should display copy button for each trace", async () => {
-      vi.mocked(searchService.get_traces).mockResolvedValue(mockTraces);
+    it("should render the pods tab", () => {
+      wrapper = createWrapper({ streamFilter: "default" });
+      expect(
+        wrapper
+          .find('[data-test="service-graph-node-panel-tab-pods"]')
+          .exists(),
+      ).toBe(true);
+    });
 
-      wrapper = createWrapper({ visible: true, streamFilter: "default" });
-      await flushPromises();
-      await nextTick();
-
-      const copyButtons = wrapper.findAll('[data-test="service-graph-side-panel-copy-trace-btn"]');
-      expect(copyButtons.length).toBe(2);
+    it("should default to operations tab on mount", () => {
+      wrapper = createWrapper({ streamFilter: "default" });
+      expect(wrapper.vm.activeTab).toBe("operations");
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Edge Cases
+  // -------------------------------------------------------------------------
 
   describe("Edge Cases", () => {
-    it("should handle null selectedNode", () => {
-      wrapper = createWrapper({ selectedNode: null });
-      expect(wrapper.vm.upstreamServices).toHaveLength(0);
-      expect(wrapper.vm.downstreamServices).toHaveLength(0);
-    });
-
-    it("should handle empty graphData", () => {
-      wrapper = createWrapper({
-        graphData: { nodes: [], edges: [] },
-      });
-
-      expect(wrapper.vm.upstreamServices).toHaveLength(0);
-      expect(wrapper.vm.downstreamServices).toHaveLength(0);
-    });
-
-    it("should handle missing node name/label", () => {
+    it("should render service name using node id when name and label are absent", () => {
       wrapper = createWrapper({
         selectedNode: { id: "test-service" },
       });
-
-      const serviceName = wrapper.find('[data-test="service-graph-side-panel-service-name"]');
+      const serviceName = wrapper.find(
+        '[data-test="service-graph-side-panel-service-name"]',
+      );
       expect(serviceName.text()).toContain("test-service");
     });
 
-    it("should handle very large request numbers", () => {
-      const largeNode = {
-        id: "service-a",
-        label: "Service A",
-        name: "Service A",
-        error_rate: 2.5,
-        requests: 99999999, // ~100M requests
-        errors: 2499999,
-      };
+    it("should handle visible prop toggle — show then hide panel", async () => {
+      wrapper = createWrapper({ visible: true });
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
+      ).toBe(true);
 
-      wrapper = createWrapper({
-        selectedNode: largeNode,
-        graphData: { nodes: [largeNode], edges: [] },
-      });
-
-      const metrics = wrapper.vm.serviceMetrics;
-      expect(metrics.requestRateValue).toContain("M");
+      await wrapper.setProps({ visible: false });
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
+      ).toBe(false);
     });
 
-    it("should handle negative error rates", () => {
+    it("should handle negative error_rate without crashing", () => {
       wrapper = createWrapper({
         selectedNode: { ...mockNodes[0], error_rate: -5 },
       });
-
-      const health = wrapper.vm.serviceHealth;
-      expect(health).toBeTruthy();
+      expect(wrapper.vm.serviceHealth).toBeTruthy();
     });
   });
 
-  describe("Props Validation", () => {
-    it("should accept all required props", () => {
-      wrapper = createWrapper();
+  // -------------------------------------------------------------------------
+  // Props Validation
+  // -------------------------------------------------------------------------
 
+  describe("Props Validation", () => {
+    it("should reflect all provided props correctly", () => {
+      wrapper = createWrapper();
       expect(wrapper.props("selectedNode")).toEqual(mockNodes[0]);
-      expect(wrapper.props("graphData")).toEqual({ nodes: mockNodes, edges: mockEdges });
+      expect(wrapper.props("graphData")).toEqual({
+        nodes: mockNodes,
+        edges: mockEdges,
+      });
       expect(wrapper.props("timeRange")).toEqual(mockTimeRange);
       expect(wrapper.props("visible")).toBe(true);
       expect(wrapper.props("streamFilter")).toBe("default");
     });
-
-    it("should handle visible prop change", async () => {
-      wrapper = createWrapper({ visible: true });
-      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(true);
-
-      await wrapper.setProps({ visible: false });
-      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(false);
-    });
   });
 
-  describe("Accessibility", () => {
-    it("should have proper data-test attributes", () => {
-      wrapper = createWrapper();
+  // -------------------------------------------------------------------------
+  // Accessibility
+  // -------------------------------------------------------------------------
 
-      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-graph-side-panel-header"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-graph-side-panel-service-name"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-graph-side-panel-close-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-graph-side-panel-show-telemetry-btn"]').exists()).toBe(true);
+  describe("Accessibility", () => {
+    it("should have all required data-test attributes in the rendered panel", () => {
+      wrapper = createWrapper();
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-graph-side-panel-header"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-service-name"]')
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-close-btn"]')
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-show-telemetry-btn"]')
+          .exists(),
+      ).toBe(true);
     });
   });
 });

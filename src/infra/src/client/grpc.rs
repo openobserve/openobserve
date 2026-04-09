@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use config::{RwAHashMap, get_config, meta::cluster::NodeInfo};
-use once_cell::sync::Lazy;
 use proto::cluster_rpc::{
     self, cluster_info_service_client::ClusterInfoServiceClient, metrics_client::MetricsClient,
     node_service_client::NodeServiceClient, search_client::SearchClient,
@@ -77,11 +76,20 @@ pub async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
         Status::internal("parse gRPC node error".to_string())
     })?;
     if cfg.grpc.tls_enabled {
-        let pem = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
-        let cert = Certificate::from_pem(pem);
-        let tls = ClientTlsConfig::new()
-            .ca_certificate(cert)
-            .domain_name(&cfg.grpc.tls_cert_domain);
+        let mut tls = ClientTlsConfig::new().domain_name(&cfg.grpc.tls_cert_domain);
+        match cfg.grpc.tls_root_certificates {
+            config::TlsRootCertificates::Native => {
+                tls = tls.with_native_roots();
+            }
+            config::TlsRootCertificates::Webpki => {
+                tls = tls.with_webpki_roots();
+                if !cfg.grpc.tls_cert_path.is_empty() {
+                    let pem = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
+                    let cert = Certificate::from_pem(pem);
+                    tls = tls.ca_certificates([cert]);
+                }
+            }
+        }
         channel = channel.tls_config(tls).map_err(|err| {
             log::error!("gRPC node: {}, tls err: {:?}", &grpc_addr, err);
             Status::internal("tls gRPC node error".to_string())

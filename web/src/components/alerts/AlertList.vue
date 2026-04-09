@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -57,22 +57,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-list-search-input"
               :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
-              class="o2-search-input"
+              :class="[
+                'o2-search-input',
+                isCompactToolbar ? 'alert-search-input' : '',
+              ]"
             >
               <template #prepend>
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
+              <template v-if="isCompactToolbar" #append>
+                <q-toggle
+                  data-test="alert-list-search-across-folders-toggle"
+                  v-model="searchAcrossFolders"
+                  class="o2-toggle-button-xs"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'o2-toggle-button-xs-dark'
+                      : 'o2-toggle-button-xs-light'
+                  "
+                  size="xs"
+                >
+                  <q-tooltip>
+                    {{
+                      searchAcrossFolders
+                        ? t('dashboard.searchSelf')
+                        : t('dashboard.searchAll')
+                    }}
+                  </q-tooltip>
+                </q-toggle>
+              </template>
             </q-input>
-            <!-- All Folders toggle -->
-            <div class="tw:ml-2">
+            <!-- All Folders toggle (normal resolution) -->
+            <div v-if="!isCompactToolbar" class="tw:ml-2">
               <q-toggle
                 data-test="alert-list-search-across-folders-toggle"
                 v-model="searchAcrossFolders"
                 label="All Folders"
-                class="tw:mr-3 tw:h-[32px] o2-toggle-button-lg all-folders-toggle"
+                class="tw:h-[32px] tw:mr-3 o2-toggle-button-lg all-folders-toggle"
                 size="lg"
-              >
-              </q-toggle>
+              />
               <q-tooltip
                 class="q-mt-lg"
                 anchor="top middle"
@@ -98,13 +121,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- Import button -->
           <q-btn
-            class="q-ml-sm o2-secondary-button tw:h-[36px]"
+            :class="[
+              'q-ml-sm o2-secondary-button tw:h-[36px]',
+              isCompactToolbar
+                ? 'compact-icon-btn'
+                : '',
+            ]"
             no-caps
             flat
-            :label="t(`dashboard.import`)"
+            :label="isCompactToolbar ? undefined : t(`dashboard.import`)"
+            icon="file_upload"
             @click="importAlert"
             data-test="alert-import"
-          />
+          >
+            <q-tooltip v-if="isCompactToolbar">
+              {{ t("dashboard.import") }}
+            </q-tooltip>
+          </q-btn>
           <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
           <q-btn
             data-test="alert-list-add-alert-btn"
@@ -983,6 +1016,16 @@ export default defineComponent({
     const isFetchingStreams = ref(false);
     const isSubmitting = ref(false);
 
+    // Compact toolbar: icon-only buttons when AI sidebar is open at narrow widths
+    const windowWidth = ref(window.innerWidth);
+    const onWindowResize = () => {
+      windowWidth.value = window.innerWidth;
+    };
+    const isCompactToolbar = computed(
+      () => store.state.isAiChatEnabled && windowWidth.value <= 1440,
+    );
+
+
     const showImportAlertDialog = ref(false);
     const showHistoryDrawer = ref(false);
     const selectedHistoryAlertId = ref("");
@@ -1105,6 +1148,11 @@ export default defineComponent({
     onMounted(() => {
       document.addEventListener("keydown", handleKeyDown);
       document.addEventListener("click", handleClickOutside, true);
+      window.addEventListener("resize", onWindowResize);
+    });
+
+    onBeforeUnmount(() => {
+      window.removeEventListener("resize", onWindowResize);
     });
 
     // Show anomaly detection only when the backend is an enterprise or cloud build.
@@ -2999,6 +3047,7 @@ export default defineComponent({
       confirmBulkDelete,
       symOutlinedSoundSampler,
       config,
+      isCompactToolbar,
     };
   },
 });
@@ -3073,6 +3122,14 @@ export default defineComponent({
   word-wrap: break-word;
   font-size: 12px;
 }
+
+@media (max-width: 1440px) {
+  .app-tabs-container .o2-tab {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    min-width: auto !important;
+  }
+}
 </style>
 
 <style lang="scss" scoped>
@@ -3124,6 +3181,27 @@ export default defineComponent({
     }
   }
 }
+.compact-icon-btn {
+  padding: 0 0.5rem !important;
+  min-width: 0 !important;
+}
+
+.alert-search-input {
+  :deep(.q-field__control) {
+    padding: 0 2px !important;
+  }
+
+  :deep(.q-field__prepend) {
+    padding-left: 2px !important;
+    padding-right: 0 !important;
+  }
+
+  :deep(.q-field__append) {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
 .all-folders-toggle {
   :deep(.q-toggle__inner) {
     height: 1.1em !important;

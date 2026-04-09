@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,6 +27,14 @@ pub struct ServiceAccountRequest {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct APIToken {
+    pub token: String,
+    pub user: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ServiceAccountCreateResponse {
+    pub code: u16,
+    pub message: String,
     pub token: String,
     pub user: String,
 }
@@ -90,6 +98,34 @@ mod tests {
 
         assert_eq!(request.first_name, "Updated");
         assert_eq!(request.last_name, "Name");
+    }
+
+    #[test]
+    fn test_service_account_create_response() {
+        let resp = ServiceAccountCreateResponse {
+            code: 200,
+            message: "User saved successfully".to_string(),
+            token: "abcd1234567890ef".to_string(),
+            user: "sa@example.com".to_string(),
+        };
+        assert_eq!(resp.code, 200);
+        assert_eq!(resp.token, "abcd1234567890ef");
+        assert_eq!(resp.user, "sa@example.com");
+    }
+
+    #[test]
+    fn test_service_account_create_response_serialization() {
+        let resp = ServiceAccountCreateResponse {
+            code: 200,
+            message: "User saved successfully".to_string(),
+            token: "tok123".to_string(),
+            user: "sa@example.com".to_string(),
+        };
+        let serialized = serde_json::to_string(&resp).unwrap();
+        let deserialized: ServiceAccountCreateResponse = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(resp.token, deserialized.token);
+        assert_eq!(resp.user, deserialized.user);
+        assert_eq!(resp.code, deserialized.code);
     }
 
     #[test]

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -552,12 +552,14 @@ export default defineComponent({
                 dismiss();
                 this.existingUser = false;
               } else {
+              if (err.response?.status != 403 || err?.status != 403) {
                 this.q.notify({
                   color: "negative",
                   message: err.response.data.message,
                   timeout: 2000,
                 });
                 dismiss();
+              }
                 this.formData.email = userEmail;
               }
             });

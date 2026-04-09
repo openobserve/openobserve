@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -1076,11 +1076,11 @@ export function usePanelDrilldown({
 
           window.open(currentUrl, "_blank");
         } else {
-          let oldParams: any = [];
+          let oldParams: any = {};
           // if pass all variables is true
           if (drilldownData.data.passAllVariables) {
-            // get current query params
-            oldParams = route.query;
+            // get current query params — spread to avoid mutating Vue Router's reactive object
+            oldParams = { ...route.query };
           }
 
           drilldownData.data.variables.forEach((variable: any) => {
@@ -1092,29 +1092,19 @@ export function usePanelDrilldown({
           });
 
           // make changes in router
+          const pushQuery = {
+            ...oldParams,
+            org_identifier: store.state.selectedOrganization.identifier,
+            dashboard: dashboardData.dashboardId,
+            folder: folderId,
+            tab: tabId,
+          };
           await router.push({
             path: "/dashboards/view",
-            query: {
-              ...oldParams,
-              org_identifier: store.state.selectedOrganization.identifier,
-              dashboard: dashboardData.dashboardId,
-              folder: folderId,
-              tab: tabId,
-            },
+            query: pushQuery,
           });
-
-          // ======= [START] default variable values
-
-          const initialVariableValues: any = {};
-          Object.keys(route.query).forEach((key) => {
-            if (key.startsWith("var-")) {
-              const newKey = key.slice(4);
-              initialVariableValues[newKey] = route.query[key];
-            }
-          });
-          // ======= [END] default variable values
-
-          emit("update:initialVariableValues", initialVariableValues);
+          // ViewDashboard's var-* watcher detects the route change and calls
+          // updateInitialVariableValues() directly via component ref — no emit needed.
         }
       }
     }
@@ -1144,6 +1134,8 @@ export function usePanelDrilldown({
                   ? b64EncodeUnicode(newQuery)
                   : newQuery,
                 query_fn: null,
+                start_time: (Date.now() - 3600000) * 1000,
+                end_time: Date.now() * 1000,
                 size: -1,
                 streaming_output: false,
                 streaming_id: null,

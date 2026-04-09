@@ -20,7 +20,7 @@ import {
   formatDuration,
   formatTimestamp,
 } from "./useTraceProcessing";
-import { SpanKind, SpanStatus } from "@/types/traces/span.types";
+import { SpanKind, SpanStatus } from "@/ts/interfaces/traces/span.types";
 
 // Helpers to create test spans
 const makeSpan = (overrides: Record<string, any> = {}) => ({

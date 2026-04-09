@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -64,7 +64,7 @@ pub struct ListAlertsResponseBodyItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_trained_at: Option<i64>,
     /// Scheduler status string. Only present for `anomaly_detection` items.
-    /// Values: "waiting" | "active" | "training" | "failed" | "disabled"
+    /// Values: "waiting" | "ready" | "training" | "failed" | "disabled"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
     /// Last error message from training or detection. Only present for `anomaly_detection` items.

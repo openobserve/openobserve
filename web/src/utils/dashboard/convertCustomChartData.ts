@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -322,4 +322,4 @@ const validateUserCode = (code: string): string | null => {
   } catch (error) {
     return "Invalid JavaScript syntax.";
   }
-};
+};

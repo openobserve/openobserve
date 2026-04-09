@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import FieldRow from "@/plugins/logs/components/FieldRow.vue";
+import FieldRow from "@/components/common/FieldRow.vue";
 import { Quasar } from "quasar";
 
 vi.mock("vuex", () => ({

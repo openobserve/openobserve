@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -120,6 +120,13 @@ describe("PatternList", () => {
         mockPatterns[1],
         "exclude",
       ]);
+    });
+
+    it("should emit create-alert event when triggered", async () => {
+      await wrapper.vm.$emit("create-alert", mockPatterns[0]);
+
+      expect(wrapper.emitted("create-alert")).toBeTruthy();
+      expect(wrapper.emitted("create-alert")![0]).toEqual([mockPatterns[0]]);
     });
   });
 

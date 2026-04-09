@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -107,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <SemanticGroupItem
         v-for="(group, index) in filteredGroups"
         :key="`${group.id}-${index}`"
+        :data-group-id="group.id"
         :group="group"
         @update="updateGroupByFilter(index, $event)"
         @delete="removeGroupByFilter(index)"
@@ -195,25 +196,20 @@ interface SemanticGroup {
   display: string;
   group?: string;
   fields: string[];
-  normalize: boolean;
-  is_stable?: boolean;
-  is_scope?: boolean;
 }
-
-// Reserved IDs that should not be used as semantic groups
-// service-fqn is the OUTPUT of correlation, not an input dimension
-const RESERVED_GROUP_IDS = ["service-fqn", "servicefqn", "fqn"];
 
 interface Props {
   semanticFieldGroups?: SemanticGroup[];
   fingerprintFields?: string[];
   showFingerprintFields?: boolean;
+  scrollToGroupId?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   semanticFieldGroups: () => [],
   fingerprintFields: () => [],
   showFingerprintFields: false,
+  scrollToGroupId: undefined,
 });
 
 const emit = defineEmits<{
@@ -221,12 +217,7 @@ const emit = defineEmits<{
   (e: "update:fingerprintFields", fields: string[]): void;
 }>();
 
-// Filter out reserved IDs like service-fqn (it's the output, not an input)
-const localGroups = ref<SemanticGroup[]>(
-  props.semanticFieldGroups.filter(
-    (g) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()),
-  ),
-);
+const localGroups = ref<SemanticGroup[]>([...props.semanticFieldGroups]);
 const localFingerprintFields = ref<string[]>([...props.fingerprintFields]);
 const selectedCategory = ref<string | null>(null);
 const showImportDrawer = ref(false);
@@ -235,10 +226,7 @@ const showImportDrawer = ref(false);
 watch(
   () => props.semanticFieldGroups,
   (newGroups) => {
-    // Filter out reserved IDs like service-fqn (it's the output, not an input)
-    localGroups.value = newGroups.filter(
-      (g) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()),
-    );
+    localGroups.value = [...newGroups];
     // Auto-select first category if none selected
     if (!selectedCategory.value && localGroups.value.length > 0) {
       nextTick(() => {
@@ -258,6 +246,29 @@ watch(
   },
 );
 
+// Helper function to normalize category names
+const normalizeCategoryName = (category: string): string => {
+  if (!category) return "Other";
+
+  const normalized = category.toLowerCase();
+
+  // Map common variations to consistent names
+  const categoryMap: Record<string, string> = {
+    'kubernetes': 'Kubernetes',
+    'k8s': 'Kubernetes',
+    'aws': 'AWS',
+    'amazon': 'AWS',
+    'azure': 'Azure',
+    'gcp': 'GCP',
+    'google': 'GCP',
+    'common': 'Common',
+    'generic': 'Common',
+    'other': 'Other'
+  };
+
+  return categoryMap[normalized] || category;
+};
+
 // Build category options from localGroups (the actual data)
 const categoryOptions = computed(() => {
   if (localGroups.value.length === 0) {
@@ -268,7 +279,7 @@ const categoryOptions = computed(() => {
   const groupsMap = new Map<string, number>();
 
   for (const group of localGroups.value) {
-    const category = group.group || "Other";
+    const category = normalizeCategoryName(group.group || "Other");
     groupsMap.set(category, (groupsMap.get(category) || 0) + 1);
   }
 
@@ -288,7 +299,7 @@ const filteredGroups = computed(() => {
     return localGroups.value;
   }
   return localGroups.value.filter(
-    (group) => (group.group || "Other") === selectedCategory.value,
+    (group) => normalizeCategoryName(group.group || "Other") === selectedCategory.value,
   );
 });
 
@@ -312,9 +323,6 @@ const addGroup = () => {
     display: "",
     group: selectedCategory.value || "Other",
     fields: [],
-    normalize: true,
-    is_stable: false,
-    is_scope: false,
   };
   localGroups.value.unshift(newGroup);
   emitUpdate();
@@ -390,13 +398,43 @@ const emitUpdate = () => {
   emit("update:fingerprintFields", [...localFingerprintFields.value]);
 };
 
-// Auto-select first category on mount
-onMounted(() => {
-  nextTick(() => {
-    if (categoryOptions.value.length > 0 && !selectedCategory.value) {
-      selectedCategory.value = categoryOptions.value[0].value;
+// Auto-select first category on mount, or navigate to a specific group
+onMounted(async () => {
+  await nextTick();
+
+  if (props.scrollToGroupId) {
+    // Find and switch to the category that contains the requested group
+    const targetGroup = localGroups.value.find((g) => g.id === props.scrollToGroupId);
+    if (targetGroup) {
+      selectedCategory.value = targetGroup.group || "Other";
+      await nextTick(); // wait for filteredGroups to re-render
     }
-  });
+  } else if (categoryOptions.value.length > 0 && !selectedCategory.value) {
+    selectedCategory.value = categoryOptions.value[0].value;
+  }
+
+  if (props.scrollToGroupId) {
+    await nextTick();
+    const el = document.querySelector(
+      `[data-group-id="${props.scrollToGroupId}"]`
+    ) as HTMLElement | null;
+    if (el) {
+      // Scroll within the nearest scrollable parent to avoid pushing
+      // ancestor containers (main page layout) out of view
+      const scrollParent = el.closest('.tw\\:overflow-y-auto') as HTMLElement | null;
+      if (scrollParent) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const offset = elRect.top - parentRect.top - (parentRect.height / 2) + (elRect.height / 2);
+        scrollParent.scrollBy({ top: offset, behavior: 'smooth' });
+      } else {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      // Blink the border to draw attention
+      el.classList.add("group-highlight");
+      setTimeout(() => el.classList.remove("group-highlight"), 2000);
+    }
+  }
 });
 </script>
 
@@ -413,6 +451,16 @@ onMounted(() => {
 .groups-list {
   width: 100%;
   overflow-x: hidden;
+}
+
+// Applied via JS to the target group item; :deep ensures it reaches child components
+:deep(.group-highlight) {
+  animation: group-border-blink 0.4s ease-in-out 3;
+}
+
+@keyframes group-border-blink {
+  0%, 100% { outline: 2px solid transparent; }
+  50%       { outline: 2px solid var(--q-primary); border-radius: 4px; }
 }
 
 .fingerprint-section {

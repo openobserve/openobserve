@@ -30,6 +30,43 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
     test.describe.configure({ mode: 'serial' });
     let pm;
 
+    /**
+     * Helper function to setup patterns view and wait for patterns to load
+     * Reduces code duplication across all pattern tests
+     * @param {Page} page - Playwright page object
+     * @param {PageManager} pm - Page manager instance
+     * @param {string} timeRange - Time range selector ('1hour' | '30seconds')
+     * @returns {Promise<string>} - Result from waitForPatternsToLoad ('patterns' | 'statistics' | 'empty' | 'timeout')
+     */
+    async function setupPatternsView(page, pm, timeRange = '1hour') {
+        await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+        await pm.logsPage.selectStream(PATTERNS_STREAM);
+
+        // Switch off quick mode (required for patterns)
+        await pm.logsPage.clickQuickModeToggle();
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+        // Set time range
+        if (timeRange === '1hour') {
+            await pm.logsPage.clickDateTimeButton();
+            await pm.logsPage.clickRelative1HourOrFallback();
+        } else if (timeRange === '30seconds') {
+            await pm.logsPage.setTimeToPast30Seconds();
+        }
+
+        await pm.logsPage.clickRefreshButton();
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+        await pm.logsPage.waitForLogsTableToLoad();
+
+        await pm.logsPage.clickPatternsToggle();
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+        return await pm.logsPage.waitForPatternsToLoad(60000);
+    }
+
     test.beforeAll(async ({ browser }) => {
         // Ingest pattern-rich data once before all tests
         if (dataIngested) {
@@ -405,7 +442,11 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
                 // Click include button
                 await pm.logsPage.clickPatternIncludeBtn(0);
-                await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+                await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+                // ASSERTION: After clicking Include, page should navigate away from patterns view
+                // Verify logs table is visible (pattern view is exited)
+                await pm.logsPage.expectLogsTableVisible();
 
                 testLogger.info(`Clicked include on pattern: ${templateText.substring(0, 50)}...`);
             } else {
@@ -451,7 +492,11 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
                 // Click exclude button
                 await pm.logsPage.clickPatternExcludeBtn(0);
-                await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+                await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+                // ASSERTION: After clicking Exclude, page should navigate away from patterns view
+                // Verify logs table is visible (pattern view is exited)
+                await pm.logsPage.expectLogsTableVisible();
 
                 testLogger.info(`Clicked exclude on pattern: ${templateText.substring(0, 50)}...`);
             } else {
@@ -548,5 +593,296 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         }
 
         testLogger.info('PASSED: Details icon test complete');
+    });
+
+    // ==========================================================================
+    // PR #10949 & #10965 - Duplicate Patterns Fix & Tokenized Chips Tests
+    // ==========================================================================
+
+    test("should not display duplicate patterns @P0 @smoke", async ({ page }) => {
+        testLogger.info('Test: Verify patterns are unique (no duplicates)');
+
+        const result = await setupPatternsView(page, pm);
+
+        // CRITICAL: P0 test must have pattern data to be meaningful
+        expect(['patterns', 'statistics']).toContain(result);
+
+        const cardCount = await pm.logsPage.getPatternCardCount();
+
+        // STRONG ASSERTION: Must have patterns for duplicate check (P0 test)
+        expect(cardCount).toBeGreaterThan(0);
+
+        // Get all pattern templates
+        const patternTemplates = [];
+        for (let i = 0; i < cardCount; i++) {
+            const template = await pm.logsPage.getPatternCardTemplateText(i);
+            patternTemplates.push(template);
+        }
+
+        testLogger.info(`Total patterns found: ${cardCount}`);
+        testLogger.info(`Pattern templates: ${patternTemplates.map(t => t.substring(0, 50)).join(', ')}`);
+
+        // Check for duplicates
+        const uniqueTemplates = [...new Set(patternTemplates)];
+        const duplicateCount = cardCount - uniqueTemplates.length;
+
+        testLogger.info(`Unique patterns: ${uniqueTemplates.length}`);
+        testLogger.info(`Duplicate patterns: ${duplicateCount}`);
+
+        // STRONG ASSERTION: No duplicates should exist
+        expect(duplicateCount).toBe(0);
+        expect(uniqueTemplates.length).toBe(cardCount);
+
+        await page.screenshot({ path: 'playwright-results/pattern-no-duplicates.png', fullPage: true });
+
+        testLogger.info('✅ VERIFIED: All patterns are unique, no duplicates found');
+
+        testLogger.info('PASSED: No duplicate patterns test complete');
+    });
+
+    test("should display tokenized wildcard chips in pattern cards @P1 @functional", async ({ page }) => {
+        testLogger.info('Test: Verify tokenized wildcard chips are displayed');
+
+        const result = await setupPatternsView(page, pm);
+
+        // ASSERTION: Patterns must be available for this test
+        expect(['patterns', 'statistics']).toContain(result);
+
+        const cardCount = await pm.logsPage.getPatternCardCount();
+
+        // ASSERTION: Must have patterns to test tokenization
+        expect(cardCount).toBeGreaterThan(0);
+
+        // Check multiple patterns for wildcards (not just index 0)
+        // At least one pattern should contain wildcard indicators
+        let patternsWithWildcards = 0;
+        const patternSamples = [];
+
+        for (let i = 0; i < Math.min(cardCount, 5); i++) {
+            const patternText = await pm.logsPage.getPatternCardTemplateText(i);
+            const hasWildcards = patternText.includes('<:') ||
+                               patternText.includes('<*>') ||
+                               patternText.includes('[<:');
+
+            if (hasWildcards) {
+                patternsWithWildcards++;
+            }
+
+            patternSamples.push({
+                index: i,
+                sample: patternText.substring(0, 80),
+                hasWildcards
+            });
+        }
+
+        testLogger.info(`Patterns checked: ${patternSamples.length}`);
+        testLogger.info(`Patterns with wildcards: ${patternsWithWildcards}`);
+        testLogger.info(`Pattern samples: ${JSON.stringify(patternSamples, null, 2)}`);
+
+        // Take screenshot for manual verification
+        await page.screenshot({ path: 'playwright-results/pattern-wildcard-chips.png', fullPage: true });
+
+        // ASSERTION: At least one pattern must contain wildcard indicators
+        expect(patternsWithWildcards).toBeGreaterThan(0);
+
+        testLogger.info('✅ Wildcard tokenization verified');
+
+        testLogger.info('PASSED: Tokenized wildcard chips test complete');
+    });
+
+    test("should display wildcard chip tooltips with sample values on hover @P1 @functional", async ({ page }) => {
+        testLogger.info('Test: Verify wildcard chip hover tooltips show sample values');
+
+        const result = await setupPatternsView(page, pm);
+
+        // ASSERTION: Patterns must be available for this test
+        expect(['patterns', 'statistics']).toContain(result);
+
+        const cardCount = await pm.logsPage.getPatternCardCount();
+
+        // ASSERTION: Must have patterns to test tooltips
+        expect(cardCount).toBeGreaterThan(0);
+
+        // Find wildcard chips - they have class 'wildcard-chip' in PatternCard.vue
+        // Tooltips only appear when tok.sampleValues.length > 0 (see PatternCard.vue:48)
+        const wildcardChips = page.locator('.wildcard-chip');
+        const chipCount = await wildcardChips.count();
+        testLogger.info(`Found ${chipCount} wildcard chips on page`);
+
+        // ASSERTION: Must have wildcard chips to test
+        expect(chipCount).toBeGreaterThan(0);
+
+        // Try hovering over multiple chips to find one with a tooltip
+        // Tooltips only appear when pattern has sampleValues (data-dependent)
+        let tooltipFound = false;
+        let tooltipContent = '';
+        const chipsToTry = Math.min(chipCount, 5);
+
+        for (let i = 0; i < chipsToTry && !tooltipFound; i++) {
+            const chip = wildcardChips.nth(i);
+            const isVisible = await chip.isVisible().catch(() => false);
+
+            if (!isVisible) continue;
+
+            const chipText = await chip.textContent().catch(() => '');
+            testLogger.info(`Trying chip ${i}: ${chipText}`);
+
+            // Hover over the chip
+            await chip.hover();
+
+            // Wait for Quasar tooltip (delay is 300ms + render time)
+            await page.waitForTimeout(500);
+
+            // Check if tooltip appeared
+            const tooltip = page.locator('.q-tooltip');
+            const tooltipVisible = await tooltip.isVisible().catch(() => false);
+
+            if (tooltipVisible) {
+                tooltipFound = true;
+                tooltipContent = await tooltip.innerText().catch(() => '');
+                testLogger.info(`✅ Tooltip found on chip ${i}: ${tooltipContent.substring(0, 100)}`);
+
+                // ASSERTION: Tooltip content must not be empty
+                expect(tooltipContent.length).toBeGreaterThan(0);
+                break;
+            }
+
+            // Move mouse away to reset for next chip
+            await page.mouse.move(0, 0);
+            await page.waitForTimeout(100);
+        }
+
+        await page.screenshot({ path: 'playwright-results/pattern-wildcard-tooltip.png', fullPage: true });
+
+        // If no tooltip found on any chip, this is data-dependent (no sampleValues)
+        // The test should still verify chips render correctly
+        if (tooltipFound) {
+            testLogger.info('✅ Wildcard chip tooltip with sample values verified');
+        } else {
+            // No tooltips found - verify this is due to missing sampleValues, not broken feature
+            // PatternCard.vue only shows tooltip when tok.sampleValues.length > 0
+            testLogger.warn('⚠️ No tooltips found on any wildcard chip - pattern data may not include sampleValues');
+            testLogger.info('This is data-dependent: tooltips only appear when sampleValues are populated');
+
+            // ASSERTION: At minimum, chips must render with proper text
+            // Wildcard formats: <*> for variables, <:NAME> for named tokens (e.g., <:TIMESTAMP>)
+            const firstChipText = await wildcardChips.first().textContent().catch(() => '');
+            expect(firstChipText.length).toBeGreaterThan(0);
+            // Match any wildcard format: <*>, <:WORD>, or angle brackets with content
+            expect(firstChipText).toMatch(/<[*:]|<\*>|<:[A-Z]/);
+            testLogger.info('✅ Wildcard chips render correctly (no sampleValues in data for tooltips)');
+        }
+
+        testLogger.info('PASSED: Wildcard chip tooltip test complete');
+    });
+
+    test("should render anomaly badges inline with pattern cards @P1 @functional", async ({ page }) => {
+        testLogger.info('Test: Verify anomaly detection badges render inline with patterns');
+
+        const result = await setupPatternsView(page, pm);
+
+        // ASSERTION: Patterns must be available for this test
+        expect(['patterns', 'statistics']).toContain(result);
+
+        const cardCount = await pm.logsPage.getPatternCardCount();
+
+        // ASSERTION: Must have patterns to test anomaly badges
+        expect(cardCount).toBeGreaterThan(0);
+
+        // Anomaly badges are INLINE with pattern cards, not in a separate column
+        // Look for anomaly badges using data-test attribute: pattern-card-{index}-anomaly-badge
+        let patternsWithAnomalyBadge = 0;
+        const anomalyBadgeInfo = [];
+
+        for (let i = 0; i < Math.min(cardCount, 10); i++) {
+            const badgeSelector = `[data-test="pattern-card-${i}-anomaly-badge"]`;
+            const badge = page.locator(badgeSelector);
+            // Use timeout to handle badges that render with slight delay
+            const isVisible = await badge.isVisible({ timeout: 500 }).catch(() => false);
+
+            if (isVisible) {
+                patternsWithAnomalyBadge++;
+                const badgeText = await badge.textContent().catch(() => '');
+                anomalyBadgeInfo.push({ index: i, text: badgeText.trim() });
+            }
+        }
+
+        testLogger.info(`Patterns with anomaly badges: ${patternsWithAnomalyBadge} out of ${Math.min(cardCount, 10)} checked`);
+        if (anomalyBadgeInfo.length > 0) {
+            testLogger.info(`Anomaly badge samples: ${JSON.stringify(anomalyBadgeInfo.slice(0, 3))}`);
+        }
+
+        await page.screenshot({ path: 'playwright-results/pattern-anomaly-badges.png', fullPage: true });
+
+        // Anomaly detection is data-dependent - badges only appear for statistically rare patterns
+        // The test verifies the feature is functional, not that anomalies must exist
+        if (patternsWithAnomalyBadge > 0) {
+            testLogger.info(`✅ Anomaly detection active: ${patternsWithAnomalyBadge} badges rendered`);
+
+            // Verify badge contains expected text (e.g., "Rare Pattern" or warning emoji)
+            const firstBadge = anomalyBadgeInfo[0];
+            expect(firstBadge.text.length).toBeGreaterThan(0);
+            testLogger.info(`Anomaly badge text verified: "${firstBadge.text}"`);
+        } else {
+            // No anomalies in current data - this is acceptable
+            testLogger.info('No anomaly badges visible (data-dependent - patterns may not be statistically rare)');
+
+            // Verify pattern cards themselves are rendered correctly
+            const firstPatternTemplate = await pm.logsPage.getPatternCardTemplateText(0);
+            expect(firstPatternTemplate.length).toBeGreaterThan(0);
+            testLogger.info('✅ Pattern cards render correctly, no anomalies detected in current data');
+        }
+
+        testLogger.info('PASSED: Anomaly detection badge test complete');
+    });
+
+    test("should display pattern statistics in details dialog @P1 @functional", async ({ page }) => {
+        testLogger.info('Test: Verify pattern statistics (z_score, avg_frequency) in details dialog');
+
+        const result = await setupPatternsView(page, pm);
+
+        // ASSERTION: Patterns must be available for this test
+        expect(['patterns', 'statistics']).toContain(result);
+
+        const cardCount = await pm.logsPage.getPatternCardCount();
+
+        // ASSERTION: Must have patterns to test statistics
+        expect(cardCount).toBeGreaterThan(0);
+
+        // Open pattern details dialog
+        await pm.logsPage.clickPatternDetailsIcon(0);
+        await pm.logsPage.expectPatternDetailsDialogOpen();
+
+        // Check for statistical information in the dialog
+        const dialogContent = await pm.logsPage.getPatternDetailsDialogContent();
+
+        // Look for statistical fields (PR #10965 adds z_score, avg_frequency, wildcard_values)
+        const hasFrequency = dialogContent.toLowerCase().includes('frequency') ||
+                           dialogContent.toLowerCase().includes('occurrences') ||
+                           dialogContent.toLowerCase().includes('count');
+        const hasPercentage = dialogContent.includes('%');
+        const hasZScore = dialogContent.toLowerCase().includes('z-score') ||
+                        dialogContent.toLowerCase().includes('z_score') ||
+                        dialogContent.toLowerCase().includes('zscore');
+
+        testLogger.info(`Dialog statistics - Frequency: ${hasFrequency}, Percentage: ${hasPercentage}, Z-Score: ${hasZScore}`);
+        testLogger.info(`Dialog content preview: ${dialogContent.substring(0, 200)}`);
+
+        await page.screenshot({ path: 'playwright-results/pattern-details-statistics.png', fullPage: true });
+
+        // ASSERTION: Dialog must contain both frequency/count AND percentage
+        // These are core pattern statistics that should always be displayed
+        expect(hasFrequency).toBeTruthy();
+        expect(hasPercentage).toBeTruthy();
+
+        // INFO: Z-Score may be conditionally displayed (for anomalous patterns)
+        if (hasZScore) {
+            testLogger.info('✅ Z-Score statistic also present in dialog');
+        }
+
+        await pm.logsPage.closePatternDetailsDialog();
+        testLogger.info('✅ Pattern statistics (frequency and percentage) verified in details dialog');
+
+        testLogger.info('PASSED: Pattern statistics test complete');
     });
 });

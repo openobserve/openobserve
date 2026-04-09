@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -152,8 +152,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                         let curr_usages = curr_usages.clone();
                         for usage_data in curr_usages {
                             if let Err(e) = super::queues::USAGE_QUEUE
-                                .enqueue(ReportingData::Usage(Box::new(usage_data)))
-                                .await
+                                .try_enqueue(ReportingData::Usage(Box::new(usage_data)))
                             {
                                 log::error!(
                                     "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
@@ -170,8 +169,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                     let curr_usages = curr_usages.clone();
                     for usage_data in curr_usages {
                         if let Err(e) = super::queues::USAGE_QUEUE
-                            .enqueue(ReportingData::Usage(Box::new(usage_data)))
-                            .await
+                            .try_enqueue(ReportingData::Usage(Box::new(usage_data)))
                         {
                             log::error!(
                                 "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"

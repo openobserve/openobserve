@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::Path, sync::Arc, time::UNIX_EPOCH};
+use std::{
+    path::Path,
+    sync::{Arc, LazyLock as Lazy},
+    time::UNIX_EPOCH,
+};
 
 use arrow_schema::Schema;
 use bytes::Bytes;
@@ -43,7 +47,6 @@ use infra::{
     storage,
 };
 use ingester::WAL_PARQUET_METADATA;
-use once_cell::sync::Lazy;
 use tokio::{
     fs::remove_file,
     sync::{Mutex, RwLock},
@@ -862,11 +865,9 @@ async fn merge_files(
         let service_streams_config =
             &o2_enterprise::enterprise::common::config::get_config().service_streams;
 
-        // Only process in ingester mode (if mode is "compactor", this will be handled during merge)
         // Skip self-reporting streams from _meta organization to avoid processing internal metrics
         if LOCAL_NODE.is_ingester()
             && service_streams_config.enabled
-            && service_streams_config.is_ingester_mode()
             && org_id != config::META_ORG_ID
             && (stream_type == StreamType::Logs
                 || stream_type == StreamType::Metrics
@@ -1126,19 +1127,17 @@ async fn queue_services_from_parquet(
 
     let start = std::time::Instant::now();
 
-    // Get semantic field groups and FQN priority upfront (before spawning tasks)
+    // Get semantic field groups upfront (before spawning tasks)
     let semantic_groups =
         crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
-    let fqn_priority =
-        crate::service::db::system_settings::get_fqn_priority_dimensions(org_id).await;
-
-    // Get config values for channel capacity
-    let ss_config = &o2_enterprise::enterprise::common::config::get_config().service_streams;
-    let channel_capacity = ss_config.channel_capacity;
+    let identity_config =
+        crate::service::db::system_settings::get_service_identity_config(org_id).await;
 
     // Create bounded channel for backpressure - drops records if consumer can't keep up
     // ARROW-NATIVE: Channel now sends RecordBatch directly (no HashMap conversion!)
-    let (tx, mut rx) = mpsc::channel::<arrow::record_batch::RecordBatch>(channel_capacity);
+    let (tx, mut rx) = mpsc::channel::<arrow::record_batch::RecordBatch>(
+        o2_enterprise::enterprise::common::config::SS_CHANNEL_CAPACITY,
+    );
 
     // Clone data needed for producer task
     let parquet_bytes = Bytes::copy_from_slice(parquet_data);
@@ -1212,7 +1211,7 @@ async fn queue_services_from_parquet(
     let processor = o2_enterprise::enterprise::service_streams::processor::StreamProcessor::new(
         org_id.to_string(),
         semantic_groups,
-        fqn_priority,
+        identity_config,
     );
 
     let mut all_services: HashMap<
@@ -1255,22 +1254,6 @@ async fn queue_services_from_parquet(
         metrics::SERVICE_STREAMS_RECORDS_DROPPED
             .with_label_values(&[org_id, &stream_type.to_string()])
             .inc_by(records_dropped);
-    }
-
-    // Log blocked dimensions
-    let blocked = processor.get_blocked_dimensions().await;
-    if !blocked.is_empty() {
-        log::warn!(
-            "[ServiceStreams] Blocked high-cardinality dimensions for {}/{}: {:?}",
-            org_id,
-            stream_name,
-            blocked
-        );
-        for (dimension, _count) in &blocked {
-            metrics::SERVICE_STREAMS_HIGH_CARDINALITY_BLOCKED
-                .with_label_values(&[org_id, dimension])
-                .inc();
-        }
     }
 
     if all_services.is_empty() {
