@@ -119,7 +119,9 @@
     "copyError": "Falha ao copiar para a área de transferência",
     "goBack": "Voltar",
     "stopGenerating": "Pare de gerar",
-    "redirectingHome": "Redirecionando para a página inicial em {contagem regressiva} segundos..."
+    "redirectingHome": "Redirecionando para a página inicial em {contagem regressiva} segundos...",
+    "version": "Versão",
+    "create": "Criar"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -2396,7 +2398,7 @@
       "clickToViewSuggestions": "Clique para ver sugestões de melhoria de correlação",
       "byService": "Por serviço",
       "byStream": "Por stream",
-      "searchServiceName": "Pesquisar nome do serviço...",
+      "searchServiceName": "Pesquisar nome do serviço ou stream...",
       "searchStreamName": "Nome do stream de pesquisa...",
       "allServices": "Todos os serviços",
       "missingTelemetry": "Telemetria ausente",
@@ -2666,7 +2668,12 @@
     "errorGettingResults": "Erro ao obter resultados",
     "discardChangesTitle": "Descartar alterações",
     "deleteNodeTitle": "Excluir Node",
-    "deleteNodeLlmEvalConfirm": "Tem certeza de que deseja excluir esse nó de avaliação do LLM?"
+    "deleteNodeLlmEvalConfirm": "Tem certeza de que deseja excluir esse nó de avaliação do LLM?",
+    "evalTemplates": "Modelos de avaliação",
+    "evaluationTemplate": "Modelo de avaliação",
+    "evaluationTemplateHelp": "Selecione um modelo de avaliação que defina os critérios e as dimensões para o juiz do LLM.",
+    "noTemplatesFound": "Nenhum modelo de avaliação encontrado. Crie um na página Modelos de avaliação.",
+    "evalTemplatesRefreshed": "Modelos de avaliação atualizados com sucesso"
   },
   "reports": {
     "header": "Relatórios",
@@ -3264,5 +3271,40 @@
     "guideQuery": "Consulta SQL atual",
     "guideQueryEncoded": "Consulta SQL codificada em Base64",
     "guideExampleHeader": "Exemplo"
+  },
+  "evalTemplate": {
+    "header": "Modelos de avaliação",
+    "newTemplate": "Novo modelo",
+    "editTemplate": "Editar modelo de avaliação",
+    "createTemplate": "Criar novo modelo de avaliação",
+    "noTemplatesFound": "Nenhum modelo de avaliação encontrado",
+    "templateName": "Nome do modelo",
+    "responseType": "Tipo de resposta",
+    "dimensions": "Dimensões de avaliação",
+    "promptTemplate": "Modelo de solicitação",
+    "statsTitle": "Estatísticas do modelo",
+    "avgQualityScore": "Índice de qualidade médio",
+    "usageStats": "Estatísticas de uso",
+    "totalEvaluations": "Total de avaliações",
+    "lastUsed": "Usado pela última vez",
+    "deleteTemplate": "Excluir modelo",
+    "deleteConfirmation": "Tem certeza de que deseja excluir “{name}”?",
+    "loadFailed": "Falha ao carregar modelos",
+    "saveRequiredFields": "Por favor, preencha todos os campos obrigatórios",
+    "updateSuccess": "Modelo atualizado com sucesso",
+    "createSuccess": "Modelo criado com sucesso",
+    "updateFailed": "Falha ao atualizar o modelo",
+    "createFailed": "Falha ao criar o modelo",
+    "deleteSuccess": "Modelo excluído com sucesso",
+    "deleteFailed": "Falha ao excluir o modelo",
+    "statsLoadFailed": "Falha ao carregar estatísticas do modelo",
+    "nameRequired": "O nome é obrigatório",
+    "responseTypeRequired": "O tipo de resposta é obrigatório",
+    "dimensionRequired": "É necessária pelo menos uma dimensão",
+    "contentRequired": "O conteúdo é obrigatório",
+    "never": "Nunca",
+    "typeScore": "Pontuação numérica (por exemplo, 0,0 - 1,0)",
+    "typeBoolean": "Binário//Falha de aprovação (booleano)",
+    "typeCustom": "Texto categórico/personalizado"
   }
 }

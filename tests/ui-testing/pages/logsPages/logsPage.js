@@ -533,55 +533,59 @@ export class LogsPage {
      * @param {number} pollIntervalMs - Interval between checks
      * @returns {Promise<boolean>} True if stream exists, false if timeout
      */
-    async waitForStreamAvailable(streamName, maxWaitMs = 30000, pollIntervalMs = 3000) {
-        testLogger.debug(`waitForStreamAvailable: Waiting for stream ${streamName} to be available`);
+    async waitForStreamAvailable(streamName, maxWaitMs = 30000, pollIntervalMs = 3000, streamType = 'logs') {
         const startTime = Date.now();
 
         const apiUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
-        const orgId = getOrgIdentifier();
+        const orgId = getOrgIdentifier() || 'default';
+        const url = `${apiUrl}/api/${orgId}/streams?type=${streamType}&keyword=${streamName}`;
+        testLogger.info(`waitForStreamAvailable: Waiting for stream ${streamName} (type=${streamType}, timeout=${maxWaitMs}ms)`);
+        let pollCount = 0;
 
         while (Date.now() - startTime < maxWaitMs) {
+            pollCount++;
             try {
-                // Use page.request which automatically includes browser session cookies
-                // This works on both cloud (cookie auth) and self-hosted (Basic Auth via storageState)
-                const response = await this.page.request.get(
-                    `${apiUrl}/api/${orgId}/streams`,
-                    { headers: getAuthHeaders() }
-                );
+                const response = await this.page.request.get(url, { headers: getAuthHeaders() });
+                const status = response.status();
 
                 if (response.ok()) {
                     const data = await response.json();
-                    if (data.list) {
-                        const streamExists = data.list.some(s => s.name === streamName);
-                        if (streamExists) {
-                            testLogger.debug(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
-                            return true;
-                        }
+                    const listCount = data.list ? data.list.length : 0;
+                    const streamExists = data.list && data.list.some(s => s.name === streamName);
+                    if (streamExists) {
+                        testLogger.info(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms (poll #${pollCount})`);
+                        return true;
+                    }
+                    if (pollCount <= 3 || pollCount % 10 === 0) {
+                        const names = data.list ? data.list.map(s => s.name).join(', ') : 'none';
+                        testLogger.info(`waitForStreamAvailable: poll #${pollCount} — HTTP ${status}, list=${listCount}, names=[${names}]`);
                     }
                 } else {
-                    testLogger.debug(`waitForStreamAvailable: API returned ${response.status()}, retrying...`);
+                    const bodyText = await response.text().catch(() => 'unreadable');
+                    testLogger.info(`waitForStreamAvailable: poll #${pollCount} — HTTP ${status}, body=${bodyText.substring(0, 200)}`);
                 }
 
-                testLogger.debug(`waitForStreamAvailable: Stream ${streamName} not found yet, waiting ${pollIntervalMs}ms...`);
                 await this.page.waitForTimeout(pollIntervalMs);
             } catch (e) {
-                testLogger.debug(`waitForStreamAvailable: Error checking stream: ${e.message}`);
+                testLogger.info(`waitForStreamAvailable: poll #${pollCount} — error: ${e.message}`);
                 await this.page.waitForTimeout(pollIntervalMs);
             }
         }
 
-        testLogger.warn(`waitForStreamAvailable: Stream ${streamName} not found after ${maxWaitMs}ms`);
+        testLogger.warn(`waitForStreamAvailable: Stream ${streamName} not found after ${maxWaitMs}ms (${pollCount} polls)`);
         return false;
     }
 
-    async selectStream(stream, maxRetries = 3, apiWaitMs = 30000) {
-        testLogger.info(`selectStream: Selecting stream: ${stream}`);
+    async selectStream(stream, maxRetries = 3, apiWaitMs = null) {
+        // Cloud environments need longer for streams to be indexed after ingestion
+        const effectiveApiWaitMs = apiWaitMs ?? (isCloudEnvironment() ? 90000 : 30000);
+        testLogger.info(`selectStream: Selecting stream: ${stream} (apiWait: ${effectiveApiWaitMs}ms)`);
 
         // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
-        if (apiWaitMs > 0) {
-            const streamAvailable = await this.waitForStreamAvailable(stream, apiWaitMs, 3000);
+        if (effectiveApiWaitMs > 0) {
+            const streamAvailable = await this.waitForStreamAvailable(stream, effectiveApiWaitMs, 3000);
             if (!streamAvailable) {
-                testLogger.warn(`selectStream: Stream ${stream} not found via API after ${apiWaitMs}ms, will still try UI selection`);
+                testLogger.warn(`selectStream: Stream ${stream} not found via API after ${effectiveApiWaitMs}ms, will still try UI selection`);
             } else {
                 testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
             }
@@ -613,6 +617,7 @@ export class LogsPage {
                 if (searchVisible) {
                     testLogger.info(`selectStream: Using search box to filter for: ${stream}`);
                     await searchInput.click();
+                    await searchInput.fill(''); // Clear any previous filter first
                     await searchInput.fill(stream);
                     await this.page.waitForTimeout(1500);
                 }
@@ -6012,9 +6017,9 @@ export class LogsPage {
      * @returns {Promise<number>} Number of pattern cards
      */
     async getPatternCardCount() {
-        // Use efficient CSS selector to count all pattern cards at once
-        // Pattern cards have data-test attribute: pattern-card-{index}
-        const count = await this.page.locator('[data-test^="pattern-card-"]:not([data-test*="-template"]):not([data-test*="-frequency"]):not([data-test*="-percentage"]):not([data-test*="-include"]):not([data-test*="-exclude"]):not([data-test*="-details"]):not([data-test*="-anomaly"])').count().catch(() => 0);
+        // Count by template elements (one per card) to avoid overcounting card sub-elements
+        // that may have data-test attributes (e.g. tokenized chips) not covered by exclusions
+        const count = await this.page.locator('[data-test^="pattern-card-"][data-test$="-template"]').count().catch(() => 0);
 
         testLogger.info(`Pattern card count: ${count}`);
         return count;

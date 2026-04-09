@@ -1184,6 +1184,8 @@ export function usePanelDrilldown({
                   ? b64EncodeUnicode(newQuery)
                   : newQuery,
                 query_fn: null,
+                start_time: (Date.now() - 3600000) * 1000,
+                end_time: Date.now() * 1000,
                 size: -1,
                 streaming_output: false,
                 streaming_id: null,
