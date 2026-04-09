@@ -712,6 +712,18 @@ export default defineComponent({
       return filtered;
     });
 
+    // The latest metadata chunk's time_offset.start_time (┬╡s) marks the left boundary
+    // of data received so far. Also pull the full query start so the overlay function
+    // can compute the fraction against the complete query range, not just received data.
+    const metadataStartTimeForOverlay = computed(() => {
+      const resultMeta = resultMetaData.value?.[0];
+      if (!resultMeta?.length) return 0;
+      return resultMeta[resultMeta.length - 1]?.time_offset?.start_time ?? 0;
+    });
+    const queryStartTimeForOverlay = computed(() =>
+      Number(metadata.value?.queries?.[0]?.startTime ?? 0),
+    );
+
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef: any = ref(null);
 
@@ -861,18 +873,26 @@ export default defineComponent({
           // Apply overlay BEFORE assigning to panelData.value.
           // This ensures a single watcher trigger with the overlaid options,
           // avoiding the double-setOption issue (one without graphic, one with).
-          if (applyOverlay && previousOptionsSnapshot && isOverlayEligible(panelSchema.value, previousOptionsSnapshot)) {
+          if (
+            applyOverlay &&
+            previousOptionsSnapshot &&
+            isOverlayEligible(panelSchema.value, previousOptionsSnapshot)
+          ) {
             // Pass container dimensions so the graphic overlay can calculate
             // width/height (required because ChartRenderer uses notMerge: true).
             const containerEl = chartPanelRef.value;
             const containerSize = containerEl
-              ? { width: containerEl.clientWidth, height: containerEl.clientHeight }
+              ? {
+                  width: containerEl.clientWidth,
+                  height: containerEl.clientHeight,
+                }
               : undefined;
             result.options = overlayNewDataOnOldOptions(
               previousOptionsSnapshot,
               result.options,
               containerSize,
-              loadingProgressPercentage.value,
+              metadataStartTimeForOverlay.value,
+              queryStartTimeForOverlay.value,
             );
           }
 
@@ -930,12 +950,16 @@ export default defineComponent({
     // Must be a single throttled unit because throttle() doesn't return a promise —
     // calling overlay separately after convertPanelDataThrottled() would run overlay
     // BEFORE the throttled conversion executes, then the conversion overwrites the result.
-    const convertAndOverlayThrottled = throttle(async () => {
-      await convertPanelDataCommon(true);
-    }, 350, {
-      leading: true,
-      trailing: true,
-    });
+    const convertAndOverlayThrottled = throttle(
+      async () => {
+        await convertPanelDataCommon(true);
+      },
+      350,
+      {
+        leading: true,
+        trailing: true,
+      },
+    );
 
     // Watch for panel schema changes to re-convert panel data
     watch(
@@ -1016,7 +1040,7 @@ export default defineComponent({
         // PromQL queries have data.value[0] as an object with .result property
         const hasData =
           data.value?.length > 0 &&
-          ((data.value[0]?.result?.length > 0) ||
+          (data.value[0]?.result?.length > 0 ||
             (Array.isArray(data.value[0]) && data.value[0].length > 0));
 
         // Use throttled version during loading (streaming), immediate version when complete
@@ -1030,17 +1054,22 @@ export default defineComponent({
             // Snapshot old rendered options if they exist — this is IMMUTABLE from here.
             const hasOldChart = panelData.value?.options?.series?.length > 0;
             if (hasOldChart) {
-              previousOptionsSnapshot = JSON.parse(JSON.stringify(panelData.value.options));
+              previousOptionsSnapshot = JSON.parse(
+                JSON.stringify(panelData.value.options),
+              );
               // Tag with metadata for eligibility checks
               previousOptionsSnapshot._chartType = panelSchema.value?.type;
-              previousOptionsSnapshot._queryCount = panelSchema.value?.queries?.length;
+              previousOptionsSnapshot._queryCount =
+                panelSchema.value?.queries?.length;
 
               // Capture actual grid pixel rect from the ECharts instance.
               // With containLabel: true, the actual plot area differs from raw grid config.
               try {
                 const chartInstance = chartRendererRef.value?.chart;
                 if (chartInstance) {
-                  const gridModel = chartInstance.getModel()?.getComponent('grid');
+                  const gridModel = chartInstance
+                    .getModel()
+                    ?.getComponent("grid");
                   const gridRect = gridModel?.coordinateSystem?.getRect();
                   if (gridRect) {
                     previousOptionsSnapshot._gridRect = {
@@ -1088,25 +1117,22 @@ export default defineComponent({
     // When loading transitions from true→false without a simultaneous data change,
     // the data watcher doesn't fire. This watcher ensures we always clean up
     // streaming state and do a final render when the stream ends.
-    watch(
-      loading,
-      async (newLoading, oldLoading) => {
-        if (oldLoading === true && newLoading === false) {
-          // Stream just completed
-          convertPanelDataThrottled.cancel();
-          convertAndOverlayThrottled.cancel();
-          hasRenderedFirstDataChunk.value = false;
+    watch(loading, async (newLoading, oldLoading) => {
+      if (oldLoading === true && newLoading === false) {
+        // Stream just completed
+        convertPanelDataThrottled.cancel();
+        convertAndOverlayThrottled.cancel();
+        hasRenderedFirstDataChunk.value = false;
 
-          // Final render with complete data — no overlay
-          await convertPanelDataCommon();
+        // Final render with complete data — no overlay
+        await convertPanelDataCommon();
 
-          // Clear streaming state
-          if (previousOptionsSnapshot) {
-            previousOptionsSnapshot = null;
-          }
+        // Clear streaming state
+        if (previousOptionsSnapshot) {
+          previousOptionsSnapshot = null;
         }
-      },
-    );
+      }
+    });
 
     const checkIfPanelIsTimeSeries = computed(() => {
       return panelData.value?.extras?.isTimeSeries;
@@ -1251,10 +1277,7 @@ export default defineComponent({
         case "metric": {
           return (
             data.value[0]?.length > 1 ||
-            yAlias.every(
-              (y: any) =>
-                getDataValue(firstRow, y) != null,
-            )
+            yAlias.every((y: any) => getDataValue(firstRow, y) != null)
           );
         }
         case "heatmap": {

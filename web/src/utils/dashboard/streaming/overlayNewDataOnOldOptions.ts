@@ -38,7 +38,8 @@ export function overlayNewDataOnOldOptions(
   oldOptions: any,
   newOptions: any,
   containerSize?: { width: number; height: number },
-  loadingProgressPercentage?: number,
+  metadataStartTime?: number,
+  queryStartTime?: number,
 ): any {
   if (!oldOptions?.series?.length) return newOptions;
   if (!newOptions?.series?.length) return oldOptions;
@@ -212,7 +213,8 @@ export function overlayNewDataOnOldOptions(
       const grid = merged.grid?.[0] || merged.grid || {};
       const gridLeft = typeof grid.left === "number" ? grid.left : 30;
       const gridRight = typeof grid.right === "number" ? grid.right : 20;
-      const gridTopVal = typeof grid.top === "number" ? grid.top : parseInt(grid.top) || 10;
+      const gridTopVal =
+        typeof grid.top === "number" ? grid.top : parseInt(grid.top) || 10;
       const gridBottom = typeof grid.bottom === "number" ? grid.bottom : 50;
 
       plotLeft = gridLeft;
@@ -222,17 +224,22 @@ export function overlayNewDataOnOldOptions(
     }
 
     if (plotWidth > 0 && plotHeight > 0) {
-      // Use loading progress to overlay the NEW data portion only.
-      // The overlay highlights freshly arrived data so the user can see
-      // what's new vs what's stale from the previous render.
-      // E.g., if 60% loaded, overlay covers the rightmost 60% (new data),
-      // leaving the leftmost 40% (old/stale) unhighlighted.
-      const progress = typeof loadingProgressPercentage === "number"
-        ? Math.max(0, Math.min(100, loadingProgressPercentage))
-        : 0;
-      // New data fraction starts from the right side of the chart
-      // (data streams in reverse chronological order — newest first)
-      const newFraction = progress / 100;
+      // Use the metadata start_time (microseconds) of the earliest received chunk
+      // to compute the overlay. Chunks stream newest-first, so metadataStartTime is
+      // the left boundary of data we've already received. Everything from
+      // metadataStartTime → newMaxTime is new; convert µs → ms for comparison.
+      const startTimeMs = metadataStartTime ? metadataStartTime / 1000 : 0;
+      // Use queryStartTime (full query start, µs→ms) as the denominator anchor so
+      // the fraction is relative to the complete query range, not just the received
+      // data range. Falls back to newMinTime if queryStartTime is not available.
+      const queryStartMs = queryStartTime ? queryStartTime / 1000 : newMinTime;
+      const totalRange = newMaxTime - queryStartMs;
+      const hasValidRange =
+        newMinTime !== Infinity && newMaxTime !== -Infinity && totalRange > 0;
+      const newFraction =
+        startTimeMs > 0 && hasValidRange
+          ? Math.max(0, Math.min(1, (newMaxTime - startTimeMs) / totalRange))
+          : 0;
 
       if (newFraction > 0 && newFraction < 1) {
         const overlayWidth = newFraction * plotWidth;
