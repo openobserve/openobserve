@@ -5,6 +5,7 @@ import dashboardChartJsonData from "../../../../test-data/dashboard_chart_json.j
 import sankeyData from "../../../../test-data/sankey_data.json";
 // Fixed testLogger path - updated to use correct relative path
 const testLogger = require('../../utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../../utils/cloud-auth.js');
 
 // Exported function to remove UTF characters
 const removeUTFCharacters = (text) => {
@@ -12,33 +13,26 @@ const removeUTFCharacters = (text) => {
   return text.replace(/[^\x00-\x7F]/g, " ");
 };
 
-// Function to retrieve authentication token (to be implemented securely)
+// Function to retrieve authentication token — cloud-aware (email:passcode on cloud, email:password on self-hosted)
 const getAuthToken = async () => {
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-  return `Basic ${basicAuthCredentials}`;
+  const headers = getAuthHeaders();
+  return headers['Authorization'];
 };
 
 // page is passed here to access the page object (currently not used)
 export const ingestion = async (page, streamName = "e2e_automate") => {
-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
+  if (!process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
 
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
 
   try {
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: await getAuthToken(),
-    };
-
     const fetchResponse = await fetch(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
-        headers,
+        headers: getAuthHeaders(),
         body: JSON.stringify(logsdata),
       }
     );
@@ -60,23 +54,18 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
 
 // Ingestion function for Geomap and Maps chart
 const ingestionForMaps = async (page, streamName = "geojson") => {
-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
+  if (!process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
 
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
 
   try {
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: await getAuthToken(),
-    };
-
     const fetchResponse = await fetch(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
-        headers,
+        headers: getAuthHeaders(),
         body: JSON.stringify(geoMapdata),
       }
     );
@@ -96,23 +85,18 @@ const ingestionForMaps = async (page, streamName = "geojson") => {
 
 // Ingestion function for Dashboard Chart JSON data
 const ingestionForDashboardChartJson = async (page, streamName = "kubernetes") => {
-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
+  if (!process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
 
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
 
   try {
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: await getAuthToken(),
-    };
-
     const fetchResponse = await fetch(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
-        headers,
+        headers: getAuthHeaders(),
         body: JSON.stringify(dashboardChartJsonData),
       }
     );
@@ -132,23 +116,18 @@ const ingestionForDashboardChartJson = async (page, streamName = "kubernetes") =
 
 // Ingestion function for Sankey chart data
 const ingestionForSankey = async (streamName = "sankey_data") => {
-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
+  if (!process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
 
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
 
   try {
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: await getAuthToken(),
-    };
-
     const fetchResponse = await fetch(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
-        headers,
+        headers: getAuthHeaders(),
         body: JSON.stringify(sankeyData),
       }
     );
