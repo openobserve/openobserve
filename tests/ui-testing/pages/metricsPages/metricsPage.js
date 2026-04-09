@@ -391,9 +391,21 @@ export class MetricsPage {
             editorContainer = this.page.locator('.monaco-editor').first();
         }
 
-        // Click on the Monaco editor to focus it
-        await editorContainer.getByRole('code').click();
-        await this.page.waitForTimeout(100);
+        // Wait for Monaco editor to be fully loaded
+        await editorContainer.waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.waitForTimeout(500);
+
+        // Click on the Monaco editor to focus it - try multiple approaches
+        const codeElement = editorContainer.getByRole('code');
+        const isCodeVisible = await codeElement.isVisible({ timeout: 5000 }).catch(() => false);
+
+        if (isCodeVisible) {
+            await codeElement.click();
+        } else {
+            // Fallback: click on the editor container directly
+            await editorContainer.click();
+        }
+        await this.page.waitForTimeout(200);
 
         // Use platform-specific key combo for select all
         const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
@@ -1797,6 +1809,58 @@ export class MetricsPage {
     // Setting element method
     async getSettingElementByText(optionText) {
         return this.page.locator(`text=/${optionText}/i`).first();
+    }
+
+    // ============================================
+    // DARK MODE TEST METHODS
+    // ============================================
+
+    /**
+     * Get theme toggle button
+     * @returns {Locator}
+     */
+    getThemeToggleButton() {
+        return this.page.locator('[data-test*="theme"], [class*="theme-toggle"], button:has-text("dark"), .q-toggle:has-text("dark")');
+    }
+
+    /**
+     * Get dark mode button
+     * @returns {Locator}
+     */
+    getDarkModeButton() {
+        return this.page.locator('[data-test*="dark-mode"], [aria-label*="dark"]');
+    }
+
+    /**
+     * Get settings button
+     * @returns {Locator}
+     */
+    getSettingsButton() {
+        return this.page.locator('[data-test*="settings"], [data-test*="profile"]');
+    }
+
+    /**
+     * Get dark mode option in menu
+     * @returns {Locator}
+     */
+    getDarkModeOption() {
+        return this.page.locator('text=Dark, text=dark mode, [data-test*="dark"]');
+    }
+
+    /**
+     * Get body element
+     * @returns {Locator}
+     */
+    getBodyElement() {
+        return this.page.locator('body');
+    }
+
+    /**
+     * Get "No results" text element
+     * @returns {Locator}
+     */
+    getNoResultsText() {
+        return this.page.locator('text=No results, text=no data, text=No results found');
     }
 
 }

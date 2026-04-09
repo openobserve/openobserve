@@ -217,8 +217,14 @@ export class AlertManagement {
     async searchAndDeleteAlert(alertName) {
         testLogger.info('Searching for alert to delete across all folders', { alertName });
 
-        await this.page.locator(this.locators.alertMenuItem).click();
-        await this.page.waitForTimeout(2000);
+        // Check if we're already on alerts page before trying to navigate
+        const currentUrl = this.page.url();
+        if (!currentUrl.includes('/alerts')) {
+            await this.page.locator(this.locators.alertMenuItem).click();
+            await this.page.waitForTimeout(2000);
+        } else {
+            testLogger.debug('Already on alerts page, skipping navigation');
+        }
 
         await this.page.locator(this.locators.searchAcrossFoldersToggle).locator('div').nth(1).click({ force: true });
         await this.page.waitForTimeout(500);

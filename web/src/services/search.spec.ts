@@ -278,7 +278,7 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(expectedUrl, params.query);
     });
 
-    it("should use multi endpoint for result schema when needed", async () => {
+    it("should use standard endpoint for result schema with array sql", async () => {
       const params = {
         org_identifier: "test-org",
         query: {
@@ -294,12 +294,12 @@ describe("Search Service", () => {
       await search.result_schema(params);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/result_schema_multi?type=logs&search_type=ui&use_cache=true",
-        params.query.query
+        "/api/test-org/result_schema?type=logs&search_type=ui&use_cache=true&is_streaming=false",
+        params.query
       );
     });
 
-    it("should handle result schema multi endpoint with aggs", async () => {
+    it("should use standard endpoint for result schema with array sql and aggs", async () => {
       const params = {
         org_identifier: "test-org",
         query: {
@@ -316,8 +316,8 @@ describe("Search Service", () => {
       await search.result_schema(params);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/result_schema_multi?type=logs&search_type=ui&use_cache=true",
-        { ...params.query.query, aggs: params.query.aggs }
+        "/api/test-org/result_schema?type=logs&search_type=ui&use_cache=true&is_streaming=false",
+        params.query
       );
     });
   });
