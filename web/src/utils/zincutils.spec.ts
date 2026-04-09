@@ -40,6 +40,7 @@ import {
   queryIndexSplit,
   convertToCamelCase,
   getFunctionErrorMessage,
+  processQueryMetadataErrors,
   generateTraceContext,
   durationFormatter,
   getTimezoneOffset,
@@ -1029,6 +1030,126 @@ if .severity == "error" {
   });
 
   describe("Error Message Utilities", () => {
+    describe("processQueryMetadataErrors", () => {
+      // Timestamps in microseconds (2026-04-09)
+      const t1 = 1744194599000000; // query 1 new_start_time
+      const t2 = 1744201799000000; // query 1 new_end_time  (t1 + 2h)
+      const t3 = 1744194199000000; // query 2 new_start_time
+      const t4 = 1744201799000000; // query 2 new_end_time  (t3 + 3h)
+
+      it("two queries both restricted ΓÇö both warnings appear", () => {
+        const metadata = [
+          [
+            {
+              function_error:
+                "Query duration is modified due to query range restriction of 2 hours",
+              new_start_time: t1,
+              new_end_time: t2,
+            },
+          ],
+          [
+            {
+              function_error:
+                "Query duration is modified due to query range restriction of 3 hours",
+              new_start_time: t3,
+              new_end_time: t4,
+            },
+          ],
+        ];
+
+        const result = processQueryMetadataErrors(metadata, "UTC");
+
+        expect(result).toContain(
+          "Query duration is modified due to query range restriction of 2 hours",
+        );
+        expect(result).toContain(
+          "Query duration is modified due to query range restriction of 3 hours",
+        );
+        // Both messages are in the same string, separated by newline
+        expect(result.split("\n").length).toBeGreaterThanOrEqual(2);
+      });
+
+      it("two queries only second restricted ΓÇö only second warning appears", () => {
+        const metadata = [
+          [{}], // Query 1 ΓÇö no error
+          [
+            {
+              function_error:
+                "Query duration is modified due to query range restriction of 3 hours",
+              new_start_time: t3,
+              new_end_time: t4,
+            },
+          ],
+        ];
+
+        const result = processQueryMetadataErrors(metadata, "UTC");
+
+        expect(result).toContain(
+          "Query duration is modified due to query range restriction of 3 hours",
+        );
+        expect(result).not.toContain("2 hours");
+      });
+
+      it("two queries neither restricted ΓÇö empty string", () => {
+        const metadata = [[{}], [{}]];
+        const result = processQueryMetadataErrors(metadata, "UTC");
+        expect(result).toBe("");
+      });
+
+      it("single query backward compat ΓÇö still works", () => {
+        const metadata = [
+          {
+            function_error:
+              "Query duration is modified due to query range restriction of 2 hours",
+            new_start_time: t1,
+            new_end_time: t2,
+          },
+        ];
+
+        const result = processQueryMetadataErrors(metadata, "UTC");
+
+        expect(result).toContain(
+          "Query duration is modified due to query range restriction of 2 hours",
+        );
+        expect(result).toContain("Data returned for:");
+      });
+
+      it("duplicate messages across two queries are deduplicated", () => {
+        const metadata = [
+          [
+            {
+              function_error:
+                "Query duration is modified due to query range restriction of 2 hours",
+              new_start_time: t1,
+              new_end_time: t2,
+            },
+          ],
+          [
+            {
+              function_error:
+                "Query duration is modified due to query range restriction of 2 hours",
+              new_start_time: t1,
+              new_end_time: t2,
+            },
+          ],
+        ];
+
+        const result = processQueryMetadataErrors(metadata, "UTC");
+        const messages = result.split("\n");
+
+        // Message should appear exactly once
+        expect(messages.length).toBe(1);
+        expect(result).toContain(
+          "Query duration is modified due to query range restriction of 2 hours",
+        );
+      });
+
+      it("returns empty string for null or empty metadata", () => {
+        expect(processQueryMetadataErrors(null)).toBe("");
+        expect(processQueryMetadataErrors([])).toBe("");
+      });
+    });
+
     describe("getFunctionErrorMessage", () => {
       it("should format error message with timestamps", () => {
         const message = "Query limit exceeded";

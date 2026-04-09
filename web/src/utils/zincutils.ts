@@ -1374,22 +1374,24 @@ export const processQueryMetadataErrors = (
 
   // Handle multi-query format (array of arrays)
   if (Array.isArray(metadata[0])) {
-    metadata[0].forEach((query: any) => {
-      if (
-        query?.function_error &&
-        query?.new_start_time &&
-        query?.new_end_time
-      ) {
-        const combinedMessage = getFunctionErrorMessage(
-          query.function_error,
-          query.new_start_time,
-          query.new_end_time,
-          timezone,
-        );
-        combinedWarnings.push(combinedMessage);
-      } else if (query?.function_error) {
-        combinedWarnings.push(...query.function_error);
-      }
+    metadata.forEach((queryChunks: any[]) => {
+      queryChunks.forEach((chunk: any) => {
+        if (
+          chunk?.function_error &&
+          chunk?.new_start_time &&
+          chunk?.new_end_time
+        ) {
+          const combinedMessage = getFunctionErrorMessage(
+            chunk.function_error,
+            chunk.new_start_time,
+            chunk.new_end_time,
+            timezone,
+          );
+          combinedWarnings.push(combinedMessage);
+        } else if (chunk?.function_error) {
+          combinedWarnings.push(...chunk.function_error);
+        }
+      });
     });
   } else {
     // Handle single query format (backward compatibility)
@@ -1409,7 +1411,7 @@ export const processQueryMetadataErrors = (
 
   // Deduplicate using mergeAndRemoveDuplicates (pass empty array as second param)
   const dedupedWarnings = mergeAndRemoveDuplicates(combinedWarnings, []);
-  return dedupedWarnings.join(", ");
+  return dedupedWarnings.join("\n");
 };
 
 /**
