@@ -164,8 +164,12 @@ mod tests {
     fn test_is_querier_route_by_body() {
         assert!(is_querier_route_by_body("/_search"));
         assert!(is_querier_route_by_body("/_search?foo=bar"));
+        assert!(is_querier_route_by_body("/_search_multi_stream"));
+        assert!(is_querier_route_by_body("/_search_multi_stream?foo=bar"));
         assert!(is_querier_route_by_body("/_search_stream"));
+        assert!(is_querier_route_by_body("/_search_stream?foo=bar"));
         assert!(is_querier_route_by_body("/_values_stream"));
+        assert!(is_querier_route_by_body("/_values_stream?foo=bar"));
         assert!(is_querier_route_by_body("/prometheus/api/v1/query_range"));
         assert!(is_querier_route_by_body(
             "/prometheus/api/v1/query_exemplars"
