@@ -283,6 +283,253 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         testLogger.info('PASSED: Multiple result_schema calls verified for multi-stream');
     });
 
+    // P1: Dashboard table panel — single stream cross-link in drilldown menu
+    test("should show cross-link in dashboard table panel drilldown menu for single stream", {
+        tag: ['@crossLinking', '@multiStream', '@dashboard', '@functional', '@P1', '@all']
+    }, async ({ page }) => {
+        testLogger.info('Testing cross-link in dashboard table panel (single stream)');
+
+        const crossLinkName = `CL-Dash-${Date.now()}`;
+
+        // Step 1: Set up cross-link on Stream A
+        const featureEnabled = await setupStreamCrossLink(page, pm, STREAM_A, {
+            name: crossLinkName,
+            url: 'https://dashboard-single.example.com/?field=${field.__name}&value=${field.__value}&from=${start_time}&to=${end_time}',
+            fields: ['kubernetes_container_name']
+        });
+        if (!featureEnabled) {
+            test.skip(true, 'Cross-linking feature not enabled');
+        }
+
+        // Step 2: Create a dashboard with a table panel using Stream A
+        const dashboardName = `CL-Multi-Dash-${Date.now()}`;
+        const orgId = process.env["ORGNAME"] || 'default';
+        await page.goto(`${process.env["ZO_BASE_URL"] || 'http://localhost:5080'}/web/dashboards?org_identifier=${orgId}`);
+        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        await page.waitForTimeout(2000);
+
+        await pm.dashboardCreate.createDashboard(dashboardName);
+        await pm.dashboardCreate.addPanel();
+        await pm.chartTypeSelector.selectChartType("table");
+        await pm.chartTypeSelector.selectStream(STREAM_A);
+        await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
+        await pm.dashboardPanelActions.addPanelName("CrossLink Single Stream Panel");
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await page.waitForTimeout(3000);
+        await pm.dashboardPanelActions.savePanel();
+        await page.waitForTimeout(3000);
+
+        testLogger.info('Dashboard with table panel created');
+
+        // Step 3: Intercept window.open to capture cross-link URL
+        await page.evaluate(() => {
+            window.__capturedCrossLinkUrl = null;
+            window.__originalOpen = window.open;
+            window.open = (url) => {
+                window.__capturedCrossLinkUrl = url;
+                return null;
+            };
+        });
+
+        try {
+            // Step 4: Click a data cell in the table panel to trigger drilldown menu
+            await page.waitForTimeout(2000);
+            await page.evaluate(() => {
+                const table = document.querySelector('[data-test="dashboard-panel-table"]');
+                if (!table) return;
+                const cells = table.querySelectorAll('td');
+                for (const cell of cells) {
+                    if (cell.offsetParent !== null && cell.textContent.trim()) {
+                        cell.click();
+                        return;
+                    }
+                }
+            });
+            await page.waitForTimeout(1500);
+
+            // Step 5: Verify the crosslink-drilldown-menu appears with the cross-link
+            const drilldownMenu = page.locator('.crosslink-drilldown-menu');
+            const menuVisible = await drilldownMenu.isVisible().catch(() => false);
+
+            expect(menuVisible, 'Drilldown menu should appear after clicking table cell').toBe(true);
+            testLogger.info('Drilldown menu is visible');
+
+            const crossLinkMenuItem = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkName });
+            const crossLinkMenuVisible = await crossLinkMenuItem.isVisible().catch(() => false);
+
+            expect(crossLinkMenuVisible, `Cross-link "${crossLinkName}" should be visible in drilldown menu`).toBe(true);
+            testLogger.info('Cross-link menu item found in dashboard drilldown');
+
+            testLogger.info('PASSED: Single stream cross-link visible in dashboard table panel drilldown');
+        } finally {
+            await page.evaluate(() => {
+                if (window.__originalOpen) window.open = window.__originalOpen;
+                delete window.__capturedCrossLinkUrl;
+                delete window.__originalOpen;
+            });
+
+            // Cleanup: delete the test dashboard
+            try {
+                await pm.dashboardCreate.backToDashboardList();
+                await page.waitForTimeout(1000);
+                await pm.dashboardCreate.searchDashboard(dashboardName);
+                await page.waitForTimeout(1000);
+                await pm.dashboardCreate.deleteDashboard();
+                await page.waitForTimeout(1000);
+                testLogger.info('Test dashboard deleted');
+            } catch (e) {
+                testLogger.warn('Dashboard cleanup failed', { error: e.message });
+            }
+        }
+    });
+
+    // P1: Dashboard table panel with UNION ALL SQL + Dynamic Columns — cross-links from both streams
+    test("should show cross-links from both streams in dashboard table panel with UNION ALL SQL", {
+        tag: ['@crossLinking', '@multiStream', '@dashboard', '@join', '@functional', '@P1', '@all']
+    }, async ({ page }) => {
+        testLogger.info('Testing multi-stream cross-links in dashboard table panel with UNION ALL SQL');
+
+        const crossLinkNameA = `CL-DashA-${Date.now()}`;
+        const crossLinkNameB = `CL-DashB-${Date.now()}`;
+
+        // Step 1: Set up cross-links on both streams
+        const featureEnabledA = await setupStreamCrossLink(page, pm, STREAM_A, {
+            name: crossLinkNameA,
+            url: 'https://dash-union-a.example.com/${field.__value}',
+            fields: ['kubernetes_container_name']
+        });
+        if (!featureEnabledA) {
+            test.skip(true, 'Cross-linking feature not enabled');
+        }
+
+        const featureEnabledB = await setupStreamCrossLink(page, pm, STREAM_B, {
+            name: crossLinkNameB,
+            url: 'https://dash-union-b.example.com/${field.__value}',
+            fields: ['kubernetes_container_name']
+        });
+        if (!featureEnabledB) {
+            test.skip(true, 'Cross-linking feature not enabled on second stream');
+        }
+
+        testLogger.info('Both stream cross-links configured for dashboard UNION test', { crossLinkNameA, crossLinkNameB });
+
+        // Step 2: Create a dashboard with a table panel using custom UNION ALL SQL
+        const dashboardName = `CL-Union-Dash-${Date.now()}`;
+        const orgId = process.env["ORGNAME"] || 'default';
+        await page.goto(`${process.env["ZO_BASE_URL"] || 'http://localhost:5080'}/web/dashboards?org_identifier=${orgId}`);
+        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        await page.waitForTimeout(2000);
+
+        await pm.dashboardCreate.createDashboard(dashboardName);
+        await pm.dashboardCreate.addPanel();
+        await pm.chartTypeSelector.selectChartType("table");
+        await pm.dashboardPanelActions.addPanelName("CrossLink UNION Panel");
+
+        // Open config sidebar and enable "Allow Dynamic Columns"
+        await pm.dashboardPanelConfigs.openConfigPanel();
+        await pm.dashboardPanelConfigs.selectDynamicColumns();
+        await page.waitForTimeout(500);
+        testLogger.info('Allow Dynamic Columns enabled');
+
+        // Switch to Custom SQL mode and enter UNION ALL query
+        await page.locator('[data-test="dashboard-sql-query-type"]').click();
+        await page.locator('[data-test="dashboard-custom-query-type"]').click();
+        await page.waitForTimeout(500);
+
+        const unionQuery = `SELECT * FROM "${STREAM_A}" UNION ALL BY NAME SELECT * FROM "${STREAM_B}" LIMIT 100`;
+        await pm.chartTypeSelector.enterCustomSQL(unionQuery);
+        await page.waitForTimeout(500);
+        testLogger.info('UNION ALL dashboard query entered', { query: unionQuery });
+
+        // Apply query to execute and render the table
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await page.waitForTimeout(5000);
+
+        // Save the panel
+        await pm.dashboardPanelActions.savePanel();
+        await page.waitForTimeout(3000);
+
+        testLogger.info('Dashboard with UNION ALL table panel created');
+
+        // Step 3: Wait for the table panel to render with data in dashboard view
+        const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
+        await tablePanel.waitFor({ state: 'visible', timeout: 15000 });
+
+        await page.waitForFunction(() => {
+            const table = document.querySelector('[data-test="dashboard-panel-table"]');
+            if (!table) return false;
+            const cells = table.querySelectorAll('td');
+            return Array.from(cells).some(cell => cell.offsetParent !== null && cell.textContent.trim());
+        }, { timeout: 15000 });
+        testLogger.info('Table panel has data rows');
+
+        // Step 4: Intercept window.open
+        await page.evaluate(() => {
+            window.__capturedCrossLinkUrl = null;
+            window.__originalOpen = window.open;
+            window.open = (url) => {
+                window.__capturedCrossLinkUrl = url;
+                return null;
+            };
+        });
+
+        try {
+            // Step 5: Click a data cell in the table panel
+            await page.waitForTimeout(2000);
+            await page.evaluate(() => {
+                const table = document.querySelector('[data-test="dashboard-panel-table"]');
+                if (!table) return;
+                const cells = table.querySelectorAll('td');
+                for (const cell of cells) {
+                    if (cell.offsetParent !== null && cell.textContent.trim()) {
+                        cell.click();
+                        return;
+                    }
+                }
+            });
+            await page.waitForTimeout(1500);
+
+            // Step 6: Verify the crosslink-drilldown-menu appears with BOTH cross-links
+            const drilldownMenu = page.locator('.crosslink-drilldown-menu');
+            const menuVisible = await drilldownMenu.isVisible().catch(() => false);
+
+            expect(menuVisible, 'Drilldown menu should appear after clicking table cell').toBe(true);
+            testLogger.info('Drilldown menu is visible');
+
+            const crossLinkMenuItemA = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkNameA });
+            const crossLinkMenuItemB = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkNameB });
+
+            const hasA = await crossLinkMenuItemA.isVisible().catch(() => false);
+            const hasB = await crossLinkMenuItemB.isVisible().catch(() => false);
+
+            testLogger.info('Dashboard UNION ALL cross-link visibility in drilldown', { streamA: hasA, streamB: hasB });
+
+            expect(hasA, `Cross-link "${crossLinkNameA}" from ${STREAM_A} should be visible in dashboard drilldown`).toBe(true);
+            expect(hasB, `Cross-link "${crossLinkNameB}" from ${STREAM_B} should be visible in dashboard drilldown`).toBe(true);
+
+            testLogger.info('PASSED: Both streams cross-links visible in dashboard UNION ALL table panel drilldown');
+        } finally {
+            await page.evaluate(() => {
+                if (window.__originalOpen) window.open = window.__originalOpen;
+                delete window.__capturedCrossLinkUrl;
+                delete window.__originalOpen;
+            });
+
+            // Cleanup: delete the test dashboard
+            try {
+                await pm.dashboardCreate.backToDashboardList();
+                await page.waitForTimeout(1000);
+                await pm.dashboardCreate.searchDashboard(dashboardName);
+                await page.waitForTimeout(1000);
+                await pm.dashboardCreate.deleteDashboard();
+                await page.waitForTimeout(1000);
+                testLogger.info('Test dashboard deleted');
+            } catch (e) {
+                testLogger.warn('Dashboard cleanup failed', { error: e.message });
+            }
+        }
+    });
+
     // P1: Single-stream regression — cross-links still work with one stream
     test("should still show cross-links correctly with single stream (regression)", {
         tag: ['@crossLinking', '@multiStream', '@regression', '@P1', '@all']
