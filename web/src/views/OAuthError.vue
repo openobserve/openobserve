@@ -2,12 +2,12 @@
   <div class="oauth-popup-page">
     <div class="oauth-popup-content">
       <div class="oauth-icon error">✕</div>
-      <h2>Authorization Failed</h2>
+      <h2>{{ t('alert_destinations.oauth_error.title') }}</h2>
       <p v-if="reason">
-        <strong>Reason:</strong> {{ reason }}
+        <strong>{{ t('alert_destinations.oauth_error.reason') }}</strong> {{ reason }}
       </p>
-      <p>You can close this window and try again from OpenObserve.</p>
-      <p class="hint">This window will close automatically.</p>
+      <p>{{ t('alert_destinations.oauth_error.tryAgain') }}</p>
+      <p class="hint">{{ t('alert_destinations.oauth_error.autoClose') }}</p>
     </div>
   </div>
 </template>
@@ -15,6 +15,9 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const route = useRoute();
 

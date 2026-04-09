@@ -2616,7 +2616,42 @@
     "custom": "Custom",
     "separator": "Separator",
     "separator_placeholder": "Enter separator (e.g., |, \\n, \\t, space)",
-    "separator_hint": "Separator string to use between records (spaces allowed)"
+    "separator_hint": "Separator string to use between records (spaces allowed)",
+    "oauth": {
+      "revokedBanner": "This {provider} connection has been revoked or expired. Click Reconnect to restore it.",
+      "reconnectBtn": "Reconnect to {provider}",
+      "connectBtn": "Connect to {provider}",
+      "cancelledMsg": "Authorization cancelled. Click Connect to try again.",
+      "timedOutMsg": "Authorization timed out. Click Connect to try again.",
+      "channelLabel": "Channel *",
+      "channelsTruncated": "Showing first 10,000 channels",
+      "inviteNeeded": "invite needed",
+      "inviteTooltip": "Private channel — run /invite @{provider} in this channel first.",
+      "noChannelsFound": "No channels found",
+      "connectedTo": "Connected to:",
+      "disconnect": "Disconnect",
+      "sendTestMessage": "Send Test Message",
+      "testSuccess": "Test sent successfully!",
+      "testFailed": "Test failed: {error}",
+      "duplicateChannelWarning": "Channel #{channel} is already used by destination \"{destination}\". You can still save — multiple destinations can share the same channel.",
+      "saveOAuthIncomplete": "Please complete the OAuth authorization and select a channel.",
+      "saveNameRequired": "Please enter a destination name.",
+      "saving": "Saving\u2026",
+      "reconnectBadge": "⚠ Reconnect",
+      "tokenRevoked": "OAuth token revoked — click Edit to reconnect.",
+      "tokenExpired": "OAuth token expired — click Edit to reconnect."
+    },
+    "oauth_error": {
+      "title": "Authorization Failed",
+      "reason": "Reason:",
+      "tryAgain": "You can close this window and try again from OpenObserve.",
+      "autoClose": "This window will close automatically."
+    },
+    "oauth_success": {
+      "title": "Connected!",
+      "message": "Authorization successful. You can close this window and return to OpenObserve.",
+      "autoClose": "This window will close automatically."
+    }
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations",

@@ -1150,14 +1150,14 @@ const saveDestination = async () => {
   if (isPrebuiltDestination.value && oauthAvailable.value && oauthPayload.value) {
     const op = oauthPayload.value;
     if (!op.ready) {
-      q.notify({ type: 'negative', message: 'Please complete the OAuth authorization and select a channel.' });
+      q.notify({ type: 'negative', message: t('alert_destinations.oauth.saveOAuthIncomplete') });
       return;
     }
     if (!formData.value.name) {
-      q.notify({ type: 'negative', message: 'Please enter a destination name.' });
+      q.notify({ type: 'negative', message: t('alert_destinations.oauth.saveNameRequired') });
       return;
     }
-    const dismiss = q.notify({ spinner: true, message: 'Saving…', timeout: 0 });
+    const dismiss = q.notify({ spinner: true, message: t('alert_destinations.oauth.saving'), timeout: 0 });
     try {
       const payload: any = {
         name: formData.value.name,
@@ -1190,7 +1190,7 @@ const saveDestination = async () => {
       dismiss();
       emit('get:destinations');
       emit('cancel:hideform');
-      q.notify({ type: 'positive', message: 'Destination saved successfully.' });
+      q.notify({ type: 'positive', message: t('alert_destinations.saved') });
     } catch (err: any) {
       dismiss();
       q.notify({ type: 'negative', message: err.response?.data?.error || err.message });
