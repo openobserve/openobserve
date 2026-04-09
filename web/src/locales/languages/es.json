@@ -1574,7 +1574,8 @@
     "multiSqlQueryLabel": "Etiqueta de consulta",
     "multiSqlQueryLabelHint": "Nombre personalizado para esta consulta en las leyendas (p. ej., «Producción»)",
     "multiQueryWarning": "Solo se representa la consulta 1 para {chartType}",
-    "trellisNotSupportedWithMultiQuery": "El diseño de Trellis está desactivado con varias consultas. Elimine las consultas adicionales para usar Trellis."
+    "trellisNotSupportedWithMultiQuery": "El diseño de Trellis está desactivado con varias consultas. Elimine las consultas adicionales para usar Trellis.",
+    "xAliasInconsistencyWarning": "Los alias del eje X son inconsistentes en todas las consultas: algunos usan el histograma y otros no. Utilice el mismo tipo de alias en todas las consultas para obtener resultados predecibles."
   },
   "panel": {
     "header": "Panel",

@@ -1574,7 +1574,8 @@
     "multiSqlQueryLabel": "Etichetta di interrogazione",
     "multiSqlQueryLabelHint": "Nome personalizzato per questa query nelle legende (ad esempio, 'Produzione')",
     "multiQueryWarning": "Viene renderizzato solo l'interrogazione 1 per {chartType}",
-    "trellisNotSupportedWithMultiQuery": "Il layout di Trellis è disabilitato con più query. Rimuovi le query aggiuntive per utilizzare trellis."
+    "trellisNotSupportedWithMultiQuery": "Il layout di Trellis è disabilitato con più query. Rimuovi le query aggiuntive per utilizzare trellis.",
+    "xAliasInconsistencyWarning": "Gli alias dell'asse X non sono coerenti tra le query: alcuni utilizzano l'istogramma e altri no. Utilizza lo stesso tipo di alias in tutte le query per risultati prevedibili."
   },
   "panel": {
     "header": "Pannello",

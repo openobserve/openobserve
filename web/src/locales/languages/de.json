@@ -1574,7 +1574,8 @@
     "multiSqlQueryLabel": "Bezeichnung abfragen",
     "multiSqlQueryLabelHint": "Benutzerdefinierter Name für diese Abfrage in Legenden (z. B. 'Production')",
     "multiQueryWarning": "Nur Abfrage 1 wird für {chartType} gerendert",
-    "trellisNotSupportedWithMultiQuery": "Das Trellis-Layout ist bei mehreren Abfragen deaktiviert. Entfernen Sie zusätzliche Abfragen, um Trellis zu verwenden."
+    "trellisNotSupportedWithMultiQuery": "Das Trellis-Layout ist bei mehreren Abfragen deaktiviert. Entfernen Sie zusätzliche Abfragen, um Trellis zu verwenden.",
+    "xAliasInconsistencyWarning": "X-Achsen-Aliase sind bei allen Abfragen inkonsistent: Einige verwenden ein Histogramm, andere nicht. Verwenden Sie für alle Abfragen denselben Aliastyp, um vorhersehbare Ergebnisse zu erzielen."
   },
   "panel": {
     "header": "Panel",

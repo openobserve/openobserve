@@ -1574,7 +1574,8 @@
     "multiSqlQueryLabel": "查询标签",
     "multiSqlQueryLabelHint": "图例中此查询的自定义名称（例如，“生产”）",
     "multiQueryWarning": "仅为 {chartType} 呈现查询 1",
-    "trellisNotSupportedWithMultiQuery": "多次查询禁用网格布局。移除额外的查询以使用网格。"
+    "trellisNotSupportedWithMultiQuery": "多次查询禁用网格布局。移除额外的查询以使用网格。",
+    "xAliasInconsistencyWarning": "X 轴别名在不同查询之间不一致：有些使用直方图，有些不使用。在所有查询中使用相同的别名类型以获得可预测的结果。"
   },
   "panel": {
     "header": "面板",

@@ -1574,7 +1574,8 @@
     "multiSqlQueryLabel": "쿼리 라벨",
     "multiSqlQueryLabelHint": "범례로 표시된 이 쿼리의 사용자 지정 이름 (예: 'Production')",
     "multiQueryWarning": "{chartType} 에 대해서는 쿼리 1만 렌더링됩니다.",
-    "trellisNotSupportedWithMultiQuery": "다중 쿼리에서 격자 레이아웃을 사용할 수 없습니다.격자를 사용하려면 추가 쿼리를 제거하세요."
+    "trellisNotSupportedWithMultiQuery": "다중 쿼리에서 격자 레이아웃을 사용할 수 없습니다.격자를 사용하려면 추가 쿼리를 제거하세요.",
+    "xAliasInconsistencyWarning": "X축 별칭은 쿼리 간에 일치하지 않습니다. 히스토그램을 사용하는 쿼리도 있고 그렇지 않은 쿼리도 있습니다.예측 가능한 결과를 얻으려면 모든 쿼리에 동일한 별칭 유형을 사용하십시오."
   },
   "panel": {
     "header": "패널",

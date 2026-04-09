@@ -1591,7 +1591,8 @@
     "multiSqlQueryLabel": "クエリーラベル",
     "multiSqlQueryLabelHint": "このクエリの凡例でのカスタム名 (例:'Production')",
     "multiQueryWarning": "{chartType} ではクエリ 1 のみがレンダリングされます",
-    "trellisNotSupportedWithMultiQuery": "Trellis レイアウトは複数のクエリで無効になります。トレリスを使用するには余分なクエリを削除してください。"
+    "trellisNotSupportedWithMultiQuery": "Trellis レイアウトは複数のクエリで無効になります。トレリスを使用するには余分なクエリを削除してください。",
+    "xAliasInconsistencyWarning": "X 軸のエイリアスはクエリ間で一貫性がありません。ヒストグラムを使用するものと使用しないものがあります。予測可能な結果を得るには、すべてのクエリで同じエイリアスタイプを使用してください。"
   },
   "panel": {
     "header": "パネル",

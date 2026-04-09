@@ -1574,7 +1574,8 @@
     "multiSqlQueryLabel": "Sorgu Etiketi",
     "multiSqlQueryLabelHint": "Açıklamalarda bu sorgu için özel ad (örn., 'Üretim')",
     "multiQueryWarning": "{chartType} için yalnızca Sorgu 1 oluşturulur",
-    "trellisNotSupportedWithMultiQuery": "Kafes düzeni birden çok sorgu ile devre dışı bırakılır. Kafes kullanmak için ekstra sorguları kaldırın."
+    "trellisNotSupportedWithMultiQuery": "Kafes düzeni birden çok sorgu ile devre dışı bırakılır. Kafes kullanmak için ekstra sorguları kaldırın.",
+    "xAliasInconsistencyWarning": "X ekseni takma adları sorgular arasında tutarsızdır: bazıları histogram kullanır, bazıları kullanmaz. Öngörülebilir sonuçlar için tüm sorgularda aynı takma ad türünü kullanın."
   },
   "panel": {
     "header": "Panel",
