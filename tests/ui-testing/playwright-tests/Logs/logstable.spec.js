@@ -626,14 +626,9 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
         testLogger.info(`Include/Exclude icon visible: ${hasIncludeExcludeIcon}`);
         testLogger.info(`Equals icon visible: ${hasEqualsIcon}`);
 
-        // PRIMARY ASSERTION: VRL fields should NOT have include/exclude functionality
-        if (hasIncludeExcludeIcon || hasEqualsIcon) {
-          testLogger.warn('⚠ Include/Exclude icon found on VRL field - Bug #9550 may still be present');
-        }
-
-        // For now, log the finding - the fix should remove these icons
-        // The test passes if no icon is found, or we log a warning if found
-        testLogger.info('✓ VRL field icon check completed');
+        // STRONG ASSERTION: VRL fields should NOT have include/exclude functionality
+        expect(hasIncludeExcludeIcon || hasEqualsIcon, 'Bug #9550: VRL fields should not have include/exclude icon').toBe(false);
+        testLogger.info('✓ VRL field has no include/exclude icon - Bug #9550 is fixed');
       } else {
         testLogger.info('Computed field not found in field list - VRL may not have been applied');
         testLogger.info('Checking for any VRL-related fields in the table');
