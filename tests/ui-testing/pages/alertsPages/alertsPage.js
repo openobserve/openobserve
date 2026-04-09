@@ -2720,10 +2720,13 @@ export class AlertsPage {
 
     /**
      * Get Group By input field
+     * Uses stable selectors that work across different UI configurations
      * @returns {Locator}
      */
     getGroupByInput() {
-        return this.page.locator('[data-test*="group-by"] input, [data-test*="groupby"] input, .group-by-field input').first();
+        // Primary: Find input/select near "Group by" label (most reliable)
+        // Fallback: data-test attributes
+        return this.page.locator('.step-query-config div:has-text("Group by") .q-select, .step-query-config div:has-text("Group by") input, [data-test*="group-by"] input, [data-test*="groupby"] input').first();
     }
 
     /**

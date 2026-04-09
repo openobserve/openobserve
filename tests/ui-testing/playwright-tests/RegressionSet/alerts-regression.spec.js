@@ -372,40 +372,35 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Find the Group By input field using POM method with fallback selectors
     const groupByInput = await pm.alertsPage.findGroupByInputWithFallback(queryConfigSection);
-    if (groupByInput) {
-      testLogger.info('✓ Found Group By input using POM fallback method');
-    }
 
-    if (groupByInput) {
-      // Click to open dropdown/autocomplete
-      await groupByInput.click();
-      await page.waitForTimeout(500);
-      testLogger.info('✓ Clicked Group By input');
+    // STRONG ASSERTION: Group By input must be found to test Bug #10899
+    expect(groupByInput, 'Bug #10899: Group By input field must be visible').not.toBeNull();
+    testLogger.info('✓ Found Group By input using POM fallback method');
 
-      // Type characters to trigger autocomplete
-      await groupByInput.fill('k8s');
-      await page.waitForTimeout(1000);
-      testLogger.info('✓ Typed "k8s" to trigger autocomplete');
+    // Click to open dropdown/autocomplete
+    await groupByInput.click();
+    await page.waitForTimeout(500);
+    testLogger.info('✓ Clicked Group By input');
 
-      // STRONG ASSERTION: Check for autocomplete suggestions using POM
-      const suggestions = pm.alertsPage.getAutocompleteSuggestions();
-      const suggestionCount = await suggestions.count();
-      testLogger.info(`Autocomplete suggestions found: ${suggestionCount}`);
+    // Type characters to trigger autocomplete
+    await groupByInput.fill('k8s');
+    await page.waitForTimeout(1000);
+    testLogger.info('✓ Typed "k8s" to trigger autocomplete');
 
-      // PRIMARY ASSERTION: Autocomplete should show suggestions
-      expect(suggestionCount, 'Bug #10899: Group By autocomplete should show suggestions').toBeGreaterThan(0);
-      testLogger.info('✓ Autocomplete suggestions appeared - Bug #10899 is fixed');
+    // STRONG ASSERTION: Check for autocomplete suggestions using POM
+    const suggestions = pm.alertsPage.getAutocompleteSuggestions();
+    const suggestionCount = await suggestions.count();
+    testLogger.info(`Autocomplete suggestions found: ${suggestionCount}`);
 
-      // Select first suggestion to verify it's clickable
-      const firstSuggestion = suggestions.first();
-      await expect(firstSuggestion).toBeVisible({ timeout: 2000 });
-      await firstSuggestion.click();
-      testLogger.info('✓ Selected first autocomplete suggestion');
-    } else {
-      // If input not found after trying all selectors, this feature might not exist in current UI
-      testLogger.warn('Could not find Group By input field with any selector - feature may not be in current UI');
-      throw new Error('Could not find Group By input field - cannot test autocomplete');
-    }
+    // PRIMARY ASSERTION: Autocomplete should show suggestions
+    expect(suggestionCount, 'Bug #10899: Group By autocomplete should show suggestions').toBeGreaterThan(0);
+    testLogger.info('✓ Autocomplete suggestions appeared - Bug #10899 is fixed');
+
+    // Select first suggestion to verify it's clickable
+    const firstSuggestion = suggestions.first();
+    await expect(firstSuggestion).toBeVisible({ timeout: 2000 });
+    await firstSuggestion.click();
+    testLogger.info('✓ Selected first autocomplete suggestion');
 
     // Clean up
     await pm.alertsPage.clickBackButton();

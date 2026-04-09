@@ -451,66 +451,57 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await pageManager.logsPage.expectLogsSearchResultLogsTableVisible();
     testLogger.info('✓ Initial query completed, logs table visible');
 
-    // Expand a field in the sidebar to see field values
+    // STRONG ASSERTION: Bug #11041 requires testing field include/exclude behavior
+    // The level field must be visible to properly test this bug
     const levelField = pageManager.logsPage.getFieldExpandButton('level');
-    if (await levelField.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await levelField.click();
-      await page.waitForTimeout(500);
-      testLogger.info('✓ Expanded level field in sidebar');
+    await expect(levelField, 'Bug #11041: level field must be visible for include/exclude testing').toBeVisible({ timeout: 5000 });
+    await levelField.click();
+    await page.waitForTimeout(500);
+    testLogger.info('✓ Expanded level field in sidebar');
 
-      // Find and click include button for a field value
-      const includeBtn = pageManager.logsPage.getSubfieldListEqualButton('level').first();
-      if (await includeBtn.isVisible()) {
-        await includeBtn.click();
-        await page.waitForTimeout(500);
+    // Find and click include button for a field value
+    const includeBtn = pageManager.logsPage.getSubfieldListEqualButton('level').first();
+    await expect(includeBtn, 'Bug #11041: Include button must be visible').toBeVisible({ timeout: 5000 });
+    await includeBtn.click();
+    await page.waitForTimeout(500);
 
-        // Click "Include Search Term" from the menu
-        const includeMenuItem = pageManager.logsPage.getIncludeSearchTermMenuItem();
-        if (await includeMenuItem.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await includeMenuItem.click();
-          testLogger.info('✓ Added first include search term');
+    // Click "Include Search Term" from the menu
+    const includeMenuItem = pageManager.logsPage.getIncludeSearchTermMenuItem();
+    await expect(includeMenuItem, 'Bug #11041: Include menu item must be visible').toBeVisible({ timeout: 3000 });
+    await includeMenuItem.click();
+    testLogger.info('✓ Added first include search term');
 
-          // Run the query with the include filter
-          await pageManager.logsPage.clickSearchBarRefreshButton();
-          await page.waitForTimeout(2000);
+    // Run the query with the include filter
+    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await page.waitForTimeout(2000);
 
-          // BUG CHECK: The include button should now be disabled or show different state
-          // for the already-included value
-          const queryEditor = pageManager.logsPage.getQueryEditorLocator();
-          const queryText = await queryEditor.textContent();
-          testLogger.info(`Query editor contains: ${queryText}`);
+    // BUG CHECK: The include button should now be disabled or show different state
+    // for the already-included value
+    const queryEditor = pageManager.logsPage.getQueryEditorLocator();
+    const queryText = await queryEditor.textContent();
+    testLogger.info(`Query editor contains: ${queryText}`);
 
-          // Verify the include term is in the query
-          expect(queryText).toContain('level');
-          testLogger.info('✓ Include term is present in query');
+    // STRONG ASSERTION: Verify the include term is in the query
+    expect(queryText, 'Bug #11041: Query must contain level filter').toContain('level');
+    testLogger.info('✓ Include term is present in query');
 
-          // Try clicking the same include button again - it should either:
-          // 1. Be disabled, OR
-          // 2. Not add duplicate entries
-          await levelField.click().catch(() => {});
-          await page.waitForTimeout(500);
+    // Try clicking the same include button again - it should either:
+    // 1. Be disabled, OR
+    // 2. Not add duplicate entries
+    await levelField.click().catch(() => {});
+    await page.waitForTimeout(500);
 
-          // Check if we can still click the same value's include button
-          // (This tests if spamming is prevented)
-          const includeBtn2 = pageManager.logsPage.getSubfieldListEqualButton('level').first();
-          if (await includeBtn2.isVisible()) {
-            const isDisabled = await includeBtn2.isDisabled().catch(() => false);
-            testLogger.info(`Include button disabled state: ${isDisabled}`);
+    // Check if we can still click the same value's include button
+    // (This tests if spamming is prevented)
+    const includeBtn2 = pageManager.logsPage.getSubfieldListEqualButton('level').first();
+    if (await includeBtn2.isVisible()) {
+      const isDisabled = await includeBtn2.isDisabled().catch(() => false);
+      testLogger.info(`Include button disabled state: ${isDisabled}`);
 
-            // The button should ideally be disabled for already-included values
-            // If not disabled, at least verify no duplicates are added
-            if (!isDisabled) {
-              testLogger.warn('⚠ Include button not disabled for already-included value - Bug #11041 behavior');
-            }
-          }
-        }
-      }
-    } else {
-      testLogger.info('Level field not found, trying kubernetes_namespace_name');
-      const nsField = pageManager.logsPage.getFieldExpandButton('kubernetes_namespace_name');
-      if (await nsField.isVisible()) {
-        await nsField.click();
-        testLogger.info('✓ Expanded kubernetes_namespace_name field');
+      // The button should ideally be disabled for already-included values
+      // If not disabled, at least verify no duplicates are added
+      if (!isDisabled) {
+        testLogger.warn('⚠ Include button not disabled for already-included value - Bug #11041 behavior');
       }
     }
 
