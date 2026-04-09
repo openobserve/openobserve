@@ -2727,6 +2727,40 @@ export class AlertsPage {
     }
 
     /**
+     * Get aggregation toggle button within query config section
+     * @param {Locator} queryConfigSection - The query config section locator
+     * @returns {Locator}
+     */
+    getAggregationToggle(queryConfigSection) {
+        return queryConfigSection.locator('.q-toggle').first();
+    }
+
+    /**
+     * Find Group By input field using fallback selectors
+     * Tries multiple selectors to find the Group By input, useful when UI structure varies
+     * @param {Locator} queryConfigSection - The query config section locator
+     * @returns {Promise<Locator|null>} The found input element or null
+     */
+    async findGroupByInputWithFallback(queryConfigSection) {
+        const possibleSelectors = [
+            'div:has-text("Group by") input',
+            'div:has-text("Group by") .q-select',
+            '.group-by-input',
+            '[data-test*="group-by"] input',
+            '[data-test*="group-by"] .q-select'
+        ];
+
+        for (const selector of possibleSelectors) {
+            const element = queryConfigSection.locator(selector).first();
+            if (await element.isVisible({ timeout: 1000 }).catch(() => false)) {
+                return element;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Get "Alert If Any Groups" text element (Scheduled features test)
      * @returns {Locator}
      */

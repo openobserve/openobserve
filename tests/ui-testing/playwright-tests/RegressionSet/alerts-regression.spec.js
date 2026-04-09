@@ -359,7 +359,7 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Enable aggregation to show Group By section
     const queryConfigSection = pm.alertsPage.getStepQueryConfigSection();
-    const aggregationToggle = queryConfigSection.locator('.q-toggle').first();
+    const aggregationToggle = pm.alertsPage.getAggregationToggle(queryConfigSection);
     await aggregationToggle.waitFor({ state: 'visible', timeout: 5000 });
     await expect(aggregationToggle).toBeEnabled({ timeout: 3000 });
     await aggregationToggle.click();
@@ -370,24 +370,10 @@ test.describe("Alerts Regression Bugs", () => {
     await expect(groupByLabel).toBeVisible({ timeout: 5000 });
     testLogger.info('✓ Group By section visible');
 
-    // Find the Group By input field - try multiple selectors
-    // Try to find Group By input using various selectors
-    const possibleSelectors = [
-      'div:has-text("Group by") input',
-      'div:has-text("Group by") .q-select',
-      '.group-by-input',
-      '[data-test*="group-by"] input',
-      '[data-test*="group-by"] .q-select'
-    ];
-
-    let groupByInput = null;
-    for (const selector of possibleSelectors) {
-      const element = queryConfigSection.locator(selector).first();
-      if (await element.isVisible({ timeout: 1000 }).catch(() => false)) {
-        groupByInput = element;
-        testLogger.info(`✓ Found Group By input using selector: ${selector}`);
-        break;
-      }
+    // Find the Group By input field using POM method with fallback selectors
+    const groupByInput = await pm.alertsPage.findGroupByInputWithFallback(queryConfigSection);
+    if (groupByInput) {
+      testLogger.info('✓ Found Group By input using POM fallback method');
     }
 
     if (groupByInput) {

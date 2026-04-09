@@ -1975,10 +1975,13 @@ export class TracesPage {
   /**
    * Get selected/active stream indicator
    * For traces, checks if stream dropdown has a selected value
+   * Uses stable selectors that don't rely on Quasar internal classes
    * @returns {Locator}
    */
   getSelectedStreamToggle() {
-    return this.page.locator('[data-test="log-search-index-list-select-stream"] .q-field__native, [data-test="log-search-index-list-select-stream"][aria-label]:not([aria-label=""])');
+    // Look for selected stream toggles or chips (indicated by 'truthy' class or stream-chip data-test)
+    // Also check for stream selector with non-empty aria-label as fallback
+    return this.page.locator('[data-test*="stream-toggle-"][class*="truthy"], [data-test*="stream-chip"], [data-test="log-search-index-list-select-stream"][aria-label]:not([aria-label=""])');
   }
 
 }
