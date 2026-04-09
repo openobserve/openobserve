@@ -1359,6 +1359,7 @@
     "multiSqlQueryLabel": "Query Label",
     "multiSqlQueryLabelHint": "Custom name for this query in legends (e.g., 'Production')",
     "multiQueryWarning": "Only Query 1 is rendered for {chartType}",
+    "xAliasInconsistencyWarning": "X-axis aliases are inconsistent across queries: some use histogram and some do not. Use the same alias type across all queries for predictable results.",
     "trellisNotSupportedWithMultiQuery": "Trellis layout is disabled with multiple queries. Remove extra queries to use trellis.",
     "vrlExtractionTooltip": "To use extracted VRL fields in the chart, write a VRL function and click on the Apply button. The fields will be extracted, allowing you to use them to build the chart.",
     "errorFetchingFunctions": "Error while fetching functions",

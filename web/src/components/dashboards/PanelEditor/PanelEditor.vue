@@ -213,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : null
                       "
                       :viewOnly="false"
+                      :xAliasInconsistencyWarning="hasInconsistentXAlias"
                     />
 
                     <!-- Add to Dashboard button (metrics/logs/build mode) -->
@@ -818,6 +819,25 @@ const showCustomChartTypeSelector = ref(false);
 // ============================================================================
 // Computed Properties
 // ============================================================================
+
+// X-axis alias consistency warning for multi-SQL panels
+const hasInconsistentXAlias = computed(() => {
+  const activeQueries = dashboardPanelData.data.queries.filter(
+    (_: any, idx: number) =>
+      !dashboardPanelData.layout.hiddenQueries.includes(idx),
+  );
+  const queriesWithX = activeQueries.filter(
+    (q: any) => q.fields.x && q.fields.x.length > 0,
+  );
+  if (queriesWithX.length < 2) return false;
+  const hasHistogram = queriesWithX.some((q: any) =>
+    q.fields.x.some((f: any) => f.functionName === "histogram"),
+  );
+  const hasNonHistogram = queriesWithX.some((q: any) =>
+    q.fields.x.some((f: any) => f.functionName !== "histogram"),
+  );
+  return hasHistogram && hasNonHistogram;
+});
 
 // Content height based on page type
 const contentHeight = computed(() => {

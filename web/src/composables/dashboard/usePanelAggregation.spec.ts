@@ -97,11 +97,16 @@ describe("usePanelAggregation", () => {
         expect(panelData.data.queries[0].fields.breakdown).toHaveLength(0);
       });
 
-      it("truncates to first query for sql queryType", () => {
-        panelData.data.queries.push(makeDefaultQuery());
+      it("resets y functionName and clears breakdown on all queries in sql multi-query mode", () => {
+        const q2 = makeDefaultQuery();
+        q2.fields.y = [{ functionName: "sum", args: [{ type: "field" }] }];
+        q2.fields.breakdown = [{ alias: "bd1" }];
+        panelData.data.queries.push(q2);
         const { resetAggregationFunction } = makeAggregation(panelData);
         resetAggregationFunction();
-        expect(panelData.data.queries).toHaveLength(1);
+        expect(panelData.data.queries).toHaveLength(2);
+        expect(panelData.data.queries[1].fields.y[0].functionName).toBeNull();
+        expect(panelData.data.queries[1].fields.breakdown).toHaveLength(0);
       });
 
       it("clears htmlContent and markdownContent", () => {
@@ -192,6 +197,18 @@ describe("usePanelAggregation", () => {
           resetAggregationFunction();
           expect(panelData.data.queries[0].fields.y[0].functionName).toBe("sum");
         });
+
+        it("resets y functionName and clears z on all queries in sql multi-query mode", () => {
+          const q2 = makeDefaultQuery();
+          q2.fields.y = [{ functionName: null, isDerived: false, args: [{ type: "field" }] }];
+          q2.fields.z = [{ alias: "z1" }];
+          panelData.data.queries.push(q2);
+          const { resetAggregationFunction } = makeAggregation(panelData);
+          resetAggregationFunction();
+          expect(panelData.data.queries).toHaveLength(2);
+          expect(panelData.data.queries[1].fields.y[0].functionName).toBe("count");
+          expect(panelData.data.queries[1].fields.z).toHaveLength(0);
+        });
       },
     );
 
@@ -221,6 +238,18 @@ describe("usePanelAggregation", () => {
         expect(panelData.data.queries[0].fields.z).toHaveLength(0);
         // breakdown is intentionally preserved for table type (used in pivot table mode)
         expect(panelData.data.queries[0].fields.breakdown).toHaveLength(1);
+      });
+
+      it("resets y functionName and clears z on all queries in sql multi-query mode", () => {
+        const q2 = makeDefaultQuery();
+        q2.fields.y = [{ functionName: null, isDerived: false, args: [{ type: "field" }] }];
+        q2.fields.z = [{ alias: "z1" }];
+        panelData.data.queries.push(q2);
+        const { resetAggregationFunction } = makeAggregation(panelData);
+        resetAggregationFunction();
+        expect(panelData.data.queries).toHaveLength(2);
+        expect(panelData.data.queries[1].fields.y[0].functionName).toBe("count");
+        expect(panelData.data.queries[1].fields.z).toHaveLength(0);
       });
     });
 
@@ -262,6 +291,20 @@ describe("usePanelAggregation", () => {
         expect(panelData.data.queries[0].fields.x).toHaveLength(1);
         expect(panelData.data.queries[0].fields.y).toHaveLength(1);
       });
+
+      it("resets y functionName, clears z and breakdown on all queries in sql multi-query mode", () => {
+        const q2 = makeDefaultQuery();
+        q2.fields.y = [{ functionName: null, isDerived: false, args: [{ type: "field" }] }];
+        q2.fields.z = [{ alias: "z1" }];
+        q2.fields.breakdown = [{ alias: "bd1" }];
+        panelData.data.queries.push(q2);
+        const { resetAggregationFunction } = makeAggregation(panelData);
+        resetAggregationFunction();
+        expect(panelData.data.queries).toHaveLength(2);
+        expect(panelData.data.queries[1].fields.y[0].functionName).toBe("count");
+        expect(panelData.data.queries[1].fields.z).toHaveLength(0);
+        expect(panelData.data.queries[1].fields.breakdown).toHaveLength(0);
+      });
     });
 
     // ── metric ─────────────────────────────────────────────────────────────
@@ -288,6 +331,20 @@ describe("usePanelAggregation", () => {
         const { resetAggregationFunction } = makeAggregation(panelData);
         resetAggregationFunction();
         expect(panelData.data.queries[0].fields.y).toHaveLength(1);
+      });
+
+      it("resets y functionName, clears z and breakdown on all queries in sql multi-query mode", () => {
+        const q2 = makeDefaultQuery();
+        q2.fields.y = [{ functionName: null, isDerived: false, args: [{ type: "field" }] }];
+        q2.fields.z = [{ alias: "z1" }];
+        q2.fields.breakdown = [{ alias: "bd1" }];
+        panelData.data.queries.push(q2);
+        const { resetAggregationFunction } = makeAggregation(panelData);
+        resetAggregationFunction();
+        expect(panelData.data.queries).toHaveLength(2);
+        expect(panelData.data.queries[1].fields.y[0].functionName).toBe("count");
+        expect(panelData.data.queries[1].fields.z).toHaveLength(0);
+        expect(panelData.data.queries[1].fields.breakdown).toHaveLength(0);
       });
     });
 
