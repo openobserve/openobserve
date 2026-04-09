@@ -38,7 +38,6 @@ import config from "@/aws-exports";
 export const useSearchBar = () => {
   const { getStream, isStreamExists, isStreamFetched } = useStreams();
 
-
   let { searchObj, searchObjDebug, notificationMsg } = searchState();
 
   const store = useStore();
@@ -349,10 +348,10 @@ export const useSearchBar = () => {
       // Replace field list in query
       const fieldList =
         searchObj.meta.quickMode &&
-          searchObj.data.stream.interestingFieldList.length > 0
+        searchObj.data.stream.interestingFieldList.length > 0
           ? searchObj.data.stream.interestingFieldList
-            .map((field: string) => quoteSqlIdentifierIfNeeded(field))
-            .join(",")
+              .map((field: string) => quoteSqlIdentifierIfNeeded(field))
+              .join(",")
           : "*";
 
       const finalQuery = query.replace(/\[FIELD_LIST\]/g, fieldList);
@@ -834,7 +833,7 @@ export const useSearchBar = () => {
   const cancelQuery = async (): Promise<boolean> => {
     return new Promise((resolve, reject) => {
       try {
-        // only call cancel query api if it is enterprise 
+        // only call cancel query api if it is enterprise
         // otherwise resolve and return immediately
         if (config.isEnterprise !== "true") {
           resolve(true);
