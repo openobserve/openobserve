@@ -177,9 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </q-tabs>
 
-            <!-- Workload fields dropdown -->
+            <!-- Resource tabs dropdown — shows/hides individual OTEL resource tabs -->
             <q-btn
-              v-if="resolvedWorkloadFields.length > 0"
+              v-if="availableResourceTabConfigs.length > 0"
               flat
               dense
               round
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:mb-[0.2rem]"
               data-test="service-graph-node-panel-workload-fields-btn"
             >
-              <q-tooltip>Workload Fields</q-tooltip>
+              <q-tooltip>Resource Tabs</q-tooltip>
               <q-menu anchor="bottom right" self="top right" :offset="[0, 4]">
                 <q-list
                   dense
@@ -196,28 +196,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="service-graph-node-panel-workload-fields-menu"
                 >
                   <q-item-label header class="tw:text-xs tw:pb-1 tw:pt-2">
-                    Resource Fields
+                    Resource Tabs
                   </q-item-label>
                   <q-item
-                    v-for="wf in resolvedWorkloadFields"
-                    :key="wf.alias.id"
+                    v-for="cfg in availableResourceTabConfigs"
+                    :key="cfg.id"
                     tag="label"
                     clickable
-                    :data-test="`service-graph-node-panel-workload-field-${wf.alias.id}`"
+                    :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
                   >
                     <q-item-section side>
                       <q-checkbox
                         v-model="selectedWorkloadFields"
-                        :val="wf.alias.id"
+                        :val="cfg.id"
                         size="sm"
                       />
                     </q-item-section>
                     <q-item-section>
                       <q-item-label class="tw:text-xs">
-                        {{ wf.alias.display }}
+                        {{ cfg.label }}
                       </q-item-label>
                       <q-item-label caption class="tw:text-[0.65rem]">
-                        {{ wf.field }}
+                        {{ cfg.groupField }}
                       </q-item-label>
                     </q-item-section>
                   </q-item>
@@ -648,7 +648,7 @@ interface ResourceRow {
 }
 
 const RESOURCE_TAB_CONFIGS: ResourceTabConfig[] = [
-  // Kubernetes (k8s.*, also covers EKS / GKE / AKS)
+  // ── Kubernetes (k8s.*) — also covers EKS / GKE / AKS ───────────────────
   {
     id: "pods",
     label: "Pods",
@@ -665,7 +665,122 @@ const RESOURCE_TAB_CONFIGS: ResourceTabConfig[] = [
     colLabel: "Node",
     colId: "node",
   },
-  // Bare metal / VMs (host.*) — EC2, GCP Compute Engine, Azure VM, Hetzner …
+  {
+    id: "k8s-clusters",
+    label: "Clusters",
+    triggerFields: ["service_k8s_cluster_name"],
+    groupField: "service_k8s_cluster_name",
+    colLabel: "Cluster",
+    colId: "cluster",
+  },
+  {
+    id: "k8s-namespaces",
+    label: "Namespaces",
+    triggerFields: ["service_k8s_namespace_name"],
+    groupField: "service_k8s_namespace_name",
+    colLabel: "Namespace",
+    colId: "namespace",
+  },
+  {
+    id: "k8s-deployments",
+    label: "Deployments",
+    triggerFields: ["service_k8s_deployment_name"],
+    groupField: "service_k8s_deployment_name",
+    colLabel: "Deployment",
+    colId: "deployment",
+  },
+  {
+    id: "k8s-statefulsets",
+    label: "StatefulSets",
+    triggerFields: ["service_k8s_statefulset_name"],
+    groupField: "service_k8s_statefulset_name",
+    colLabel: "StatefulSet",
+    colId: "statefulset",
+  },
+  {
+    id: "k8s-daemonsets",
+    label: "DaemonSets",
+    triggerFields: ["service_k8s_daemonset_name"],
+    groupField: "service_k8s_daemonset_name",
+    colLabel: "DaemonSet",
+    colId: "daemonset",
+  },
+  {
+    id: "k8s-jobs",
+    label: "Jobs",
+    triggerFields: ["service_k8s_job_name"],
+    groupField: "service_k8s_job_name",
+    colLabel: "Job",
+    colId: "job",
+  },
+  {
+    id: "k8s-cronjobs",
+    label: "CronJobs",
+    triggerFields: ["service_k8s_cronjob_name"],
+    groupField: "service_k8s_cronjob_name",
+    colLabel: "CronJob",
+    colId: "cronjob",
+  },
+  {
+    id: "k8s-replicasets",
+    label: "ReplicaSets",
+    triggerFields: ["service_k8s_replicaset_name"],
+    groupField: "service_k8s_replicaset_name",
+    colLabel: "ReplicaSet",
+    colId: "replicaset",
+  },
+  {
+    id: "k8s-containers",
+    label: "K8s Containers",
+    triggerFields: ["service_k8s_container_name"],
+    groupField: "service_k8s_container_name",
+    colLabel: "Container",
+    colId: "k8scontainer",
+  },
+
+  // ── Cloud Generic (cloud.*) — any provider ──────────────────────────────
+  {
+    id: "cloud-providers",
+    label: "Cloud Providers",
+    triggerFields: ["service_cloud_provider"],
+    groupField: "service_cloud_provider",
+    colLabel: "Provider",
+    colId: "provider",
+  },
+  {
+    id: "cloud-platforms",
+    label: "Cloud Platforms",
+    triggerFields: ["service_cloud_platform"],
+    groupField: "service_cloud_platform",
+    colLabel: "Platform",
+    colId: "platform",
+  },
+  {
+    id: "cloud-regions",
+    label: "Cloud Regions",
+    triggerFields: ["service_cloud_region"],
+    groupField: "service_cloud_region",
+    colLabel: "Region",
+    colId: "region",
+  },
+  {
+    id: "cloud-azs",
+    label: "Availability Zones",
+    triggerFields: ["service_cloud_availability_zone"],
+    groupField: "service_cloud_availability_zone",
+    colLabel: "Zone",
+    colId: "zone",
+  },
+  {
+    id: "cloud-accounts",
+    label: "Cloud Accounts",
+    triggerFields: ["service_cloud_account_id"],
+    groupField: "service_cloud_account_id",
+    colLabel: "Account",
+    colId: "account",
+  },
+
+  // ── Hosts — bare metal, EC2, GCP Compute Engine, Azure VM, Hetzner … ───
   {
     id: "hosts",
     label: "Hosts",
@@ -675,7 +790,8 @@ const RESOURCE_TAB_CONFIGS: ResourceTabConfig[] = [
     colLabel: "Host",
     colId: "host",
   },
-  // Standalone containers / Docker / ECS Fargate containers (container.*)
+
+  // ── Containers — Docker / standalone / ECS Fargate (container.*) ────────
   {
     id: "containers",
     label: "Containers",
@@ -685,7 +801,8 @@ const RESOURCE_TAB_CONFIGS: ResourceTabConfig[] = [
     colLabel: "Container",
     colId: "container",
   },
-  // Serverless / FaaS (faas.*) — AWS Lambda, GCP Cloud Run/Functions, Azure Functions
+
+  // ── FaaS / Serverless (faas.*) — Lambda, Cloud Run, Azure Functions … ──
   {
     id: "functions",
     label: "Functions",
@@ -694,7 +811,16 @@ const RESOURCE_TAB_CONFIGS: ResourceTabConfig[] = [
     colLabel: "Function",
     colId: "function",
   },
-  // AWS ECS tasks (aws.ecs.*)
+  {
+    id: "faas-versions",
+    label: "Function Versions",
+    triggerFields: ["service_faas_version"],
+    groupField: "service_faas_version",
+    colLabel: "Function Version",
+    colId: "faasversion",
+  },
+
+  // ── AWS ECS (aws.ecs.*) ──────────────────────────────────────────────────
   {
     id: "ecs-tasks",
     label: "ECS Tasks",
@@ -702,6 +828,32 @@ const RESOURCE_TAB_CONFIGS: ResourceTabConfig[] = [
     groupField: "service_aws_ecs_task_arn",
     colLabel: "ECS Task",
     colId: "task",
+  },
+  {
+    id: "aws-ecs-clusters",
+    label: "ECS Clusters",
+    triggerFields: ["service_aws_ecs_cluster_arn"],
+    groupField: "service_aws_ecs_cluster_arn",
+    colLabel: "ECS Cluster",
+    colId: "ecscluster",
+  },
+  {
+    id: "aws-ecs-task-families",
+    label: "ECS Task Families",
+    triggerFields: ["service_aws_ecs_task_family"],
+    groupField: "service_aws_ecs_task_family",
+    colLabel: "ECS Task Family",
+    colId: "ecstaskfamily",
+  },
+
+  // ── Process / Runtime ────────────────────────────────────────────────────
+  {
+    id: "process-runtimes",
+    label: "Runtimes",
+    triggerFields: ["service_process_runtime_name"],
+    groupField: "service_process_runtime_name",
+    colLabel: "Runtime",
+    colId: "runtime",
   },
 ];
 
@@ -1185,8 +1337,14 @@ export default defineComponent({
     // Dynamic resource tabs state (replaces per-resource recentNodes/recentPods/loadingNodes/loadingPods)
     const resourceTabData = ref<Record<string, ResourceRow[]>>({});
     const resourceTabLoading = ref<Record<string, boolean>>({});
-    // Which RESOURCE_TAB_CONFIGS are active for the current trace stream (populated by resolveWorkloadFields)
-    const activeResourceTabConfigs = ref<ResourceTabConfig[]>([]);
+    // All RESOURCE_TAB_CONFIGS that exist in the current trace stream schema
+    const availableResourceTabConfigs = ref<ResourceTabConfig[]>([]);
+    // Tabs actually shown = those selected by the user in the dropdown (default: all)
+    const activeResourceTabConfigs = computed(() =>
+      availableResourceTabConfigs.value.filter((c) =>
+        selectedWorkloadFields.value.includes(c.id),
+      ),
+    );
 
     // Workload Field Discovery State
     const resolvedWorkloadFields = ref<{ field: string; alias: FieldAlias }[]>(
@@ -1682,7 +1840,7 @@ export default defineComponent({
 
         // Step 4: Detect which OTEL resource tab configs are present in the schema
         const schemaFieldSet = new Set(schemaFields.map((f) => f.name));
-        activeResourceTabConfigs.value = RESOURCE_TAB_CONFIGS.filter((cfg) =>
+        const detected = RESOURCE_TAB_CONFIGS.filter((cfg) =>
           cfg.triggerFields.some((f) => schemaFieldSet.has(f)),
         ).map((cfg) => {
           // Resolve which groupField is actually present in the schema
@@ -1696,13 +1854,18 @@ export default defineComponent({
               : cfg.groupField;
           return { ...cfg, groupField: resolvedGroupField };
         });
+
+        availableResourceTabConfigs.value = detected;
+        // Default: select all available tabs (user can deselect via the dropdown)
+        selectedWorkloadFields.value = detected.map((c) => c.id);
       } catch (err) {
         console.error(
           "[ServiceGraphNodeSidePanel] Failed to resolve workload fields:",
           err,
         );
         resolvedWorkloadFields.value = [];
-        activeResourceTabConfigs.value = [];
+        availableResourceTabConfigs.value = [];
+        selectedWorkloadFields.value = [];
       }
     };
 
@@ -1764,7 +1927,7 @@ export default defineComponent({
       () => {
         resourceTabData.value = {};
         resourceTabLoading.value = {};
-        activeResourceTabConfigs.value = [];
+        availableResourceTabConfigs.value = [];
         resolvedWorkloadFields.value = [];
         selectedWorkloadFields.value = [];
         metricsCorrelationData.value = null;
@@ -1886,6 +2049,7 @@ export default defineComponent({
       operationsTableRows,
       navigateToTraces,
       // Dynamic resource tabs (OTEL platforms)
+      availableResourceTabConfigs,
       activeResourceTabConfigs,
       resourceTabData,
       resourceTabLoading,
