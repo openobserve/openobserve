@@ -2273,7 +2273,42 @@
     "custom": "Personalizado",
     "separator": "Separador",
     "separator_placeholder": "Introduzca un separador (p. ej., |,\\n,\\ t, espacio)",
-    "separator_hint": "Cadena separadora para usar entre registros (se permiten espacios)"
+    "separator_hint": "Cadena separadora para usar entre registros (se permiten espacios)",
+    "oauth": {
+      "revokedBanner": "Esta conexión de {provider} se ha revocado o caducado. Haz clic en Reconectar para restaurarla.",
+      "reconnectBtn": "Vuelva a conectarse a {provider}",
+      "connectBtn": "Conéctese a {provider}",
+      "cancelledMsg": "Autorización cancelada. Haz clic en Conectar para volver a intentarlo.",
+      "timedOutMsg": "Se agotó el tiempo de espera de la autorización. Haz clic en Conectar para volver a intentarlo.",
+      "channelLabel": "Canal *",
+      "channelsTruncated": "Mostrar los primeros 10 000 canales",
+      "inviteNeeded": "se necesita invitación",
+      "inviteTooltip": "Canal privado: ejecuta /invite @ {provider} primero en este canal.",
+      "noChannelsFound": "No se ha encontrado ningún canal",
+      "connectedTo": "Conectado a:",
+      "disconnect": "Desconectar",
+      "sendTestMessage": "Enviar mensaje de prueba",
+      "testSuccess": "¡La prueba se envió correctamente!",
+      "testFailed": "Fallo en la prueba: {error}",
+      "duplicateChannelWarning": "El destino «{destination}» ya está utilizando el canal # {channel}. Aún puedes guardar, ya que varios destinos pueden compartir el mismo canal.",
+      "saveOAuthIncomplete": "Complete la autorización de OAuth y seleccione un canal.",
+      "saveNameRequired": "Introduce un nombre de destino.",
+      "saving": "Ahorrando...",
+      "reconnectBadge": "⚠ Vuelva a conectar",
+      "tokenRevoked": "Token de OAuth revocado: haz clic en Editar para volver a conectarte.",
+      "tokenExpired": "El token de OAuth ha caducado. Haz clic en Editar para volver a conectarte."
+    },
+    "oauth_error": {
+      "title": "Falló la autorización",
+      "reason": "Motivo:",
+      "tryAgain": "Puede cerrar esta ventana e intentarlo de nuevo desde OpenObserve.",
+      "autoClose": "Esta ventana se cerrará automáticamente."
+    },
+    "oauth_success": {
+      "title": "¡Conectado!",
+      "message": "La autorización se ha realizado correctamente. Puede cerrar esta ventana y volver a OpenObserve.",
+      "autoClose": "Esta ventana se cerrará automáticamente."
+    }
   },
   "metrics": {
     "searchMetric": "Buscar una métrica",
