@@ -185,6 +185,7 @@ jobs:
                 "dashboard-promql-suggestions.spec.js",
                 "dashboard-share-link.spec.js",
                 "crossLinking.spec.js",
+                "crossLinkMultiStream.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
