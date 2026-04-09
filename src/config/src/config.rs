@@ -555,6 +555,7 @@ pub struct Config {
     pub health_check: HealthCheck,
     pub encryption: Encryption,
     pub enrichment_table: EnrichmentTable,
+    pub oauth_destinations: OAuthDestinations,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -2304,6 +2305,29 @@ pub struct HealthCheck {
         help = "The node will be removed from consistent hash if health check failed exceed this times"
     )]
     pub failed_times: usize,
+}
+
+#[derive(Serialize, EnvConfig, Default)]
+pub struct OAuthDestinations {
+    /// Base URL of the OpenObserve instance, used to build the proxy-callback redirect URI.
+    /// e.g. "https://cloud.openobserve.ai" or "https://customer.onprem.com"
+    #[env_config(name = "O2_BASE_URL", default = "")]
+    pub base_url: String,
+
+    /// URL of the destination-proxy service.
+    /// e.g. "https://proxy.openobserve.ai"
+    #[env_config(name = "O2_OAUTH_PROXY_URL", default = "")]
+    pub oauth_proxy_url: String,
+
+    /// API key issued by the proxy for this OO instance (bcrypt-hashed on the proxy side).
+    #[env_config(name = "O2_OAUTH_PROXY_API_KEY", default = "")]
+    pub oauth_proxy_api_key: String,
+
+    // Webhook signing secrets — used to verify revocation events that providers
+    // send directly to OO (e.g. Slack app_uninstalled webhooks).
+    // These are NOT client secrets; they are safe to hold in OO.
+    #[env_config(name = "O2_SLACK_SIGNING_SECRET", default = "")]
+    pub slack_signing_secret: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]

@@ -117,18 +117,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
+          <!-- OAuth form — shown when server-side OAuth is configured for this provider -->
+          <!-- v-show (not v-if) so the component stays mounted and keeps state after popup closes -->
+          <OAuthConnectionForm
+            v-show="formData.destination_type && formData.destination_type !== 'custom' && oauthAvailable"
+            :key="`oauth-${formData.destination_type}`"
+            :provider="(formData.destination_type as any)"
+            :display-name="oauthDisplayName"
+            :existing-connection="existingOAuthConnection"
+            data-test="oauth-form"
+            @update="oauthPayload = $event"
+          />
+          <!-- Legacy webhook form — shown when OAuth is NOT configured (self-hosted BYOA) -->
           <PrebuiltDestinationForm
-            v-if="formData.destination_type && formData.destination_type !== 'custom'"
+            v-if="formData.destination_type && formData.destination_type !== 'custom' && !oauthAvailable"
             :key="`${formData.destination_type}-${isUpdatingDestination}`"
             v-model="prebuiltCredentials"
             :destination-type="formData.destination_type"
             :hide-actions="true"
             data-test="prebuilt-form"
           />
-          <div v-else-if="isUpdatingDestination" class="q-pa-md text-center">
-            <q-spinner color="primary" size="40px" />
-            <div class="q-mt-sm text-grey-7">Loading destination data...</div>
-          </div>
 
           <!-- Additional Settings for Prebuilt Destinations -->
           <div class="col-12 q-mt-md">
@@ -465,8 +473,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div class="flex justify-between q-px-lg q-py-lg full-width">
-      <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
-      <div v-if="isAlerts && (isPrebuiltDestination || (isUpdatingDestination && formData.destination_type !== 'custom'))" class="flex items-center tw:gap-2">
+      <!-- Left side: Test and Preview buttons (only for non-OAuth prebuilt destinations) -->
+      <div v-if="isAlerts && !oauthAvailable && (isPrebuiltDestination || (isUpdatingDestination && formData.destination_type !== 'custom'))" class="flex items-center tw:gap-2">
         <q-btn
           data-test="destination-preview-button"
           :label="t('alert_destinations.preview')"
@@ -554,6 +562,8 @@ import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import DestinationTestResult from "./DestinationTestResult.vue";
 import DestinationPreview from "./DestinationPreview.vue";
+import OAuthConnectionForm from "./OAuthConnectionForm.vue";
+import oauthService from "@/services/oauth_destinations";
 
 const props = defineProps({
   templates: {
@@ -620,6 +630,42 @@ const prebuiltCredentials = ref<Record<string, any>>({});
 const destinationSearchQuery = ref('');
 const showPreviewModal = ref(false);
 const previewContent = ref('');
+
+// OAuth destinations state
+// Set to true when the currently-selected provider has OAuth configured server-side
+const oauthAvailable = ref(false);
+const oauthDisplayName = ref('');
+// Payload emitted by OAuthConnectionForm; drives the save payload
+const oauthPayload = ref<{
+  state?: string;
+  connection_id: string;
+  team_id?: string;
+  team_name?: string;
+  channel_id?: string;
+  channel_name?: string;
+  status: string;
+  ready: boolean;
+} | null>(null);
+
+// Providers that support OAuth (must match OAuthProvider enum on the backend)
+const OAUTH_CAPABLE_PROVIDERS = ['slack', 'discord', 'pagerduty', 'msteams', 'servicenow'];
+
+// Parse the saved OAuthConnection from destination metadata for edit mode.
+// The backend serializes it as metadata["oauth_connection"] (JSON string)
+// when destination_type_name starts with "oauth_".
+const existingOAuthConnection = computed(() => {
+  const dest = props.destination;
+  if (!dest) return undefined;
+  const typeName: string = (dest as any).destination_type_name ?? '';
+  if (!typeName.startsWith('oauth_')) return undefined;
+  const raw = (dest as any).metadata?.oauth_connection;
+  if (!raw) return undefined;
+  try {
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return undefined;
+  }
+});
 
 // TODO OK: Use UUID package instead of this and move this method in utils
 const getUUID = () => {
@@ -1003,21 +1049,63 @@ const getActionOptions = async () => {
   }
 };
 
+// Check OAuth availability for a provider type and update reactive state
+const checkOAuthAvailability = async (type: string) => {
+  if (!OAUTH_CAPABLE_PROVIDERS.includes(type)) {
+    oauthAvailable.value = false;
+    return;
+  }
+  try {
+    const resp = await oauthService.available(
+      store.state.selectedOrganization.identifier,
+      type as any
+    );
+    // Only update — never flip back to false once enabled, to prevent
+    // remounting the OAuthConnectionForm and losing its in-progress state.
+    if (resp.data.enabled) {
+      oauthAvailable.value = true;
+      oauthDisplayName.value = resp.data.display_name;
+    } else if (!oauthAvailable.value) {
+      oauthAvailable.value = false;
+    }
+  } catch {
+    if (!oauthAvailable.value) {
+      oauthAvailable.value = false;
+    }
+  }
+};
+
+// Watch destination_type changes (covers both initial mount default and user clicks)
+watch(
+  () => formData.value.destination_type,
+  (type, oldType) => {
+    // Reset only when the provider actually changes, not on every render
+    if (type !== oldType) {
+      oauthAvailable.value = false;
+      oauthPayload.value = null;
+    }
+    if (type && type !== 'custom') {
+      checkOAuthAvailability(type);
+    }
+  },
+  { immediate: true }
+);
+
 // Select destination type (prebuilt or custom)
 const selectDestinationType = (type: string) => {
   formData.value.destination_type = type;
 
   // Reset form data when switching types
   prebuiltCredentials.value = {};
+  oauthPayload.value = null;
 
   if (type === 'custom') {
-    // Switch to custom mode
     formData.value.type = 'http';
     formData.value.url = '';
     formData.value.template = '';
   } else {
-    // Set up prebuilt type
     formData.value.type = type === 'email' ? 'email' : 'http';
+    // oauthAvailable updated by the watcher above
   }
 };
 
@@ -1058,6 +1146,58 @@ const showPreview = async () => {
 
 // Save prebuilt or custom destination
 const saveDestination = async () => {
+  // Handle OAuth destinations
+  if (isPrebuiltDestination.value && oauthAvailable.value && oauthPayload.value) {
+    const op = oauthPayload.value;
+    if (!op.ready) {
+      q.notify({ type: 'negative', message: 'Please complete the OAuth authorization and select a channel.' });
+      return;
+    }
+    if (!formData.value.name) {
+      q.notify({ type: 'negative', message: 'Please enter a destination name.' });
+      return;
+    }
+    const dismiss = q.notify({ spinner: true, message: 'Saving…', timeout: 0 });
+    try {
+      const payload: any = {
+        name: formData.value.name,
+        template: `prebuilt_${formData.value.destination_type}`,
+        oauth_connection: {
+          provider: formData.value.destination_type,
+          connection_id: op.connection_id,
+          team_id: op.team_id,
+          team_name: op.team_name,
+          channel_id: op.channel_id,
+          channel_name: op.channel_name,
+          status: op.status,
+        },
+      };
+      if (op.state) payload.oauth_state = op.state;
+
+      if (isUpdatingDestination.value) {
+        await destinationService.update({
+          org_identifier: store.state.selectedOrganization.identifier,
+          destination_name: props.destination.name,
+          data: payload,
+        });
+      } else {
+        await destinationService.create({
+          org_identifier: store.state.selectedOrganization.identifier,
+          destination_name: formData.value.name,
+          data: payload,
+        });
+      }
+      dismiss();
+      emit('get:destinations');
+      emit('cancel:hideform');
+      q.notify({ type: 'positive', message: 'Destination saved successfully.' });
+    } catch (err: any) {
+      dismiss();
+      q.notify({ type: 'negative', message: err.response?.data?.error || err.message });
+    }
+    return;
+  }
+
   // Handle prebuilt destinations (both create and update)
   if (isPrebuiltDestination.value) {
     try {

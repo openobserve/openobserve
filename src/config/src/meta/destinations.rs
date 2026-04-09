@@ -22,6 +22,101 @@ use utoipa::ToSchema;
 
 use crate::stats::MemorySize;
 
+// ---------------------------------------------------------------------------
+// OAuth destination types
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum OAuthProvider {
+    Slack,
+    Discord,
+    PagerDuty,
+    #[serde(rename = "msteams")]
+    MsTeams,
+    ServiceNow,
+}
+
+impl fmt::Display for OAuthProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Slack => write!(f, "slack"),
+            Self::Discord => write!(f, "discord"),
+            Self::PagerDuty => write!(f, "pagerduty"),
+            Self::MsTeams => write!(f, "msteams"),
+            Self::ServiceNow => write!(f, "servicenow"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum OAuthConnectionStatus {
+    Valid,
+    /// Provider sent a revocation event
+    Revoked,
+    /// Send failed with auth error and no refresh token available
+    TokenExpired,
+}
+
+impl Default for OAuthConnectionStatus {
+    fn default() -> Self {
+        Self::Valid
+    }
+}
+
+impl fmt::Display for OAuthConnectionStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Valid => write!(f, "valid"),
+            Self::Revoked => write!(f, "revoked"),
+            Self::TokenExpired => write!(f, "token_expired"),
+        }
+    }
+}
+
+/// Non-sensitive OAuth connection metadata stored in the destination record.
+/// The actual access token is stored in the cipher table keyed by
+/// `"{provider}/{connection_id}"`.
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(default)]
+pub struct OAuthConnection {
+    pub provider: OAuthProvider,
+    /// KSUID generated at `/oauth/{provider}/start`; key into cipher table
+    pub connection_id: String,
+    /// Workspace / guild ID (provider-specific); `None` for PagerDuty
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub team_id: Option<String>,
+    /// Human-readable workspace name e.g. "Acme Corp"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub team_name: Option<String>,
+    /// Target channel ID; `None` for PagerDuty (routing key embedded in token)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channel_id: Option<String>,
+    /// Human-readable channel name e.g. "#alerts"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channel_name: Option<String>,
+    pub status: OAuthConnectionStatus,
+    /// Unix timestamp (seconds) when the token expires; `None` = non-expiring
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_expires_at: Option<i64>,
+}
+
+impl Default for OAuthConnection {
+    fn default() -> Self {
+        Self {
+            provider: OAuthProvider::Slack,
+            connection_id: String::new(),
+            team_id: None,
+            team_name: None,
+            channel_id: None,
+            channel_name: None,
+            status: OAuthConnectionStatus::Valid,
+            token_expires_at: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(default)]
 #[serde(rename_all = "snake_case")]
@@ -88,6 +183,10 @@ pub enum DestinationType {
     Http(Endpoint),
     Email(Email),
     Sns(AwsSns),
+    /// OAuth-based destination (Slack, Discord, PagerDuty, …).
+    /// The legacy webhook-based Slack destination is still `Http` with
+    /// `endpoint.destination_type = Some("slack")`.
+    OAuth(OAuthConnection),
 }
 
 impl Default for DestinationType {

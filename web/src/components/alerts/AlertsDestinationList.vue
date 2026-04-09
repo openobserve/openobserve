@@ -173,6 +173,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="getCustomDestinationLabel(props.row)"
                 />
               </template>
+              <!-- OAuth revoked / token-expired warning badge -->
+              <template v-if="getOAuthStatus(props.row) === 'revoked' || getOAuthStatus(props.row) === 'token_expired'">
+                <q-badge
+                  :data-test="`destination-oauth-revoked-badge-${props.row.name}`"
+                  color="negative"
+                  class="tw:text-xs"
+                  label="⚠ Reconnect"
+                >
+                  <q-tooltip>
+                    {{ getOAuthStatus(props.row) === 'revoked'
+                        ? 'OAuth token revoked — click Edit to reconnect.'
+                        : 'OAuth token expired — click Edit to reconnect.' }}
+                  </q-tooltip>
+                </q-badge>
+              </template>
             </div>
           </q-td>
         </template>
@@ -641,6 +656,23 @@ export default defineComponent({
       });
     };
 
+    // Get OAuth connection status for a destination row.
+    // Returns 'valid' | 'revoked' | 'token_expired' | null (null = not an OAuth destination).
+    const getOAuthStatus = (destination: any): string | null => {
+      try {
+        const meta = destination.metadata;
+        if (!meta) return null;
+        const connJson = typeof meta === 'string'
+          ? JSON.parse(meta)?.oauth_connection
+          : meta?.oauth_connection;
+        if (!connJson) return null;
+        const conn = typeof connJson === 'string' ? JSON.parse(connJson) : connJson;
+        return conn?.status ?? null;
+      } catch {
+        return null;
+      }
+    };
+
     // Get display name for prebuilt destination type
     const getPrebuiltTypeName = (destination: DestinationPayload): string | null => {
       const prebuiltType = detectPrebuiltType(destination);
@@ -807,6 +839,7 @@ export default defineComponent({
       selectedDestinations,
       getPrebuiltTypeName,
       getCustomDestinationLabel,
+      getOAuthStatus,
     };
   },
 });

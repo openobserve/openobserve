@@ -30,6 +30,8 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EntryKind {
     CipherKey,
+    /// OAuth access/refresh tokens for OAuth-based alert destinations
+    OAuthToken,
 }
 
 // DBKey to set cipher keys
@@ -106,6 +108,7 @@ impl std::fmt::Display for EntryKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::CipherKey => write!(f, "cipher_key"),
+            Self::OAuthToken => write!(f, "oauth_token"),
         }
     }
 }
@@ -115,6 +118,7 @@ impl TryFrom<String> for EntryKind {
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.as_str() {
             "cipher_key" => Ok(Self::CipherKey),
+            "oauth_token" => Ok(Self::OAuthToken),
             _ => Err(errors::Error::NotImplemented),
         }
     }

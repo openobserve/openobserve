@@ -44,6 +44,7 @@ pub mod license;
 pub mod logs;
 pub mod mcp;
 pub mod metrics;
+pub mod oauth_destinations;
 pub mod organization;
 pub mod patterns;
 pub mod pipeline;
