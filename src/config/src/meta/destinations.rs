@@ -49,20 +49,15 @@ impl fmt::Display for OAuthProvider {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum OAuthConnectionStatus {
+    #[default]
     Valid,
     /// Provider sent a revocation event
     Revoked,
     /// Send failed with auth error and no refresh token available
     TokenExpired,
-}
-
-impl Default for OAuthConnectionStatus {
-    fn default() -> Self {
-        Self::Valid
-    }
 }
 
 impl fmt::Display for OAuthConnectionStatus {

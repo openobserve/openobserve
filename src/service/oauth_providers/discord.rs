@@ -102,11 +102,7 @@ impl OAuthProviderHandler for DiscordProvider {
             0 if status.as_u16() == 401 => OAuthNotifyError::TokenRevoked,
             10003 => OAuthNotifyError::ChannelNotFound,
             50001 => OAuthNotifyError::TokenRevoked,
-            _ => OAuthNotifyError::Other(
-                result
-                    .message
-                    .unwrap_or_else(|| format!("code={code}")),
-            ),
+            _ => OAuthNotifyError::Other(result.message.unwrap_or_else(|| format!("code={code}"))),
         })
     }
 
@@ -161,7 +157,12 @@ impl OAuthProviderHandler for DiscordProvider {
         &[] // Discord has no revocation webhook; expiry detected at send time
     }
 
-    fn verify_event_signature(&self, _raw_body: &[u8], _headers: &HeaderMap, _secret: &str) -> bool {
+    fn verify_event_signature(
+        &self,
+        _raw_body: &[u8],
+        _headers: &HeaderMap,
+        _secret: &str,
+    ) -> bool {
         true // Not called — no revocation webhook
     }
 

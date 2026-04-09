@@ -207,17 +207,16 @@ impl ProxyClient {
     // POST /api/proxy/refresh
     // -----------------------------------------------------------------------
 
-    pub async fn refresh(
-        &self,
-        provider: &str,
-        refresh_token: &str,
-    ) -> Result<RefreshResponse> {
+    pub async fn refresh(&self, provider: &str, refresh_token: &str) -> Result<RefreshResponse> {
         let url = format!("{}/api/proxy/refresh", self.base_url);
         let resp = self
             .http
             .post(&url)
             .bearer_auth(&self.api_key)
-            .json(&RefreshRequest { provider, refresh_token })
+            .json(&RefreshRequest {
+                provider,
+                refresh_token,
+            })
             .send()
             .await
             .context("proxy refresh: HTTP send failed")?;

@@ -15,7 +15,9 @@
 
 use config::{
     get_config,
-    meta::destinations::{Destination, DestinationType, Email, Module, OAuthConnectionStatus, Template},
+    meta::destinations::{
+        Destination, DestinationType, Email, Module, OAuthConnectionStatus, Template,
+    },
 };
 
 use crate::{
@@ -336,9 +338,8 @@ async fn migrate_oauth_token(
     };
 
     let session: crate::service::oauth_providers::OAuthPendingSession =
-        serde_json::from_str(&session_model.access_token).map_err(|e| {
-            infra::errors::Error::Message(format!("OAuth session corrupt: {e}"))
-        })?;
+        serde_json::from_str(&session_model.access_token)
+            .map_err(|e| infra::errors::Error::Message(format!("OAuth session corrupt: {e}")))?;
 
     // Org isolation
     if session.org_id != org_id {
@@ -347,9 +348,9 @@ async fn migrate_oauth_token(
         ));
     }
 
-    let access_token = session
-        .access_token
-        .ok_or_else(|| infra::errors::Error::Message("OAuth token not present in session".to_string()))?;
+    let access_token = session.access_token.ok_or_else(|| {
+        infra::errors::Error::Message("OAuth token not present in session".to_string())
+    })?;
 
     // Capture expiry before session fields are moved into token_json
     let token_expires_at = session.expires_at_token;
@@ -396,16 +397,20 @@ async fn migrate_oauth_token(
         let provider_str = conn.provider.to_string();
         let index_key = format!("team_index/{provider_str}/{team_id}");
 
-        let mut entries: Vec<serde_json::Value> =
-            match cipher::get_data("_alert_dest_oauth_team_index", EntryKind::OAuthToken, &index_key).await? {
-                Some(data) => serde_json::from_str(&data).unwrap_or_default(),
-                None => vec![],
-            };
+        let mut entries: Vec<serde_json::Value> = match cipher::get_data(
+            "_alert_dest_oauth_team_index",
+            EntryKind::OAuthToken,
+            &index_key,
+        )
+        .await?
+        {
+            Some(data) => serde_json::from_str(&data).unwrap_or_default(),
+            None => vec![],
+        };
 
         // De-duplicate — remove existing entry for this connection_id then re-append
         entries.retain(|e| {
-            e.get("connection_id").and_then(|v| v.as_str())
-                != Some(&conn.connection_id)
+            e.get("connection_id").and_then(|v| v.as_str()) != Some(&conn.connection_id)
         });
         entries.push(serde_json::json!({
             "org_id": org_id,
@@ -588,15 +593,16 @@ async fn delete_oauth_internal(
     // 2. Remove from team index
     if let Some(team_id) = team_id {
         let index_key = format!("team_index/{provider}/{team_id}");
-        if let Ok(Some(data)) =
-            cipher::get_data("_alert_dest_oauth_team_index", EntryKind::OAuthToken, &index_key).await
+        if let Ok(Some(data)) = cipher::get_data(
+            "_alert_dest_oauth_team_index",
+            EntryKind::OAuthToken,
+            &index_key,
+        )
+        .await
         {
-            if let Ok(mut entries) =
-                serde_json::from_str::<Vec<serde_json::Value>>(&data)
-            {
+            if let Ok(mut entries) = serde_json::from_str::<Vec<serde_json::Value>>(&data) {
                 entries.retain(|e| {
-                    e.get("connection_id").and_then(|v| v.as_str())
-                        != Some(&connection_id)
+                    e.get("connection_id").and_then(|v| v.as_str()) != Some(&connection_id)
                 });
                 let updated = serde_json::to_string(&entries).unwrap_or_default();
                 let entry = CipherEntry {
@@ -699,7 +705,6 @@ async fn set_oauth_connection_status(
     // Not found is not necessarily an error (destination may have been deleted)
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {
