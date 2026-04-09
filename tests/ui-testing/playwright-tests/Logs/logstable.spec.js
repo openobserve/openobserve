@@ -494,16 +494,12 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     // Check if we can still click the same value's include button
     // (This tests if spamming is prevented)
     const includeBtn2 = pageManager.logsPage.getSubfieldListEqualButton('level').first();
-    if (await includeBtn2.isVisible()) {
-      const isDisabled = await includeBtn2.isDisabled().catch(() => false);
-      testLogger.info(`Include button disabled state: ${isDisabled}`);
+    await expect(includeBtn2, 'Bug #11041: Include button must be visible').toBeVisible({ timeout: 5000 });
+    const isDisabled = await includeBtn2.isDisabled().catch(() => false);
+    testLogger.info(`Include button disabled state: ${isDisabled}`);
 
-      // The button should ideally be disabled for already-included values
-      // If not disabled, at least verify no duplicates are added
-      if (!isDisabled) {
-        testLogger.warn('⚠ Include button not disabled for already-included value - Bug #11041 behavior');
-      }
-    }
+    // STRONG ASSERTION: The button must be disabled for already-included values
+    expect(isDisabled, 'Bug #11041: include button must be disabled for already-included value').toBe(true);
 
     testLogger.info('✓ Multi-select sidebar behavior test completed');
   });
