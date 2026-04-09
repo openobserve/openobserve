@@ -138,12 +138,13 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
             // also we use bytes() here as sometimes compiler can optimize it faster with sse
             // see https://users.rust-lang.org/t/count-number-of-z-in-a-string/49763/5
             let (quote_count, slash_count) =
-                s.bytes().fold((0usize, 0usize), |(quote_count, slash_count), b| {
-                    (
-                        quote_count + usize::from(b == b'"'),
-                        slash_count + usize::from(b == b'\\'),
-                    )
-                });
+                s.bytes()
+                    .fold((0usize, 0usize), |(quote_count, slash_count), b| {
+                        (
+                            quote_count + usize::from(b == b'"'),
+                            slash_count + usize::from(b == b'\\'),
+                        )
+                    });
             // "?"=>2
             size += s.len() + 2 + quote_count + slash_count;
         }
