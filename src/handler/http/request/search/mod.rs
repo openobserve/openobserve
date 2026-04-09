@@ -305,6 +305,7 @@ pub async fn search(
     let stream_names = match resolve_stream_names(&req.query.sql) {
         Ok(v) => v.clone(),
         Err(e) => {
+            log::error!("[trace_id {trace_id}] http->search: error resolving stream names: {e}");
             return map_error_to_http_response(&(e.into()), Some(trace_id));
         }
     };
@@ -339,6 +340,7 @@ pub async fn search(
                 converted_histogram_query = Some(req.query.sql.clone());
             }
             Err(e) => {
+                log::error!("[trace_id {trace_id}] http->search: error converting to histogram query: {e}");
                 return map_error_to_http_response(&(e), Some(trace_id));
             }
         }
@@ -382,6 +384,7 @@ pub async fn search(
                 utils::validate_query_fields(&org_id, &stream_name, stream_type, &req.query.sql)
                     .await
         {
+            log::error!("[trace_id {trace_id}] http->search: error validating query fields: {e}");
             return map_error_to_http_response(&e, Some(trace_id));
         }
 
@@ -496,7 +499,7 @@ pub async fn search(
                 &search_type,
                 "",
             );
-            log::error!("[trace_id {trace_id}] search error: {err}");
+            log::error!("[trace_id {trace_id}] http->search: execution error: {err}");
             error_utils::map_error_to_http_response(&err, Some(trace_id))
         }
     }
