@@ -2271,7 +2271,42 @@
     "custom": "Özel",
     "separator": "Ayırıcı",
     "separator_placeholder": "Ayırıcı girin (örn. |,\\ n,\\ t, boşluk)",
-    "separator_hint": "Kayıtlar arasında kullanılacak ayırıcı dize (boşluklara izin verilir)"
+    "separator_hint": "Kayıtlar arasında kullanılacak ayırıcı dize (boşluklara izin verilir)",
+    "oauth": {
+      "revokedBanner": "Bu {provider} bağlantısı iptal edildi veya süresi doldu. Geri yüklemek için Yeniden Bağlan'ı tıklayın.",
+      "reconnectBtn": "{provider} 'e yeniden bağlanın",
+      "connectBtn": "{provider} 'a bağlanın",
+      "cancelledMsg": "Yetkilendirme iptal edildi. Tekrar denemek için Bağlan'ı tıklayın.",
+      "timedOutMsg": "Yetkilendirme zaman aşımına uğradı. Tekrar denemek için Bağlan'ı tıklayın.",
+      "channelLabel": "Kanal*",
+      "channelsTruncated": "İlk 10.000 kanalı gösterme",
+      "inviteNeeded": "davet gerekli",
+      "inviteTooltip": "Özel kanal — önce bu kanalda /invite @ {provider} çalıştırın.",
+      "noChannelsFound": "Kanal bulunamadı",
+      "connectedTo": "Bağlı:",
+      "disconnect": "Bağlantıyı kes",
+      "sendTestMessage": "Test Mesajı Gönder",
+      "testSuccess": "Test başarıyla gönderildi!",
+      "testFailed": "Test başarısız oldu: {error}",
+      "duplicateChannelWarning": "Kanal # {channel} zaten hedef “{destination}” tarafından kullanılmıştır. Yine de kaydedebilirsiniz - birden fazla hedef aynı kanalı paylaşabilir.",
+      "saveOAuthIncomplete": "Lütfen OAuth yetkilendirmesini tamamlayın ve bir kanal seçin.",
+      "saveNameRequired": "Lütfen bir hedef adı girin.",
+      "saving": "Tasarruf...",
+      "reconnectBadge": "⚠ Yeniden Bağlan",
+      "tokenRevoked": "OAuth belirteci iptal edildi - yeniden bağlanmak için Düzenle'yi tıklayın.",
+      "tokenExpired": "OAuth belirtecinin süresi doldu - yeniden bağlanmak için Düzenle\"yi tıklayın."
+    },
+    "oauth_error": {
+      "title": "Yetkilendirme Başarısız",
+      "reason": "Sebep:",
+      "tryAgain": "Bu pencereyi kapatabilir ve OpenObserve üzerinden tekrar deneyebilirsiniz.",
+      "autoClose": "Bu pencere otomatik olarak kapanacaktır."
+    },
+    "oauth_success": {
+      "title": "Bağlı!",
+      "message": "Yetkilendirme başarılı. Bu pencereyi kapatıp OpenObservere'ye dönebilirsiniz.",
+      "autoClose": "Bu pencere otomatik olarak kapanacaktır."
+    }
   },
   "metrics": {
     "searchMetric": "Bir Metrik Ara",

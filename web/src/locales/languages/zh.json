@@ -2273,7 +2273,42 @@
     "custom": "自定义",
     "separator": "分隔符",
     "separator_placeholder": "输入分隔符（例如，|、\\n、\\ t、空格）",
-    "separator_hint": "在记录之间使用的分隔字符串（允许空格）"
+    "separator_hint": "在记录之间使用的分隔字符串（允许空格）",
+    "oauth": {
+      "revokedBanner": "此 {提供商} 连接已被撤销或过期。单击 “重新连接” 将其恢复。",
+      "reconnectBtn": "重新连接到 {提供商}",
+      "connectBtn": "连接到 {提供商}",
+      "cancelledMsg": "授权已取消。单击 “连接” 重试。",
+      "timedOutMsg": "授权超时。单击 “连接” 重试。",
+      "channelLabel": "频道*",
+      "channelsTruncated": "显示前 10,000 个频道",
+      "inviteNeeded": "需要邀请",
+      "inviteTooltip": "私人频道 — 先在此频道中运行 /invite @ {provider}。",
+      "noChannelsFound": "未找到频道",
+      "connectedTo": "已连接到：",
+      "disconnect": "断开连接",
+      "sendTestMessage": "发送测试消息",
+      "testSuccess": "测试成功发送！",
+      "testFailed": "测试失败：{错误}",
+      "duplicateChannelWarning": "目的地 “{目的地}” 已使用频道 # {频道}。你仍然可以保存——多个目的地可以共享同一个频道。",
+      "saveOAuthIncomplete": "请完成 OAuth 授权并选择一个频道。",
+      "saveNameRequired": "请输入目的地名称。",
+      "saving": "正在保存...",
+      "reconnectBadge": "⚠ 重新连接",
+      "tokenRevoked": "OAuth 令牌已撤销 — 单击 “编辑” 重新连接。",
+      "tokenExpired": "OAuth 令牌已过期 — 单击 “编辑” 重新连接。"
+    },
+    "oauth_error": {
+      "title": "授权失败",
+      "reason": "原因：",
+      "tryAgain": "你可以关闭这个窗口，然后从 OpenObserve 重试。",
+      "autoClose": "此窗口将自动关闭。"
+    },
+    "oauth_success": {
+      "title": "已连接！",
+      "message": "授权成功。你可以关闭这个窗口并返回到 OpenObserve。",
+      "autoClose": "此窗口将自动关闭。"
+    }
   },
   "metrics": {
     "searchMetric": "搜索指标",

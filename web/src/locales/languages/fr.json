@@ -2273,7 +2273,42 @@
     "custom": "Personnalisé",
     "separator": "Séparateur",
     "separator_placeholder": "Entrez un séparateur (par exemple, |,\\n, \\ t, espace)",
-    "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)"
+    "separator_hint": "Chaîne de séparation à utiliser entre les enregistrements (espaces autorisés)",
+    "oauth": {
+      "revokedBanner": "Cette connexion {provider} a été révoquée ou a expiré. Cliquez sur Reconnecter pour le restaurer.",
+      "reconnectBtn": "Reconnectez-vous à {provider}",
+      "connectBtn": "Connectez-vous à {provider}",
+      "cancelledMsg": "Autorisation annulée. Cliquez sur Connecter pour réessayer.",
+      "timedOutMsg": "Le délai d'autorisation a expiré. Cliquez sur Connecter pour réessayer.",
+      "channelLabel": "Chaîne *",
+      "channelsTruncated": "Affichage des 10 000 premières chaînes",
+      "inviteNeeded": "invitation requise",
+      "inviteTooltip": "Chaîne privée : lancez d'abord /invite @ {provider} sur cette chaîne.",
+      "noChannelsFound": "Aucune chaîne n'a été trouvée",
+      "connectedTo": "Connecté à :",
+      "disconnect": "Déconnecter",
+      "sendTestMessage": "Envoyer un message de test",
+      "testSuccess": "Test envoyé avec succès !",
+      "testFailed": "Échec du test : {error}",
+      "duplicateChannelWarning": "Le canal # {canal} est déjà utilisé par la destination « {destination} ». Vous pouvez toujours enregistrer : plusieurs destinations peuvent partager la même chaîne.",
+      "saveOAuthIncomplete": "Veuillez compléter l'autorisation OAuth et sélectionner un canal.",
+      "saveNameRequired": "Entrez un nom de destination.",
+      "saving": "Économiser...",
+      "reconnectBadge": "⚠ Reconnectez-vous",
+      "tokenRevoked": "Token OAuth révoqué : cliquez sur Modifier pour vous reconnecter.",
+      "tokenExpired": "Le jeton OAuth a expiré : cliquez sur Modifier pour vous reconnecter."
+    },
+    "oauth_error": {
+      "title": "Échec de l'autorisation",
+      "reason": "Motif :",
+      "tryAgain": "Vous pouvez fermer cette fenêtre et réessayer depuis OpenObserve.",
+      "autoClose": "Cette fenêtre se fermera automatiquement."
+    },
+    "oauth_success": {
+      "title": "Connecté !",
+      "message": "Autorisation réussie. Vous pouvez fermer cette fenêtre et revenir à OpenObserve.",
+      "autoClose": "Cette fenêtre se fermera automatiquement."
+    }
   },
   "metrics": {
     "searchMetric": "Rechercher une métrique",
