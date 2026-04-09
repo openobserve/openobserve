@@ -2272,7 +2272,42 @@
     "custom": "사용자 지정",
     "separator": "분리기",
     "separator_placeholder": "구분자 입력 (예: |,\\n,\\ t, 공백)",
-    "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)"
+    "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)",
+    "oauth": {
+      "revokedBanner": "이 {provider} 연결이 취소되었거나 만료되었습니다.다시 연결을 클릭하여 복원하십시오.",
+      "reconnectBtn": "{제공자} 에 다시 연결",
+      "connectBtn": "{제공자} 에 연결",
+      "cancelledMsg": "승인이 취소되었습니다.연결을 클릭하여 다시 시도하세요.",
+      "timedOutMsg": "인증 시간이 초과되었습니다.연결을 클릭하여 다시 시도하세요.",
+      "channelLabel": "채널 *",
+      "channelsTruncated": "처음 10,000개의 채널 보기",
+      "inviteNeeded": "초대 필요",
+      "inviteTooltip": "비공개 채널 — 먼저 이 채널에서 /invite @ {provider} 를 실행합니다.",
+      "noChannelsFound": "채널을 찾을 수 없음",
+      "connectedTo": "연결 대상:",
+      "disconnect": "연결 끊기",
+      "sendTestMessage": "테스트 메시지 전송",
+      "testSuccess": "테스트가 성공적으로 전송되었습니다!",
+      "testFailed": "테스트 실패: {error}",
+      "duplicateChannelWarning": "채널 # {channel} 이 (가) 대상 “{destination}”에서 이미 사용되고 있습니다.여전히 저장할 수 있습니다. 여러 목적지가 동일한 채널을 공유할 수 있습니다.",
+      "saveOAuthIncomplete": "OAuth 인증을 완료하고 채널을 선택하세요.",
+      "saveNameRequired": "목적지 이름을 입력하십시오.",
+      "saving": "저장 중...",
+      "reconnectBadge": "⚠ 재연결",
+      "tokenRevoked": "OAuth 토큰이 해지되었습니다. 다시 연결하려면 편집을 클릭합니다.",
+      "tokenExpired": "OAuth 토큰이 만료되었습니다. 다시 연결하려면 편집을 클릭합니다."
+    },
+    "oauth_error": {
+      "title": "인증 실패",
+      "reason": "이유:",
+      "tryAgain": "이 창을 닫고 OpenObsebse에서 다시 시도할 수 있습니다.",
+      "autoClose": "이 창은 자동으로 닫힙니다."
+    },
+    "oauth_success": {
+      "title": "연결됨!",
+      "message": "인증에 성공했습니다.이 창을 닫고 OpenObserve 화면으로 돌아갈 수 있습니다.",
+      "autoClose": "이 창은 자동으로 닫힙니다."
+    }
   },
   "metrics": {
     "searchMetric": "지표 검색",

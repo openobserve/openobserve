@@ -2272,7 +2272,42 @@
     "custom": "Personalizzato",
     "separator": "Separatore",
     "separator_placeholder": "Inserisci un separatore (ad esempio, |,\\n,\\ t, spazio)",
-    "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)"
+    "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)",
+    "oauth": {
+      "revokedBanner": "Questa connessione {provider} è stata revocata o è scaduta. Fai clic su Riconnetti per ripristinarla.",
+      "reconnectBtn": "Riconnettiti a {provider}",
+      "connectBtn": "Connettiti a {provider}",
+      "cancelledMsg": "Autorizzazione annullata. Fai clic su Connetti per riprovare.",
+      "timedOutMsg": "L'autorizzazione è scaduta. Fai clic su Connetti per riprovare.",
+      "channelLabel": "Canale *",
+      "channelsTruncated": "Mostra i primi 10.000 canali",
+      "inviteNeeded": "invito necessario",
+      "inviteTooltip": "Canale privato: esegui prima /invite @ {provider} in questo canale.",
+      "noChannelsFound": "Nessun canale trovato",
+      "connectedTo": "Connesso a:",
+      "disconnect": "Disconnetti",
+      "sendTestMessage": "Invia messaggio di prova",
+      "testSuccess": "Test inviato con successo!",
+      "testFailed": "Test fallito: {error}",
+      "duplicateChannelWarning": "Il canale # {channel} è già utilizzato dalla destinazione «{destination}». Puoi comunque salvare: più destinazioni possono condividere lo stesso canale.",
+      "saveOAuthIncomplete": "Completa l'autorizzazione OAuth e seleziona un canale.",
+      "saveNameRequired": "Inserisci un nome di destinazione.",
+      "saving": "Salvataggio...",
+      "reconnectBadge": "⚠ Riconnetti",
+      "tokenRevoked": "Token OAuth revocato: fai clic su Modifica per riconnetterti.",
+      "tokenExpired": "Token OAuth scaduto: fai clic su Modifica per riconnetterti."
+    },
+    "oauth_error": {
+      "title": "Autorizzazione non riuscita",
+      "reason": "Motivo:",
+      "tryAgain": "Puoi chiudere questa finestra e riprovare da OpenObserve.",
+      "autoClose": "Questa finestra si chiuderà automaticamente."
+    },
+    "oauth_success": {
+      "title": "Connesso!",
+      "message": "Autorizzazione avvenuta con successo. Puoi chiudere questa finestra e tornare a OpenObserve.",
+      "autoClose": "Questa finestra si chiuderà automaticamente."
+    }
   },
   "metrics": {
     "searchMetric": "Cerca una metrica",

@@ -2272,7 +2272,42 @@
     "custom": "Op maat",
     "separator": "Separator",
     "separator_placeholder": "Voer een scheidingsteken in (bijvoorbeeld |,\\n,\\ t, spatie)",
-    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)"
+    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)",
+    "oauth": {
+      "revokedBanner": "Deze verbinding met {provider} is ingetrokken of verlopen. Klik op Opnieuw verbinden om de verbinding te herstellen.",
+      "reconnectBtn": "Maak opnieuw verbinding met {provider}",
+      "connectBtn": "Maak verbinding met {provider}",
+      "cancelledMsg": "Autorisatie geannuleerd. Klik op Verbinden om het opnieuw te proberen.",
+      "timedOutMsg": "Er is een time-out opgetreden voor autorisatie. Klik op Verbinden om het opnieuw te proberen.",
+      "channelLabel": "Kanaal *",
+      "channelsTruncated": "De eerste 10.000 kanalen worden weergegeven",
+      "inviteNeeded": "uitnodiging nodig",
+      "inviteTooltip": "Privékanaal — voer eerst /invite @ {provider} uit in dit kanaal.",
+      "noChannelsFound": "Geen kanalen gevonden",
+      "connectedTo": "Verbonden met:",
+      "disconnect": "Verbinding verbreken",
+      "sendTestMessage": "Testbericht verzenden",
+      "testSuccess": "Test succesvol verzonden!",
+      "testFailed": "Test mislukt: {error}",
+      "duplicateChannelWarning": "Kanaal # {channel} wordt al gebruikt door de bestemming „{destination}”. Je kunt nog steeds opslaan — meerdere bestemmingen kunnen hetzelfde kanaal delen.",
+      "saveOAuthIncomplete": "Voltooi de OAuth-autorisatie en selecteer een kanaal.",
+      "saveNameRequired": "Voer een bestemmingsnaam in.",
+      "saving": "Opslaan...",
+      "reconnectBadge": "⚠ Maak opnieuw verbinding",
+      "tokenRevoked": "OAuth-token ingetrokken — klik op Bewerken om opnieuw verbinding te maken.",
+      "tokenExpired": "OAuth-token is verlopen — klik op Bewerken om opnieuw verbinding te maken."
+    },
+    "oauth_error": {
+      "title": "Autorisatie is mislukt",
+      "reason": "Reden:",
+      "tryAgain": "U kunt dit venster sluiten en het opnieuw proberen vanuit OpenObserve.",
+      "autoClose": "Dit venster wordt automatisch gesloten."
+    },
+    "oauth_success": {
+      "title": "Verbonden!",
+      "message": "Autorisatie geslaagd. U kunt dit venster sluiten en terugkeren naar OpenObserve.",
+      "autoClose": "Dit venster wordt automatisch gesloten."
+    }
   },
   "metrics": {
     "searchMetric": "Zoek naar een statistiek",

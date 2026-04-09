@@ -2291,7 +2291,42 @@
     "custom": "カスタム",
     "separator": "セパレーター",
     "separator_placeholder": "セパレータを入力してください (例:|、\\n、\\ t、スペース)",
-    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)"
+    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)",
+    "oauth": {
+      "revokedBanner": "この {provider} 接続は取り消されたか、有効期限が切れています。[再接続] をクリックして復元します。",
+      "reconnectBtn": "{プロバイダー} に再接続",
+      "connectBtn": "{プロバイダー} に接続",
+      "cancelledMsg": "認証がキャンセルされました。[接続] をクリックしてやり直してください。",
+      "timedOutMsg": "認証がタイムアウトしました。[接続] をクリックしてやり直してください。",
+      "channelLabel": "チャネル *",
+      "channelsTruncated": "最初の 10,000 チャンネルを表示",
+      "inviteNeeded": "招待が必要",
+      "inviteTooltip": "プライベートチャンネル — まずこのチャンネルで /invite @ {provider} を実行してください。",
+      "noChannelsFound": "チャンネルが見つかりません",
+      "connectedTo": "接続先:",
+      "disconnect": "接続解除",
+      "sendTestMessage": "テストメッセージを送信",
+      "testSuccess": "テストは正常に送信されました！",
+      "testFailed": "テストが失敗しました:{error}",
+      "duplicateChannelWarning": "チャネル # {channel} はデスティネーション「{destination}」ですでに使用されています。保存はできます。複数の宛先が同じチャンネルを共有できます。",
+      "saveOAuthIncomplete": "OAuth 認証を完了し、チャネルを選択してください。",
+      "saveNameRequired": "目的地名を入力してください。",
+      "saving": "保存中...",
+      "reconnectBadge": "⚠ 再接続",
+      "tokenRevoked": "OAuth トークンが失効しました。[編集] をクリックして再接続してください。",
+      "tokenExpired": "OAuth トークンの有効期限が切れています。[編集] をクリックして再接続してください。"
+    },
+    "oauth_error": {
+      "title": "認証失敗",
+      "reason": "理由:",
+      "tryAgain": "このウィンドウを閉じて、OpenObserveからやり直すことができます。",
+      "autoClose": "このウィンドウは自動的に閉じます。"
+    },
+    "oauth_success": {
+      "title": "接続されました！",
+      "message": "認証が成功しました。このウィンドウを閉じて OpenObserve に戻ることができます。",
+      "autoClose": "このウィンドウは自動的に閉じます。"
+    }
   },
   "pipeline_destinations": {
     "header": "パイプライン送信先",

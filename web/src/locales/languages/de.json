@@ -2274,7 +2274,42 @@
     "custom": "Benutzerdefiniert",
     "separator": "Trennzeichen",
     "separator_placeholder": "Geben Sie ein Trennzeichen ein (z. B. |,\\n,\\ t, Leerzeichen)",
-    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)"
+    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)",
+    "oauth": {
+      "revokedBanner": "Diese {provider} -Verbindung wurde gesperrt oder ist abgelaufen. Klicken Sie auf Erneut verbinden, um sie wiederherzustellen.",
+      "reconnectBtn": "Stellen Sie erneut eine Verbindung zu {provider} her",
+      "connectBtn": "Stellen Sie eine Verbindung zu {provider} her",
+      "cancelledMsg": "Autorisierung storniert. Klicken Sie auf Verbinden, um es erneut zu versuchen.",
+      "timedOutMsg": "Das Zeitlimit für die Autorisierung ist abgelaufen. Klicken Sie auf Verbinden, um es erneut zu versuchen.",
+      "channelLabel": "Kanal *",
+      "channelsTruncated": "Zeigt die ersten 10.000 Kanäle",
+      "inviteNeeded": "Einladung erforderlich",
+      "inviteTooltip": "Privater Channel — führe zuerst /invite @ {provider} in diesem Channel aus.",
+      "noChannelsFound": "Keine Kanäle gefunden",
+      "connectedTo": "Verbunden mit:",
+      "disconnect": "Trennen",
+      "sendTestMessage": "Testnachricht senden",
+      "testSuccess": "Test erfolgreich gesendet!",
+      "testFailed": "Test fehlgeschlagen: {error}",
+      "duplicateChannelWarning": "Kanal # {channel} wird bereits vom Ziel „{destination}“ verwendet. Du kannst immer noch speichern — mehrere Ziele können denselben Kanal teilen.",
+      "saveOAuthIncomplete": "Bitte vervollständigen Sie die OAuth-Autorisierung und wählen Sie einen Kanal aus.",
+      "saveNameRequired": "Bitte geben Sie einen Zielnamen ein.",
+      "saving": "Wird gespeichert...",
+      "reconnectBadge": "⚠ Erneut verbinden",
+      "tokenRevoked": "OAuth-Token gesperrt — klicken Sie auf Bearbeiten, um die Verbindung erneut herzustellen.",
+      "tokenExpired": "OAuth-Token ist abgelaufen — klicken Sie auf Bearbeiten, um die Verbindung erneut herzustellen."
+    },
+    "oauth_error": {
+      "title": "Autorisierung fehlgeschlagen",
+      "reason": "Grund:",
+      "tryAgain": "Sie können dieses Fenster schließen und es erneut von OpenObserve aus versuchen.",
+      "autoClose": "Dieses Fenster wird automatisch geschlossen."
+    },
+    "oauth_success": {
+      "title": "Verbunden!",
+      "message": "Die Autorisierung war erfolgreich. Sie können dieses Fenster schließen und zu OpenObserve zurückkehren.",
+      "autoClose": "Dieses Fenster wird automatisch geschlossen."
+    }
   },
   "metrics": {
     "searchMetric": "Suchen Sie nach einer Metrik",
