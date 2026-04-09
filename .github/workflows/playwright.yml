@@ -310,6 +310,7 @@ jobs:
                 "dashboard-variables-default-values-chain.spec.js",
                 "dashboard-variables-custom-parents.spec.js",
                 "dashboard-variables-stream-field.spec.js",
+                "dashboard-mustache-variables.spec.js",
               ]
           - testfolder: "Dashboard-Table-Pagination"
             browser: "chrome"

@@ -2,31 +2,14 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ref } from "vue";
 import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
 
-// Mock utilities used by the composable
-vi.mock("@/utils/query/promQLUtils", () => ({
-  addLabelToPromQlQuery: vi.fn(
-    (query: string, name: string, value: string, operator: string) =>
-      `${query}{${name}${operator}"${value}"}`,
-  ),
-}));
-
+// Mock utilities that have heavy dependencies (vuex, quasar, services, async parser)
 vi.mock("@/utils/query/sqlUtils", () => ({
   addLabelsToSQlQuery: vi.fn(async (query: string, _vars: any[]) => query),
   getStreamFromQuery: vi.fn(async () => "test_stream"),
 }));
 
-vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
-  formatInterval: vi.fn(() => ({ value: 5, unit: "m" })),
-  formatRateInterval: vi.fn((v: number) => `${v}s`),
-  getTimeInSecondsBasedOnUnit: vi.fn(() => 300),
-}));
-
 vi.mock("@/utils/zincutils", () => ({
   escapeSingleQuotes: vi.fn((s: string) => s.replace(/'/g, "''")),
-}));
-
-vi.mock("@/utils/dashboard/constants", () => ({
-  SELECT_ALL_VALUE: "*",
 }));
 
 const log = vi.fn();
@@ -297,11 +280,11 @@ describe("replaceQueryValue", () => {
     const { query } = inst.replaceQueryValue(
       "rate(metric[$__interval])",
       0,
-      300_000_000, // 300s in microseconds
+      300_000_000, // 300ms range in microseconds
       "promql",
     );
-    // formatInterval mock returns { value: 5, unit: 'm' }
-    expect(query).toContain("5m");
+    // __interval = 300_000_000 / 1000 / 1000 = 300 (ms), formatInterval(300) → 200ms bucket
+    expect(query).toContain("200ms");
   });
 
   it("replaces fixed variable $__interval_ms", () => {
@@ -379,7 +362,7 @@ describe("replaceQueryValue", () => {
       300_000_000,
       "sql",
     );
-    expect(query).toContain("*");
+    expect(query).toContain("_o2_all_");
   });
 
   it("replaces ${VAR_NAME} bracket syntax", () => {
