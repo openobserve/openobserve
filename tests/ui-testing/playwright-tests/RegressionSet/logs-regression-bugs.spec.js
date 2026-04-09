@@ -666,6 +666,189 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('✓ PASSED: Field values correctly refresh when switching streams (no caching issue)');
   });
 
+  // ==========================================================================
+  // Bug #9788: Share button should be disabled when ZO_WEB_URL is not configured
+  // https://github.com/openobserve/openobserve/issues/9788
+  // ==========================================================================
+  test("Share button should be disabled when ZO_WEB_URL is not configured @bug-9788 @P1 @shareLink @regression", async ({ page }, testInfo) => {
+    testLogger.info('Test: Share button disabled state with mocked config (Bug #9788)');
+
+    // Set up mock BEFORE any navigation to ensure config is mocked from the start
+    await page.route('**/config', async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+
+      // Delete web_url property to simulate it not being configured
+      const modifiedConfig = { ...json };
+      delete modifiedConfig.web_url;
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(modifiedConfig)
+      });
+    });
+
+    // Navigate to logs page with mock already active
+    const logsUrl = `${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`;
+    testLogger.info('Navigating to logs page with mocked config');
+    await page.goto(logsUrl);
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+    // Select a stream and run query to load results
+    await pm.logsPage.selectStream('e2e_automate');
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    testLogger.info('Logs page loaded with mocked config');
+
+    // PRIMARY ASSERTION: Share button should exist
+    await pm.logsPage.expectShareLinkButtonVisible();
+    testLogger.info('✓ Share button is visible');
+
+    // SECONDARY ASSERTION: Share button should be disabled when ZO_WEB_URL not configured
+    await pm.logsPage.expectShareLinkButtonDisabled();
+    testLogger.info('✓ PRIMARY CHECK PASSED: Share button is disabled (ZO_WEB_URL not configured)');
+
+    // TERTIARY ASSERTION: Check for tooltip explaining why it's disabled
+    await pm.logsPage.hoverShareLinkButton();
+
+    // Verify tooltip is visible with specific message about ZO_WEB_URL configuration
+    await pm.logsPage.expectShareLinkTooltipVisible(/share\s+url\s+is\s+disabled.*zo_web_url.*configured/i);
+
+    // Get and validate tooltip text matches expected structure
+    const tooltipText = await pm.logsPage.getShareLinkTooltipText(/share\s+url\s+is\s+disabled.*zo_web_url.*configured/i);
+    expect(tooltipText.toLowerCase()).toMatch(/share\s+url\s+is\s+disabled.*zo_web_url.*configured/i);
+    testLogger.info('✓ TERTIARY CHECK PASSED: Informative tooltip present');
+
+    testLogger.info('✓ PASSED: Share button disabled state test completed for Bug #9788');
+  });
+
+  // ==========================================================================
+  // Bug #9690: VRL function not loading correctly when opening saved view
+  // https://github.com/openobserve/openobserve/issues/9690
+  // ==========================================================================
+  test("should load VRL function correctly when opening saved view @bug-9690 @P1 @savedViews @vrl @regression", async ({ page }) => {
+    testLogger.info('Test: Verify VRL function loads correctly in saved views (Bug #9690)');
+
+    const uniqueSuffix = Date.now();
+    const testFunctionName = `TestVRLFunc_${uniqueSuffix}`;
+    const testViewName = `VRLTestView_${uniqueSuffix}`;
+    const vrlFunction = '.test_field = "bug9690_test"';
+
+    try {
+      // Navigate to logs page
+      await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      await pm.logsPage.selectStream('e2e_automate');
+      await page.waitForTimeout(1000);
+
+      // Step 1: Enable VRL toggle
+      testLogger.info('Step 1: Enabling VRL function toggle');
+      await pm.logsPage.clickVrlToggleButton().catch(() => {
+        testLogger.warn('VRL toggle click failed, trying alternative');
+      });
+      await page.waitForTimeout(1000);
+
+      // Step 2: Enter VRL function in the editor
+      testLogger.info('Step 2: Entering VRL function');
+      const vrlEditor = pm.logsPage.getVrlEditor().first();
+
+      // STRONG ASSERTION: VRL editor must be visible
+      await expect(vrlEditor, 'Bug #9690: VRL editor must be visible').toBeVisible({ timeout: 5000 });
+      await vrlEditor.click();
+      await page.keyboard.type(vrlFunction);
+      testLogger.info(`VRL function entered: ${vrlFunction}`);
+
+      // Step 3: Save the function
+      try {
+        await pm.logsPage.clickSaveTransformButton();
+        await page.waitForTimeout(500);
+        await pm.logsPage.fillSavedFunctionNameInput(testFunctionName);
+        await pm.logsPage.clickConfirmButton();
+        await page.waitForTimeout(1000);
+        testLogger.info(`Function saved: ${testFunctionName}`);
+      } catch (saveError) {
+        testLogger.warn('Save function step skipped - UI flow may differ');
+      }
+
+      // Step 4: Run query to have results
+      await pm.logsPage.clickRefreshButton();
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(2000);
+
+      // Step 5: Save the view
+      testLogger.info('Step 5: Saving current view');
+      await pm.logsPage.clickSavedViewsExpand();
+      await page.waitForTimeout(500);
+      await pm.logsPage.clickSaveViewButton();
+      await pm.logsPage.fillSavedViewName(testViewName);
+      await pm.logsPage.clickSavedViewDialogSave();
+      await page.waitForTimeout(2000);
+      testLogger.info(`View saved: ${testViewName}`);
+
+      // Step 6: Reload the page to simulate fresh load
+      testLogger.info('Step 6: Reloading page');
+      await page.reload();
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      await page.waitForTimeout(2000);
+
+      // Step 7: Navigate back to logs and select the saved view
+      testLogger.info('Step 7: Selecting saved view');
+      await pm.logsPage.selectStream('e2e_automate');
+      await page.waitForTimeout(1000);
+
+      // Open saved views dropdown and search
+      await pm.logsPage.clickSavedViewsExpand();
+      await pm.logsPage.clickSavedViewSearchInput();
+      await pm.logsPage.fillSavedViewSearchInput(testViewName);
+      await page.waitForTimeout(1000);
+
+      // Wait for and click on the saved view
+      await pm.logsPage.waitForSavedViewText(testViewName);
+      await pm.logsPage.clickSavedViewByText(testViewName);
+      await page.waitForTimeout(2000);
+
+      // Step 8: Verify VRL function is loaded
+      testLogger.info('Step 8: Verifying VRL function loaded');
+
+      // Toggle VRL editor to make it visible (it's collapsed by default after loading saved view)
+      await pm.logsPage.clickVrlToggle();
+      await page.waitForTimeout(1000);
+
+      // Check if VRL editor has content
+      const vrlEditorContent = await pm.logsPage.getVrlEditorContent();
+      testLogger.info(`VRL editor content after load: ${vrlEditorContent.substring(0, 100)}`);
+
+      // Check if function dropdown shows selection
+      const dropdownText = await pm.logsPage.getFunctionDropdownText();
+      testLogger.info(`Function dropdown text: ${dropdownText}`);
+
+      // PRIMARY ASSERTION: VRL content should be present (not empty)
+      // Either the editor has content OR the function is selected in dropdown
+      const hasVrlContent = vrlEditorContent.length > 0 || dropdownText.includes(testFunctionName);
+      expect(hasVrlContent, 'Bug #9690: VRL function should load in saved view').toBeTruthy();
+      testLogger.info('✓ PRIMARY CHECK PASSED: VRL function loaded in saved view');
+
+    } catch (error) {
+      testLogger.error(`Test error: ${error.message}`);
+      throw error;
+    } finally {
+      // Cleanup: Delete the saved view if possible
+      try {
+        await pm.logsPage.clickDeleteSavedViewButton(testViewName).catch(() => {});
+        await page.waitForTimeout(500);
+        await pm.logsPage.clickConfirmButton().catch(() => {});
+        testLogger.info(`Cleaned up test view: ${testViewName}`);
+      } catch (cleanupError) {
+        testLogger.debug('Cleanup skipped or failed gracefully');
+      }
+    }
+
+    testLogger.info('✓ PASSED: VRL saved views test completed (Bug #9690)');
+  });
+
   test.afterEach(async () => {
     // Cleanup new stream created by field cache test (e2e_automate is never deleted)
     if (fieldCacheStreamsToCleanup.length > 0 && pm) {
