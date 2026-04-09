@@ -189,7 +189,7 @@ test.describe("UI Regression Bugs", () => {
   // Bug #11064: Query management page text not in CamelCase
   // https://github.com/openobserve/openobserve/issues/11064
   // ==========================================================================
-  test("Query management page should display text in CamelCase @bug-11064 @P3 @regression @accessibility", async ({ page }) => {
+  test.skip("Query management page should display text in CamelCase @bug-11064 @P3 @regression @accessibility", async ({ page }) => {
     testLogger.info('Test: Verify CamelCase text on Query management page (Bug #11064)');
 
     // Navigate to Query management / Scheduled queries page

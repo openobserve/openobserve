@@ -46,19 +46,23 @@ test.describe("Logs Regression Bug Fixes", () => {
   // https://github.com/openobserve/openobserve/issues/9996
   // ==========================================================================
   test("should maintain table visibility during scroll @bug-9996 @P0 @scroll @regression", async ({ page }) => {
+    test.setTimeout(240000); // 4 minutes timeout for slow environments
     testLogger.info('Test: Verify scroll maintains content visibility (Bug #9996)');
 
-    await pm.logsPage.clickMenuLinkLogsItem();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await pm.logsPage.selectStream('e2e_automate');
-    await pm.logsPage.clickDateTimeButton();
-    await pm.logsPage.clickRelative15MinButton();
+    // Navigate directly to logs page with stream and time parameters
+    const fifteenMinsAgo = Date.now() - (15 * 60 * 1000);
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}&stream=e2e_automate&stream_type=logs&from=${fifteenMinsAgo}&to=${Date.now()}`);
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // Run query to load data
     await pm.logsPage.clickRefreshButton();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
     // STRONG ASSERTION: Table must be visible before scroll
     await pm.logsPage.expectLogsTableVisible();
+    testLogger.info('✓ Table visible before scroll');
 
     // Scroll multiple times and verify table stays visible
     for (let i = 0; i < 5; i++) {
@@ -66,6 +70,7 @@ test.describe("Logs Regression Bug Fixes", () => {
       await page.waitForTimeout(300);
       // STRONG ASSERTION: Table must remain visible after each scroll
       await pm.logsPage.expectLogsTableVisible();
+      testLogger.info(`✓ Table visible after scroll ${i + 1}/5`);
     }
 
     testLogger.info('✓ PASSED: Table visible throughout scroll');

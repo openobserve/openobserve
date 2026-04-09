@@ -36,32 +36,15 @@ test.describe("Metrics Regression Bugs", () => {
   test("No results found text should be visible in dark mode @bug-11061 @P2 @regression @darkMode", async ({ page }, testInfo) => {
     testLogger.info('Test: Verify "No results found" visibility in dark mode (Bug #11061)');
 
-    // Enable dark mode if not already enabled
-    const themeToggle = pm.metricsPage.getThemeToggleButton();
-    const darkModeButton = pm.metricsPage.getDarkModeButton();
+    // Enable dark mode using the navbar theme toggle button
+    const themeToggleBtn = page.locator('[data-test="navbar-theme-toggle-btn"]');
 
-    // Try to find and click dark mode toggle
-    if (await darkModeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await darkModeButton.click();
-      await page.waitForTimeout(500);
-      testLogger.info('✓ Clicked dark mode toggle');
-    } else if (await themeToggle.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-      await themeToggle.first().click();
-      await page.waitForTimeout(500);
-      testLogger.info('✓ Clicked theme toggle');
+    if (await themeToggleBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await themeToggleBtn.click();
+      await page.waitForTimeout(1000);
+      testLogger.info('✓ Clicked theme toggle button');
     } else {
-      // Try via settings or profile menu
-      const settingsBtn = pm.metricsPage.getSettingsButton().first();
-      if (await settingsBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await settingsBtn.click();
-        await page.waitForTimeout(500);
-
-        const darkModeOption = pm.metricsPage.getDarkModeOption().first();
-        if (await darkModeOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await darkModeOption.click();
-          testLogger.info('✓ Enabled dark mode via settings');
-        }
-      }
+      testLogger.warn('Theme toggle button not found');
     }
 
     // Check if page is in dark mode by looking for dark class or dark theme styles
