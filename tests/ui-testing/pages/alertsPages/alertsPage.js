@@ -2224,27 +2224,19 @@ export class AlertsPage {
     // ==================== PROMQL CONDITION ROW METHODS ====================
 
     /**
-     * Get the PromQL condition row locator
-     */
-    getPromqlConditionRow() {
-        return this.page.locator(this.locators.alertSettingsRow).filter({ hasText: 'Trigger if the value is' });
-    }
-
-    /**
-     * Expect PromQL condition row "Trigger if the value is" to be visible
+     * Expect the PromQL threshold operator control to be visible in Step 4.
+     * Verifies bug #9967 fix: "Alert if [op] [value] series match criteria" row exists in PromQL mode.
      */
     async expectPromqlConditionRowVisible() {
-        const promqlConditionRow = this.getPromqlConditionRow();
-        await expect(promqlConditionRow).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="alert-threshold-operator-select"]')).toBeVisible({ timeout: 10000 });
         testLogger.info('PromQL condition row is visible');
     }
 
     /**
-     * Expect PromQL condition row NOT to be visible (for Custom mode)
+     * Expect the PromQL threshold operator control NOT to be visible (Custom mode).
      */
     async expectPromqlConditionRowNotVisible() {
-        const promqlConditionRow = this.getPromqlConditionRow();
-        await expect(promqlConditionRow).not.toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test="alert-threshold-operator-select"]')).not.toBeVisible({ timeout: 5000 });
         testLogger.info('PromQL condition row is NOT visible');
     }
 
@@ -2252,9 +2244,7 @@ export class AlertsPage {
      * Expect operator dropdown to be visible in PromQL condition row
      */
     async expectOperatorDropdownVisible() {
-        const promqlConditionRow = this.getPromqlConditionRow();
-        const operatorDropdown = promqlConditionRow.locator('.q-select').first();
-        await expect(operatorDropdown).toBeVisible();
+        await expect(this.page.locator('[data-test="alert-threshold-operator-select"]')).toBeVisible();
         testLogger.info('Operator dropdown is visible');
     }
 
@@ -2262,9 +2252,7 @@ export class AlertsPage {
      * Expect value input to be visible in PromQL condition row
      */
     async expectValueInputVisible() {
-        const promqlConditionRow = this.getPromqlConditionRow();
-        const valueInput = promqlConditionRow.locator('input[type="number"]');
-        await expect(valueInput).toBeVisible();
+        await expect(this.page.locator('[data-test="alert-threshold-value-input"]')).toBeVisible();
         testLogger.info('Value input is visible');
     }
 
@@ -2272,8 +2260,7 @@ export class AlertsPage {
      * Get the current value from the PromQL condition value input
      */
     async getPromqlConditionValue() {
-        const promqlConditionRow = this.getPromqlConditionRow();
-        const valueInput = promqlConditionRow.locator('input[type="number"]');
+        const valueInput = this.page.locator('[data-test="alert-threshold-value-input"]');
         await expect(valueInput).toBeVisible();
         const value = await valueInput.inputValue();
         testLogger.info('Retrieved PromQL condition value', { value });
