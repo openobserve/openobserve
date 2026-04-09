@@ -60,37 +60,11 @@ async fn extract_filtered_semantic_dimensions(
     org_id: &str,
     labels: &HashMap<String, String>,
 ) -> Option<FilteredSemanticResult> {
-    use config::meta::{
-        alerts::incidents::KeyType, correlation::ServiceIdentityConfig,
-        system_settings::SettingScope,
-    };
+    use config::meta::alerts::incidents::KeyType;
 
-    // Load ServiceIdentityConfig to get distinguish_by groups
-    let identity_config = match infra::table::system_settings::get(
-        &SettingScope::Org,
-        Some(org_id),
-        None,
-        "service_identity",
-    )
-    .await
-    {
-        Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
-            .unwrap_or_else(|e| {
-                log::warn!(
-                    "[incidents] Invalid service_identity config for org {}: {}, using default",
-                    org_id,
-                    e
-                );
-                ServiceIdentityConfig::default_config()
-            }),
-        _ => {
-            log::debug!(
-                "[incidents] No service_identity config found for org {}, using default",
-                org_id
-            );
-            ServiceIdentityConfig::default_config()
-        }
-    };
+    // Load ServiceIdentityConfig with auto-configuration applied
+    let identity_config =
+        crate::service::db::system_settings::get_service_identity_config(org_id).await;
 
     // Validate config has at least one set
     if identity_config.sets.is_empty() {
@@ -129,17 +103,17 @@ async fn extract_filtered_semantic_dimensions(
         if let Some(alias_group) = semantic_groups.iter().find(|g| g.id == *group_id) {
             // Find first matching field from this semantic group
             for field_name in &alias_group.fields {
-                if let Some(value) = labels.get(field_name) {
-                    if !value.is_empty() {
-                        group_values.insert(group_id.clone(), value.clone());
-                        log::debug!(
-                            "[incidents] Mapped field '{}' → '{}' = '{}'",
-                            field_name,
-                            group_id,
-                            value
-                        );
-                        break; // Take first match from this group
-                    }
+                if let Some(value) = labels.get(field_name)
+                    && !value.is_empty()
+                {
+                    group_values.insert(group_id.clone(), value.clone());
+                    log::debug!(
+                        "[incidents] Mapped field '{}' → '{}' = '{}'",
+                        field_name,
+                        group_id,
+                        value
+                    );
+                    break; // Take first match from this group
                 }
             }
         } else {
@@ -276,15 +250,15 @@ fn extract_service_name_parallel(
 
     // Priority 2: Extract from labels using standard service field names
     for field in ["service", "service_name", "svc", "app"] {
-        if let Some(service) = labels.get(field) {
-            if !service.is_empty() {
-                log::debug!(
-                    "[incidents] Extracted service name from field '{}': '{}'",
-                    field,
-                    service
-                );
-                return service.clone();
-            }
+        if let Some(service) = labels.get(field)
+            && !service.is_empty()
+        {
+            log::debug!(
+                "[incidents] Extracted service name from field '{}': '{}'",
+                field,
+                service
+            );
+            return service.clone();
         }
     }
 
@@ -981,6 +955,15 @@ async fn create_new_incident(
                     log::debug!(
                         "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
                     );
+
+                    emit_analysis_failure(
+                        &org_id_rca,
+                        &incident_id_rca,
+                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident,
+                        "Background spawn failed",
+                        Some(&e),
+                    )
+                    .await;
                 }
             });
         }
@@ -1005,12 +988,69 @@ async fn find_or_create_incident(
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
     use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
 
-    // STEP 1: Venn diagram match against all open incidents
+    // STEP 1: AlertId exact match - check for existing incident with same alert_id
+    if key_type == KeyType::AlertId {
+        let alert_id = alert.get_unique_key();
+
+        if let Some(existing) =
+            infra::table::alert_incidents::find_open_incident_by_alert_id(org_id, &alert_id).await?
+        {
+            // Found existing AlertId incident for this alert - join it
+            let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
+                &existing.id,
+                &alert_id,
+                &alert.name,
+                triggered_at,
+                correlation_reason,
+            )
+            .await?;
+
+            if let Err(e) = infra::table::incident_events::record_alert(
+                org_id,
+                &existing.id,
+                &alert_id,
+                &alert.name,
+                triggered_at,
+            )
+            .await
+            {
+                log::error!(
+                    "[Incidents] Failed to record alert event for incident {}: {e}",
+                    existing.id
+                );
+            }
+
+            spawn_topology_enrichment(
+                org_id,
+                &existing.id,
+                service_name,
+                &alert_id,
+                &alert.name,
+                triggered_at,
+            );
+
+            // AlertId incidents can't have new alert types (always same alert)
+            // but we respect the database result for consistency
+            if is_new_alert_type {
+                log::warn!(
+                    "[incidents] Unexpected new alert type for AlertId incident {}: {}",
+                    existing.id,
+                    alert_id
+                );
+            }
+
+            return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
+                incident_id: existing.id,
+                service_name: service_name.to_string(),
+            });
+        }
+    }
+
+    // STEP 2: Venn diagram match against all open incidents (for Primary/Secondary key types)
     //
     // Load all open incidents and check for dimension compatibility.
     // Equal or NewIsSubset → join incident; NewIsSuperset → upgrade and join.
     // PartialOverlap or Incompatible → skip (create new incident).
-    // AlertId key_type: skip Venn matching entirely — isolated per-alert.
     if key_type != KeyType::AlertId {
         let open_incidents =
             infra::table::alert_incidents::find_open_incidents_filtered(org_id, None, None).await?;
@@ -1164,6 +1204,14 @@ async fn find_or_create_incident(
                                 log::debug!(
                                     "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
                                 );
+
+                                emit_analysis_failure(
+                                    &org_id_rca,
+                                    &incident_id_rca,
+                                    config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis,
+                                    "Reanalysis trigger failed",
+                                    Some(&e),
+                                ).await;
                             }
                         });
                     } else {
@@ -1545,6 +1593,32 @@ fn cooldown_elapsed(
     }
 }
 
+/// Emit an AI analysis failure event for the specified incident
+#[cfg(feature = "enterprise")]
+async fn emit_analysis_failure(
+    org_id: &str,
+    incident_id: &str,
+    trigger_type: config::meta::alerts::incidents::AnalysisTriggerType,
+    reason: &str,
+    error: Option<&anyhow::Error>,
+) {
+    use config::meta::alerts::incidents::IncidentEvent;
+
+    let error_details = error.map(|e| format!("{:#}", e).chars().take(500).collect::<String>());
+
+    if let Err(e) = infra::table::incident_events::append(
+        org_id,
+        incident_id,
+        IncidentEvent::ai_analysis_failed(reason, trigger_type, error_details),
+    )
+    .await
+    {
+        log::error!(
+            "[INCIDENTS::RCA] Failed to emit AIAnalysisFailed event for {incident_id}: {e}"
+        );
+    }
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn trigger_rca_for_incident(
     org_id: String,
@@ -1721,6 +1795,27 @@ pub async fn trigger_rca_for_incident(
         }
         Err(e) => {
             log::warn!("[INCIDENTS::RCA] RCA failed for {incident_id}: {e}");
+
+            // Determine trigger type based on function context
+            let trigger_type = if reanalysis {
+                if _user_email == "system@openobserve.ai" {
+                    config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis
+                } else {
+                    config::meta::alerts::incidents::AnalysisTriggerType::Manual
+                }
+            } else {
+                config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident
+            };
+
+            emit_analysis_failure(
+                &org_id,
+                &incident_id,
+                trigger_type,
+                "RCA service call failed",
+                Some(&e),
+            )
+            .await;
+
             Err(e)
         }
     }
@@ -1810,7 +1905,7 @@ pub async fn update_status(
                 // reanalysis on reopen: deduct credits and report usage;
                 // begin_already_emitted=true skips cooldown/in-flight guards
                 if let Err(e) = trigger_rca_for_incident(
-                    org_id_rca,
+                    org_id_rca.clone(),
                     incident_id_rca.clone(),
                     true, // reanalysis — deduct credits and report usage
                     true, // begin already emitted above
@@ -1819,6 +1914,15 @@ pub async fn update_status(
                 .await
                 {
                     log::debug!("[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}");
+
+                    emit_analysis_failure(
+                        &org_id_rca,
+                        &incident_id_rca,
+                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReopened,
+                        "Reanalysis after reopen failed",
+                        Some(&e),
+                    )
+                    .await;
                 }
             });
         } else {

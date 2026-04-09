@@ -109,7 +109,11 @@ describe("parseUsageDetails", () => {
   });
 
   it("returns zeros for undefined", () => {
-    expect(parseUsageDetails(undefined)).toEqual({ input: 0, output: 0, total: 0 });
+    expect(parseUsageDetails(undefined)).toEqual({
+      input: 0,
+      output: 0,
+      total: 0,
+    });
   });
 
   it("parses plain input/output/total keys", () => {
@@ -171,7 +175,9 @@ describe("parseCostDetails", () => {
   });
 
   it("parses plain input/output/total keys", () => {
-    expect(parseCostDetails({ input: 0.001, output: 0.002, total: 0.003 })).toEqual({
+    expect(
+      parseCostDetails({ input: 0.001, output: 0.002, total: 0.003 }),
+    ).toEqual({
       input: 0.001,
       output: 0.002,
       total: 0.003,
@@ -322,7 +328,9 @@ describe("truncateLLMContent", () => {
       { role: "system", content: "You are helpful." },
       { role: "user", content: "Tell me a joke." },
     ];
-    expect(truncateLLMContent(JSON.stringify(messages))).toBe("Tell me a joke.");
+    expect(truncateLLMContent(JSON.stringify(messages))).toBe(
+      "Tell me a joke.",
+    );
   });
 
   it("falls back to first message with content when no user message", () => {
@@ -340,7 +348,9 @@ describe("truncateLLMContent", () => {
       tools: [],
       messages: [{ role: "user", content: "Nested user prompt" }],
     };
-    expect(truncateLLMContent(JSON.stringify(content))).toBe("Nested user prompt");
+    expect(truncateLLMContent(JSON.stringify(content))).toBe(
+      "Nested user prompt",
+    );
   });
 
   it("extracts text part from multimodal content array", () => {
@@ -353,7 +363,9 @@ describe("truncateLLMContent", () => {
         ],
       },
     ];
-    expect(truncateLLMContent(JSON.stringify(messages))).toBe("Describe this image.");
+    expect(truncateLLMContent(JSON.stringify(messages))).toBe(
+      "Describe this image.",
+    );
   });
 
   it("extracts from object with 'prompt' field", () => {
@@ -386,13 +398,17 @@ describe("parseEvaluationScores", () => {
   });
 
   it("returns scores when quality score is present", () => {
-    const result = parseEvaluationScores({ llm_evaluation_quality_score: 0.85 });
+    const result = parseEvaluationScores({
+      llm_evaluation_quality_score: 0.85,
+    });
     expect(result).not.toBeNull();
     expect(result!.qualityScore).toBe(0.85);
   });
 
   it("converts numeric strings to numbers", () => {
-    const result = parseEvaluationScores({ llm_evaluation_quality_score: "0.9" });
+    const result = parseEvaluationScores({
+      llm_evaluation_quality_score: "0.9",
+    });
     expect(result!.qualityScore).toBe(0.9);
   });
 
@@ -630,7 +646,9 @@ describe("formatModelParameters", () => {
   });
 
   it("formats a single parameter", () => {
-    expect(formatModelParameters({ temperature: 0.7 })).toBe("temperature: 0.7");
+    expect(formatModelParameters({ temperature: 0.7 })).toBe(
+      "temperature: 0.7",
+    );
   });
 
   it("formats multiple parameters with newlines", () => {

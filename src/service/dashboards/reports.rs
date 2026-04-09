@@ -23,8 +23,9 @@ use config::{
     meta::dashboards::{
         datetime_now,
         reports::{
-            HttpReportPayload, Report, ReportDashboard, ReportDestination, ReportEmailDetails,
-            ReportFrequencyType, ReportListFilters, ReportTimerangeType,
+            HttpReportPayload, Report, ReportDashboard, ReportDestination,
+            ReportEmailAttachmentType, ReportEmailDetails, ReportFrequencyType, ReportListFilters,
+            ReportMediaType, ReportTimerangeType,
         },
     },
     utils::time::now_micros,
@@ -79,6 +80,9 @@ pub enum ReportError {
 
     #[error("Atleast one dashboard is required")]
     NoDashboards,
+
+    #[error("Inline attachment type is only supported for PNG reports, not PDF")]
+    InlineAttachmentTypeNotSupportedForPdf,
 
     #[error("Atleast one tab is required")]
     NoDashboardTabs,
@@ -171,6 +175,14 @@ pub async fn save(
     // Atleast one `ReportDashboard` needs to be present
     if report.dashboards.is_empty() {
         return Err(ReportError::NoDashboards);
+    }
+
+    // Inline attachment type is only valid for PNG reports
+    if report.dashboards.iter().any(|d| {
+        d.report_type == ReportMediaType::Pdf
+            && d.email_attachment_type == ReportEmailAttachmentType::Inline
+    }) {
+        return Err(ReportError::InlineAttachmentTypeNotSupportedForPdf);
     }
 
     // Check if dashboards & tabs exist
@@ -368,6 +380,7 @@ impl SendReport for Report {
                     name: self.name.clone(),
                     message: self.message.clone(),
                     dashb_url: format!("{}{}/web", cfg.common.web_url, cfg.common.base_uri),
+                    image_preview: self.image_preview,
                 },
             };
 

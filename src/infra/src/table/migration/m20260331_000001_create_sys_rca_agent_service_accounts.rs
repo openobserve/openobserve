@@ -59,7 +59,7 @@ impl MigrationTrait for Migration {
                     continue;
                 }
 
-                let now = chrono::Utc::now().timestamp_micros() as u64;
+                let now = chrono::Utc::now().timestamp_micros();
 
                 // Generate password
                 let random_password = generate_random_string(32);
@@ -177,8 +177,8 @@ mod users {
         pub is_root: bool,
         pub password_ext: Option<String>,
         pub user_type: i16,
-        pub created_at: u64,
-        pub updated_at: u64,
+        pub created_at: i64,
+        pub updated_at: i64,
     }
 
     #[derive(Copy, Clone, Debug, EnumIter)]
@@ -219,8 +219,8 @@ mod org_users {
         pub token: String,
         pub rum_token: Option<String>,
         pub allow_static_token: bool,
-        pub created_at: u64,
-        pub updated_at: u64,
+        pub created_at: i64,
+        pub updated_at: i64,
     }
 
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

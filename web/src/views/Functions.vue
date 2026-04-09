@@ -110,6 +110,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t('function.enrichmentTables') }}
                   </q-tooltip>
                 </q-route-tab>
+                />
+                <q-route-tab
+                  v-if="config.isEnterprise == 'true'"
+                  data-test="eval-templates-tab"
+                  name="evalTemplates"
+                  :to="{
+                    name: 'evalTemplates',
+                    query: {
+                      org_identifier: store.state.selectedOrganization.identifier,
+                    },
+                  }"
+                  label="Evaluation Templates"
+                  content-class="tab_content"
+                />
               </q-tabs>
             </div>
           </div>
@@ -149,6 +163,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "@/utils/zincutils";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "AppFunctions",
@@ -266,6 +281,7 @@ export default defineComponent({
       sendToAiChat,
       isCompactSidebar,
       functionIcon,
+      config,
     };
   },
 });
