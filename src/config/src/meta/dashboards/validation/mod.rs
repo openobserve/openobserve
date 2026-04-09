@@ -48,8 +48,7 @@ mod tests {
 
     #[test]
     fn test_valid_minimal_dashboard() {
-        let json_str =
-            include_str!("../../../../../../test-fixtures/valid/minimal-dashboard.json");
+        let json_str = include_str!("../../../../../../test-fixtures/valid/minimal-dashboard.json");
         let json: Value = serde_json::from_str(json_str).unwrap();
         let errors = validate_dashboard(&json);
         assert!(
@@ -61,8 +60,7 @@ mod tests {
 
     #[test]
     fn test_invalid_missing_title() {
-        let json_str =
-            include_str!("../../../../../../test-fixtures/invalid/missing-title.json");
+        let json_str = include_str!("../../../../../../test-fixtures/invalid/missing-title.json");
         let json: Value = serde_json::from_str(json_str).unwrap();
         let errors = validate_dashboard(&json);
         assert!(
