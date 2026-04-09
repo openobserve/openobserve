@@ -667,6 +667,76 @@ test.describe("Logs Regression Bug Fixes", () => {
   });
 
   // ==========================================================================
+  // Bug #9550: Remove = icon for VRL when added to the table
+  // https://github.com/openobserve/openobserve/issues/9550
+  // VRL-generated fields should not show include/exclude (=) icon since
+  // these computed fields don't support include/exclude functionality.
+  // ==========================================================================
+  test("should not display include/exclude icon for VRL-generated fields @bug-9550 @P2 @vrl @regression", async ({ page }) => {
+    test.setTimeout(120000); // 2 minutes timeout for VRL processing
+    testLogger.info('Test: Verify VRL fields do not show include/exclude icon (Bug #9550)');
+
+    // Navigate to logs page
+    const logsUrl = `${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`;
+    await page.goto(logsUrl);
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    // Step 1: Enable VRL toggle
+    testLogger.info('Step 1: Enabling VRL function toggle');
+    await pm.logsPage.clickVrlToggleButton().catch(() => {
+      testLogger.warn('VRL toggle may already be enabled or not visible');
+    });
+    await page.waitForTimeout(1000);
+
+    // Step 2: Enter a VRL function that creates a computed field
+    testLogger.info('Step 2: Entering VRL function');
+    const vrlEditor = pm.logsPage.getVrlEditor().first();
+
+    // STRONG ASSERTION: VRL editor must be visible (no soft guard)
+    await expect(vrlEditor, 'Bug #9550: VRL editor must be visible').toBeVisible({ timeout: 5000 });
+
+    await vrlEditor.click();
+    await page.keyboard.type('.computed_field = .kubernetes_pod_name + "_computed"');
+    testLogger.info('VRL function entered to create computed_field');
+
+    // Step 3: Run query to apply VRL
+    await pm.logsPage.clickSearchBarRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // Step 4: Search for the computed field
+    testLogger.info('Step 4: Looking for computed_field in field list');
+    await pm.logsPage.fillIndexFieldSearchInput('computed_field');
+    await page.waitForTimeout(500);
+
+    const computedFieldBtn = pm.logsPage.getComputedFieldButton().first();
+
+    // STRONG ASSERTION: Computed field must appear (no soft guard)
+    await expect(computedFieldBtn, 'Bug #9550: computed_field must appear').toBeVisible({ timeout: 5000 });
+
+    // Hover over the field to show action buttons
+    await computedFieldBtn.hover();
+    await page.waitForTimeout(300);
+
+    // Step 5: Verify include/exclude icon is NOT present for VRL fields
+    testLogger.info('Step 5: Checking for include/exclude icon');
+    const includeExcludeIcon = pm.logsPage.getIncludeExcludeIcon();
+    const hasIncludeExcludeIcon = await includeExcludeIcon.isVisible().catch(() => false);
+
+    const equalsIcon = pm.logsPage.getEqualsIcon();
+    const hasEqualsIcon = await equalsIcon.isVisible().catch(() => false);
+
+    testLogger.info(`Include/Exclude icon visible: ${hasIncludeExcludeIcon}`);
+    testLogger.info(`Equals icon visible: ${hasEqualsIcon}`);
+
+    // STRONG ASSERTION: VRL fields should NOT have include/exclude functionality
+    expect(hasIncludeExcludeIcon || hasEqualsIcon, 'Bug #9550: VRL fields should not have include/exclude icon').toBe(false);
+    testLogger.info('✓ PASSED: VRL field has no include/exclude icon - Bug #9550 is fixed');
+  });
+
+  // ==========================================================================
   // Bug #9788: Share button should be disabled when ZO_WEB_URL is not configured
   // https://github.com/openobserve/openobserve/issues/9788
   // ==========================================================================
