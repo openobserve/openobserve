@@ -184,6 +184,7 @@ jobs:
                 "dashboard-share-link.spec.js",
                 "crossLinking.spec.js",
                 "dashboard-table-histogram-timestamp.spec.js",
+                "crossLinkMultiStream.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
