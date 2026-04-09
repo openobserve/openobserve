@@ -41,6 +41,7 @@ pub mod metrics;
 pub mod node;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
+pub mod oauth_providers;
 pub mod organization;
 pub mod pipeline;
 pub mod promql;

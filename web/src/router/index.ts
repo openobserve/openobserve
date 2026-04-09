@@ -90,16 +90,27 @@ export default function (store: any) {
     }
 
     const isAuthenticated = store.state.loggedIn;
+    const sessionUserInfo = getDecodedUserInfo();
 
-    if (!isAuthenticated && (to.path == "/cb" || to.path == "/web/cb")) {
+    const isNoAuthRoute =
+      to.path === "/cb" ||
+      to.path === "/web/cb" ||
+      to.path === "/oauth-success" ||
+      to.path === "/oauth-error" ||
+      to.matched.some((r: any) => r.meta?.noAuth);
+
+    console.log(`[ROUTER] path=${to.path} | isAuthenticated=${isAuthenticated} | isNoAuthRoute=${isNoAuthRoute} | sessionUserInfo=${sessionUserInfo !== null ? 'present' : 'null'} | matched=${JSON.stringify(to.matched?.map((r: any) => ({ path: r.path, noAuth: r.meta?.noAuth })))}`);
+
+    // No-auth routes always pass through regardless of login state
+    if (isNoAuthRoute) {
+      console.log(`[ROUTER] → next() (no-auth route)`);
       next();
-    } else if (!isAuthenticated) {
-      const sessionUserInfo = getDecodedUserInfo();
+      return;
+    }
 
+    if (!isAuthenticated) {
       if (
         to.path !== "/login" &&
-        to.path !== "/cb" &&
-        to.path != "/web/cb" &&
         sessionUserInfo === null
       ) {
         if (
@@ -117,6 +128,7 @@ export default function (store: any) {
             window.sessionStorage.setItem("redirectURI", window.location.href);
           }
         }
+        console.log(`[ROUTER] → redirect to /login (not authenticated, no session)`);
         next({ path: "/login" });
       } else {
         if (sessionUserInfo !== null) {
@@ -126,6 +138,7 @@ export default function (store: any) {
             userInfo: userInfo,
           });
         }
+        console.log(`[ROUTER] → next() (not authenticated but session found)`);
         next();
       }
     } else {

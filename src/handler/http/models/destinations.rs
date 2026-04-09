@@ -71,6 +71,23 @@ impl From<meta_dest::Destination> for Destination {
                     destination_type: DestinationType::Sns,
                     ..Default::default()
                 },
+                meta_dest::DestinationType::OAuth(conn) => {
+                    // Serialize OAuthConnection as JSON into the destination metadata
+                    // so the frontend receives the full connection info.
+                    let mut metadata = hashbrown::HashMap::new();
+                    metadata.insert(
+                        "oauth_connection".to_string(),
+                        serde_json::to_string(&conn).unwrap_or_default(),
+                    );
+                    Self {
+                        name: value.name,
+                        template,
+                        destination_type: DestinationType::Http, // treated as HTTP for API compat
+                        destination_type_name: Some(format!("oauth_{}", conn.provider)),
+                        metadata,
+                        ..Default::default()
+                    }
+                }
             },
             meta_dest::Module::Pipeline { endpoint } => Self {
                 name: value.name,
@@ -105,6 +122,12 @@ impl Destination {
                 DestinationType::Email => meta_dest::DestinationType::Email(meta_dest::Email {
                     recipients: self.emails,
                 }),
+                DestinationType::Http if self.oauth_connection.is_some() => {
+                    let conn: meta_dest::OAuthConnection =
+                        serde_json::from_value(self.oauth_connection.unwrap())
+                            .map_err(|_e| DestinationError::EmptyUrl)?;
+                    meta_dest::DestinationType::OAuth(conn)
+                }
                 DestinationType::Http => meta_dest::DestinationType::Http(meta_dest::Endpoint {
                     url: self.url,
                     method: self.method,
@@ -294,6 +317,14 @@ pub struct Destination {
     /// Optional key-value metadata for the destination.
     #[serde(default)]
     pub metadata: HashMap<String, String>,
+    /// OAuth state UUID — present only when creating/reconnecting an OAuth destination.
+    /// On save the backend migrates the token from the session table to the cipher table.
+    /// Must be absent (or null) for channel-only updates.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oauth_state: Option<String>,
+    /// OAuth connection details — present only when destination_type_name starts with "oauth_".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oauth_connection: Option<serde_json::Value>,
 }
 
 #[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone, ToSchema)]

@@ -30,7 +30,8 @@ use config::{
             alert::{Alert, AlertListFilter, ListAlertsParams, RowTemplateType},
         },
         destinations::{
-            AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateType,
+            AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, OAuthConnection,
+            OAuthConnectionStatus, Template, TemplateType,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         search::{SearchEventContext, SearchEventType},
@@ -1151,6 +1152,9 @@ pub(crate) async fn dispatch_notification(
         DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
         DestinationType::Email(email) => send_email_notification(subject, email, msg).await,
         DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
+        DestinationType::OAuth(_conn) => {
+            Err(anyhow::anyhow!("OAuth destinations are not supported via dispatch_notification"))
+        }
     }
 }
 
@@ -1218,7 +1222,220 @@ async fn send_notification(
         DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
         DestinationType::Email(email) => send_email_notification(&email_subject, email, msg).await,
         DestinationType::Sns(aws_sns) => send_sns_notification(&alert.name, aws_sns, msg).await,
+        DestinationType::OAuth(conn) => send_oauth_notification(&alert.org_id, conn, msg).await,
     }
+}
+
+/// Send an alert notification to an OAuth-based destination (Slack, Discord, PagerDuty, …).
+///
+/// This function is in OSS code (not behind `#[cfg(feature = "enterprise")]`).
+async fn send_oauth_notification(
+    org_id: &str,
+    connection: &OAuthConnection,
+    msg: String,
+) -> Result<String, anyhow::Error> {
+    use crate::service::oauth_providers::{OAuthNotifyError, PROVIDER_REGISTRY};
+    use infra::table::cipher::{self, EntryKind};
+
+    if connection.status == OAuthConnectionStatus::Revoked {
+        return Err(anyhow::anyhow!(
+            "OAuth destination token is revoked for connection {}",
+            connection.connection_id
+        ));
+    }
+    if connection.status == OAuthConnectionStatus::TokenExpired {
+        return Err(anyhow::anyhow!(
+            "OAuth destination token is expired for connection {}",
+            connection.connection_id
+        ));
+    }
+
+    let handler = PROVIDER_REGISTRY
+        .get(&connection.provider)
+        .ok_or_else(|| anyhow::anyhow!("Unknown OAuth provider: {}", connection.provider))?;
+
+    let cipher_name = format!("{}/{}", connection.provider, connection.connection_id);
+    let token_json = cipher::get_data(org_id, EntryKind::OAuthToken, &cipher_name)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("OAuth token not found for connection {}", connection.connection_id))?;
+
+    // Token stored as JSON {"access_token":"...", "refresh_token":"...", "expires_at": i64}
+    let token_value: serde_json::Value =
+        serde_json::from_str(&token_json).unwrap_or(serde_json::Value::String(token_json.clone()));
+
+    let mut access_token = token_value
+        .get("access_token")
+        .and_then(|x| x.as_str())
+        .unwrap_or(&token_json)
+        .to_string();
+
+    // Token refresh: attempt if token expires within 1 hour.
+    // The destination-proxy holds all client secrets, so we relay the refresh
+    // token to it and it returns new tokens.
+    if let Some(expires_at) = connection.token_expires_at {
+        let now = chrono::Utc::now().timestamp();
+        if expires_at - now < 3600 {
+            let refresh_token = token_value
+                .get("refresh_token")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            if !refresh_token.is_empty() {
+                use crate::service::oauth_providers::proxy_client::ProxyClient;
+
+                let proxy = match ProxyClient::from_config() {
+                    Some(p) => p,
+                    None => {
+                        log::warn!(
+                            "OAuth token refresh skipped for connection {}: proxy not configured",
+                            connection.connection_id
+                        );
+                        // Fall through and attempt send with possibly-expired token
+                        return Err(anyhow::anyhow!(
+                            "token_expired: proxy not configured for refresh"
+                        ));
+                    }
+                };
+
+                let provider_str = connection.provider.to_string();
+                match proxy.refresh(&provider_str, &refresh_token).await {
+                    Ok(r) => {
+                        access_token = r.access_token.clone();
+
+                        let updated_json = serde_json::json!({
+                            "access_token": r.access_token,
+                            "refresh_token": r.refresh_token.unwrap_or(refresh_token),
+                            "expires_at": r.expires_at,
+                        })
+                        .to_string();
+
+                        let new_entry = infra::table::cipher::CipherEntry {
+                            org: org_id.to_string(),
+                            created_at: chrono::Utc::now().timestamp(),
+                            created_by: "system".to_string(),
+                            name: cipher_name.clone(),
+                            data: updated_json,
+                            kind: EntryKind::OAuthToken,
+                        };
+                        if let Err(e) = cipher::update(new_entry).await {
+                            log::warn!("OAuth token refresh: cipher update failed: {e}");
+                        }
+
+                        if let Some(new_exp) = r.expires_at {
+                            let _ = super::destinations::update_oauth_token_expiry(
+                                org_id,
+                                &connection.connection_id,
+                                new_exp,
+                            )
+                            .await;
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "OAuth token refresh failed for connection {}: {e}",
+                            connection.connection_id
+                        );
+                        let _ = super::destinations::set_oauth_status_token_expired(
+                            org_id,
+                            &connection.connection_id,
+                        )
+                        .await;
+                        return Err(anyhow::anyhow!("token_expired: refresh failed: {e}"));
+                    }
+                }
+            }
+        }
+    }
+
+    // Retry with rate-limit back-off (up to 3 attempts)
+    let max_retries = 3u8;
+    let mut last_error = String::new();
+    let mut retry_count: u8 = 0;
+    for attempt in 0..max_retries {
+        retry_count = attempt;
+        match handler
+            .send_notification(&access_token, connection.channel_id.as_deref(), &msg)
+            .await
+        {
+            Ok(()) => {
+                // Build structured notification result for alert history
+                let result = serde_json::json!({
+                    "provider": connection.provider.to_string(),
+                    "connection_id": connection.connection_id,
+                    "channel_id": connection.channel_id,
+                    "channel_name": connection.channel_name,
+                    "status": "success",
+                    "retry_count": retry_count,
+                    "timestamp": chrono::Utc::now().timestamp(),
+                });
+                return Ok(result.to_string());
+            }
+            Err(OAuthNotifyError::RateLimited(retry_after)) => {
+                if attempt + 1 < max_retries {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(retry_after)).await;
+                    continue;
+                }
+                last_error = format!("rate_limited(retry_after={retry_after}s)");
+            }
+            Err(OAuthNotifyError::TokenRevoked) => {
+                let _ = super::destinations::set_oauth_status_revoked_by_connection(
+                    org_id,
+                    &connection.connection_id,
+                )
+                .await;
+                let result = serde_json::json!({
+                    "provider": connection.provider.to_string(),
+                    "connection_id": connection.connection_id,
+                    "channel_id": connection.channel_id,
+                    "channel_name": connection.channel_name,
+                    "status": "failed",
+                    "error_code": "token_revoked",
+                    "retry_count": retry_count,
+                    "timestamp": chrono::Utc::now().timestamp(),
+                });
+                return Err(anyhow::anyhow!("{}", result));
+            }
+            Err(OAuthNotifyError::TokenExpired) => {
+                let _ = super::destinations::set_oauth_status_token_expired(
+                    org_id,
+                    &connection.connection_id,
+                )
+                .await;
+                let result = serde_json::json!({
+                    "provider": connection.provider.to_string(),
+                    "connection_id": connection.connection_id,
+                    "channel_id": connection.channel_id,
+                    "channel_name": connection.channel_name,
+                    "status": "failed",
+                    "error_code": "token_expired",
+                    "retry_count": retry_count,
+                    "timestamp": chrono::Utc::now().timestamp(),
+                });
+                return Err(anyhow::anyhow!("{}", result));
+            }
+            Err(OAuthNotifyError::ChannelNotFound) => {
+                last_error = "channel_not_found".to_string();
+                break; // don't retry — channel won't reappear
+            }
+            Err(e) => {
+                last_error = e.to_string();
+                break;
+            }
+        }
+    }
+
+    let result = serde_json::json!({
+        "provider": connection.provider.to_string(),
+        "connection_id": connection.connection_id,
+        "channel_id": connection.channel_id,
+        "channel_name": connection.channel_name,
+        "status": "failed",
+        "error_code": last_error,
+        "retry_count": retry_count,
+        "timestamp": chrono::Utc::now().timestamp(),
+    });
+    Err(anyhow::anyhow!("{}", result))
 }
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {

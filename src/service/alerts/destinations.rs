@@ -15,7 +15,7 @@
 
 use config::{
     get_config,
-    meta::destinations::{Destination, DestinationType, Email, Module, Template},
+    meta::destinations::{Destination, DestinationType, Email, Module, OAuthConnectionStatus, Template},
 };
 
 use crate::{
@@ -132,6 +132,7 @@ pub async fn save(
     name: &str,
     mut destination: Destination,
     create: bool,
+    oauth_state: Option<String>,
 ) -> Result<Destination, DestinationError> {
     // First validate the `destination` according to its `destination_type`
     match &mut destination.module {
@@ -165,6 +166,20 @@ pub async fn save(
             DestinationType::Sns(aws_sns) => {
                 if aws_sns.sns_topic_arn.is_empty() || aws_sns.aws_region.is_empty() {
                     return Err(DestinationError::InvalidSns);
+                }
+            }
+            DestinationType::OAuth(conn) => {
+                use crate::service::oauth_providers::PROVIDER_REGISTRY;
+                if conn.connection_id.is_empty() {
+                    return Err(DestinationError::EmptyUrl); // connection_id is required
+                }
+                // Enforce channel_id for providers that have a channel picker
+                if let Some(handler) = PROVIDER_REGISTRY.get(&conn.provider) {
+                    if handler.has_channel_picker()
+                        && conn.channel_id.as_deref().unwrap_or("").is_empty()
+                    {
+                        return Err(DestinationError::EmptyUrl); // channel_id required
+                    }
                 }
             }
         },
@@ -222,6 +237,7 @@ pub async fn save(
                 }
             }
             DestinationType::Sns(_) => None, // SNS doesn't have prebuilt templates yet
+            DestinationType::OAuth(_) => None, // OAuth: template already set by caller or prebuilt
         };
 
         // If it's a prebuilt type and doesn't have a custom template, ensure prebuilt template
@@ -253,11 +269,169 @@ pub async fn save(
         return Err(DestinationError::TemplateNotFound);
     }
 
+    // For OAuth destinations: if a state token was provided, migrate token from
+    // session table → cipher table and update the team index. This must happen
+    // after validation but BEFORE saving the destination row so that a cipher
+    // failure aborts the whole operation.
+    //
+    // Also back-fills token_expires_at on the OAuthConnection from the session
+    // so that token refresh fires correctly for expiring tokens (Discord, PagerDuty, etc.).
+    if let Module::Alert {
+        destination_type: DestinationType::OAuth(ref mut conn),
+        ..
+    } = destination.module
+    {
+        if let Some(ref state) = oauth_state {
+            let expires_at = migrate_oauth_token(&destination.org_id, conn, state)
+                .await
+                .map_err(DestinationError::InfraError)?;
+            conn.token_expires_at = expires_at;
+        }
+    }
+
     let saved = db::alerts::destinations::set(destination).await?;
+
+    // Delete session row only after successful destination save
+    if let Module::Alert {
+        destination_type: DestinationType::OAuth(_),
+        ..
+    } = saved.module
+    {
+        if let Some(ref state) = oauth_state {
+            if let Err(e) = infra::table::sessions::delete(state).await {
+                log::warn!("save: failed to delete OAuth session after save: {e}");
+            }
+        }
+    }
+
     if name.is_empty() {
         set_ownership(&saved.org_id, "destinations", Authz::new(&saved.name)).await;
     }
     Ok(saved)
+}
+
+/// Migrate OAuth token from the session table to the cipher table.
+///
+/// Session table → cipher table → update team index.
+/// Called during `save()` when `oauth_state` is present.
+/// Returns the token expiry timestamp so the caller can set `conn.token_expires_at`.
+async fn migrate_oauth_token(
+    org_id: &str,
+    conn: &config::meta::destinations::OAuthConnection,
+    state: &str,
+) -> Result<Option<i64>, infra::errors::Error> {
+    use infra::table::{
+        cipher::{self, CipherEntry, EntryKind},
+        sessions,
+    };
+
+    // Read pending session
+    let session_model = match sessions::get(state).await? {
+        Some(m) => m,
+        None => {
+            return Err(infra::errors::Error::Message(
+                "OAuth session not found or expired".to_string(),
+            ));
+        }
+    };
+
+    let session: crate::service::oauth_providers::OAuthPendingSession =
+        serde_json::from_str(&session_model.access_token).map_err(|e| {
+            infra::errors::Error::Message(format!("OAuth session corrupt: {e}"))
+        })?;
+
+    // Org isolation
+    if session.org_id != org_id {
+        return Err(infra::errors::Error::Message(
+            "OAuth session org_id mismatch".to_string(),
+        ));
+    }
+
+    let access_token = session
+        .access_token
+        .ok_or_else(|| infra::errors::Error::Message("OAuth token not present in session".to_string()))?;
+
+    // Capture expiry before session fields are moved into token_json
+    let token_expires_at = session.expires_at_token;
+
+    // Store as JSON so we can also keep refresh_token if present
+    let token_json = serde_json::json!({
+        "access_token": access_token,
+        "refresh_token": session.refresh_token,
+        "expires_at": token_expires_at,
+    })
+    .to_string();
+
+    let cipher_name = format!("{}/{}", conn.provider, conn.connection_id);
+
+    // Use update-or-insert: try add first, fallback to update
+    let entry = CipherEntry {
+        org: org_id.to_string(),
+        created_at: chrono::Utc::now().timestamp(),
+        created_by: "system".to_string(),
+        name: cipher_name.clone(),
+        data: token_json.clone(),
+        kind: EntryKind::OAuthToken,
+    };
+
+    match cipher::add(entry).await {
+        Ok(_) => {}
+        Err(infra::errors::Error::DbError(infra::errors::DbError::UniqueViolation)) => {
+            // Already exists (reconnect) — update instead
+            let update_entry = CipherEntry {
+                org: org_id.to_string(),
+                created_at: chrono::Utc::now().timestamp(),
+                created_by: "system".to_string(),
+                name: cipher_name.clone(),
+                data: token_json,
+                kind: EntryKind::OAuthToken,
+            };
+            cipher::update(update_entry).await?;
+        }
+        Err(e) => return Err(e),
+    }
+
+    // Update team index for revocation fan-out (skip if no team_id — e.g. PagerDuty)
+    if let Some(ref team_id) = conn.team_id {
+        let provider_str = conn.provider.to_string();
+        let index_key = format!("team_index/{provider_str}/{team_id}");
+
+        let mut entries: Vec<serde_json::Value> =
+            match cipher::get_data("_alert_dest_oauth_team_index", EntryKind::OAuthToken, &index_key).await? {
+                Some(data) => serde_json::from_str(&data).unwrap_or_default(),
+                None => vec![],
+            };
+
+        // De-duplicate — remove existing entry for this connection_id then re-append
+        entries.retain(|e| {
+            e.get("connection_id").and_then(|v| v.as_str())
+                != Some(&conn.connection_id)
+        });
+        entries.push(serde_json::json!({
+            "org_id": org_id,
+            "connection_id": conn.connection_id,
+        }));
+
+        let updated_json = serde_json::to_string(&entries).unwrap_or_default();
+        let index_entry = CipherEntry {
+            org: "_alert_dest_oauth_team_index".to_string(),
+            created_at: chrono::Utc::now().timestamp(),
+            created_by: "system".to_string(),
+            name: index_key,
+            data: updated_json,
+            kind: EntryKind::OAuthToken,
+        };
+
+        match cipher::add(index_entry.clone()).await {
+            Ok(_) => {}
+            Err(infra::errors::Error::DbError(infra::errors::DbError::UniqueViolation)) => {
+                cipher::update(index_entry).await?;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    Ok(token_expires_at)
 }
 
 /// Validates email destination configuration and sends a test email.
@@ -377,10 +551,155 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
         }
     }
 
+    // For OAuth destinations, clean up cipher + team index before deleting the row.
+    if let Ok(dest) = db::alerts::destinations::get(org_id, name).await {
+        if let Module::Alert {
+            destination_type: DestinationType::OAuth(ref conn),
+            ..
+        } = dest.module
+        {
+            return delete_oauth_internal(org_id, name, conn).await;
+        }
+    }
+
     db::alerts::destinations::delete(org_id, name).await?;
     remove_ownership(org_id, "destinations", Authz::new(name)).await;
     Ok(())
 }
+
+async fn delete_oauth_internal(
+    org_id: &str,
+    name: &str,
+    conn: &config::meta::destinations::OAuthConnection,
+) -> Result<(), DestinationError> {
+    use infra::table::cipher::{self, CipherEntry, EntryKind};
+
+    let provider = conn.provider.to_string();
+    let connection_id = conn.connection_id.clone();
+    let team_id = conn.team_id.clone();
+    let cipher_name = format!("{provider}/{connection_id}");
+
+    // 1. Remove cipher token first — abort if fails
+    if let Err(e) = cipher::remove(org_id, EntryKind::OAuthToken, &cipher_name).await {
+        log::error!("delete_oauth: cipher removal failed for {cipher_name}: {e}");
+        return Err(DestinationError::InfraError(e));
+    }
+
+    // 2. Remove from team index
+    if let Some(team_id) = team_id {
+        let index_key = format!("team_index/{provider}/{team_id}");
+        if let Ok(Some(data)) =
+            cipher::get_data("_alert_dest_oauth_team_index", EntryKind::OAuthToken, &index_key).await
+        {
+            if let Ok(mut entries) =
+                serde_json::from_str::<Vec<serde_json::Value>>(&data)
+            {
+                entries.retain(|e| {
+                    e.get("connection_id").and_then(|v| v.as_str())
+                        != Some(&connection_id)
+                });
+                let updated = serde_json::to_string(&entries).unwrap_or_default();
+                let entry = CipherEntry {
+                    org: "_alert_dest_oauth_team_index".to_string(),
+                    created_at: chrono::Utc::now().timestamp(),
+                    created_by: "system".to_string(),
+                    name: index_key,
+                    data: updated,
+                    kind: EntryKind::OAuthToken,
+                };
+                if let Err(e) = cipher::update(entry).await {
+                    log::warn!("delete_oauth: team index update failed: {e}");
+                }
+            }
+        }
+    }
+
+    // 3. Delete destination row
+    db::alerts::destinations::delete(org_id, name).await?;
+    remove_ownership(org_id, "destinations", Authz::new(name)).await;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// OAuth-specific helpers (used by alert.rs and oauth_destinations.rs)
+// ---------------------------------------------------------------------------
+
+/// Set the OAuth connection status to `Revoked` for a given connection_id.
+/// Searches all destinations in the org that reference this connection.
+pub async fn set_oauth_status_revoked(
+    org_id: &str,
+    connection_id: &str,
+) -> Result<(), DestinationError> {
+    set_oauth_connection_status(org_id, connection_id, OAuthConnectionStatus::Revoked).await
+}
+
+/// Set the OAuth connection status to `Revoked` by connection_id (alias for compatibility).
+pub async fn set_oauth_status_revoked_by_connection(
+    org_id: &str,
+    connection_id: &str,
+) -> Result<(), DestinationError> {
+    set_oauth_status_revoked(org_id, connection_id).await
+}
+
+/// Set the OAuth connection status to `TokenExpired` for a given connection_id.
+pub async fn set_oauth_status_token_expired(
+    org_id: &str,
+    connection_id: &str,
+) -> Result<(), DestinationError> {
+    set_oauth_connection_status(org_id, connection_id, OAuthConnectionStatus::TokenExpired).await
+}
+
+/// Update the `token_expires_at` field on an OAuth destination after a successful refresh.
+pub async fn update_oauth_token_expiry(
+    org_id: &str,
+    connection_id: &str,
+    new_expires_at: i64,
+) -> Result<(), DestinationError> {
+    let destinations = db::alerts::destinations::list(org_id, Some("alert")).await?;
+    for mut dest in destinations {
+        if let Module::Alert {
+            ref mut destination_type,
+            ..
+        } = dest.module
+        {
+            if let DestinationType::OAuth(conn) = destination_type {
+                if conn.connection_id == connection_id {
+                    conn.token_expires_at = Some(new_expires_at);
+                    db::alerts::destinations::set(dest).await?;
+                    return Ok(());
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn set_oauth_connection_status(
+    org_id: &str,
+    connection_id: &str,
+    new_status: OAuthConnectionStatus,
+) -> Result<(), DestinationError> {
+    // List all alert destinations for this org and find the matching connection
+    let destinations = db::alerts::destinations::list(org_id, Some("alert")).await?;
+    for mut dest in destinations {
+        if let Module::Alert {
+            ref mut destination_type,
+            ..
+        } = dest.module
+        {
+            if let DestinationType::OAuth(conn) = destination_type {
+                if conn.connection_id == connection_id {
+                    conn.status = new_status.clone();
+                    db::alerts::destinations::set(dest).await?;
+                    return Ok(());
+                }
+            }
+        }
+    }
+    // Not found is not necessarily an error (destination may have been deleted)
+    Ok(())
+}
+
 
 #[cfg(test)]
 mod tests {

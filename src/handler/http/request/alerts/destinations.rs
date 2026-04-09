@@ -302,11 +302,12 @@ pub async fn save_destination(
     let module = query.get("module").map(|s| s.as_str());
     let is_alert = module != Some("pipeline");
 
-    let dest = match dest.into(org_id, is_alert) {
+    let oauth_state = dest.oauth_state.clone();
+    let dest = match dest.into(org_id.clone(), is_alert) {
         Ok(dest) => dest,
         Err(e) => return e.into(),
     };
-    match destinations::save("", dest, true).await {
+    match destinations::save("", dest, true, oauth_state).await {
         Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Destination saved")
                 .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
@@ -355,11 +356,12 @@ pub async fn update_destination(
     let module = query.get("module").map(|s| s.as_str());
     let is_alert = module != Some("pipeline");
 
-    let dest = match dest.into(org_id, is_alert) {
+    let oauth_state = dest.oauth_state.clone();
+    let dest = match dest.into(org_id.clone(), is_alert) {
         Ok(dest) => dest,
         Err(e) => return e.into(),
     };
-    match destinations::save(&name, dest, false).await {
+    match destinations::save(&name, dest, false, oauth_state).await {
         Ok(_) => MetaHttpResponse::ok("Destination updated"),
         Err(e) => e.into(),
     }

@@ -354,6 +354,13 @@ pub async fn create_org(
         return Err(anyhow::anyhow!("Only root user can create organization"));
     }
 
+    // Guard: "_alert_dest_oauth_team_index" is a reserved org name used by the OAuth team index.
+    if org.name == "_alert_dest_oauth_team_index" {
+        return Err(anyhow::anyhow!(
+            "Organization name '_alert_dest_oauth_team_index' is reserved and cannot be used"
+        ));
+    }
+
     #[cfg(feature = "cloud")]
     {
         let o2cfg = o2_enterprise::enterprise::common::config::get_config();

@@ -679,6 +679,13 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/alerts/destinations/test", post(alerts::destinations::test_destination))
         .route("/{org_id}/alerts/destinations/bulk", delete(alerts::destinations::delete_destination_bulk))
 
+        // OAuth destinations — org-scoped authenticated routes
+        .route("/{org_id}/oauth/{provider}/available", get(oauth_destinations::available))
+        .route("/{org_id}/oauth/{provider}/start", get(oauth_destinations::start))
+        .route("/{org_id}/oauth/{provider}/status", get(oauth_destinations::status))
+        .route("/{org_id}/oauth/{provider}/channels", get(oauth_destinations::channels))
+        .route("/{org_id}/oauth/{provider}/test", post(oauth_destinations::test))
+
         // Deduplication
         .route("/{org_id}/alerts/deduplication/config", get(alerts::deduplication::get_config).post(alerts::deduplication::set_config).delete(alerts::deduplication::delete_config))
         .route("/{org_id}/alerts/deduplication/semantic-groups", get(alerts::deduplication::get_semantic_groups).put(alerts::deduplication::save_semantic_groups))
@@ -1003,10 +1010,17 @@ pub fn create_app_router() -> Router {
         Router::new().merge(basic_routes()).merge(router_routes)
     } else {
         // Non-router node: use direct service routes
+        // OAuth callback and events are unauthenticated (provider-initiated redirects/webhooks)
+        // so they must be registered OUTSIDE service_routes() which has auth_middleware applied.
+        let oauth_public_routes = Router::new()
+            .route("/api/oauth/{provider}/proxy-callback", get(oauth_destinations::proxy_callback))
+            .route("/api/oauth/{provider}/events", post(oauth_destinations::events));
+
         Router::new()
             .merge(basic_routes())
             .nest("/config", config_routes())
             .nest("/api", service_routes())
+            .merge(oauth_public_routes)
             .merge(other_service_routes())
             .merge(proxy_routes(true))
     };

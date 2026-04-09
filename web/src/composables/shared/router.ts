@@ -84,6 +84,20 @@ import Login from "@/views/Login.vue";
 const useRoutes = () => {
   const parentRoutes: any = [
     {
+      // OAuth popup: shown after successful provider authorization
+      path: "/oauth-success",
+      name: "oauth-success",
+      component: () => import("@/views/OAuthSuccess.vue"),
+      meta: { title: "Connected", noAuth: true },
+    },
+    {
+      // OAuth popup: shown after failed provider authorization
+      path: "/oauth-error",
+      name: "oauth-error",
+      component: () => import("@/views/OAuthError.vue"),
+      meta: { title: "Authorization Failed", noAuth: true },
+    },
+    {
       path: "/login",
       component: Login,
       meta: {
