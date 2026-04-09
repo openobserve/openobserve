@@ -33,7 +33,10 @@ use config::{
 };
 use datafusion::{
     common::TableReference,
-    physical_optimizer::{PhysicalOptimizerRule, filter_pushdown::FilterPushdown},
+    physical_optimizer::{
+        PhysicalOptimizerRule, filter_pushdown::FilterPushdown, limit_pushdown::LimitPushdown,
+        projection_pushdown::ProjectionPushdown,
+    },
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
@@ -473,10 +476,27 @@ pub async fn search(
         )
     );
 
-    if cfg.common.feature_pushdown_filter_enabled {
-        let pushdown_filter = FilterPushdown::new();
-        physical_plan = pushdown_filter.optimize(physical_plan, ctx.state().config_options())?;
-    }
+    let pushdown_filter = FilterPushdown::new();
+    physical_plan = pushdown_filter
+        .optimize(physical_plan, ctx.state().config_options())
+        .map_err(|e| {
+            log::error!("[trace_id {trace_id}] flight->search: pushdown filter error: {e}");
+            e
+        })?;
+    let limit_pushdown = LimitPushdown::new();
+    physical_plan = limit_pushdown
+        .optimize(physical_plan, ctx.state().config_options())
+        .map_err(|e| {
+            log::error!("[trace_id {trace_id}] flight->search: limit pushdown error: {e}");
+            e
+        })?;
+    let projection_pushdown = ProjectionPushdown::new();
+    physical_plan = projection_pushdown
+        .optimize(physical_plan, ctx.state().config_options())
+        .map_err(|e| {
+            log::error!("[trace_id {trace_id}] flight->search: projection pushdown error: {e}");
+            e
+        })?;
 
     if cfg.common.feature_dynamic_pushdown_filter_enabled {
         let pushdown_filter = FilterPushdown::new_post_optimization();
