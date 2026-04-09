@@ -127,7 +127,7 @@ export function useStickyColumns(props: any, store: any) {
         box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1) !important;
       }
 
-      /* Right-sticky total column body cells */
+      /* Right-sticky total column body cells — shadow matches bottom total row */
       ${scope} tbody td.pivot-total-col {
         position: sticky !important;
         z-index: 2 !important;
@@ -155,6 +155,19 @@ export function useStickyColumns(props: any, store: any) {
 
     styleElement.textContent = css;
     document.head.appendChild(styleElement);
+
+    console.log(
+      "[useStickyColumns] Updated sticky styles for table:",
+      tableId,
+      "\n  stickyColTotals:",
+      stickyColTotals,
+      "\n  stickyRowTotals:",
+      stickyRowTotals,
+      "\n  theme:",
+      store.state.theme,
+      "\n  bgColor:",
+      bgColor,
+    );
   };
 
   // Watch sticky column offsets and update styles

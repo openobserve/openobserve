@@ -45,12 +45,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? width - 12 + 'px'
                   : '100%'
                 : '100%',
+          // Use border-collapse:separate for pivot tables so borders stick
+          // with position:sticky headers (collapse mode paints borders on
+          // the table grid which doesn't move with sticky elements).
+          borderCollapse: isPivotMode ? 'separate' : undefined,
+          borderSpacing: isPivotMode ? '0' : undefined,
         }"
       >
         <!-- ── Pivot multi-level headers (dashboard only) ───────────────────── -->
         <thead
           v-if="pivotHeaderLevels.length > 0"
-          class="tw:sticky tw:top-0 tw:z-10"
+          class="pivot-thead tw:sticky tw:top-0 tw:z-10"
         >
           <tr
             v-for="(level, levelIdx) in pivotHeaderLevels as any[]"
@@ -90,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 level.isLeaf
                   ? 'pivot-value-header'
                   : 'pivot-group-header tw:text-center',
-                { 'pivot-section-border': cell.hasBorder },
+                { 'pivot-section-border': cell.hasBorder && !(stickyColTotals && cell._isTotalHeader) },
                 { 'pivot-total-col': stickyColTotals && cell._isTotalHeader },
                 { 'tw:cursor-pointer': cell._sortColumn },
               ]"
@@ -378,7 +383,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <tr
               v-for="(row, rowIdx) in pagedRows"
               :key="row.id"
-              class="dashboard-data-row tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
+              class="dashboard-data-row tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
+              :class="{ 'tw:border-b': !isPivotMode }"
               @click="
                 handleDataRowClick(row.original, rowIdx as number, $event)
               "
@@ -404,6 +410,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       stickyColTotals &&
                       (cell.column.columnDef.meta as any)?._isTotalColumn,
                   },
+                  // In pivot mode (border-collapse:separate), borders on <tr>
+                  // don't render, so apply the row border on each <td> instead.
+                  { 'tw:border-b': isPivotMode },
                   isPivotMergeNoBorder(
                     row.original,
                     (cell.column.columnDef.meta as any)?._col,
@@ -1360,7 +1369,7 @@ const getStickyTotalColumnStyle = (col: any) => {
   if (!stickyColTotals.value || !col?._isTotalColumn) return {};
   const rightOffset =
     (col._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
-  return {
+  const style = {
     position: "sticky",
     right: `${rightOffset}px`,
     "z-index": 2,
@@ -1368,10 +1377,20 @@ const getStickyTotalColumnStyle = (col: any) => {
     "min-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     "max-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     "background-color": store.state.theme === "dark" ? "#565656" : "#E0E0E0",
-    "box-shadow": "-4px 0 6px rgba(0, 0, 0, 0.15)",
+    // Shadow matching bottom total row style (-2px 0 4px)
+    "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
     "white-space": "normal",
     "word-break": "break-word",
   };
+  console.log(
+    "[TenstackTable] getStickyTotalColumnStyle:",
+    col.name,
+    "rightOffset:",
+    rightOffset,
+    "style.box-shadow:",
+    style["box-shadow"],
+  );
+  return style;
 };
 
 const getStickyTotalHeaderForPivot = (cell: any) => {
@@ -1381,7 +1400,7 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
   const width = cell.colspan
     ? cell.colspan * PIVOT_TABLE_TOTAL_COLUMN_WIDTH
     : PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
-  return {
+  const style = {
     position: "sticky",
     right: `${rightOffset}px`,
     top: 0,
@@ -1389,11 +1408,26 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
     width: `${width}px`,
     "min-width": `${width}px`,
     "max-width": `${width}px`,
-    "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
+    // Opaque background so scrolled body content doesn't bleed through
+    "background-color": "inherit",
+    // Shadow matching bottom total row style
     "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
     "white-space": "normal",
     "word-break": "break-word",
+    // Remove border so shadow aligns with body total column
+    "border": "none",
   };
+  console.log(
+    "[TenstackTable] getStickyTotalHeaderForPivot:",
+    cell.label,
+    "rightOffset:",
+    rightOffset,
+    "width:",
+    width,
+    "shadow:",
+    style["box-shadow"],
+  );
+  return style;
 };
 
 const getCellDisplayValue = (cell: any): any => {
