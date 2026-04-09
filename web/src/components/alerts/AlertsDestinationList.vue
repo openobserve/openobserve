@@ -179,12 +179,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`destination-oauth-revoked-badge-${props.row.name}`"
                   color="negative"
                   class="tw:text-xs"
-                  label="⚠ Reconnect"
+                  :label="t('alert_destinations.oauth.reconnectBadge')"
                 >
                   <q-tooltip>
                     {{ getOAuthStatus(props.row) === 'revoked'
-                        ? 'OAuth token revoked — click Edit to reconnect.'
-                        : 'OAuth token expired — click Edit to reconnect.' }}
+                        ? t('alert_destinations.oauth.tokenRevoked')
+                        : t('alert_destinations.oauth.tokenExpired') }}
                   </q-tooltip>
                 </q-badge>
               </template>

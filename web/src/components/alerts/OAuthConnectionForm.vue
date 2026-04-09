@@ -39,15 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #avatar>
         <q-icon name="warning" />
       </template>
-      ⚠ This {{ displayName }} connection has been revoked or expired. Click
-      <strong>Reconnect</strong> to restore it.
+      {{ t('alert_destinations.oauth.revokedBanner', { provider: displayName }) }}
     </q-banner>
 
     <!-- Connect / Reconnect button -->
     <div v-if="!isConnected" class="q-mb-md">
       <q-btn
         :loading="isConnecting"
-        :label="isRevoked ? `Reconnect to ${displayName}` : `Connect to ${displayName}`"
+        :label="isRevoked ? t('alert_destinations.oauth.reconnectBtn', { provider: displayName }) : t('alert_destinations.oauth.connectBtn', { provider: displayName })"
         color="primary"
         icon="link"
         unelevated
@@ -64,14 +63,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="row items-center q-gutter-sm">
         <q-icon name="check_circle" color="positive" size="20px" />
         <span class="text-body2">
-          Connected to: <strong>{{ teamName }}</strong>
+          {{ t('alert_destinations.oauth.connectedTo') }} <strong>{{ teamName }}</strong>
         </span>
         <q-btn
           flat
           dense
           size="sm"
           color="negative"
-          label="Disconnect"
+          :label="t('alert_destinations.oauth.disconnect')"
           @click="disconnect"
         />
       </div>
@@ -84,8 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="filteredChannels"
         option-value="id"
         option-label="name"
-        :label="`Channel *`"
-        :hint="truncated ? 'Showing first 10,000 channels' : ''"
+        :label="t('alert_destinations.oauth.channelLabel')"
+        :hint="truncated ? t('alert_destinations.oauth.channelsTruncated') : ''"
         use-input
         input-debounce="300"
         @filter="filterChannels"
@@ -118,28 +117,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   text-color="grey-7"
                   class="q-ml-xs"
                 >
-                  invite needed
+                  {{ t('alert_destinations.oauth.inviteNeeded') }}
                 </q-chip>
               </q-item-label>
             </q-item-section>
             <q-tooltip v-if="!scope.opt.is_member">
-              Private channel — run
-              <code>/invite @{{ displayName }}</code> in this channel first.
+              {{ t('alert_destinations.oauth.inviteTooltip', { provider: displayName }) }}
             </q-tooltip>
           </q-item>
         </template>
         <template #no-option>
           <q-item>
-            <q-item-section class="text-grey">No channels found</q-item-section>
+            <q-item-section class="text-grey">{{ t('alert_destinations.oauth.noChannelsFound') }}</q-item-section>
           </q-item>
         </template>
       </q-select>
 
       <!-- Duplicate channel warning -->
       <div v-if="duplicateWarning" class="text-caption text-warning q-mt-xs">
-        ⚠ Channel #{{ selectedChannel?.name }} is already used by destination
-        "{{ duplicateWarning }}". You can still save — multiple destinations can
-        share the same channel.
+        {{ t('alert_destinations.oauth.duplicateChannelWarning', { channel: selectedChannel?.name, destination: duplicateWarning }) }}
       </div>
     </div>
 
@@ -149,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         flat
         dense
         color="primary"
-        label="Send Test Message"
+        :label="t('alert_destinations.oauth.sendTestMessage')"
         icon="send"
         :loading="isTesting"
         :disable="hasChannelPicker && !selectedChannel"
@@ -157,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="sendTest"
       />
       <span v-if="testResult" class="q-ml-sm text-caption" :class="testResult.ok ? 'text-positive' : 'text-negative'">
-        {{ testResult.ok ? "Test sent successfully!" : `Test failed: ${testResult.error}` }}
+        {{ testResult.ok ? t('alert_destinations.oauth.testSuccess') : t('alert_destinations.oauth.testFailed', { error: testResult.error }) }}
       </span>
     </div>
   </div>
@@ -166,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import oauthService, {
   type OAuthProvider,
   type ChannelItem,
@@ -212,6 +209,7 @@ const emit = defineEmits<{
 // ---------------------------------------------------------------------------
 
 const store = useStore();
+const { t } = useI18n();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 // ---------------------------------------------------------------------------
@@ -337,8 +335,7 @@ async function startOAuthFlow() {
           setTimeout(() => {
             if (!isConnected.value) {
               isConnecting.value = false;
-              cancelledMsg.value =
-                "Authorization cancelled. Click Connect to try again.";
+              cancelledMsg.value = t('alert_destinations.oauth.cancelledMsg');
               clearPollInterval();
             }
           }, 6000);
@@ -362,7 +359,7 @@ function startPolling(state: string) {
     if (Date.now() - started > TIMEOUT_MS) {
       clearPollInterval();
       isConnecting.value = false;
-      cancelledMsg.value = "Authorization timed out. Click Connect to try again.";
+      cancelledMsg.value = t('alert_destinations.oauth.timedOutMsg');
       return;
     }
 

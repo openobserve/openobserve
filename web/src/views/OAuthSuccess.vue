@@ -2,18 +2,18 @@
   <div class="oauth-popup-page">
     <div class="oauth-popup-content">
       <div class="oauth-icon success">✓</div>
-      <h2>Connected!</h2>
-      <p>
-        Authorization successful. You can close this window and return to
-        OpenObserve.
-      </p>
-      <p class="hint">This window will close automatically.</p>
+      <h2>{{ t('alert_destinations.oauth_success.title') }}</h2>
+      <p>{{ t('alert_destinations.oauth_success.message') }}</p>
+      <p class="hint">{{ t('alert_destinations.oauth_success.autoClose') }}</p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted } from "vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 onMounted(() => {
   // window.close() only works reliably when the window was opened via window.open()
