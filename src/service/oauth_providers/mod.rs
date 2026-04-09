@@ -125,12 +125,7 @@ pub trait OAuthProviderHandler: Send + Sync {
 
     /// Validate the incoming event webhook signature (provider-specific HMAC).
     /// Return `true` to accept, `false` to reject.
-    fn verify_event_signature(
-        &self,
-        raw_body: &[u8],
-        headers: &HeaderMap,
-        secret: &str,
-    ) -> bool;
+    fn verify_event_signature(&self, raw_body: &[u8], headers: &HeaderMap, secret: &str) -> bool;
 
     /// Extract the team/workspace ID from a revocation event payload.
     fn extract_team_id_from_event(&self, payload: &serde_json::Value) -> Option<String>;

@@ -64,7 +64,10 @@ impl OAuthProviderHandler for ServiceNowProvider {
             )
         })?;
 
-        let url = format!("{}/api/now/table/incident", instance_url.trim_end_matches('/'));
+        let url = format!(
+            "{}/api/now/table/incident",
+            instance_url.trim_end_matches('/')
+        );
 
         let client = Client::new();
         let body = serde_json::json!({
@@ -119,7 +122,12 @@ impl OAuthProviderHandler for ServiceNowProvider {
         &[] // ServiceNow does not push revocation webhooks
     }
 
-    fn verify_event_signature(&self, _raw_body: &[u8], _headers: &HeaderMap, _secret: &str) -> bool {
+    fn verify_event_signature(
+        &self,
+        _raw_body: &[u8],
+        _headers: &HeaderMap,
+        _secret: &str,
+    ) -> bool {
         true // Not called — no revocation webhook
     }
 

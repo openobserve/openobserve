@@ -1013,8 +1013,14 @@ pub fn create_app_router() -> Router {
         // OAuth callback and events are unauthenticated (provider-initiated redirects/webhooks)
         // so they must be registered OUTSIDE service_routes() which has auth_middleware applied.
         let oauth_public_routes = Router::new()
-            .route("/api/oauth/{provider}/proxy-callback", get(oauth_destinations::proxy_callback))
-            .route("/api/oauth/{provider}/events", post(oauth_destinations::events));
+            .route(
+                "/api/oauth/{provider}/proxy-callback",
+                get(oauth_destinations::proxy_callback),
+            )
+            .route(
+                "/api/oauth/{provider}/events",
+                post(oauth_destinations::events),
+            );
 
         Router::new()
             .merge(basic_routes())

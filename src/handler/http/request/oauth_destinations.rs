@@ -39,15 +39,15 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::{get_config, meta::destinations::OAuthProvider};
+use infra::table::{
+    cipher::{self, EntryKind},
+    sessions,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     service::oauth_providers::{OAuthPendingSession, OAuthStatus, PROVIDER_REGISTRY},
-};
-use infra::table::{
-    cipher::{self, EntryKind},
-    sessions,
 };
 
 // ---------------------------------------------------------------------------
@@ -293,9 +293,15 @@ pub async fn proxy_callback(
 
     fn error_html(reason: &str) -> axum::response::Response {
         let msg = match reason {
-            "session_not_found" => "Authorization session not found or expired. Please try again.".to_string(),
-            "exchange_failed" => "Failed to retrieve authorization token. Please try again.".to_string(),
-            "proxy_not_configured" => "Proxy is not configured. Contact your administrator.".to_string(),
+            "session_not_found" => {
+                "Authorization session not found or expired. Please try again.".to_string()
+            }
+            "exchange_failed" => {
+                "Failed to retrieve authorization token. Please try again.".to_string()
+            }
+            "proxy_not_configured" => {
+                "Proxy is not configured. Contact your administrator.".to_string()
+            }
             r => format!("Authorization failed: {r}. Please close this window and try again."),
         };
         axum::response::Html(format!(
@@ -364,11 +370,10 @@ h2{{margin:0 0 .5rem;font-size:1.25rem;color:#111827}}p{{margin:0 0 .5rem;color:
         }
     };
 
-    let mut session: OAuthPendingSession =
-        match serde_json::from_str(&session_model.access_token) {
-            Ok(s) => s,
-            Err(_) => return error_html("session_corrupt"),
-        };
+    let mut session: OAuthPendingSession = match serde_json::from_str(&session_model.access_token) {
+        Ok(s) => s,
+        Err(_) => return error_html("session_corrupt"),
+    };
 
     if session.provider != provider {
         return error_html("provider_mismatch");
@@ -425,11 +430,10 @@ pub async fn status(
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
 
-    let session: OAuthPendingSession =
-        match serde_json::from_str(&session_model.access_token) {
-            Ok(s) => s,
-            Err(_) => return MetaHttpResponse::internal_error("session corrupt"),
-        };
+    let session: OAuthPendingSession = match serde_json::from_str(&session_model.access_token) {
+        Ok(s) => s,
+        Err(_) => return MetaHttpResponse::internal_error("session corrupt"),
+    };
 
     // Org isolation
     if session.org_id != org_id {
@@ -482,11 +486,10 @@ pub async fn channels(
             }
             Err(e) => return MetaHttpResponse::internal_error(e),
         };
-        let session: OAuthPendingSession =
-            match serde_json::from_str(&model.access_token) {
-                Ok(s) => s,
-                Err(_) => return MetaHttpResponse::internal_error("session corrupt"),
-            };
+        let session: OAuthPendingSession = match serde_json::from_str(&model.access_token) {
+            Ok(s) => s,
+            Err(_) => return MetaHttpResponse::internal_error("session corrupt"),
+        };
         if session.org_id != org_id {
             return (StatusCode::FORBIDDEN, "Forbidden").into_response();
         }
@@ -580,11 +583,10 @@ pub async fn test(
             Ok(None) => return MetaHttpResponse::bad_request("OAuth session not found"),
             Err(e) => return MetaHttpResponse::internal_error(e),
         };
-        let session: OAuthPendingSession =
-            match serde_json::from_str(&model.access_token) {
-                Ok(s) => s,
-                Err(_) => return MetaHttpResponse::internal_error("session corrupt"),
-            };
+        let session: OAuthPendingSession = match serde_json::from_str(&model.access_token) {
+            Ok(s) => s,
+            Err(_) => return MetaHttpResponse::internal_error("session corrupt"),
+        };
         if session.org_id != org_id {
             return (StatusCode::FORBIDDEN, "Forbidden").into_response();
         }
@@ -618,7 +620,10 @@ pub async fn test(
         .send_notification(&token, body.channel_id.as_deref(), test_msg)
         .await
     {
-        Ok(()) => MetaHttpResponse::json(TestResponse { ok: true, error: None }),
+        Ok(()) => MetaHttpResponse::json(TestResponse {
+            ok: true,
+            error: None,
+        }),
         Err(e) => MetaHttpResponse::json(TestResponse {
             ok: false,
             error: Some(e.to_string()),
@@ -633,10 +638,7 @@ pub async fn test(
 // Signature is verified synchronously; revocation fan-out is async.
 // ---------------------------------------------------------------------------
 
-pub async fn events(
-    Path(provider): Path<OAuthProvider>,
-    request: Request,
-) -> Response {
+pub async fn events(Path(provider): Path<OAuthProvider>, request: Request) -> Response {
     let handler = match PROVIDER_REGISTRY.get(&provider) {
         Some(h) => h,
         None => return (StatusCode::NOT_FOUND, "Unknown provider").into_response(),
@@ -650,7 +652,11 @@ pub async fn events(
     };
 
     if signing_secret.is_empty() {
-        return (StatusCode::NOT_FOUND, "Webhook signing secret not configured").into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            "Webhook signing secret not configured",
+        )
+            .into_response();
     }
 
     let headers = request.headers().clone();
@@ -712,7 +718,13 @@ pub async fn events(
 
 async fn revoke_team_connections(provider: &str, team_id: &str) {
     let index_key = format!("team_index/{provider}/{team_id}");
-    let data = match cipher::get_data("_alert_dest_oauth_team_index", EntryKind::OAuthToken, &index_key).await {
+    let data = match cipher::get_data(
+        "_alert_dest_oauth_team_index",
+        EntryKind::OAuthToken,
+        &index_key,
+    )
+    .await
+    {
         Ok(Some(d)) => d,
         Ok(None) => return,
         Err(e) => {

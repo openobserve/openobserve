@@ -107,7 +107,12 @@ impl OAuthProviderHandler for PagerDutyProvider {
         &[] // PagerDuty has no revocation webhook; detected at send time
     }
 
-    fn verify_event_signature(&self, _raw_body: &[u8], _headers: &HeaderMap, _secret: &str) -> bool {
+    fn verify_event_signature(
+        &self,
+        _raw_body: &[u8],
+        _headers: &HeaderMap,
+        _secret: &str,
+    ) -> bool {
         true // Not called — no revocation webhook
     }
 

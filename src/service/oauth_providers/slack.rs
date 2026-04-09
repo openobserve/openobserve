@@ -121,9 +121,7 @@ impl OAuthProviderHandler for SlackProvider {
 
         let err_code = result.error.unwrap_or_else(|| "unknown".to_string());
         Err(match err_code.as_str() {
-            "token_revoked" | "account_inactive" | "invalid_auth" => {
-                OAuthNotifyError::TokenRevoked
-            }
+            "token_revoked" | "account_inactive" | "invalid_auth" => OAuthNotifyError::TokenRevoked,
             "ratelimited" => OAuthNotifyError::RateLimited(60),
             "channel_not_found" | "channel_is_archived" | "is_archived" => {
                 OAuthNotifyError::ChannelNotFound
@@ -224,11 +222,7 @@ impl OAuthProviderHandler for SlackProvider {
             return false;
         }
 
-        let sig_basestring = format!(
-            "v0:{}:{}",
-            timestamp_str,
-            String::from_utf8_lossy(raw_body)
-        );
+        let sig_basestring = format!("v0:{}:{}", timestamp_str, String::from_utf8_lossy(raw_body));
 
         type HmacSha256 = Hmac<Sha256>;
         let mut mac = match HmacSha256::new_from_slice(signing_secret.as_bytes()) {

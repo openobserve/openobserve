@@ -79,9 +79,7 @@ impl OAuthProviderHandler for MsTeamsProvider {
         };
 
         let client = Client::new();
-        let url = format!(
-            "{GRAPH_API_BASE}/teams/{team_id}/channels/{ch_id}/messages"
-        );
+        let url = format!("{GRAPH_API_BASE}/teams/{team_id}/channels/{ch_id}/messages");
 
         let body = serde_json::json!({
             "body": {
@@ -146,7 +144,12 @@ impl OAuthProviderHandler for MsTeamsProvider {
         &[] // MS Teams / Azure AD does not push revocation webhooks to OO
     }
 
-    fn verify_event_signature(&self, _raw_body: &[u8], _headers: &HeaderMap, _secret: &str) -> bool {
+    fn verify_event_signature(
+        &self,
+        _raw_body: &[u8],
+        _headers: &HeaderMap,
+        _secret: &str,
+    ) -> bool {
         true // Not called — no revocation webhook
     }
 

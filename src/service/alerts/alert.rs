@@ -1152,9 +1152,9 @@ pub(crate) async fn dispatch_notification(
         DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
         DestinationType::Email(email) => send_email_notification(subject, email, msg).await,
         DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
-        DestinationType::OAuth(_conn) => {
-            Err(anyhow::anyhow!("OAuth destinations are not supported via dispatch_notification"))
-        }
+        DestinationType::OAuth(_conn) => Err(anyhow::anyhow!(
+            "OAuth destinations are not supported via dispatch_notification"
+        )),
     }
 }
 
@@ -1234,8 +1234,9 @@ async fn send_oauth_notification(
     connection: &OAuthConnection,
     msg: String,
 ) -> Result<String, anyhow::Error> {
-    use crate::service::oauth_providers::{OAuthNotifyError, PROVIDER_REGISTRY};
     use infra::table::cipher::{self, EntryKind};
+
+    use crate::service::oauth_providers::{OAuthNotifyError, PROVIDER_REGISTRY};
 
     if connection.status == OAuthConnectionStatus::Revoked {
         return Err(anyhow::anyhow!(
@@ -1257,7 +1258,12 @@ async fn send_oauth_notification(
     let cipher_name = format!("{}/{}", connection.provider, connection.connection_id);
     let token_json = cipher::get_data(org_id, EntryKind::OAuthToken, &cipher_name)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("OAuth token not found for connection {}", connection.connection_id))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "OAuth token not found for connection {}",
+                connection.connection_id
+            )
+        })?;
 
     // Token stored as JSON {"access_token":"...", "refresh_token":"...", "expires_at": i64}
     let token_value: serde_json::Value =
