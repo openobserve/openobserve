@@ -24,7 +24,9 @@ module.exports = defineConfig({
   /* Exclude archived tests from all test runs */
   testIgnore: ['**/test-archives/**', '**/*_old.js'],
   /* Global setup and teardown */
-  globalSetup: './playwright-tests/utils/global-setup.js',
+  globalSetup: process.env.IS_CLOUD === 'true'
+    ? './playwright-tests/utils/global-setup-alpha1.js'
+    : './playwright-tests/utils/global-setup.js',
   globalTeardown: './playwright-tests/utils/global-teardown.js',
   /* Run tests in files in parallel */
   fullyParallel: true,
