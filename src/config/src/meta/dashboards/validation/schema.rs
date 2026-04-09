@@ -57,16 +57,11 @@ pub fn validate(json: &Value) -> Vec<super::ValidationError> {
 }
 
 /// Maps raw jsonschema errors to user-friendly messages using errorMessages.json.
-fn map_error_message(
-    path: &str,
-    keyword: &str,
-    raw_message: &str,
-    dashboard: &Value,
-) -> String {
+fn map_error_message(path: &str, keyword: &str, raw_message: &str, dashboard: &Value) -> String {
     // Extract panel info from path
     if let Some(info) = extract_panel_info(path, dashboard) {
         // Try chart-type specific messages
-        let field = path.split('/').last().unwrap_or("");
+        let field = path.split('/').next_back().unwrap_or("");
 
         // Map jsonschema error kinds to our key format
         let error_key = if keyword.contains("MinItems") {
@@ -84,33 +79,28 @@ fn map_error_message(
             String::new()
         };
 
-        if !error_key.is_empty() {
-            if let Some(msg) = ERROR_MESSAGES
+        if !error_key.is_empty()
+            && let Some(msg) = ERROR_MESSAGES
                 .get("chartErrors")
                 .and_then(|c| c.get(&info.chart_type))
                 .and_then(|m| m.get(&error_key))
                 .and_then(|v| v.as_str())
-            {
-                return msg.to_string();
-            }
+        {
+            return msg.to_string();
         }
 
         // Panel structure errors
         if keyword.contains("Enum") && path.ends_with("/type") {
-            return format!(
-                "Panel {}: Chart type is not supported.",
-                info.id
-            );
+            return format!("Panel {}: Chart type is not supported.", info.id);
         }
     }
 
     // Dashboard-level errors
-    if path.is_empty() || path == "/" {
-        if keyword.contains("Required") {
-            if raw_message.contains("title") {
-                return "Dashboard title is required".to_string();
-            }
-        }
+    if (path.is_empty() || path == "/")
+        && keyword.contains("Required")
+        && raw_message.contains("title")
+    {
+        return "Dashboard title is required".to_string();
     }
 
     if keyword.contains("MinItems") && path.ends_with("/tabs") {
