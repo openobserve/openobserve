@@ -90,6 +90,12 @@ const defaultObject = {
     showErrorOnly: false,
     queryEditorPlaceholderFlag: true,
     searchMode: "spans" as TraceSearchMode,
+    serviceGraphVisualizationType:
+      (localStorage.getItem("serviceGraph_visualizationType") as
+        | "tree"
+        | "graph") || "tree",
+    serviceGraphLayoutType:
+      localStorage.getItem("serviceGraph_layoutType") || "horizontal",
   },
   data: {
     query: "",

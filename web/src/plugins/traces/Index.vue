@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filters-reset="onFiltersReset"
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
+              @service-graph-refresh="serviceGraphRef?.loadServiceGraph()"
             />
           </div>
         </template>
@@ -63,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
           >
             <service-graph
+              ref="serviceGraphRef"
               class="tw:h-full"
               @view-traces="handleServiceGraphViewTraces"
             />
@@ -331,6 +333,7 @@ const { fnParsedSQL } = logsUtils();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
+const serviceGraphRef = ref<any>(null);
 const splitterModel = ref(15);
 let parser: any;
 const fieldValues = ref({});
