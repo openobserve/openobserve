@@ -650,8 +650,7 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
         && !config::get_config().common.local_mode
     {
         if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::anomaly_config_delete(
-            org_id,
-            anomaly_id,
+            org_id, anomaly_id,
         )
         .await
         {
