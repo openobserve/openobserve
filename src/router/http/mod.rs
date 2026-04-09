@@ -615,6 +615,7 @@ fn build_request_headers(headers: &HeaderMap, is_streaming: bool) -> reqwest::he
 const STREAMING_ENDPOINTS: &[&str] = &[
     "/_search_stream",
     "/_values_stream",
+    "/_search_multi_stream",
     "/ai/chat_stream",
     "/prometheus/api/v1/query_range",
 ];
@@ -685,6 +686,7 @@ mod tests {
     fn test_is_streaming_endpoint() {
         assert!(is_streaming_endpoint("/api/org/_search_stream"));
         assert!(is_streaming_endpoint("/api/org/_values_stream"));
+        assert!(is_streaming_endpoint("/api/org/_search_multi_stream"));
         assert!(is_streaming_endpoint("/api/org/ai/chat_stream"));
         assert!(is_streaming_endpoint(
             "/api/org/prometheus/api/v1/query_range"
