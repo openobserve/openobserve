@@ -2047,21 +2047,22 @@ defineExpose({
 .pivot-group-header {
   text-align: center;
   font-weight: 600;
-  border-bottom: 2px solid rgba(0, 0, 0, 0.12);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  vertical-align: middle;
+  white-space: nowrap;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  border-right: 1px solid rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
 }
 
 .pivot-value-header {
   text-align: center;
   font-weight: 500;
   font-size: 0.85em;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  vertical-align: middle;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  border-right: 1px solid rgba(0, 0, 0, 0.15);
 }
 
 // Column separator between pivot sections
