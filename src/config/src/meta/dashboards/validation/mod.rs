@@ -77,10 +77,7 @@ mod tests {
             include_str!("../../../../../../../test-fixtures/invalid/invalid-chart-type.json");
         let json: Value = serde_json::from_str(json_str).unwrap();
         let errors = validate_dashboard(&json);
-        assert!(
-            !errors.is_empty(),
-            "Expected errors for invalid chart type"
-        );
+        assert!(!errors.is_empty(), "Expected errors for invalid chart type");
     }
 
     #[test]
