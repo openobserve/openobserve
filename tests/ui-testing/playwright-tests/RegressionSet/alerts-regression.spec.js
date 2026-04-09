@@ -281,8 +281,7 @@ test.describe("Alerts Regression Bugs", () => {
     testLogger.info('✓ Navigated to Step 2');
 
     // Enable aggregation to show Group By section
-    const queryConfigSection = pm.alertsPage.getStepQueryConfigSection();
-    const aggregationToggle = pm.alertsPage.getAggregationToggle(queryConfigSection);
+    const aggregationToggle = pm.alertsPage.getAggregationToggle();
     await aggregationToggle.waitFor({ state: 'visible', timeout: 5000 });
     await expect(aggregationToggle).toBeEnabled({ timeout: 3000 });
     await aggregationToggle.click();

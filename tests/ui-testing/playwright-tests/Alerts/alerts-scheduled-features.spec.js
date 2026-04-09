@@ -530,8 +530,7 @@ test.describe("Scheduled Alert Features", () => {
 
         // Find and click the aggregation toggle
         // The aggregation toggle is the only q-toggle in the step-query-config section
-        const queryConfigSection = pm.alertsPage.getStepQueryConfigSection();
-        const aggregationToggle = pm.alertsPage.getAggregationToggle(queryConfigSection);
+        const aggregationToggle = pm.alertsPage.getAggregationToggle();
         await aggregationToggle.waitFor({ state: 'visible', timeout: 5000 });
         await aggregationToggle.click();
         await page.waitForTimeout(1000);

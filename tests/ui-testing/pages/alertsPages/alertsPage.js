@@ -2731,11 +2731,10 @@ export class AlertsPage {
 
     /**
      * Get aggregation toggle button within query config section
-     * @param {Locator} queryConfigSection - The query config section locator
      * @returns {Locator}
      */
-    getAggregationToggle(queryConfigSection) {
-        return queryConfigSection.locator('.q-toggle').first();
+    getAggregationToggle() {
+        return this.getStepQueryConfigSection().locator('.q-toggle').first();
     }
 
     /**

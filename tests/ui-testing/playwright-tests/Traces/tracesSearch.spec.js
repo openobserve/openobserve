@@ -374,5 +374,5 @@ test.describe("Traces Search testcases", () => {
     await pm.tracesPage.expectSearchBarVisible();
   });
 
-  // Bug #10743 test moved to RegressionSet/traces-regression.spec.js to avoid duplication
+  // Bug #10743 test was removed - false positive in automated testing, feature works correctly in manual testing
 });
