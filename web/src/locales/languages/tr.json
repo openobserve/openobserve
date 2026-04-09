@@ -1570,7 +1570,14 @@
     "configSectionDrilldown": "Detaya inme",
     "configSectionComparison": "Karşılaştırma",
     "configSectionMarkLines": "Çizgileri İşaretle",
-    "configSectionBackground": "Arkaplan"
+    "configSectionBackground": "Arkaplan",
+    "axisLabelRotateTooltip": "Etiketler uzun veya kalabalık olduğunda okunabilirliği artırmak için x ekseni etiket metnini seçilen bir açıyla (derece cinsinden) döndürün. <br /><br /><strong>Not:</strong> Bu seçenek zaman serisi x ekseni alanları için desteklenmez.",
+    "axisLabelTruncateTooltip": "X ekseni etiketlerini belirtilen genişliğe (piksel cinsinden) kesin. <br /><br /><strong>Not:</strong> Bu seçenek zaman serisi x ekseni alanları için desteklenmez.",
+    "multiSqlQueryLabel": "Sorgu Etiketi",
+    "multiSqlQueryLabelHint": "Açıklamalarda bu sorgu için özel ad (örn., 'Üretim')",
+    "multiQueryWarning": "{chartType} için yalnızca Sorgu 1 oluşturulur",
+    "trellisNotSupportedWithMultiQuery": "Kafes düzeni birden çok sorgu ile devre dışı bırakılır. Kafes kullanmak için ekstra sorguları kaldırın.",
+    "xAliasInconsistencyWarning": "X ekseni takma adları sorgular arasında tutarsızdır: bazıları histogram kullanır, bazıları kullanmaz. Öngörülebilir sonuçlar için tüm sorgularda aynı takma ad türünü kullanın."
   },
   "panel": {
     "header": "Panel",

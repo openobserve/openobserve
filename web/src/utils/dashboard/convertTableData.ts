@@ -391,3 +391,62 @@ const isSampleValuesNumbers = (arr: any, key: string, sampleSize: number) => {
     );
   });
 };
+
+/**
+ * Merges table data from multiple SQL queries in UNION mode.
+ * Rows from all queries are combined into a single list.
+ * Column set is the union of all queries' columns.
+ */
+export const convertMultiQueryTableData = (
+  panelSchema: any,
+  searchQueryData: any[],
+  store: any,
+): { rows: any[]; columns: any[] } => {
+  if (!searchQueryData || searchQueryData.length <= 1) {
+    return convertTableData(panelSchema, searchQueryData, store);
+  }
+
+  const allRows: any[] = [];
+  const allColumnNames = new Set<string>();
+
+  // Collect rows and discover all column names
+  searchQueryData.forEach((queryData: any[]) => {
+    if (!queryData || !Array.isArray(queryData)) return;
+
+    queryData.forEach((row: any) => {
+      Object.keys(row).forEach((key) => allColumnNames.add(key));
+      allRows.push({ ...row });
+    });
+  });
+
+  // Build column definitions
+  const columns: any[] = [];
+
+  // Try to use field configs from queries for known columns
+  const knownAliases = new Map<string, any>();
+  panelSchema.queries.forEach((query: any) => {
+    const allFields = [
+      ...(query.fields?.x || []),
+      ...(query.fields?.y || []),
+      ...(query.fields?.breakdown || []),
+    ];
+    allFields.forEach((f: any) => {
+      if (f.alias && !knownAliases.has(f.alias)) {
+        knownAliases.set(f.alias, f);
+      }
+    });
+  });
+
+  allColumnNames.forEach((colName) => {
+    const fieldConfig = knownAliases.get(colName);
+    columns.push({
+      name: colName,
+      field: colName,
+      label: fieldConfig?.label || colName,
+      align: fieldConfig?.aggregationFunction ? "right" : "left",
+      sortable: true,
+    });
+  });
+
+  return { rows: allRows, columns };
+};

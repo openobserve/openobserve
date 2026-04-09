@@ -271,6 +271,24 @@ export async function setupTestDashboard(page, pm, dashboardName, options = {}) 
 export async function cleanupTestDashboard(page, pm, dashboardName) {
   testLogger.info('Cleaning up test dashboard', { dashboardName });
 
+  // If still on add_panel (e.g., save validation failed due to unconfigured query tabs),
+  // click Discard to navigate back to the dashboard view page first.
+  if (page.url().includes('add_panel')) {
+    testLogger.info('Still on add_panel, clicking Discard to navigate back');
+    const dialogHandler = (dialog) => dialog.accept();
+    page.once('dialog', dialogHandler);
+    const discardBtn = page.locator('[data-test="dashboard-panel-discard"]');
+    if (await discardBtn.isVisible().catch(() => false)) {
+      await discardBtn.click();
+    }
+    await page.waitForURL((url) => !url.pathname.includes('add_panel'), {
+      timeout: 10000,
+    }).catch(() => {
+      testLogger.warn('cleanupTestDashboard: still on add_panel after discard');
+    });
+    await page.waitForTimeout(500);
+  }
+
   await pm.dashboardCreate.backToDashboardList();
   await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
   await deleteDashboard(page, dashboardName);

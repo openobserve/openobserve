@@ -55,9 +55,19 @@ export function applyMetricChart(ctx: SQLContext): void {
   options.polar = {};
   options.xAxis = [];
   options.yAxis = [];
+  const metricText = formatUnitValue(unitValue);
+  const metricFillColor = getContrastColor(
+    panelSchema.config?.background?.value?.color,
+    store.state.theme === "dark",
+  );
+  const metricFieldLabel =
+    panelSchema.queries[0]?.fields?.y?.[0]?.label || key1;
   options.series = [
     {
       ...defaultSeriesProps,
+      _metricText: metricText,
+      _metricFillColor: metricFillColor,
+      _metricLabel: metricFieldLabel,
       renderItem: function (params: any) {
         try {
           const backgroundColor = panelSchema.config?.background?.value?.color;

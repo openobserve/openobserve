@@ -1572,7 +1572,12 @@
     "axisLabelRotateTooltipText": "Faites pivoter le texte de l'étiquette sur l'axe X selon un angle choisi (en degrés) pour améliorer la lisibilité lorsque les étiquettes sont longues ou encombrées.",
     "axisLabelTruncateTooltipText": "Tronquez les étiquettes de l'axe X à la largeur spécifiée (en pixels).",
     "axisLabelTooltipNotePrefix": "Remarque :",
-    "axisLabelTooltipNoteText": " Cette option n'est pas prise en charge pour les champs de l'axe X de séries chronologiques."
+    "axisLabelTooltipNoteText": " Cette option n'est pas prise en charge pour les champs de l'axe X de séries chronologiques.",
+    "multiSqlQueryLabel": "Libellé de requête",
+    "multiSqlQueryLabelHint": "Nom personnalisé pour cette requête dans les légendes (par exemple, « Production »)",
+    "multiQueryWarning": "Seule la requête 1 est affichée pour {chartType}",
+    "trellisNotSupportedWithMultiQuery": "La disposition en treillis est désactivée en cas de requêtes multiples. Supprimez les requêtes supplémentaires pour utiliser Trellis.",
+    "xAliasInconsistencyWarning": "Les alias de l'axe X ne sont pas cohérents d'une requête à l'autre : certaines utilisent un histogramme, d'autres non. Utilisez le même type d'alias pour toutes les requêtes pour obtenir des résultats prévisibles."
   },
   "panel": {
     "header": "Panneau",

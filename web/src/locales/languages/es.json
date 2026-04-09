@@ -1572,7 +1572,12 @@
     "axisLabelRotateTooltipText": "Gire el texto de la etiqueta del eje x en un ángulo elegido (en grados) para mejorar la legibilidad cuando las etiquetas son largas o están abarrotadas.",
     "axisLabelTruncateTooltipText": "Trunque las etiquetas del eje x al ancho especificado (en píxeles).",
     "axisLabelTooltipNotePrefix": "Nota:",
-    "axisLabelTooltipNoteText": " Esta opción no es compatible con los campos del eje x de series temporales."
+    "axisLabelTooltipNoteText": " Esta opción no es compatible con los campos del eje x de series temporales.",
+    "multiSqlQueryLabel": "Etiqueta de consulta",
+    "multiSqlQueryLabelHint": "Nombre personalizado para esta consulta en las leyendas (p. ej., «Producción»)",
+    "multiQueryWarning": "Solo se representa la consulta 1 para {chartType}",
+    "trellisNotSupportedWithMultiQuery": "El diseño de Trellis está desactivado con varias consultas. Elimine las consultas adicionales para usar Trellis.",
+    "xAliasInconsistencyWarning": "Los alias del eje X son inconsistentes en todas las consultas: algunos usan el histograma y otros no. Utilice el mismo tipo de alias en todas las consultas para obtener resultados predecibles."
   },
   "panel": {
     "header": "Panel",

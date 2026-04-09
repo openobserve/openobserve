@@ -1,6 +1,6 @@
 <template>
   <div
-    v-if="error || maxQueryRangeWarning || limitNumberOfSeriesWarningMessage || isCachedDataDifferWithCurrentTimeRange || (isPartialData && !isPanelLoading) || (lastTriggeredAt && !viewOnly && !simplifiedPanelView)"
+    v-if="error || maxQueryRangeWarning || limitNumberOfSeriesWarningMessage || xAliasInconsistencyWarning || isCachedDataDifferWithCurrentTimeRange || (isPartialData && !isPanelLoading) || (lastTriggeredAt && !viewOnly && !simplifiedPanelView)"
     class="row items-center no-wrap"
   >
     <q-btn
@@ -46,6 +46,21 @@
       <q-tooltip anchor="bottom right" self="top right">
         <div style="white-space: pre-wrap">
           {{ limitNumberOfSeriesWarningMessage }}
+        </div>
+      </q-tooltip>
+    </q-btn>
+    <q-btn
+      v-if="xAliasInconsistencyWarning"
+      :icon="outlinedWarning"
+      flat
+      size="xs"
+      padding="2px"
+      data-test="panel-x-alias-inconsistency-warning"
+      class="warning"
+    >
+      <q-tooltip anchor="bottom right" self="top right" max-width="260px">
+        <div style="white-space: pre-wrap">
+          {{ t('dashboard.xAliasInconsistencyWarning') }}
         </div>
       </q-tooltip>
     </q-btn>
@@ -99,6 +114,7 @@
 
 <script lang="ts">
 import { defineComponent } from "vue";
+import { useI18n } from "vue-i18n";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import {
   outlinedWarning,
@@ -148,9 +164,15 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    xAliasInconsistencyWarning: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup() {
+    const { t } = useI18n();
     return {
+      t,
       outlinedWarning,
       outlinedRunningWithErrors,
       symOutlinedClockLoader20,

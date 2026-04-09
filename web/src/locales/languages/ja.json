@@ -1589,7 +1589,12 @@
     "axisLabelRotateTooltipText": "X 軸のラベルテキストを選択した角度 (度単位) で回転させると、ラベルが長い場合やラベルが混み合っている場合に読みやすくなります。",
     "axisLabelTruncateTooltipText": "X 軸のラベルを指定された幅 (ピクセル単位) に切り捨てます。",
     "axisLabelTooltipNotePrefix": "注記:",
-    "axisLabelTooltipNoteText": " このオプションは、時系列の X 軸フィールドではサポートされていません。"
+    "axisLabelTooltipNoteText": " このオプションは、時系列の X 軸フィールドではサポートされていません。",
+    "multiSqlQueryLabel": "クエリーラベル",
+    "multiSqlQueryLabelHint": "このクエリの凡例でのカスタム名 (例:'Production')",
+    "multiQueryWarning": "{chartType} ではクエリ 1 のみがレンダリングされます",
+    "trellisNotSupportedWithMultiQuery": "Trellis レイアウトは複数のクエリで無効になります。トレリスを使用するには余分なクエリを削除してください。",
+    "xAliasInconsistencyWarning": "X 軸のエイリアスはクエリ間で一貫性がありません。ヒストグラムを使用するものと使用しないものがあります。予測可能な結果を得るには、すべてのクエリで同じエイリアスタイプを使用してください。"
   },
   "panel": {
     "header": "パネル",

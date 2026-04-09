@@ -1572,7 +1572,12 @@
     "axisLabelRotateTooltipText": "Gire o texto do rótulo do eixo x em um ângulo escolhido (em graus) para melhorar a legibilidade quando os rótulos estiverem longos ou cheios.",
     "axisLabelTruncateTooltipText": "Trunque os rótulos do eixo x na largura especificada (em pixels).",
     "axisLabelTooltipNotePrefix": "Nota:",
-    "axisLabelTooltipNoteText": " Essa opção não é suportada para campos do eixo x de séries temporais."
+    "axisLabelTooltipNoteText": " Essa opção não é suportada para campos do eixo x de séries temporais.",
+    "multiSqlQueryLabel": "Rótulo de consulta",
+    "multiSqlQueryLabelHint": "Nome personalizado para essa consulta em legendas (por exemplo, 'Produção')",
+    "multiQueryWarning": "Somente a consulta 1 é renderizada para {chartType}",
+    "trellisNotSupportedWithMultiQuery": "O layout do Trellis está desativado com várias consultas. Remova consultas extras para usar a treliça.",
+    "xAliasInconsistencyWarning": "Os aliases do eixo X são inconsistentes nas consultas: alguns usam histograma e outros não. Use o mesmo tipo de alias em todas as consultas para obter resultados previsíveis."
   },
   "panel": {
     "header": "Painel",

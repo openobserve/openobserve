@@ -228,12 +228,51 @@ describe("QueryInspector", () => {
       expect(searchInput.exists()).toBe(true);
     });
 
-    it("should display query numbers", async () => {
+    it("should display query numbers as fallback when tabName is not set", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
       expect(wrapper.text()).toContain("Query 1");
       expect(wrapper.text()).toContain("Query 2");
+    });
+
+    it("should display tabName when set instead of default query number", async () => {
+      wrapper = createWrapper({
+        metaData: {
+          queries: [
+            {
+              ...defaultProps.metaData.queries[0],
+              tabName: "Ziox",
+            },
+            {
+              ...defaultProps.metaData.queries[1],
+              tabName: "Monitoring",
+            },
+          ],
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("Ziox");
+      expect(wrapper.text()).toContain("Monitoring");
+      expect(wrapper.text()).not.toContain("Query 1");
+      expect(wrapper.text()).not.toContain("Query 2");
+    });
+
+    it("should fall back to query number when tabName is empty string", async () => {
+      wrapper = createWrapper({
+        metaData: {
+          queries: [
+            {
+              ...defaultProps.metaData.queries[0],
+              tabName: "",
+            },
+          ],
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("Query 1");
     });
 
     it("should display query types", async () => {
