@@ -37,7 +37,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </h2>
         </div>
-        <div class="panel-header-actions">
+        <div class="panel-header-actions tw:flex tw:items-center tw:gap-2">
+          <q-btn-dropdown
+            flat
+            dense
+            no-caps
+            size="sm"
+            class="tw:pl-[0.675rem]! tw:border! tw:border-[var(--o2-border-color)]! tw:rounded! tw:text-[0.7rem]! tw:tracking-[0.05rem]! tw:text-[var(--o2-text-2)]!"
+            label="View Related"
+            data-test="service-graph-node-panel-view-related-btn"
+          >
+            <q-list dense class="tw:min-w-[120px]">
+              <q-item
+                clickable
+                v-close-popup
+                @click="viewRelatedLogs"
+                data-test="service-graph-node-panel-view-related-logs-btn"
+              >
+                <q-item-section class="tw:text-[var(--o2-text-2)]!"
+                  >Logs</q-item-section
+                >
+              </q-item>
+              <q-item
+                clickable
+                v-close-popup
+                @click="viewRelatedTraces"
+                data-test="service-graph-node-panel-view-related-traces-btn"
+              >
+                <q-item-section class="tw:text-[var(--o2-text-2)]!"
+                  >Traces</q-item-section
+                >
+              </q-item>
+            </q-list>
+          </q-btn-dropdown>
           <q-btn
             flat
             dense
@@ -151,8 +183,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="activeTab"
               dense
               inline-label
+              outside-arrows
               align="left"
-              class="text-bold tw:flex-1"
+              class="text-bold tw:flex-1 tw:w-[calc(100%-2rem)]!"
               data-test="service-graph-node-panel-tabs"
             >
               <q-tab
@@ -182,10 +215,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="availableResourceTabConfigs.length > 0"
               flat
               dense
-              round
               icon="tune"
-              size="sm"
-              class="tw:mb-[0.2rem]"
+              size="1.1rem"
               data-test="service-graph-node-panel-workload-fields-btn"
             >
               <q-tooltip>{{ t("common.resources") }}</q-tooltip>
@@ -611,6 +642,7 @@ import {
   escapeSingleQuotes,
   deepCopy,
   formatTimeWithSuffix,
+  b64EncodeUnicode,
 } from "@/utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics/metrics.json";
@@ -1840,6 +1872,7 @@ export default defineComponent({
       errorsOnly?: boolean;
       minDurationMicros?: number;
       maxDurationMicros?: number;
+      mode?: "spans" | "traces";
     }) => {
       emit("view-traces", {
         stream: props.streamFilter,
@@ -1855,12 +1888,70 @@ export default defineComponent({
         minDurationMicros: params.minDurationMicros,
         maxDurationMicros: params.maxDurationMicros,
         timeRange: props.timeRange,
+        mode: params.mode || "spans",
       });
     };
 
     // Handlers
     const handleClose = () => {
       emit("close");
+    };
+
+    const viewRelatedTraces = () => {
+      navigateToTraces({ mode: "traces" });
+    };
+
+    const viewRelatedLogs = async () => {
+      const serviceName = buildServiceName();
+      if (!serviceName) return;
+
+      const org = store.state.selectedOrganization.identifier;
+
+      let streamName: string | undefined;
+      let filterQuery = `service_name='${escapeSingleQuotes(serviceName)}'`;
+
+      try {
+        const correlateResponse = await correlateStreams(org, {
+          source_stream: props.streamFilter || "default",
+          source_type: "traces",
+          available_dimensions: { service: serviceName },
+        });
+
+        const logStreams = correlateResponse.data?.related_streams?.logs || [];
+        if (logStreams.length > 0) {
+          const firstLogStream = logStreams[0];
+          streamName = firstLogStream.stream_name;
+
+          // Build filter from the stream's resolved field names
+          const filters: Record<string, string> = firstLogStream.filters || {};
+          const filterParts = Object.entries(filters)
+            .map(([field, value]) => `${field}='${escapeSingleQuotes(value)}'`)
+            .join(" AND ");
+          if (filterParts) {
+            filterQuery = filterParts;
+          }
+        }
+      } catch {
+        // Fall back to default service_name filter
+      }
+
+      const queryParams: any = {
+        stream_type: "logs",
+        from: props.timeRange.startTime,
+        to: props.timeRange.endTime,
+        sql_mode: "false",
+        query: b64EncodeUnicode(filterQuery),
+        org_identifier: org,
+      };
+
+      if (streamName) {
+        queryParams.stream_value = streamName;
+      }
+
+      router.push({
+        path: "/logs",
+        query: queryParams,
+      });
     };
 
     const handleShowTelemetry = async () => {
@@ -1914,6 +2005,8 @@ export default defineComponent({
       getErrorRateClass,
       getLatencyClass,
       handleClose,
+      viewRelatedTraces,
+      viewRelatedLogs,
       handleShowTelemetry,
       // RED Charts
       dashboardData,

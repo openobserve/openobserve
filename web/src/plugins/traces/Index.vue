@@ -1841,7 +1841,7 @@ watch(moveSplitter, () => {
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
   // Switch to search tab
-  searchObj.meta.searchMode = "spans";
+  searchObj.meta.searchMode = data.mode;
 
   // Set the selected stream in dropdown
   if (data.stream) {
