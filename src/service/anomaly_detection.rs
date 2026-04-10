@@ -543,19 +543,27 @@ pub async fn update_config(
 
     // Broadcast config update to all super cluster regions.
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-        && !config::get_config().common.local_mode
     {
-        if let Err(e) =
-            o2_enterprise::enterprise::super_cluster::queue::anomaly_config_update(updated.clone())
+        let sc_enabled = o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled;
+        let local_mode = config::get_config().common.local_mode;
+        log::info!(
+            "[anomaly_detection {}] ConfigUpdate broadcast check: super_cluster.enabled={sc_enabled} local_mode={local_mode}",
+            updated.anomaly_id
+        );
+        if sc_enabled && !local_mode {
+            if let Err(e) =
+                o2_enterprise::enterprise::super_cluster::queue::anomaly_config_update(
+                    updated.clone(),
+                )
                 .await
-        {
-            log::warn!(
-                "[anomaly_detection {}] failed to broadcast ConfigUpdate to super cluster: {e}",
-                updated.anomaly_id
-            );
+            {
+                log::warn!(
+                    "[anomaly_detection {}] failed to broadcast ConfigUpdate to super cluster: {e}",
+                    updated.anomaly_id
+                );
+            }
         }
     }
 
