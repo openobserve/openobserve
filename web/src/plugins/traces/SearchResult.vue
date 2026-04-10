@@ -18,8 +18,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="traces-search-result" class="overflow-hidden tw:h-full">
-    <!-- ════════════════════ RED Metrics Section ════════════════════ -->
-    <div class="card-container tw:h-fit tw:overflow-hidden">
+    <div
+      class="card-container tw:h-full tw:flex tw:flex-col tw:overflow-hidden"
+    >
+      <!-- Section header: title + count badge + insights + pagination -->
+      <div
+        v-if="
+          searchObj.data.stream.selectedStream.value &&
+          !searchObj.data.errorMsg?.trim()?.length &&
+          searchObj.searchApplied
+        "
+        data-test="traces-section-header"
+        class="row items-center tw:px-[0.5rem]! q-py-xs tw:shrink-0 tw:min-h-[2rem] tw:border-b tw:border-[rgba(0,0,0,0.07)]"
+      >
+        <q-badge
+          data-test="traces-count-badge"
+          rounded
+          :label="`${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}`"
+          class="text-caption tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.6rem]"
+        />
+        <q-badge
+          v-if="
+            searchObj.data.queryResults.errorCount != null &&
+            searchObj.data.queryResults.errorCount > 0
+          "
+          data-test="traces-error-count-badge"
+          rounded
+          :label="`${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}`"
+          class="text-caption tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-field-type-boolean-bg)]! tw:mr-[0.85rem]"
+        />
+        <!-- Insights Button -->
+        <q-btn
+          outline
+          dense
+          no-caps
+          color="primary"
+          icon="timeline"
+          :label="t('volumeInsights.insightsButtonLabel')"
+          class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold! tw:mr-[0.5rem]"
+          @click.stop="openUnifiedAnalysisDashboard"
+          data-test="insights-button"
+        >
+          <q-tooltip>{{ t("volumeInsights.analyzeTooltipTraces") }}</q-tooltip>
+        </q-btn>
+
+        <q-space />
+        <!-- Pagination -->
+        <template v-if="searchObj.meta.resultGrid.showPagination">
+          <q-select
+            :model-value="searchObj.meta.resultGrid.rowsPerPage"
+            :options="rowsPerPageOptions"
+            class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
+            size="sm"
+            dense
+            borderless
+            data-test="traces-search-result-records-per-page"
+            @update:model-value="changeRowsPerPage"
+          />
+          <q-pagination
+            :disable="searchObj.loading"
+            :model-value="searchObj.data.resultGrid.currentPage + 1"
+            :max="totalPages"
+            :input="false"
+            direction-links
+            :boundary-numbers="false"
+            :max-pages="5"
+            :ellipses="false"
+            icon-first="skip_previous"
+            icon-last="skip_next"
+            icon-prev="fast_rewind"
+            icon-next="fast_forward"
+            class="float-right paginator-section tw:mt-0!"
+            data-test="traces-search-result-pagination"
+            @update:model-value="changePage"
+          />
+        </template>
+      </div>
+
+      <!-- ════════════════════ RED Metrics Section ════════════════════ -->
       <transition
         enter-active-class="transition-all duration-300 ease-in-out"
         leave-active-class="transition-all duration-300 ease-in-out"
@@ -29,6 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         leave-to-class="opacity-0 -translate-y-4 max-h-0"
       >
         <TracesMetricsDashboard
+          v-show="searchObj.meta.showHistogram"
           v-if="
             searchObj.data.stream.selectedStream.value &&
             searchObj.searchApplied
@@ -48,39 +125,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @filters-updated="onMetricsFiltersUpdated"
         />
       </transition>
-    </div>
-    <div
-      class="card-container tw:overflow-hidden tw:mt-[0.625rem] tw:duration-300 tw:ease-in"
-      :class="
-        searchObj.meta.showHistogram
-          ? 'tw:h-[calc(100%-16.7rem)]!'
-          : 'tw:h-[calc(100%-3.15rem)]!'
-      "
-    >
-      <TracesSearchResultList
-        :hits="hits"
-        :loading="searchObj.loading"
-        :search-performed="searchPerformed"
-        :total="searchObj.data.queryResults.total"
-        :error-count="searchObj.data.queryResults.errorCount"
-        :show-header="
-          !!(
-            searchObj.data.stream.selectedStream.value &&
-            !searchObj.data.errorMsg?.trim()?.length &&
-            searchObj.searchApplied
-          )
-        "
-        :current-page="searchObj.data.resultGrid.currentPage + 1"
-        :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
-        :show-pagination="searchObj.meta.resultGrid.showPagination"
-        :sort-by="searchObj.meta.resultGrid.sortBy"
-        :sort-order="searchObj.meta.resultGrid.sortOrder"
-        :search-mode="searchObj.meta.searchMode"
-        @row-click="expandRowDetail"
-        @page-change="changePage"
-        @rows-per-page-change="changeRowsPerPage"
-        @sort-change="changeSortBy"
-      />
+
+      <div class="tw:flex-1 tw:overflow-hidden tw:relative">
+        <TracesSearchResultList
+          :hits="hits"
+          :loading="searchObj.loading"
+          :search-performed="searchPerformed"
+          :total="searchObj.data.queryResults.total"
+          :error-count="searchObj.data.queryResults.errorCount"
+          :show-header="
+            !!(
+              searchObj.data.stream.selectedStream.value &&
+              !searchObj.data.errorMsg?.trim()?.length &&
+              searchObj.searchApplied
+            )
+          "
+          :current-page="searchObj.data.resultGrid.currentPage + 1"
+          :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
+          :show-pagination="searchObj.meta.resultGrid.showPagination"
+          :sort-by="searchObj.meta.resultGrid.sortBy"
+          :sort-order="searchObj.meta.resultGrid.sortOrder"
+          :search-mode="searchObj.meta.searchMode"
+          @row-click="expandRowDetail"
+          @page-change="changePage"
+          @rows-per-page-change="changeRowsPerPage"
+          @sort-change="changeSortBy"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -94,6 +165,7 @@ import { useI18n } from "vue-i18n";
 import useTraces from "../../composables/useTraces";
 import { useRouter } from "vue-router";
 import TracesSearchResultList from "./components/TracesSearchResultList.vue";
+import { formatLargeNumber } from "../../utils/zincutils";
 
 export default defineComponent({
   name: "SearchResult",
@@ -205,6 +277,20 @@ export default defineComponent({
       ),
     );
 
+    const rowsPerPageOptions = [10, 25, 50, 100];
+
+    const totalPages = computed(() =>
+      searchObj.data.queryResults.total && searchObj.meta.resultGrid.rowsPerPage
+        ? Math.max(
+            1,
+            Math.ceil(
+              searchObj.data.queryResults.total /
+                searchObj.meta.resultGrid.rowsPerPage,
+            ),
+          )
+        : 1,
+    );
+
     function changePage(page: number) {
       if (searchObj.loading) return;
       searchObj.data.resultGrid.currentPage = page - 1;
@@ -226,6 +312,12 @@ export default defineComponent({
       emit("update:sort");
     }
 
+    function openUnifiedAnalysisDashboard() {
+      if (metricsDashboardRef.value) {
+        metricsDashboardRef.value.openUnifiedAnalysisDashboard();
+      }
+    }
+
     return {
       t,
       store,
@@ -241,12 +333,17 @@ export default defineComponent({
       changePage,
       changeRowsPerPage,
       changeSortBy,
+      rowsPerPageOptions,
+      totalPages,
+      openUnifiedAnalysisDashboard,
+      formatLargeNumber,
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
+@import "@/styles/pagination.scss";
 /* ── Traces list section ─────────────────────────────────────────────────── */
 .traces-section {
   flex: 1;
