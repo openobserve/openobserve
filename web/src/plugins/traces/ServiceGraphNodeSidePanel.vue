@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:mb-[0.2rem]"
               data-test="service-graph-node-panel-workload-fields-btn"
             >
-              <q-tooltip>Resource Tabs</q-tooltip>
+              <q-tooltip>{{ t("common.resources") }}</q-tooltip>
               <q-menu anchor="bottom right" self="top right" :offset="[0, 4]">
                 <q-list
                   dense
@@ -210,21 +210,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       tag="label"
                       clickable
                       :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
-                      class="tw:px-[0.325rem]!"
+                      class="tw:px-[0.325rem]! tw:h-[30px]! tw:min-h-[30px]!"
                     >
-                      <q-item-section side>
+                      <q-item-section side class="tw:pr-[0rem]!">
                         <q-checkbox
                           v-model="selectedWorkloadFields"
                           :val="cfg.id"
-                          size="sm"
+                          size="xs"
                         />
                       </q-item-section>
                       <q-item-section>
                         <q-item-label class="tw:text-xs">
                           {{ cfg.label }}
-                        </q-item-label>
-                        <q-item-label caption class="tw:text-[0.65rem]">
-                          {{ cfg.groupField }}
+                          <q-tooltip>
+                            {{ cfg.groupField }}
+                          </q-tooltip>
                         </q-item-label>
                       </q-item-section>
                     </q-item>
@@ -616,6 +616,7 @@ import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboar
 import metrics from "./metrics/metrics.json";
 import { type MetricGroupDefinition } from "@/utils/metrics/metricGrouping";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
+import { useI18n } from "vue-i18n";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -642,7 +643,7 @@ const TenstackTable = defineAsyncComponent(
 // Within the shown set, DEFAULT_GROUP_IDS determines which tabs are pre-selected.
 // ---------------------------------------------------------------------------
 
-interface ResourceTabConfig {
+export interface ResourceTabConfig {
   id: string; // unique tab name (= FoundGroup.group_id)
   label: string; // display label
   groupField: string; // SQL GROUP BY field (= FoundGroup.aliases["traces"])
@@ -652,7 +653,7 @@ interface ResourceTabConfig {
   isDefault: boolean; // pre-selected when the environment is first detected
 }
 
-interface ResourceRow {
+export interface ResourceRow {
   name: string;
   requestCount: number;
   errorCount: number;
@@ -738,6 +739,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const $q = useQuasar();
+    const { t } = useI18n();
 
     // RED Charts State
     const dashboardData = ref<any>({});
@@ -1200,7 +1202,6 @@ export default defineComponent({
         const seen = new Set<string>();
         const envs: { key: string; label: string }[] = [];
         for (const cfg of availableResourceTabConfigs.value) {
-          console.log(cfg);
           if (!seen.has(cfg.environment)) {
             seen.add(cfg.environment);
             envs.push({
@@ -1676,7 +1677,7 @@ export default defineComponent({
       try {
         const org = store.state.selectedOrganization.identifier;
 
-        // Step 1: Fetch semantic groups and build a reverse lookup map (field → alias)
+        // Fetch semantic groups and build a reverse lookup map (field → alias)
         const semanticGroupsResponse = await getSemanticGroups(org);
         const fieldToAliasMap = new Map<string, FieldAlias>();
         for (const alias of semanticGroupsResponse.data) {
@@ -1685,7 +1686,7 @@ export default defineComponent({
           }
         }
 
-        // Step 2: Fetch trace stream schema
+        // Fetch trace stream schema
         const schemaResponse = await streamService.schema(
           org,
           props.streamFilter,
@@ -1695,7 +1696,7 @@ export default defineComponent({
           schemaResponse.data?.schema || schemaResponse.data?.fields || [];
         const schemaFieldSet = new Set(schemaFields.map((f) => f.name));
 
-        // Step 3: Filter for service_ fields, intersect with semantic groups, deduplicate by alias.id
+        // Filter for service_ fields, intersect with semantic groups, deduplicate by alias.id
         const seen = new Set<string>();
         const matched: { field: string; alias: FieldAlias }[] = [];
         for (const schemaField of schemaFields) {
@@ -1707,19 +1708,18 @@ export default defineComponent({
         }
         resolvedWorkloadFields.value = matched;
 
-        debugger;
-        // Step 4: Fetch org-wide dimension analytics to discover all available resource groups
+        // Fetch org-wide dimension analytics to discover all available resource groups
         const analyticsResp = await getDimensionAnalytics(org);
         const allGroups: FoundGroup[] =
           analyticsResp.data?.available_groups ?? [];
 
-        // Step 5: Filter to groups whose traces (or spans) alias exists in this stream's schema
+        // Filter to groups whose traces (or spans) alias exists in this stream's schema
         const schemaMatchedGroups = allGroups.filter((g) => {
           const field = g.aliases["traces"] ?? g.aliases["spans"];
           return field && schemaFieldSet.has(field);
         });
 
-        // Step 6: Apply ENV_SEGMENTS priority
+        // Apply ENV_SEGMENTS priority
         // If any primary-platform groups (k8s / aws / azure / gcp) are present
         // in this stream, show ONLY those. Otherwise fall back to generic groups.
         const platformGroups = schemaMatchedGroups.filter(
@@ -1728,7 +1728,7 @@ export default defineComponent({
         const visibleGroups =
           platformGroups.length > 0 ? platformGroups : schemaMatchedGroups;
 
-        // Step 7: Build ResourceTabConfig from FoundGroup data
+        // Build ResourceTabConfig from FoundGroup data
         availableResourceTabConfigs.value = visibleGroups.map((g) => {
           const field = g.aliases["traces"] ?? g.aliases["spans"] ?? "";
           const envKey = groupEnvKey(g.group_id) ?? g.group_id.split("-")[0];
@@ -1743,7 +1743,7 @@ export default defineComponent({
           };
         });
 
-        // Step 8: Smart defaults — pre-select only the important groups
+        // Smart defaults — pre-select only the important groups
         selectedWorkloadFields.value = availableResourceTabConfigs.value
           .filter((c) => c.isDefault)
           .map((c) => c.id);
@@ -1906,6 +1906,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       serviceMetrics,
       serviceHealth,
       isAllStreamsSelected,

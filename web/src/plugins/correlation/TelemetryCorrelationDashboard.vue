@@ -1274,12 +1274,12 @@ const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );
 
-interface TimeRange {
+export interface TimeRange {
   startTime: number;
   endTime: number;
 }
 
-interface Props {
+export interface TelemetryCorrelationDashboardProps {
   serviceName: string;
   matchedDimensions: Record<string, string>;
   additionalDimensions?: Record<string, string>; // Unstable dimensions (pod-id, etc.) - shown with _o2_all option
@@ -1301,7 +1301,7 @@ interface Props {
   logsPanelHeight?: number; // Override default panel height (grid units) for logs panel
 }
 
-const props = withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<TelemetryCorrelationDashboardProps>(), {
   mode: "dialog",
   externalActiveTab: "logs",
   metricGroupDefinitions: () => DEFAULT_METRIC_GROUP_DEFINITIONS,
