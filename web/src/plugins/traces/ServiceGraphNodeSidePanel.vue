@@ -192,35 +192,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-menu anchor="bottom right" self="top right" :offset="[0, 4]">
                 <q-list
                   dense
-                  style="min-width: 10rem"
+                  class="tw:min-w-[12rem]!"
                   data-test="service-graph-node-panel-workload-fields-menu"
                 >
-                  <q-item-label header class="tw:text-xs tw:pb-1 tw:pt-2">
-                    Resource Tabs
-                  </q-item-label>
-                  <q-item
-                    v-for="cfg in availableResourceTabConfigs"
-                    :key="cfg.id"
-                    tag="label"
-                    clickable
-                    :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
-                  >
-                    <q-item-section side>
-                      <q-checkbox
-                        v-model="selectedWorkloadFields"
-                        :val="cfg.id"
-                        size="sm"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label class="tw:text-xs">
-                        {{ cfg.label }}
-                      </q-item-label>
-                      <q-item-label caption class="tw:text-[0.65rem]">
-                        {{ cfg.groupField }}
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
+                  <template v-for="env in detectedEnvironments" :key="env.key">
+                    <q-item-label
+                      header
+                      class="tw:text-xs tw:pb-0 tw:py-[0.375rem]! tw:uppercase tw:tracking-wide"
+                    >
+                      {{ env.label }}
+                    </q-item-label>
+                    <q-item
+                      v-for="cfg in availableResourceTabConfigs.filter(
+                        (c) => c.environment === env.key,
+                      )"
+                      :key="cfg.id"
+                      tag="label"
+                      clickable
+                      :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
+                      class="tw:px-[0.325rem]!"
+                    >
+                      <q-item-section side>
+                        <q-checkbox
+                          v-model="selectedWorkloadFields"
+                          :val="cfg.id"
+                          size="sm"
+                        />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label class="tw:text-xs">
+                          {{ cfg.label }}
+                        </q-item-label>
+                        <q-item-label caption class="tw:text-[0.65rem]">
+                          {{ cfg.groupField }}
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </template>
                 </q-list>
               </q-menu>
             </q-btn>
@@ -594,8 +602,11 @@ import streamService from "@/services/stream";
 import {
   correlate as correlateStreams,
   getSemanticGroups,
+  getDimensionAnalytics,
   type FieldAlias,
+  type FoundGroup,
 } from "@/services/service_streams";
+import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
 import {
   escapeSingleQuotes,
   deepCopy,
@@ -621,20 +632,24 @@ const TenstackTable = defineAsyncComponent(
 // ---------------------------------------------------------------------------
 // OTEL Resource Tab Configuration
 // ---------------------------------------------------------------------------
-// Maps OTEL semantic convention resource attributes (stored in OpenObserve with
-// a "service_" prefix, dots → underscores) to resource tabs in the side panel.
-// Tabs are shown only when the trace stream schema contains at least one of
-// the tab's triggerFields.
+// Resource tabs are derived dynamically from getDimensionAnalytics (org-wide).
+//
+// Priority logic:
+//   - If any ENV_SEGMENTS groups (k8s / aws / azure / gcp) are present in the
+//     current stream schema → show ONLY those platform-specific tabs.
+//   - Otherwise → show generic fallbacks (host, container, faas, process, cloud).
+//
+// Within the shown set, DEFAULT_GROUP_IDS determines which tabs are pre-selected.
 // ---------------------------------------------------------------------------
 
 interface ResourceTabConfig {
-  id: string; // unique tab name used as q-tab name
+  id: string; // unique tab name (= FoundGroup.group_id)
   label: string; // display label
-  triggerFields: string[]; // any of these in schema activates the tab
-  groupField: string; // primary SQL GROUP BY field
-  fallbackGroupField?: string; // used when groupField is absent from schema
+  groupField: string; // SQL GROUP BY field (= FoundGroup.aliases["traces"])
   colLabel: string; // header of the first column (entity name)
   colId: string; // row property key for the entity name column
+  environment: string; // env key derived from group_id first segment
+  isDefault: boolean; // pre-selected when the environment is first detected
 }
 
 interface ResourceRow {
@@ -647,215 +662,48 @@ interface ResourceRow {
   p99Latency: number;
 }
 
-const RESOURCE_TAB_CONFIGS: ResourceTabConfig[] = [
-  // ── Kubernetes (k8s.*) — also covers EKS / GKE / AKS ───────────────────
-  {
-    id: "pods",
-    label: "Pods",
-    triggerFields: ["service_k8s_pod_name"],
-    groupField: "service_k8s_pod_name",
-    colLabel: "Pod",
-    colId: "pod",
-  },
-  {
-    id: "nodes",
-    label: "Nodes",
-    triggerFields: ["service_k8s_node_name"],
-    groupField: "service_k8s_node_name",
-    colLabel: "Node",
-    colId: "node",
-  },
-  {
-    id: "k8s-clusters",
-    label: "Clusters",
-    triggerFields: ["service_k8s_cluster_name"],
-    groupField: "service_k8s_cluster_name",
-    colLabel: "Cluster",
-    colId: "cluster",
-  },
-  {
-    id: "k8s-namespaces",
-    label: "Namespaces",
-    triggerFields: ["service_k8s_namespace_name"],
-    groupField: "service_k8s_namespace_name",
-    colLabel: "Namespace",
-    colId: "namespace",
-  },
-  {
-    id: "k8s-deployments",
-    label: "Deployments",
-    triggerFields: ["service_k8s_deployment_name"],
-    groupField: "service_k8s_deployment_name",
-    colLabel: "Deployment",
-    colId: "deployment",
-  },
-  {
-    id: "k8s-statefulsets",
-    label: "StatefulSets",
-    triggerFields: ["service_k8s_statefulset_name"],
-    groupField: "service_k8s_statefulset_name",
-    colLabel: "StatefulSet",
-    colId: "statefulset",
-  },
-  {
-    id: "k8s-daemonsets",
-    label: "DaemonSets",
-    triggerFields: ["service_k8s_daemonset_name"],
-    groupField: "service_k8s_daemonset_name",
-    colLabel: "DaemonSet",
-    colId: "daemonset",
-  },
-  {
-    id: "k8s-jobs",
-    label: "Jobs",
-    triggerFields: ["service_k8s_job_name"],
-    groupField: "service_k8s_job_name",
-    colLabel: "Job",
-    colId: "job",
-  },
-  {
-    id: "k8s-cronjobs",
-    label: "CronJobs",
-    triggerFields: ["service_k8s_cronjob_name"],
-    groupField: "service_k8s_cronjob_name",
-    colLabel: "CronJob",
-    colId: "cronjob",
-  },
-  {
-    id: "k8s-replicasets",
-    label: "ReplicaSets",
-    triggerFields: ["service_k8s_replicaset_name"],
-    groupField: "service_k8s_replicaset_name",
-    colLabel: "ReplicaSet",
-    colId: "replicaset",
-  },
-  {
-    id: "k8s-containers",
-    label: "K8s Containers",
-    triggerFields: ["service_k8s_container_name"],
-    groupField: "service_k8s_container_name",
-    colLabel: "Container",
-    colId: "k8scontainer",
-  },
+// OTEL semantic field names (OpenObserve format: service_ prefix, dots → underscores)
+// that are pre-selected by default when their environment is detected.
+// Keyed on the actual stream field, not on the internal group_id, so this stays
+// in sync with OTEL semantic conventions regardless of backend group_id naming.
+const DEFAULT_GROUP_FIELDS = new Set([
+  // Kubernetes
+  "service_k8s_pod_name",
+  "service_k8s_node_name",
+  // Host
+  "service_host_name",
+  // Container
+  "service_container_name",
+  // Serverless (FaaS)
+  "service_faas_name",
+  // AWS ECS
+  "service_aws_ecs_task_arn",
+  "service_aws_ecs_container_name",
+  // Cloud
+  "service_cloud_region",
+  // Process / runtime
+  "service_process_runtime_name",
+  "service_process_runtime_version",
+  // Service identity
+  "service_namespace",
+  "service_version",
+]);
 
-  // ── Cloud Generic (cloud.*) — any provider ──────────────────────────────
-  {
-    id: "cloud-providers",
-    label: "Cloud Providers",
-    triggerFields: ["service_cloud_provider"],
-    groupField: "service_cloud_provider",
-    colLabel: "Provider",
-    colId: "provider",
-  },
-  {
-    id: "cloud-platforms",
-    label: "Cloud Platforms",
-    triggerFields: ["service_cloud_platform"],
-    groupField: "service_cloud_platform",
-    colLabel: "Platform",
-    colId: "platform",
-  },
-  {
-    id: "cloud-regions",
-    label: "Cloud Regions",
-    triggerFields: ["service_cloud_region"],
-    groupField: "service_cloud_region",
-    colLabel: "Region",
-    colId: "region",
-  },
-  {
-    id: "cloud-azs",
-    label: "Availability Zones",
-    triggerFields: ["service_cloud_availability_zone"],
-    groupField: "service_cloud_availability_zone",
-    colLabel: "Zone",
-    colId: "zone",
-  },
-  {
-    id: "cloud-accounts",
-    label: "Cloud Accounts",
-    triggerFields: ["service_cloud_account_id"],
-    groupField: "service_cloud_account_id",
-    colLabel: "Account",
-    colId: "account",
-  },
+// Generic environment display labels for non-primary-platform segments.
+// Primary platform labels (k8s/aws/azure/gcp) come from the shared ENV_SEGMENTS.
+const GENERIC_ENV_LABELS: Record<string, string> = {
+  host: "Host",
+  container: "Container",
+  faas: "Serverless",
+  process: "Runtime",
+  cloud: "Cloud",
+};
 
-  // ── Hosts — bare metal, EC2, GCP Compute Engine, Azure VM, Hetzner … ───
-  {
-    id: "hosts",
-    label: "Hosts",
-    triggerFields: ["service_host_name", "service_host_id"],
-    groupField: "service_host_name",
-    fallbackGroupField: "service_host_id",
-    colLabel: "Host",
-    colId: "host",
-  },
-
-  // ── Containers — Docker / standalone / ECS Fargate (container.*) ────────
-  {
-    id: "containers",
-    label: "Containers",
-    triggerFields: ["service_container_name", "service_container_id"],
-    groupField: "service_container_name",
-    fallbackGroupField: "service_container_id",
-    colLabel: "Container",
-    colId: "container",
-  },
-
-  // ── FaaS / Serverless (faas.*) — Lambda, Cloud Run, Azure Functions … ──
-  {
-    id: "functions",
-    label: "Functions",
-    triggerFields: ["service_faas_name"],
-    groupField: "service_faas_name",
-    colLabel: "Function",
-    colId: "function",
-  },
-  {
-    id: "faas-versions",
-    label: "Function Versions",
-    triggerFields: ["service_faas_version"],
-    groupField: "service_faas_version",
-    colLabel: "Function Version",
-    colId: "faasversion",
-  },
-
-  // ── AWS ECS (aws.ecs.*) ──────────────────────────────────────────────────
-  {
-    id: "ecs-tasks",
-    label: "ECS Tasks",
-    triggerFields: ["service_aws_ecs_task_arn"],
-    groupField: "service_aws_ecs_task_arn",
-    colLabel: "ECS Task",
-    colId: "task",
-  },
-  {
-    id: "aws-ecs-clusters",
-    label: "ECS Clusters",
-    triggerFields: ["service_aws_ecs_cluster_arn"],
-    groupField: "service_aws_ecs_cluster_arn",
-    colLabel: "ECS Cluster",
-    colId: "ecscluster",
-  },
-  {
-    id: "aws-ecs-task-families",
-    label: "ECS Task Families",
-    triggerFields: ["service_aws_ecs_task_family"],
-    groupField: "service_aws_ecs_task_family",
-    colLabel: "ECS Task Family",
-    colId: "ecstaskfamily",
-  },
-
-  // ── Process / Runtime ────────────────────────────────────────────────────
-  {
-    id: "process-runtimes",
-    label: "Runtimes",
-    triggerFields: ["service_process_runtime_name"],
-    groupField: "service_process_runtime_name",
-    colLabel: "Runtime",
-    colId: "runtime",
-  },
-];
+/** Gets a display label for any environment key, platform or generic. */
+const envLabel = (envKey: string): string =>
+  Object.values(ENV_SEGMENTS).find((e) => e.key === envKey)?.label ??
+  GENERIC_ENV_LABELS[envKey] ??
+  envKey;
 
 export default defineComponent({
   name: "ServiceGraphNodeSidePanel",
@@ -1337,13 +1185,32 @@ export default defineComponent({
     // Dynamic resource tabs state (replaces per-resource recentNodes/recentPods/loadingNodes/loadingPods)
     const resourceTabData = ref<Record<string, ResourceRow[]>>({});
     const resourceTabLoading = ref<Record<string, boolean>>({});
-    // All RESOURCE_TAB_CONFIGS that exist in the current trace stream schema
+    // Resource groups from getDimensionAnalytics that match the current stream schema
+    // (after platform-priority filtering — see resolveWorkloadFields)
     const availableResourceTabConfigs = ref<ResourceTabConfig[]>([]);
-    // Tabs actually shown = those selected by the user in the dropdown (default: all)
+    // Tabs actually shown = those selected by the user in the dropdown
     const activeResourceTabConfigs = computed(() =>
       availableResourceTabConfigs.value.filter((c) =>
         selectedWorkloadFields.value.includes(c.id),
       ),
+    );
+    // Deduped list of environments detected from visible resource groups
+    const detectedEnvironments = computed<{ key: string; label: string }[]>(
+      () => {
+        const seen = new Set<string>();
+        const envs: { key: string; label: string }[] = [];
+        for (const cfg of availableResourceTabConfigs.value) {
+          console.log(cfg);
+          if (!seen.has(cfg.environment)) {
+            seen.add(cfg.environment);
+            envs.push({
+              key: cfg.environment,
+              label: envLabel(cfg.environment),
+            });
+          }
+        }
+        return envs;
+      },
     );
 
     // Workload Field Discovery State
@@ -1798,8 +1665,10 @@ export default defineComponent({
       }
     };
 
-    // Discover which workload fields exist in the trace stream and are mapped in semantic groups.
-    // Also detects which RESOURCE_TAB_CONFIGS are active based on the stream schema.
+    // Discover which workload fields exist in the trace stream and build resource tabs
+    // via getDimensionAnalytics. Uses ENV_SEGMENTS priority: if any primary-platform
+    // groups (k8s / aws / azure / gcp) match the schema, show only those. Otherwise
+    // fall back to generic groups (host, container, faas, process, cloud).
     const resolveWorkloadFields = async () => {
       if (!props.visible || props.streamFilter === "all" || !props.streamFilter)
         return;
@@ -1824,40 +1693,60 @@ export default defineComponent({
         );
         const schemaFields: { name: string; type: string }[] =
           schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+        const schemaFieldSet = new Set(schemaFields.map((f) => f.name));
 
         // Step 3: Filter for service_ fields, intersect with semantic groups, deduplicate by alias.id
         const seen = new Set<string>();
         const matched: { field: string; alias: FieldAlias }[] = [];
-        for (const f of schemaFields) {
-          if (!f.name.startsWith("service_")) continue;
-          const alias = fieldToAliasMap.get(f.name);
+        for (const schemaField of schemaFields) {
+          if (!schemaField.name.startsWith("service_")) continue;
+          const alias = fieldToAliasMap.get(schemaField.name);
           if (!alias || seen.has(alias.id)) continue;
           seen.add(alias.id);
-          matched.push({ field: f.name, alias });
+          matched.push({ field: schemaField.name, alias });
         }
-
         resolvedWorkloadFields.value = matched;
 
-        // Step 4: Detect which OTEL resource tab configs are present in the schema
-        const schemaFieldSet = new Set(schemaFields.map((f) => f.name));
-        const detected = RESOURCE_TAB_CONFIGS.filter((cfg) =>
-          cfg.triggerFields.some((f) => schemaFieldSet.has(f)),
-        ).map((cfg) => {
-          // Resolve which groupField is actually present in the schema
-          const hasFallback =
-            cfg.fallbackGroupField &&
-            schemaFieldSet.has(cfg.fallbackGroupField);
-          const resolvedGroupField = schemaFieldSet.has(cfg.groupField)
-            ? cfg.groupField
-            : hasFallback
-              ? cfg.fallbackGroupField!
-              : cfg.groupField;
-          return { ...cfg, groupField: resolvedGroupField };
+        debugger;
+        // Step 4: Fetch org-wide dimension analytics to discover all available resource groups
+        const analyticsResp = await getDimensionAnalytics(org);
+        const allGroups: FoundGroup[] =
+          analyticsResp.data?.available_groups ?? [];
+
+        // Step 5: Filter to groups whose traces (or spans) alias exists in this stream's schema
+        const schemaMatchedGroups = allGroups.filter((g) => {
+          const field = g.aliases["traces"] ?? g.aliases["spans"];
+          return field && schemaFieldSet.has(field);
         });
 
-        availableResourceTabConfigs.value = detected;
-        // Default: select all available tabs (user can deselect via the dropdown)
-        selectedWorkloadFields.value = detected.map((c) => c.id);
+        // Step 6: Apply ENV_SEGMENTS priority
+        // If any primary-platform groups (k8s / aws / azure / gcp) are present
+        // in this stream, show ONLY those. Otherwise fall back to generic groups.
+        const platformGroups = schemaMatchedGroups.filter(
+          (g) => groupEnvKey(g.group_id) !== null,
+        );
+        const visibleGroups =
+          platformGroups.length > 0 ? platformGroups : schemaMatchedGroups;
+
+        // Step 7: Build ResourceTabConfig from FoundGroup data
+        availableResourceTabConfigs.value = visibleGroups.map((g) => {
+          const field = g.aliases["traces"] ?? g.aliases["spans"] ?? "";
+          const envKey = groupEnvKey(g.group_id) ?? g.group_id.split("-")[0];
+          return {
+            id: g.group_id,
+            label: g.display,
+            groupField: field,
+            colLabel: g.display,
+            colId: g.group_id.replace(/-/g, "_"),
+            environment: envKey,
+            isDefault: DEFAULT_GROUP_FIELDS.has(field),
+          };
+        });
+
+        // Step 8: Smart defaults — pre-select only the important groups
+        selectedWorkloadFields.value = availableResourceTabConfigs.value
+          .filter((c) => c.isDefault)
+          .map((c) => c.id);
       } catch (err) {
         console.error(
           "[ServiceGraphNodeSidePanel] Failed to resolve workload fields:",
@@ -2051,6 +1940,7 @@ export default defineComponent({
       // Dynamic resource tabs (OTEL platforms)
       availableResourceTabConfigs,
       activeResourceTabConfigs,
+      detectedEnvironments,
       resourceTabData,
       resourceTabLoading,
       buildEntityTableColumns,

@@ -1010,6 +1010,7 @@ import type {
   FieldAlias,
   ServiceFieldSource,
 } from "@/services/service_streams";
+import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1154,19 +1155,7 @@ const activeStreamValues = computed(() => {
 /** Active environment tab - auto-selects first detected environment */
 const activeEnvironment = ref<string>("");
 
-/** Map of group_id first segment -> environment key */
-const ENV_SEGMENTS: Record<string, { key: string; label: string }> = {
-  k8s:    { key: "k8s",   label: "K8s" },
-  aws:    { key: "aws",   label: "AWS" },
-  azure:  { key: "azure", label: "Azure" },
-  gcp:    { key: "gcp",   label: "GCP" },
-};
-
-/** Gets the environment key for a group_id using its first dash-separated segment */
-function groupEnvKey(groupId: string): string | null {
-  const seg = groupId.split('-')[0];
-  return ENV_SEGMENTS[seg]?.key ?? null;
-}
+/** Map of group_id first segment -> environment key (shared from serviceStreamEnvs util) */
 
 /** Coverage % for any given environment key (used for sorting tabs) */
 function getEnvCoverage(envKey: string): number {
