@@ -1,0 +1,985 @@
+{
+  "version": 8,
+  "title": "2026-04-03_E2E Playwright Test Reports_41hg701",
+  "description": "E2E test report for run 41hg701",
+  "role": "",
+  "owner": "",
+  "tabs": [
+    {
+      "tabId": "overview",
+      "name": "Overview",
+      "panels": [
+        {
+          "id": "p_total_tests",
+          "type": "metric",
+          "title": "Total Tests",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT COUNT(*) as total FROM e2e_playwright_reports WHERE run_id = '41hg701'",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Total",
+                    "alias": "total",
+                    "column": "total"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 48,
+            "h": 4,
+            "i": 1
+          }
+        },
+        {
+          "id": "p_passed",
+          "type": "metric",
+          "title": "Passed",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT COUNT(*) as passed FROM e2e_playwright_reports WHERE run_id = '41hg701' AND status = 'passed'",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Passed",
+                    "alias": "passed",
+                    "column": "passed"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 48,
+            "y": 0,
+            "w": 48,
+            "h": 4,
+            "i": 2
+          }
+        },
+        {
+          "id": "p_failed",
+          "type": "metric",
+          "title": "Failed",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT COUNT(*) as failed FROM e2e_playwright_reports WHERE run_id = '41hg701' AND status = 'failed'",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Failed",
+                    "alias": "failed",
+                    "column": "failed"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 96,
+            "y": 0,
+            "w": 48,
+            "h": 4,
+            "i": 3
+          }
+        },
+        {
+          "id": "p_skipped",
+          "type": "metric",
+          "title": "Skipped",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT COUNT(*) as skipped FROM e2e_playwright_reports WHERE run_id = '41hg701' AND status = 'skipped'",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Skipped",
+                    "alias": "skipped",
+                    "column": "skipped"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 144,
+            "y": 0,
+            "w": 48,
+            "h": 4,
+            "i": 4
+          }
+        },
+        {
+          "id": "p_pass_rate",
+          "type": "metric",
+          "title": "Pass Rate %",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT ROUND(COUNT(CASE WHEN status = 'passed' THEN 1 END) * 100.0 / COUNT(*), 1) as pass_rate FROM e2e_playwright_reports WHERE run_id = '41hg701'",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Pass Rate",
+                    "alias": "pass_rate",
+                    "column": "pass_rate"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 4,
+            "w": 48,
+            "h": 4,
+            "i": 5
+          }
+        },
+        {
+          "id": "p_status_pie",
+          "type": "pie",
+          "title": "Test Status Distribution",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT status, COUNT(*) as count FROM e2e_playwright_reports WHERE run_id = '41hg701' GROUP BY status ORDER BY count DESC",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Status",
+                    "alias": "status",
+                    "column": "status"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Count",
+                    "alias": "count",
+                    "column": "count"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 8,
+            "w": 192,
+            "h": 10,
+            "i": 6
+          }
+        },
+        {
+          "id": "p_shard_bar",
+          "type": "stacked",
+          "title": "Results by Shard",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT shard, status, COUNT(*) as count FROM e2e_playwright_reports WHERE run_id = '41hg701' GROUP BY shard, status ORDER BY shard",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Shard",
+                    "alias": "shard",
+                    "column": "shard"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Count",
+                    "alias": "count",
+                    "column": "count"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 18,
+            "w": 192,
+            "h": 10,
+            "i": 7
+          }
+        },
+        {
+          "id": "p_failed_table",
+          "type": "table",
+          "title": "Failed Tests",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT shard, file_path, test_name, duration_secs, error_category, error_message FROM e2e_playwright_reports WHERE run_id = '41hg701' AND status = 'failed' ORDER BY shard, file_path",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Shard",
+                    "alias": "shard",
+                    "column": "shard"
+                  },
+                  {
+                    "label": "File",
+                    "alias": "file_path",
+                    "column": "file_path"
+                  },
+                  {
+                    "label": "Test",
+                    "alias": "test_name",
+                    "column": "test_name"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Duration (s)",
+                    "alias": "duration_secs",
+                    "column": "duration_secs"
+                  },
+                  {
+                    "label": "Error Category",
+                    "alias": "error_category",
+                    "column": "error_category"
+                  },
+                  {
+                    "label": "Error Message",
+                    "alias": "error_message",
+                    "column": "error_message"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 28,
+            "w": 192,
+            "h": 10,
+            "i": 8
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "failures",
+      "name": "Failures & Errors",
+      "panels": [
+        {
+          "id": "p_error_cats",
+          "type": "pie",
+          "title": "Error Categories",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT error_category, COUNT(*) as count FROM e2e_playwright_reports WHERE run_id = '41hg701' AND status = 'failed' AND error_category != '' GROUP BY error_category ORDER BY count DESC",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Category",
+                    "alias": "error_category",
+                    "column": "error_category"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Count",
+                    "alias": "count",
+                    "column": "count"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 10,
+            "i": 9
+          }
+        },
+        {
+          "id": "p_failing_tests",
+          "type": "table",
+          "title": "Failing Tests",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT test_name, file_path, shard, COUNT(*) as failure_count FROM e2e_playwright_reports WHERE run_id = '41hg701' AND status = 'failed' GROUP BY test_name, file_path, shard ORDER BY failure_count DESC LIMIT 20",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Test",
+                    "alias": "test_name",
+                    "column": "test_name"
+                  },
+                  {
+                    "label": "File",
+                    "alias": "file_path",
+                    "column": "file_path"
+                  },
+                  {
+                    "label": "Shard",
+                    "alias": "shard",
+                    "column": "shard"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Failures",
+                    "alias": "failure_count",
+                    "column": "failure_count"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 10,
+            "w": 192,
+            "h": 10,
+            "i": 10
+          }
+        },
+        {
+          "id": "p_error_messages",
+          "type": "table",
+          "title": "Error Messages",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT shard, test_name, error_category, error_message FROM e2e_playwright_reports WHERE run_id = '41hg701' AND status = 'failed' ORDER BY _timestamp DESC LIMIT 50",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Shard",
+                    "alias": "shard",
+                    "column": "shard"
+                  },
+                  {
+                    "label": "Test",
+                    "alias": "test_name",
+                    "column": "test_name"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Error Category",
+                    "alias": "error_category",
+                    "column": "error_category"
+                  },
+                  {
+                    "label": "Error Message",
+                    "alias": "error_message",
+                    "column": "error_message"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 20,
+            "w": 192,
+            "h": 10,
+            "i": 11
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "performance",
+      "name": "Performance",
+      "panels": [
+        {
+          "id": "p_slowest",
+          "type": "h-bar",
+          "title": "Slowest Tests",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT test_name, shard, ROUND(AVG(duration_secs), 1) as avg_duration_secs FROM e2e_playwright_reports WHERE run_id = '41hg701' AND status IN ('passed', 'failed') GROUP BY test_name, shard ORDER BY avg_duration_secs DESC LIMIT 20",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Test",
+                    "alias": "test_name",
+                    "column": "test_name"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Avg Duration (s)",
+                    "alias": "avg_duration_secs",
+                    "column": "avg_duration_secs"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 10,
+            "i": 12
+          }
+        },
+        {
+          "id": "p_dur_dist",
+          "type": "bar",
+          "title": "Test Duration Distribution",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT CASE WHEN duration_secs < 5 THEN '0-5s' WHEN duration_secs < 15 THEN '5-15s' WHEN duration_secs < 30 THEN '15-30s' WHEN duration_secs < 60 THEN '30-60s' WHEN duration_secs < 120 THEN '1-2min' ELSE '2min+' END as duration_bucket, COUNT(*) as count FROM e2e_playwright_reports WHERE run_id = '41hg701' GROUP BY duration_bucket ORDER BY count DESC",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Bucket",
+                    "alias": "duration_bucket",
+                    "column": "duration_bucket"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Count",
+                    "alias": "count",
+                    "column": "count"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 10,
+            "w": 192,
+            "h": 10,
+            "i": 13
+          }
+        },
+        {
+          "id": "p_shard_dur",
+          "type": "bar",
+          "title": "Shard Total Duration (s)",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT shard, ROUND(SUM(duration_secs), 1) as total_duration_secs, COUNT(*) as test_count FROM e2e_playwright_reports WHERE run_id = '41hg701' GROUP BY shard ORDER BY total_duration_secs DESC",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Shard",
+                    "alias": "shard",
+                    "column": "shard"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Total Duration (s)",
+                    "alias": "total_duration_secs",
+                    "column": "total_duration_secs"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 20,
+            "w": 192,
+            "h": 10,
+            "i": 14
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "retries",
+      "name": "Retries & Flaky",
+      "panels": [
+        {
+          "id": "p_flaky_list",
+          "type": "table",
+          "title": "Flaky Tests",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT test_name, file_path, shard, status, duration_secs FROM e2e_playwright_reports WHERE run_id = '41hg701' AND status = 'flaky' ORDER BY test_name",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Test",
+                    "alias": "test_name",
+                    "column": "test_name"
+                  },
+                  {
+                    "label": "File",
+                    "alias": "file_path",
+                    "column": "file_path"
+                  },
+                  {
+                    "label": "Shard",
+                    "alias": "shard",
+                    "column": "shard"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Status",
+                    "alias": "status",
+                    "column": "status"
+                  },
+                  {
+                    "label": "Duration (s)",
+                    "alias": "duration_secs",
+                    "column": "duration_secs"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 10,
+            "i": 15
+          }
+        },
+        {
+          "id": "p_retries",
+          "type": "table",
+          "title": "Tests That Required Retries",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT test_name, shard, attempt_number, status, duration_secs, error_category FROM e2e_playwright_reports WHERE run_id = '41hg701' AND attempt_number > 0 ORDER BY test_name, attempt_number LIMIT 50",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Test",
+                    "alias": "test_name",
+                    "column": "test_name"
+                  },
+                  {
+                    "label": "Shard",
+                    "alias": "shard",
+                    "column": "shard"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Attempt",
+                    "alias": "attempt_number",
+                    "column": "attempt_number"
+                  },
+                  {
+                    "label": "Status",
+                    "alias": "status",
+                    "column": "status"
+                  },
+                  {
+                    "label": "Duration (s)",
+                    "alias": "duration_secs",
+                    "column": "duration_secs"
+                  },
+                  {
+                    "label": "Error Category",
+                    "alias": "error_category",
+                    "column": "error_category"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 10,
+            "w": 192,
+            "h": 10,
+            "i": 16
+          }
+        }
+      ]
+    },
+    {
+      "tabId": "all_tests",
+      "name": "All Tests",
+      "panels": [
+        {
+          "id": "p_all_tests",
+          "type": "table",
+          "title": "All Test Results",
+          "description": "",
+          "queryType": "",
+          "queries": [
+            {
+              "query": "SELECT shard, file_path, test_name, status, duration_secs, attempt_number, error_category, error_message FROM e2e_playwright_reports WHERE run_id = '41hg701' ORDER BY shard, file_path, test_name",
+              "customQuery": true,
+              "fields": {
+                "stream": "e2e_playwright_reports",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Shard",
+                    "alias": "shard",
+                    "column": "shard"
+                  },
+                  {
+                    "label": "File",
+                    "alias": "file_path",
+                    "column": "file_path"
+                  },
+                  {
+                    "label": "Test",
+                    "alias": "test_name",
+                    "column": "test_name"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Status",
+                    "alias": "status",
+                    "column": "status"
+                  },
+                  {
+                    "label": "Duration (s)",
+                    "alias": "duration_secs",
+                    "column": "duration_secs"
+                  },
+                  {
+                    "label": "Attempt",
+                    "alias": "attempt_number",
+                    "column": "attempt_number"
+                  },
+                  {
+                    "label": "Error Category",
+                    "alias": "error_category",
+                    "column": "error_category"
+                  },
+                  {
+                    "label": "Error Message",
+                    "alias": "error_message",
+                    "column": "error_message"
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "type": "list",
+                  "values": [],
+                  "logicalOperator": "AND",
+                  "filterType": "list"
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          },
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 192,
+            "h": 10,
+            "i": 17
+          }
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": [],
+    "showDynamicFilters": false
+  }
+}
