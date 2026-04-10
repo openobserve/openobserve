@@ -42,7 +42,7 @@ test.describe("Alerts Regression Bugs", () => {
 
       // Create template and destination via API for reliability
       const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
-      const org = getOrgIdentifier();
+      const org = getOrgIdentifier() || 'default';
       const authToken = Buffer.from(`${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`).toString('base64');
 
       // Create template via API
