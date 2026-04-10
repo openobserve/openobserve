@@ -41,7 +41,7 @@ export interface TemplateStats {
 
 class EvalTemplateService {
   private getBaseURL(orgId: string): string {
-    return `/api/${orgId}/eval-templates`;
+    return `/api/${orgId}/eval_templates`;
   }
 
   /**
