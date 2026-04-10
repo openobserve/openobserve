@@ -54,6 +54,45 @@ export function overlayNewDataOnOldOptions(
     merged.legend = JSON.parse(JSON.stringify(newOptions.legend));
   }
 
+  // Preserve the maximum yAxis nameGap seen across streaming chunks.
+  // nameGap is computed from the longest formatted Y-value in the current partial data.
+  // Early chunks have smaller Y values ΓåÆ shorter strings ΓåÆ smaller nameGap, causing the
+  // Y-axis name label (e.g. "Metric_Name") to overlap tick labels mid-stream.
+  // By taking max(old, new) we ensure nameGap only grows, never shrinks, during streaming.
+  if (oldOptions.yAxis && newOptions.yAxis) {
+    const oldNameGap =
+      typeof oldOptions.yAxis.nameGap === "number"
+        ? oldOptions.yAxis.nameGap
+        : 0;
+    const newNameGap =
+      typeof newOptions.yAxis?.nameGap === "number"
+        ? newOptions.yAxis.nameGap
+        : 0;
+    if (oldNameGap > newNameGap) {
+      merged.yAxis = { ...newOptions.yAxis, nameGap: oldNameGap };
+    }
+  }
+
+  // Preserve the maximum grid.bottom seen across streaming chunks.
+  // For non-time-series categorical charts with rotated x-axis labels, grid.bottom
+  // includes `additionalBottomSpace` which is derived from the longest x-axis category
+  // label string in the current partial data. Early chunks may have shorter category
+  // names ΓåÆ smaller additionalBottomSpace ΓåÆ smaller grid.bottom. As more data arrives
+  // with longer category labels, grid.bottom grows to its correct final value, causing
+  // the plot area to jump. Taking max(old, new) prevents it from shrinking mid-stream.
+  const oldGrid = oldOptions.grid?.[0] ?? oldOptions.grid;
+  const newGrid = newOptions.grid?.[0] ?? newOptions.grid;
+  if (oldGrid && newGrid) {
+    const oldBottom = typeof oldGrid.bottom === "number" ? oldGrid.bottom : 0;
+    const newBottom = typeof newGrid.bottom === "number" ? newGrid.bottom : 0;
+    if (oldBottom > newBottom) {
+      const mergedGrid = { ...newGrid, bottom: oldBottom };
+      merged.grid = Array.isArray(newOptions.grid)
+        ? [mergedGrid, ...newOptions.grid.slice(1)]
+        : mergedGrid;
+    }
+  }
+
   // First pass: compute the full time range across ALL new series.
   // fillMissingValues ensures the new data spans the entire query range,
   // so newMinTime/newMaxTime represent the new query's time boundaries.
