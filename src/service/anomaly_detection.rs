@@ -553,11 +553,10 @@ pub async fn update_config(
             updated.anomaly_id
         );
         if sc_enabled && !local_mode {
-            if let Err(e) =
-                o2_enterprise::enterprise::super_cluster::queue::anomaly_config_update(
-                    updated.clone(),
-                )
-                .await
+            if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::anomaly_config_update(
+                updated.clone(),
+            )
+            .await
             {
                 log::warn!(
                     "[anomaly_detection {}] failed to broadcast ConfigUpdate to super cluster: {e}",
