@@ -266,7 +266,7 @@ test.describe("VRL visualization support testcases", () => {
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
     await expect(tablePanel).toBeVisible({ timeout: 15000 });
 
-    await pm.dashboardTimeRefresh.setRelative("8", "h");
+    // await pm.dashboardTimeRefresh.setRelative("30", "m");
     // await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender(page);
 

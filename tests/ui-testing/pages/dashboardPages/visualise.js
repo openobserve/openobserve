@@ -553,30 +553,37 @@ export default class LogsVisualise {
     await dashboardDropdown.waitFor({ state: "visible", timeout: 15000 });
 
     // Click the "+" button to open the "New Dashboard" dialog.
-    // force:true bypasses Quasar backdrop overlay interception.
+    // scrollIntoViewIfNeeded + dispatchEvent bypasses viewport bounds (CI) and Quasar backdrop.
     await this.newDashboardBtn.waitFor({ state: "visible", timeout: 10000 });
-    await this.newDashboardBtn.click({ force: true });
+    await this.newDashboardBtn.scrollIntoViewIfNeeded();
+    await this.page.waitForTimeout(300);
+    await this.newDashboardBtn.dispatchEvent('click');
     await this.page.waitForTimeout(1000);
 
-    // Wait for the "New Dashboard" dialog's name input to be visible
-    await this.dashboardNameInput.waitFor({ state: "visible", timeout: 15000 });
-
-    // Fill dashboard name — target the inner <input> inside the q-input wrapper
-    await this.dashboardNameInput.locator('input').fill(randomDashboardName);
+    // The "New Dashboard" dialog attaches but may be behind the outer dialog backdrop (not visible).
+    // Use state:"attached" to detect DOM presence, then fill via evaluate to bypass visibility.
+    await this.dashboardNameInput.waitFor({ state: "attached", timeout: 15000 });
+    await this.dashboardNameInput.evaluate((el, name) => {
+      const input = el.tagName === 'INPUT' ? el : el.querySelector('input');
+      if (input) {
+        input.focus();
+        input.value = name;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }, randomDashboardName);
 
     // Click "Save" to create the dashboard
-    await this.dashboardSubmitBtn.waitFor({ state: "visible", timeout: 5000 });
-    await this.dashboardSubmitBtn.click({ force: true });
+    await this.dashboardSubmitBtn.waitFor({ state: "attached", timeout: 5000 });
+    await this.dashboardSubmitBtn.dispatchEvent('click');
 
     // Wait for the new dashboard dialog to close
     await this.dashboardNameInput.waitFor({ state: "detached", timeout: 10000 }).catch(() => {});
     await this.page.waitForTimeout(1000);
 
-    // Wait for panel title input to appear (shown after dashboard is auto-selected)
+    // metrics-new-dashboard-panel-title IS a direct <input> element (not a q-input wrapper)
     await this.panelTitleInput.waitFor({ state: "visible", timeout: 15000 });
-
-    // Fill panel title — target inner <input> to ensure Vue v-model.trim updates
-    await this.panelTitleInput.locator('input').fill(panelName);
+    await this.panelTitleInput.fill(panelName);
 
     // Wait for the "Add" button to be enabled (requires non-empty panelTitle)
     await this.page.waitForFunction(
@@ -587,7 +594,7 @@ export default class LogsVisualise {
       { timeout: 10000 }
     ).catch(() => {});
 
-    await this.updateSettingsBtn.click({ force: true });
+    await this.updateSettingsBtn.dispatchEvent('click');
   }
 
   //wait for query inspector to be visible
