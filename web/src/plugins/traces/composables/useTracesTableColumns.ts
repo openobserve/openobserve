@@ -77,7 +77,6 @@ const KNOWN_COLUMN_META: Record<
       slot: true,
       cellClass: "tw:text-[var(--o2-text-4)]!",
     },
-    sortable: true,
   },
   spans: {
     header: "Spans",
@@ -88,6 +87,11 @@ const KNOWN_COLUMN_META: Record<
       cellClass: "tw:text-[var(--o2-text-1)]!",
     },
     accessorFn: (row: any) => row.spans,
+  },
+  span_status: {
+    header: "Span Status",
+    size: 120,
+    meta: { align: "center", slot: true, disableCellAction: true },
   },
   status: {
     header: "Status",
@@ -133,7 +137,7 @@ function toColumnDef(fieldName: string): ColumnDef<Record<string, any>> {
       id: fieldName,
       header: known.header,
       size: known.size,
-      meta: known.meta,
+      meta: { ...known.meta },
       ...(known.accessorFn ? { accessorFn: known.accessorFn } : {}),
       ...(known.sortable ? { sortable: known.sortable } : {}),
     };
@@ -202,6 +206,15 @@ export function useTracesTableColumns() {
       } else {
         cols.push(...llm);
       }
+    }
+
+    // In spans mode, all columns support sort
+    if (searchMode === "spans") {
+      cols.forEach((col) => {
+        if (col.meta) {
+          (col.meta as Record<string, unknown>).sortable = true;
+        }
+      });
     }
 
     columns.value = cols;

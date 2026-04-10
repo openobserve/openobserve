@@ -169,7 +169,7 @@ export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
     "service_name",
     "operation_name",
     "duration",
-    "status",
+    "span_status",
     "status_code",
     "method",
   ],
@@ -242,9 +242,19 @@ const useTraces = () => {
     const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
     const saved = useLocalTraceFilterField()?.value?.[key];
 
-    searchObj.data.stream.selectedFields = saved?.[searchMode]?.length
+    let fields = [];
+    fields = saved?.[searchMode]?.length
       ? saved?.[searchMode]
       : [...DEFAULT_TRACE_COLUMNS[searchMode]];
+
+    fields = fields.map((field) => {
+      if (field === "status" && searchMode === "spans") {
+        return "span_status";
+      } else {
+        return field;
+      }
+    });
+    searchObj.data.stream.selectedFields = fields;
   };
 
   function getUrlQueryParams(getShareLink: boolean = false) {
