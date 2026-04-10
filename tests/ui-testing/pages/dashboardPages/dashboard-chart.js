@@ -92,9 +92,7 @@ export default class ChartTypeSelector {
         await this.page.locator('[role="listbox"]').waitFor({ state: "visible", timeout: 10000 });
 
         const streamOption = this.page
-          .getByRole("option", { name: streamName, exact: true })
-          .locator("div")
-          .nth(2);
+          .getByRole("option", { name: streamName, exact: true });
 
         await streamOption.waitFor({ state: "visible", timeout: 15000 });
         await streamOption.click();
