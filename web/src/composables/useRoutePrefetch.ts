@@ -94,10 +94,49 @@ export default function useRoutePrefetch() {
     prefetchedRoutes.value.clear();
   };
 
+  /**
+   * Schedule background prefetching of all routes after initial load.
+   * Runs during browser idle time in priority tiers so it never competes
+   * with the initial render or user interactions.
+   * Skips automatically on slow/metered connections.
+   */
+  const startBackgroundPrefetch = () => {
+    // Skip on slow or data-saver connections
+    const conn = (navigator as any).connection;
+    if (conn?.saveData || ["slow-2g", "2g"].includes(conn?.effectiveType)) {
+      return;
+    }
+
+    const tiers: string[][] = [
+      ["/logs", "/metrics", "/traces"],
+      ["/dashboards", "/alerts", "/rum"],
+      ["/streams", "/ingestion", "/iam", "/settings", "/reports", "/actions"],
+    ];
+
+    let tierIndex = 0;
+
+    const scheduleNextTier = () => {
+      if (tierIndex >= tiers.length) return;
+      const routes = tiers[tierIndex++];
+      const run = () => {
+        prefetchRoutes(routes);
+        scheduleNextTier();
+      };
+      if (typeof requestIdleCallback !== "undefined") {
+        requestIdleCallback(run, { timeout: 3000 });
+      } else {
+        setTimeout(run, 0);
+      }
+    };
+
+    scheduleNextTier();
+  };
+
   return {
     prefetchRoute,
     prefetchRoutes,
     prefetchedRoutes: prefetchedRoutes.value,
     resetPrefetchCache,
+    startBackgroundPrefetch,
   };
 }

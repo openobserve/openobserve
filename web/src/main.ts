@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { createApp } from "vue";
-import { Notify, Dialog, Quasar, AppFullscreen } from "quasar";
+import { Notify, Dialog, Quasar, AppFullscreen, LoadingBar } from "quasar";
 import "quasar/src/css/index.sass";
 import "@quasar/extras/roboto-font/roboto-font.css";
 import "@quasar/extras/material-icons/material-icons.css";
@@ -46,6 +46,7 @@ app
       Dialog,
       Notify,
       AppFullscreen,
+      LoadingBar,
     },
   })
   .use(i18n);
