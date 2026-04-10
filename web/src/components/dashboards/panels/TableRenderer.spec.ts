@@ -1389,4 +1389,50 @@ describe("TableRenderer", () => {
       expect(wrapper.find(".test-bottom").exists()).toBe(true);
     });
   });
+
+  describe("Drilldown Visual Cues", () => {
+    it("should not apply drilldown-active class by default", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.find(".drilldown-active").exists()).toBe(false);
+    });
+
+    it("should apply drilldown-active class when hasDrilldown is true", () => {
+      wrapper = createWrapper({ hasDrilldown: true });
+
+      expect(wrapper.find(".drilldown-active").exists()).toBe(true);
+    });
+
+    it("should not apply drilldown-active class when hasDrilldown is false", () => {
+      wrapper = createWrapper({ hasDrilldown: false });
+
+      expect(wrapper.find(".drilldown-active").exists()).toBe(false);
+    });
+
+    it("should default hasDrilldown prop to false", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.props("hasDrilldown")).toBe(false);
+    });
+
+    it("should toggle drilldown-active class reactively", async () => {
+      wrapper = createWrapper({ hasDrilldown: false });
+      expect(wrapper.find(".drilldown-active").exists()).toBe(false);
+
+      await wrapper.setProps({ hasDrilldown: true });
+      expect(wrapper.find(".drilldown-active").exists()).toBe(true);
+
+      await wrapper.setProps({ hasDrilldown: false });
+      expect(wrapper.find(".drilldown-active").exists()).toBe(false);
+    });
+
+    it("should still emit row-click when drilldown is active", async () => {
+      wrapper = createWrapper({ hasDrilldown: true });
+
+      const table = wrapper.findComponent({ name: "QTable" });
+      await table.vm.$emit("row-click", {}, mockTableData.rows[0]);
+
+      expect(wrapper.emitted("row-click")).toBeTruthy();
+    });
+  });
 });

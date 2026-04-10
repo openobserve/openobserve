@@ -2257,4 +2257,100 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.panelSchema.queries.length).toBeGreaterThan(0);
     });
   });
+
+  describe("Drilldown Visual Cues (hasDrilldown)", () => {
+    it("should expose hasDrilldown as a computed property", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.hasDrilldown).toBeDefined();
+      expect(typeof wrapper.vm.hasDrilldown).toBe("boolean");
+    });
+
+    it("should return false when no drilldown is configured", () => {
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          config: {},
+        },
+      });
+
+      expect(wrapper.vm.hasDrilldown).toBe(false);
+    });
+
+    it("should return false when drilldown array is empty", () => {
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          config: { drilldown: [] },
+        },
+      });
+
+      expect(wrapper.vm.hasDrilldown).toBe(false);
+    });
+
+    it("should return true when drilldown is configured with entries", () => {
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          config: {
+            drilldown: [
+              {
+                name: "View Logs",
+                type: "byUrl",
+                targetBlank: true,
+                data: { url: "https://example.com/${series.__name}" },
+              },
+            ],
+          },
+        },
+      });
+
+      expect(wrapper.vm.hasDrilldown).toBe(true);
+    });
+
+    it("should return true when multiple drilldowns are configured", () => {
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          config: {
+            drilldown: [
+              {
+                name: "By URL",
+                type: "byUrl",
+                targetBlank: false,
+                data: { url: "https://example.com" },
+              },
+              {
+                name: "By Dashboard",
+                type: "byDashboard",
+                targetBlank: false,
+                data: { folder: "f1", dashboard: "d1", tab: "t1" },
+              },
+            ],
+          },
+        },
+      });
+
+      expect(wrapper.vm.hasDrilldown).toBe(true);
+    });
+
+    it("should return true when logs drilldown is configured", () => {
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          config: {
+            drilldown: [
+              {
+                name: "Logs",
+                type: "logs",
+                data: { logsMode: "auto" },
+              },
+            ],
+          },
+        },
+      });
+
+      expect(wrapper.vm.hasDrilldown).toBe(true);
+    });
+  });
 });

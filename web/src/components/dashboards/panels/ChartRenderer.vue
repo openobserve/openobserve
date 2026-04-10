@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="chartRef"
     id="chart1"
     class="chart-container"
+    :class="{ 'chart-drilldown-active': hasDrilldown }"
     @mouseover="
       () => {
         // if hoveredSeriesState is not null then set panelId
@@ -215,6 +216,10 @@ export default defineComponent({
     height: {
       type: String,
       default: "100%",
+    },
+    hasDrilldown: {
+      type: Boolean,
+      default: false,
     },
   },
   setup(props: any, { emit }) {
@@ -875,6 +880,10 @@ export default defineComponent({
  * This ensures charts fit properly when printing, regardless of their original
  * render dimensions.
  */
+.chart-drilldown-active {
+  cursor: pointer;
+}
+
 @media print {
   /* Clip the ECharts wrapper to prevent chart overflow but don't scale */
   .chart-container > div[style*="position: relative"] {

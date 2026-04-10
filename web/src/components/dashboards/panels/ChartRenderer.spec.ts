@@ -731,4 +731,90 @@ describe("ChartRenderer", () => {
       expect(wrapper.exists()).toBe(true);
     });
   });
+
+  describe("Drilldown Visual Cues", () => {
+    it("should not apply drilldown cursor class by default", () => {
+      wrapper = mount(ChartRenderer, {
+        props: {
+          data: mockChartData,
+          renderType: "canvas",
+          height: "100%",
+        },
+        global: {
+          plugins: [i18n],
+          provide: {
+            store,
+            hoveredSeriesState: mockHoveredSeriesState,
+          },
+        },
+      });
+
+      const container = wrapper.find('[data-test="chart-renderer"]');
+      expect(container.classes()).not.toContain("chart-drilldown-active");
+    });
+
+    it("should apply chart-drilldown-active class when hasDrilldown is true", async () => {
+      wrapper = mount(ChartRenderer, {
+        props: {
+          data: mockChartData,
+          renderType: "canvas",
+          height: "100%",
+          hasDrilldown: true,
+        },
+        global: {
+          plugins: [i18n],
+          provide: {
+            store,
+            hoveredSeriesState: mockHoveredSeriesState,
+          },
+        },
+      });
+
+      const container = wrapper.find('[data-test="chart-renderer"]');
+      expect(container.classes()).toContain("chart-drilldown-active");
+    });
+
+    it("should remove drilldown class when hasDrilldown changes to false", async () => {
+      wrapper = mount(ChartRenderer, {
+        props: {
+          data: mockChartData,
+          renderType: "canvas",
+          height: "100%",
+          hasDrilldown: true,
+        },
+        global: {
+          plugins: [i18n],
+          provide: {
+            store,
+            hoveredSeriesState: mockHoveredSeriesState,
+          },
+        },
+      });
+
+      expect(wrapper.find('[data-test="chart-renderer"]').classes()).toContain("chart-drilldown-active");
+
+      await wrapper.setProps({ hasDrilldown: false });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="chart-renderer"]').classes()).not.toContain("chart-drilldown-active");
+    });
+
+    it("should default hasDrilldown to false", () => {
+      wrapper = mount(ChartRenderer, {
+        props: {
+          data: mockChartData,
+          renderType: "canvas",
+        },
+        global: {
+          plugins: [i18n],
+          provide: {
+            store,
+            hoveredSeriesState: mockHoveredSeriesState,
+          },
+        },
+      });
+
+      expect(wrapper.props("hasDrilldown")).toBe(false);
+    });
+  });
 });
