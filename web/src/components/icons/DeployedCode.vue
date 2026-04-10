@@ -19,7 +19,7 @@ defineProps({
     default: 18,
   },
   height: {
-    type: Number || String,
+    type: [Number, String],
     default: "auto",
   },
 });

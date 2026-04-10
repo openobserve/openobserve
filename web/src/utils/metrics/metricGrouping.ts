@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { Component } from "vue";
 import type { StreamInfo } from "@/services/service_streams";
 
 /**
@@ -39,7 +40,7 @@ export interface MetricGroupDefinition {
 export interface MetricGroupConfig {
   id: string;
   label: string;
-  icon: string;
+  icon: string | Component;
   streams: StreamInfo[];
 }
 
