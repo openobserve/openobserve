@@ -1,7 +1,170 @@
 <template>
-  <q-card flat class="tw:h-full">
+  <q-card flat class="tw:h-full tw:flex tw:flex-col">
+    <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
+    <div class="tw:flex tw:items-center tw:gap-2 tw:p-[0.375rem] tw:pb-0">
+      <!-- Stream selector -->
+      <div
+        data-test="service-graph-stream-selector"
+        class="tw:w-[11rem] tw:flex-shrink-0"
+      >
+        <q-select
+          v-model="streamFilter"
+          :options="
+            availableStreams.length > 0
+              ? availableStreams.map((s) => ({ label: s, value: s }))
+              : []
+          "
+          dense
+          borderless
+          emit-value
+          map-options
+          class="tw:w-[auto] tw:flex-shrink-0 tw:bg-[var(--o2-primary-background)] tw:rounded"
+          @update:model-value="onStreamFilterChange"
+          :disable="availableStreams.length === 0"
+        >
+          <q-tooltip v-if="availableStreams.length === 0">
+            No streams detected. Ensure service graph metrics include
+            stream_name labels.
+          </q-tooltip>
+        </q-select>
+      </div>
+      <!-- Search input -->
+      <div data-test="service-graph-search-input">
+        <q-input
+          v-model="searchFilter"
+          borderless
+          dense
+          class="no-border tw:w-[14rem]! tw:h-[36px] tw:bg-[var(--o2-primary-background)] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
+          placeholder="Search Services"
+          debounce="300"
+          @update:model-value="applyFilters"
+          clearable
+        >
+          <template #prepend>
+            <q-icon class="o2-search-input-icon" size="1rem" name="search" />
+          </template>
+        </q-input>
+      </div>
+      <!-- Spacer -->
+      <div class="tw:flex-1" />
+      <!-- Legends (horizontal) -->
+      <div
+        data-test="service-graph-legends"
+        class="tw:flex tw:flex-row tw:items-center tw:gap-3 tw:p-[0.325rem] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
+      >
+        <div
+          data-test="sg-legend"
+          class="tw:flex tw:flex-row tw:items-center tw:gap-3 tw:min-w-0"
+        >
+          <!-- Border Color -->
+          <div
+            class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
+          >
+            Border Color
+            <span class="sg-legend-subtitle">| Errors</span>
+          </div>
+          <div class="tw:flex! tw:flex-row tw:gap-2">
+            <div
+              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+            >
+              <div class="sg-legend-dot" style="border-color: #52c41a"></div>
+              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+                <div
+                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                >
+                  Healthy
+                </div>
+                <div class="sg-legend-color-value tw:text-left">&lt; 1%</div>
+              </div>
+            </div>
+            <div
+              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+            >
+              <div class="sg-legend-dot" style="border-color: #faad14"></div>
+              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+                <div
+                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                >
+                  Degraded
+                </div>
+                <div class="sg-legend-color-value tw:text-left">1 – 5%</div>
+              </div>
+            </div>
+            <div
+              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+            >
+              <div class="sg-legend-dot" style="border-color: #fa8c16"></div>
+              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+                <div
+                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                >
+                  Warning
+                </div>
+                <div class="sg-legend-color-value tw:text-left">5 – 10%</div>
+              </div>
+            </div>
+            <div
+              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+            >
+              <div class="sg-legend-dot" style="border-color: #f5222d"></div>
+              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+                <div
+                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                >
+                  Critical
+                </div>
+                <div class="sg-legend-color-value tw:text-left">&gt; 10%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <q-separator
+          vertical
+          v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+          class="tw:self-stretch tw:mx-1"
+        />
+        <div
+          v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+          data-test="sg-node-size-info"
+          class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:min-w-0"
+        >
+          <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
+          <div
+            class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
+          >
+            Node Size
+            <span class="sg-legend-subtitle">| Requests</span>
+          </div>
+          <div class="sg-legend-row sg-legend-sizes tw:py-0!">
+            <div
+              class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
+            >
+              <div
+                class="sg-legend-circle"
+                style="width: 16px; height: 16px; border-color: #52c41a"
+              ></div>
+              <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
+                >Low</span
+              >
+            </div>
+            <div class="sg-legend-size-dots tw:mb-0">···</div>
+            <div
+              class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
+            >
+              <div
+                class="sg-legend-circle"
+                style="width: 28px; height: 28px; border-color: #52c41a"
+              ></div>
+              <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
+                >High</span
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <q-card-section
-      class="tw:p-[0.375rem]! tw:h-full card-container service-graph-container"
+      class="tw:p-[0.375rem]! tw:flex-1 tw:min-h-0 card-container service-graph-container"
     >
       <!-- Graph Visualization -->
       <q-card flat bordered class="graph-card tw:h-full">
@@ -11,221 +174,6 @@
             class="graph-container tw:h-full tw:bg-[var(--o2-bg)]"
             style="position: relative"
           >
-            <div
-              data-test="service-graph-search-input"
-              class="tw:absolute tw:top-[0.62rem] tw:right-[0.62rem] tw:flex tw:z-10"
-            >
-              <!-- Stream selector + search input row -->
-              <div
-                class="tw:flex tw:flex-row tw:gap-2 tw:items-center"
-                data-test="service-graph-toolbar-left"
-              >
-                <!-- Search input -->
-                <q-input
-                  v-model="searchFilter"
-                  borderless
-                  dense
-                  class="no-border tw:w-[14rem]! tw:h-[36px] tw:bg-[var(--o2-primary-background)] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
-                  placeholder="Search Services"
-                  debounce="300"
-                  @update:model-value="applyFilters"
-                  clearable
-                >
-                  <template #prepend>
-                    <q-icon
-                      class="o2-search-input-icon"
-                      size="1rem"
-                      name="search"
-                    />
-                  </template>
-                </q-input>
-              </div>
-            </div>
-            <div
-              data-test="service-graph-stream-selector"
-              class="tw:absolute tw:w-[9.5rem] tw:top-[0.62rem] tw:left-[0.62rem] tw:flex tw:flex-col tw:gap-2 tw:z-10"
-            >
-              <!-- Stream selector -->
-              <q-select
-                v-model="streamFilter"
-                :options="
-                  availableStreams.length > 0
-                    ? availableStreams.map((s) => ({ label: s, value: s }))
-                    : []
-                "
-                dense
-                borderless
-                emit-value
-                map-options
-                class="tw:w-[auto] tw:flex-shrink-0 tw:bg-[var(--o2-primary-background)] tw:rounded"
-                @update:model-value="onStreamFilterChange"
-                :disable="availableStreams.length === 0"
-              >
-                <q-tooltip v-if="availableStreams.length === 0">
-                  No streams detected. Ensure service graph metrics include
-                  stream_name labels.
-                </q-tooltip>
-              </q-select>
-              <!-- Legend -->
-              <div
-                data-test="service-graph-legends"
-                class="tw:p-[0.325rem] tw:mt-[0.375rem]! tw:w-full! tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
-              >
-                <div
-                  data-test="sg-legend"
-                  class="tw:w-fit tw:flex tw:flex-col tw:items-center tw:gap-2 tw:min-w-0"
-                >
-                  <!-- Border Color -->
-                  <div
-                    class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
-                  >
-                    Border Color
-                    <span class="sg-legend-subtitle">| Errors</span>
-                  </div>
-                  <div class="tw:flex! tw:flex-col tw:gap-2">
-                    <div
-                      class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
-                    >
-                      <div
-                        class="sg-legend-dot"
-                        style="border-color: #52c41a"
-                      ></div>
-                      <div
-                        class="tw:flex tw:flex-row tw:items-baseline tw:gap-1"
-                      >
-                        <div
-                          class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
-                        >
-                          Healthy
-                        </div>
-                        <div class="sg-legend-color-value tw:text-left">
-                          &lt; 1%
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
-                    >
-                      <div
-                        class="sg-legend-dot"
-                        style="border-color: #faad14"
-                      ></div>
-                      <div
-                        class="tw:flex tw:flex-row tw:items-baseline tw:gap-1"
-                      >
-                        <div
-                          class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
-                        >
-                          Degraded
-                        </div>
-                        <div class="sg-legend-color-value tw:text-left">
-                          1 – 5%
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
-                    >
-                      <div
-                        class="sg-legend-dot"
-                        style="border-color: #fa8c16"
-                      ></div>
-                      <div
-                        class="tw:flex tw:flex-row tw:items-baseline tw:gap-1"
-                      >
-                        <div
-                          class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
-                        >
-                          Warning
-                        </div>
-                        <div class="sg-legend-color-value tw:text-left">
-                          5 – 10%
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
-                    >
-                      <div
-                        class="sg-legend-dot"
-                        style="border-color: #f5222d"
-                      ></div>
-                      <div
-                        class="tw:flex tw:flex-row tw:items-baseline tw:gap-1"
-                      >
-                        <div
-                          class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
-                        >
-                          Critical
-                        </div>
-                        <div class="sg-legend-color-value tw:text-left">
-                          &gt; 10%
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <q-separator
-                  v-if="
-                    searchObj.meta.serviceGraphVisualizationType === 'graph'
-                  "
-                  class="tw:my-[0.5rem]!"
-                />
-                <div
-                  v-if="
-                    searchObj.meta.serviceGraphVisualizationType === 'graph'
-                  "
-                  data-test="sg-node-size-info"
-                  class="tw:flex tw:flex-row tw:items-center tw:gap-4 tw:min-w-0"
-                >
-                  <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
-                  <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
-                    <div
-                      class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
-                    >
-                      Node Size
-                      <span class="sg-legend-subtitle">| Requests</span>
-                    </div>
-                    <div class="sg-legend-row sg-legend-sizes tw:py-0!">
-                      <div
-                        class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
-                      >
-                        <div
-                          class="sg-legend-circle"
-                          style="
-                            width: 16px;
-                            height: 16px;
-                            border-color: #52c41a;
-                          "
-                        ></div>
-                        <span
-                          class="sg-legend-label tw:text-[var(--o2-text-2)]!"
-                          >Low</span
-                        >
-                      </div>
-                      <div class="sg-legend-size-dots tw:mb-0">···</div>
-                      <div
-                        class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
-                      >
-                        <div
-                          class="sg-legend-circle"
-                          style="
-                            width: 28px;
-                            height: 28px;
-                            border-color: #52c41a;
-                          "
-                        ></div>
-                        <span
-                          class="sg-legend-label tw:text-[var(--o2-text-2)]!"
-                          >High</span
-                        >
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <div v-if="loading" class="flex flex-center tw:h-full">
               <div class="text-center tw:flex tw:flex-col tw:items-center">
                 <q-spinner-hourglass color="primary" size="4em" />
