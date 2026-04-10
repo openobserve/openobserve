@@ -258,6 +258,22 @@ pub async fn create(
             match db_eval_templates::add(&db_template).await {
                 Ok(_) => {
                     set_ownership(&org_id, "eval_templates", Authz::new(&template.id)).await;
+
+                    // super cluster sync
+                    if o2_enterprise::enterprise::common::config::get_config()
+                        .super_cluster
+                        .enabled
+                        && let Err(e) =
+                            o2_enterprise::enterprise::super_cluster::queue::eval_templates_put(
+                                db_template.clone(),
+                            )
+                            .await
+                    {
+                        log::error!(
+                            "[EvalTemplate] error triggering super cluster event to add eval template: {e}"
+                        );
+                    }
+
                     let response = TemplateResponse {
                         id: template.id,
                         org_id: template.org_id,
@@ -374,6 +390,20 @@ pub async fn update(
 
                     match db_eval_templates::update(&db_template).await {
                         Ok(_) => {
+                            // super cluster sync
+                            if o2_enterprise::enterprise::common::config::get_config()
+                                .super_cluster
+                                .enabled
+                                && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::eval_templates_update(
+                                    db_template.clone(),
+                                )
+                                .await
+                            {
+                                log::error!(
+                                    "[EvalTemplate] error triggering super cluster event to update eval template: {e}"
+                                );
+                            }
+
                             let response = TemplateResponse {
                                 id: template.id,
                                 org_id: template.org_id,
@@ -508,6 +538,22 @@ pub async fn delete(Path((org_id, template_id)): Path<(String, String)>) -> impl
                         Ok(_) => {
                             remove_ownership(&org_id, "eval_templates", Authz::new(&template.id))
                                 .await;
+
+                            // super cluster sync
+                            if o2_enterprise::enterprise::common::config::get_config()
+                                .super_cluster
+                                .enabled
+                                && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::eval_templates_delete(
+                                    &org_id,
+                                    &template.id,
+                                )
+                                .await
+                            {
+                                log::error!(
+                                    "[EvalTemplate] error triggering super cluster event to delete eval template: {e}"
+                                );
+                            }
+
                             (
                                 StatusCode::OK,
                                 Json(
