@@ -747,7 +747,7 @@ const onFunctionClear = () => {
 };
 
 // Build multi-window query - includes all multi-windows automatically
-const buildMultiWindowQuery = (sql: string, periodInMicroseconds: number) => {
+const buildMultiWindowQuery = (sql: string, fn: boolean, periodInMicroseconds: number) => {
   const queryToSend: any[] = [];
 
   // Guard: If multiTimeRange is null, undefined, or empty, return empty array
@@ -783,6 +783,7 @@ const buildMultiWindowQuery = (sql: string, periodInMicroseconds: number) => {
       individualQuery.start_time = startTime - periodInMicroseconds;
       individualQuery.end_time = startTime;
       individualQuery.sql = sql;
+      individualQuery.query_fn = fn ? b64EncodeUnicode(vrlFunctionContent.value) : null;
       queryToSend.push(individualQuery);
     } else {
       console.warn("Invalid format:", date);
@@ -821,12 +822,13 @@ const triggerQuery = async (fn = false) => {
         start_time: startTime,
         end_time: endTime,
         sql: queryReq.query.sql,
+        query_fn: fn ? b64EncodeUnicode(vrlFunctionContent.value) : null,
       }
     ];
     console.log('[QueryEditorDialog] Initial queryToSend:', queryToSend);
 
     console.log('[QueryEditorDialog] Step 5: Calling buildMultiWindowQuery...');
-    const multiWindowQueries = buildMultiWindowQuery(queryReq.query.sql, periodInMicroseconds);
+    const multiWindowQueries = buildMultiWindowQuery(queryReq.query.sql, fn, periodInMicroseconds);
     console.log('[QueryEditorDialog] Multi-window queries:', multiWindowQueries);
 
     queryToSend.push(...multiWindowQueries);
