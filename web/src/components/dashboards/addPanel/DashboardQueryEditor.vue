@@ -518,7 +518,7 @@ export default defineComponent({
     // Feed stream names into PromQL metric keyword autocomplete
     watch(
       [
-        () => dashboardPanelData.meta.stream.streamResults,
+        () => dashboardPanelData.meta?.stream?.streamResults,
         () => promqlMode.value,
       ],
       ([newResults]) => {
@@ -529,6 +529,8 @@ export default defineComponent({
               type: stream.metrics_meta?.metric_type || "",
             })),
           );
+        } else {
+          updateMetricKeywords([]);
         }
       },
       { immediate: true },
