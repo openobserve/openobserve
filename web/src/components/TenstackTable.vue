@@ -1382,14 +1382,6 @@ const getStickyTotalColumnStyle = (col: any) => {
     "white-space": "normal",
     "word-break": "break-word",
   };
-  console.log(
-    "[TenstackTable] getStickyTotalColumnStyle:",
-    col.name,
-    "rightOffset:",
-    rightOffset,
-    "style.box-shadow:",
-    style["box-shadow"],
-  );
   return style;
 };
 
@@ -1417,16 +1409,6 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
     // Remove border so shadow aligns with body total column
     "border": "none",
   };
-  console.log(
-    "[TenstackTable] getStickyTotalHeaderForPivot:",
-    cell.label,
-    "rightOffset:",
-    rightOffset,
-    "width:",
-    width,
-    "shadow:",
-    style["box-shadow"],
-  );
   return style;
 };
 
