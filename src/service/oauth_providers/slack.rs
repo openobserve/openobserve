@@ -225,7 +225,7 @@ impl OAuthProviderHandler for SlackProvider {
         let sig_basestring = format!("v0:{}:{}", timestamp_str, String::from_utf8_lossy(raw_body));
 
         type HmacSha256 = Hmac<Sha256>;
-        let mut mac = match HmacSha256::new_from_slice(signing_secret.as_bytes()) {
+        let mut mac: HmacSha256 = match HmacSha256::new_from_slice(signing_secret.as_bytes()) {
             Ok(m) => m,
             Err(_) => return false,
         };
