@@ -166,7 +166,12 @@ export function useStickyColumns(props: any, store: any) {
   watch(() => store.state.theme, updateStickyColumnStyles);
 
   onMounted(() => {
-    updateStickyColumnStyles();
+    // Defer to next frame so the synchronous style injection from the watch
+    // chain (which already ran during setup) doesn't invalidate the style cache
+    // right before other code reads layout properties (e.g. getRect).
+    requestAnimationFrame(() => {
+      updateStickyColumnStyles();
+    });
   });
 
   onBeforeUnmount(() => {

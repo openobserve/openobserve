@@ -34,8 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :style="{
           minWidth: '100%',
           ...columnSizeVars,
-          minHeight:
-            showPagination || !useVirtualScroll ? undefined : totalSize + 'px',
+          minHeight: showPagination ? undefined : totalSize + 'px',
           width: !useVirtualScroll
             ? '100%'
             : !defaultColumns
@@ -380,13 +379,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Used when `data` prop is present (dashboard mode) OR pagination is
             enabled. Virtual scroll (below) is only for logs/traces. -->
           <template v-if="showPagination || !useVirtualScroll">
+            <!-- Top spacer for dashboard virtual scroll -->
             <tr
-              v-for="(row, rowIdx) in pagedRows"
+              v-if="dashVirtualEnabled && dashVirtualPaddingTop > 0"
+              aria-hidden="true"
+            >
+              <td
+                :colspan="columnOrder.length"
+                :style="{
+                  height: dashVirtualPaddingTop + 'px',
+                  padding: 0,
+                  border: 'none',
+                }"
+              />
+            </tr>
+            <tr
+              v-for="{ row, idx } in renderedDashboardRows"
               :key="row.id"
               class="dashboard-data-row tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
               :class="{ 'tw:border-b': !isPivotMode }"
               @click="
-                handleDataRowClick(row.original, rowIdx as number, $event)
+                handleDataRowClick(row.original, idx as number, $event)
               "
             >
               <td
@@ -462,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         shouldShowCopyButton(cell.getValue())
                       "
                       :icon="
-                        isCellCopied(rowIdx as number, cell.column.id)
+                        isCellCopied(idx as number, cell.column.id)
                           ? 'check'
                           : 'content_copy'
                       "
@@ -474,7 +487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="
                         copyCellContent(
                           cell.getValue(),
-                          rowIdx as number,
+                          idx as number,
                           cell.column.id,
                         )
                       "
@@ -507,7 +520,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         shouldShowCopyButton(cell.getValue())
                       "
                       :icon="
-                        isCellCopied(rowIdx as number, cell.column.id)
+                        isCellCopied(idx as number, cell.column.id)
                           ? 'check'
                           : 'content_copy'
                       "
@@ -519,7 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="
                         copyCellContent(
                           cell.getValue(),
-                          rowIdx as number,
+                          idx as number,
                           cell.column.id,
                         )
                       "
@@ -527,6 +540,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </td>
+            </tr>
+            <!-- Bottom spacer for dashboard virtual scroll -->
+            <tr
+              v-if="dashVirtualEnabled && dashVirtualPaddingBottom > 0"
+              aria-hidden="true"
+            >
+              <td
+                :colspan="columnOrder.length"
+                :style="{
+                  height: dashVirtualPaddingBottom + 'px',
+                  padding: 0,
+                  border: 'none',
+                }"
+              />
             </tr>
           </template>
 
@@ -1233,6 +1260,13 @@ const stickyColTotals = computed(() => !!props.stickyColTotals);
 const stickyTotalRow = computed(() => props.stickyTotalRow || null);
 const isPivotMode = computed(() => pivotHeaderLevels.value.length > 0);
 
+// Dashboard virtual scroll: enabled when not using logs virtual scroll and not paginated.
+// Uses spacer rows + @tanstack/vue-virtual to render only visible rows (matching
+// the old Quasar QTable :virtual-scroll behaviour).
+const dashVirtualEnabled = computed(
+  () => !props.useVirtualScroll && !props.showPagination,
+);
+
 // Pivot sort state (managed manually — TanStack sort is disabled for pivot).
 const pivotSortState = ref<{ sortBy: string; descending: boolean }>({
   sortBy: "",
@@ -1250,8 +1284,9 @@ const handlePivotSort = (field: string) => {
 };
 
 // Re-sort pivot rows whenever sort state changes.
+// Use serialized watch source to avoid deep comparison overhead.
 watch(
-  () => pivotSortState.value,
+  () => `${pivotSortState.value.sortBy}_${pivotSortState.value.descending}`,
   () => {
     if (!isPivotMode.value) return;
     const rows = ((props.rows as any[]) || []).filter(
@@ -1502,7 +1537,8 @@ watch(
       );
     }
 
-    if (props.defaultColumns) updateTableWidth();
+    // updateTableWidth is only needed for logs/traces auto-sizing
+    if (props.defaultColumns && props.useVirtualScroll) updateTableWidth();
   },
   {
     immediate: true,
@@ -1517,7 +1553,10 @@ watch(
     // Filter out total rows (dashboard pivot); no-op for logs/traces
     const rows = (newVal as any[]).filter((r: any) => !r.__isTotalRow);
 
-    // Apply pivot sort when active, otherwise just assign
+    // Apply pivot sort when active, otherwise just assign.
+    // For pivot mode we need a copy to sort in-place; for dashboard mode
+    // the parent (TableRenderer) already provides a fresh sorted array,
+    // so we can assign directly to avoid an unnecessary O(n) copy.
     const { sortBy, descending } = pivotSortState.value;
     if (isPivotMode.value && sortBy) {
       const col = ((props.columns as any[]) || []).find(
@@ -1533,8 +1572,12 @@ watch(
         else result = String(va ?? "").localeCompare(String(vb ?? ""));
         return descending ? -result : result;
       });
-    } else {
+    } else if (props.useVirtualScroll) {
+      // Logs/traces: copy so expand-row splices don't mutate parent data
       tableRows.value = [...rows];
+    } else {
+      // Dashboard: parent already provides a fresh reference
+      tableRows.value = rows as any[];
     }
 
     await nextTick();
@@ -1562,7 +1605,8 @@ watch(
     setExpandedRows();
 
     await nextTick();
-    if (props.defaultColumns) updateTableWidth();
+    // updateTableWidth is only needed for logs/traces auto-sizing (defaultColumns + virtual scroll)
+    if (props.defaultColumns && props.useVirtualScroll) updateTableWidth();
   },
 );
 
@@ -1586,9 +1630,10 @@ let table: any = useVueTable({
     },
   },
   onSortingChange: setSorting,
-  // Disable TanStack client sort for pivot — rows are pre-sorted manually.
+  // Disable TanStack client sort for pivot (rows are pre-sorted manually)
+  // and for dashboard mode (TableRenderer handles sorting externally).
   get enableSorting() {
-    return !isPivotMode.value;
+    return !isPivotMode.value && props.useVirtualScroll;
   },
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
@@ -1684,12 +1729,16 @@ const formattedRows = computed(() => {
   return table?.getRowModel().rows;
 });
 
-/** Rows for current page when showPagination=true (dashboard). */
+/** Rows for current page (dashboard).
+ *  When pagination is enabled, slices by page. Otherwise returns all rows —
+ *  dashboard virtual scroll handles limiting rendered DOM nodes. */
 const pagedRows = computed(() => {
   const all = formattedRows.value ?? [];
-  if (!props.showPagination || localRowsPerPage.value === 0) return all;
-  const start = (currentPage.value - 1) * localRowsPerPage.value;
-  return all.slice(start, start + localRowsPerPage.value);
+  if (props.showPagination && localRowsPerPage.value > 0) {
+    const start = (currentPage.value - 1) * localRowsPerPage.value;
+    return all.slice(start, start + localRowsPerPage.value);
+  }
+  return all;
 });
 
 const isResizingHeader = ref(false);
@@ -1726,11 +1775,51 @@ const baseOffset = isFirefox.value ? 20 : 0;
 // Cache for expanded row heights
 const expandedRowHeights = ref<{ [key: number]: number }>({});
 
+/** Custom observeElementRect that avoids layout-thrashing during Vue's synchronous flush.
+ *  The default TanStack Virtual implementation calls `offsetWidth`/`offsetHeight`
+ *  synchronously during init, which forces a full layout recalculation for each of
+ *  the 21 dashboard table virtualizers (792ms forced reflow).  Using ResizeObserver
+ *  only batches all measurements into a single async callback after mount. */
+const deferredObserveElementRect = (
+  instance: any,
+  cb: (rect: { width: number; height: number }) => void,
+) => {
+  const element = instance.scrollElement;
+  if (!element) return;
+
+  // Provide a reasonable initial estimate so getVirtualItems() returns items
+  // on the very first render (ResizeObserver corrects in the next frame).
+  cb({ width: 800, height: 300 });
+
+  const observer = new ResizeObserver((entries) => {
+    const entry = entries[0];
+    if (entry?.borderBoxSize?.[0]) {
+      const box = entry.borderBoxSize[0];
+      cb({
+        width: Math.round(box.inlineSize),
+        height: Math.round(box.blockSize),
+      });
+    } else if (entry) {
+      cb({
+        width: Math.round(entry.contentRect.width),
+        height: Math.round(entry.contentRect.height),
+      });
+    }
+  });
+  observer.observe(element, { box: "border-box" });
+  return () => observer.unobserve(element);
+};
+
 const rowVirtualizerOptions = computed(() => {
+  const isDashVirtual = dashVirtualEnabled.value;
+  // All non-logs tables (paginated + non-paginated dashboard panels)
+  const isNonLogs = !props.useVirtualScroll;
   return {
     count: formattedRows.value.length,
     getScrollElement: () => parentRef.value,
     estimateSize: (index: number) => {
+      // Dashboard virtual scroll: fixed row height, no measurement
+      if (isDashVirtual) return props.rowHeight ?? 22;
       // Fixed row height mode (e.g. traces table)
       if (props.rowHeight) return props.rowHeight;
       // Check if this is an expanded row (odd indices after expansion)
@@ -1739,10 +1828,13 @@ const rowVirtualizerOptions = computed(() => {
         ? expandedRowHeights.value[index] || 300 // Default expanded height
         : (props.rowHeight ?? 28); // Default collapsed height
     },
-    overscan: 100,
-    measureElement:
-      // When rowHeight is provided, skip dynamic measurement entirely
-      props.rowHeight
+    // Dashboard: low overscan (panels are small, ~13 visible rows).
+    // Logs/traces: high overscan for smooth fast-scroll experience.
+    overscan: isDashVirtual ? 10 : 100,
+    measureElement: isDashVirtual
+      ? undefined
+      : // When rowHeight is provided, skip dynamic measurement entirely
+        props.rowHeight
         ? undefined
         : typeof window !== "undefined" && !isFirefox.value
           ? (element: any) => {
@@ -1758,6 +1850,29 @@ const rowVirtualizerOptions = computed(() => {
               return props.rowHeight ?? 28; // Default height for collapsed rows
             }
           : undefined,
+    // All dashboard tables: avoid layout-thrashing from sync getRect calls during Vue flush
+    ...(isNonLogs ? { observeElementRect: deferredObserveElementRect } : {}),
+    // All dashboard tables: skip unnecessary scrollTo(0) during init
+    ...(isNonLogs
+      ? {
+          scrollToFn: (
+            offset: number,
+            opts: { adjustments?: number; behavior?: ScrollBehavior },
+            instance: any,
+          ) => {
+            // Only scroll when the target offset is non-zero (user-initiated).
+            // The virtualizer calls scrollTo(0) during _willUpdate init, which
+            // forces a synchronous layout reflow — skip it entirely for freshly
+            // mounted panels where scrollTop is already 0.
+            const toOffset = offset + (opts.adjustments ?? 0);
+            if (toOffset === 0) return;
+            instance.scrollElement?.scrollTo({
+              [instance.options.horizontal ? "left" : "top"]: toOffset,
+              behavior: opts.behavior,
+            });
+          },
+        }
+      : {}),
   };
 });
 
@@ -1768,6 +1883,37 @@ const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 const totalSize = computed(
   () => rowVirtualizer.value.getTotalSize() + (props.rowHeight ?? 0),
 );
+
+// ── Dashboard virtual scroll: spacer row heights ─────────────────────────────
+const dashVirtualPaddingTop = computed(() => {
+  if (!dashVirtualEnabled.value) return 0;
+  const items = virtualRows.value;
+  return items.length > 0 ? items[0].start : 0;
+});
+
+const dashVirtualPaddingBottom = computed(() => {
+  if (!dashVirtualEnabled.value) return 0;
+  const items = virtualRows.value;
+  if (items.length === 0) return 0;
+  return rowVirtualizer.value.getTotalSize() - items[items.length - 1].end;
+});
+
+/** Unified row iterator for dashboard mode (both paginated and virtual scroll).
+ *  Each item has `row` (TanStack Row) and `idx` (row index in the full dataset). */
+const renderedDashboardRows = computed(() => {
+  if (dashVirtualEnabled.value) {
+    const items = virtualRows.value;
+    const rows = formattedRows.value ?? [];
+    return items
+      .map((vi: any) => ({ row: rows[vi.index], idx: vi.index }))
+      .filter((r: any) => r.row);
+  }
+  // Paginated mode: use pagedRows with iteration index
+  return (pagedRows.value ?? []).map((row: any, i: number) => ({
+    row,
+    idx: i,
+  }));
+});
 
 const setExpandedRows = () => {
   props.expandedRows.forEach((index: any) => {
