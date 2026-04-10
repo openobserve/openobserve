@@ -3,6 +3,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { getHeaders, getIngestionUrl, sendRequest } = require('../utils/data-ingestion.js');
 const logData = require("../../fixtures/log.json");
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 /**
  * Alerts Regression Bugs Test Suite
@@ -33,7 +34,7 @@ test.describe("Alerts Regression Bugs", () => {
 
     try {
       // Navigate to base to get auth context
-      await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${process.env.ORGNAME || 'default'}`);
+      await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${getOrgIdentifier() || 'default'}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
       // Ingest metrics data
@@ -41,7 +42,7 @@ test.describe("Alerts Regression Bugs", () => {
 
       // Create template and destination via API for reliability
       const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
-      const org = process.env.ORGNAME || 'default';
+      const org = getOrgIdentifier() || 'default';
       const authToken = Buffer.from(`${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`).toString('base64');
 
       // Create template via API
@@ -131,7 +132,7 @@ test.describe("Alerts Regression Bugs", () => {
     testLogger.info('Bug: Cannot save alert when selecting PromQL on metrics stream');
     testLogger.info('Fix: Added promql_condition field with operator and value inputs');
 
-    const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
+    const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
@@ -262,7 +263,7 @@ test.describe("Alerts Regression Bugs", () => {
     test.setTimeout(300000); // 5 minutes timeout
     testLogger.info('Test: Verify Group By field autocomplete (Bug #10899)');
 
-    const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
+    const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -345,7 +346,7 @@ test.describe("Alerts Regression Bugs", () => {
       description: 'VRL editor location varies by alert type and deployment configuration. Test needs refactoring to properly navigate the alert wizard steps.'
     });
 
-    const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
+    const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -439,7 +440,7 @@ test.describe("Alerts Regression Bugs", () => {
       description: 'This test verifies the firing count column is visible but does not validate increment behavior. Full testing requires triggering alerts, which is done in other tests.'
     });
 
-    const alertsUrl = `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`;
+    const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     testLogger.info('✓ Navigated to alerts list');
@@ -486,7 +487,7 @@ test.describe("Alerts Regression Bugs", () => {
     const cleanupPm = new PageManager(page);
 
     try {
-      await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${process.env.ORGNAME || 'default'}`);
+      await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${getOrgIdentifier() || 'default'}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
       await cleanupAlertDestination(page, cleanupPm);
@@ -509,7 +510,7 @@ test.describe("Alerts Regression Bugs", () => {
  * Ingest metrics data to the test metrics stream using JSON API
  */
 async function ingestMetricsData(page) {
-  const orgId = process.env["ORGNAME"];
+  const orgId = getOrgIdentifier();
   const streamName = 'e2e_test_cpu_usage';
   const baseUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080';
   const ingestionUrl = `${baseUrl}/api/${orgId}/ingest/metrics/_json`;

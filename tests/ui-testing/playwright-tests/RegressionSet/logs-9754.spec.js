@@ -12,6 +12,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { getHeaders, getIngestionUrl, sendRequest } = require('../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // Test data containing edge cases for bug #9754
 // PR fixes issue when user has [ , { , < , ' , ( as single char without closing character
@@ -165,7 +166,7 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
   test("should ingest test data with unclosed brackets/quotes @bug-9754 @setup", async ({ page }) => {
     testLogger.info('Test: Ingest test data for Bug #9754');
 
-    const orgId = process.env["ORGNAME"];
+    const orgId = getOrgIdentifier();
     const headers = getHeaders();
     const url = getIngestionUrl(orgId, STREAM_NAME);
 
@@ -174,8 +175,12 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
 
     testLogger.info('Ingestion response:', response);
 
-    // Wait for data to be indexed
-    await page.waitForTimeout(3000);
+    // Wait for data to be indexed (cloud indexing can take longer)
+    testLogger.info(`Waiting for stream "${STREAM_NAME}" to be indexed...`);
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    const streamAvailable = await pm.logsPage.waitForStreamAvailable(STREAM_NAME, 90000, 3000);
+    testLogger.info(`Stream "${STREAM_NAME}" available: ${streamAvailable}`);
 
     testLogger.info('Test data ingested successfully');
   });

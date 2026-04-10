@@ -893,10 +893,7 @@ async function getQueryData(
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
-      const sortCol =
-        searchObj.meta.resultGrid.sortBy === "duration"
-          ? "duration"
-          : "start_time";
+      const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
       const sortOrd = (
         searchObj.meta.resultGrid.sortOrder || "desc"
       ).toUpperCase();
@@ -1540,6 +1537,13 @@ const onErrorOnlyToggled = (value: boolean) => {
 const onSearchModeChange = (mode: "traces" | "spans" | "service-graph") => {
   searchObj.meta.searchMode = mode;
   if (mode === "service-graph") return;
+  if (
+    mode === "traces" &&
+    searchObj.meta.resultGrid.sortBy !== "start_time" &&
+    searchObj.meta.resultGrid.sortBy !== "duration"
+  ) {
+    searchObj.meta.resultGrid.sortBy = "start_time";
+  }
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.data.queryResults = {
     hits: [],
