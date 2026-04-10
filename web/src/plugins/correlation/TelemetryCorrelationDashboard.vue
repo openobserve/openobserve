@@ -747,7 +747,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="0.875rem"
                             class="tw:mr-0.5"
                           />
-                          <component :is="group.icon" class="" />
+                          <component v-if="typeof group.icon !== 'string'" :is="group.icon" class="" />
                           <q-icon
                             v-if="typeof group.icon === 'string'"
                             :name="group.icon"
@@ -868,7 +868,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex-none!"
                 >
                   <div class="tw:flex tw:items-center tw:gap-1 tw:px-1">
-                    <component :is="group.icon" />
+                    <component v-if="typeof group.icon !== 'string'" :is="group.icon" />
                     <q-icon
                       v-if="typeof group.icon === 'string'"
                       :name="group.icon"
