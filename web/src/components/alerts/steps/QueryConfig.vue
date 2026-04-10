@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </q-select>
                   <!-- "of [field]" shown for measure modes -->
-                  <template v-if="selectedFunction !== 'count'">
+                  <template v-if="selectedFunction !== 'total_events'">
                     <span class="condition-text">of</span>
                     <q-select
                       v-model="logMeasureColumn"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <!-- COUNT mode -->
-                  <template v-if="selectedFunction === 'count'">
+                  <template v-if="selectedFunction === 'total_events'">
                     <q-select
                       v-model="triggerOperator"
                       :options="numericOperators"
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- For any (group by) row (hidden for count mode) -->
-              <div v-if="selectedFunction !== 'count'" class="condition-row">
+              <div v-if="selectedFunction !== 'total_events'" class="condition-row">
                 <span class="condition-label">
                   For any <span class="condition-label-hint">(group by)</span>
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Atleast row — trigger threshold for measure mode -->
-              <div v-if="selectedFunction !== 'count'" class="condition-row">
+              <div v-if="selectedFunction !== 'total_events'" class="condition-row">
                 <span class="condition-label">
                   Atleast
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-select>
 
                   <!-- "of [field]" hidden for count mode -->
-                  <template v-if="selectedFunction !== 'count'">
+                  <template v-if="selectedFunction !== 'total_events'">
                     <span class="condition-text">of</span>
                     <q-select
                       v-model="inputData.aggregation.having.column"
@@ -334,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <!-- Count mode for metrics -->
-                  <template v-if="selectedFunction === 'count'">
+                  <template v-if="selectedFunction === 'total_events'">
                     <q-select
                       v-model="triggerOperator"
                       :options="numericOperators"
@@ -388,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- For any (group by) row — hidden for count mode -->
-              <div v-if="inputData.aggregation && selectedFunction !== 'count'" class="condition-row">
+              <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="condition-row">
                 <span class="condition-label">
                   For any <span class="condition-label-hint">(group by)</span>
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
@@ -463,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Atleast row — trigger threshold for metrics measure mode -->
-              <div v-if="selectedFunction !== 'count'" class="condition-row">
+              <div v-if="selectedFunction !== 'total_events'" class="condition-row">
                 <span class="condition-label">
                   Atleast
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
@@ -984,8 +984,8 @@ export default defineComponent({
 
     // Log function options — count (default) and measure functions
     const logFunctionOptions = [
-      { label: 'total events', value: 'count', tooltip: 'Count the total number of log events matching your filters (COUNT(*))' },
-      { label: 'count', value: 'count_field', tooltip: 'Count non-null values of a specific field (COUNT(field))' },
+      { label: 'total events', value: 'total_events', tooltip: 'Count the total number of log events matching your filters (COUNT(*))' },
+      { label: 'count', value: 'count', tooltip: 'Count non-null values of a specific field (COUNT(field))' },
       { label: 'avg', value: 'avg', tooltip: 'Average value of a numeric field' },
       { label: 'min', value: 'min', tooltip: 'Minimum value of a numeric field' },
       { label: 'max', value: 'max', tooltip: 'Maximum value of a numeric field' },
@@ -1000,8 +1000,8 @@ export default defineComponent({
 
     // Metric function options — always aggregated
     const metricFunctionOptions = [
-      { label: 'total events', value: 'count', tooltip: 'Count the total number of metric events matching your filters (COUNT(*))' },
-      { label: 'count', value: 'count_field', tooltip: 'Count non-null values of a specific field (COUNT(field))' },
+      { label: 'total events', value: 'total_events', tooltip: 'Count the total number of metric events matching your filters (COUNT(*))' },
+      { label: 'count', value: 'count', tooltip: 'Count non-null values of a specific field (COUNT(field))' },
       { label: 'avg', value: 'avg', tooltip: 'Average value of a numeric field' },
       { label: 'min', value: 'min', tooltip: 'Minimum value of a numeric field' },
       { label: 'max', value: 'max', tooltip: 'Maximum value of a numeric field' },
@@ -1017,12 +1017,12 @@ export default defineComponent({
     // Numeric-only operators (no Contains/NotContains for thresholds)
     const numericOperators = ["=", "!=", ">=", ">", "<=", "<"];
 
-    // Selected function — for logs defaults to 'count', for metrics to 'avg'
+    // Selected function — for logs defaults to 'total_events', for metrics to 'avg'
     const selectedFunction = ref(
       isEventBased.value
         ? (props.isAggregationEnabled && props.inputData.aggregation?.function
             ? props.inputData.aggregation.function
-            : 'count')
+            : 'total_events')
         : (props.inputData.aggregation?.function || 'avg')
     );
 
@@ -1054,7 +1054,7 @@ export default defineComponent({
     watch(isEventBased, (eventBased) => {
       if (eventBased) {
         // Switched to logs/traces
-        selectedFunction.value = 'count';
+        selectedFunction.value = 'total_events';
         localIsAggregationEnabled.value = false;
       } else {
         // Switched to metrics — default to avg
@@ -1615,7 +1615,7 @@ export default defineComponent({
 
     // When condition operator changes
     const onConditionOperatorChange = (value: string) => {
-      if (isEventBased.value && selectedFunction.value === 'count') {
+      if (isEventBased.value && selectedFunction.value === 'total_events') {
         // Logs count mode: maps to trigger_condition
         if (props.triggerCondition) {
           props.triggerCondition.operator = value;
@@ -1633,7 +1633,7 @@ export default defineComponent({
     // When condition value changes
     const onConditionValueChange = (value: any) => {
       const parsed = value === '' || value === null || value === undefined ? null : Number(value);
-      if (isEventBased.value && selectedFunction.value === 'count') {
+      if (isEventBased.value && selectedFunction.value === 'total_events') {
         // Logs count mode: maps to trigger_condition
         if (props.triggerCondition) {
           isUserTriggerChange.value = true;
