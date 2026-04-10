@@ -984,7 +984,8 @@ export default defineComponent({
 
     // Log function options — count (default) and measure functions
     const logFunctionOptions = [
-      { label: 'events count', value: 'count', tooltip: 'Count the number of log events matching your filters' },
+      { label: 'total events', value: 'count', tooltip: 'Count the total number of log events matching your filters (COUNT(*))' },
+      { label: 'count', value: 'count_field', tooltip: 'Count non-null values of a specific field (COUNT(field))' },
       { label: 'avg', value: 'avg', tooltip: 'Average value of a numeric field' },
       { label: 'min', value: 'min', tooltip: 'Minimum value of a numeric field' },
       { label: 'max', value: 'max', tooltip: 'Maximum value of a numeric field' },
@@ -999,7 +1000,8 @@ export default defineComponent({
 
     // Metric function options — always aggregated
     const metricFunctionOptions = [
-      { label: 'events count', value: 'count', tooltip: 'Count the number of metric events matching your filters' },
+      { label: 'total events', value: 'count', tooltip: 'Count the total number of metric events matching your filters (COUNT(*))' },
+      { label: 'count', value: 'count_field', tooltip: 'Count non-null values of a specific field (COUNT(field))' },
       { label: 'avg', value: 'avg', tooltip: 'Average value of a numeric field' },
       { label: 'min', value: 'min', tooltip: 'Minimum value of a numeric field' },
       { label: 'max', value: 'max', tooltip: 'Maximum value of a numeric field' },
