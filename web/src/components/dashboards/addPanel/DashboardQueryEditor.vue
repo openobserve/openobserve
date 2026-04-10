@@ -431,10 +431,6 @@ export default defineComponent({
 
     const currentEditorKeywords = computed(() => {
       if (dashboardPanelData.data.queryType === "promql") {
-        console.log(
-          "[DashboardQueryEditor] Using PromQL autocomplete keywords:",
-          promqlAutoCompleteKeywords.value,
-        );
         return promqlAutoCompleteKeywords.value;
       }
       return sqlAutoCompleteKeywords.value;
@@ -442,9 +438,6 @@ export default defineComponent({
 
     const currentEditorSuggestions = computed(() => {
       if (dashboardPanelData.data.queryType === "promql") {
-        console.log(
-          "[DashboardQueryEditor] Using PromQL autocomplete suggestions:"
-        );
         return [];
       }
       return sqlAutoCompleteSuggestions.value;
