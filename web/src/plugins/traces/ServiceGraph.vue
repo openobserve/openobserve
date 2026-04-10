@@ -7,10 +7,12 @@
       <q-card flat bordered class="graph-card tw:h-full">
         <q-card-section class="q-pa-none tw:h-full" style="height: 100%">
           <div
+            data-test="service-graph-container"
             class="graph-container tw:h-full tw:bg-[var(--o2-bg)]"
             style="position: relative"
           >
             <div
+              data-test="service-graph-search-input"
               class="tw:absolute tw:top-[0.62rem] tw:right-[0.62rem] tw:flex tw:z-10"
             >
               <!-- Stream selector + search input row -->
@@ -40,6 +42,7 @@
               </div>
             </div>
             <div
+              data-test="service-graph-stream-selector"
               class="tw:absolute tw:w-[9.5rem] tw:top-[0.62rem] tw:left-[0.62rem] tw:flex tw:flex-col tw:gap-2 tw:z-10"
             >
               <!-- Stream selector -->
@@ -65,6 +68,7 @@
               </q-select>
               <!-- Legend -->
               <div
+                data-test="service-graph-legends"
                 class="tw:p-[0.325rem] tw:mt-[0.375rem]! tw:w-full! tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
               >
                 <div
