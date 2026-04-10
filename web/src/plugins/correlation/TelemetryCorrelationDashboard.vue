@@ -2069,8 +2069,8 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
       // Preserve original layout properties (w, h) from generateDashboard or cache
       panel.layout = {
         ...panel.layout,
-        x: (index % Math.floor(grid / props.panelWidth)) * props.panelWidth,
-        y: maxY + Math.floor(index / 3) * props.panelHeight,
+        x: (index % Math.floor(grid / (props.panelWidth ?? 64))) * (props.panelWidth ?? 64),
+        y: maxY + Math.floor(index / 3) * (props.panelHeight ?? 16),
         i: uniqueId,
       };
       panel.id = `${panel.id}_${timestamp}`;
