@@ -28,6 +28,7 @@ import {
 } from "@/utils/commons";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
+import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUtils";
 import searchService from "@/services/search";
 
 export function usePanelDrilldown({
@@ -119,15 +120,18 @@ export function usePanelDrilldown({
 
   // drilldown
   const replacePlaceholders = (str: any, obj: any) => {
+    str = normalizeVariableSyntax(str);
     // if the str is same as the key, return it's value(it can be an string or array).
     for (const key in obj) {
-      // ${varName} == str
-      if (`\$\{${key}\}` == str) {
+      // ${varName} == str or {{varName}} == str
+      if (`\$\{${key}\}` == str || `{{${key}}}` == str) {
         return obj[key];
       }
     }
 
-    return str.replace(/\$\{([^}]+)\}/g, function (_: any, key: any) {
+    // Replace both {{key}} and ${key} patterns
+    return str.replace(/(?:\{\{([^}]+)\}\})|(?:\$\{([^}]+)\})/g, function (_: any, mustacheKey: any, dollarKey: any) {
+      const key = (mustacheKey || dollarKey).trim();
       // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
       let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
 
@@ -136,7 +140,7 @@ export function usePanelDrilldown({
         if (value && part in value) {
           value = value[part];
         } else {
-          return "${" + key + "}";
+          return mustacheKey ? "{{" + key + "}}" : "${" + key + "}";
         }
       }
       return value;
@@ -144,9 +148,10 @@ export function usePanelDrilldown({
   };
 
   const replaceDrilldownToLogs = (str: any, obj: any) => {
+    str = normalizeVariableSyntax(str);
     // If str is exactly equal to a key, return its value directly
     for (const key in obj) {
-      if (`\$\{${key}\}` === str) {
+      if (`\$\{${key}\}` === str || `{{${key}}}` === str) {
         let value = obj[key];
 
         // Ensure string values are wrapped in quotes
@@ -154,7 +159,9 @@ export function usePanelDrilldown({
       }
     }
 
-    return str.replace(/\$\{([^}]+)\}/g, function (_: any, key: any) {
+    // Replace both {{key}} and ${key} patterns
+    return str.replace(/(?:\{\{([^}]+)\}\})|(?:\$\{([^}]+)\})/g, function (_: any, mustacheKey: any, dollarKey: any) {
+      const key = (mustacheKey || dollarKey).trim();
       // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
       let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
 
@@ -163,7 +170,7 @@ export function usePanelDrilldown({
         if (value && part in value) {
           value = value[part];
         } else {
-          return "${" + key + "}"; // Keep the placeholder if the key is not found
+          return mustacheKey ? "{{" + key + "}}" : "${" + key + "}"; // Keep the placeholder if the key is not found
         }
       }
 
@@ -272,6 +279,8 @@ export function usePanelDrilldown({
     currentDependentVariablesData: any,
     panelSchema: any,
   ) => {
+    // Normalize spaces inside variable syntax before replacement
+    query = normalizeVariableSyntax(query);
     const queryType = panelSchema?.value?.queryType;
     currentDependentVariablesData?.forEach((variable: any) => {
       const variableName = `$${variable.name}`;
@@ -286,6 +295,28 @@ export function usePanelDrilldown({
           )
           .join(",");
         const possibleVariablesPlaceHolderTypes = [
+          // Mustache forms
+          {
+            placeHolder: `{{${variable.name}:csv}}`,
+            value: variable.value.join(","),
+          },
+          {
+            placeHolder: `{{${variable.name}:pipe}}`,
+            value: variable.value.join("|"),
+          },
+          {
+            placeHolder: `{{${variable.name}:doublequote}}`,
+            value: variable.value.map((value: any) => `"${value}"`).join(","),
+          },
+          {
+            placeHolder: `{{${variable.name}:singlequote}}`,
+            value: value,
+          },
+          {
+            placeHolder: `{{${variable.name}}}`,
+            value: queryType === "sql" ? value : variable.value.join("|"),
+          },
+          // Dollar-sign forms (existing)
           {
             placeHolder: `\${${variable.name}:csv}`,
             value: variable.value.join(","),
@@ -341,6 +372,24 @@ export function usePanelDrilldown({
         //     value: variable.value,
         //   });
         // }
+
+        // Replace all forms of the variable placeholder in the query, 
+        // placeholders can be in the form of {{varName}}, ${varName}, ${varName}, {{varName:csv}}, ${varName:csv} etc. 
+        // which will be replaced with the variable value. For csv and pipe forms, if the variable value is an array, it will be joined with comma or pipe respectively. 
+        // For doublequote form, the variable value will be wrapped with double quotes. 
+        // For singlequote form, the variable value will be wrapped with single quotes.
+        const mustachePlaceholder = `{{${variable.name}}}`;
+        query = query.replaceAll(`{{${variable.name}:csv}}`, variableValue);
+        query = query.replaceAll(`{{${variable.name}:pipe}}`, variableValue);
+        query = query.replaceAll(
+          `{{${variable.name}:doublequote}}`,
+          variableValue,
+        );
+        query = query.replaceAll(
+          `{{${variable.name}:singlequote}}`,
+          variableValue,
+        );
+        query = query.replaceAll(mustachePlaceholder, variableValue);
         query = query.replaceAll(variableNameWithBrackets, variableValue);
         query = query.replaceAll(variableName, variableValue);
       }
@@ -389,7 +438,8 @@ export function usePanelDrilldown({
     for (const f of fields) {
       aliasMap[f.name] = f.alias || f.name;
     }
-    return url.replace(/\$?\{(\w+)\}/g, (_match: string, fieldName: string) => {
+    return url.replace(/(?:\{\{\s*(\w+)\s*\}\})|(?:\$?\{\s*(\w+)\s*\})/g, (_match: string, mustacheField: string, dollarField: string) => {
+      const fieldName = mustacheField || dollarField;
       const resolved = aliasMap[fieldName] || fieldName;
       return '${row.field["' + resolved + '"]}';
     });
@@ -657,17 +707,17 @@ export function usePanelDrilldown({
         // Resolve the 6 fixed variables
         const resolvedUrl = rawUrl
           .replace(
-            /\$\{field\.__name\}/g,
+            /(?:\{\{field\.__name\}\})|(?:\$\{field\.__name\})/g,
             encodeURIComponent(String(fieldName)),
           )
           .replace(
-            /\$\{field\.__value\}/g,
+            /(?:\{\{field\.__value\}\})|(?:\$\{field\.__value\})/g,
             encodeURIComponent(String(fieldValue)),
           )
-          .replace(/\$\{start_time\}/g, String(startTime))
-          .replace(/\$\{end_time\}/g, String(endTime))
-          .replace(/\$\{query\}/g, encodeURIComponent(currentQuery))
-          .replace(/\$\{query_encoded\}/g, b64EncodeUnicode(currentQuery));
+          .replace(/(?:\{\{start_time\}\})|(?:\$\{start_time\})/g, String(startTime))
+          .replace(/(?:\{\{end_time\}\})|(?:\$\{end_time\})/g, String(endTime))
+          .replace(/(?:\{\{query\}\})|(?:\$\{query\})/g, encodeURIComponent(currentQuery))
+          .replace(/(?:\{\{query_encoded\}\})|(?:\$\{query_encoded\})/g, b64EncodeUnicode(currentQuery));
 
         window.open(resolvedUrl, "_blank");
       } catch (error) {

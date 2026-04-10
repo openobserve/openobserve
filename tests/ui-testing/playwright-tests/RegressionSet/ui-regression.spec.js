@@ -185,6 +185,76 @@ test.describe("UI Regression Bugs", () => {
     testLogger.info('✓ PASSED: Org context preserved');
   });
 
+  // ==========================================================================
+  // Bug #11064: Query management page text not in CamelCase
+  // https://github.com/openobserve/openobserve/issues/11064
+  // ==========================================================================
+  test.skip("Query management page should display text in CamelCase @bug-11064 @P3 @regression @accessibility", async ({ page }) => {
+    testLogger.info('Test: Verify CamelCase text on Query management page (Bug #11064)');
+
+    // Navigate to Query management / Scheduled queries page
+    const queryManagementUrl = `${process.env.ZO_BASE_URL || ''}/web/query-management?org_identifier=${process.env.ORGNAME || 'default'}`;
+    await page.goto(queryManagementUrl);
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    testLogger.info('✓ Navigated to Query management page');
+
+    // Check for lowercase words that should be CamelCase
+    const lowercaseWords = ['dashboards', 'ui'];
+    const expectedCamelCase = ['Dashboards', 'UI'];
+    let totalElementsFound = 0;
+
+    for (let i = 0; i < lowercaseWords.length; i++) {
+      const lowercase = lowercaseWords[i];
+      const camelCase = expectedCamelCase[i];
+
+      // Find elements containing the lowercase version (case-sensitive)
+      const lowercaseElement = pm.commonActions.getElementsWithText(lowercase);
+      const lowercaseCount = await lowercaseElement.count();
+
+      // Find elements containing the CamelCase version
+      const camelCaseElement = pm.commonActions.getElementsWithText(camelCase);
+      const camelCaseCount = await camelCaseElement.count();
+
+      testLogger.info(`Word "${lowercase}": lowercase count = ${lowercaseCount}, CamelCase "${camelCase}" count = ${camelCaseCount}`);
+
+      totalElementsFound += lowercaseCount + camelCaseCount;
+
+      // PRIMARY ASSERTION: Should use CamelCase, not lowercase
+      // If we find only lowercase without CamelCase, that indicates Bug #11064
+      if (lowercaseCount > 0) {
+        expect(camelCaseCount,
+          `Bug #11064: Found "${lowercase}" (${lowercaseCount} times) but should use "${camelCase}"`
+        ).toBeGreaterThan(0);
+      }
+
+      if (camelCaseCount > 0) {
+        testLogger.info(`✓ Found proper CamelCase "${camelCase}"`);
+      }
+    }
+
+    // Ensure page content was actually inspected
+    expect(totalElementsFound, 'Bug #11064: Page should contain relevant text elements').toBeGreaterThan(0);
+
+    // Also check page title and headers for proper casing
+    const pageTitle = pm.commonActions.getPageTitle();
+    if (await pageTitle.isVisible({ timeout: 3000 }).catch(() => false)) {
+      const titleText = await pageTitle.textContent();
+      testLogger.info(`Page title text: "${titleText}"`);
+
+      // STRONG ASSERTION: Check if title words are properly capitalized
+      const words = titleText.split(/\s+/);
+      const allCapitalized = words.every(word => {
+        if (word.length === 0) return true;
+        return word[0] === word[0].toUpperCase();
+      });
+
+      expect(allCapitalized, 'Bug #11064: Page title words should be capitalized').toBe(true);
+      testLogger.info('✓ Page title uses proper capitalization');
+    }
+
+    testLogger.info('✓ PASSED: CamelCase text test completed');
+  });
+
   test.afterEach(async () => {
     testLogger.info('UI regression test completed');
   });

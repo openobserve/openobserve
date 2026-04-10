@@ -36,9 +36,20 @@ jobs:
             You must post EXACTLY ONE comment on this PR. Never post multiple comments.
             Never post a summary AND a review - combine everything into ONE comment.
 
-            ### Step 1: Check for Existing Review
+            ### Step 1: Gather PR Context (DO THIS FIRST)
 
-            Run: `gh pr view ${{ github.event.pull_request.number }} --json comments --jq '.comments[] | select(.body | contains("claude-pr-review")) | .id'`
+            Run both of these once and reuse the results throughout:
+
+            **Commits:**
+            `gh pr view ${{ github.event.pull_request.number }} --json commits --jq '[.commits[] | {sha: .oid, author: .authors[0].login, message: .messageHeadline}]'`
+
+            **Existing review comment (id + body):**
+            `gh pr view ${{ github.event.pull_request.number }} --json comments --jq '[.comments[] | select(.body | contains("claude-pr-review")) | {id: .id, body: .body}]'`
+
+            From the results above:
+            - Note the existing comment **id** (if any) for Step 3
+            - Note the existing comment **body** to understand what was previously flagged
+            - Look for bot commit → human revert patterns in the commit list: if a human commit undoes code that a bot commit introduced, treat those lines as an intentional author decision. Do NOT re-raise or re-fix them. Add to Resolved as: `~~Issue~~ — intentionally reverted by author`
 
             ### Step 2: Review the Code
 
@@ -49,14 +60,15 @@ jobs:
 
             ### Step 3: Post or Update Comment
 
-            **If existing comment found (Step 1 returned an ID):**
-            Use `gh api` to update it:
+            **If existing comment found (Step 1 returned an id):**
             ```
             gh api repos/${{ github.repository }}/issues/comments/{COMMENT_ID} -X PATCH -f body='...'
             ```
 
             **If no existing comment:**
-            Create one: `gh pr comment ${{ github.event.pull_request.number }} --body '...'`
+            ```
+            gh pr comment ${{ github.event.pull_request.number }} --body '...'
+            ```
 
             ### Comment Format (EXACT FORMAT - NO ADDITIONS)
 
@@ -82,6 +94,7 @@ jobs:
             - **2 sentences max** per issue
             - **Max 10 issues** - prioritize by severity
             - **LGTM if clean** - just show "Status: LGTM ✅" with empty table
+            - **Respect human reverts** - if a human reverted any bot-authored change, never re-raise or re-fix it
 
           claude_args: |
             --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Read,Grep,Glob"

@@ -1130,6 +1130,26 @@ export class LogsPage {
         await this.page.locator(this.quickModeToggle).click();
     }
 
+    // Click on the Quick Mode text label (not the toggle switch) - for testing #10821
+    async clickQuickModeTextLabel() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        // Click on the text label "Quick Mode" instead of the toggle switch
+        await this.page.locator(this.quickModeToggle).locator('.q-item__label').click();
+        // Close the utilities menu to match the pattern in getQuickModeState()
+        await this.page.keyboard.press('Escape');
+    }
+
+    // Get the current quick mode state (true/false)
+    async getQuickModeState() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
+        await this.page.keyboard.press('Escape');
+        return isOn;
+    }
+
     // Histogram methods
     async toggleHistogram() {
         // await this.page.locator(this.utilitiesMenuButton).click();
@@ -3355,9 +3375,10 @@ export class LogsPage {
         // Quick mode is now inside the utilities hamburger menu
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        if (toggleInner) {
-            const isSwitchedOff = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const toggleExists = await toggleInner.count() > 0;
+        if (toggleExists) {
+            const isSwitchedOff = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--falsy')).catch(() => false);
             if (isSwitchedOff) {
                 await toggleInner.click();
             } else {
@@ -3473,10 +3494,8 @@ export class LogsPage {
         // Quick mode is now inside the utilities hamburger menu
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const isQuickModeOn = toggleInner
-            ? await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy'))
-            : false;
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isQuickModeOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
 
         if (isQuickModeOn) {
             testLogger.info('Quick Mode is ON - turning it OFF for include/exclude functionality');
@@ -3702,10 +3721,8 @@ export class LogsPage {
         // Quick mode is now inside the utilities hamburger menu
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const isOn = toggleInner
-            ? await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy'))
-            : false;
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
 
         if (desiredState !== isOn) {
             await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
@@ -6849,5 +6866,39 @@ export class LogsPage {
     async expectVisible(locator) {
         await expect(locator).toBeVisible();
         testLogger.info('Element is visible');
+    }
+
+    /**
+     * Get expand button for a specific field in sidebar (Bug #11041)
+     * @param {string} fieldName - The field name (e.g., "level", "kubernetes_namespace_name")
+     * @returns {Locator}
+     */
+    getFieldExpandButton(fieldName) {
+        return this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+    }
+
+    /**
+     * Get include/exclude button for a specific field value in sidebar (Bug #11041)
+     * @param {string} fieldName - The field name (e.g., "level")
+     * @returns {Locator}
+     */
+    getSubfieldListEqualButton(fieldName) {
+        return this.page.locator(`[data-test*="logs-search-subfield-add-${fieldName}"]`);
+    }
+
+    /**
+     * Get "Include Search Term" menu item (Bug #11041)
+     * @returns {Locator}
+     */
+    getIncludeSearchTermMenuItem() {
+        return this.page.getByText('Include Search Term', { exact: true });
+    }
+
+    /**
+     * Get query editor locator
+     * @returns {Locator}
+     */
+    getQueryEditorLocator() {
+        return this.page.locator(this.logsSearchBarQueryEditor);
     }
 }
