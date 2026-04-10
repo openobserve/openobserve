@@ -119,7 +119,8 @@
     "set": "+ 设置",
     "goBack": "回去",
     "stopGenerating": "停止生成",
-    "redirectingHome": "{倒计时} 秒后重定向到主页..."
+    "redirectingHome": "{倒计时} 秒后重定向到主页...",
+    "resources": "资源"
   },
   "search": {
     "selectIndex": "选择数据流",

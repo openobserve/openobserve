@@ -119,7 +119,8 @@
     "copyError": "Panoya kopyalanamadı",
     "goBack": "Geri Dön",
     "stopGenerating": "Oluşturmayı bırak",
-    "redirectingHome": "{geri sayım} saniye içinde eve yönlendiriliyor..."
+    "redirectingHome": "{geri sayım} saniye içinde eve yönlendiriliyor...",
+    "resources": "Kaynaklar"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",

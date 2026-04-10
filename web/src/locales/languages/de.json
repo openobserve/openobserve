@@ -119,7 +119,8 @@
     "copyError": "Fehler beim Kopieren in die Zwischenablage",
     "goBack": "Geh zurück",
     "stopGenerating": "Generieren beenden",
-    "redirectingHome": "In {Countdown} Sekunden wird zur Startseite weitergeleitet..."
+    "redirectingHome": "In {Countdown} Sekunden wird zur Startseite weitergeleitet...",
+    "resources": "Ressourcen"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",

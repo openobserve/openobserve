@@ -119,7 +119,8 @@
     "copyError": "No se pudo copiar al portapapeles",
     "goBack": "Regresar",
     "stopGenerating": "Deja de generar",
-    "redirectingHome": "Redirigiendo a casa en {countdown} segundos..."
+    "redirectingHome": "Redirigiendo a casa en {countdown} segundos...",
+    "resources": "Recursos"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",

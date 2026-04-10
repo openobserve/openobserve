@@ -119,7 +119,8 @@
     "copyError": "Impossible de copier dans le presse-papiers",
     "goBack": "Retourner",
     "stopGenerating": "Arrêtez de générer",
-    "redirectingHome": "Redirection vers la page d'accueil dans {compte à rebours} secondes..."
+    "redirectingHome": "Redirection vers la page d'accueil dans {compte à rebours} secondes...",
+    "resources": "Ressources"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",

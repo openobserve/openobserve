@@ -119,7 +119,8 @@
     "copyError": "Falha ao copiar para a área de transferência",
     "goBack": "Voltar",
     "stopGenerating": "Pare de gerar",
-    "redirectingHome": "Redirecionando para a página inicial em {contagem regressiva} segundos..."
+    "redirectingHome": "Redirecionando para a página inicial em {contagem regressiva} segundos...",
+    "resources": "Recursos"
   },
   "search": {
     "selectIndex": "Selecione Stream First",

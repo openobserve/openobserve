@@ -119,7 +119,8 @@
     "set": "+ 세트",
     "goBack": "뒤로 이동",
     "stopGenerating": "생성 중지",
-    "redirectingHome": "{countdown} 초 내에 홈으로 리디렉션하는 중..."
+    "redirectingHome": "{countdown} 초 내에 홈으로 리디렉션하는 중...",
+    "resources": "리소스"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",

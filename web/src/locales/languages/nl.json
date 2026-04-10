@@ -119,7 +119,8 @@
     "copyError": "Kopiëren naar klembord is mislukt",
     "goBack": "Ga terug",
     "stopGenerating": "Stop met genereren",
-    "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden..."
+    "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden...",
+    "resources": "Hulpbronnen"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",

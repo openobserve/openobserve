@@ -119,7 +119,8 @@
     "copyError": "Copia negli appunti non riuscita",
     "goBack": "Torna indietro",
     "stopGenerating": "Smetti di generare",
-    "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi..."
+    "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi...",
+    "resources": "Risorse"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",

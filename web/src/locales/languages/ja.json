@@ -119,7 +119,8 @@
     "set": "+ セット",
     "goBack": "戻る",
     "stopGenerating": "生成を停止",
-    "redirectingHome": "{countdown} 秒後にホームにリダイレクト中..."
+    "redirectingHome": "{countdown} 秒後にホームにリダイレクト中...",
+    "resources": "リソース"
   },
   "search": {
     "metrics": "メトリクス",
