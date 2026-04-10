@@ -119,7 +119,9 @@
     "set": "+ セット",
     "goBack": "戻る",
     "stopGenerating": "生成を停止",
-    "redirectingHome": "{countdown} 秒後にホームにリダイレクト中..."
+    "redirectingHome": "{countdown} 秒後にホームにリダイレクト中...",
+    "version": "[バージョン]",
+    "create": "作成"
   },
   "search": {
     "metrics": "メトリクス",
@@ -2417,7 +2419,7 @@
       "clickToViewSuggestions": "クリックして相関関係の改善提案を表示",
       "byService": "サービス別",
       "byStream": "ストリーム別",
-      "searchServiceName": "サービス名を検索中...",
+      "searchServiceName": "サービスまたはストリーム名を検索...",
       "searchStreamName": "ストリーム名を検索...",
       "allServices": "すべてのサービス",
       "missingTelemetry": "テレメトリが見つからない",
@@ -2687,7 +2689,12 @@
     "errorGettingResults": "結果を取得中にエラーが発生しました",
     "discardChangesTitle": "変更を破棄",
     "deleteNodeTitle": "ノードを削除",
-    "deleteNodeLlmEvalConfirm": "この LLM 評価ノードを削除してよろしいですか?"
+    "deleteNodeLlmEvalConfirm": "この LLM 評価ノードを削除してよろしいですか?",
+    "evalTemplates": "評価テンプレート",
+    "evaluationTemplate": "評価テンプレート",
+    "evaluationTemplateHelp": "LLMジャッジの基準とディメンションを定義する評価テンプレートを選択してください。",
+    "noTemplatesFound": "評価テンプレートが見つかりません。評価テンプレートページで作成してください。",
+    "evalTemplatesRefreshed": "評価テンプレートは正常に更新されました"
   },
   "reports": {
     "header": "レポート",
@@ -2712,7 +2719,14 @@
     "cached": "キャッシュ",
     "cachedReport": "キャッシュレポート",
     "destination": "送信先",
-    "scheduled": "スケジュール済み"
+    "scheduled": "スケジュール済み",
+    "reportFormat": "レポート形式",
+    "reportType": "レポートタイプ",
+    "attachmentType": "アタッチメントスタイル",
+    "dimensionWidth": "幅 (ピクセル)",
+    "dimensionHeight": "高さ (ピクセル)",
+    "imagePreview": "インラインダッシュボードのプレビュー画像を含める",
+    "customDimensions": "カスタムディメンション (アドバンス)"
   },
   "queries": {
     "runningQueries": "実行中のクエリ",
@@ -3257,5 +3271,40 @@
     "guideQuery": "現在の SQL クエリ",
     "guideQueryEncoded": "Base64 でエンコードされた SQL クエリ",
     "guideExampleHeader": "例"
+  },
+  "evalTemplate": {
+    "header": "評価テンプレート",
+    "newTemplate": "新しいテンプレート",
+    "editTemplate": "評価テンプレートを編集",
+    "createTemplate": "新しい評価テンプレートを作成",
+    "noTemplatesFound": "評価テンプレートが見つかりません",
+    "templateName": "[テンプレート名]",
+    "responseType": "回答タイプ",
+    "dimensions": "評価ディメンション",
+    "promptTemplate": "プロンプトテンプレート",
+    "statsTitle": "テンプレート統計",
+    "avgQualityScore": "平均品質スコア",
+    "usageStats": "使用統計",
+    "totalEvaluations": "評価総数",
+    "lastUsed": "最終使用日",
+    "deleteTemplate": "テンプレートを削除",
+    "deleteConfirmation": "「{name}」を削除してよろしいですか？",
+    "loadFailed": "テンプレートを読み込めませんでした",
+    "saveRequiredFields": "すべての必須フィールドに入力してください",
+    "updateSuccess": "テンプレートは正常に更新されました",
+    "createSuccess": "テンプレートは正常に作成されました",
+    "updateFailed": "テンプレートを更新できませんでした",
+    "createFailed": "テンプレートを作成できませんでした",
+    "deleteSuccess": "テンプレートは正常に削除されました",
+    "deleteFailed": "テンプレートを削除できませんでした",
+    "statsLoadFailed": "テンプレート統計を読み込めませんでした",
+    "nameRequired": "名前が必要です",
+    "responseTypeRequired": "回答タイプが必要です",
+    "dimensionRequired": "少なくとも 1 つのディメンションが必要です",
+    "contentRequired": "コンテンツは必須です",
+    "never": "決して",
+    "typeScore": "数値スコア (例:0.0-1.0)",
+    "typeBoolean": "バイナリ/パスフェール (ブーリアン)",
+    "typeCustom": "カテゴリ/カスタムテキスト"
   }
 }

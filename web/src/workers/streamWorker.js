@@ -60,6 +60,9 @@ function processChunk(traceId, chunk) {
 
     const lines = messages.filter(line => line.trim());
 
+    // Collect all parsed events from this chunk into a batch
+    const batch = [];
+
     // Process each complete line
     for (let i = 0; i < lines.length; i++) {
       try {
@@ -78,15 +81,14 @@ function processChunk(traceId, chunk) {
               // Try to parse as JSON
               const json = JSON.parse(data);
 
-              // Send message based on event type
-              self.postMessage({
+              batch.push({
                 type: eventType,
                 traceId,
                 data: json,
               });
             } catch (parseErr) {
               // If JSON parsing fails, send raw data
-              self.postMessage({
+              batch.push({
                 type: 'error',
                 traceId,
                 data: { message: 'Error parsing data', error: parseErr.toString() },
@@ -100,15 +102,14 @@ function processChunk(traceId, chunk) {
           try {
             // Try to parse as JSON
             const json = JSON.parse(data);
-            // Send message based on event type
-            self.postMessage({
+            batch.push({
               type: 'data',
               traceId,
               data: json,
             });
           } catch (parseErr) {
             // If JSON parsing fails, send raw data
-            self.postMessage({
+            batch.push({
               type: 'data',
               traceId,
               data: data,
@@ -116,12 +117,25 @@ function processChunk(traceId, chunk) {
           }
         }
       } catch (e) {
-        self.postMessage({
+        batch.push({
           type: 'error',
           traceId,
           data: { message: 'Error processing message', error: e.toString() },
         });
       }
+    }
+
+    // Send all events from this chunk as a single batch message
+    if (batch.length === 1) {
+      // Single event — send directly for backwards compatibility
+      self.postMessage(batch[0]);
+    } else if (batch.length > 1) {
+      // Multiple events — send as batch
+      self.postMessage({
+        type: 'batch',
+        traceId,
+        events: batch,
+      });
     }
   } catch (error) {
     // Send error to main thread

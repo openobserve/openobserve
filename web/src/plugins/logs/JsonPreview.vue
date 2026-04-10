@@ -812,8 +812,8 @@ export default {
             org_identifier: searchObj.organizationIdentifier,
             query: {
               query: {
-                start_time: props.value._timestamp - 10 * 60 * 1000,
                 sql: `SELECT _original FROM "${props.streamName ? props.streamName : searchObj.data.stream.selectedStream}" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
+                start_time: props.value._timestamp - 10 * 60 * 1000,
                 end_time: props.value._timestamp + 10 * 60 * 1000,
                 size: 1,
                 from: 0,

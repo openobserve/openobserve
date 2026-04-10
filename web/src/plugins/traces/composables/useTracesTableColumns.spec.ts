@@ -22,7 +22,7 @@ const DEFAULT_SPANS_FIELDS = [
   "service",
   "operation_name",
   "duration",
-  "status",
+  "span_status",
   "status_code",
   "method",
 ];
@@ -120,7 +120,7 @@ describe("useTracesTableColumns", () => {
         "status_code",
         "operation_name",
         "duration",
-        "status",
+        "span_status",
         "method",
       ];
       expect(buildCols(false, "spans", reordered).map((c) => c.id)).toEqual(
@@ -225,6 +225,113 @@ describe("useTracesTableColumns", () => {
   });
 
   // ── buildColumns called multiple times ────────────────────────────────────
+
+  // ── span_status column metadata ───────────────────────────────────────────
+
+  describe("span_status column metadata", () => {
+    it("should include span_status in default spans fields", () => {
+      const ids = buildCols(false, "spans", [...DEFAULT_SPANS_FIELDS]).map(
+        (c) => c.id,
+      );
+      expect(ids).toContain("span_status");
+    });
+
+    it("should use 'Span Status' as the header for span_status", () => {
+      const col = buildCols(false, "spans", ["span_status"]).find(
+        (c) => c.id === "span_status",
+      );
+      expect(col?.header).toBe("Span Status");
+    });
+
+    it("should use size 120 for span_status", () => {
+      const col = buildCols(false, "spans", ["span_status"]).find(
+        (c) => c.id === "span_status",
+      );
+      expect(col?.size).toBe(120);
+    });
+
+    it("should have slot:true and disableCellAction:true in meta for span_status", () => {
+      const col = buildCols(false, "spans", ["span_status"]).find(
+        (c) => c.id === "span_status",
+      );
+      const meta = col?.meta as Record<string, unknown>;
+      expect(meta?.slot).toBe(true);
+      expect(meta?.disableCellAction).toBe(true);
+    });
+  });
+
+  // ── spans mode: all columns have meta.sortable = true ─────────────────────
+
+  describe("spans mode — all columns have meta.sortable = true", () => {
+    it("should set meta.sortable=true on every column in spans mode", () => {
+      const cols = buildCols(false, "spans", [...DEFAULT_SPANS_FIELDS]);
+      cols.forEach((col) => {
+        const meta = col.meta as Record<string, unknown>;
+        expect(meta?.sortable).toBe(true);
+      });
+    });
+
+    it("should set meta.sortable=true on span_status column in spans mode", () => {
+      const col = buildCols(false, "spans", ["span_status"]).find(
+        (c) => c.id === "span_status",
+      );
+      const meta = col?.meta as Record<string, unknown>;
+      expect(meta?.sortable).toBe(true);
+    });
+
+    it("should set meta.sortable=true on custom unknown columns in spans mode", () => {
+      const col = buildCols(false, "spans", ["http_url"]).find(
+        (c) => c.id === "http_url",
+      );
+      const meta = col?.meta as Record<string, unknown>;
+      expect(meta?.sortable).toBe(true);
+    });
+
+    it("should NOT set meta.sortable=true on all columns in traces mode", () => {
+      // In traces mode only columns with sortable in KNOWN_COLUMN_META get it
+      const cols = buildCols(false, "traces", [...DEFAULT_TRACES_FIELDS]);
+      const sortableCols = cols.filter(
+        (c) => (c.meta as Record<string, unknown>)?.sortable === true,
+      );
+      // Only duration and _timestamp have sortable in traces mode; not all columns
+      expect(sortableCols.length).toBeLessThan(cols.length);
+    });
+  });
+
+  // ── status column has no top-level sortable ───────────────────────────────
+
+  describe("status column — no top-level sortable property", () => {
+    it("should not have a top-level sortable property on the status column in traces mode", () => {
+      const col = buildCols(false, "traces", ["status"]).find(
+        (c) => c.id === "status",
+      );
+      // sortable is not set at the column-def level (only in meta when in spans mode)
+      expect((col as any)?.sortable).toBeUndefined();
+    });
+
+    it("should have meta.sortable=true on status column when in spans mode", () => {
+      // spans mode sets meta.sortable on all columns
+      const col = buildCols(false, "spans", ["status"]).find(
+        (c) => c.id === "status",
+      );
+      const meta = col?.meta as Record<string, unknown>;
+      expect(meta?.sortable).toBe(true);
+    });
+  });
+
+  // ── toColumnDef does not mutate KNOWN_COLUMN_META ─────────────────────────
+
+  describe("toColumnDef — meta spread does not mutate shared KNOWN_COLUMN_META", () => {
+    it("should not share meta reference between two calls for span_status", () => {
+      const [col1] = buildCols(false, "spans", ["span_status"]);
+      const [col2] = buildCols(false, "spans", ["span_status"]);
+      // Each call returns a fresh meta object — mutating one must not affect the other
+      (col1.meta as Record<string, unknown>).extraProp = "test";
+      expect(
+        (col2.meta as Record<string, unknown>).extraProp,
+      ).toBeUndefined();
+    });
+  });
 
   describe("buildColumns called multiple times", () => {
     it("should update columns.value on each call", () => {

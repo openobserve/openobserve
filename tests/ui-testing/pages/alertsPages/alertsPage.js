@@ -542,10 +542,10 @@ export class AlertsPage {
     }
 
     /**
-     * Verify all action buttons (edit, refresh, close) are visible in the alert details dialog
+     * Verify action buttons (close, optional refresh) are visible in the alert details dialog
+     * Note: Edit button was removed from the UI in alert history sidebar refactoring
      */
     async expectAlertDetailsActionButtonsVisible() {
-        await expect(this.page.locator(this.locators.alertDetailsEditButton)).toBeVisible({ timeout: 10000 });
         // Refresh button may not be present on all deployments (absent on alpha1 cloud)
         const refreshVisible = await this.page.locator(this.locators.alertDetailsRefreshButton)
             .isVisible({ timeout: 3000 }).catch(() => false);
@@ -2096,6 +2096,42 @@ export class AlertsPage {
     }
 
     /**
+     * Select a logs stream from dropdown with fallback to first available
+     */
+    async selectLogsStream(streamName) {
+        const streamDropdown = this.page.locator(this.locators.streamNameDropdown);
+        await streamDropdown.click();
+
+        const testStreamOption = this.page.getByText(streamName, { exact: true });
+        try {
+            await expect(testStreamOption).toBeVisible({ timeout: 5000 });
+            await testStreamOption.click();
+            testLogger.info('Selected logs stream', { stream: streamName });
+            return true;
+        } catch (e) {
+            // Retry: click dropdown again
+            await streamDropdown.click();
+            await this.page.waitForTimeout(1000);
+
+            if (await testStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await testStreamOption.click();
+                testLogger.info('Selected logs stream on retry', { stream: streamName });
+                return true;
+            } else {
+                // Use first available logs stream from dropdown
+                const anyStreamOption = this.page.locator('.q-menu .q-item').first();
+                if (await anyStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    await anyStreamOption.click();
+                    testLogger.info('Using first available logs stream');
+                    return true;
+                }
+                testLogger.warn('No logs streams available');
+                return false;
+            }
+        }
+    }
+
+    /**
      * Select scheduled alert type
      */
     async selectScheduledAlertType() {
@@ -2224,27 +2260,29 @@ export class AlertsPage {
     // ==================== PROMQL CONDITION ROW METHODS ====================
 
     /**
-     * Get the PromQL condition row locator
+     * Get the PromQL condition row locator in Step 2 (QueryConfig)
      */
     getPromqlConditionRow() {
-        return this.page.locator(this.locators.alertSettingsRow).filter({ hasText: 'Trigger if the value is' });
+        const queryConfigSection = this.page.locator('.step-query-config');
+        const promqlConditionLabel = queryConfigSection.getByText('Trigger if the value is').first();
+        // Return the parent container that holds both label and controls
+        return promqlConditionLabel.locator('..');
     }
 
     /**
-     * Expect PromQL condition row "Trigger if the value is" to be visible
+     * Expect the PromQL threshold operator control to be visible in Step 4.
+     * Verifies bug #9967 fix: "Alert if [op] [value] series match criteria" row exists in PromQL mode.
      */
     async expectPromqlConditionRowVisible() {
-        const promqlConditionRow = this.getPromqlConditionRow();
-        await expect(promqlConditionRow).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="alert-threshold-operator-select"]')).toBeVisible({ timeout: 10000 });
         testLogger.info('PromQL condition row is visible');
     }
 
     /**
-     * Expect PromQL condition row NOT to be visible (for Custom mode)
+     * Expect the PromQL threshold operator control NOT to be visible (Custom mode).
      */
     async expectPromqlConditionRowNotVisible() {
-        const promqlConditionRow = this.getPromqlConditionRow();
-        await expect(promqlConditionRow).not.toBeVisible({ timeout: 5000 });
+        await expect(this.page.locator('[data-test="alert-threshold-operator-select"]')).not.toBeVisible({ timeout: 5000 });
         testLogger.info('PromQL condition row is NOT visible');
     }
 
@@ -2252,9 +2290,7 @@ export class AlertsPage {
      * Expect operator dropdown to be visible in PromQL condition row
      */
     async expectOperatorDropdownVisible() {
-        const promqlConditionRow = this.getPromqlConditionRow();
-        const operatorDropdown = promqlConditionRow.locator('.q-select').first();
-        await expect(operatorDropdown).toBeVisible();
+        await expect(this.page.locator('[data-test="alert-threshold-operator-select"]')).toBeVisible();
         testLogger.info('Operator dropdown is visible');
     }
 
@@ -2262,9 +2298,7 @@ export class AlertsPage {
      * Expect value input to be visible in PromQL condition row
      */
     async expectValueInputVisible() {
-        const promqlConditionRow = this.getPromqlConditionRow();
-        const valueInput = promqlConditionRow.locator('input[type="number"]');
-        await expect(valueInput).toBeVisible();
+        await expect(this.page.locator('[data-test="alert-threshold-value-input"]')).toBeVisible();
         testLogger.info('Value input is visible');
     }
 
@@ -2272,8 +2306,7 @@ export class AlertsPage {
      * Get the current value from the PromQL condition value input
      */
     async getPromqlConditionValue() {
-        const promqlConditionRow = this.getPromqlConditionRow();
-        const valueInput = promqlConditionRow.locator('input[type="number"]');
+        const valueInput = this.page.locator('[data-test="alert-threshold-value-input"]');
         await expect(valueInput).toBeVisible();
         const value = await valueInput.inputValue();
         testLogger.info('Retrieved PromQL condition value', { value });
@@ -2582,5 +2615,214 @@ export class AlertsPage {
             testLogger.info('PUT request does not have double-encoded VRL');
         }
         return !hasDoubleEncoding;
+    }
+
+    /**
+     * Alias for navigateToAlertsPage() - Navigate to alerts list
+     */
+    async navigateToAlertsList() {
+        return this.navigateToAlertsPage();
+    }
+
+    /**
+     * Alias for clickAddAlertButton() - Click create alert button
+     */
+    async clickCreateAlertButton() {
+        return this.clickAddAlertButton();
+    }
+
+    /**
+     * Get firing count elements from alert list
+     * NOTE: firing_count field exists in data but no dedicated column displays it
+     * Returns "last_triggered_at" column header as proxy - closest related column
+     * @returns {Locator}
+     */
+    getFiringCountElements() {
+        return this.page.locator('[data-test="alert-list-table"] th:has-text("Last Triggered")');
+    }
+
+    /**
+     * Get alert table element
+     * @returns {Locator}
+     */
+    getAlertTable() {
+        return this.page.locator('[data-test*="alert-list"], .alerts-table, table');
+    }
+
+    /**
+     * Get all table headers from alert table
+     * @returns {Promise<string[]>}
+     */
+    async getAlertTableHeaders() {
+        const table = this.getAlertTable();
+        if (await table.isVisible({ timeout: 3000 }).catch(() => false)) {
+            return await table.locator('th').allTextContents();
+        }
+        return [];
+    }
+
+    /**
+     * Get notification element (Scheduled features test)
+     * @returns {Locator}
+     */
+    getNotification() {
+        return this.page.locator('.q-notification');
+    }
+
+    /**
+     * Get "Alert Setup" text element (Scheduled features test)
+     * @returns {Locator}
+     */
+    getAlertSetupText() {
+        return this.page.getByText('Alert Setup');
+    }
+
+    /**
+     * Get "Preview is not available in SQL mode" text element (Scheduled features test)
+     * @returns {Locator}
+     */
+    getPreviewNotAvailableMessage() {
+        return this.page.getByText('Preview is not available in SQL mode');
+    }
+
+    /**
+     * Get step query config section (Scheduled features test)
+     * @returns {Locator}
+     */
+    getStepQueryConfigSection() {
+        return this.page.locator('.step-query-config');
+    }
+
+    /**
+     * Get "Group by" text element (Scheduled features test)
+     * @returns {Locator}
+     */
+    getGroupByLabel() {
+        return this.page.getByText('Group by');
+    }
+
+    /**
+     * Get Group By section container
+     * @returns {Locator}
+     */
+    getGroupBySection() {
+        return this.page.locator('.step-query-config').locator('div:has-text("Group by")').first();
+    }
+
+    /**
+     * Get autocomplete suggestions dropdown items
+     * Scoped to menu context to avoid matching all q-items on page
+     * @returns {Locator}
+     */
+    getAutocompleteSuggestions() {
+        return this.page.locator('.q-menu .q-item, [role="listbox"] .q-item, .autocomplete-dropdown .q-item');
+    }
+
+    /**
+     * Get Group By input field
+     * Uses stable selectors that work across different UI configurations
+     * @returns {Locator}
+     */
+    getGroupByInput() {
+        // Primary: Find input/select near "Group by" label (most reliable)
+        // Fallback: data-test attributes
+        return this.page.locator('.step-query-config div:has-text("Group by") .q-select, .step-query-config div:has-text("Group by") input, [data-test*="group-by"] input, [data-test*="groupby"] input').first();
+    }
+
+    /**
+     * Get aggregation toggle button within query config section
+     * @returns {Locator}
+     */
+    getAggregationToggle() {
+        return this.getStepQueryConfigSection().locator('.q-toggle').first();
+    }
+
+    /**
+     * Find Group By input field using fallback selectors
+     * Tries multiple selectors to find the Group By input, useful when UI structure varies
+     * @param {Locator} queryConfigSection - The query config section locator
+     * @returns {Promise<Locator|null>} The found input element or null
+     */
+    async findGroupByInputWithFallback(queryConfigSection) {
+        const possibleSelectors = [
+            'div:has-text("Group by") input',
+            'div:has-text("Group by") .q-select',
+            '.group-by-input',
+            '[data-test*="group-by"] input',
+            '[data-test*="group-by"] .q-select'
+        ];
+
+        for (const selector of possibleSelectors) {
+            const element = queryConfigSection.locator(selector).first();
+            if (await element.isVisible({ timeout: 1000 }).catch(() => false)) {
+                return element;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get "Alert If Any Groups" text element (Scheduled features test)
+     * @returns {Locator}
+     */
+    getAggregationThresholdLabel() {
+        return this.page.getByText('Alert If Any Groups');
+    }
+
+    /**
+     * Get "Compare with Past" step container (not a toggle - it's a step in alert wizard)
+     * @returns {Locator}
+     */
+    getCompareWithPastContainer() {
+        return this.page.locator('.step-compare-with-past, [class*="multi-window"]');
+    }
+
+    /**
+     * Get multi-window option (VRL encoding test)
+     * @returns {Locator}
+     */
+    getMultiWindowOption() {
+        return this.page.locator('[data-test*="multi-window"], [data-test*="multiwindow"]');
+    }
+
+    /**
+     * Get condition tab (VRL encoding test)
+     * @returns {Locator}
+     */
+    getConditionTab() {
+        return this.page.locator('[data-test*="condition"], [role="tab"]:has-text("Condition")');
+    }
+
+    /**
+     * Get VRL editor (VRL encoding test)
+     * @returns {Locator}
+     */
+    getVrlEditorElement() {
+        return this.page.locator('[data-test*="vrl"], .vrl-editor, [class*="vrl"]');
+    }
+
+    /**
+     * Get "Apply VRL" button (VRL encoding test)
+     * @returns {Locator}
+     */
+    getApplyVrlButton() {
+        return this.page.locator('button:has-text("Apply VRL"), [data-test*="apply-vrl"]');
+    }
+
+    /**
+     * Get VRL editor input field (textarea, monaco-editor, or input)
+     * @returns {Locator}
+     */
+    getVrlEditorInput() {
+        return this.getVrlEditorElement().locator('textarea, .monaco-editor, input').first();
+    }
+
+    /**
+     * Get error message banner (VRL encoding test)
+     * @returns {Locator}
+     */
+    getErrorMessageBanner() {
+        return this.page.locator('[class*="error"], .q-banner--negative, [data-test*="error"]');
     }
 }
