@@ -149,8 +149,9 @@ const usePromqlSuggestions = () => {
         const content = textUpToCursor.substring(lastOpen + 1);
         labelMeta.isEmpty = content.length === 0;
 
-        // Value context: label name followed by = (with optional partial quoted value)
-        const valueMatch = content.match(/(\w+)\s*=(?:"[^"]*)?$/);
+        // Value context: label name followed by any PromQL matcher (=, !=, =~, !~)
+        // with an optional partial quoted value
+        const valueMatch = content.match(/(\w+)\s*(?:=~|!=|!~|=)(?:"[^"]*)?$/);
         if (valueMatch) {
           labelMeta.focusOn = "value";
           labelMeta.meta.label = valueMatch[1];
