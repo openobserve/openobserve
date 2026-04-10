@@ -208,25 +208,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </template>
-                  <!-- Default empty dropdown when no group-by fields yet -->
-                  <q-select
-                    v-if="logGroupBy.length === 0"
-                    :model-value="null"
-                    :options="filteredFields"
-                    class="inline-condition-select"
-                    borderless
-                    dense
-                    use-input
-                    emit-value
-                    hide-selected
-                    :placeholder="t('alerts.placeholders.selectColumn')"
-                    fill-input
-                    :input-debounce="400"
-                    hide-bottom-space
-                    @filter="(val: string, update: any) => filterFields(val, update)"
-                    style="min-width: 120px; max-width: 180px;"
-                    @update:model-value="(val: string) => { logGroupBy.push(val); onLogGroupByChange(); }"
-                  />
                   <q-btn
                     icon="add"
                     size="xs"
@@ -429,25 +410,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </template>
-                  <!-- Default empty dropdown when no group-by fields yet -->
-                  <q-select
-                    v-if="!inputData.aggregation.group_by || inputData.aggregation.group_by.length === 0"
-                    :model-value="null"
-                    :options="filteredFields"
-                    class="inline-condition-select"
-                    borderless
-                    dense
-                    use-input
-                    emit-value
-                    hide-selected
-                    :placeholder="t('alerts.placeholders.selectColumn')"
-                    fill-input
-                    :input-debounce="400"
-                    hide-bottom-space
-                    @filter="(val: string, update: any) => filterFields(val, update)"
-                    style="min-width: 120px; max-width: 180px;"
-                    @update:model-value="(val: string) => { if (inputData.aggregation) { inputData.aggregation.group_by.push(val); emitAggregationUpdate(); } }"
-                  />
                   <q-btn
                     icon="add"
                     size="xs"
@@ -972,7 +934,7 @@ export default defineComponent({
       // Initialize aggregation object if missing
       if (!props.inputData.aggregation) {
         props.inputData.aggregation = {
-          group_by: [""],
+          group_by: [],
           function: "avg",
           having: { column: "", operator: ">=", value: "" },
         };
@@ -1062,7 +1024,7 @@ export default defineComponent({
         localIsAggregationEnabled.value = true;
         if (!props.inputData.aggregation) {
           props.inputData.aggregation = {
-            group_by: [""],
+            group_by: [],
             function: "avg",
             having: { column: "", operator: ">=", value: "" },
           };
@@ -1523,7 +1485,7 @@ export default defineComponent({
       // Initialize aggregation object if needed
       if (!props.inputData.aggregation) {
         props.inputData.aggregation = {
-          group_by: [""],
+          group_by: [],
           function: value,
           having: {
             column: "",
