@@ -954,6 +954,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import {
   ref,
+  shallowRef,
   computed,
   watch,
   nextTick,
@@ -1214,7 +1215,7 @@ const tableRowSize = ref(0);
 
 const columnOrder = ref<any>([]);
 
-const tableRows = ref<any[]>([...(props.rows ?? [])]);
+const tableRows = shallowRef<any[]>([...(props.rows ?? [])]);
 
 // ── Dashboard: convert Quasar column defs → TanStack ColumnDef[] ─────────────
 const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
@@ -1295,7 +1296,6 @@ watch(
       return descending ? -result : result;
     });
   },
-  { deep: true },
 );
 
 // ── Dashboard: pivot merge map ───────────────────────────────────────────────
@@ -1525,7 +1525,6 @@ watch(
     if (props.defaultColumns) updateTableWidth();
   },
   {
-    deep: true,
     immediate: true,
   },
 );
@@ -1584,9 +1583,6 @@ watch(
 
     await nextTick();
     if (props.defaultColumns) updateTableWidth();
-  },
-  {
-    deep: true,
   },
 );
 
@@ -1683,7 +1679,6 @@ watch(
   },
   {
     immediate: true,
-    deep: true,
   },
 );
 
