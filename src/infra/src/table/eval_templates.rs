@@ -16,6 +16,7 @@
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder, Schema, Set,
 };
+use serde::{Deserialize, Serialize};
 
 use super::get_lock;
 use crate::{
@@ -24,7 +25,7 @@ use crate::{
     table::entity::eval_templates::{ActiveModel, Column, Entity, Model},
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EvalTemplate {
     pub id: String,
     pub org_id: String,
