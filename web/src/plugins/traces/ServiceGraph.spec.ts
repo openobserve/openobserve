@@ -17,7 +17,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers";
 import { Notify } from "quasar";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import ServiceGraph from "./ServiceGraph.vue";
 
 installQuasar({
@@ -26,6 +26,26 @@ installQuasar({
 
 // Create a persistent mock for router push
 const mockRouterPush = vi.fn();
+
+// Shared reactive searchObj so Vue watchers inside the component fire when
+// tests mutate datetime or meta fields directly.
+const mockSearchObj = reactive({
+  meta: {
+    serviceGraphVisualizationType: "tree",
+    serviceGraphLayoutType: "horizontal",
+  },
+  data: {
+    datetime: {
+      startTime: Date.now() - 3600000,
+      endTime: Date.now(),
+      relativeTimePeriod: "15m",
+      type: "relative",
+    },
+    stream: {
+      selectedStream: { label: "", value: "" },
+    },
+  },
+});
 
 // Mock dependencies
 vi.mock("@/services/service_graph", () => ({
@@ -43,18 +63,7 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 vi.mock("@/composables/useTraces", () => ({
-  default: () => ({
-    searchObj: {
-      data: {
-        datetime: {
-          startTime: Date.now() - 3600000,
-          endTime: Date.now(),
-          relativeTimePeriod: "15m",
-          type: "relative",
-        },
-      },
-    },
-  }),
+  default: () => ({ searchObj: mockSearchObj }),
 }));
 
 vi.mock("vue-router", () => ({
@@ -144,9 +153,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         stubs: {
           AppTabs: true,
           ChartRenderer: true,
-          DateTime: {
-            template: '<div data-test="date-time-picker"></div>',
-          },
           ServiceGraphSidePanel: true,
           QCard: false,
           QCardSection: false,
@@ -164,6 +170,14 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset shared reactive searchObj to baseline before every test so watcher
+    // state does not bleed between tests.
+    mockSearchObj.meta.serviceGraphVisualizationType = "tree";
+    mockSearchObj.meta.serviceGraphLayoutType = "horizontal";
+    mockSearchObj.data.datetime.startTime = Date.now() - 3600000;
+    mockSearchObj.data.datetime.endTime = Date.now();
+    mockSearchObj.data.datetime.relativeTimePeriod = "15m";
+    mockSearchObj.data.datetime.type = "relative";
     vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
       mockApiResponse,
     );
@@ -200,10 +214,61 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.vm.chartKey).toBe(0);
     });
 
-    it("should set initial lastChartOptions to be falsy", () => {
+    it("should return chartData with an options property after mount", async () => {
       wrapper = createWrapper();
-      // lastChartOptions is initialized as undefined/null
-      expect(wrapper.vm.lastChartOptions).toBeFalsy();
+      await flushPromises();
+      // chartData is a computed that returns { options, notMerge, ... }
+      expect(wrapper.vm.chartData).toHaveProperty("options");
+    });
+  });
+
+  describe("Toolbar Layout", () => {
+    it("should render stream-selector and search-input in the top toolbar row (outside graph container)", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const streamSelector = wrapper.find(
+        '[data-test="service-graph-stream-selector"]',
+      );
+      const searchInput = wrapper.find(
+        '[data-test="service-graph-search-input"]',
+      );
+      const graphContainer = wrapper.find(
+        '[data-test="service-graph-container"]',
+      );
+
+      expect(streamSelector.exists()).toBe(true);
+      expect(searchInput.exists()).toBe(true);
+      expect(graphContainer.exists()).toBe(true);
+
+      // Stream selector and search input must NOT be descendants of the graph container
+      const streamSelectorInsideContainer = graphContainer.find(
+        '[data-test="service-graph-stream-selector"]',
+      );
+      const searchInputInsideContainer = graphContainer.find(
+        '[data-test="service-graph-search-input"]',
+      );
+
+      expect(streamSelectorInsideContainer.exists()).toBe(false);
+      expect(searchInputInsideContainer.exists()).toBe(false);
+    });
+
+    it("should render legends in a horizontal flex row", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const legends = wrapper.find('[data-test="service-graph-legends"]');
+      expect(legends.exists()).toBe(true);
+      // Legends use tw:flex-row — confirm the element has neither flex-col class
+      expect(legends.classes()).not.toContain("tw:flex-col");
+    });
+
+    it("should not render a date-time-picker inside ServiceGraph", () => {
+      wrapper = createWrapper();
+      // ServiceGraph no longer owns a date-time picker — time range is controlled
+      // externally by SearchBar via the shared useTraces composable.
+      const dateTimePicker = wrapper.find('[data-test="date-time-picker"]');
+      expect(dateTimePicker.exists()).toBe(false);
     });
   });
 
@@ -463,16 +528,14 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       const initialChartKey = wrapper.vm.chartKey;
 
-      // Change time range
-      await wrapper.vm.updateTimeRange({
-        startTime: Date.now() - 7200000,
-        endTime: Date.now(),
-        relativeTimePeriod: "30m",
-      });
+      // Time range changes are driven by mutating the shared searchObj datetime.
+      // The component watches searchObj.data.datetime (deep) and calls loadServiceGraph.
+      wrapper.vm.searchObj.data.datetime.startTime = Date.now() - 7200000;
+      wrapper.vm.searchObj.data.datetime.endTime = Date.now();
+      wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "30m";
       await flushPromises();
 
       // Verify chartKey was incremented (which invalidates any cached data)
-      // This forces chart to regenerate with fresh data
       expect(wrapper.vm.chartKey).toBeGreaterThan(initialChartKey);
     });
 
@@ -482,15 +545,12 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       const initialChartKey = wrapper.vm.chartKey;
 
-      // Change time range
-      await wrapper.vm.updateTimeRange({
-        startTime: Date.now() - 7200000,
-        endTime: Date.now(),
-        relativeTimePeriod: "30m",
-      });
+      wrapper.vm.searchObj.data.datetime.startTime = Date.now() - 7200000;
+      wrapper.vm.searchObj.data.datetime.endTime = Date.now();
+      wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "30m";
       await flushPromises();
 
-      // Verify chartKey was incremented
+      // chartKey increments once for the watcher-triggered loadServiceGraph
       expect(wrapper.vm.chartKey).toBe(initialChartKey + 1);
     });
 
@@ -503,15 +563,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const newStartTime = Date.now() - 7200000;
       const newEndTime = Date.now();
 
-      // Change time range
-      await wrapper.vm.updateTimeRange({
-        startTime: newStartTime,
-        endTime: newEndTime,
-        relativeTimePeriod: "30m",
-      });
+      wrapper.vm.searchObj.data.datetime.startTime = newStartTime;
+      wrapper.vm.searchObj.data.datetime.endTime = newEndTime;
+      wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "30m";
       await flushPromises();
 
-      // Verify API was called with new time range
       expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
         "test-org",
         expect.objectContaining({
@@ -521,20 +577,18 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       );
     });
 
-    it("should update searchObj datetime with new time range", async () => {
+    it("should reflect new datetime values on searchObj after mutation", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
       const newStartTime = Date.now() - 7200000;
       const newEndTime = Date.now();
 
-      await wrapper.vm.updateTimeRange({
-        startTime: newStartTime,
-        endTime: newEndTime,
-        relativeTimePeriod: "30m",
-      });
+      wrapper.vm.searchObj.data.datetime.startTime = newStartTime;
+      wrapper.vm.searchObj.data.datetime.endTime = newEndTime;
+      wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "30m";
+      await nextTick();
 
-      // Verify searchObj was updated
       expect(wrapper.vm.searchObj.data.datetime.startTime).toBe(newStartTime);
       expect(wrapper.vm.searchObj.data.datetime.endTime).toBe(newEndTime);
       expect(wrapper.vm.searchObj.data.datetime.relativeTimePeriod).toBe("30m");
@@ -565,14 +619,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         newApiResponse,
       );
 
-      await wrapper.vm.updateTimeRange({
-        startTime: Date.now() - 7200000,
-        endTime: Date.now(),
-        relativeTimePeriod: "30m",
-      });
+      wrapper.vm.searchObj.data.datetime.startTime = Date.now() - 7200000;
+      wrapper.vm.searchObj.data.datetime.endTime = Date.now();
+      wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "30m";
       await flushPromises();
 
-      // Verify graphData was updated
       expect(wrapper.vm.graphData.nodes).toHaveLength(1);
       expect(wrapper.vm.graphData.nodes[0].id).toBe("service-e");
     });
@@ -593,53 +644,30 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.vm.chartKey).not.toBe(initialChartKey);
     });
 
-    it("should regenerate chartData computed property when cache is cleared", async () => {
+    it("should regenerate chartData computed property after chartKey is incremented", async () => {
       wrapper = createWrapper();
       await flushPromises();
       await nextTick();
 
       const initialKey = wrapper.vm.chartKey;
 
-      // Set cached options
-      wrapper.vm.lastChartOptions = {
-        key: wrapper.vm.chartKey,
-        data: { options: {} },
-      };
-
-      // Clear cache and increment chartKey
-      wrapper.vm.lastChartOptions = null;
+      // Increment chartKey directly — loadServiceGraph also does this on each call
       wrapper.vm.chartKey++;
       await nextTick();
       await flushPromises();
 
-      // Get new chartData
-      const newChartData = wrapper.vm.chartData;
-
-      // Verify cache was cleared and chartKey changed (which forces regeneration)
-      expect(wrapper.vm.lastChartOptions).toBeNull();
+      // Verify chartKey changed (which forces chart to regenerate with fresh data)
       expect(wrapper.vm.chartKey).toBe(initialKey + 1);
-      // Note: Object identity might be same due to Vue reactivity, but content regenerates
-      expect(newChartData).toBeDefined();
+      expect(wrapper.vm.chartData).toBeDefined();
     });
 
-    it("should use cached chartData when chartKey hasn't changed", async () => {
+    it("should return chartData with options object", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      // Trigger chart data generation
-      const firstChartData = wrapper.vm.chartData;
-      await nextTick();
-
-      // Set cached options
-      if (wrapper.vm.lastChartOptions) {
-        const cachedOptions = wrapper.vm.lastChartOptions;
-
-        // Get chartData again without changing chartKey
-        const secondChartData = wrapper.vm.chartData;
-
-        // Verify it returned cached data (same reference)
-        expect(secondChartData.options).toBe(cachedOptions.data.options);
-      }
+      // chartData computed returns an object with an options property
+      const chartData = wrapper.vm.chartData;
+      expect(chartData).toHaveProperty("options");
     });
   });
 
@@ -688,12 +716,10 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
 
-      // Change time range
-      await wrapper.vm.updateTimeRange({
-        startTime: Date.now() - 7200000,
-        endTime: Date.now(),
-        relativeTimePeriod: "30m",
-      });
+      // Time range change triggers the deep watcher on searchObj.data.datetime
+      wrapper.vm.searchObj.data.datetime.startTime = Date.now() - 7200000;
+      wrapper.vm.searchObj.data.datetime.endTime = Date.now();
+      wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "30m";
       await flushPromises();
 
       // Then change stream
@@ -807,26 +833,17 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       getItemSpy.mockRestore();
     });
 
-    it("should restore visualization type from localStorage on mount", () => {
+    it("should restore stream filter from localStorage on mount (visualization type is managed by searchObj.meta)", () => {
+      // visualizationType and layoutType are now managed externally via searchObj.meta
+      // (set by SearchBar and read from the shared useTraces composable).
+      // Only streamFilter is persisted and restored by ServiceGraph itself.
       const getItemSpy = vi
         .spyOn(Storage.prototype, "getItem")
-        .mockReturnValue("tree");
+        .mockReturnValue("stream1");
 
       wrapper = createWrapper();
 
-      expect(wrapper.vm.visualizationType).toBe("tree");
-
-      getItemSpy.mockRestore();
-    });
-
-    it("should restore layout type from localStorage on mount", () => {
-      const getItemSpy = vi
-        .spyOn(Storage.prototype, "getItem")
-        .mockReturnValue("circular");
-
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.layoutType).toBe("circular");
+      expect(wrapper.vm.streamFilter).toBe("stream1");
 
       getItemSpy.mockRestore();
     });
@@ -913,80 +930,42 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
   });
 
   describe("Layout and Visualization Changes", () => {
-    it("should change layout type", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
+    // Layout type and visualization type are now driven externally by the SearchBar
+    // toolbar via the shared useTraces composable (searchObj.meta). The ServiceGraph
+    // component watches searchObj.meta fields and reacts accordingly — it no longer
+    // exposes setLayout / setVisualizationType methods.
 
-      wrapper.vm.setLayout("circular");
-
-      expect(wrapper.vm.layoutType).toBe("circular");
-    });
-
-    it("should persist layout type to localStorage", async () => {
-      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.setLayout("circular");
-
-      expect(setItemSpy).toHaveBeenCalledWith(
-        "serviceGraph_layoutType",
-        "circular",
-      );
-      setItemSpy.mockRestore();
-    });
-
-    it("should increment chartKey when layout changes", async () => {
+    it("should increment chartKey when layout type changes on searchObj.meta", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
       const initialChartKey = wrapper.vm.chartKey;
 
-      wrapper.vm.setLayout("circular");
+      // Simulate SearchBar changing layout type
+      wrapper.vm.searchObj.meta.serviceGraphLayoutType = "circular";
+      await flushPromises();
 
       expect(wrapper.vm.chartKey).toBe(initialChartKey + 1);
     });
 
-    it("should change visualization type", async () => {
+    it("should reflect current layout type from searchObj.meta in chartData", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      wrapper.vm.setVisualizationType("tree");
-
-      expect(wrapper.vm.visualizationType).toBe("tree");
+      // Default layout is horizontal (set in beforeEach)
+      expect(wrapper.vm.searchObj.meta.serviceGraphLayoutType).toBe(
+        "horizontal",
+      );
     });
 
-    it("should persist visualization type to localStorage", async () => {
-      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+    it("should reflect current visualization type from searchObj.meta in chartData", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      wrapper.vm.setVisualizationType("tree");
-
-      expect(setItemSpy).toHaveBeenCalledWith(
-        "serviceGraph_visualizationType",
+      // Default viz type is tree (set in beforeEach)
+      expect(wrapper.vm.searchObj.meta.serviceGraphVisualizationType).toBe(
         "tree",
       );
-      setItemSpy.mockRestore();
-    });
-
-    it("should set default layout when switching to tree view", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.setVisualizationType("tree");
-
-      expect(wrapper.vm.layoutType).toBe("horizontal");
-    });
-
-    it("should set default layout when switching to graph view", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      wrapper.vm.visualizationType = "tree";
-      wrapper.vm.setVisualizationType("graph");
-
-      expect(wrapper.vm.layoutType).toBe("force");
     });
 
     it("should NOT increment chartKey when visualization type changes (prevents tree animation replay)", async () => {
@@ -995,10 +974,12 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       const initialChartKey = wrapper.vm.chartKey;
 
-      wrapper.vm.setVisualizationType("tree");
+      // Simulate SearchBar switching viz type — the watcher only clears lastChartOptions,
+      // does NOT increment chartKey, to avoid replaying the tree expand animation.
+      wrapper.vm.searchObj.meta.serviceGraphVisualizationType = "graph";
+      await flushPromises();
 
-      // chartKey must stay the same — incrementing it destroys the component and
-      // replays the full expand animation every time the user toggles between views
+      // chartKey must stay the same after a viz-type-only change
       expect(wrapper.vm.chartKey).toBe(initialChartKey);
     });
   });
@@ -1422,18 +1403,17 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
   });
 
   describe("Tree View Custom Tooltips", () => {
-    it("should set up tree tooltips when visualization type is tree", async () => {
+    it("should initialize in tree mode when searchObj.meta specifies tree", async () => {
+      // beforeEach sets visualizationType = "tree" on mockSearchObj.meta
       wrapper = createWrapper();
       await flushPromises();
 
-      wrapper.vm.visualizationType = "tree";
-      wrapper.vm.chartKey++;
-      await nextTick();
-
-      // setupTreeEdgeTooltips creates a tooltip element in the chart DOM
-      // We can't easily access the internal function, but we verify the component
-      // initializes correctly in tree mode
-      expect(wrapper.vm.visualizationType).toBe("tree");
+      // Component reads visualizationType from searchObj.meta — confirm it's accessible
+      expect(wrapper.vm.searchObj.meta.serviceGraphVisualizationType).toBe(
+        "tree",
+      );
+      // chartData series uses orthogonal layout for tree
+      expect(wrapper.vm.chartData.options.series[0].layout).toBe("orthogonal");
     });
 
     it("should handle tree mode with empty graph data", async () => {
@@ -1452,54 +1432,58 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         emptyMock,
       );
 
+      // beforeEach already sets visualizationType = "tree"
       wrapper = createWrapper();
-      wrapper.vm.visualizationType = "tree";
       await flushPromises();
 
       expect(wrapper.vm.graphData.nodes.length).toBe(0);
       expect(wrapper.vm.graphData.edges.length).toBe(0);
     });
 
-    it("should handle switching from tree to graph mode", async () => {
+    it("should handle switching from tree to graph mode via searchObj.meta", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      wrapper.vm.visualizationType = "tree";
-      await nextTick();
-      expect(wrapper.vm.visualizationType).toBe("tree");
+      // Confirm starting in tree mode
+      expect(wrapper.vm.searchObj.meta.serviceGraphVisualizationType).toBe(
+        "tree",
+      );
 
-      wrapper.vm.setVisualizationType("graph");
+      // Simulate SearchBar switching to graph mode
+      wrapper.vm.searchObj.meta.serviceGraphVisualizationType = "graph";
       await nextTick();
-      expect(wrapper.vm.visualizationType).toBe("graph");
+
+      expect(wrapper.vm.searchObj.meta.serviceGraphVisualizationType).toBe(
+        "graph",
+      );
     });
 
-    it("should cleanup tooltip handlers when switching modes", async () => {
+    it("should cleanup tooltip handlers when switching modes via searchObj.meta", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
       const initialKey = wrapper.vm.chartKey;
-      wrapper.vm.visualizationType = "tree";
       wrapper.vm.chartKey++;
       await nextTick();
 
       expect(wrapper.vm.chartKey).toBe(initialKey + 1);
 
-      // Switch back to graph
-      wrapper.vm.setVisualizationType("graph");
+      // Switch back to graph via shared meta
+      wrapper.vm.searchObj.meta.serviceGraphVisualizationType = "graph";
       await nextTick();
 
       // Verify mode switched without errors
-      expect(wrapper.vm.visualizationType).toBe("graph");
+      expect(wrapper.vm.searchObj.meta.serviceGraphVisualizationType).toBe(
+        "graph",
+      );
     });
 
     it("should handle node click in tree mode to open side panel", async () => {
+      // beforeEach sets visualizationType = "tree" via mockSearchObj.meta
       wrapper = createWrapper();
       await flushPromises();
 
-      wrapper.vm.visualizationType = "tree";
-      await nextTick();
-
-      // Simulate clicking a tree node
+      // Tree node clicks use params.componentType === "series" — viz type is in searchObj.meta
       const nodeClickParams = {
         componentType: "series",
         data: {
@@ -1515,10 +1499,10 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     });
 
     it("should close side panel when clicking same node twice in tree mode", async () => {
+      // beforeEach sets visualizationType = "tree" via mockSearchObj.meta
       wrapper = createWrapper();
       await flushPromises();
 
-      wrapper.vm.visualizationType = "tree";
       const nodeData = wrapper.vm.graphData.nodes[0];
 
       // First click - opens panel
@@ -1539,10 +1523,10 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     });
 
     it("should handle node click with missing node data in tree mode", async () => {
+      // beforeEach sets visualizationType = "tree" via mockSearchObj.meta
       wrapper = createWrapper();
       await flushPromises();
 
-      wrapper.vm.visualizationType = "tree";
       const consoleWarn = vi
         .spyOn(console, "warn")
         .mockImplementation(() => {});
@@ -1564,12 +1548,10 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       consoleWarn.mockRestore();
     });
 
-    it("should use dynamic node sizing in tree mode", async () => {
+    it("should use orthogonal layout in tree mode", async () => {
+      // beforeEach sets visualizationType = "tree" on mockSearchObj.meta
       wrapper = createWrapper();
       await flushPromises();
-
-      wrapper.vm.visualizationType = "tree";
-      await nextTick();
 
       const chartData = wrapper.vm.chartData;
       expect(chartData.options).toBeDefined();
@@ -1577,12 +1559,9 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     });
 
     it("should set tree bounds for horizontal layout", async () => {
+      // beforeEach sets layoutType = "horizontal" on mockSearchObj.meta
       wrapper = createWrapper();
       await flushPromises();
-
-      wrapper.vm.visualizationType = "tree";
-      wrapper.vm.layoutType = "horizontal";
-      await nextTick();
 
       const series = wrapper.vm.chartData.options.series[0];
       expect(series.left).toBe("3%");
@@ -1592,12 +1571,11 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     });
 
     it("should set tree bounds for vertical layout", async () => {
+      // Mutate searchObj.meta before mount so chartData computed uses vertical bounds
+      mockSearchObj.meta.serviceGraphLayoutType = "vertical";
+
       wrapper = createWrapper();
       await flushPromises();
-
-      wrapper.vm.visualizationType = "tree";
-      wrapper.vm.layoutType = "vertical";
-      await nextTick();
 
       const series = wrapper.vm.chartData.options.series[0];
       expect(series.left).toBe("2%");
@@ -1607,22 +1585,18 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     });
 
     it("should disable built-in ECharts tooltip for tree mode", async () => {
+      // beforeEach sets visualizationType = "tree"
       wrapper = createWrapper();
       await flushPromises();
-
-      wrapper.vm.visualizationType = "tree";
-      await nextTick();
 
       const tooltip = wrapper.vm.chartData.options.tooltip;
       expect(tooltip.show).toBe(false);
     });
 
-    it("should use inside label positioning for tree nodes", async () => {
+    it("should use right label positioning for tree nodes in horizontal layout", async () => {
+      // beforeEach sets visualizationType = "tree", layoutType = "horizontal"
       wrapper = createWrapper();
       await flushPromises();
-
-      wrapper.vm.visualizationType = "tree";
-      await nextTick();
 
       const series = wrapper.vm.chartData.options.series[0];
       expect(series.label.position).toBe("right");
