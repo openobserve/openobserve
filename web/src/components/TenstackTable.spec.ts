@@ -787,7 +787,9 @@ describe("TenstackTable", () => {
       expect(rows.length).toBe(dashboardRows.length);
     });
 
-    it("should not set min-height on the table when useVirtualScroll=false", () => {
+    it("should set min-height based on totalSize when useVirtualScroll=false and showPagination=false", () => {
+      // The virtualizer mock returns count*24 for getTotalSize(). With 2 dashboard rows: 2*24=48.
+      // Default rowHeight=22 → totalSize = 48 + 22 = 70px.
       wrapper = mountTable({
         columns: dashboardColumns,
         rows: dashboardRows,
@@ -795,7 +797,7 @@ describe("TenstackTable", () => {
       });
       const table = wrapper.find('[data-test="o2-table"]');
       const style = table.attributes("style") ?? "";
-      expect(style).not.toContain("min-height");
+      expect(style).toContain("min-height: 70px");
     });
 
     it("should render column labels from Quasar column format", () => {
@@ -858,6 +860,454 @@ describe("TenstackTable", () => {
       });
       const copyBtns = wrapper.findAll(".copy-btn");
       expect(copyBtns.length).toBe(0);
+    });
+  });
+
+  // ── wrap-enabled class on wrapper ─────────────────────────────────────────
+  describe("wrap-enabled class on wrapper", () => {
+    it("should add wrap-enabled class to root when wrap=true", () => {
+      wrapper = mountTable({ wrap: true });
+      // Use combined selector: the root div has BOTH the static class and the dynamic one
+      expect(
+        wrapper.find(".my-sticky-virtscroll-table.wrap-enabled").exists(),
+      ).toBe(true);
+    });
+
+    it("should not add wrap-enabled class when wrap=false", () => {
+      wrapper = mountTable({ wrap: false });
+      expect(
+        wrapper.find(".my-sticky-virtscroll-table.wrap-enabled").exists(),
+      ).toBe(false);
+    });
+  });
+
+  // ── stickyRowTotals wrapper class ─────────────────────────────────────────
+  describe("stickyRowTotals wrapper class", () => {
+    it("should add pivot-sticky-totals class when stickyRowTotals=true", () => {
+      wrapper = mountTable({ stickyRowTotals: true });
+      expect(
+        wrapper
+          .find(".my-sticky-virtscroll-table.pivot-sticky-totals")
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("should not add pivot-sticky-totals class when stickyRowTotals=false", () => {
+      wrapper = mountTable({ stickyRowTotals: false });
+      expect(
+        wrapper
+          .find(".my-sticky-virtscroll-table.pivot-sticky-totals")
+          .exists(),
+      ).toBe(false);
+    });
+  });
+
+  // ── tbody tw:relative class ───────────────────────────────────────────────
+  describe("tbody tw:relative class", () => {
+    it("should have tw:relative on tbody when useVirtualScroll=true and showPagination=false", () => {
+      wrapper = mountTable();
+      expect(
+        wrapper.find('[data-test="o2-table-body"]').classes(),
+      ).toContain("tw:relative");
+    });
+
+    it("should not have tw:relative on tbody when useVirtualScroll=false", () => {
+      wrapper = mountTable({
+        columns: [{ name: "name", label: "NAME", field: "name" }],
+        rows: [],
+        useVirtualScroll: false,
+      });
+      expect(
+        wrapper.find('[data-test="o2-table-body"]').classes(),
+      ).not.toContain("tw:relative");
+    });
+
+    it("should not have tw:relative on tbody when showPagination=true", () => {
+      wrapper = mountTable({ showPagination: true });
+      expect(
+        wrapper.find('[data-test="o2-table-body"]').classes(),
+      ).not.toContain("tw:relative");
+    });
+  });
+
+  // ── pivot mode ────────────────────────────────────────────────────────────
+  describe("pivot mode", () => {
+    const pivotCols = [
+      { name: "region", label: "REGION", field: "region", _isRowField: true },
+      { name: "jan", label: "JAN", field: "jan" },
+      { name: "feb", label: "FEB", field: "feb" },
+    ];
+
+    const oneLevel = [
+      {
+        isLeaf: true,
+        cells: [
+          { label: "Jan", colspan: 1, _sortColumn: "jan" },
+          { label: "Feb", colspan: 1, _sortColumn: "feb" },
+        ],
+      },
+    ];
+
+    const twoLevels = [
+      {
+        isLeaf: false,
+        cells: [{ label: "H1", colspan: 2, hasBorder: true }],
+      },
+      {
+        isLeaf: true,
+        cells: [
+          { label: "Jan", colspan: 1, _sortColumn: "jan" },
+          { label: "Feb", colspan: 1, _sortColumn: "feb" },
+        ],
+      },
+    ];
+
+    it("should render pivot-thead when pivotHeaderLevels is non-empty", () => {
+      wrapper = mountTable({
+        columns: pivotCols,
+        rows: [],
+        useVirtualScroll: false,
+        pivotHeaderLevels: oneLevel,
+      });
+      expect(wrapper.find("thead.pivot-thead").exists()).toBe(true);
+    });
+
+    it("should not render standard o2-table-th-* headers in pivot mode", () => {
+      wrapper = mountTable({
+        columns: pivotCols,
+        rows: [],
+        useVirtualScroll: false,
+        pivotHeaderLevels: oneLevel,
+      });
+      expect(wrapper.find('[data-test="o2-table-th-region"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("should render pivot value headers for leaf levels", () => {
+      wrapper = mountTable({
+        columns: pivotCols,
+        rows: [],
+        useVirtualScroll: false,
+        pivotHeaderLevels: oneLevel,
+      });
+      const valueHeaders = wrapper.findAll(".pivot-value-header");
+      expect(valueHeaders.length).toBe(2);
+      expect(wrapper.text()).toContain("Jan");
+      expect(wrapper.text()).toContain("Feb");
+    });
+
+    it("should render pivot group headers for non-leaf levels", () => {
+      wrapper = mountTable({
+        columns: pivotCols,
+        rows: [],
+        useVirtualScroll: false,
+        pivotHeaderLevels: twoLevels,
+      });
+      expect(wrapper.text()).toContain("H1");
+      const groupHeaders = wrapper.findAll(".pivot-group-header");
+      expect(groupHeaders.length).toBeGreaterThan(0);
+    });
+
+    it("should render the row-field column label inside pivot-thead", () => {
+      wrapper = mountTable({
+        columns: pivotCols,
+        rows: [],
+        useVirtualScroll: false,
+        pivotHeaderLevels: oneLevel,
+      });
+      expect(wrapper.text()).toContain("REGION");
+    });
+
+    it("should apply border-collapse:separate to the table in pivot mode", () => {
+      wrapper = mountTable({
+        columns: pivotCols,
+        rows: [],
+        useVirtualScroll: false,
+        pivotHeaderLevels: oneLevel,
+      });
+      const style = wrapper.find('[data-test="o2-table"]').attributes("style") ?? "";
+      expect(style).toContain("border-collapse: separate");
+    });
+
+    it("should apply pivot-section-border to a cell with hasBorder=true", () => {
+      const levelsWithBorder = [
+        {
+          isLeaf: true,
+          cells: [{ label: "Q1", colspan: 1, hasBorder: true }],
+        },
+      ];
+      wrapper = mountTable({
+        columns: pivotCols,
+        rows: [],
+        useVirtualScroll: false,
+        pivotHeaderLevels: levelsWithBorder,
+        stickyColTotals: false,
+      });
+      expect(wrapper.find(".pivot-section-border").exists()).toBe(true);
+    });
+
+    it("should apply pivot-total-col to a cell with _isTotalHeader=true when stickyColTotals=true", () => {
+      const totalLevel = [
+        {
+          isLeaf: true,
+          cells: [{ label: "Total", colspan: 1, _isTotalHeader: true }],
+        },
+      ];
+      wrapper = mountTable({
+        columns: pivotCols,
+        rows: [],
+        useVirtualScroll: false,
+        pivotHeaderLevels: totalLevel,
+        stickyColTotals: true,
+      });
+      expect(wrapper.find(".pivot-total-col").exists()).toBe(true);
+    });
+
+    it("should NOT apply pivot-section-border when _isTotalHeader=true and stickyColTotals=true", () => {
+      const totalLevel = [
+        {
+          isLeaf: true,
+          cells: [
+            { label: "Total", colspan: 1, hasBorder: true, _isTotalHeader: true },
+          ],
+        },
+      ];
+      wrapper = mountTable({
+        columns: pivotCols,
+        rows: [],
+        useVirtualScroll: false,
+        pivotHeaderLevels: totalLevel,
+        stickyColTotals: true,
+      });
+      expect(wrapper.find(".pivot-section-border").exists()).toBe(false);
+    });
+  });
+
+  // ── getCellDisplayValue (dashboard format fn) ─────────────────────────────
+  describe("getCellDisplayValue", () => {
+    it("should apply the format function to a cell value", () => {
+      const cols = [
+        {
+          name: "amount",
+          label: "AMOUNT",
+          field: "amount",
+          format: (val: any) => `$${val}`,
+        },
+      ];
+      wrapper = mountTable({
+        columns: cols,
+        rows: [{ amount: 100 }],
+        useVirtualScroll: false,
+      });
+      expect(wrapper.text()).toContain("$100");
+    });
+
+    it("should call format(null, row) for null cell values", () => {
+      const cols = [
+        {
+          name: "amount",
+          label: "AMOUNT",
+          field: "amount",
+          format: (val: any) => (val === null ? "N/A" : `$${val}`),
+        },
+      ];
+      wrapper = mountTable({
+        columns: cols,
+        rows: [{ amount: null }],
+        useVirtualScroll: false,
+      });
+      expect(wrapper.text()).toContain("N/A");
+    });
+
+    it("should render the raw value when no format function is provided", () => {
+      const cols = [{ name: "score", label: "SCORE", field: "score" }];
+      wrapper = mountTable({
+        columns: cols,
+        rows: [{ score: 42 }],
+        useVirtualScroll: false,
+      });
+      expect(wrapper.text()).toContain("42");
+    });
+  });
+
+  // ── click:dataRow emit ────────────────────────────────────────────────────
+  describe("click:dataRow emit", () => {
+    it("should emit click:dataRow with the row data when a dashboard row is clicked", async () => {
+      const cols = [{ name: "name", label: "NAME", field: "name" }];
+      wrapper = mountTable({
+        columns: cols,
+        rows: [{ name: "alpha" }],
+        useVirtualScroll: false,
+      });
+      await wrapper.find(".dashboard-data-row").trigger("click");
+      expect(wrapper.emitted("click:dataRow")).toBeTruthy();
+      const [row] = wrapper.emitted("click:dataRow")![0] as any[];
+      expect(row).toMatchObject({ name: "alpha" });
+    });
+
+    it("should include the zero-based row index in the click:dataRow payload", async () => {
+      const cols = [{ name: "name", label: "NAME", field: "name" }];
+      wrapper = mountTable({
+        columns: cols,
+        rows: [{ name: "alpha" }, { name: "beta" }],
+        useVirtualScroll: false,
+      });
+      const rows = wrapper.findAll(".dashboard-data-row");
+      await rows[1].trigger("click");
+      const [, rowIndex] = wrapper.emitted("click:dataRow")![0] as any[];
+      expect(rowIndex).toBe(1);
+    });
+  });
+
+  // ── rowClass prop ─────────────────────────────────────────────────────────
+  describe("rowClass prop", () => {
+    it("should apply the rowClass result as a CSS class on virtual scroll rows", () => {
+      wrapper = mountTable({
+        rowClass: (row: any) => (row.status === "error" ? "error-row" : ""),
+      });
+      // baseRows includes { status: "error" }
+      expect(wrapper.find(".error-row").exists()).toBe(true);
+    });
+
+    it("should not add a custom class when rowClass returns an empty string", () => {
+      wrapper = mountTable({
+        rowClass: () => "",
+      });
+      expect(wrapper.find(".error-row").exists()).toBe(false);
+    });
+  });
+
+  // ── Pagination navigation ─────────────────────────────────────────────────
+  describe("pagination navigation", () => {
+    function mountWithBottomSlot(propsOverride: Record<string, any> = {}) {
+      let slotProps: any = null;
+      const w = mountTable(
+        { showPagination: true, rowsPerPage: 1, ...propsOverride },
+        { bottom: (props: any) => { slotProps = props; return []; } },
+      );
+      return { w, getProps: () => slotProps };
+    }
+
+    it("should start on page 1", () => {
+      const { getProps } = mountWithBottomSlot();
+      expect(getProps().pagination.page).toBe(1);
+    });
+
+    it("should advance to page 2 when nextPage is called", async () => {
+      const { w, getProps } = mountWithBottomSlot();
+      wrapper = w;
+      getProps().nextPage();
+      await wrapper.vm.$nextTick();
+      expect(getProps().pagination.page).toBe(2);
+    });
+
+    it("should return to page 1 when prevPage is called on page 2", async () => {
+      const { w, getProps } = mountWithBottomSlot();
+      wrapper = w;
+      getProps().nextPage();
+      await wrapper.vm.$nextTick();
+      getProps().prevPage();
+      await wrapper.vm.$nextTick();
+      expect(getProps().pagination.page).toBe(1);
+    });
+
+    it("should not go below page 1 when prevPage is called on page 1", async () => {
+      const { w, getProps } = mountWithBottomSlot();
+      wrapper = w;
+      getProps().prevPage();
+      await wrapper.vm.$nextTick();
+      expect(getProps().pagination.page).toBe(1);
+    });
+
+    it("should jump to last page when lastPage is called", async () => {
+      const { w, getProps } = mountWithBottomSlot();
+      wrapper = w;
+      getProps().lastPage();
+      await wrapper.vm.$nextTick();
+      expect(getProps().pagination.page).toBe(baseRows.length); // 3 rows / 1 per page = 3 pages
+    });
+
+    it("should jump to first page when firstPage is called after navigating away", async () => {
+      const { w, getProps } = mountWithBottomSlot();
+      wrapper = w;
+      getProps().lastPage();
+      await wrapper.vm.$nextTick();
+      getProps().firstPage();
+      await wrapper.vm.$nextTick();
+      expect(getProps().pagination.page).toBe(1);
+    });
+
+    it("should not advance beyond the last page when nextPage is called on the last page", async () => {
+      const { w, getProps } = mountWithBottomSlot();
+      wrapper = w;
+      getProps().lastPage();
+      await wrapper.vm.$nextTick();
+      getProps().nextPage();
+      await wrapper.vm.$nextTick();
+      expect(getProps().pagination.page).toBe(baseRows.length);
+    });
+
+    it("should report isFirstPage=true on page 1", () => {
+      const { getProps } = mountWithBottomSlot({ rowsPerPage: 2 });
+      expect(getProps().isFirstPage).toBe(true);
+    });
+
+    it("should report isLastPage=true when on the final page", async () => {
+      const { w, getProps } = mountWithBottomSlot({ rowsPerPage: 2 });
+      wrapper = w;
+      // 3 rows / 2 per page = 2 pages; advance to page 2
+      getProps().nextPage();
+      await wrapper.vm.$nextTick();
+      expect(getProps().isLastPage).toBe(true);
+    });
+
+    it("should update rowsPerPage and reset to page 1 when setRowsPerPage is called", async () => {
+      const { w, getProps } = mountWithBottomSlot();
+      wrapper = w;
+      getProps().nextPage(); // go to page 2
+      await wrapper.vm.$nextTick();
+      getProps().setRowsPerPage(3);
+      await wrapper.vm.$nextTick();
+      expect(getProps().pagination.rowsPerPage).toBe(3);
+      expect(getProps().pagination.page).toBe(1);
+    });
+
+    it("should expose totalRows as the full dataset length", () => {
+      const { getProps } = mountWithBottomSlot({ rowsPerPage: 1 });
+      expect(getProps().totalRows).toBe(baseRows.length);
+    });
+  });
+
+  // ── paginationOptions ─────────────────────────────────────────────────────
+  describe("paginationOptions", () => {
+    function getOptions(rowsPerPage: number, showPagination = true) {
+      let slotProps: any = null;
+      mountTable(
+        { showPagination, rowsPerPage },
+        { bottom: (props: any) => { slotProps = props; return []; } },
+      );
+      return slotProps?.paginationOptions ?? [];
+    }
+
+    it("should include a custom rowsPerPage value not in the base list", () => {
+      expect(getOptions(75)).toContain(75);
+    });
+
+    it("should always include 0 (show all) at the end", () => {
+      const opts = getOptions(10);
+      expect(opts[opts.length - 1]).toBe(0);
+    });
+
+    it("should include standard values (10, 20, 50…)", () => {
+      const opts = getOptions(10);
+      expect(opts).toContain(10);
+      expect(opts).toContain(20);
+      expect(opts).toContain(50);
+    });
+
+    it("should return [0] when showPagination=false", () => {
+      expect(getOptions(10, false)).toEqual([0]);
     });
   });
 });
