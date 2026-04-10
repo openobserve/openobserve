@@ -49,9 +49,16 @@ export function overlayNewDataOnOldOptions(
   // JSON.parse(JSON.stringify()) strips functions — using it on the full object caused
   // y-axis formatter loss and unformatted numbers during streaming.
   const merged: any = { ...newOptions };
-  merged.series = JSON.parse(JSON.stringify(newOptions.series));
+  merged.series = newOptions.series.map((series: any) => {
+    if (Array.isArray(series?.data)) {
+      return { ...series, data: series.data.slice() };
+    }
+    return { ...series };
+  });
   if (newOptions.legend) {
-    merged.legend = JSON.parse(JSON.stringify(newOptions.legend));
+    merged.legend = Array.isArray(newOptions.legend)
+      ? newOptions.legend.map((legendItem: any) => ({ ...legendItem }))
+      : { ...newOptions.legend };
   }
 
   // Preserve the maximum yAxis nameGap seen across streaming chunks.
@@ -179,7 +186,12 @@ export function overlayNewDataOnOldOptions(
       (s: any) => s.name === oldSeries.name,
     );
     if (!existsInNew) {
-      const cloned = JSON.parse(JSON.stringify(oldSeries));
+      const cloned = {
+        ...oldSeries,
+        data: Array.isArray(oldSeries.data)
+          ? oldSeries.data.slice()
+          : oldSeries.data,
+      };
 
       // Filter old data points to the new query's time range
       if (hasValidNewRange && Array.isArray(cloned.data)) {
