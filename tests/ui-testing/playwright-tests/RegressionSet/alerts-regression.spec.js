@@ -34,7 +34,7 @@ test.describe("Alerts Regression Bugs", () => {
 
     try {
       // Navigate to base to get auth context
-      await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${getOrgIdentifier()}`);
+      await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${getOrgIdentifier() || 'default'}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
       // Ingest metrics data
@@ -264,10 +264,6 @@ test.describe("Alerts Regression Bugs", () => {
     testLogger.info('Test: Verify Group By field autocomplete (Bug #10899)');
 
     const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
-    const testValue = 75;
-    const testOperator = '>';
-
-    // First create a PromQL alert with specific values
     await page.goto(alertsUrl);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -491,7 +487,7 @@ test.describe("Alerts Regression Bugs", () => {
     const cleanupPm = new PageManager(page);
 
     try {
-      await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${getOrgIdentifier()}`);
+      await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${getOrgIdentifier() || 'default'}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
       await cleanupAlertDestination(page, cleanupPm);
