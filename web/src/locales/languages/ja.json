@@ -121,7 +121,8 @@
     "stopGenerating": "生成を停止",
     "redirectingHome": "{countdown} 秒後にホームにリダイレクト中...",
     "version": "[バージョン]",
-    "create": "作成"
+    "create": "作成",
+    "resources": "リソース"
   },
   "search": {
     "metrics": "メトリクス",
