@@ -115,7 +115,14 @@ async function verifyAuthentication(page) {
  * @param {import('@playwright/test').Page} page 
  */
 async function navigateToBase(page) {
-  const baseUrlWithOrg = `${process.env["ZO_BASE_URL"]}?org_identifier=${process.env["ORGNAME"]}`;
+  // On cloud, ZO_BASE_URL is the domain root (no /web/). The SPA lives at /web/ and only
+  // processes ?org_identifier when it is present on the /web/ path itself. Without /web/,
+  // the server redirects to /web/ and drops the query param, so the app defaults to _meta.
+  const baseUrl = process.env["ZO_BASE_URL"].replace(/\/+$/, '');
+  const webBase = isCloudEnvironment()
+    ? `${baseUrl}/web/`
+    : `${baseUrl}/`;
+  const baseUrlWithOrg = `${webBase}?org_identifier=${process.env["ORGNAME"]}`;
   testLogger.info('Navigating to base URL with org identifier', { url: baseUrlWithOrg });
 
   // Cloud with parallel workers needs a longer navigation timeout than the default 30s

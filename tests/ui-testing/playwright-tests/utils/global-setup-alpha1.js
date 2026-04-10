@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const testLogger = require('./test-logger.js');
 const logsdata = require('../../../test-data/logs_data.json');
+const dashboardChartJsonData = require('../../../test-data/dashboard_chart_json.json');
 
 /**
  * Global setup for Alpha1 cloud tests
@@ -47,7 +48,7 @@ async function globalSetup() {
     // Step 1: Navigate to alpha1 — this redirects to Dex login page
     const loginUrl = `${baseUrl}/web/`;
     testLogger.info(`[alpha1] Navigating to ${loginUrl}`);
-    await page.goto(loginUrl);
+    await page.goto(loginUrl, { timeout: 60000 });
     await page.waitForLoadState('domcontentloaded');
 
     testLogger.info(`[alpha1] Current URL: ${page.url()}`);
@@ -255,8 +256,10 @@ async function globalSetup() {
     testLogger.error(`[alpha1] Login failed. Screenshot: ${screenshotPath}`);
     testLogger.error(`[alpha1] Current URL: ${page.url()}`);
     testLogger.error(`[alpha1] Error: ${error.message}`);
-    // Clean up stale auth file on failure so it's not reused
-    if (fs.existsSync(authFile)) {
+    // Only delete stale auth file on credential/auth failures, not network timeouts.
+    // Preserving the file allows tests to reuse the last valid session on transient network issues.
+    const isNetworkTimeout = error.name === 'TimeoutError' && error.message.includes('page.goto');
+    if (!isNetworkTimeout && fs.existsSync(authFile)) {
       fs.unlinkSync(authFile);
     }
     throw error;
@@ -294,6 +297,7 @@ async function performGlobalIngestion(page) {
   const streams = [
     { name: 'e2e_automate', data: logsdata },
     { name: 'auto_playwright_stream', data: [{ level: 'info', job: 'test', log: 'test message for openobserve' }] },
+    { name: 'kubernetes', data: dashboardChartJsonData },
   ];
 
   for (const stream of streams) {
@@ -339,11 +343,12 @@ async function performGlobalIngestion(page) {
       if (streamsResult.ok) {
         const hasE2e = streamsResult.names.includes('e2e_automate');
         const hasAuto = streamsResult.names.includes('auto_playwright_stream');
-        if (hasE2e && hasAuto) {
-          testLogger.info(`[alpha1] Both streams indexed after ${Date.now() - startTime}ms`);
+        const hasKubernetes = streamsResult.names.includes('kubernetes');
+        if (hasE2e && hasAuto && hasKubernetes) {
+          testLogger.info(`[alpha1] All streams indexed after ${Date.now() - startTime}ms`);
           break;
         }
-        testLogger.debug(`[alpha1] Streams not yet indexed (e2e_automate=${hasE2e}, auto_playwright_stream=${hasAuto}), waiting...`);
+        testLogger.debug(`[alpha1] Streams not yet indexed (e2e_automate=${hasE2e}, auto_playwright_stream=${hasAuto}, kubernetes=${hasKubernetes}), waiting...`);
       } else {
         testLogger.debug(`[alpha1] Streams API returned ${streamsResult.status}, retrying...`);
       }
