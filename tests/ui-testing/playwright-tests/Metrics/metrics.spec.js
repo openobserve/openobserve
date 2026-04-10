@@ -548,4 +548,6 @@ test.describe("Metrics testcases", () => {
       }
     }
   });
+
+  // Bug #11061 test moved to RegressionSet/metrics-regression.spec.js
 });

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,6 +19,11 @@ import axios from "axios";
 import config from "../aws-exports";
 import { Notify } from "quasar";
 import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
+
+// Shared refresh state — ensures only one dex_refresh request is in-flight
+// at a time across all axios instances. All concurrent 401s wait on the same
+// Promise and retry once it resolves.
+let refreshPromise: Promise<void> | null = null;
 
 const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
@@ -70,27 +75,40 @@ const http = ({ headers } = {} as any) => {
               !error.config.url.includes("/config/dex_refresh") &&
               !error.config.url.includes("/auth/login")
             ) {
-              // Modify the request to include the refresh token
-              return instance
-                .get("/config/dex_refresh", {
-                  //headers: { Authorization: `${refreshToken}` },
-                })
-                .then((res) => {
-                  if (res.status === 200) {
-                    // Token refreshed successfully, retry the original request
-                    return instance.request(error.config);
-                  }
-                })
-                .catch((refreshError) => {
-                  instance.get("/config/logout", {}).then((res) => {
-                    store.dispatch("logout");
-                    useLocalCurrentUser("", true);
-                    useLocalUserInfo("", true);
-                    sessionStorage.clear();
-                    window.location.reload();
-                    return Promise.reject(refreshError);
+              // If no refresh is in-flight, start one. All concurrent 401s
+              // share the same Promise so only a single /config/dex_refresh
+              // request is made.
+              if (!refreshPromise) {
+                refreshPromise = instance
+                  .get("/config/dex_refresh", {})
+                  .then((res) => {
+                    if (res.status !== 200) {
+                      return Promise.reject(
+                        new Error("Refresh returned non-200"),
+                      );
+                    }
+                  })
+                  .catch((refreshError) => {
+                    return instance
+                      .get("/config/logout", {})
+                      .finally(() => {
+                        store.dispatch("logout");
+                        useLocalCurrentUser("", true);
+                        useLocalUserInfo("", true);
+                        sessionStorage.clear();
+                        window.location.reload();
+                      })
+                      .then(() => Promise.reject(refreshError));
+                  })
+                  .finally(() => {
+                    refreshPromise = null;
                   });
-                });
+              }
+
+              // Wait for the shared refresh, then retry the original request
+              return refreshPromise.then(() =>
+                instance.request(error.config),
+              );
             } else {
               if (!error.request.responseURL.includes("/login")) {
                 store.dispatch("logout");

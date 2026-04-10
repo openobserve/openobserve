@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,12 +18,11 @@
 //! Implements wait-and-collect logic to batch multiple alerts with the same
 //! fingerprint before sending a single grouped notification.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use chrono::Utc;
 use config::{meta::alerts::alert::Alert, utils::json};
 use dashmap::DashMap;
-use once_cell::sync::Lazy;
 
 /// In-memory cache of pending alert batches
 /// Key: fingerprint, Value: PendingBatch

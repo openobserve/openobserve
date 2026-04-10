@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <RenderDashboardCharts
-        :key="currentDashboardData.data?.dashboardId"
+        :key="currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey"
         v-if="selectedDate"
         ref="renderDashboardChartsRef"
         @variablesData="variablesDataUpdated"
@@ -390,6 +390,8 @@ import {
   contextRegistry,
 } from "@/composables/contextProviders";
 import { hasPanelTime } from "@/utils/dashboard/panelTimeUtils";
+import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
+import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -604,6 +606,8 @@ export default defineComponent({
       },
       async () => {
         // When committed variables change, update the URL
+        // Skip during same-dashboard drilldown to avoid clobbering drilldown var-* params
+        if (isDrilldownInProgress.value) return;
         await nextTick();
         if (selectedDate.value && variablesManager.value) {
           updateUrlWithCurrentState();
@@ -647,7 +651,9 @@ export default defineComponent({
     });
     // ======= [START] default variable values
 
-    const initialVariableValues = { value: {} };
+    const initialVariableValues = reactive({
+      value: {} as Record<string, any>,
+    });
     Object.keys(route.query).forEach((key) => {
       if (key.startsWith("var-")) {
         const newKey = key.slice(4);
@@ -700,6 +706,16 @@ export default defineComponent({
     // Prevents updateUrlWithCurrentState() from overwriting the incoming tab ID.
     const isDashboardLoading = ref(false);
 
+    // Guard flag: true while a same-dashboard drilldown is being processed.
+    // Prevents updateUrlWithCurrentState() from clobbering drilldown var-* params
+    // with stale committed variable values before the manager has been updated.
+    const isDrilldownInProgress = ref(false);
+
+    // Guard flag: true while updateUrlWithCurrentState is updating the URL.
+    // Prevents the var-* watcher from re-triggering when the app itself syncs
+    // variable params to the URL (e.g., after a normal dropdown change).
+    const isInternalUrlUpdate = ref(false);
+
     const loadDashboard = async (onlyIfRequired = false) => {
       // check if drilldown or soft-refresh request
       if (onlyIfRequired) {
@@ -709,7 +725,29 @@ export default defineComponent({
           // check for tab
           selectedTabId.value === route.query.tab
         ) {
-          return;
+          // Even for same dashboard+tab, check if var-* params changed
+          // This handles same-dashboard drilldown where variables are passed via URL
+          const urlVarParams: Record<string, any> = {};
+          Object.keys(route.query).forEach((key) => {
+            if (key.startsWith("var-")) {
+              urlVarParams[key.slice(4)] = route.query[key];
+            }
+          });
+
+          const currentVarParams: Record<string, any> = {};
+          Object.keys(initialVariableValues.value).forEach((name) => {
+            currentVarParams[name] = initialVariableValues.value[name];
+          });
+
+          const sortedStringify = (obj: Record<string, any>) =>
+            JSON.stringify(Object.fromEntries(Object.entries(obj).sort()));
+          const hasVarChanges =
+            sortedStringify(urlVarParams) !== sortedStringify(currentVarParams);
+
+          if (!hasVarChanges) {
+            return; // Truly nothing changed
+          }
+          // Fall through — variable values changed, need to re-apply
         }
       }
 
@@ -1062,12 +1100,13 @@ export default defineComponent({
       { deep: true }
     );
 
-    // Sync selectedTabId from URL changes (handles back/forward navigation)
+    // Sync selectedTabId from URL changes (handles back/forward navigation and drilldown)
     watch(
       () => route.query.tab,
       (newTabId) => {
         if (newTabId && newTabId !== selectedTabId.value) {
           selectedTabId.value = newTabId;
+          // Variable re-reading is handled by the var-* watcher below
         }
       },
     );
@@ -1087,7 +1126,74 @@ export default defineComponent({
             isDashboardLoading.value = false;
           }
         }
-      }
+      },
+    );
+
+    // Watch for var-* query param changes (handles same-dashboard drilldown)
+    // When a drilldown targets the same dashboard, only var-* params change in the URL.
+    // This watcher detects that and re-reads variable values from the URL.
+    watch(
+      () => {
+        const varParams: Record<string, any> = {};
+        Object.keys(route.query).forEach((key) => {
+          if (key.startsWith("var-")) {
+            varParams[key] = route.query[key];
+          }
+        });
+        return JSON.stringify(varParams);
+      },
+      async (newVarParamsStr, oldVarParamsStr) => {
+        if (newVarParamsStr === oldVarParamsStr) {
+          return;
+        }
+        // Skip during cross-dashboard navigation (loadDashboard handles it)
+        if (isDashboardLoading.value) {
+          return;
+        }
+
+        // Skip if this URL change was caused by updateUrlWithCurrentState (app-initiated sync)
+        // This prevents redundant loadFromUrl+commitAll when user changes a variable via dropdown
+        if (isInternalUrlUpdate.value) {
+          return;
+        }
+
+        // Set drilldown guard to prevent updateUrlWithCurrentState from clobbering
+        // the new var-* params before the manager processes them
+        try {
+          isDrilldownInProgress.value = true;
+
+          // Re-read variable values from URL into initialVariableValues
+          const newInitialVars: Record<string, any> = {};
+          Object.keys(route.query).forEach((key) => {
+            if (key.startsWith("var-")) {
+              const newKey = key.slice(4);
+              newInitialVars[newKey] = route.query[key];
+            }
+          });
+
+          // Update initialVariableValues prop
+          initialVariableValues.value = newInitialVars;
+
+          // Directly call updateInitialVariableValues on RenderDashboardCharts
+          // The emit chain from usePanelDrilldown doesn't reliably reach RenderDashboardCharts,
+          // so we call the exposed method directly via the component ref
+          if (renderDashboardChartsRef.value?.updateInitialVariableValues) {
+            await renderDashboardChartsRef.value.updateInitialVariableValues();
+          }
+
+          // Clear the drilldown guard after reactivity settles
+          await nextTick();
+          await nextTick();
+
+          // Now sync the full URL state (adds back from/to, refresh, print, etc.)
+          // The drilldown's router.push may not include all params (e.g. when passAllVariables is false),
+          // so we need updateUrlWithCurrentState to fill in the missing ones.
+          // Only runs if updateInitialVariableValues() succeeded — avoids writing stale state on error.
+          updateUrlWithCurrentState();
+        } finally {
+          isDrilldownInProgress.value = false;
+        }
+      },
     );
 
     const getPanelFromTab = (tabId: string, panelId: string) => {
@@ -1275,6 +1381,7 @@ export default defineComponent({
 
     // Helper function to update URL with current state
     const updateUrlWithCurrentState = () => {
+      isInternalUrlUpdate.value = true;
       // Build variable params - prefer manager if available, otherwise use route.query
       let variableParams: Record<string, any> = {};
 
@@ -1408,7 +1515,11 @@ export default defineComponent({
       );
 
       if (hasQueryChanged) {
-        router.replace({ query: newQuery });
+        router.replace({ query: newQuery }).finally(() => {
+          isInternalUrlUpdate.value = false;
+        });
+      } else {
+        isInternalUrlUpdate.value = false;
       }
     };
 
@@ -1421,6 +1532,7 @@ export default defineComponent({
       ],
       () => {
         if (isDashboardLoading.value) return; // skip during cross-dashboard navigation
+        if (isDrilldownInProgress.value) return; // skip during same-dashboard drilldown
         generateNewDashboardRunId();
         updateUrlWithCurrentState();
       },
@@ -1585,8 +1697,32 @@ export default defineComponent({
       document.addEventListener("fullscreenchange", onFullscreenChange);
     });
 
+    // Force remount key — bumped on AI dashboard events to force RenderDashboardCharts to remount
+    const dashboardRemountKey = ref(0);
+
+    // Listen for AI assistant dashboard mutations to auto-refresh
+    const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
+    const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
+      const currentDashboardId = route.query.dashboard as string;
+      const shouldReload = event.dashboardId === currentDashboardId;
+
+      if (shouldReload && currentDashboardId) {
+        // Clear cached dashboard data so getDashboard() fetches fresh from API
+        delete store.state.organizationData.allDashboardData[currentDashboardId];
+        await loadDashboard();
+        // Bump key to force RenderDashboardCharts to fully remount with new data
+        dashboardRemountKey.value++;
+      }
+    };
+    onMounted(() => {
+      onDashboardEvent(handleAiDashboardEvent);
+    });
+
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
+
+      // Clean up AI dashboard event listener
+      offDashboardEvent(handleAiDashboardEvent);
 
       // Clean up dashboard context provider
       contextRegistry.unregister("dashboards");
@@ -1660,6 +1796,7 @@ export default defineComponent({
 
     return {
       currentDashboardData,
+      dashboardRemountKey,
       toggleFullscreen,
       fullscreenDiv,
       isFullscreen,

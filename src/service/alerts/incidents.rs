@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Alert Incident Correlation Service (Enterprise only)
+//! Alert Incident Correlation Service
 //!
 //! Correlates fired alerts into unified incidents to reduce alert fatigue.
 
@@ -32,32 +32,239 @@ use config::{
 
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
-    correlation_key: String,
+    group_values: HashMap<String, String>,
+    key_type: config::meta::alerts::incidents::KeyType,
     service_name: String,
-    #[allow(dead_code)]
-    matched_dimensions: HashMap<String, String>,
 }
 
-/// Extract service name from dimensions using FQN priority
-/// Guarantees a service name is always returned (fallback to "unknown")
-fn extract_service_name_from_dimensions(
-    dimensions: &HashMap<String, String>,
-    fqn_priority: &[String],
-) -> String {
-    // Try each FQN priority dimension in order
-    for dim_key in fqn_priority {
-        if let Some(value) = dimensions.get(dim_key)
-            && !value.is_empty()
-        {
-            return value.clone();
+/// Result from filtered semantic extraction using distinguish_by groups
+struct FilteredSemanticResult {
+    group_values: HashMap<String, String>,
+    key_type: config::meta::alerts::incidents::KeyType,
+    matched_set_id: Option<String>, // Which identity set matched best
+}
+
+/// Combined correlation result from both Service Discovery and semantic extraction
+struct ParallelCorrelationResult {
+    service_discovery: Option<ServiceDiscoveryResult>,
+    semantic_extraction: Option<FilteredSemanticResult>,
+    final_group_values: HashMap<String, String>,
+    final_key_type: config::meta::alerts::incidents::KeyType,
+    correlation_reason: String,
+}
+
+/// Extract semantic dimensions using configured distinguish_by groups only
+/// This replaces the current fallback that uses ALL labels
+#[cfg(feature = "enterprise")]
+async fn extract_filtered_semantic_dimensions(
+    org_id: &str,
+    labels: &HashMap<String, String>,
+) -> Option<FilteredSemanticResult> {
+    use config::meta::alerts::incidents::KeyType;
+
+    // Load ServiceIdentityConfig with auto-configuration applied
+    let identity_config =
+        crate::service::db::system_settings::get_service_identity_config(org_id).await;
+
+    // Validate config has at least one set
+    if identity_config.sets.is_empty() {
+        log::debug!(
+            "[incidents] ServiceIdentityConfig for org {} has no identity sets, semantic extraction skipped",
+            org_id
+        );
+        return None;
+    }
+
+    // Load semantic groups for field mapping
+    let semantic_groups =
+        crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
+
+    // Try each identity set, pick best coverage (same as Service Discovery logic)
+    let best_set = match identity_config.resolve_best_set(labels) {
+        Some(set) => set,
+        None => {
+            log::debug!(
+                "[incidents] No identity set matches labels for org {}, semantic extraction skipped",
+                org_id
+            );
+            return None;
+        }
+    };
+
+    log::debug!(
+        "[incidents] Using identity set '{}' for semantic extraction, distinguish_by: {:?}",
+        best_set.id,
+        best_set.distinguish_by
+    );
+
+    // Extract only dimensions from distinguish_by fields of the best set
+    let mut group_values = HashMap::new();
+    for group_id in &best_set.distinguish_by {
+        if let Some(alias_group) = semantic_groups.iter().find(|g| g.id == *group_id) {
+            // Find first matching field from this semantic group
+            for field_name in &alias_group.fields {
+                if let Some(value) = labels.get(field_name)
+                    && !value.is_empty()
+                {
+                    group_values.insert(group_id.clone(), value.clone());
+                    log::debug!(
+                        "[incidents] Mapped field '{}' → '{}' = '{}'",
+                        field_name,
+                        group_id,
+                        value
+                    );
+                    break; // Take first match from this group
+                }
+            }
+        } else {
+            log::debug!(
+                "[incidents] Semantic group '{}' not found, skipping",
+                group_id
+            );
         }
     }
 
-    // Final fallback: check "service" directly
-    dimensions
-        .get("service")
-        .cloned()
-        .unwrap_or_else(|| "unknown".to_string())
+    if group_values.is_empty() {
+        log::debug!(
+            "[incidents] No dimensions extracted from configured distinguish_by groups for org {}",
+            org_id
+        );
+        return None;
+    }
+
+    log::debug!(
+        "[incidents] Filtered semantic extraction for org {} extracted dimensions: {:?}",
+        org_id,
+        group_values
+    );
+
+    Some(FilteredSemanticResult {
+        group_values,
+        key_type: KeyType::Secondary, // Lower priority than Service Discovery
+        matched_set_id: Some(best_set.id.clone()),
+    })
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn extract_filtered_semantic_dimensions(
+    _org_id: &str,
+    _labels: &HashMap<String, String>,
+) -> Option<FilteredSemanticResult> {
+    None
+}
+
+/// Execute Service Discovery and semantic extraction in parallel
+async fn correlate_parallel(
+    org_id: &str,
+    labels: &HashMap<String, String>,
+) -> ParallelCorrelationResult {
+    // Execute both approaches in parallel
+    let (sd_result, semantic_result) = tokio::join!(
+        query_service_discovery_key(org_id, labels),
+        extract_filtered_semantic_dimensions(org_id, labels)
+    );
+
+    log::debug!(
+        "[incidents] Parallel correlation results: service_discovery_success={}, semantic_extraction_success={}",
+        sd_result.is_some(),
+        semantic_result.is_some()
+    );
+
+    // Merge results using priority system
+    let (final_group_values, final_key_type, correlation_reason) =
+        merge_correlation_results(&sd_result, &semantic_result);
+
+    ParallelCorrelationResult {
+        service_discovery: sd_result,
+        semantic_extraction: semantic_result,
+        final_group_values,
+        final_key_type,
+        correlation_reason,
+    }
+}
+
+/// Merge correlation results from Service Discovery and semantic extraction using priority system
+fn merge_correlation_results(
+    sd_result: &Option<ServiceDiscoveryResult>,
+    semantic_result: &Option<FilteredSemanticResult>,
+) -> (
+    HashMap<String, String>,
+    config::meta::alerts::incidents::KeyType,
+    String,
+) {
+    use config::meta::alerts::incidents::KeyType;
+
+    match (sd_result, semantic_result) {
+        // Service Discovery success - highest priority
+        (Some(sd), _) => {
+            log::debug!(
+                "[incidents] Using Service Discovery result: service='{}', dimensions={:?}",
+                sd.service_name,
+                sd.group_values
+            );
+            (
+                sd.group_values.clone(),
+                sd.key_type,
+                "service_discovery".to_string(),
+            )
+        }
+        // Semantic extraction success - medium priority
+        (None, Some(sem)) => {
+            log::debug!(
+                "[incidents] Using filtered semantic extraction result: set='{}', dimensions={:?}",
+                sem.matched_set_id.as_deref().unwrap_or("unknown"),
+                sem.group_values
+            );
+            (
+                sem.group_values.clone(),
+                sem.key_type,
+                format!(
+                    "semantic_extraction:{}",
+                    sem.matched_set_id.as_deref().unwrap_or("unknown")
+                ),
+            )
+        }
+        // Both failed - fallback to AlertId isolation
+        (None, None) => {
+            log::debug!(
+                "[incidents] Both Service Discovery and semantic extraction failed, using AlertId fallback"
+            );
+            (
+                HashMap::new(),
+                KeyType::AlertId,
+                "alert_id_fallback".to_string(),
+            )
+        }
+    }
+}
+
+/// Extract service name from both parallel correlation results
+fn extract_service_name_parallel(
+    labels: &HashMap<String, String>,
+    sd_result: &Option<ServiceDiscoveryResult>,
+) -> String {
+    // Priority 1: Service Discovery result
+    if let Some(sd) = sd_result {
+        return sd.service_name.clone();
+    }
+
+    // Priority 2: Extract from labels using standard service field names
+    for field in ["service", "service_name", "svc", "app"] {
+        if let Some(service) = labels.get(field)
+            && !service.is_empty()
+        {
+            log::debug!(
+                "[incidents] Extracted service name from field '{}': '{}'",
+                field,
+                service
+            );
+            return service.clone();
+        }
+    }
+
+    // Priority 3: Default fallback
+    log::debug!("[incidents] No service name found in labels, using 'unknown'");
+    "unknown".to_string()
 }
 
 /// Collect the union of notification destinations from all alerts correlated to an incident.
@@ -124,11 +331,11 @@ async fn send_incident_notifications(
     let (severity, title, service_name) =
         match infra::table::alert_incidents::get(org_id, incident_id).await {
             Ok(Some(model)) => {
-                let dims: std::collections::HashMap<String, String> =
-                    serde_json::from_value(model.stable_dimensions).unwrap_or_default();
-                let svc = dims
+                let gv: std::collections::HashMap<String, String> =
+                    serde_json::from_value(model.group_values).unwrap_or_default();
+                let svc = gv
                     .get("service_name")
-                    .or_else(|| dims.get("service"))
+                    .or_else(|| gv.get("service"))
                     .cloned()
                     .unwrap_or_default();
                 let title_str = model.title.unwrap_or_default();
@@ -289,25 +496,14 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
 /// Pass an empty slice from manual test-trigger paths that send their own notification.
 ///
 /// Correlation priority:
-/// 1. Service Discovery hash - uses pre-computed correlation_key from service_streams table
-/// 2. Manual extraction - computes blake3 hash from stable dimensions
+/// 1. Service Discovery — uses labels matched by service_streams to identify service
+/// 2. Manual extraction — extracts semantic dimensions from alert labels
 pub async fn correlate_alert_to_incident(
     alert: &Alert,
     result_row: &Map<String, Value>,
     notify_rows: &[Map<String, Value>],
     triggered_at: i64,
 ) -> Result<Option<IncidentCorrelationOutcome>, anyhow::Error> {
-    // Semantic groups from system_settings — the single source of truth,
-    // configured via /settings/v2/semantic_field_groups API.
-    let semantic_groups =
-        crate::service::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
-
-    let upgrade_window_minutes =
-        match super::org_config::get_deduplication_config(&alert.org_id).await {
-            Ok(Some(config)) => config.upgrade_window_minutes,
-            _ => 30,
-        };
-
     // Extract labels from result row as HashMap
     let mut labels: HashMap<String, String> = result_row
         .iter()
@@ -326,6 +522,8 @@ pub async fn correlate_alert_to_incident(
     // Handles SQL WHERE, GUI conditions, and PromQL label matchers
     #[cfg(feature = "enterprise")]
     {
+        let semantic_groups =
+            crate::service::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
         let condition_dims =
             o2_enterprise::enterprise::alerts::sql_parser::extract_dimensions_from_alert_conditions(
                 &alert.query_condition,
@@ -355,72 +553,54 @@ pub async fn correlate_alert_to_incident(
         labels
     );
 
-    // Query Service Discovery for pre-computed correlation_key hash using correlation API
-    let stream_type_str = alert.stream_type.to_string();
-    let service_discovery_result =
-        query_service_discovery_key(&alert.org_id, &alert.stream_name, &stream_type_str, &labels)
-            .await;
+    // Execute Service Discovery and semantic extraction in parallel (non-blocking)
+    let parallel_result = correlate_parallel(&alert.org_id, &labels).await;
 
-    // Use enterprise correlation engine with actual hash (or None for fallback)
-    let mut correlation_result = o2_enterprise::enterprise::alerts::incidents::correlate_alert(
-        &labels,
-        service_discovery_result
-            .as_ref()
-            .map(|r| r.correlation_key.as_str()),
-        &semantic_groups,
-    );
+    let group_values = parallel_result.final_group_values;
+    let mut key_type = parallel_result.final_key_type;
+    let correlation_reason = parallel_result.correlation_reason;
 
-    // BUGFIX: If stable_dimensions is empty, use alert_id as correlation_key
-    // This prevents unrelated alerts from being grouped into the same incident
-    // (they would all hash to the same value for empty dimensions)
-    if correlation_result.stable_dimensions.is_empty() {
-        let alert_id = alert.get_unique_key();
+    // Extract service name using both results
+    let service_name = extract_service_name_parallel(&labels, &parallel_result.service_discovery);
+
+    // If group_values is empty, isolate by alert_id to prevent incorrect grouping
+    use config::meta::alerts::incidents::KeyType;
+    if group_values.is_empty() {
+        key_type = KeyType::AlertId;
         log::warn!(
-            "[incidents] Alert {} has no stable dimensions - using alert_id as correlation_key to prevent incorrect grouping",
+            "[incidents] Alert {} has no group_values - isolated by alert_id",
             alert.name
         );
-        correlation_result.correlation_key = format!("ALERT:{alert_id}");
     }
 
-    // Guarantee service_name extraction
-    let service_name = if let Some(ref sd_result) = service_discovery_result {
-        sd_result.service_name.clone()
-    } else {
-        // Fallback 1: Check if service_name is directly in the alert result labels
-        if let Some(svc) = labels.get("service_name") {
-            svc.clone()
-        } else if let Some(svc) = labels.get("service") {
-            svc.clone()
-        } else {
-            // Fallback 2: Extract from stable_dimensions using FQN priority
-            let fqn_priority =
-                crate::service::db::system_settings::get_fqn_priority_dimensions(&alert.org_id)
-                    .await;
-            extract_service_name_from_dimensions(
-                &correlation_result.stable_dimensions,
-                &fqn_priority,
-            )
-        }
-    };
-
+    // Enhanced logging for correlation decisions
     log::info!(
-        "[incidents] Alert {} correlation - service: {}, correlation_key: {}, stable_dimensions: {:?}",
+        "[incidents] Alert '{}' correlation result: reason={}, key_type={:?}, dimensions={:?}, service_discovery_success={}, semantic_extraction_success={}",
         alert.name,
-        service_name,
-        correlation_result.correlation_key,
-        correlation_result.stable_dimensions
+        correlation_reason,
+        key_type,
+        group_values,
+        parallel_result.service_discovery.is_some(),
+        parallel_result.semantic_extraction.is_some()
     );
 
+    if let Some(sem_result) = &parallel_result.semantic_extraction {
+        log::debug!(
+            "[incidents] Semantic extraction for alert '{}': matched_set={:?}, dimensions={:?}",
+            alert.name,
+            sem_result.matched_set_id,
+            sem_result.group_values
+        );
+    }
     // Find or create incident
     let outcome = find_or_create_incident(
         &alert.org_id,
-        &correlation_result.correlation_key,
-        &correlation_result.stable_dimensions,
+        &group_values,
+        key_type,
         alert,
         triggered_at,
-        &correlation_result.reason.to_string(),
+        &correlation_reason,
         &service_name,
-        upgrade_window_minutes,
     )
     .await?;
 
@@ -498,60 +678,56 @@ pub async fn correlate_alert_to_incident(
     Ok(Some(outcome))
 }
 
-/// Query Service Discovery for correlation_key using the correlation API
+/// Query Service Discovery for group_values using the correlation API
 ///
-/// Uses ServiceStorage::correlate() from PR #9513 for proper dimension matching
+/// Uses ServiceStorage::correlate() for proper dimension matching
 /// Returns full result including service_name for topology enrichment
 async fn query_service_discovery_key(
     org_id: &str,
-    alert_stream: &str,
-    alert_stream_type: &str,
     labels: &HashMap<String, String>,
 ) -> Option<ServiceDiscoveryResult> {
     #[cfg(feature = "enterprise")]
     {
-        // Get FQN priority and semantic groups (org-level or system defaults)
-        let fqn_priority =
-            crate::service::db::system_settings::get_fqn_priority_dimensions(org_id).await;
-
+        let identity_config = {
+            use config::meta::{correlation::ServiceIdentityConfig, system_settings::SettingScope};
+            match infra::table::system_settings::get(
+                &SettingScope::Org,
+                Some(org_id),
+                None,
+                "service_identity",
+            )
+            .await
+            {
+                Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
+                    .unwrap_or_else(|_| ServiceIdentityConfig::default_config()),
+                _ => ServiceIdentityConfig::default_config(),
+            }
+        };
         let semantic_groups =
-            crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
+            o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
 
-        // Get the updated_at timestamp for semantic_field_groups setting
-        let semantic_groups_updated_at =
-            crate::service::db::system_settings::get_semantic_field_groups_updated_at(org_id).await;
-
-        // Use the existing ServiceStorage::correlate API for proper dimension matching
-        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::correlate(
+        match o2_enterprise::enterprise::service_streams::storage::correlate(
             org_id,
-            alert_stream,
-            alert_stream_type,
             labels,
-            &fqn_priority,
+            &identity_config,
             &semantic_groups,
-            semantic_groups_updated_at,
         )
         .await
         {
             Ok(Some(response)) => {
-                // Compute correlation_key from the matched dimensions (hierarchical)
-                let (correlation_key, _key_type) =
-                    o2_enterprise::enterprise::alerts::incidents::compute_correlation_key(
-                        &response.matched_dimensions,
-                        &semantic_groups,
-                    );
-
                 log::debug!(
-                    "[incidents] Found service via correlation API: {} (correlation_key: {})",
+                    "[incidents] Found service via correlation API: {}, group_values: {:?}",
                     response.service_name,
-                    correlation_key
+                    response.matched_dimensions
                 );
 
-                // Return full result including service_name
+                // Use only the matched (distinguish_by) dimensions as group_values so that
+                // alerts for the same service but differing on unrelated labels (e.g. severity)
+                // are still merged into the same incident.
                 Some(ServiceDiscoveryResult {
-                    correlation_key,
+                    group_values: response.matched_dimensions.clone(),
+                    key_type: config::meta::alerts::incidents::KeyType::Primary,
                     service_name: response.service_name,
-                    matched_dimensions: response.matched_dimensions,
                 })
             }
             Ok(None) => {
@@ -630,350 +806,27 @@ fn spawn_topology_enrichment(
     });
 }
 
-async fn find_upgradeable_incident(
-    org_id: &str,
-    new_key_type: config::meta::alerts::incidents::KeyType,
-    new_dimensions: &HashMap<String, String>,
-    age_threshold: i64,
-) -> Result<Option<infra::table::entity::alert_incidents::Model>, anyhow::Error> {
-    use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
-
-    let candidates = infra::table::alert_incidents::find_open_incidents_filtered(
-        org_id,
-        Some(age_threshold),
-        Some(100),
-    )
-    .await?;
-
-    for candidate in candidates {
-        let existing_key_type = KeyType::classify(&candidate.correlation_key);
-        if !existing_key_type.can_upgrade_to(new_key_type) {
-            continue;
-        }
-
-        let existing_dims: HashMap<String, String> =
-            serde_json::from_value(candidate.stable_dimensions.clone()).unwrap_or_default();
-
-        let relationship = DimensionRelationship::check(&existing_dims, new_dimensions);
-
-        match relationship {
-            DimensionRelationship::NewIsSuperset
-            | DimensionRelationship::NewIsSubset
-            | DimensionRelationship::Equal => {
-                log::info!(
-                    "[incidents] Found upgradeable incident {}: {:?}",
-                    candidate.id,
-                    relationship
-                );
-                return Ok(Some(candidate));
-            }
-            _ => continue,
-        }
-    }
-
-    Ok(None)
-}
-
-/// Find an existing open incident or create a new one
+/// Create a brand new incident and set up its initial state.
 #[allow(clippy::too_many_arguments)]
-async fn find_or_create_incident(
+async fn create_new_incident(
     org_id: &str,
-    correlation_key: &str,
-    stable_dimensions: &HashMap<String, String>,
+    group_values: &HashMap<String, String>,
+    key_type: config::meta::alerts::incidents::KeyType,
     alert: &Alert,
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
-    upgrade_window_minutes: u64,
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
-    use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
-
-    // STEP 1: Exact match
-    if let Some(existing) =
-        infra::table::alert_incidents::find_open_by_correlation_key(org_id, correlation_key).await?
-    {
-        let mut current_dims: HashMap<String, String> =
-            serde_json::from_value(existing.stable_dimensions.clone()).unwrap_or_default();
-
-        let dimensions_changed =
-            merge_dimensions(&mut current_dims, stable_dimensions, &existing.id);
-
-        // add_alert_to_incident checks whether this alert_id is new to the
-        // incident and inserts the row atomically in the same transaction,
-        // avoiding the read-then-write race of a separate check.
-        let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
-            &existing.id,
-            &alert.get_unique_key(),
-            &alert.name,
-            triggered_at,
-            correlation_reason,
-        )
-        .await?;
-
-        // Record alert event (compacted)
-        if let Err(e) = infra::table::incident_events::record_alert(
-            org_id,
-            &existing.id,
-            &alert.get_unique_key(),
-            &alert.name,
-            triggered_at,
-        )
-        .await
-        {
-            log::error!(
-                "[Incidents] Failed to record alert event for incident {}: {e}",
-                existing.id
-            );
-        }
-
-        if dimensions_changed {
-            let updated = infra::table::alert_incidents::get(org_id, &existing.id)
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
-
-            infra::table::alert_incidents::update_incident_metadata(
-                org_id,
-                &existing.id,
-                updated.alert_count,
-                updated.last_alert_at,
-                Some(serde_json::to_value(&current_dims)?),
-            )
-            .await?;
-        }
-
-        #[cfg(feature = "enterprise")]
-        if o2_enterprise::enterprise::common::config::get_config()
-            .super_cluster
-            .enabled
-            && !config::get_config().common.local_mode
-            && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_add_alert(
-                org_id,
-                &existing.id,
-                &alert.get_unique_key(),
-                &alert.name,
-                triggered_at,
-                correlation_reason,
-            )
-            .await
-        {
-            log::error!("[SUPER_CLUSTER] Failed to publish incident add_alert: {e}");
-        }
-
-        spawn_topology_enrichment(
-            org_id,
-            &existing.id,
-            service_name,
-            &alert.get_unique_key(),
-            &alert.name,
-            triggered_at,
-        );
-
-        if is_new_alert_type {
-            #[cfg(feature = "enterprise")]
-            {
-                let org_id_rca = org_id.to_string();
-                let incident_id_rca = existing.id.clone();
-                let cooldown = o2_enterprise::enterprise::common::config::get_config()
-                    .incidents
-                    .reanalysis_cooldown_minutes;
-                let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
-                    .await
-                    .unwrap_or_default();
-                if !is_analysis_in_flight(&events, cooldown * 2) {
-                    // Emit Begin synchronously so the frontend sees it on the next poll
-                    let _ = infra::table::incident_events::append(
-                        &org_id_rca,
-                        &incident_id_rca,
-                        config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-                    )
-                    .await;
-                    tokio::spawn(async move {
-                        if let Err(e) = trigger_rca_for_incident(
-                            org_id_rca.clone(),
-                            incident_id_rca.clone(),
-                            true, // reanalysis — deduct credits and report usage
-                            true, // begin already emitted above
-                            "system@openobserve.ai".to_string(),
-                        )
-                        .await
-                        {
-                            log::debug!(
-                                "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
-                            );
-                        }
-                    });
-                } else {
-                    log::debug!(
-                        "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping NewAlertTypeJoined trigger"
-                    );
-                }
-            }
-            return Ok(IncidentCorrelationOutcome::NewAlertTypeJoined {
-                incident_id: existing.id,
-                service_name: service_name.to_string(),
-            });
-        } else {
-            return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
-                incident_id: existing.id,
-                service_name: service_name.to_string(),
-            });
-        }
-    }
-
-    // STEP 2: Try hierarchical upgrade with Venn diagram matching
-    let new_key_type = KeyType::classify(correlation_key);
-
-    if new_key_type != KeyType::AlertId {
-        let age_threshold = triggered_at - (upgrade_window_minutes as i64 * 60 * 1_000_000);
-
-        if let Some(upgradeable_incident) =
-            find_upgradeable_incident(org_id, new_key_type, stable_dimensions, age_threshold)
-                .await?
-        {
-            log::info!(
-                "[incidents] Upgrading incident {} with alert '{}' (correlation_key: {} → {})",
-                upgradeable_incident.id,
-                alert.name,
-                upgradeable_incident.correlation_key,
-                correlation_key
-            );
-
-            let mut existing_dims: HashMap<String, String> =
-                serde_json::from_value(upgradeable_incident.stable_dimensions.clone())
-                    .unwrap_or_default();
-
-            let relationship = DimensionRelationship::check(&existing_dims, stable_dimensions);
-            let dimensions_changed = merge_dimensions(
-                &mut existing_dims,
-                stable_dimensions,
-                &upgradeable_incident.id,
-            );
-
-            infra::table::alert_incidents::add_alert_to_incident(
-                &upgradeable_incident.id,
-                &alert.get_unique_key(),
-                &alert.name,
-                triggered_at,
-                correlation_reason,
-            )
-            .await?;
-
-            let updated = infra::table::alert_incidents::get(org_id, &upgradeable_incident.id)
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
-
-            // Upgrade correlation key if new key is stronger (NewIsSuperset)
-            // Otherwise just update dimensions if they changed
-            if matches!(relationship, DimensionRelationship::NewIsSuperset) {
-                let old_key = upgradeable_incident.correlation_key.clone();
-                infra::table::alert_incidents::upgrade_incident_correlation(
-                    org_id,
-                    &upgradeable_incident.id,
-                    correlation_key,
-                    serde_json::to_value(&existing_dims)?,
-                    updated.alert_count,
-                    updated.last_alert_at,
-                )
-                .await?;
-
-                // Record dimensions upgrade event
-                if let Err(e) = infra::table::incident_events::append(
-                    org_id,
-                    &upgradeable_incident.id,
-                    config::meta::alerts::incidents::IncidentEvent::dimensions_upgraded(
-                        old_key,
-                        correlation_key,
-                    ),
-                )
-                .await
-                {
-                    log::error!("[Incidents] Failed to record dimensions upgrade event: {e}");
-                }
-            } else if dimensions_changed {
-                infra::table::alert_incidents::update_incident_metadata(
-                    org_id,
-                    &upgradeable_incident.id,
-                    updated.alert_count,
-                    updated.last_alert_at,
-                    Some(serde_json::to_value(&existing_dims)?),
-                )
-                .await?;
-            }
-
-            spawn_topology_enrichment(
-                org_id,
-                &upgradeable_incident.id,
-                service_name,
-                &alert.get_unique_key(),
-                &alert.name,
-                triggered_at,
-            );
-
-            #[cfg(feature = "enterprise")]
-            {
-                let org_id_rca = org_id.to_string();
-                let incident_id_rca = upgradeable_incident.id.clone();
-                let cooldown = o2_enterprise::enterprise::common::config::get_config()
-                    .incidents
-                    .reanalysis_cooldown_minutes;
-                let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
-                    .await
-                    .unwrap_or_default();
-                if !is_analysis_in_flight(&events, cooldown * 2) {
-                    // Emit Begin synchronously so the frontend sees it on the next poll
-                    let _ = infra::table::incident_events::append(
-                        &org_id_rca,
-                        &incident_id_rca,
-                        config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-                    )
-                    .await;
-                    tokio::spawn(async move {
-                        if let Err(e) = trigger_rca_for_incident(
-                            org_id_rca,
-                            incident_id_rca.clone(),
-                            true, // reanalysis — deduct credits and report usage
-                            true, // begin already emitted above
-                            "system@openobserve.ai".to_string(),
-                        )
-                        .await
-                        {
-                            log::debug!(
-                                "[INCIDENTS::RCA] Reanalysis trigger failed after DimensionsUpgraded: {e}"
-                            );
-                        }
-                    });
-                } else {
-                    log::debug!(
-                        "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping DimensionsUpgraded trigger"
-                    );
-                }
-            }
-
-            return Ok(IncidentCorrelationOutcome::NewAlertTypeJoined {
-                incident_id: upgradeable_incident.id,
-                service_name: service_name.to_string(),
-            });
-        }
-    } else {
-        log::debug!(
-            "[incidents] Alert '{}' has alert_id correlation key - skipping hierarchical upgrade search",
-            alert.name
-        );
-    }
-
-    // STEP 3: Create new incident
     let severity = o2_enterprise::enterprise::alerts::incidents::determine_severity(None);
 
-    let title = o2_enterprise::enterprise::alerts::incidents::generate_title(
-        &alert.name,
-        stable_dimensions,
-    );
+    let title =
+        o2_enterprise::enterprise::alerts::incidents::generate_title(&alert.name, group_values);
 
     let incident = infra::table::alert_incidents::create(
         org_id,
-        correlation_key,
         severity,
-        serde_json::to_value(stable_dimensions)?,
+        serde_json::to_value(group_values)?,
+        &key_type.to_string(),
         triggered_at,
         Some(title.clone()),
     )
@@ -1014,15 +867,28 @@ async fn find_or_create_incident(
     }
 
     log::info!(
-        "[incidents] Created new incident {} for alert '{}' (correlation_key: {}, severity: {})",
+        "[incidents] Created new incident {} for alert '{}' (key_type: {:?}, severity: {})",
         incident.id,
         alert.name,
-        correlation_key,
+        key_type,
         severity
     );
 
-    // Usage reporting for incident creation is handled by the try_deduct
-    // quota block in correlate_alert_to_incident (paid orgs only).
+    // Report incident creation to the usage stream
+    crate::service::self_reporting::report_request_usage_stats(
+        config::meta::self_reporting::usage::RequestStats {
+            records: 1,
+            request_body: Some(serde_json::json!({"incident_id": incident.id}).to_string()),
+            ..Default::default()
+        },
+        org_id,
+        "",
+        config::meta::stream::StreamType::Metadata,
+        config::meta::self_reporting::usage::UsageType::NewIncident,
+        0,
+        triggered_at,
+    )
+    .await;
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -1031,9 +897,9 @@ async fn find_or_create_incident(
         && !config::get_config().common.local_mode
         && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_create(
             org_id,
-            correlation_key,
+            &key_type.to_string(),
             severity,
-            serde_json::to_value(stable_dimensions)?,
+            serde_json::to_value(group_values)?,
             triggered_at,
             Some(title),
         )
@@ -1052,9 +918,6 @@ async fn find_or_create_incident(
     );
 
     // Trigger immediate RCA for new incident.
-    // AIAnalysisBegin is emitted here synchronously (same DB context as init/record_alert) to
-    // avoid a race where the spawned task hits a fresh connection that can't yet see the
-    // just-committed events row and silently drops the append.
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
@@ -1080,8 +943,6 @@ async fn find_or_create_incident(
             let org_id_rca = org_id.to_string();
             let incident_id_rca = incident.id.clone();
             tokio::spawn(async move {
-                // begin_already_emitted=true: Begin was emitted synchronously above; the spawn
-                // skips the in-flight guard + cooldown check and goes straight to the agent.
                 if let Err(e) = trigger_rca_for_incident(
                     org_id_rca.clone(),
                     incident_id_rca.clone(),
@@ -1094,6 +955,15 @@ async fn find_or_create_incident(
                     log::debug!(
                         "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
                     );
+
+                    emit_analysis_failure(
+                        &org_id_rca,
+                        &incident_id_rca,
+                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident,
+                        "Background spawn failed",
+                        Some(&e),
+                    )
+                    .await;
                 }
             });
         }
@@ -1103,6 +973,276 @@ async fn find_or_create_incident(
         incident_id: incident.id,
         service_name: service_name.to_string(),
     })
+}
+
+/// Find an existing open incident or create a new one
+#[allow(clippy::too_many_arguments)]
+async fn find_or_create_incident(
+    org_id: &str,
+    group_values: &HashMap<String, String>,
+    key_type: config::meta::alerts::incidents::KeyType,
+    alert: &Alert,
+    triggered_at: i64,
+    correlation_reason: &str,
+    service_name: &str,
+) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
+    use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
+
+    // STEP 1: AlertId exact match - check for existing incident with same alert_id
+    if key_type == KeyType::AlertId {
+        let alert_id = alert.get_unique_key();
+
+        if let Some(existing) =
+            infra::table::alert_incidents::find_open_incident_by_alert_id(org_id, &alert_id).await?
+        {
+            // Found existing AlertId incident for this alert - join it
+            let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
+                &existing.id,
+                &alert_id,
+                &alert.name,
+                triggered_at,
+                correlation_reason,
+            )
+            .await?;
+
+            if let Err(e) = infra::table::incident_events::record_alert(
+                org_id,
+                &existing.id,
+                &alert_id,
+                &alert.name,
+                triggered_at,
+            )
+            .await
+            {
+                log::error!(
+                    "[Incidents] Failed to record alert event for incident {}: {e}",
+                    existing.id
+                );
+            }
+
+            spawn_topology_enrichment(
+                org_id,
+                &existing.id,
+                service_name,
+                &alert_id,
+                &alert.name,
+                triggered_at,
+            );
+
+            // AlertId incidents can't have new alert types (always same alert)
+            // but we respect the database result for consistency
+            if is_new_alert_type {
+                log::warn!(
+                    "[incidents] Unexpected new alert type for AlertId incident {}: {}",
+                    existing.id,
+                    alert_id
+                );
+            }
+
+            return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
+                incident_id: existing.id,
+                service_name: service_name.to_string(),
+            });
+        }
+    }
+
+    // STEP 2: Venn diagram match against all open incidents (for Primary/Secondary key types)
+    //
+    // Load all open incidents and check for dimension compatibility.
+    // Equal or NewIsSubset → join incident; NewIsSuperset → upgrade and join.
+    // PartialOverlap or Incompatible → skip (create new incident).
+    if key_type != KeyType::AlertId {
+        let open_incidents =
+            infra::table::alert_incidents::find_open_incidents_filtered(org_id, None, None).await?;
+
+        for existing in open_incidents {
+            let existing_key_type = KeyType::from_stored(&existing.key_type);
+
+            let existing_dims: HashMap<String, String> =
+                serde_json::from_value(existing.group_values.clone()).unwrap_or_default();
+
+            let relationship = DimensionRelationship::check(&existing_dims, group_values);
+
+            let join_incident = matches!(
+                relationship,
+                DimensionRelationship::Equal
+                    | DimensionRelationship::NewIsSubset
+                    | DimensionRelationship::NewIsSuperset
+            );
+
+            if !join_incident {
+                continue;
+            }
+
+            let mut merged_dims = existing_dims.clone();
+            let dimensions_changed = merge_dimensions(&mut merged_dims, group_values, &existing.id);
+
+            let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
+                &existing.id,
+                &alert.get_unique_key(),
+                &alert.name,
+                triggered_at,
+                correlation_reason,
+            )
+            .await?;
+
+            if let Err(e) = infra::table::incident_events::record_alert(
+                org_id,
+                &existing.id,
+                &alert.get_unique_key(),
+                &alert.name,
+                triggered_at,
+            )
+            .await
+            {
+                log::error!(
+                    "[Incidents] Failed to record alert event for incident {}: {e}",
+                    existing.id
+                );
+            }
+
+            let updated = infra::table::alert_incidents::get(org_id, &existing.id)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
+
+            if matches!(relationship, DimensionRelationship::NewIsSuperset)
+                && existing_key_type.can_upgrade_to(key_type)
+            {
+                // Upgrade group_values AND key_type
+                let old_key_type_str = existing.key_type.clone();
+                let new_key_type_str = key_type.to_string();
+                infra::table::alert_incidents::upgrade_incident_group_values(
+                    org_id,
+                    &existing.id,
+                    serde_json::to_value(&merged_dims)?,
+                    &new_key_type_str,
+                    updated.alert_count,
+                    updated.last_alert_at,
+                )
+                .await?;
+
+                if let Err(e) = infra::table::incident_events::append(
+                    org_id,
+                    &existing.id,
+                    config::meta::alerts::incidents::IncidentEvent::dimensions_upgraded(
+                        old_key_type_str,
+                        new_key_type_str,
+                    ),
+                )
+                .await
+                {
+                    log::error!("[Incidents] Failed to record dimensions upgrade event: {e}");
+                }
+            } else if dimensions_changed {
+                infra::table::alert_incidents::update_incident_metadata(
+                    org_id,
+                    &existing.id,
+                    updated.alert_count,
+                    updated.last_alert_at,
+                    Some(serde_json::to_value(&merged_dims)?),
+                    None,
+                )
+                .await?;
+            }
+
+            #[cfg(feature = "enterprise")]
+            if o2_enterprise::enterprise::common::config::get_config()
+                .super_cluster
+                .enabled
+                && !config::get_config().common.local_mode
+                && let Err(e) =
+                    o2_enterprise::enterprise::super_cluster::queue::incidents_add_alert(
+                        org_id,
+                        &existing.id,
+                        &alert.get_unique_key(),
+                        &alert.name,
+                        triggered_at,
+                        correlation_reason,
+                    )
+                    .await
+            {
+                log::error!("[SUPER_CLUSTER] Failed to publish incident add_alert: {e}");
+            }
+
+            spawn_topology_enrichment(
+                org_id,
+                &existing.id,
+                service_name,
+                &alert.get_unique_key(),
+                &alert.name,
+                triggered_at,
+            );
+
+            if is_new_alert_type {
+                #[cfg(feature = "enterprise")]
+                {
+                    let org_id_rca = org_id.to_string();
+                    let incident_id_rca = existing.id.clone();
+                    let cooldown = o2_enterprise::enterprise::common::config::get_config()
+                        .incidents
+                        .reanalysis_cooldown_minutes;
+                    let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
+                        .await
+                        .unwrap_or_default();
+                    if !is_analysis_in_flight(&events, cooldown * 2) {
+                        let _ = infra::table::incident_events::append(
+                            &org_id_rca,
+                            &incident_id_rca,
+                            config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+                        )
+                        .await;
+                        tokio::spawn(async move {
+                            if let Err(e) = trigger_rca_for_incident(
+                                org_id_rca.clone(),
+                                incident_id_rca.clone(),
+                                true,
+                                true,
+                                "system@openobserve.ai".to_string(),
+                            )
+                            .await
+                            {
+                                log::debug!(
+                                    "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
+                                );
+
+                                emit_analysis_failure(
+                                    &org_id_rca,
+                                    &incident_id_rca,
+                                    config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis,
+                                    "Reanalysis trigger failed",
+                                    Some(&e),
+                                ).await;
+                            }
+                        });
+                    } else {
+                        log::debug!(
+                            "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping NewAlertTypeJoined trigger"
+                        );
+                    }
+                }
+                return Ok(IncidentCorrelationOutcome::NewAlertTypeJoined {
+                    incident_id: existing.id,
+                    service_name: service_name.to_string(),
+                });
+            } else {
+                return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
+                    incident_id: existing.id,
+                    service_name: service_name.to_string(),
+                });
+            }
+        }
+    }
+
+    create_new_incident(
+        org_id,
+        group_values,
+        key_type,
+        alert,
+        triggered_at,
+        correlation_reason,
+        service_name,
+    )
+    .await
 }
 
 /// Get incident with its alerts for detail view
@@ -1134,27 +1274,6 @@ pub async fn get_incident_with_alerts(
             actual_count
         );
         incident_data.alert_count = actual_count;
-    }
-
-    // Fix topology node alert_counts from actual triggers
-    if let Some(ref mut topology) = incident_data.topology_context {
-        for node in &mut topology.nodes {
-            let actual_node_count = incident_alerts
-                .iter()
-                .filter(|t| t.alert_id == node.alert_id)
-                .count() as u32;
-
-            if node.alert_count != actual_node_count {
-                log::debug!(
-                    "[incidents] Topology node {} in incident {} count mismatch: stored={}, actual={}",
-                    node.alert_id,
-                    incident_id,
-                    node.alert_count,
-                    actual_node_count
-                );
-                node.alert_count = actual_node_count;
-            }
-        }
     }
 
     // Convert incident_alerts to triggers
@@ -1474,6 +1593,32 @@ fn cooldown_elapsed(
     }
 }
 
+/// Emit an AI analysis failure event for the specified incident
+#[cfg(feature = "enterprise")]
+async fn emit_analysis_failure(
+    org_id: &str,
+    incident_id: &str,
+    trigger_type: config::meta::alerts::incidents::AnalysisTriggerType,
+    reason: &str,
+    error: Option<&anyhow::Error>,
+) {
+    use config::meta::alerts::incidents::IncidentEvent;
+
+    let error_details = error.map(|e| format!("{:#}", e).chars().take(500).collect::<String>());
+
+    if let Err(e) = infra::table::incident_events::append(
+        org_id,
+        incident_id,
+        IncidentEvent::ai_analysis_failed(reason, trigger_type, error_details),
+    )
+    .await
+    {
+        log::error!(
+            "[INCIDENTS::RCA] Failed to emit AIAnalysisFailed event for {incident_id}: {e}"
+        );
+    }
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn trigger_rca_for_incident(
     org_id: String,
@@ -1489,9 +1634,9 @@ pub async fn trigger_rca_for_incident(
     // For automated/system-initiated calls, use "system@openobserve.ai".
     _user_email: String,
 ) -> Result<(), anyhow::Error> {
-    use config::{get_config, meta::alerts::incidents::IncidentTopology};
+    use config::meta::alerts::incidents::IncidentTopology;
     use o2_enterprise::enterprise::{
-        alerts::rca_agent::RcaAgentClient, common::config::get_config as get_o2_config,
+        alerts::rca_agent::get_agent_client, common::config::get_config as get_o2_config,
     };
 
     let config = get_o2_config();
@@ -1593,21 +1738,21 @@ pub async fn trigger_rca_for_incident(
         }
     }
 
-    // Create RCA agent client with root credentials
-    let zo_config = get_config();
-    let username = &zo_config.auth.root_user_email;
-    let password = &zo_config.auth.root_user_password;
+    // Create RCA agent client with SA credentials
+    let (email, token) = crate::service::organization::get_sre_agent_credentials(&org_id).await?;
+    let auth_header = crate::common::utils::auth::build_basic_auth_header(&email, &token);
 
-    let client = RcaAgentClient::new(&config.ai.agent_url, username, password)?;
+    let client =
+        get_agent_client().ok_or_else(|| anyhow::anyhow!("RCA agent client not initialized"))?;
 
     // Quick health check
-    if let Err(e) = client.health().await {
+    if let Err(e) = client.health(&auth_header).await {
         log::debug!("[INCIDENTS::RCA] Agent health check failed for immediate trigger: {e}");
         return Err(anyhow::anyhow!("RCA agent not available: {}", e));
     }
 
     // Analyze incident
-    match client.analyze_incident(&incident).await {
+    match client.analyze_incident(&incident, &auth_header).await {
         Ok(rca_result) => {
             log::info!(
                 "[INCIDENTS::RCA] RCA completed for {incident_id}: {} chars",
@@ -1650,19 +1795,43 @@ pub async fn trigger_rca_for_incident(
         }
         Err(e) => {
             log::warn!("[INCIDENTS::RCA] RCA failed for {incident_id}: {e}");
+
+            // Determine trigger type based on function context
+            let trigger_type = if reanalysis {
+                if _user_email == "system@openobserve.ai" {
+                    config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis
+                } else {
+                    config::meta::alerts::incidents::AnalysisTriggerType::Manual
+                }
+            } else {
+                config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident
+            };
+
+            emit_analysis_failure(
+                &org_id,
+                &incident_id,
+                trigger_type,
+                "RCA service call failed",
+                Some(&e),
+            )
+            .await;
+
             Err(e)
         }
     }
 }
 
-/// Convert database model to domain model with topology (fetches topology)
+/// Convert database model to domain model
 async fn model_to_incident(
     db_model: infra::table::entity::alert_incidents::Model,
 ) -> Result<Incident, anyhow::Error> {
-    let topology_context =
-        infra::table::alert_incidents::get_topology(&db_model.org_id, &db_model.id).await?;
+    // Load topology context (including RCA analysis) from database
+    let topology = infra::table::alert_incidents::get_topology(&db_model.org_id, &db_model.id)
+        .await
+        .ok()
+        .flatten();
 
-    Ok(model_to_incident_with_topology(db_model, topology_context))
+    Ok(model_to_incident_with_topology(db_model, topology))
 }
 
 /// Convert database model to domain model with pre-fetched topology
@@ -1673,11 +1842,8 @@ fn model_to_incident_with_topology(
     Incident {
         id: db_model.id,
         org_id: db_model.org_id,
-        correlation_key: db_model.correlation_key,
         status: db_model.status.parse().unwrap_or_default(),
         severity: db_model.severity.parse().unwrap_or_default(),
-        stable_dimensions: serde_json::from_value(db_model.stable_dimensions).unwrap_or_default(),
-        topology_context,
         first_alert_at: db_model.first_alert_at,
         last_alert_at: db_model.last_alert_at,
         resolved_at: db_model.resolved_at,
@@ -1686,6 +1852,9 @@ fn model_to_incident_with_topology(
         assigned_to: db_model.assigned_to,
         created_at: db_model.created_at,
         updated_at: db_model.updated_at,
+        group_values: db_model.group_values,
+        key_type: config::meta::alerts::incidents::KeyType::from_stored(&db_model.key_type),
+        topology_context,
     }
 }
 
@@ -1736,7 +1905,7 @@ pub async fn update_status(
                 // reanalysis on reopen: deduct credits and report usage;
                 // begin_already_emitted=true skips cooldown/in-flight guards
                 if let Err(e) = trigger_rca_for_incident(
-                    org_id_rca,
+                    org_id_rca.clone(),
                     incident_id_rca.clone(),
                     true, // reanalysis — deduct credits and report usage
                     true, // begin already emitted above
@@ -1745,6 +1914,15 @@ pub async fn update_status(
                 .await
                 {
                     log::debug!("[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}");
+
+                    emit_analysis_failure(
+                        &org_id_rca,
+                        &incident_id_rca,
+                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReopened,
+                        "Reanalysis after reopen failed",
+                        Some(&e),
+                    )
+                    .await;
                 }
             });
         } else {

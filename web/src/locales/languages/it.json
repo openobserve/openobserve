@@ -118,7 +118,10 @@
     "copySuccess": "Copiato negli appunti",
     "copyError": "Copia negli appunti non riuscita",
     "goBack": "Torna indietro",
-    "stopGenerating": "Smetti di generare"
+    "stopGenerating": "Smetti di generare",
+    "version": "Versione",
+    "create": "Crea",
+    "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi..."
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -376,7 +379,8 @@
     "patternNavNext": "Prossimo",
     "patternWildcardSampleValues": "Valori di esempio",
     "wildcardSampleValues": "Valori di esempio",
-    "patternZScore": "Z-score: {zScore} (frequenza media: {avgFrequency})"
+    "patternZScore": "Z-score: {zScore} (frequenza media: {avgFrequency})",
+    "createAlertFromPattern": "Crea un avviso da questo modello"
   },
   "menu": {
     "home": "Home",
@@ -1497,7 +1501,25 @@
     "vrlExtractionTooltip": "Per utilizzare i campi VRL estratti nel grafico, scrivi una funzione VRL e fai clic sul pulsante Applica. I campi verranno estratti, consentendoti di utilizzarli per creare il grafico.",
     "errorFetchingFunctions": "Errore durante il recupero delle funzioni",
     "functionAppliedSuccess": "Funzione {name} applicata correttamente.",
+    "pivotOptions": "Opzioni Pivot",
+    "pivotShowRowTotals": "Mostra i totali delle righe",
+    "pivotShowColTotals": "Mostra i totali delle colonne",
+    "pivotMissingValue": "Valore mancante",
+    "pivotMissingValueHint": "Valore mostrato per le celle senza dati",
+    "pivotShowRowTotalsTooltip": "Visualizza una riga dei totali nella parte inferiore della tabella pivot che riassume i valori di ogni colonna",
+    "pivotShowColTotalsTooltip": "Visualizza una colonna dei totali sul lato destro della tabella pivot che riassume i valori di ogni riga",
+    "pivotStickyRowTotals": "Totali di Sticky Row",
+    "pivotStickyRowTotalsTooltip": "Appunta la riga dei totali in basso in modo che rimanga visibile quando scorri verticalmente",
+    "pivotStickyColTotals": "Totali delle colonne permanenti",
+    "pivotStickyColTotalsTooltip": "Appunta la colonna dei totali sulla destra in modo che rimanga visibile quando scorri orizzontalmente",
+    "axisLabelRotate": "Etichetta Rotate",
+    "axisLabelRotateTooltipText": "Ruota il testo dell'etichetta sull'asse x di un angolo scelto (in gradi) per migliorare la leggibilità quando le etichette sono lunghe o affollate.",
+    "axisLabelTruncate": "Etichetta Truncate",
+    "axisLabelTruncateTooltipText": "Tronca le etichette dell'asse x alla larghezza specificata (in pixel).",
+    "axisLabelTooltipNotePrefix": "Nota:",
+    "axisLabelTooltipNoteText": " Questa opzione non è supportata per i campi dell'asse x delle serie temporali.",
     "configSectionGeneral": "Generale",
+    "configSectionPromqlTable": "Modalità tabella ProMQL",
     "configSectionGeographic": "Configurazione geografica",
     "configSectionLegend": "Leggenda",
     "configSectionData": "Dati",
@@ -1505,7 +1527,7 @@
     "configSectionLabels": "Etichette",
     "configSectionLineStyle": "Stile della linea",
     "configSectionTable": "Tavolo",
-    "configSectionPivotTable": "Tabella pivot",
+    "configSectionPivotTable": "Tabella Pivot",
     "configSectionValueTransformations": "Trasformazioni di valore",
     "configSectionValueTransformationsTooltip": "Migliora la leggibilità delle tabelle mappando i valori su testo e colori di sfondo personalizzati per una visualizzazione più chiara dei dati.",
     "addValueMapping": "Mappatura del valore aggiunto",
@@ -1537,6 +1559,7 @@
     "overrideConfigAddNew": "+ Aggiungi l'override del campo",
     "overrideConfigSave": "Salva",
     "configPanelSearchPlaceholder": "Configurazione della ricerca...",
+    "configPanelNoResultsFound": "Nessuna impostazione trovata per «{query}»",
     "intervalInputPlaceholder": "ad esempio, 30s, 1m, 5m, 1h",
     "placeholderAll": "TUTTI",
     "mapsMapTypeTooltip": "Tipo di mappa da visualizzare. Predefinito: «mondo»",
@@ -1547,28 +1570,7 @@
     "configSectionDrilldown": "Drilldown",
     "configSectionComparison": "Confronto",
     "configSectionMarkLines": "Segna linee",
-    "configSectionBackground": "Sfondo",
-    "configPanelNoResultsFound": "Nessuna impostazione trovata per «{query}»",
-    "pivotOptions": "Opzioni Pivot",
-    "pivotShowRowTotals": "Mostra i totali delle righe",
-    "pivotShowColTotals": "Mostra i totali delle colonne",
-    "pivotMissingValue": "Valore mancante",
-    "pivotMissingValueHint": "Valore mostrato per le celle senza dati",
-    "pivotShowRowTotalsTooltip": "Visualizza una riga dei totali nella parte inferiore della tabella pivot che riassume i valori di ogni colonna",
-    "pivotShowColTotalsTooltip": "Visualizza una colonna dei totali sul lato destro della tabella pivot che riassume i valori di ogni riga",
-    "pivotStickyRowTotals": "Totali di Sticky Row",
-    "pivotStickyRowTotalsTooltip": "Appunta la riga dei totali in basso in modo che rimanga visibile quando scorri verticalmente",
-    "pivotStickyColTotals": "Totali delle colonne permanenti",
-    "pivotStickyColTotalsTooltip": "Appunta la colonna dei totali sulla destra in modo che rimanga visibile quando scorri orizzontalmente",
-    "configSectionPromqlTable": "Modalità tabella ProMQL",
-    "axisLabelRotate": "Etichetta Rotate",
-    "axisLabelTruncate": "Etichetta Truncate",
-    "axisLabelRotateTooltip": "Ruota il testo dell'etichetta sull'asse x di un angolo scelto (in gradi) per migliorare la leggibilità quando le etichette sono lunghe o affollate. <br /><br /><strong>Nota:</strong> questa opzione non è supportata per i campi sull'asse x delle serie temporali.",
-    "axisLabelTruncateTooltip": "Tronca le etichette dell'asse x alla larghezza specificata (in pixel). <br /><br /><strong>Nota:</strong> questa opzione non è supportata per i campi sull'asse x delle serie temporali.",
-    "axisLabelRotateTooltipText": "Ruota il testo dell'etichetta sull'asse x di un angolo scelto (in gradi) per migliorare la leggibilità quando le etichette sono lunghe o affollate.",
-    "axisLabelTruncateTooltipText": "Tronca le etichette dell'asse x alla larghezza specificata (in pixel).",
-    "axisLabelTooltipNotePrefix": "Nota:",
-    "axisLabelTooltipNoteText": " Questa opzione non è supportata per i campi dell'asse x delle serie temporali."
+    "configSectionBackground": "Sfondo"
   },
   "panel": {
     "header": "Pannello",
@@ -2202,7 +2204,7 @@
     "anomalyStatus": {
       "waiting": "Aspettando",
       "training": "Allenamento",
-      "ready": "Pronto",
+      "active": "Attivo",
       "failed": "Fallito",
       "disabled": "Disabili"
     },
@@ -2213,7 +2215,9 @@
     },
     "updateAnomalyDetection": "Aggiorna il rilevamento delle anomalie:",
     "anomalyCreated": "Configurazione di rilevamento delle anomalie creata. La formazione inizierà a breve.",
-    "editJson": "Modifica avviso JSON"
+    "editJson": "Modifica avviso JSON",
+    "importedFromPattern": "Avviso precompilato dal modello di registro",
+    "importedFromAnomalyPattern": "Avviso precompilato da un modello di registro anomalo: rivedi le impostazioni di urgenza"
   },
   "alert_templates": {
     "header": "Modelli",
@@ -2673,7 +2677,12 @@
     "errorGettingResults": "Errore durante l'ottenimento dei risultati",
     "discardChangesTitle": "Ignora le modifiche",
     "deleteNodeTitle": "Elimina nodo",
-    "deleteNodeLlmEvalConfirm": "Sei sicuro di voler eliminare questo nodo di valutazione LLM?"
+    "deleteNodeLlmEvalConfirm": "Sei sicuro di voler eliminare questo nodo di valutazione LLM?",
+    "evalTemplates": "Modelli di valutazione",
+    "evaluationTemplate": "Modello di valutazione",
+    "evaluationTemplateHelp": "Seleziona un modello di valutazione che definisca i criteri e le dimensioni per il giudice LLM.",
+    "noTemplatesFound": "Nessun modello di valutazione trovato. Creane uno nella pagina Modelli di valutazione.",
+    "evalTemplatesRefreshed": "Modelli di valutazione aggiornati con successo"
   },
   "reports": {
     "header": "Rapporti",
@@ -2698,7 +2707,14 @@
     "cached": "Memorizzato nella cache",
     "cachedReport": "Report memorizzato nella cache",
     "destination": "Destinazione",
-    "scheduled": "Pianificato"
+    "scheduled": "Pianificato",
+    "reportFormat": "Formato del rapporto",
+    "reportType": "Tipo di rapporto",
+    "attachmentType": "Stile di fissaggio",
+    "dimensionWidth": "Larghezza (px)",
+    "dimensionHeight": "Altezza (px)",
+    "imagePreview": "Includi l'immagine di anteprima della dashboard in linea",
+    "customDimensions": "Dimensioni personalizzate (avanzate)"
   },
   "queries": {
     "runningQueries": "Interrogazioni in esecuzione",
@@ -2748,7 +2764,26 @@
     "spansTitle": "SI ESTENDE",
     "spansFound": "Spacchi trovati",
     "errorTraces": "Tracce di errore",
-    "errorSpans": "Spazi di errore"
+    "errorSpans": "Spazi di errore",
+    "applyPendingFilters": "Applica filtri in sospeso e Search Traces",
+    "backToTraces": "Torna a Traces",
+    "loadingTrace": "Caricamento...",
+    "traceId": "ID di tracciamento",
+    "copyTraceId": "Copia l'ID di tracciamento",
+    "viewFilters": "Visualizza filtri",
+    "reviewAndApplyFilters": "Rivedi e applica filtri a Traces",
+    "spansLabel": "ricopre",
+    "errorsLabel": "sbagli",
+    "previousMatch": "Partita precedente",
+    "nextMatch": "Prossima partita",
+    "searchInSpans": "Cerca in intervalli",
+    "spansTableView": "Visualizzazione della tabella Spans",
+    "comingSoon": "Presto in arrivo...",
+    "fetchingTrace": "Cerco la tua traccia.",
+    "traceFilters": "Filtri Trace",
+    "showTraces": "Mostra tracce",
+    "applyAndSearch": "Applica e cerca",
+    "addToTable": "Aggiungi alla tabella"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -3148,7 +3183,8 @@
     "metricsError": "Impossibile caricare le metriche",
     "metricsErrorDetails": "Si è verificato un errore durante il recupero dei dati delle metriche. Riprova.",
     "noMetricsDescription": "Nessuna metrica trovata per questa correlazione nell'intervallo di tempo selezionato.",
-    "errorRetrievingTraces": "Si è verificato un errore durante il recupero delle tracce."
+    "errorRetrievingTraces": "Si è verificato un errore durante il recupero delle tracce.",
+    "serviceGroupProtected": "Il gruppo di servizi non può essere rimosso. È possibile modificare solo i campi mappati."
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",
@@ -3244,5 +3280,40 @@
     "guideQuery": "Query SQL corrente",
     "guideQueryEncoded": "Query SQL con codifica Base64",
     "guideExampleHeader": "Esempio"
+  },
+  "evalTemplate": {
+    "header": "Modelli di valutazione",
+    "newTemplate": "Nuovo modello",
+    "editTemplate": "Modifica modello di valutazione",
+    "createTemplate": "Crea un nuovo modello di valutazione",
+    "noTemplatesFound": "Nessun modello di valutazione trovato",
+    "templateName": "Nome del modello",
+    "responseType": "Tipo di risposta",
+    "dimensions": "Dimensioni della valutazione",
+    "promptTemplate": "Modello di richiesta",
+    "statsTitle": "Statistiche dei modelli",
+    "avgQualityScore": "Punteggio medio di qualità",
+    "usageStats": "Statistiche di utilizzo",
+    "totalEvaluations": "Valutazioni totali",
+    "lastUsed": "Ultimo utilizzo",
+    "deleteTemplate": "Elimina modello",
+    "deleteConfirmation": "Sei sicuro di voler eliminare «{name}»?",
+    "loadFailed": "Caricamento dei modelli non riuscito",
+    "saveRequiredFields": "Compila tutti i campi obbligatori",
+    "updateSuccess": "Modello aggiornato con successo",
+    "createSuccess": "Modello creato con successo",
+    "updateFailed": "Aggiornamento del modello non riuscito",
+    "createFailed": "Creazione del modello non riuscita",
+    "deleteSuccess": "Modello eliminato con successo",
+    "deleteFailed": "Eliminazione del modello non riuscita",
+    "statsLoadFailed": "Caricamento delle statistiche del modello non riuscito",
+    "nameRequired": "Il nome è obbligatorio",
+    "responseTypeRequired": "Il tipo di risposta è obbligatorio",
+    "dimensionRequired": "È richiesta almeno una dimensione",
+    "contentRequired": "Il contenuto è obbligatorio",
+    "never": "Mai",
+    "typeScore": "Punteggio numerico (ad es. 0,0 - 1,0)",
+    "typeBoolean": "Binario/Pass-Fail (booleano)",
+    "typeCustom": "Testo categoriale/personalizzato"
   }
 }

@@ -212,6 +212,17 @@ pub async fn update(
 
     let email_id = email_id.trim().to_string();
 
+    // Check if this is a system service account - prefer role-based check over email pattern
+    // matching
+    if let Ok(user_record) = crate::service::db::org_users::get(&org_id, &email_id).await {
+        if user_record.role == UserRole::SreAgent {
+            return MetaHttpResponse::forbidden("System service accounts cannot be modified");
+        }
+    } else if crate::service::organization::is_system_service_account(&email_id) {
+        // Fall back to email pattern matching if user record is not found
+        return MetaHttpResponse::forbidden("System service accounts cannot be modified");
+    }
+
     let rotate_token = match query.get("rotateToken") {
         Some(s) => match s.to_lowercase().as_str() {
             "true" => true,
@@ -393,62 +404,4 @@ pub async fn delete_bulk(
         unsuccessful,
         err,
     })
-}
-
-/// GetAPIToken
-
-#[utoipa::path(
-    get,
-    path = "/{org_id}/service_accounts/{email_id}",
-    context_path = "/api",
-     tag = "ServiceAccounts",
-    operation_id = "GetServiceAccountToken",
-    summary = "Get service account API token",
-    description = "Retrieves the current API token for a specific service account. The API token is used for authenticating automated systems and applications when making API requests. \
-                   \
-                   **Security Note:** Service accounts with `allow_static_token=false` will return a masked token (***MASKED***) instead of the actual token. These accounts must use the `assume_service_account` API to obtain temporary session tokens. \
-                   \
-                   Keep tokens secure and rotate them regularly for security best practices. If the token is compromised, use the update endpoint with rotateToken=true to generate a new one.",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("email_id" = String, Path, description = "Service Account email id"),
-      ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
-        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
-    ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Get service account token", "category": "users"}))
-    )
-)]
-pub async fn get_api_token(
-    Path((org, user_id)): Path<(String, String)>,
-    Headers(_user_email): Headers<UserEmail>,
-) -> Response {
-    let config = config::get_config();
-    if !config.auth.service_account_enabled {
-        return MetaHttpResponse::forbidden("Service Accounts Not Enabled");
-    }
-
-    // Always return single token for the requested org
-    let org_id = Some(org.as_str());
-    match crate::service::organization::get_passcode(org_id, &user_id).await {
-        Ok(passcode) => (
-            StatusCode::OK,
-            Json(APIToken {
-                token: passcode.passcode,
-                user: passcode.user,
-            }),
-        )
-            .into_response(),
-        Err(e) => (
-            StatusCode::NOT_FOUND,
-            Json(MetaHttpResponse::error(StatusCode::NOT_FOUND, e)),
-        )
-            .into_response(),
-    }
 }

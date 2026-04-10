@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -54,6 +54,7 @@ export const usePanelSQLExecutor = (ctx: {
   shouldFetchAnnotations: () => boolean;
   refreshAnnotations: (start: any, end: any) => Promise<any>;
   log: (...args: any[]) => void;
+  getRegionClusterParams: () => Record<string, any>;
 }) => {
   const {
     state,
@@ -83,6 +84,7 @@ export const usePanelSQLExecutor = (ctx: {
     removeTraceId,
     shouldFetchAnnotations,
     refreshAnnotations,
+    getRegionClusterParams,
     log,
   } = ctx;
 
@@ -149,6 +151,7 @@ export const usePanelSQLExecutor = (ctx: {
               null,
             )),
           },
+          ...getRegionClusterParams(),
         },
         type: "histogram",
         isPagination: false,
@@ -359,6 +362,7 @@ export const usePanelSQLExecutor = (ctx: {
                   per_query_response: true,
                   size: -1,
                 },
+                ...getRegionClusterParams(),
               },
               type: "histogram" as const,
               isPagination: false,

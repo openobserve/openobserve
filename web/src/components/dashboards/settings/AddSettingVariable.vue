@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-item-label>
                           {{ scope.opt.name }}
                           <span
-                            v-if="scope.opt.name?.startsWith('$')"
+                            v-if="scope.opt.name?.startsWith('$') || scope.opt.name?.startsWith('{{')"
                             class="text-grey-6 text-caption"
                           >
                             (variable)
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-item-label>
                         {{ scope.opt.name }}
                         <span
-                          v-if="scope.opt.name?.startsWith('$')"
+                          v-if="scope.opt.name?.startsWith('$') || scope.opt.name?.startsWith('{{')"
                           class="text-grey-6 text-caption"
                         >
                           (variable)
@@ -1312,7 +1312,7 @@ export default defineComponent({
               // if stream type and stream is exists
               if (variableData?.query_data?.stream) {
                 // Check if stream is a variable reference (contains $)
-                const isVariableReference = variableData.query_data.stream?.includes('$');
+                const isVariableReference = variableData.query_data.stream?.includes('$') || variableData.query_data.stream?.includes('{{');
 
                 if (isVariableReference) {
                   // Don't fetch schema for variable references - field list will be empty
@@ -1339,7 +1339,7 @@ export default defineComponent({
             }
           } catch (error: any) {
             // Check if the error is for a variable reference (should be suppressed)
-            const isVariableReference = variableData?.query_data?.stream?.includes('$');
+            const isVariableReference = variableData?.query_data?.stream?.includes('$') || variableData?.query_data?.stream?.includes('{{');
 
             if (!isVariableReference) {
               // Only show error if it's NOT a variable reference
@@ -1545,6 +1545,20 @@ export default defineComponent({
           return false;
         }
 
+        // When in AddPanel mode, check for duplicate variable names client-side
+        // (dashboard settings relies on the server returning a 409 for this)
+        if (props.isFromAddPanel && props.dashboardVariablesList) {
+          const isDuplicate = props.dashboardVariablesList.some(
+            (v: any) =>
+              v.name === variableData.name &&
+              v.name !== props.variableName,
+          );
+          if (isDuplicate) {
+            showErrorNotification(`Variable with same name already exists.`);
+            return false;
+          }
+        }
+
         // check if filter has cycle
         if (await isFilterHasCycle()) {
           // filter has cycle, so show error and return
@@ -1608,7 +1622,7 @@ export default defineComponent({
 
       try {
         // Check if stream is a variable reference FIRST (contains $)
-        const isVariableReference = variableData.query_data.stream?.includes('$');
+        const isVariableReference = variableData.query_data.stream?.includes('$') || variableData.query_data.stream?.includes('{{');
 
         if (isVariableReference) {
           // Don't reset field if it already has a value (editing mode)
@@ -1643,7 +1657,7 @@ export default defineComponent({
         }
       } catch (error: any) {
         // Only show error if it's not a variable reference
-        const isVariableReference = variableData.query_data.stream?.includes('$');
+        const isVariableReference = variableData.query_data.stream?.includes('$') || variableData.query_data.stream?.includes('{{');
 
         if (!isVariableReference) {
           showErrorNotification(error ?? "Failed to get stream fields", {

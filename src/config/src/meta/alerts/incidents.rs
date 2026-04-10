@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -92,10 +92,10 @@ impl std::str::FromStr for IncidentSeverity {
 pub enum CorrelationReason {
     /// Correlation key from Service Discovery
     ServiceDiscovery,
-    /// Correlated by matching environment scope dimensions (cluster, region, namespace)
-    ScopeMatch,
-    /// Correlated by matching workload identity dimensions (service, deployment)
-    WorkloadMatch,
+    /// Correlated by matching primary dimensions (cluster, region, namespace)
+    PrimaryMatch,
+    /// Correlated by matching secondary dimensions (service, deployment)
+    SecondaryMatch,
     /// Fallback: no dimensions found, isolated by alert ID
     AlertId,
 }
@@ -104,8 +104,8 @@ impl std::fmt::Display for CorrelationReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ServiceDiscovery => write!(f, "service_discovery"),
-            Self::ScopeMatch => write!(f, "scope_match"),
-            Self::WorkloadMatch => write!(f, "workload_match"),
+            Self::PrimaryMatch => write!(f, "primary_match"),
+            Self::SecondaryMatch => write!(f, "secondary_match"),
             Self::AlertId => write!(f, "alert_id"),
         }
     }
@@ -117,8 +117,8 @@ impl TryFrom<&str> for CorrelationReason {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             "service_discovery" => Ok(Self::ServiceDiscovery),
-            "scope_match" => Ok(Self::ScopeMatch),
-            "workload_match" => Ok(Self::WorkloadMatch),
+            "primary_match" => Ok(Self::PrimaryMatch),
+            "secondary_match" => Ok(Self::SecondaryMatch),
             "alert_id" => Ok(Self::AlertId),
             unmatched => Err(format!("'{unmatched}' is not a valid CorrelationReason")),
         }
@@ -127,42 +127,35 @@ impl TryFrom<&str> for CorrelationReason {
 
 /// Classification of correlation key strength for hierarchical upgrade logic
 ///
-/// Hierarchy: AlertId (weakest) → Workload → Scope (strongest)
+/// Hierarchy: AlertId (weakest) → Secondary → Primary (strongest)
 /// Upgrades only move UP the hierarchy, never down.
-///
-/// Key format: `[KIND]:[key]` where KIND is SCOPE, WORKLOAD, SD, or ALERT.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize, ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum KeyType {
     /// Weakest: No stable dimensions found, isolated by alert ID
-    /// Format: ALERT:<alert_unique_key>
+    #[default]
     AlertId,
-    /// Medium: Correlation by workload dimensions (deployment, statefulset, service)
-    /// Format: WORKLOAD:<hash>
-    Workload,
-    /// Strongest: Correlation by scope dimensions (cluster, namespace, region, environment)
-    /// Format: SCOPE:<hash>
-    Scope,
+    Secondary,
+    Primary,
 }
 
 impl KeyType {
-    pub fn classify(correlation_key: &str) -> Self {
-        if correlation_key.starts_with("SCOPE:") || correlation_key.starts_with("SD:") {
-            Self::Scope
-        } else if correlation_key.starts_with("WORKLOAD:") {
-            Self::Workload
-        } else {
-            // ALERT: prefix or unknown format — treat as weakest
-            Self::AlertId
+    pub fn from_stored(s: &str) -> Self {
+        match s {
+            "Primary" => Self::Primary,
+            "Secondary" => Self::Secondary,
+            _ => Self::AlertId,
         }
     }
 
     pub const fn can_upgrade_to(&self, target: Self) -> bool {
         matches!(
             (self, target),
-            (Self::AlertId, Self::Workload | Self::Scope)
-                | (Self::Workload, Self::Scope | Self::Workload)
-                | (Self::Scope, Self::Scope)
+            (Self::AlertId, Self::Secondary | Self::Primary)
+                | (Self::Secondary, Self::Primary | Self::Secondary)
+                | (Self::Primary, Self::Primary)
         )
     }
 }
@@ -170,9 +163,9 @@ impl KeyType {
 impl std::fmt::Display for KeyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AlertId => write!(f, "alert_id"),
-            Self::Workload => write!(f, "workload"),
-            Self::Scope => write!(f, "scope"),
+            Self::AlertId => write!(f, "AlertId"),
+            Self::Secondary => write!(f, "Secondary"),
+            Self::Primary => write!(f, "Primary"),
         }
     }
 }
@@ -312,17 +305,9 @@ pub struct Incident {
     /// KSUID (27 chars)
     pub id: String,
     pub org_id: String,
-    /// blake3 hash of stable dimensions (64 chars)
-    pub correlation_key: String,
 
     pub status: IncidentStatus,
     pub severity: IncidentSeverity,
-
-    /// Stable dimensions used for correlation (service, namespace, cluster, environment)
-    pub stable_dimensions: HashMap<String, String>,
-    /// Service Graph topology context (populated async)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub topology_context: Option<IncidentTopology>,
 
     /// Timestamps in microseconds
     pub first_alert_at: i64,
@@ -339,6 +324,14 @@ pub struct Incident {
 
     pub created_at: i64,
     pub updated_at: i64,
+
+    #[serde(default)]
+    pub group_values: serde_json::Value,
+    #[serde(default)]
+    pub key_type: KeyType,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub topology_context: Option<IncidentTopology>,
 }
 
 /// Alert info within an incident (junction table representation)
@@ -510,6 +503,20 @@ pub struct IncidentStats {
 
 // ==================== INCIDENT EVENTS ====================
 
+/// Classification of how AI/RCA analysis was triggered
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AnalysisTriggerType {
+    /// Triggered automatically when new incident is created
+    AutomaticNewIncident,
+    /// Triggered automatically when alert is added to existing incident
+    AutomaticReanalysis,
+    /// Triggered manually by user via API
+    Manual,
+    /// Triggered automatically when incident is reopened
+    AutomaticReopened,
+}
+
 /// A single event in an incident's lifecycle timeline
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct IncidentEvent {
@@ -552,7 +559,9 @@ pub enum IncidentEventType {
     },
 
     /// Status changed to Acknowledged
-    Acknowledged { user_id: String },
+    Acknowledged {
+        user_id: String,
+    },
 
     /// Status changed to Resolved
     Resolved {
@@ -561,10 +570,15 @@ pub enum IncidentEventType {
     },
 
     /// Resolved incident reopened
-    Reopened { user_id: String, reason: String },
+    Reopened {
+        user_id: String,
+        reason: String,
+    },
 
-    /// Correlation key strength upgraded (e.g. Workload -> Scope)
-    DimensionsUpgraded { from_key: String, to_key: String },
+    DimensionsUpgraded {
+        from_key: String,
+        to_key: String,
+    },
 
     /// Incident title edited by user
     TitleChanged {
@@ -581,7 +595,10 @@ pub enum IncidentEventType {
     },
 
     /// User comment
-    Comment { user_id: String, comment: String },
+    Comment {
+        user_id: String,
+        comment: String,
+    },
 
     /// AI/RCA analysis started
     #[serde(rename = "ai_analysis_begin")]
@@ -590,6 +607,17 @@ pub enum IncidentEventType {
     /// AI/RCA analysis completed
     #[serde(rename = "ai_analysis_complete")]
     AIAnalysisComplete,
+
+    /// AI/RCA analysis failed
+    #[serde(rename = "ai_analysis_failed")]
+    AIAnalysisFailed {
+        /// Reason for the failure
+        reason: String,
+        /// Context in which the analysis was triggered
+        trigger_type: AnalysisTriggerType,
+        /// Optional error details for debugging
+        error_details: Option<String>,
+    },
 }
 
 impl IncidentEvent {
@@ -691,6 +719,18 @@ impl IncidentEvent {
 
     pub fn ai_analysis_complete() -> Self {
         Self::now(IncidentEventType::AIAnalysisComplete)
+    }
+
+    pub fn ai_analysis_failed(
+        reason: impl Into<String>,
+        trigger_type: AnalysisTriggerType,
+        error_details: Option<String>,
+    ) -> Self {
+        Self::now(IncidentEventType::AIAnalysisFailed {
+            reason: reason.into(),
+            trigger_type,
+            error_details,
+        })
     }
 
     /// Increment alert count if this is an Alert event for the given alert_id.
@@ -931,10 +971,10 @@ mod tests {
             CorrelationReason::ServiceDiscovery.to_string(),
             "service_discovery"
         );
-        assert_eq!(CorrelationReason::ScopeMatch.to_string(), "scope_match");
+        assert_eq!(CorrelationReason::PrimaryMatch.to_string(), "primary_match");
         assert_eq!(
-            CorrelationReason::WorkloadMatch.to_string(),
-            "workload_match"
+            CorrelationReason::SecondaryMatch.to_string(),
+            "secondary_match"
         );
     }
 
@@ -970,11 +1010,11 @@ mod tests {
         );
         assert_ne!(
             CorrelationReason::ServiceDiscovery,
-            CorrelationReason::ScopeMatch
+            CorrelationReason::PrimaryMatch
         );
         assert_ne!(
-            CorrelationReason::ScopeMatch,
-            CorrelationReason::WorkloadMatch
+            CorrelationReason::PrimaryMatch,
+            CorrelationReason::SecondaryMatch
         );
     }
 
@@ -1054,76 +1094,53 @@ mod tests {
     // ========== KeyType Tests ==========
 
     #[test]
-    fn test_key_type_classify_scope() {
-        let key = "SCOPE:abc123def456";
-        assert_eq!(KeyType::classify(key), KeyType::Scope);
+    fn test_key_type_from_stored() {
+        assert_eq!(KeyType::from_stored("Primary"), KeyType::Primary);
+        assert_eq!(KeyType::from_stored("Secondary"), KeyType::Secondary);
+        assert_eq!(KeyType::from_stored("AlertId"), KeyType::AlertId);
+        assert_eq!(KeyType::from_stored("unknown"), KeyType::AlertId);
     }
 
     #[test]
-    fn test_key_type_classify_workload() {
-        let key = "WORKLOAD:xyz789";
-        assert_eq!(KeyType::classify(key), KeyType::Workload);
+    fn test_key_type_can_upgrade_alert_id_to_secondary() {
+        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Secondary));
     }
 
     #[test]
-    fn test_key_type_classify_alert_id() {
-        let key = "ALERT:2QxZj9K0d6XYz8wN3sF5pL4mT7v";
-        assert_eq!(KeyType::classify(key), KeyType::AlertId);
+    fn test_key_type_can_upgrade_alert_id_to_primary() {
+        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Primary));
     }
 
     #[test]
-    fn test_key_type_classify_sd() {
-        let key = "SD:abc123def456789012345678901234567890123456789012345678901234";
-        assert_eq!(KeyType::classify(key), KeyType::Scope);
+    fn test_key_type_can_upgrade_secondary_to_primary() {
+        assert!(KeyType::Secondary.can_upgrade_to(KeyType::Primary));
     }
 
     #[test]
-    fn test_key_type_classify_unknown() {
-        // Unknown format — treat as weakest
-        let key = "some_random_string";
-        assert_eq!(KeyType::classify(key), KeyType::AlertId);
-    }
-
-    #[test]
-    fn test_key_type_can_upgrade_alert_id_to_workload() {
-        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Workload));
-    }
-
-    #[test]
-    fn test_key_type_can_upgrade_alert_id_to_scope() {
-        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Scope));
-    }
-
-    #[test]
-    fn test_key_type_can_upgrade_workload_to_scope() {
-        assert!(KeyType::Workload.can_upgrade_to(KeyType::Scope));
-    }
-
-    #[test]
-    fn test_key_type_can_upgrade_same_level_workload() {
+    fn test_key_type_can_upgrade_same_level_secondary() {
         // Same level upgrades allowed (dimension refinement)
-        assert!(KeyType::Workload.can_upgrade_to(KeyType::Workload));
+        assert!(KeyType::Secondary.can_upgrade_to(KeyType::Secondary));
     }
 
     #[test]
-    fn test_key_type_can_upgrade_same_level_scope() {
+    fn test_key_type_can_upgrade_same_level_primary() {
         // Same level upgrades allowed (dimension refinement)
-        assert!(KeyType::Scope.can_upgrade_to(KeyType::Scope));
+        assert!(KeyType::Primary.can_upgrade_to(KeyType::Primary));
     }
 
     #[test]
-    fn test_key_type_cannot_downgrade_scope_to_workload() {
-        assert!(!KeyType::Scope.can_upgrade_to(KeyType::Workload));
+    fn test_key_type_cannot_downgrade_primary_to_secondary() {
+        assert!(!KeyType::Primary.can_upgrade_to(KeyType::Secondary));
     }
 
     #[test]
-    fn test_key_type_cannot_downgrade_scope_to_alert_id() {
-        assert!(!KeyType::Scope.can_upgrade_to(KeyType::AlertId));
+    fn test_key_type_cannot_downgrade_primary_to_alert_id() {
+        assert!(!KeyType::Primary.can_upgrade_to(KeyType::AlertId));
     }
 
     #[test]
-    fn test_key_type_cannot_downgrade_workload_to_alert_id() {
-        assert!(!KeyType::Workload.can_upgrade_to(KeyType::AlertId));
+    fn test_key_type_cannot_downgrade_secondary_to_alert_id() {
+        assert!(!KeyType::Secondary.can_upgrade_to(KeyType::AlertId));
     }
 
     // ========== DimensionRelationship Tests ==========

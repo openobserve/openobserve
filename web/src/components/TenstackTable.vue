@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
             :style="{
               width: `calc(var(--header-${sanitizeCssId(header?.id)}-size) * 1px)`,
-              height: rowHeight + 'px',
+              height: rowHeight != null ? rowHeight + 'px' : undefined,
             }"
             :data-test="`o2-table-th-${header.id}`"
           >
@@ -397,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : wrap
                         ? width - 260 - 12 + 'px'
                         : 'auto',
-                  height: wrap ? 'stretch' : rowHeight + 'px',
+                  height: wrap ? 'stretch' : rowHeight != null ? rowHeight + 'px' : undefined,
                 }"
                 @mouseover="handleCellMouseOver(cell)"
                 @mouseleave="handleCellMouseLeave()"
@@ -629,8 +629,8 @@ const props = defineProps({
   /** Fixed row height in px used by the virtualizer.
    *  When set, all rows use this fixed height and dynamic measurement is disabled. */
   rowHeight: {
-    type: Number as PropType<number | undefined>,
-    default: undefined,
+    type: Number as PropType<number>,
+    default: 22,
   },
   // ── Feature flags (all default true → current logs behavior unchanged) ──
   /** Show VueDraggable column reorder in header. Default: true */
@@ -988,7 +988,9 @@ const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
 
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 
-const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+const totalSize = computed(
+  () => rowVirtualizer.value.getTotalSize() + (props.rowHeight ?? 0),
+);
 
 const setExpandedRows = () => {
   props.expandedRows.forEach((index: any) => {

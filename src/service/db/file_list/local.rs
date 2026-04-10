@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::LazyLock as Lazy;
+
 use config::meta::stream::{FileKey, FileListDeleted};
 use hashbrown::HashSet;
 use infra::errors::Result;
-use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 static PENDING_DELETE_FILES: Lazy<RwLock<HashSet<String>>> =
@@ -77,10 +78,9 @@ pub async fn filter_by_pending_delete(mut files: Vec<String>) -> Vec<String> {
 }
 
 pub async fn load_pending_delete() -> Result<()> {
-    let local_mode = config::get_config().common.local_mode;
     let files = infra::file_list::LOCAL_CACHE.list_deleted().await?;
     for file in files {
-        if ingester::is_wal_file(local_mode, &file.file) {
+        if ingester::is_wal_file(&file.file) {
             PENDING_DELETE_FILES.write().await.insert(file.file);
         }
     }

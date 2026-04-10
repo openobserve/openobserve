@@ -118,7 +118,10 @@
     "copySuccess": "Gekopieerd naar klembord",
     "copyError": "Kopiëren naar klembord is mislukt",
     "goBack": "Ga terug",
-    "stopGenerating": "Stop met genereren"
+    "stopGenerating": "Stop met genereren",
+    "version": "Versie",
+    "create": "Creëren",
+    "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden..."
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -376,7 +379,8 @@
     "patternNavNext": "Volgende",
     "patternWildcardSampleValues": "Voorbeeldwaarden",
     "wildcardSampleValues": "Voorbeeldwaarden",
-    "patternZScore": "Z-score: {zScore} (gemiddelde frequentie: {avgFrequency})"
+    "patternZScore": "Z-score: {zScore} (gemiddelde frequentie: {avgFrequency})",
+    "createAlertFromPattern": "Creëer een waarschuwing op basis van dit patroon"
   },
   "menu": {
     "home": "Home",
@@ -1497,7 +1501,25 @@
     "vrlExtractionTooltip": "Om geëxtraheerde VRL-velden in het diagram te gebruiken, schrijft u een VRL-functie en klikt u op de knop Toepassen. De velden worden geëxtraheerd, zodat u ze kunt gebruiken om de grafiek samen te stellen.",
     "errorFetchingFunctions": "Fout bij het ophalen van functies",
     "functionAppliedSuccess": "De functie {name} is succesvol toegepast.",
+    "pivotOptions": "Pivot-opties",
+    "pivotShowRowTotals": "Rijtotalen weergeven",
+    "pivotShowColTotals": "Kolomtotalen weergeven",
+    "pivotMissingValue": "Ontbrekende waarde",
+    "pivotMissingValueHint": "Getoonde waarde voor cellen zonder gegevens",
+    "pivotShowRowTotalsTooltip": "Een rij met totalen onder aan de draaitabel weergeven met een samenvatting van de waarden van elke kolom",
+    "pivotShowColTotalsTooltip": "Een kolom met totalen aan de rechterkant van de draaitabel weergeven met een samenvatting van de waarden van elke rij",
+    "pivotStickyRowTotals": "Totalen van Sticky Row",
+    "pivotStickyRowTotalsTooltip": "Zet de rij met totalen onderaan vast, zodat deze zichtbaar blijft wanneer je verticaal scrolt.",
+    "pivotStickyColTotals": "Totalen van plakkerige kolommen",
+    "pivotStickyColTotalsTooltip": "Zet de kolom met totalen aan de rechterkant vast, zodat deze zichtbaar blijft wanneer u horizontaal scrolt",
+    "axisLabelRotate": "Label roteren",
+    "axisLabelRotateTooltipText": "Roteer de labeltekst op de x-as met een gekozen hoek (in graden) om de leesbaarheid te verbeteren wanneer labels lang of vol zitten.",
+    "axisLabelTruncate": "Label Truncate",
+    "axisLabelTruncateTooltipText": "Knot labels op de x-as af tot de opgegeven breedte (in pixels).",
+    "axisLabelTooltipNotePrefix": "Opmerking:",
+    "axisLabelTooltipNoteText": " Deze optie wordt niet ondersteund voor velden met de x-as van tijdreeksen.",
     "configSectionGeneral": "Generaal",
+    "configSectionPromqlTable": "ProMQL-tabelmodus",
     "configSectionGeographic": "Geografische configuratie",
     "configSectionLegend": "Legenda",
     "configSectionData": "Gegevens",
@@ -1537,6 +1559,7 @@
     "overrideConfigAddNew": "+ Veldoverride toevoegen",
     "overrideConfigSave": "Opslaan",
     "configPanelSearchPlaceholder": "Zoekconfiguratie...",
+    "configPanelNoResultsFound": "Geen instellingen gevonden voor „{query}”",
     "intervalInputPlaceholder": "bijv. 30s, 1m, 5m, 1h",
     "placeholderAll": "ALLES",
     "mapsMapTypeTooltip": "Kaarttype om weer te geven. Standaard: „world”",
@@ -1547,28 +1570,7 @@
     "configSectionDrilldown": "Inzoomen",
     "configSectionComparison": "Vergelijking",
     "configSectionMarkLines": "Lijnen markeren",
-    "configSectionBackground": "Achtergrond",
-    "configPanelNoResultsFound": "Geen instellingen gevonden voor „{query}”",
-    "pivotOptions": "Pivot-opties",
-    "pivotShowRowTotals": "Rijtotalen weergeven",
-    "pivotShowColTotals": "Kolomtotalen weergeven",
-    "pivotMissingValue": "Ontbrekende waarde",
-    "pivotMissingValueHint": "Getoonde waarde voor cellen zonder gegevens",
-    "pivotShowRowTotalsTooltip": "Een rij met totalen onder aan de draaitabel weergeven met een samenvatting van de waarden van elke kolom",
-    "pivotShowColTotalsTooltip": "Een kolom met totalen aan de rechterkant van de draaitabel weergeven met een samenvatting van de waarden van elke rij",
-    "pivotStickyRowTotals": "Totalen van Sticky Row",
-    "pivotStickyRowTotalsTooltip": "Zet de rij met totalen onderaan vast, zodat deze zichtbaar blijft wanneer je verticaal scrolt.",
-    "pivotStickyColTotals": "Totalen van plakkerige kolommen",
-    "pivotStickyColTotalsTooltip": "Zet de kolom met totalen aan de rechterkant vast, zodat deze zichtbaar blijft wanneer u horizontaal scrolt",
-    "configSectionPromqlTable": "ProMQL-tabelmodus",
-    "axisLabelRotate": "Label roteren",
-    "axisLabelTruncate": "Label Truncate",
-    "axisLabelRotateTooltip": "Roteer de labeltekst op de x-as met een gekozen hoek (in graden) om de leesbaarheid te verbeteren wanneer labels lang of vol zitten. <br /><br /><strong>Opmerking:</strong> Deze optie wordt niet ondersteund voor velden met de x-as van tijdreeksen.",
-    "axisLabelTruncateTooltip": "Snijd labels op de x-as af tot de opgegeven breedte (in pixels). <br /><br /><strong>Opmerking:</strong> Deze optie wordt niet ondersteund voor velden met de x-as van tijdreeksen.",
-    "axisLabelRotateTooltipText": "Roteer de labeltekst op de x-as met een gekozen hoek (in graden) om de leesbaarheid te verbeteren wanneer labels lang of vol zitten.",
-    "axisLabelTruncateTooltipText": "Snijd labels op de x-as af tot de opgegeven breedte (in pixels).",
-    "axisLabelTooltipNotePrefix": "Opmerking:",
-    "axisLabelTooltipNoteText": " Deze optie wordt niet ondersteund voor velden met de x-as van tijdreeksen."
+    "configSectionBackground": "Achtergrond"
   },
   "panel": {
     "header": "Paneel",
@@ -2202,7 +2204,7 @@
     "anomalyStatus": {
       "waiting": "Wachtend",
       "training": "Opleiding",
-      "ready": "Klaar",
+      "active": "Actief",
       "failed": "Mislukt",
       "disabled": "Uitgeschakeld"
     },
@@ -2213,7 +2215,9 @@
     },
     "updateAnomalyDetection": "Anomaliedetectie bijwerken:",
     "anomalyCreated": "Configuratie voor anomaliedetectie gemaakt. De training start binnenkort.",
-    "editJson": "Waarschuwings-JSON bewerken"
+    "editJson": "Waarschuwings-JSON bewerken",
+    "importedFromPattern": "Waarschuwing vooraf ingevuld op basis van logpatroon",
+    "importedFromAnomalyPattern": "Waarschuwing vooraf ingevuld op basis van een abnormaal logpatroon — bekijk de urgentie-instellingen"
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2675,7 +2679,12 @@
     "errorGettingResults": "Fout bij het verkrijgen van resultaten",
     "discardChangesTitle": "Wijzigingen negeren",
     "deleteNodeTitle": "Knooppunt verwijderen",
-    "deleteNodeLlmEvalConfirm": "Weet u zeker dat u dit LLM-evaluatieknooppunt wilt verwijderen?"
+    "deleteNodeLlmEvalConfirm": "Weet u zeker dat u dit LLM-evaluatieknooppunt wilt verwijderen?",
+    "evalTemplates": "Evaluatiesjablonen",
+    "evaluationTemplate": "Evaluatiesjabloon",
+    "evaluationTemplateHelp": "Selecteer een evaluatiesjabloon dat de criteria en dimensies voor de LLM-jurylid definieert.",
+    "noTemplatesFound": "Geen evaluatiesjablonen gevonden. Maak er een op de pagina Evaluatiesjablonen.",
+    "evalTemplatesRefreshed": "Evaluatiesjablonen zijn succesvol vernieuwd"
   },
   "reports": {
     "header": "Rapporten",
@@ -2700,7 +2709,14 @@
     "cached": "In de cache opgeslagen",
     "cachedReport": "Rapport in cache",
     "destination": "Bestemming",
-    "scheduled": "Gepland"
+    "scheduled": "Gepland",
+    "reportFormat": "Formaat van het rapport",
+    "reportType": "Soort rapport",
+    "attachmentType": "Stijl van gehechtheid",
+    "dimensionWidth": "Breedte (px)",
+    "dimensionHeight": "Hoogte (px)",
+    "imagePreview": "Inline voorbeeldafbeelding van het dashboard toevoegen",
+    "customDimensions": "Aangepaste afmetingen (geavanceerd)"
   },
   "queries": {
     "runningQueries": "Zoekopdrachten uitvoeren",
@@ -2750,7 +2766,26 @@
     "spansTitle": "OVERSPANT",
     "spansFound": "Overspanningen gevonden",
     "errorTraces": "Foutsporen",
-    "errorSpans": "Foutspanne"
+    "errorSpans": "Foutspanne",
+    "applyPendingFilters": "Filters in behandeling en zoeksporen toepassen",
+    "backToTraces": "Terug naar Traces",
+    "loadingTrace": "Aan het laden...",
+    "traceId": "Traceer-ID",
+    "copyTraceId": "Trace-ID kopiëren",
+    "viewFilters": "Filters bekijken",
+    "reviewAndApplyFilters": "Filters bekijken en toepassen op Traces",
+    "spansLabel": "overspant",
+    "errorsLabel": "fouten",
+    "previousMatch": "Vorige wedstrijd",
+    "nextMatch": "Volgende wedstrijd",
+    "searchInSpans": "Zoek in spanen",
+    "spansTableView": "Overspant de tabelweergave",
+    "comingSoon": "Binnenkort beschikbaar...",
+    "fetchingTrace": "Je spoor ophalen.",
+    "traceFilters": "Traceerfilters",
+    "showTraces": "Sporen weergeven",
+    "applyAndSearch": "Solliciteer en zoek",
+    "addToTable": "Aan tabel toevoegen"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -3150,7 +3185,8 @@
     "metricsError": "Kan statistieken niet laden",
     "metricsErrorDetails": "Er is een fout opgetreden tijdens het ophalen van metrische gegevens. Probeer het nog eens.",
     "noMetricsDescription": "Er zijn geen statistieken gevonden voor deze correlatie in het geselecteerde tijdbereik.",
-    "errorRetrievingTraces": "Er is een fout opgetreden bij het ophalen van sporen."
+    "errorRetrievingTraces": "Er is een fout opgetreden bij het ophalen van sporen.",
+    "serviceGroupProtected": "De servicegroep kan niet worden verwijderd. U kunt alleen de toegewezen velden wijzigen."
   },
   "sreChat": {
     "emptyMessage": "Vraag me alles over je meldingen en incidenten",
@@ -3246,5 +3282,40 @@
     "guideQuery": "Huidige SQL-query",
     "guideQueryEncoded": "SQL-query met Base64-codering",
     "guideExampleHeader": "Voorbeeld"
+  },
+  "evalTemplate": {
+    "header": "Evaluatiesjablonen",
+    "newTemplate": "Nieuw sjabloon",
+    "editTemplate": "Evaluatiesjabloon bewerken",
+    "createTemplate": "Maak een nieuw evaluatiesjabloon",
+    "noTemplatesFound": "Geen evaluatiesjablonen gevonden",
+    "templateName": "Naam van de sjabloon",
+    "responseType": "Soort reactie",
+    "dimensions": "Afmetingen van de evaluatie",
+    "promptTemplate": "Prompt-sjabloon",
+    "statsTitle": "Sjabloonstatistieken",
+    "avgQualityScore": "Gemiddelde kwaliteitsscore",
+    "usageStats": "Gebruiksstatistieken",
+    "totalEvaluations": "Totaal aantal beoordelingen",
+    "lastUsed": "Laatst gebruikt",
+    "deleteTemplate": "Sjabloon verwijderen",
+    "deleteConfirmation": "Weet je zeker dat je „{name}” wilt verwijderen?",
+    "loadFailed": "Het laden van sjablonen is mislukt",
+    "saveRequiredFields": "Gelieve alle verplichte velden in te vullen",
+    "updateSuccess": "Sjabloon succesvol bijgewerkt",
+    "createSuccess": "Sjabloon succesvol aangemaakt",
+    "updateFailed": "Het bijwerken van de sjabloon is mislukt",
+    "createFailed": "Het aanmaken van een sjabloon is mislukt",
+    "deleteSuccess": "Sjabloon succesvol verwijderd",
+    "deleteFailed": "Het verwijderen van de sjabloon is mislukt",
+    "statsLoadFailed": "Het laden van sjabloonstatistieken is mislukt",
+    "nameRequired": "Naam is verplicht",
+    "responseTypeRequired": "Antwoordtype is vereist",
+    "dimensionRequired": "Er is minstens één dimensie vereist",
+    "contentRequired": "Inhoud is vereist",
+    "never": "Nooit",
+    "typeScore": "Numerieke score (bijvoorbeeld 0,0 - 1,0)",
+    "typeBoolean": "Binair/Pass-Fail (Booleaans)",
+    "typeCustom": "Categorische/aangepaste tekst"
   }
 }

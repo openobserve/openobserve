@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -105,7 +105,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     removeXYFilters,
     setFieldsBasedOnChartTypeValidation,
     isPivotMode,
-  } = usePanelFields({ dashboardPanelData, store });
+  } = usePanelFields({ dashboardPanelData, store, pageKey });
 
   const { resetAggregationFunction } = usePanelAggregation({
     dashboardPanelData,
@@ -1067,12 +1067,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     return validateRecursive(query, variables);
   };
 
-  // Extract variables from the query
+  // Extract variables from the query (supports $var, ${var}, and {{var}} syntax, with optional spaces)
   const extractVariables = (query: any) => {
-    const matches = query.match(/\$(\w+|\{\w+\})/g);
-    return matches
-      ? [...new Set(matches.map((v: any) => v.replace(/^\$|\{|\}/g, "")))]
-      : [];
+    const regex = /(?:\$(\w+|\{\s*\w+\s*\}))|(?:\{\{\s*(\w+)\s*(?::\s*[a-zA-Z]+\s*)?\}\})/g;
+    const names: string[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(query)) !== null) {
+      const varName = match[1] || match[2];
+      names.push(varName.replace(/^\{|\}$/g, "").trim());
+    }
+    return [...new Set(names)];
   };
 
   // now check if the correct stream is selected
@@ -1108,30 +1112,23 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           ].query;
 
         // replace variables with dummy values to verify query is correct or not
-        if (/\${[a-zA-Z0-9_-]+:csv}/.test(currentQuery)) {
-          currentQuery = currentQuery.replaceAll(
-            /\${[a-zA-Z0-9_-]+:csv}/g,
-            "1,2",
-          );
-        }
-        if (/\${[a-zA-Z0-9_-]+:singlequote}/.test(currentQuery)) {
-          currentQuery = currentQuery.replaceAll(
-            /\${[a-zA-Z0-9_-]+:singlequote}/g,
-            "'1','2'",
-          );
-        }
-        if (/\${[a-zA-Z0-9_-]+:doublequote}/.test(currentQuery)) {
-          currentQuery = currentQuery.replaceAll(
-            /\${[a-zA-Z0-9_-]+:doublequote}/g,
-            '"1","2"',
-          );
-        }
-        if (/\${[a-zA-Z0-9_-]+:pipe}/.test(currentQuery)) {
-          currentQuery = currentQuery.replaceAll(
-            /\${[a-zA-Z0-9_-]+:pipe}/g,
-            "1|2",
-          );
-        }
+        // Handle both ${var:format} and {{var:format}} syntaxes (with optional spaces)
+        currentQuery = currentQuery.replaceAll(
+          /(?:\$\{\s*[a-zA-Z0-9_-]+\s*:\s*csv\s*\})|(?:\{\{\s*[a-zA-Z0-9_-]+\s*:\s*csv\s*\}\})/g,
+          "1,2",
+        );
+        currentQuery = currentQuery.replaceAll(
+          /(?:\$\{\s*[a-zA-Z0-9_-]+\s*:\s*singlequote\s*\})|(?:\{\{\s*[a-zA-Z0-9_-]+\s*:\s*singlequote\s*\}\})/g,
+          "'1','2'",
+        );
+        currentQuery = currentQuery.replaceAll(
+          /(?:\$\{\s*[a-zA-Z0-9_-]+\s*:\s*doublequote\s*\})|(?:\{\{\s*[a-zA-Z0-9_-]+\s*:\s*doublequote\s*\}\})/g,
+          '"1","2"',
+        );
+        currentQuery = currentQuery.replaceAll(
+          /(?:\$\{\s*[a-zA-Z0-9_-]+\s*:\s*pipe\s*\})|(?:\{\{\s*[a-zA-Z0-9_-]+\s*:\s*pipe\s*\}\})/g,
+          "1|2",
+        );
 
         const variables = extractVariables(currentQuery); // Extract all unique variables
         const validatedQuery = validateQuery(currentQuery, variables);
@@ -1292,8 +1289,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               ? b64EncodeUnicode(query)
               : query,
             query_fn: null,
-            start_time: startISOTimestamp,
-            end_time: endISOTimestamp,
+            start_time: (Date.now() - 3600000) * 1000,
+            end_time: Date.now() * 1000,
             size: -1,
             histogram_interval: undefined,
             streaming_output: false,

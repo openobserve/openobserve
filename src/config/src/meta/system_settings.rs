@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -137,8 +137,6 @@ impl std::str::FromStr for SettingCategory {
 
 /// Well-known setting keys
 pub mod keys {
-    /// FQN priority dimensions for service correlation
-    pub const FQN_PRIORITY_DIMENSIONS: &str = "fqn_priority_dimensions";
     /// Semantic field groups for dimension extraction
     pub const SEMANTIC_FIELD_GROUPS: &str = "semantic_field_groups";
     /// UI theme preference

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 30px; margin: 0 0px; padding: 4px 12px"
               @click="onChangeSearchType(visual)"
             >
-              {{ visual }}</q-btn
+              {{ searchTypeLabels[visual] ?? visual }}</q-btn
             >
           </template>
         </div>
@@ -222,6 +222,11 @@ export default defineComponent({
 
     const selectedSearchType = ref("dashboards");
     const searchTypes = ["dashboards", "ui", "Others"]; // UI, Dashboards, Reports, Alerts, Values, Other, RUM, DerivedStream,
+    const searchTypeLabels: Record<string, string> = {
+      dashboards: "Dashboards",
+      ui: "UI",
+      Others: "Others",
+    };
 
     const runningQueryTypes = [
       { label: "User Summary", value: "summary" },
@@ -827,6 +832,7 @@ export default defineComponent({
       runningQueriesSummary,
       onChangeSearchType,
       searchTypes,
+      searchTypeLabels,
       selectedSearchType,
       filterUserQueries,
       summaryRows,

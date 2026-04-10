@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -265,12 +265,13 @@ export default defineComponent({
 
     .q-icon {
       font-size: 20px;
-      width: 28px;
+      width: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-right: 8px;
-      margin-left: 3px;
+      margin-right: 0px;
+      margin-left: 0px;
+      height: auto;
     }
   }
 

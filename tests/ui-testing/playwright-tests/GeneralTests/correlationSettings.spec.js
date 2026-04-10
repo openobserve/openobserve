@@ -6,7 +6,7 @@ const PageManager = require('../../pages/page-manager.js');
  * Correlation Settings UI Tests
  *
  * Tests for the Correlation Settings page which has 3 tabs:
- * - Service Identity: Configure FQN priority dimensions
+ * - Configuration: Configure service discovery settings
  * - Discovered Services: View discovered services and telemetry
  * - Alert Correlation: Configure deduplication settings
  *
@@ -18,7 +18,7 @@ const PageManager = require('../../pages/page-manager.js');
  *
  * Tests: 13 total (all active)
  * - P0 Navigation: 2 tests (page load, tab switching)
- * - P1 Service Identity: 2 tests (UI elements, search)
+ * - P1 Configuration: 2 tests (UI elements, search)
  * - P1 Discovered Services: 2 tests (content + refresh, loading state)
  * - P1 Alert Correlation: 7 tests (elements, interactions, cross-alert, fingerprint groups, save persistence)
  *
@@ -46,7 +46,7 @@ test.describe("Correlation Settings Tests", () => {
     test.describe("P0 - Critical Navigation Tests", () => {
         test.describe.configure({ mode: 'serial' });
 
-        test("should load page with all three tabs visible", {
+        test("should load page with all four tabs visible", {
             tag: ['@correlationSettings', '@settings', '@smoke', '@P0']
         }, async () => {
             const orgId = process.env["ORGNAME"];
@@ -57,9 +57,9 @@ test.describe("Correlation Settings Tests", () => {
             await pm.correlationSettingsPage.expectPageLoaded();
             testLogger.info('Correlation Settings page loaded successfully');
 
-            // Verify all three tabs are visible
+            // Verify all four tabs are visible
             await pm.correlationSettingsPage.expectAllTabsVisible();
-            testLogger.info('All three tabs (Service Identity, Discovered Services, Alert Correlation) are visible');
+            testLogger.info('All four tabs (Services, Configuration, Alert Correlation, Field Aliases) are visible');
         });
 
         test("should switch between all tabs successfully", {
@@ -71,24 +71,24 @@ test.describe("Correlation Settings Tests", () => {
             await pm.correlationSettingsPage.navigateToCorrelationSettings(orgId);
             await pm.correlationSettingsPage.expectPageLoaded();
 
-            // Service Identity tab should be active by default
-            testLogger.info('Verifying Service Identity tab is active by default');
-            await pm.correlationSettingsPage.expectServiceIdentityContentVisible();
+            // Services tab should be active by default
+            testLogger.info('Verifying Services tab is active by default');
+            await pm.correlationSettingsPage.expectServicesContentVisible();
 
-            // Switch to Discovered Services tab
-            testLogger.info('Switching to Discovered Services tab');
-            await pm.correlationSettingsPage.clickDiscoveredServicesTab();
-            await pm.correlationSettingsPage.expectDiscoveredServicesContentVisible();
+            // Switch to Configuration tab
+            testLogger.info('Switching to Configuration tab');
+            await pm.correlationSettingsPage.clickServiceDiscoveryTab();
+            await pm.correlationSettingsPage.expectServiceDiscoveryContentVisible();
 
             // Switch to Alert Correlation tab
             testLogger.info('Switching to Alert Correlation tab');
             await pm.correlationSettingsPage.clickAlertCorrelationTab();
             await pm.correlationSettingsPage.expectAlertCorrelationContentVisible();
 
-            // Switch back to Service Identity tab
-            testLogger.info('Switching back to Service Identity tab');
-            await pm.correlationSettingsPage.clickServiceIdentityTab();
-            await pm.correlationSettingsPage.expectServiceIdentityContentVisible();
+            // Switch back to Services tab
+            testLogger.info('Switching back to Services tab');
+            await pm.correlationSettingsPage.clickServicesTab();
+            await pm.correlationSettingsPage.expectServicesContentVisible();
 
             testLogger.info('Tab switching works correctly');
         });
@@ -97,17 +97,17 @@ test.describe("Correlation Settings Tests", () => {
     // ==================== P1 - Tab-Specific Functional Tests ====================
     // Each tab runs independently to satisfy Rule 7
 
-    test.describe("P1 - Service Identity Tab", () => {
+    test.describe("P1 - Configuration Tab", () => {
 
         test("should display all elements and support search functionality", {
-            tag: ['@correlationSettings', '@settings', '@functional', '@P1', '@serviceIdentity']
+            tag: ['@correlationSettings', '@settings', '@functional', '@P1', '@serviceDiscovery']
         }, async () => {
             const orgId = process.env["ORGNAME"];
-            testLogger.info('Testing Service Identity tab elements and search');
+            testLogger.info('Testing Configuration tab elements and search');
 
             await pm.correlationSettingsPage.navigateToCorrelationSettings(orgId);
             await pm.correlationSettingsPage.expectPageLoaded();
-            await pm.correlationSettingsPage.expectServiceIdentityContentVisible();
+            await pm.correlationSettingsPage.expectServiceDiscoveryContentVisible();
 
             // Verify all UI elements are visible
             testLogger.info('Verifying Save button visible');
@@ -139,18 +139,18 @@ test.describe("Correlation Settings Tests", () => {
             await pm.correlationSettingsPage.clearSearchAvailableDimensions();
             testLogger.info('Cleared search input');
 
-            testLogger.info('Service Identity tab - all elements visible and search works');
+            testLogger.info('Configuration tab - all elements visible and search works');
         });
 
         test("should filter available dimensions list when searching", {
-            tag: ['@correlationSettings', '@settings', '@functional', '@P1', '@serviceIdentity', '@featureTest']
+            tag: ['@correlationSettings', '@settings', '@functional', '@P1', '@serviceDiscovery', '@featureTest']
         }, async () => {
             const orgId = process.env["ORGNAME"];
             testLogger.info('Testing that search actually filters the dimensions list');
 
             await pm.correlationSettingsPage.navigateToCorrelationSettings(orgId);
             await pm.correlationSettingsPage.expectPageLoaded();
-            await pm.correlationSettingsPage.expectServiceIdentityContentVisible();
+            await pm.correlationSettingsPage.expectServiceDiscoveryContentVisible();
 
             // Get initial count of available dimensions
             testLogger.info('Getting initial count of available dimensions');
@@ -190,7 +190,7 @@ test.describe("Correlation Settings Tests", () => {
     test.describe("P1 - Discovered Services Tab", () => {
 
         test("should load tab content with refresh button", {
-            tag: ['@correlationSettings', '@settings', '@functional', '@P1', '@discoveredServices']
+            tag: ['@correlationSettings', '@settings', '@functional', '@P1', '@services']
         }, async () => {
             const orgId = process.env["ORGNAME"];
             testLogger.info('Testing Discovered Services tab');
@@ -202,7 +202,7 @@ test.describe("Correlation Settings Tests", () => {
             testLogger.info('Switching to Discovered Services tab');
             await pm.correlationSettingsPage.clickDiscoveredServicesTab();
             await pm.correlationSettingsPage.expectDiscoveredServicesLoaded();
-            await pm.correlationSettingsPage.expectDiscoveredServicesContentVisible();
+            await pm.correlationSettingsPage.expectServicesContentVisible();
 
             // Verify refresh button is visible
             testLogger.info('Verifying Refresh button visible');
@@ -212,7 +212,7 @@ test.describe("Correlation Settings Tests", () => {
         });
 
         test("should show loading state when fetching services data", {
-            tag: ['@correlationSettings', '@settings', '@functional', '@P1', '@discoveredServices', '@loadingState']
+            tag: ['@correlationSettings', '@settings', '@functional', '@P1', '@services', '@loadingState']
         }, async () => {
             const orgId = process.env["ORGNAME"];
             testLogger.info('Testing Discovered Services loading state');
@@ -229,7 +229,7 @@ test.describe("Correlation Settings Tests", () => {
             testLogger.info('Loading completed');
 
             // Verify content is visible (either services or empty state)
-            await pm.correlationSettingsPage.expectDiscoveredServicesContentVisible();
+            await pm.correlationSettingsPage.expectServicesContentVisible();
 
             // Click refresh button to trigger loading again
             testLogger.info('Clicking refresh button to trigger reload');
@@ -237,7 +237,7 @@ test.describe("Correlation Settings Tests", () => {
 
             // Wait for content to be visible again after refresh
             await pm.correlationSettingsPage.expectDiscoveredServicesLoaded();
-            await pm.correlationSettingsPage.expectDiscoveredServicesContentVisible();
+            await pm.correlationSettingsPage.expectServicesContentVisible();
 
             testLogger.info('Discovered Services loading state works correctly');
         });

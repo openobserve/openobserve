@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -217,7 +217,7 @@ pub async fn report_request_usage_stats(
         peak_memory_usage: stats.peak_memory_usage,
     });
     if !usage.is_empty() {
-        publish_usage(usage).await;
+        report_usage(usage);
     }
 }
 

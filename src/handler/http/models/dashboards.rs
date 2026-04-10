@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -163,6 +163,31 @@ pub struct MoveDashboardsRequestBody {
 
     /// Indicates the folder to which dashboard should be moved.
     pub dst_folder_id: String,
+}
+
+/// Request body for AddPanel and UpdatePanel endpoints.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PanelRequestBody {
+    pub panel: v8::Panel,
+    pub tab_id: Option<String>,
+}
+
+/// Response body for AddPanel and UpdatePanel endpoints.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PanelResponseBody {
+    pub panel: v8::Panel,
+    pub hash: String,
+    pub tab_id: String,
+}
+
+/// Response body for DeletePanel endpoint.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DeletePanelResponseBody {
+    pub hash: String,
+    pub panel_id: String,
 }
 
 impl From<DashboardRequestBody> for MetaDashboard {

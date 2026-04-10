@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -271,7 +271,7 @@ describe("convertSQLData", () => {
         mockStore,
         mockChartPanelRef,
         mockHoveredSeriesState,
-        { value: [{}] },
+        { value: [[{}]] },
         { queries: [{}] },
         mockChartPanelStyle,
         mockAnnotations
@@ -287,7 +287,7 @@ describe("convertSQLData", () => {
         mockStore,
         mockChartPanelRef,
         mockHoveredSeriesState,
-        { value: [{}] },
+        { value: [[{}]] },
         { queries: [{}] },
         mockChartPanelStyle,
         mockAnnotations
@@ -303,7 +303,7 @@ describe("convertSQLData", () => {
         mockStore,
         mockChartPanelRef,
         mockHoveredSeriesState,
-        { value: [{}] },
+        { value: [[{}]] },
         { queries: [{}] },
         mockChartPanelStyle,
         mockAnnotations
@@ -320,7 +320,7 @@ describe("convertSQLData", () => {
         ]
       ];
 
-      const resultMetaData = { value: [{}] };
+      const resultMetaData = { value: [[{}]] };
       const metadata = { queries: [{}] };
 
       const result = await convertMultiSQLData(
@@ -350,7 +350,7 @@ describe("convertSQLData", () => {
         ]
       ];
 
-      const resultMetaData = { value: [{}, {}] };
+      const resultMetaData = { value: [[{}], [{}]] };
       const metadata = { queries: [{}, {}] };
 
       const result = await convertMultiSQLData(
@@ -3586,7 +3586,7 @@ describe("convertSQLData", () => {
           [{ timestamp: "2023-01-02", value: 20 }]
         ];
 
-        const resultMetaData = { value: [mockResultMetaData[0], mockResultMetaData[0]] };
+        const resultMetaData = { value: [[mockResultMetaData[0]], [mockResultMetaData[0]]] };
         const metadata = {
           queries: [
             { timeRangeGap: { periodAsStr: "1h" } },
@@ -3628,7 +3628,7 @@ describe("convertSQLData", () => {
           ]
         ];
 
-        const resultMetaData = { value: [mockResultMetaData[0], mockResultMetaData[0]] };
+        const resultMetaData = { value: [[mockResultMetaData[0]], [mockResultMetaData[0]]] };
         const metadata = {
           queries: [
             { timeRangeGap: { periodAsStr: "1h" } },
@@ -3660,7 +3660,7 @@ describe("convertSQLData", () => {
           [{ timestamp: "2023-01-02", value: 20 }]
         ];
 
-        const resultMetaData = { value: [mockResultMetaData[0], mockResultMetaData[0]] };
+        const resultMetaData = { value: [[mockResultMetaData[0]], [mockResultMetaData[0]]] };
         const metadata = {
           queries: [
             { timeRangeGap: {} }, // No periodAsStr

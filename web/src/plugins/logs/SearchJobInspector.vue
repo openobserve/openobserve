@@ -640,9 +640,21 @@ export default defineComponent({
     });
 
     const maxDuration = computed(() => {
-      if (!hierarchicalEvents.value || hierarchicalEvents.value.length === 0) return 1;
-      const max = Math.max(...hierarchicalEvents.value.map((e: any) => e.duration));
-      return max || 1;
+      if (!profileData.value?.events) return 1;
+
+      const findMax = (events: ProfileEvent[]): number => {
+        let max = 0;
+        for (const event of events) {
+          if (event.duration > max) max = event.duration;
+          if (event.events && event.events.length > 0) {
+            const childMax = findMax(event.events);
+            if (childMax > max) max = childMax;
+          }
+        }
+        return max;
+      };
+
+      return findMax(profileData.value.events) || 1;
     });
 
     // Calculate maximum depth in the hierarchy

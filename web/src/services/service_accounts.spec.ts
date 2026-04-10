@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -75,45 +75,6 @@ describe("service_accounts service", () => {
       await expect(service_accounts.list("test-org")).rejects.toThrow(
         "Unauthorized"
       );
-    });
-  });
-
-  describe("get_service_token", () => {
-    it("should make GET request to fetch a specific service account by email", async () => {
-      mockHttpInstance.get.mockResolvedValue({ data: { token: "abc123" } });
-
-      await service_accounts.get_service_token(
-        "test-org",
-        "svc@example.com"
-      );
-
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/test-org/service_accounts/svc@example.com"
-      );
-    });
-
-    it("should handle different email formats", async () => {
-      mockHttpInstance.get.mockResolvedValue({ data: {} });
-
-      const emails = [
-        "svc@example.com",
-        "service.account@company.org",
-        "bot+tag@domain.io",
-      ];
-      for (const email of emails) {
-        await service_accounts.get_service_token("test-org", email);
-        expect(mockHttpInstance.get).toHaveBeenCalledWith(
-          `/api/test-org/service_accounts/${email}`
-        );
-      }
-    });
-
-    it("should propagate errors", async () => {
-      mockHttpInstance.get.mockRejectedValue(new Error("Not found"));
-
-      await expect(
-        service_accounts.get_service_token("test-org", "missing@example.com")
-      ).rejects.toThrow("Not found");
     });
   });
 
@@ -322,7 +283,6 @@ describe("service_accounts service", () => {
 
       await service_accounts.create(data, "test-org");
       await service_accounts.list("test-org");
-      await service_accounts.get_service_token("test-org", email);
       await service_accounts.refresh_token("test-org", email);
       await service_accounts.delete("test-org", email);
 
@@ -332,9 +292,6 @@ describe("service_accounts service", () => {
       );
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/service_accounts"
-      );
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/test-org/service_accounts/${email}`
       );
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/test-org/service_accounts/${email}?rotateToken=true`,

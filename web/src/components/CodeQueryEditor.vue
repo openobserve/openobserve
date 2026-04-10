@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -37,7 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <img :src="aiIcon" alt="AI" class="ai-icon-img" />
       </q-icon>
       <q-tooltip>
-        {{ disableAiReason || t(nlpMode ? 'search.nlpModeEnabled' : 'search.nlpModeLabel') }}
+        {{
+          disableAiReason ||
+          t(nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel")
+        }}
       </q-tooltip>
     </q-btn>
   </div>
@@ -135,10 +138,21 @@ export default defineComponent({
     },
     disableAiReason: {
       type: String,
-      default: '',
+      default: "",
     },
   },
-  emits: ["update-query", "run-query", "update:query", "focus", "blur", "nlpModeDetected", "generation-start", "generation-end", "generation-success", "toggle-nlp-mode"],
+  emits: [
+    "update-query",
+    "run-query",
+    "update:query",
+    "focus",
+    "blur",
+    "nlpModeDetected",
+    "generation-start",
+    "generation-end",
+    "generation-success",
+    "toggle-nlp-mode",
+  ],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
@@ -147,10 +161,16 @@ export default defineComponent({
     // editor object is used to interact with the monaco editor instance
     let editorObj: any = null;
     const { searchObj } = searchState();
-    const { detectNaturalLanguage, generateSQL, transformToSQL, isGenerating, streamingResponse } = useNLQuery();
+    const {
+      detectNaturalLanguage,
+      generateSQL,
+      transformToSQL,
+      isGenerating,
+      streamingResponse,
+    } = useNLQuery();
 
     let provider: Ref<any | null> = ref(null);
-    const currentEditorText = ref('');
+    const currentEditorText = ref("");
 
     // These will be initialized when Monaco loads
     let CompletionKind: any = null;
@@ -364,25 +384,31 @@ export default defineComponent({
       currentEditorText.value = text;
       const isNL = detectNaturalLanguage(text, props.language);
 
-      console.log('[NL2Q-Detection]', {
+      console.log("[NL2Q-Detection]", {
         text: text.substring(0, 50),
         language: props.language,
         isNaturalLanguage: isNL,
-        currentNlpMode: props.nlpMode
+        currentNlpMode: props.nlpMode,
       });
 
       // ONLY emit events if NOT already in NLP mode (auto-detection feature)
       // If already in NLP mode (user toggled it), don't change anything
       if (!props.nlpMode) {
         if (isNL) {
-          console.log('[NL2Q-Detection] Natural language detected, emitting nlpModeDetected: true');
+          console.log(
+            "[NL2Q-Detection] Natural language detected, emitting nlpModeDetected: true",
+          );
           emit("nlpModeDetected", true);
         } else {
-          console.log('[NL2Q-Detection] Query syntax detected, emitting nlpModeDetected: false');
+          console.log(
+            "[NL2Q-Detection] Query syntax detected, emitting nlpModeDetected: false",
+          );
           emit("nlpModeDetected", false);
         }
       } else {
-        console.log('[NL2Q-Detection] Already in NLP mode, not emitting auto-detection events');
+        console.log(
+          "[NL2Q-Detection] Already in NLP mode, not emitting auto-detection events",
+        );
       }
     }, 500);
 
@@ -391,85 +417,114 @@ export default defineComponent({
      * Calls AI to generate query based on current language (SQL, PromQL, VRL, JavaScript)
      * @param customText - Optional custom text to use instead of editor content
      */
-    const handleGenerateSQL = async (customText?: string, abortSignal?: AbortSignal, sessionId?: string) => {
+    const handleGenerateSQL = async (
+      customText?: string,
+      abortSignal?: AbortSignal,
+      sessionId?: string,
+    ) => {
       const currentText = customText || currentEditorText.value;
       if (!currentText.trim()) return;
 
-      const currentLanguage = props.language?.toLowerCase() || 'sql';
-      console.log('[NL2Q-UI] Starting query generation for language:', currentLanguage, 'text:', currentText);
+      const currentLanguage = props.language?.toLowerCase() || "sql";
+      console.log(
+        "[NL2Q-UI] Starting query generation for language:",
+        currentLanguage,
+        "text:",
+        currentText,
+      );
 
       try {
         // Get organization ID from store
-        const orgId = store.state.selectedOrganization?.identifier || 'default';
-        console.log('[NL2Q-UI] Organization ID:', orgId);
+        const orgId = store.state.selectedOrganization?.identifier || "default";
+        console.log("[NL2Q-UI] Organization ID:", orgId);
 
         // Create language-appropriate prompt
-        let promptPrefix = '';
+        let promptPrefix = "";
         switch (currentLanguage) {
-          case 'promql':
-            promptPrefix = 'Generate PromQL query';
+          case "promql":
+            promptPrefix = "Generate PromQL query";
             break;
-          case 'vrl':
-            promptPrefix = 'Generate VRL function';
+          case "vrl":
+            promptPrefix = "Generate VRL function";
             break;
-          case 'javascript':
-            promptPrefix = 'Generate JavaScript function';
+          case "javascript":
+            promptPrefix = "Generate JavaScript function";
             break;
-          case 'sql':
+          case "sql":
           default:
-            promptPrefix = 'Generate SQL query';
+            promptPrefix = "Generate SQL query";
             break;
         }
 
         const prompt = `${promptPrefix} : ${currentText}`;
-        console.log('[NL2Q-UI] Generated prompt:', prompt);
+        console.log("[NL2Q-UI] Generated prompt:", prompt);
 
         // Generate query from natural language
-        console.log('[NL2Q-UI] Calling generateSQL...');
-        const generatedSQL = await generateSQL(prompt, orgId, abortSignal, sessionId);
-        console.log('[NL2Q-UI] generateSQL returned:', {
+        console.log("[NL2Q-UI] Calling generateSQL...");
+        const generatedSQL = await generateSQL(
+          prompt,
+          orgId,
+          abortSignal,
+          sessionId,
+        );
+        console.log("[NL2Q-UI] generateSQL returned:", {
           value: generatedSQL,
           type: typeof generatedSQL,
           isNull: generatedSQL === null,
-          isEmpty: generatedSQL === '',
-          isFalsy: !generatedSQL
+          isEmpty: generatedSQL === "",
+          isFalsy: !generatedSQL,
         });
 
-        if (!generatedSQL || generatedSQL.trim() === '') {
+        if (!generatedSQL || generatedSQL.trim() === "") {
           // Show error notification
-          console.log('[NL2Q-UI] Showing error notification - query generation failed or empty');
-          showErrorNotification(t('search.nlQueryGenerationFailed'));
-          throw new Error('Query generation failed');
+          console.log(
+            "[NL2Q-UI] Showing error notification - query generation failed or empty",
+          );
+          showErrorNotification(t("search.nlQueryGenerationFailed"));
+          throw new Error("Query generation failed");
         }
 
         // Check if this is a special action completion (dashboard/alert)
-        if (generatedSQL.startsWith('✓ DASHBOARD_CREATED:')) {
-          console.log('[NL2Q-UI] Dashboard created successfully');
-          const responseText = generatedSQL.replace('✓ DASHBOARD_CREATED:', '').trim();
-          emit("generation-success", { type: 'dashboard', message: responseText });
+        if (generatedSQL.startsWith("✓ DASHBOARD_CREATED:")) {
+          console.log("[NL2Q-UI] Dashboard created successfully");
+          const responseText = generatedSQL
+            .replace("✓ DASHBOARD_CREATED:", "")
+            .trim();
+          emit("generation-success", {
+            type: "dashboard",
+            message: responseText,
+          });
           // Don't emit nlpModeDetected - keep user in current mode
           return; // Success without SQL
         }
 
-        if (generatedSQL.startsWith('✓ ALERT_CREATED:')) {
-          console.log('[NL2Q-UI] Alert created successfully');
-          const responseText = generatedSQL.replace('✓ ALERT_CREATED:', '').trim();
-          emit("generation-success", { type: 'alert', message: responseText });
+        if (generatedSQL.startsWith("✓ ALERT_CREATED:")) {
+          console.log("[NL2Q-UI] Alert created successfully");
+          const responseText = generatedSQL
+            .replace("✓ ALERT_CREATED:", "")
+            .trim();
+          emit("generation-success", { type: "alert", message: responseText });
           // Don't emit nlpModeDetected - keep user in current mode
           return; // Success without SQL
         }
 
-        if (generatedSQL.startsWith('✓ ACTION_COMPLETED:')) {
-          console.log('[NL2Q-UI] Action completed successfully');
-          const responseText = generatedSQL.replace('✓ ACTION_COMPLETED:', '').trim();
-          emit("generation-success", { type: 'action', message: responseText });
+        if (generatedSQL.startsWith("✓ ACTION_COMPLETED:")) {
+          console.log("[NL2Q-UI] Action completed successfully");
+          const responseText = generatedSQL
+            .replace("✓ ACTION_COMPLETED:", "")
+            .trim();
+          emit("generation-success", { type: "action", message: responseText });
           // Don't emit nlpModeDetected - keep user in current mode
           return; // Success without SQL
         }
 
         // Normal query generation - transform and update editor with language-specific comments
-        const transformedText = transformToSQL(currentText, generatedSQL, props.language);
-        console.log('[NL2Q-UI] Transformed text:', transformedText);
+        const transformedText = transformToSQL(
+          currentText,
+          generatedSQL,
+          props.language,
+        );
+        console.log("[NL2Q-UI] Transformed text:", transformedText);
 
         // Update editor value
         setValue(transformedText);
@@ -480,16 +535,17 @@ export default defineComponent({
 
         // Turn off NLP mode after generating SQL (we're now in SQL mode)
         emit("nlpModeDetected", false);
-        console.log('[NL2Q-UI] Emitted nlpModeDetected: false to turn off NLP mode');
+        console.log(
+          "[NL2Q-UI] Emitted nlpModeDetected: false to turn off NLP mode",
+        );
 
         // Emit SQL generation success
-        emit("generation-success", { type: 'sql', message: generatedSQL });
+        emit("generation-success", { type: "sql", message: generatedSQL });
 
-        console.log('[NL2Q-UI] SQL generation completed successfully');
-
+        console.log("[NL2Q-UI] SQL generation completed successfully");
       } catch (error) {
-        console.error('[NL2Q-UI] Exception during SQL generation:', error);
-        showErrorNotification(t('search.nlQueryGenerationFailed'));
+        console.error("[NL2Q-UI] Exception during SQL generation:", error);
+        showErrorNotification(t("search.nlQueryGenerationFailed"));
         throw error; // Re-throw so SearchBar can handle it
       }
     };
@@ -571,7 +627,7 @@ export default defineComponent({
       if (editorElement && editorElement?.hasChildNodes()) {
         if (editorObj) {
           // Update editor value if different from current
-          const currentValue = editorObj.getValue();
+          const currentValue = editorObj?.getValue();
           if (currentValue !== props.query?.trim()) {
             editorObj.setValue(props.query?.trim() || "");
           }
@@ -591,7 +647,7 @@ export default defineComponent({
           }
 
           // New props have actual data - safe to recreate
-          editorElement.innerHTML = '';
+          editorElement.innerHTML = "";
           // Fall through to create new editor below
         }
       }
@@ -630,12 +686,12 @@ export default defineComponent({
 
       editorObj.onDidChangeModelContent(
         debounce((e: any) => {
-          const newValue = editorObj.getValue()?.trim();
+          const newValue = editorObj?.getValue()?.trim();
           emit("update-query", newValue, e);
           emit("update:query", newValue, e);
 
           // Check for natural language after user stops typing (debounced)
-          checkForNaturalLanguage(newValue);
+          if (newValue) checkForNaturalLanguage(newValue);
         }, props.debounceTime),
       );
 
@@ -651,7 +707,7 @@ export default defineComponent({
       editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
 
-        // added hack to handle case where ctrl+enter / cmd+enter stops working after 
+        // added hack to handle case where ctrl+enter / cmd+enter stops working after
         // user click on the result row and open sidebase or opensidebar from schedule search
         // This is because the editor loses focus and the context key "ctrlenter" is not active anymore, so we need to re-add the command on focus
         editorObj.addCommand(
@@ -665,9 +721,9 @@ export default defineComponent({
       });
 
       editorObj.onDidBlurEditorWidget(() => {
-        const model = editorObj.getModel();
-        const value = model.getValue();
-        const trimmedValue = value.trim();
+        const model = editorObj?.getModel();
+        const value = model?.getValue();
+        const trimmedValue = value?.trim();
 
         // Only apply trim if there are actually tailing and leading spaces to trim
         if (value !== trimmedValue) {
@@ -713,38 +769,26 @@ export default defineComponent({
       provider.value?.dispose();
 
       if (props.language === "sql") {
-        await import(
-          "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js"
-        );
+        await import("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js");
       }
 
       if (props.language === "json") {
-        await import(
-          "monaco-editor/esm/vs/language/json/monaco.contribution.js"
-        );
+        await import("monaco-editor/esm/vs/language/json/monaco.contribution.js");
       }
 
       if (props.language === "html") {
-        await import(
-          "monaco-editor/esm/vs/language/html/monaco.contribution.js"
-        );
+        await import("monaco-editor/esm/vs/language/html/monaco.contribution.js");
       }
 
       if (props.language === "markdown") {
-        await import(
-          "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js"
-        );
+        await import("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js");
       }
 
       if (props.language === "python") {
-        await import(
-          "monaco-editor/esm/vs/basic-languages/python/python.contribution.js"
-        );
+        await import("monaco-editor/esm/vs/basic-languages/python/python.contribution.js");
       }
       if (props.language === "javascript") {
-        await import(
-          "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js"
-        );
+        await import("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js");
       }
 
       setupEditor();
@@ -810,16 +854,17 @@ export default defineComponent({
       (newQuery, oldQuery) => {
         if (!editorObj) return;
 
-        const currentValue = editorObj.getValue();
-        const newValue = props.query || '';
+        const currentValue = editorObj?.getValue();
+        const newValue = props.query || "";
         const hasFocus = editorObj.hasWidgetFocus();
 
         // Only update if:
         // 1. Editor doesn't have focus (external update), OR
         // 2. It's readonly AND values are actually different
         // 3. Compare trimmed values to avoid cursor jumps from trailing spaces
-        const shouldUpdate = (props.readOnly || !hasFocus)
-          && currentValue?.trim() !== newValue?.trim();
+        const shouldUpdate =
+          (props.readOnly || !hasFocus) &&
+          currentValue?.trim() !== newValue?.trim();
 
         if (shouldUpdate) {
           editorObj.getModel()?.setValue(newValue);
@@ -888,7 +933,14 @@ export default defineComponent({
     };
 
     const triggerAutoComplete = async (value: string) => {
-      disableSuggestionPopup();
+      // Close any currently-open suggestion popup before retriggering.
+      // Monaco's model.trigger() calls cancel() internally, but if a natural
+      // popup is already in "Showing" state (e.g. opened by typing quote after
+      // an operator, or from word-based suggest while typing NOT LIKE), the
+      // widget may not refresh its item list. hideSuggestWidget transitions
+      // state to Idle cleanly (no "user dismissed" flag) so the following
+      // triggerSuggest always opens a fresh popup with the latest keywords.
+      editorObj.trigger(value, "hideSuggestWidget", {});
       await nextTick();
       editorObj.trigger(value, "editor.action.triggerSuggest", {});
     };
@@ -1010,13 +1062,13 @@ export default defineComponent({
 
     // Watch isGenerating and emit events to parent
     watch(isGenerating, (newValue) => {
-      console.log('[CodeQueryEditor] isGenerating changed to:', newValue);
+      console.log("[CodeQueryEditor] isGenerating changed to:", newValue);
       if (newValue) {
-        console.log('[CodeQueryEditor] Emitting generation-start');
-        emit('generation-start');
+        console.log("[CodeQueryEditor] Emitting generation-start");
+        emit("generation-start");
       } else {
-        console.log('[CodeQueryEditor] Emitting generation-end');
-        emit('generation-end');
+        console.log("[CodeQueryEditor] Emitting generation-end");
+        emit("generation-end");
       }
     });
 
@@ -1029,7 +1081,7 @@ export default defineComponent({
 
     // Toggle NLP mode
     const toggleNlpMode = () => {
-      emit('toggle-nlp-mode');
+      emit("toggle-nlp-mode");
     };
 
     return {
@@ -1130,7 +1182,7 @@ export default defineComponent({
   bottom: 0.5rem;
   right: 0.5rem;
   z-index: 100;
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
   color: white !important;
   box-shadow: 0 0.25rem 0.9375rem 0 rgba(139, 92, 246, 0.3) !important;
   transition: all 0.3s ease !important;
@@ -1138,7 +1190,7 @@ export default defineComponent({
 }
 
 .generate-sql-button:hover:not(.disabled):not([disabled]):not(:disabled) {
-  background: linear-gradient(135deg, #7C3AED 0%, #DB2777 100%) !important;
+  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
   box-shadow: 0 0.375rem 1.25rem 0 rgba(139, 92, 246, 0.4) !important;
   transform: translateY(-0.0625rem) !important;
 }
@@ -1170,7 +1222,7 @@ export default defineComponent({
   max-height: 31.25rem;
   background: var(--o2-card-bg);
   border-radius: 0.5rem; /* 8px - matches O2 message border-radius */
-  border: 2px solid #8B5CF6; /* O2 AI Assistant purple border */
+  border: 2px solid #8b5cf6; /* O2 AI Assistant purple border */
   padding: 0.75rem; /* 12px - matches O2 message padding */
   z-index: 99;
   overflow: hidden;
@@ -1188,7 +1240,9 @@ export default defineComponent({
 
 /* Streaming preview content - O2 AI Assistant text-block style */
 .streaming-preview-content {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
   font-size: 0.875rem;
   line-height: 1.6; /* Better readability for text content */
   color: var(--o2-text-primary);
@@ -1208,7 +1262,7 @@ export default defineComponent({
 
 /* Animated dots - ellipsis animation using pseudo-element */
 .animated-dots::after {
-  content: '';
+  content: "";
   animation: ellipsis 1.5s infinite;
   display: inline-block;
   width: 1.5em;
@@ -1222,23 +1276,24 @@ export default defineComponent({
 
 @keyframes ellipsis {
   0% {
-    content: '';
+    content: "";
   }
   25% {
-    content: '.';
+    content: ".";
   }
   50% {
-    content: '..';
+    content: "..";
   }
-  75%, 100% {
-    content: '...';
+  75%,
+  100% {
+    content: "...";
   }
 }
 
 /* Code blocks within streaming preview */
 .streaming-preview-content :deep(pre),
 .streaming-preview-content :deep(code) {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", "Courier New", monospace;
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: break-word;
@@ -1294,7 +1349,8 @@ export default defineComponent({
 }
 
 @keyframes typing-cursor {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -1306,6 +1362,7 @@ export default defineComponent({
 <style lang="scss">
 .logs-query-editor {
   flex: 1;
+  min-height: 0;
   .monaco-editor,
   .monaco-editor .monaco-editor {
     padding: 0px 0px 0px 0px !important;
@@ -1317,7 +1374,6 @@ export default defineComponent({
     }
     --vscode-focusBorder: transparent !important;
   }
-
 }
 
 .highlight-error {

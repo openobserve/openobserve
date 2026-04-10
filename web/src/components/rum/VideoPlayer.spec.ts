@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -340,6 +340,7 @@ describe("VideoPlayer Component", () => {
 
     it("should handle skip forward", () => {
       wrapper.vm.playerState.actualTime = 10000;
+      wrapper.vm.playerState.totalTime = 120000;
       wrapper.vm.player = { goto: vi.fn() };
       wrapper.vm.skipTo("forward");
       expect(wrapper.vm.player.goto).toHaveBeenCalledWith(20000, false);
@@ -350,6 +351,36 @@ describe("VideoPlayer Component", () => {
       wrapper.vm.player = { goto: vi.fn() };
       wrapper.vm.skipTo("backward");
       expect(wrapper.vm.player.goto).toHaveBeenCalledWith(10000, false);
+    });
+
+    it("should clamp skip backward to 0 when current time is less than 10 seconds", () => {
+      wrapper.vm.playerState.actualTime = 5000; // 5 seconds
+      wrapper.vm.player = { goto: vi.fn() };
+      wrapper.vm.skipTo("backward");
+      expect(wrapper.vm.player.goto).toHaveBeenCalledWith(0, false);
+    });
+
+    it("should clamp skip forward to totalTime when exceeding session duration", () => {
+      wrapper.vm.playerState.actualTime = 110000; // 110 seconds
+      wrapper.vm.playerState.totalTime = 120000; // 120 seconds total
+      wrapper.vm.player = { goto: vi.fn() };
+      wrapper.vm.skipTo("forward");
+      expect(wrapper.vm.player.goto).toHaveBeenCalledWith(120000, false);
+    });
+
+    it("should handle skip backward at exactly 0", () => {
+      wrapper.vm.playerState.actualTime = 0;
+      wrapper.vm.player = { goto: vi.fn() };
+      wrapper.vm.skipTo("backward");
+      expect(wrapper.vm.player.goto).toHaveBeenCalledWith(0, false);
+    });
+
+    it("should handle skip forward at exactly totalTime", () => {
+      wrapper.vm.playerState.actualTime = 120000;
+      wrapper.vm.playerState.totalTime = 120000;
+      wrapper.vm.player = { goto: vi.fn() };
+      wrapper.vm.skipTo("forward");
+      expect(wrapper.vm.player.goto).toHaveBeenCalledWith(120000, false);
     });
   });
 

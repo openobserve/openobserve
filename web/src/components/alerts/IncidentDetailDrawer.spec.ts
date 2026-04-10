@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -33,12 +33,20 @@ vi.mock("@/services/incidents", () => ({
   },
 }));
 
+// Mock service streams API
+vi.mock("@/services/service_streams", () => ({
+  default: {
+    getSemanticGroups: vi.fn(),
+  },
+}));
+
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
 import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
+import serviceStreamsApi from "@/services/service_streams";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -51,11 +59,11 @@ installQuasar({ plugins: [Dialog, Notify] });
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   id: overrides.id || "incident-1",
   org_id: overrides.org_id || "org-1",
-  correlation_key: overrides.correlation_key || "key-1",
+  key_type: overrides.key_type || "key-1",
   status: overrides.status || "open",
   severity: overrides.severity || "P1",
   title: overrides.title || "Test Incident",
-  stable_dimensions: overrides.stable_dimensions || { service: "test-service" },
+  group_values: overrides.group_values || { service: "test-service" },
   alert_count: overrides.alert_count !== undefined ? overrides.alert_count : 5,
   first_alert_at: overrides.first_alert_at || 1700000000000000,
   last_alert_at: overrides.last_alert_at || 1700000000000000,
@@ -167,6 +175,11 @@ describe("IncidentDetailDrawer.vue", () => {
     (incidentsService.updateIncident as any).mockResolvedValue({
       data: { severity: "P2" },
     });
+
+    // Mock service streams API
+    (serviceStreamsApi.getSemanticGroups as any).mockResolvedValue({
+      data: [],
+    });
   });
 
   afterEach(() => {
@@ -246,14 +259,27 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should set loading state during fetch", async () => {
+      // Create a pending promise that we can control
+      let resolvePromise: (value: any) => void;
+      const pendingPromise = new Promise((resolve) => {
+        resolvePromise = resolve;
+      });
+
+      (incidentsService.get as any).mockReturnValue(pendingPromise);
+
       wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
 
-      // Loading should be true during fetch
-      // But may complete quickly, so just verify it was called
-      await flushPromises();
+      // Now loading should be true since the promise is pending
+      expect(wrapper.vm.loading).toBe(true);
 
+      // Resolve the promise
+      resolvePromise!({ data: createIncidentWithAlerts({ id: "test-123" }) });
+      await flushPromises();
+      await nextTick(); // Give Vue time to update reactive state
+
+      // Now loading should be false
       expect(incidentsService.get).toHaveBeenCalled();
       expect(wrapper.vm.loading).toBe(false);
     });
@@ -530,7 +556,7 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(contextData).toHaveProperty("alert_count");
       expect(contextData).toHaveProperty("first_alert_at");
       expect(contextData).toHaveProperty("last_alert_at");
-      expect(contextData).toHaveProperty("stable_dimensions");
+      expect(contextData).toHaveProperty("group_values");
       expect(contextData).toHaveProperty("topology_context");
       expect(contextData).toHaveProperty("triggers");
       expect(contextData).toHaveProperty("rca_analysis");
@@ -826,7 +852,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should handle empty dimensions", async () => {
       (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", stable_dimensions: {} }),
+        data: createIncidentWithAlerts({ id: "test-123", group_values: {} }),
       });
 
       wrapper = await createWrapper({}, {}, "test-123");
@@ -834,7 +860,7 @@ describe("IncidentDetailDrawer.vue", () => {
       await nextTick();
       await flushPromises();
 
-      expect(wrapper.vm.incidentDetails.stable_dimensions).toEqual({});
+      expect(wrapper.vm.incidentDetails.group_values).toEqual({});
     });
 
     it("should handle resolved incident with timestamp", async () => {

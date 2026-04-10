@@ -591,7 +591,7 @@ const formatValue = (
  */
 const formatINValue = (value: any) => {
   // if variable is present, don't want to use splitQuotedString
-  if (value?.includes("$")) {
+  if (value?.includes("$") || value?.includes("{{")) {
     if (value.startsWith("(") && value.endsWith(")")) {
       return value.substring(1, value.length - 1);
     }

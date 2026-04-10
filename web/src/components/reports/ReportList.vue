@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -136,6 +136,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="confirmDeleteReport(props.row)"
                 >
               </q-btn>
+              </q-td>
+            </template>
+
+            <!-- Show report type and image preview badges in the name column -->
+            <template v-slot:body-cell-name="props">
+              <q-td :props="props">
+                <span>{{ props.row.name }}</span>
+                <q-badge
+                  v-if="props.row.dashboards?.[0]?.report_type === 'png'"
+                  color="teal"
+                  class="q-ml-xs"
+                  label="PNG"
+                  outline
+                />
+                <q-badge
+                  v-if="props.row.imagePreview"
+                  color="blue-grey"
+                  class="q-ml-xs"
+                  label="Preview"
+                  outline
+                />
               </q-td>
             </template>
 

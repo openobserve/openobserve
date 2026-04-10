@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,10 +24,10 @@ import serviceStreamsApi, {
 export interface Incident {
   id: string;
   org_id: string;
-  correlation_key: string;
   status: "open" | "acknowledged" | "resolved";
   severity: "P1" | "P2" | "P3" | "P4";
-  stable_dimensions: Record<string, string>;
+  group_values?: Record<string, string>;
+  key_type?: "Primary" | "Secondary" | "AlertId";
   topology_context?: IncidentTopology;
   first_alert_at: number;
   last_alert_at: number;
@@ -66,7 +66,7 @@ export interface IncidentAlert {
   alert_id: string;
   alert_name: string;
   alert_fired_at: number;
-  correlation_reason: "service_discovery" | "scope_match" | "workload_match" | "alert_id";
+  correlation_reason: "service_discovery" | "primary_match" | "secondary_match" | "alert_id";
   created_at: number;
 }
 
@@ -190,18 +190,18 @@ const incidents = {
   /**
    * Get correlated telemetry streams for an incident
    *
-   * Uses the incident's stable_dimensions to find related logs, metrics, and traces
+   * Uses the incident's group_values to find related logs, metrics, and traces
    * via the service correlation API.
    *
    * @param org_identifier Organization ID
-   * @param incident The incident with stable_dimensions
+   * @param incident The incident with group_values
    * @returns Correlated streams grouped by type
    */
   getCorrelatedStreams: async (
     org_identifier: string,
     incident: Incident
   ): Promise<IncidentCorrelatedStreams> => {
-    const dimensions = incident.stable_dimensions;
+    const dimensions = incident.group_values ?? {};
 
     const request: CorrelationRequest = {
       source_stream:

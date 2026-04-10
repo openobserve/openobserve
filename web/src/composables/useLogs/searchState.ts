@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -44,6 +44,7 @@ interface StreamData {
   selectedFields: any[];
   filterField: string;
   addToFilter: string;
+  removeFilterField: string;
   functions: any[];
   streamType: string;
 }
@@ -61,6 +62,7 @@ interface SearchObjectData {
   streamResults: any;
   errorMsg: string;
   errorDetail: string;
+  errorCode: number;
   countErrorMsg: string;
   stream: StreamData;
   queryResults: any;
@@ -299,6 +301,20 @@ export const searchState = () => {
   };
 
   /**
+   * Resets log search error state to default values.
+   *
+   * Clears all error messages, code and details related to search logs operations.
+   * This is typically called before logs and patterns are loaded or when
+   * recovering from logs-related errors.
+   */
+  const resetSearchError = (): void => {
+    searchObj.data.errorMsg = "";
+    searchObj.data.errorDetail = "";
+    searchObj.data.countErrorMsg = "";
+    searchObj.data.errorCode = 0;
+  };
+
+  /**
    * Resets query-related data and pagination state.
    *
    * Clears query results, resets pagination to first page, stops any running queries,
@@ -315,9 +331,7 @@ export const searchState = () => {
     searchObj.data.sortedQueryResults = [];
     searchObj.data.resultGrid.currentPage = 1;
     searchObj.runQuery = false;
-    searchObj.data.errorMsg = "";
-    searchObj.data.errorDetail = "";
-    searchObj.data.countErrorMsg = "";
+    resetSearchError();
   };
 
   /**
@@ -421,6 +435,7 @@ export const searchState = () => {
     histogramMappedData,
     histogramResults,
     searchPartitionMap,
+    resetSearchError,
   };
 };
 

@@ -70,7 +70,7 @@ jobs:
           node-version: 22
 
       - name: Build frontend code
-        run: cd web && npm install && npm run build
+        run: cd web && npm ci && npm run build
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg

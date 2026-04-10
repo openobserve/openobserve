@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,14 +23,6 @@ const service_accounts = {
   ) => {
     return http().get(
       `/api/${org_identifier}/service_accounts`
-    );
-  },
-  get_service_token: (
-    org_identifier: string,
-    email_id: string
-  ) => {
-    return http().get(
-      `/api/${org_identifier}/service_accounts/${email_id}`
     );
   },
   create: (data: any, org_identifier: string) => {

@@ -44,7 +44,7 @@ use vortex::{
 };
 
 use crate::service::search::datafusion::{
-    exec::{DATAFUSION_MIN_PARTITION, DataFusionContextBuilder},
+    exec::DataFusionContextBuilder,
     merge::{MergeParquetResult, append_metadata},
     table_provider::uniontable::NewUnionTable,
 };
@@ -73,7 +73,7 @@ pub async fn merge_parquet_files_with_downsampling(
     // create datafusion context
     let ctx = DataFusionContextBuilder::new()
         .sorted_by_time(true)
-        .build(DATAFUSION_MIN_PARTITION)
+        .build(get_config().limit.datafusion_min_partition_num)
         .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -129,6 +129,7 @@ import {
   reactive,
   onUnmounted,
   onMounted,
+  onBeforeMount,
   defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
@@ -212,9 +213,12 @@ export default defineComponent({
       resetDashboardPanelData();
     });
 
-    onMounted(async () => {
+    // Initialize state before any child components mount so FieldList.vue sees
+    // stream_type = "metrics" from the start, preventing a spurious
+    // streams?type=logs request and the double stream-list fetch that results
+    // from stream_type changing logs → metrics after children have mounted.
+    onBeforeMount(() => {
       errorData.errors = [];
-
       editMode.value = false;
       resetDashboardPanelDataAndAddTimeField();
 
@@ -233,7 +237,10 @@ export default defineComponent({
       dashboardPanelData.layout.showQueryBar = true;
 
       chartData.value = {};
-      // set the value of the date time after the reset
+    });
+
+    onMounted(async () => {
+      // DateTimePicker is now mounted; safe to read its value
       updateDateTime(selectedDate.value);
 
       // let it call the watchers and then mark the panel config watcher as activated

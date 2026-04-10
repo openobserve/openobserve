@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -53,18 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
 
-        <!-- Anomaly Column Header -->
-        <div class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-center">
-          <span
-            class="tw:font-bold"
-            :class="store.state.theme === 'dark' ? 'text-white' : 'text-grey-8'"
-          >
-            {{ t("search.anomalyColumnHeader") }}
-          </span>
-        </div>
-
         <!-- Actions Column - No Header -->
-        <div class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:relative table-head">
+        <div class="tw:w-24 tw:flex-shrink-0 tw:px-2 tw:relative table-head">
         </div>
       </div>
 
@@ -82,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="$emit('open-details', pattern, index)"
           @include="$emit('add-to-search', pattern, 'include')"
           @exclude="$emit('add-to-search', pattern, 'exclude')"
+          @create-alert="$emit('create-alert', pattern)"
         />
       </q-virtual-scroll>
     </div>
@@ -144,6 +135,7 @@ defineProps<{
 defineEmits<{
   (e: "open-details", pattern: any, index: number): void;
   (e: "add-to-search", pattern: any, action: "include" | "exclude"): void;
+  (e: "create-alert", pattern: any): void;
 }>();
 
 const store = useStore();

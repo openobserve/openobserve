@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -201,6 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :visibleResourceCount="countOfVisibleResources"
                 :selected-permissions-hash="selectedPermissionsHash"
                 @updated:permission="handlePermissionChange"
+                @updated:permission-batch="handlePermissionBatchChange"
                 @expand:row="expandPermission"
               />
             </div>
@@ -889,6 +890,15 @@ const handlePermissionChange = (row: any, permission: string) => {
 
   // Add permission to addedPermissions if not present
   updatePermissionMappings(permissionHash);
+};
+
+const handlePermissionBatchChange = (
+  changes: { row: any; permission: string; newValue: boolean }[]
+) => {
+  changes.forEach(({ row, permission, newValue }) => {
+    row.permission[permission].value = newValue;
+    handlePermissionChange(row, permission);
+  });
 };
 
 const updatePermissionMappings = (permissionHash: string) => {
