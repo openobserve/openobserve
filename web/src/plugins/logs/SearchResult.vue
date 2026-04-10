@@ -334,16 +334,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
           @update:columnSizes="handleColumnSizesUpdate"
           @update:columnOrder="handleColumnOrderUpdate"
-          @copy="copyLogToClipboard"
-          @add-field-to-table="addFieldToTable"
-          @add-search-term="addSearchTerm"
           @close-column="closeColumn"
           @click:data-row="openLogDetails"
           @expand-row="expandLog"
           @send-to-ai-chat="sendToAiChat"
-          @view-trace="redirectToTraces"
-          @show-correlation="openLogDetailsWithCorrelation"
-        />
+        >
+          <template #expanded-row="{ row, index }">
+            <json-preview
+              :value="row"
+              show-copy-button
+              class="tw:py-[0.375rem]"
+              mode="expanded"
+              :index="index"
+              :highlight-query="searchObj.data.highlightQuery"
+              :streamName="searchObj.data.stream.selectedStream[0]"
+              @copy="copyLogToClipboard"
+              @add-field-to-table="addFieldToTable"
+              @add-search-term="addSearchTerm"
+              @view-trace="() => redirectToTraces(row)"
+              @show-correlation="() => openLogDetailsWithCorrelation(row)"
+              @send-to-ai-chat="sendToAiChat"
+            />
+          </template>
+        </tenstack-table>
       </template>
 
       <!-- Patterns View -->
@@ -517,6 +530,7 @@ export default defineComponent({
     ),
     SanitizedHtmlRenderer,
     TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
+    JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
     EqualIcon,
     NotEqualIcon,
     TelemetryCorrelationDashboard,

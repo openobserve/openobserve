@@ -5,7 +5,8 @@
       dense
       size="sm"
       no-caps
-      class="tw:absolute! tw:top-0! tw:right-0! tw:z-10 q-px-sm tw:py-[0.35rem]! tw:bg-[var(--o2-tag-grey-2)]!"
+      class="tw:absolute! tw:top-0! tw:right-0 tw:z-10 q-px-sm tw:py-[0.35rem]! tw:bg-[var(--o2-tag-grey-2)]!"
+      :class="copyButtonClass"
       icon="content_copy"
       @click="copyToClipboard"
     >
@@ -30,7 +31,7 @@
         outlined
         filled
         dense
-        class="q-ml-sm pointer"
+        class="q-ml-sm pointer tw:px-0!"
         :name="'img:' + getImageURL('images/common/add_icon.svg')"
         aria-label="Add icon"
       >
@@ -40,7 +41,7 @@
       </q-btn-dropdown>
 
       <span
-        class="q-pl-xs"
+        class="tw:pl-[0.625rem]"
         :data-test="`json-preview-key-${key}`"
         :class="store.state.theme === 'dark' ? 'dark' : ''"
       >
@@ -90,6 +91,10 @@ export default {
       default: true,
     },
     highlightQuery: {
+      type: String,
+      default: "",
+    },
+    copyButtonClass: {
       type: String,
       default: "",
     },

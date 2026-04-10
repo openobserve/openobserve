@@ -23,7 +23,7 @@ export function useStickyColumns(props: any, store: any) {
 
   // Watch for columns changes to update sticky offsets
   watch(
-    () => props.data?.columns,
+    () => props.columns,
     (columns: any[]) => {
       const offsets: { [key: string]: number } = {};
       let cumulativeWidth = 0;
@@ -70,12 +70,12 @@ export function useStickyColumns(props: any, store: any) {
     styleElement = document.createElement("style");
     styleElement.setAttribute("data-sticky-styles", "true");
 
-    const columns = (props.data?.columns || []) as any[];
+    const columns = (props.columns || []) as any[];
     const bgColor = store.state.theme === "dark" ? "#1a1a1a" : "#fff";
     let css = "";
 
-    const stickyColTotals = !!props.data?.stickyColTotals;
-    const stickyRowTotals = !!props.data?.stickyRowTotals;
+    const stickyColTotals = !!props.stickyColTotals;
+    const stickyRowTotals = !!props.stickyRowTotals;
     const TOTAL_COL_WIDTH = 150;
 
     const scope = `.my-sticky-virtscroll-table[data-sticky-id="${tableId}"]`;
@@ -132,7 +132,7 @@ export function useStickyColumns(props: any, store: any) {
         position: sticky !important;
         z-index: 2 !important;
         background-color: ${bgColor} !important;
-        box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1) !important;
+        box-shadow: inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
       }
 
       /* Sticky total row (bottom sticky) */
@@ -166,7 +166,12 @@ export function useStickyColumns(props: any, store: any) {
   watch(() => store.state.theme, updateStickyColumnStyles);
 
   onMounted(() => {
-    updateStickyColumnStyles();
+    // Defer to next frame so the synchronous style injection from the watch
+    // chain (which already ran during setup) doesn't invalidate the style cache
+    // right before other code reads layout properties (e.g. getRect).
+    requestAnimationFrame(() => {
+      updateStickyColumnStyles();
+    });
   });
 
   onBeforeUnmount(() => {
