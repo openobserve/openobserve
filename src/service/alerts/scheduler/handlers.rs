@@ -113,7 +113,10 @@ async fn handle_anomaly_detection_triggers(
     // The trigger is cleaned up via ConfigDelete in the super cluster queue, not here.
     let Some(config) = config else {
         log::warn!(
-            "[anomaly_detection] config not found locally for {anomaly_id}, rescheduling trigger (may not have synced yet)"
+            "[anomaly_detection] config not found locally for id={anomaly_id} org={} — \
+             trigger row arrived before ConfigCreate synced; rescheduling +60s. \
+             If this persists the ConfigCreate NATS message may have been lost.",
+            trigger.org
         );
         trigger.next_run_at = now_micros() + 60 * 1_000_000;
         trigger.status = db::scheduler::TriggerStatus::Waiting;
