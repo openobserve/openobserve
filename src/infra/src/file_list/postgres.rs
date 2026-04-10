@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap as stdHashMap;
+use std::{collections::HashMap as stdHashMap, sync::LazyLock as Lazy};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, NaiveDate, TimeZone, Timelike, Utc};
@@ -31,7 +31,6 @@ use config::{
     },
 };
 use hashbrown::{HashMap, HashSet};
-use once_cell::sync::Lazy;
 use sqlx::{Executor, PgConnection, Postgres, QueryBuilder, Row};
 
 use crate::{
@@ -2809,7 +2808,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     )
     .await?;
 
-    // Phase 1: Autovacuum tuning + column width compatibility
+    // Autovacuum tuning + column width compatibility
     if cfg.common.meta_partition_mode == "auto" {
         apply_autovacuum_tuning(&pool).await?;
         apply_column_width_compat(&pool).await?;

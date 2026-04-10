@@ -22,12 +22,11 @@ use arrow_flight::{
     flight_service_server::FlightService,
 };
 use config::{
-    cluster::LOCAL_NODE, datafusion::request::FlightSearchRequest, get_batch_size,
-    meta::search::ScanStats,
+    cluster::LOCAL_NODE, datafusion::request::FlightSearchRequest, meta::search::ScanStats,
 };
 use datafusion::{
     common::{DataFusionError, Result},
-    physical_plan::{ExecutionPlan, coalesce_batches::CoalesceBatchesExec, execute_stream},
+    physical_plan::execute_stream,
 };
 use flight::common::{MetricsInfo, PreCustomMessage};
 use futures::{StreamExt, stream::BoxStream};
@@ -154,19 +153,17 @@ impl FlightService for FlightServiceImpl {
         let (ctx, physical_plan, lock, scan_stats) = match result {
             Ok(v) => v,
             Err(e) => {
-                // clear session data
                 clear_session_data(&trace_id);
-                log::error!(
-                    "[trace_id {trace_id}] flight->search: do_get physical plan generate error: {e:?}",
-                );
+                #[cfg(feature = "enterprise")]
+                if get_o2_config().work_group.max_nodes_per_query > 0 {
+                    o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
+                    log::error!(
+                        "[trace_id {trace_id}] flight->search: do_get physical plan generate error: {e:?}",
+                    );
+                }
                 return Err(Status::internal(e.to_string()));
             }
         };
-        // https://github.com/openobserve/openobserve/issues/8280
-        // https://github.com/apache/datafusion/pull/11587
-        // add coalesce batches exec to trigger StringView gc to reduce memory usage
-        let physical_plan: Arc<dyn ExecutionPlan> =
-            Arc::new(CoalesceBatchesExec::new(physical_plan, get_batch_size()));
 
         log::info!(
             "[trace_id {trace_id}] flight->search: executing stream, is super cluster: {is_super_cluster}"
@@ -211,11 +208,14 @@ impl FlightService for FlightServiceImpl {
         let peak_memory_ref = get_peak_memory(&physical_plan);
 
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
-            // clear session data
             clear_session_data(&trace_id);
-            log::error!(
-                "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
-            );
+            #[cfg(feature = "enterprise")]
+            if get_o2_config().work_group.max_nodes_per_query > 0 {
+                o2_enterprise::enterprise::search::admission::ledger::release(&trace_id);
+                log::error!(
+                    "[trace_id {trace_id}] flight->search: do_get physical plan execution error: {e:?}",
+                );
+            }
             Status::internal(e.to_string())
         })?;
 

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -172,6 +172,7 @@ export const DEFAULT_LOGS_CONFIG = {
       selectedFields: [] as string[],
       filterField: "",
       addToFilter: "",
+      removeFilterField: "",
       functions: [] as any[],
       streamType: "logs",
       interestingFieldList: [] as string[],

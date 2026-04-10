@@ -747,7 +747,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/service_accounts/{email_id}", put(service_accounts::update).delete(service_accounts::delete))
 
         // MCP
-        .route("/{org_id}/mcp", get(mcp::handle_mcp_get).post(mcp::handle_mcp_post))
+        .route("/{org_id}/mcp", get(mcp::handle_mcp_get).post(mcp::handle_mcp_post).delete(mcp::handle_mcp_delete))
 
         // sourcemaps
         .route("/{org_id}/sourcemaps",get(sourcemaps::list).post(sourcemaps::upload_maps).delete(sourcemaps::delete))
@@ -799,6 +799,11 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
             .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
             .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
+
+            // Evaluation Templates
+            .route("/{org_id}/eval-templates", get(eval_templates::list).post(eval_templates::create))
+            .route("/{org_id}/eval-templates/{template_id}", get(eval_templates::get).put(eval_templates::update).delete(eval_templates::delete))
+            .route("/{org_id}/eval-templates/{template_id}/stats", get(eval_templates::get_stats))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))
@@ -1046,6 +1051,7 @@ pub fn create_app_router() -> Router {
 #[cfg(test)]
 mod tests {
     use axum::{body::Body, http::Request};
+    use serde_json::Value;
     use tower::ServiceExt;
 
     use super::*;
@@ -1065,6 +1071,28 @@ mod tests {
             response.status().is_client_error() || response.status().is_server_error(),
             "expected 4xx/5xx, got {}",
             response.status()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_config_routes_include_sql_reserved_keywords() {
+        let app = config_routes();
+
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let payload: Value = serde_json::from_slice(&body).unwrap();
+
+        assert!(
+            payload
+                .get("sql_reserved_keywords")
+                .and_then(Value::as_array)
+                .is_some_and(|keywords| !keywords.is_empty())
         );
     }
 }

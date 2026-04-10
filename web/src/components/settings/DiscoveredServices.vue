@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="tw:flex tw:items-center tw:gap-1.5 tw:flex-1 tw:min-w-0">
                         <span
                           v-for="[key, value] in Object.entries(instance.disambiguation).sort(([a], [b]) => a.localeCompare(b))"
-                          :key="key"
+                          :key="`${key}=${value}`"
                           class="dimension-badge"
                           :class="getDimensionColorClass(key)"
                         >
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <span
                 v-for="[key, value] in Object.entries(selectedService.disambiguation).sort(([a], [b]) => a.localeCompare(b))"
-                :key="key"
+                :key="`${key}=${value}`"
                 class="dimension-badge"
                 :class="getDimensionColorClass(key)"
               >
@@ -609,7 +609,10 @@ const filteredGroups = computed((): ServiceGroup[] => {
       g.instances.some(inst =>
         Object.entries(inst.disambiguation).some(([k, v]) =>
           k.toLowerCase().includes(query) || v.toLowerCase().includes(query)
-        )
+        ) ||
+        inst.logs_streams.some(stream => stream.toLowerCase().includes(query)) ||
+        inst.traces_streams.some(stream => stream.toLowerCase().includes(query)) ||
+        inst.metrics_streams.some(stream => stream.toLowerCase().includes(query))
       )
     );
   }

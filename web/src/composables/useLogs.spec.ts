@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -2515,6 +2515,27 @@ describe("Use Logs Composable", () => {
 
         expect(typeof wrapper.vm.handleRunQuery).toBe("function");
       });
+    });
+  });
+
+  describe("getFilterExpressionByFieldType", () => {
+    const setupStreamSchema = (fieldName: string, fieldType: string) => {
+      wrapper.vm.searchObj.data.stream.selectedStream = ["logs"];
+      wrapper.vm.searchObj.data.streamResults.list = [
+        {
+          name: "logs",
+          schema: [{ name: fieldName, type: fieldType }],
+        },
+      ];
+    };
+
+    it("keeps the field unquoted in non-SQL mode", () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      setupStreamSchema("user", "Utf8");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType("user", "alice", "include"),
+      ).toBe("user = 'alice'");
     });
   });
 

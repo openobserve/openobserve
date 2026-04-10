@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -34,6 +34,7 @@ pub mod distinct_values;
 pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod entity;
+pub mod eval_templates;
 pub mod folders;
 pub mod incident_events;
 pub mod kv_store;

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod histogram;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use arrow_schema::{DataType, Field};
 use config::{
@@ -34,7 +34,6 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::{SchemaCache, unwrap_stream_settings},
 };
-use once_cell::sync::Lazy;
 use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
 use sqlparser::{ast::VisitMut, dialect::PostgreSqlDialect, parser::Parser};
@@ -104,6 +103,23 @@ impl Sql {
         search_event_type: Option<SearchEventType>,
     ) -> Result<Sql, Error> {
         Self::new_with_options(query, org_id, stream_type, search_event_type, false).await
+    }
+
+    pub fn get_first_stream_key(&self) -> String {
+        self.stream_names
+            .first()
+            .map(|s| {
+                format!(
+                    "{}/{}",
+                    s.get_stream_type(self.stream_type),
+                    s.stream_name()
+                )
+            })
+            // For multi-stream / cross-index queries there is no single stream
+            // name.  Fall back to the stream-type prefix so select_nodes always
+            // receives a non-empty, deterministic key (rather than "" which
+            // would silently select all nodes and defeat org/stream affinity).
+            .unwrap_or_else(|| format!("{}/", self.stream_type))
     }
 
     pub async fn new_with_options(

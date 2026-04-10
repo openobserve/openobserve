@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -297,8 +297,7 @@ const useHttpStreaming = () => {
       
       if(worker) {
       // Set up worker message handling
-        worker.onmessage = (event) => {
-          const { type, traceId: eventTraceId, data } = event.data;
+        const dispatchWorkerEvent = (type: string, eventTraceId: string, data: any) => {
           switch (type) {
             case 'search_response_metadata':
               onData(eventTraceId, 'search_response_metadata', data);
@@ -321,6 +320,19 @@ const useHttpStreaming = () => {
             case 'end':
               onData(eventTraceId, 'end', 'end');
               break;
+          }
+        };
+
+        worker.onmessage = (event) => {
+          const { type, traceId: eventTraceId, data, events } = event.data;
+          if (type === 'batch' && events) {
+            // Worker sent multiple events from one chunk as a batch.
+            // Dispatch all in the same macrotask so microtask batching works.
+            for (const evt of events) {
+              dispatchWorkerEvent(evt.type, evt.traceId, evt.data);
+            }
+          } else {
+            dispatchWorkerEvent(type, eventTraceId, data);
           }
         };
       } else {

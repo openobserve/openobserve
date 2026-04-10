@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -32,11 +32,11 @@ import useNotifications from "@/composables/useNotifications";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useSearchStream from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import config from "@/aws-exports";
 
 export const useSearchBar = () => {
   const { getStream, isStreamExists, isStreamFetched } = useStreams();
-
 
   let { searchObj, searchObjDebug, notificationMsg } = searchState();
 
@@ -349,7 +349,9 @@ export const useSearchBar = () => {
       const fieldList =
         searchObj.meta.quickMode &&
         searchObj.data.stream.interestingFieldList.length > 0
-          ? searchObj.data.stream.interestingFieldList.join(",")
+          ? searchObj.data.stream.interestingFieldList
+              .map((field: string) => quoteSqlIdentifierIfNeeded(field))
+              .join(",")
           : "*";
 
       const finalQuery = query.replace(/\[FIELD_LIST\]/g, fieldList);
@@ -449,30 +451,54 @@ export const useSearchBar = () => {
         // Store the built query so resolveCrossLinkUrl can use it (searchObj.data.query is empty in non-SQL mode)
         searchObj.data.crossLinkQuery = crossLinkQuery || "";
         if (crossLinkQuery) {
-          searchService
-            .result_schema(
-              {
-                org_identifier: store.state.selectedOrganization.identifier,
-                query: {
-                  query: {
-                    sql: crossLinkQuery,
-                    query_fn: null,
-                    size: -1,
-                    streaming_output: false,
-                    streaming_id: null,
+          const orgId = store.state.selectedOrganization.identifier;
+          const pageType = searchObj.data.stream.streamType || "logs";
+          const sqlQueries: string[] = Array.isArray(crossLinkQuery)
+            ? crossLinkQuery
+            : [crossLinkQuery];
+
+          Promise.all(
+            sqlQueries.map((sql: string) =>
+              searchService
+                .result_schema(
+                  {
+                    org_identifier: orgId,
+                    query: {
+                      query: {
+                        sql,
+                        start_time: (Date.now() - 3600000) * 1000,
+                        end_time: Date.now() * 1000,
+                        query_fn: null,
+                        size: -1,
+                        streaming_output: false,
+                        streaming_id: null,
+                      },
+                    },
+                    page_type: pageType,
+                    is_streaming: false,
+                    cross_linking: true,
                   },
-                },
-                page_type: searchObj.data.stream.streamType || "logs",
-                is_streaming: false,
-                cross_linking: true,
-              },
-              "ui",
-            )
-            .then((response: any) => {
-              searchObj.data.crossLinks = response.data?.cross_links || {
+                  "ui",
+                )
+                .catch(() => null),
+            ),
+          )
+            .then((responses: any[]) => {
+              const mergedLinks: any = {
                 stream_links: [],
                 org_links: [],
               };
+              for (const res of responses) {
+                if (!res?.data?.cross_links) continue;
+                mergedLinks.stream_links.push(
+                  ...res.data.cross_links.stream_links,
+                );
+                // org_links are common across all streams, take from first response
+                if (mergedLinks.org_links.length === 0) {
+                  mergedLinks.org_links = res.data.cross_links.org_links;
+                }
+              }
+              searchObj.data.crossLinks = mergedLinks;
             })
             .catch(() => {
               searchObj.data.crossLinks = {
@@ -829,7 +855,7 @@ export const useSearchBar = () => {
   const cancelQuery = async (): Promise<boolean> => {
     return new Promise((resolve, reject) => {
       try {
-        // only call cancel query api if it is enterprise 
+        // only call cancel query api if it is enterprise
         // otherwise resolve and return immediately
         if (config.isEnterprise !== "true") {
           resolve(true);

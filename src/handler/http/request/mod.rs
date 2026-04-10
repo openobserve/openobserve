@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -32,6 +32,8 @@ pub mod dashboards;
 #[cfg(feature = "enterprise")]
 pub mod domain_management;
 pub mod enrichment_table;
+#[cfg(feature = "enterprise")]
+pub mod eval_templates;
 #[allow(deprecated)]
 pub mod folders;
 pub mod functions;

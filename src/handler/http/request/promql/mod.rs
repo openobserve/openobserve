@@ -313,7 +313,7 @@ async fn query(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Execute PromQL range query", "category": "metrics"}))
+        ("x-o2-mcp" = json!({"description": "Execute PromQL range query", "category": "metrics", "pinned": true}))
     )
 )]
 pub async fn query_range_get(

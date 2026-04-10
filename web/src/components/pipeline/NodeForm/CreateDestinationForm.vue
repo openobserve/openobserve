@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -1461,6 +1461,10 @@ defineExpose({
     .card-icon {
       color: var(--o2-border-color);
     }
+
+    .card-label {
+      color: #333333;
+    }
   }
 
   &.dark-mode {
@@ -1479,6 +1483,10 @@ defineExpose({
 
       .card-icon {
         color: #5d9cec;
+      }
+
+      .card-label {
+        color: #ffffff;
       }
     }
   }

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -2358,6 +2358,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import {
@@ -2385,6 +2386,7 @@ import {
   getFieldFromExpression,
   hasFieldCondition,
   replaceExistingFieldCondition,
+  removeFieldCondition,
 } from "@/plugins/logs/filterUtils";
 
 const defaultValue: any = () => {
@@ -2394,6 +2396,53 @@ const defaultValue: any = () => {
     params: "row",
     transType: "0",
   };
+};
+
+/**
+ * Extracts the field name from a filter expression.
+ * Handles single: `field = 'val'`, multi: `(field = 'x' OR field = 'y')`,
+ * and SQL-prefixed: `"stream".field = 'val'`.
+ */
+const getFieldFromExpression = (expression: string): string | null => {
+  const cleaned = expression.trim().replace(/^\(\s*/, "");
+  const match =
+    cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
+    cleaned.match(/^"?(\w+)"?\s*(?:=|!=|is)/i);
+  return match ? match[1] : null;
+};
+
+/**
+ * Tries to replace an existing condition for `fieldName` in `queryStr` with
+ * `newExpression`. Returns the modified string, or the original if not found.
+ * Handles both parenthesized multi-value groups and single conditions.
+ */
+const replaceExistingFieldCondition = (
+  queryStr: string,
+  fieldName: string,
+  newExpression: string,
+): string => {
+  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const opPat = `(?:=|!=|is(?:\\s+not)?)`;
+  const fieldPat = `(?:"${esc}"|${esc})`;
+  const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
+
+  // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
+  const multiRegex = new RegExp(
+    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
+    "gi",
+  );
+  if (multiRegex.test(queryStr)) {
+    return queryStr.replace(multiRegex, newExpression);
+  }
+
+  // Try single condition
+  const singleRegex = new RegExp(condPat, "gi");
+  if (singleRegex.test(queryStr)) {
+    return queryStr.replace(singleRegex, newExpression);
+  }
+
+  return queryStr;
 };
 
 export default defineComponent({
@@ -4427,9 +4476,16 @@ export default defineComponent({
     }
 
     function buildStreamQuery(stream, fieldList, isQuickMode) {
+      const selectFields =
+        fieldList.length > 0 && isQuickMode
+          ? fieldList
+              .map((field) => quoteSqlIdentifierIfNeeded(field))
+              .join(",")
+          : "*";
+
       return QUERY_TEMPLATE.replace("[STREAM_NAME]", stream).replace(
         "[FIELD_LIST]",
-        fieldList.length > 0 && isQuickMode ? fieldList.join(",") : "*",
+        selectFields,
       );
     }
 
@@ -5304,6 +5360,9 @@ export default defineComponent({
     addSearchTerm() {
       return this.searchObj.data.stream.addToFilter;
     },
+    removeFieldTerm() {
+      return this.searchObj.data.stream.removeFilterField;
+    },
     toggleTransformEditor() {
       return this.searchObj.meta.showTransformEditor;
     },
@@ -5391,41 +5450,42 @@ export default defineComponent({
                     fieldNameSQL,
                     filter,
                   );
-                } else if (query.toLowerCase().includes("order by")) {
-                  const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
-                    query,
-                    "order by",
-                  );
-                  query =
-                    beforeOrderBy.trim() +
-                    " AND " +
-                    filter +
-                    " order by" +
-                    afterOrderBy;
-                } else if (query.toLowerCase().includes("group by")) {
-                  const [beforeGroupBy, afterGroupBy] = queryIndexSplit(
-                    query,
-                    "group by",
-                  );
-                  query =
-                    beforeGroupBy.trim() +
-                    " AND " +
-                    filter +
-                    " group by" +
-                    afterGroupBy;
-                } else if (query.toLowerCase().includes("limit")) {
-                  const [beforeLimit, afterLimit] = queryIndexSplit(
-                    query,
-                    "limit",
-                  );
-                  query =
-                    beforeLimit.trim() +
-                    " AND " +
-                    filter +
-                    " limit" +
-                    afterLimit;
                 } else {
-                  query = query + " AND " + filter;
+                  // Find the earliest clause that ends the WHERE conditions.
+                  // Standard SQL clause order: WHERE → GROUP BY → HAVING → ORDER BY → LIMIT.
+                  // We must insert the new filter before whichever comes first so it
+                  // stays inside the WHERE clause rather than after GROUP BY / ORDER BY.
+                  const terminatingClauses = [
+                    "group by",
+                    "having",
+                    "order by",
+                    "limit",
+                  ];
+                  const lowerQuery = query.toLowerCase();
+                  let firstClause: string | null = null;
+                  let firstIndex = Infinity;
+                  for (const clause of terminatingClauses) {
+                    const idx = lowerQuery.indexOf(clause);
+                    if (idx !== -1 && idx < firstIndex) {
+                      firstIndex = idx;
+                      firstClause = clause;
+                    }
+                  }
+                  if (firstClause) {
+                    const [beforeClause, afterClause] = queryIndexSplit(
+                      query,
+                      firstClause,
+                    );
+                    query =
+                      beforeClause.trim() +
+                      " AND " +
+                      filter +
+                      " " +
+                      firstClause +
+                      afterClause;
+                  } else {
+                    query = query + " AND " + filter;
+                  }
                 }
               } else {
                 if (query.toLowerCase().includes("order by")) {
@@ -5496,6 +5556,17 @@ export default defineComponent({
             this.queryEditorRef.setValue(this.searchObj.data.query);
         }
       }
+    },
+    removeFieldTerm(fieldName: string) {
+      if (!fieldName) return;
+      const newValue = removeFieldCondition(
+        this.searchObj.data.editorValue,
+        fieldName,
+      );
+      this.searchObj.data.editorValue = newValue;
+      this.searchObj.data.query = newValue;
+      this.searchObj.data.stream.removeFilterField = "";
+      if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
     },
     toggleTransformEditor(newVal) {
       if (newVal == false) {

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -273,7 +273,7 @@ mod super_cluster {
 mod tests {
     use config::meta::dashboards::reports::{
         Report, ReportDashboard, ReportDestination, ReportFrequency, ReportFrequencyType,
-        ReportMediaType, ReportTimerange,
+        ReportTimerange,
     };
 
     fn create_test_report() -> Report {
@@ -288,13 +288,16 @@ mod tests {
                 tabs: vec![],
                 variables: vec![],
                 timerange: ReportTimerange::default(),
+                report_type: Default::default(),
+                email_attachment_type: Default::default(),
+                attachment_dimensions: None,
             }],
             destinations: vec![ReportDestination::Email("test@example.com".to_string())],
             frequency: ReportFrequency::default(),
             enabled: true,
             start: chrono::Utc::now().timestamp_micros(),
             message: "Test message".to_string(),
-            media_type: ReportMediaType::Pdf,
+            image_preview: false,
             timezone: "UTC".to_string(),
             tz_offset: 0,
             created_at: config::meta::dashboards::datetime_now(),

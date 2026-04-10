@@ -802,7 +802,7 @@ fn get_writer(
     let cfg = get_config();
     let writer_props = WriterProperties::builder()
         .set_write_batch_size(get_batch_size()) // in bytes
-        .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
+        .set_max_row_group_row_count(Some(PARQUET_MAX_ROW_GROUP_SIZE)) // maximum number of rows in a row group
         .set_compression(get_parquet_compression(&cfg.common.parquet_compression));
 
     let writer_props = writer_props.build();

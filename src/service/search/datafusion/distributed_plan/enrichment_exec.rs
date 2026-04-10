@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,7 @@ use bytes::Bytes;
 use config::{get_batch_size, utils::record_batch_ext::convert_vrl_to_record_batch};
 use datafusion::{
     arrow::datatypes::SchemaRef,
-    common::{Result, Statistics, internal_err},
+    common::{Result, internal_err},
     error::DataFusionError,
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning},
@@ -48,7 +48,7 @@ pub struct EnrichmentExec {
     org_id: String,
     stream_name: String,
     schema: SchemaRef,
-    cache: PlanProperties,
+    cache: Arc<PlanProperties>,
     metrics: ExecutionPlanMetricsSet,
 }
 
@@ -65,15 +65,15 @@ impl EnrichmentExec {
         }
     }
 
-    fn compute_properties(schema: SchemaRef, n_partitions: usize) -> PlanProperties {
+    fn compute_properties(schema: SchemaRef, n_partitions: usize) -> Arc<PlanProperties> {
         let eq_properties = EquivalenceProperties::new(schema);
         let output_partitioning = Partitioning::UnknownPartitioning(n_partitions);
-        PlanProperties::new(
+        Arc::new(PlanProperties::new(
             eq_properties,
             output_partitioning,
             EmissionType::Incremental,
             Boundedness::Bounded,
-        )
+        ))
     }
 
     pub fn trace_id(&self) -> &str {
@@ -150,7 +150,7 @@ impl ExecutionPlan for EnrichmentExec {
         self
     }
 
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.cache
     }
 
@@ -191,10 +191,6 @@ impl ExecutionPlan for EnrichmentExec {
             self.schema.clone(),
             stream,
         )))
-    }
-
-    fn statistics(&self) -> Result<Statistics> {
-        Ok(Statistics::new_unknown(&self.schema))
     }
 
     fn metrics(&self) -> Option<MetricsSet> {

@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -246,6 +246,29 @@ watch(
   },
 );
 
+// Helper function to normalize category names
+const normalizeCategoryName = (category: string): string => {
+  if (!category) return "Other";
+
+  const normalized = category.toLowerCase();
+
+  // Map common variations to consistent names
+  const categoryMap: Record<string, string> = {
+    'kubernetes': 'Kubernetes',
+    'k8s': 'Kubernetes',
+    'aws': 'AWS',
+    'amazon': 'AWS',
+    'azure': 'Azure',
+    'gcp': 'GCP',
+    'google': 'GCP',
+    'common': 'Common',
+    'generic': 'Common',
+    'other': 'Other'
+  };
+
+  return categoryMap[normalized] || category;
+};
+
 // Build category options from localGroups (the actual data)
 const categoryOptions = computed(() => {
   if (localGroups.value.length === 0) {
@@ -256,7 +279,7 @@ const categoryOptions = computed(() => {
   const groupsMap = new Map<string, number>();
 
   for (const group of localGroups.value) {
-    const category = group.group || "Other";
+    const category = normalizeCategoryName(group.group || "Other");
     groupsMap.set(category, (groupsMap.get(category) || 0) + 1);
   }
 
@@ -276,7 +299,7 @@ const filteredGroups = computed(() => {
     return localGroups.value;
   }
   return localGroups.value.filter(
-    (group) => (group.group || "Other") === selectedCategory.value,
+    (group) => normalizeCategoryName(group.group || "Other") === selectedCategory.value,
   );
 });
 

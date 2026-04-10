@@ -17,7 +17,7 @@ use std::{
     cmp::max,
     collections::BTreeMap,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, LazyLock as Lazy},
     time::Duration,
 };
 
@@ -35,7 +35,6 @@ use lettre::{
         client::{Tls, TlsParameters},
     },
 };
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 
@@ -53,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 36;
+pub const DB_SCHEMA_VERSION: u64 = 38;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -108,8 +107,8 @@ pub const MESSAGE_COL_NAME: &str = "message";
 pub const STREAM_NAME_LABEL: &str = "o2_stream_name";
 pub const DEFAULT_STREAM_NAME: &str = "default";
 
-const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 9] = [
-    "log", "message", "msg", "content", "data", "body", "json", "error", "errors",
+const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
+    "log", "message", "msg", "content", "data", "body", "json", "error",
 ];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
@@ -2630,6 +2629,8 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.batch_size = 8192;
     }
     cfg.limit.batch_size = cfg.limit.batch_size.clamp(1024, 8192);
+    // clamp datafusion_min_partition_num to 1
+    cfg.limit.datafusion_min_partition_num = cfg.limit.datafusion_min_partition_num.max(1);
 
     Ok(())
 }
@@ -3377,9 +3378,25 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub fn ensure_not_empty(s: &str, name: &str) -> Result<(), anyhow::Error> {
+    if s.trim().is_empty() {
+        return Err(anyhow::anyhow!("{} is empty", name));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_config_static_uses_std_lazylock_api() {
+        let cfg = std::sync::LazyLock::force(&CONFIG).load();
+        assert_eq!(
+            cfg.limit.req_cols_per_record_limit,
+            get_config().limit.req_cols_per_record_limit
+        );
+    }
 
     #[test]
     fn test_get_config() {
@@ -3504,5 +3521,25 @@ mod tests {
         unsafe {
             std::env::remove_var("ZO_USAGE_REPORT_TO_OWN_ORG");
         }
+    }
+
+    #[test]
+    fn test_ensure_not_empty_valid() {
+        assert!(ensure_not_empty("valid", "TEST").is_ok());
+    }
+
+    #[test]
+    fn test_ensure_not_empty_invalid() {
+        assert!(ensure_not_empty("", "TEST").is_err());
+    }
+
+    #[test]
+    fn test_ensure_not_empty_with_whitespace() {
+        assert!(ensure_not_empty("  value  ", "TEST").is_ok());
+    }
+
+    #[test]
+    fn test_ensure_not_empty_single_char() {
+        assert!(ensure_not_empty("a", "TEST").is_ok());
     }
 }

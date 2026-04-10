@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -132,17 +132,7 @@ const search = {
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
     if (folder_id) url += `&folder_id=${folder_id}`;
     if (cross_linking) url += `&cross_linking=true`;
-    if (typeof query.query.sql != "string") {
-      url = `/api/${org_identifier}/result_schema_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
-      if (query.hasOwnProperty("aggs")) {
-        return http({ headers: { traceparent } }).post(url, {
-          ...query.query,
-          aggs: query.aggs,
-        });
-      } else {
-        return http({ headers: { traceparent } }).post(url, query.query);
-      }
-    }
+
     return http({ headers: { traceparent } }).post(url, query);
   },
 

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -275,6 +275,10 @@ pub struct LlmEvaluationParams {
     /// Only spans containing this field (with a non-empty value) are considered LLM spans.
     #[serde(default = "default_llm_span_identifier")]
     pub llm_span_identifier: String,
+    /// Optional template to use for evaluation (response_type name).
+    /// If specified, overrides auto-resolution by response_type.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eval_template: Option<String>,
 }
 
 fn default_sampling_rate() -> f64 {
@@ -332,6 +336,7 @@ impl Default for LlmEvaluationParams {
             sampling_rate: default_sampling_rate(),
             enable_llm_judge: default_enable_llm_judge(),
             llm_span_identifier: default_llm_span_identifier(),
+            eval_template: None,
         }
     }
 }
@@ -341,6 +346,7 @@ impl MemorySize for LlmEvaluationParams {
         std::mem::size_of::<LlmEvaluationParams>()
             + self.name.mem_size()
             + self.llm_span_identifier.mem_size()
+            + self.eval_template.mem_size()
     }
 }
 

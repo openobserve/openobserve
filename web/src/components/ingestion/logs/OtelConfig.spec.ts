@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -142,7 +142,12 @@ describe("OtelConfig", () => {
         organization: default-org
         stream-name: default
       tls:
-        insecure: true`;
+        insecure: true
+
+service:
+  telemetry:
+    logs:
+      level: warn`;
     
     expect(wrapper.vm.getOtelGrpcConfig).toBe(expectedConfig);
   });
@@ -154,7 +159,12 @@ describe("OtelConfig", () => {
     endpoint: http://localhost:5080/api/default-org
     headers:
       Authorization: Basic ${btoa("test@example.com:test-passcode-123")}
-      stream-name: default`;
+      stream-name: default
+
+service:
+  telemetry:
+    logs:
+      level: warn`;
     
     expect(wrapper.vm.getOtelHttpConfig).toBe(expectedConfig);
   });
@@ -258,6 +268,9 @@ describe("OtelConfig", () => {
     expect(config).toContain("stream-name:");
     expect(config).toContain("tls:");
     expect(config).toContain("insecure:");
+    expect(config).toContain("service:");
+    expect(config).toContain("telemetry:");
+    expect(config).toContain("level: warn");
   });
 
   // Test 22: HTTP configuration structure validation
@@ -270,6 +283,9 @@ describe("OtelConfig", () => {
     expect(config).toContain("headers:");
     expect(config).toContain("Authorization:");
     expect(config).toContain("stream-name:");
+    expect(config).toContain("service:");
+    expect(config).toContain("telemetry:");
+    expect(config).toContain("level: warn");
   });
 
   // Test 23: Default stream name in configs

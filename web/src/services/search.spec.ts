@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -100,7 +100,7 @@ describe("Search Service", () => {
 
       await search.search(params);
 
-      const expectedUrl = 
+      const expectedUrl =
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true" +
         "&dashboard_id=dash-123" +
         "&folder_id=folder-456" +
@@ -147,7 +147,7 @@ describe("Search Service", () => {
     it("should use multi endpoint when query.query.sql is not a string", async () => {
       const params = {
         org_identifier: "test-org",
-        query: { 
+        query: {
           query: { sql: ["SELECT * FROM logs1", "SELECT * FROM logs2"] },
         },
         page_type: "logs",
@@ -164,7 +164,7 @@ describe("Search Service", () => {
     it("should handle multi endpoint with aggs", async () => {
       const params = {
         org_identifier: "test-org",
-        query: { 
+        query: {
           query: { sql: ["SELECT * FROM logs1", "SELECT * FROM logs2"] },
           aggs: { some: "aggregation" },
         },
@@ -234,7 +234,13 @@ describe("Search Service", () => {
     it("should build correct URL for result schema", async () => {
       const params = {
         org_identifier: "test-org",
-        query: { query: { sql: "SELECT * FROM logs" } },
+        query: {
+          query: {
+            sql: "SELECT * FROM logs",
+            start_time: (Date.now() - 3600000) * 1000,
+            end_time: Date.now() * 1000,
+          }
+        },
         page_type: "logs",
       };
 
@@ -249,7 +255,13 @@ describe("Search Service", () => {
     it("should add dashboard parameters to result schema URL", async () => {
       const params = {
         org_identifier: "test-org",
-        query: { query: { sql: "SELECT * FROM logs" } },
+        query: {
+          query: {
+            sql: "SELECT * FROM logs",
+            start_time: (Date.now() - 3600000) * 1000,
+            end_time: Date.now() * 1000,
+          }
+        },
         page_type: "logs",
         dashboard_id: "dash-123",
         folder_id: "folder-456",
@@ -258,7 +270,7 @@ describe("Search Service", () => {
 
       await search.result_schema(params);
 
-      const expectedUrl = 
+      const expectedUrl =
         "/api/test-org/result_schema?type=logs&search_type=ui&use_cache=true&is_streaming=true" +
         "&dashboard_id=dash-123" +
         "&folder_id=folder-456";
@@ -266,11 +278,15 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(expectedUrl, params.query);
     });
 
-    it("should use multi endpoint for result schema when needed", async () => {
+    it("should use standard endpoint for result schema with array sql", async () => {
       const params = {
         org_identifier: "test-org",
-        query: { 
-          query: { sql: ["SELECT * FROM logs1", "SELECT * FROM logs2"] },
+        query: {
+          query: {
+            sql: ["SELECT * FROM logs1", "SELECT * FROM logs2"],
+            start_time: (Date.now() - 3600000) * 1000,
+            end_time: Date.now() * 1000,
+          },
         },
         page_type: "logs",
       };
@@ -278,16 +294,20 @@ describe("Search Service", () => {
       await search.result_schema(params);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/result_schema_multi?type=logs&search_type=ui&use_cache=true",
-        params.query.query
+        "/api/test-org/result_schema?type=logs&search_type=ui&use_cache=true&is_streaming=false",
+        params.query
       );
     });
 
-    it("should handle result schema multi endpoint with aggs", async () => {
+    it("should use standard endpoint for result schema with array sql and aggs", async () => {
       const params = {
         org_identifier: "test-org",
-        query: { 
-          query: { sql: ["SELECT * FROM logs1", "SELECT * FROM logs2"] },
+        query: {
+          query: {
+            sql: ["SELECT * FROM logs1", "SELECT * FROM logs2"],
+            start_time: (Date.now() - 3600000) * 1000,
+            end_time: Date.now() * 1000,
+          },
           aggs: { some: "aggregation" },
         },
         page_type: "logs",
@@ -296,8 +316,8 @@ describe("Search Service", () => {
       await search.result_schema(params);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/result_schema_multi?type=logs&search_type=ui&use_cache=true",
-        { ...params.query.query, aggs: params.query.aggs }
+        "/api/test-org/result_schema?type=logs&search_type=ui&use_cache=true&is_streaming=false",
+        params.query
       );
     });
   });
@@ -467,7 +487,7 @@ describe("Search Service", () => {
 
       await search.metrics_query_range(params);
 
-      const expectedUrl = 
+      const expectedUrl =
         "/api/test-org/prometheus/api/v1/query_range?use_cache=true&start=1609459200&end=1609545600&step=1m&query=cpu_usage%7Binstance%3D'server1'%7D" +
         "&dashboard_id=dash-123" +
         "&folder_id=folder-456" +

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,12 +14,51 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { 
-  buildVariablesDependencyGraph, 
-  isGraphHasCycle 
+import {
+  buildVariablesDependencyGraph,
+  extractVariableNames,
+  isGraphHasCycle
 } from "./variablesDependencyUtils";
 
 describe("Variables Dependency Utils", () => {
+  describe("extractVariableNames with spaces", () => {
+    it("should extract variable names from mustache with spaces", () => {
+      expect(extractVariableNames("{{ hello }}")).toEqual(["hello"]);
+      expect(extractVariableNames("{{  hello  }}")).toEqual(["hello"]);
+    });
+
+    it("should extract variable names from dollar-brace with spaces", () => {
+      expect(extractVariableNames("${ hello }")).toEqual(["hello"]);
+      expect(extractVariableNames("${  hello  }")).toEqual(["hello"]);
+    });
+
+    it("should extract variable names from mustache with format specifier and spaces", () => {
+      expect(extractVariableNames("{{ hello : csv }}")).toEqual(["hello"]);
+      expect(extractVariableNames("{{ hello:pipe }}")).toEqual(["hello"]);
+    });
+
+    it("should extract variable names from dollar-brace with format specifier and spaces", () => {
+      expect(extractVariableNames("${ hello : csv }")).toEqual(["hello"]);
+    });
+
+    it("should extract from mixed spaced and non-spaced patterns", () => {
+      const result = extractVariableNames("{{ a }} $b ${c} ${ d }");
+      expect(result).toEqual(expect.arrayContaining(["a", "b", "c", "d"]));
+      expect(result.length).toBe(4);
+    });
+
+    it("should handle variables with hyphens and underscores with spaces", () => {
+      expect(extractVariableNames("{{ k8s-cluster_name }}")).toEqual(["k8s-cluster_name"]);
+      expect(extractVariableNames("${ k8s-cluster_name }")).toEqual(["k8s-cluster_name"]);
+    });
+
+    it("should filter by variableNames set when using spaces", () => {
+      const names = new Set(["hello"]);
+      expect(extractVariableNames("{{ hello }}", names)).toEqual(["hello"]);
+      expect(extractVariableNames("{{ world }}", names)).toEqual([]);
+    });
+  });
+
   describe("buildVariablesDependencyGraph", () => {
     it("should build empty graph for empty variables list", () => {
       const variables = [];
