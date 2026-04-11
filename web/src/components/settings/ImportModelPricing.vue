@@ -61,66 +61,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`model-pricing-import-error-${index}-${errorIndex}`"
                 >
                   <span
-                    data-test="model-pricing-import-name-error"
                     class="text-red"
-                    v-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'model_pricing_name'
-                    "
+                    v-if="typeof errorMessage === 'object'"
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
-                      <q-input
-                        data-test="model-pricing-import-name-input"
-                        v-model="userSelectedModelPricingName[index]"
-                        :label="'Model Name *'"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="showLabelOnTop"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        tabindex="0"
-                        @update:model-value="
-                          updateModelPricingName(
-                            userSelectedModelPricingName[index],
-                            index,
-                          )
-                        "
-                      />
-                    </div>
-                  </span>
-                  <span
-                    data-test="model-pricing-import-pattern-error"
-                    class="text-red"
-                    v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'model_pricing_pattern'
-                    "
-                  >
-                    {{ errorMessage.message }}
-                    <div style="width: 300px">
-                      <q-input
-                        data-test="model-pricing-import-pattern-input"
-                        v-model="userSelectedModelPricingPattern[index]"
-                        :label="'Match Pattern *'"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="showLabelOnTop"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        tabindex="0"
-                        @update:model-value="
-                          updateModelPricingPattern(
-                            userSelectedModelPricingPattern[index],
-                            index,
-                          )
-                        "
-                      />
-                    </div>
                   </span>
                   <span class="text-red" v-else>{{ errorMessage }}</span>
                 </div>
@@ -183,8 +127,6 @@ const router = useRouter();
 const q = useQuasar();
 const baseImportRef = ref<any>(null);
 const modelPricingErrorsToDisplay = ref<any[]>([]);
-const userSelectedModelPricingName = ref<string[]>([]);
-const userSelectedModelPricingPattern = ref<string[]>([]);
 const modelPricingCreators = ref<any[]>([]);
 const activeTab = ref("import_json_file");
 const isImporting = ref(false);
@@ -210,28 +152,6 @@ const allTabs = ref([
     value: "import_json_url",
   },
 ]);
-
-function updateModelPricingName(name: string, index: number) {
-  if (baseImportRef.value?.jsonArrayOfObj[index]) {
-    baseImportRef.value.jsonArrayOfObj[index].name = name;
-    baseImportRef.value.jsonStr = JSON.stringify(
-      baseImportRef.value.jsonArrayOfObj,
-      null,
-      2
-    );
-  }
-}
-
-function updateModelPricingPattern(pattern: string, index: number) {
-  if (baseImportRef.value?.jsonArrayOfObj[index]) {
-    baseImportRef.value.jsonArrayOfObj[index].match_pattern = pattern;
-    baseImportRef.value.jsonStr = JSON.stringify(
-      baseImportRef.value.jsonArrayOfObj,
-      null,
-      2
-    );
-  }
-}
 
 function handleTabChange(newTab: string) {
   activeTab.value = newTab;
@@ -260,27 +180,56 @@ async function importJson({ jsonStr: jsonString }: any) {
     return;
   }
 
-  let successCount = 0;
   const totalCount = jsonArrayOfObj.value.length;
   isImporting.value = true;
 
-  // Detect duplicate names within the batch
+  // --- All-or-nothing validation pass ---
+  // Check for duplicates within the batch and against existing models.
+  // If any error is found, abort the entire import without creating anything.
   const batchNames = new Set<string>();
   for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
-    if (jsonObj.name && batchNames.has(jsonObj.name)) {
+    const position = index + 1;
+
+    if (!jsonObj.name || !jsonObj.name.trim() || typeof jsonObj.name !== "string") {
       modelPricingErrorsToDisplay.value.push([
-        {
-          field: "model_pricing_name",
-          message: `Model pricing - ${index + 1}: duplicate name "${jsonObj.name}" within this import batch. Each model must have a unique name.`,
-        },
+        { field: "model_pricing_name", message: `Model pricing - ${position}: name is required` },
       ]);
-      continue;
+    } else if (batchNames.has(jsonObj.name)) {
+      modelPricingErrorsToDisplay.value.push([
+        { field: "model_pricing_name", message: `Model pricing - ${position}: duplicate name "${jsonObj.name}" within this import batch. Each model must have a unique name.` },
+      ]);
+    } else if (props.existingModels?.includes(jsonObj.name)) {
+      modelPricingErrorsToDisplay.value.push([
+        { field: "model_pricing_name", message: `Model pricing - ${position}: a model named "${jsonObj.name}" already exists in this org.` },
+      ]);
+    } else {
+      batchNames.add(jsonObj.name);
     }
-    if (jsonObj.name) batchNames.add(jsonObj.name);
-    const success = await processJsonObject(jsonObj, index + 1);
-    if (success) {
-      successCount++;
+
+    if (!jsonObj.match_pattern || !jsonObj.match_pattern.trim() || typeof jsonObj.match_pattern !== "string") {
+      modelPricingErrorsToDisplay.value.push([
+        { field: "model_pricing_pattern", message: `Model pricing - ${position}: match_pattern is required` },
+      ]);
     }
+
+    if (!Array.isArray(jsonObj.tiers) || jsonObj.tiers.length === 0) {
+      modelPricingErrorsToDisplay.value.push([
+        `Model pricing - ${position}: tiers must be a non-empty array`,
+      ]);
+    }
+  }
+
+  if (modelPricingErrorsToDisplay.value.length > 0) {
+    isImporting.value = false;
+    if (baseImportRef.value) baseImportRef.value.isImporting = false;
+    return;
+  }
+
+  // --- Import pass (all entries are valid) ---
+  let successCount = 0;
+  for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
+    const success = await createModelPricing(jsonObj, index + 1);
+    if (success) successCount++;
   }
 
   if (successCount === totalCount) {
@@ -308,72 +257,6 @@ async function importJson({ jsonStr: jsonString }: any) {
   if (baseImportRef.value) {
     baseImportRef.value.isImporting = false;
   }
-}
-
-async function processJsonObject(jsonObj: any, index: number) {
-  try {
-    const validationResult = await validateModelPricingInputs(jsonObj, index);
-    if (!validationResult) {
-      return false;
-    }
-
-    const created = await createModelPricing(jsonObj, index);
-    return created;
-  } catch (e: any) {
-    q.notify({
-      message: "Error importing model pricing. Please check the JSON format.",
-      color: "negative",
-      position: "bottom",
-      timeout: 2000,
-    });
-    return false;
-  }
-}
-
-async function validateModelPricingInputs(jsonObj: any, index: number) {
-  if (!jsonObj.name || !jsonObj.name.trim() || typeof jsonObj.name !== "string") {
-    modelPricingErrorsToDisplay.value.push([
-      {
-        field: "model_pricing_name",
-        message: `Model pricing - ${index}: name is required`,
-      },
-    ]);
-    return false;
-  }
-
-  if (
-    !jsonObj.match_pattern ||
-    !jsonObj.match_pattern.trim() ||
-    typeof jsonObj.match_pattern !== "string"
-  ) {
-    modelPricingErrorsToDisplay.value.push([
-      {
-        field: "model_pricing_pattern",
-        message: `Model pricing - ${index}: match_pattern is required`,
-      },
-    ]);
-    return false;
-  }
-
-  // Check for duplicate name against existing models in the org
-  if (props.existingModels?.includes(jsonObj.name)) {
-    modelPricingErrorsToDisplay.value.push([
-      {
-        field: "model_pricing_name",
-        message: `Model pricing - ${index}: a model with name "${jsonObj.name}" already exists. Please choose a different name.`,
-      },
-    ]);
-    return false;
-  }
-
-  if (!Array.isArray(jsonObj.tiers) || jsonObj.tiers.length === 0) {
-    modelPricingErrorsToDisplay.value.push([
-      `Model pricing - ${index}: tiers must be a non-empty array`,
-    ]);
-    return false;
-  }
-
-  return true;
 }
 
 async function createModelPricing(jsonObj: any, index: number) {

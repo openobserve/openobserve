@@ -18,67 +18,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="built-in-model-pricing-container card-container">
     <!-- Search and Filter Bar -->
     <div class="filters-bar q-pa-md">
-      <div class="tw:flex tw:items-center tw:justify-between tw:flex-wrap">
-        <!-- Text search -->
-         <div class="tw:flex tw:gap-3">
+      <div class="tw:flex tw:items-center tw:gap-3">
         <q-input
-            v-model="searchQuery"
-            placeholder="Search by model name..."
-            borderless
-            dense
-            flat
-            clearable
-            class="no-border tw:w-[220px]"
-            data-test="built-in-model-pricing-search"
-          >
-            <template v-slot:prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
-            </template>
-          </q-input>
+          v-model="searchQuery"
+          placeholder="Search by model name..."
+          borderless
+          dense
+          flat
+          clearable
+          class="no-border tw:w-[220px]"
+          data-test="built-in-model-pricing-search"
+        >
+          <template v-slot:prepend>
+            <q-icon class="o2-search-input-icon" name="search" />
+          </template>
+        </q-input>
 
         <!-- Provider dropdown filter -->
-          <q-select
-            v-model="selectedProvider"
-            :options="providerOptions"
-            placeholder="Provider"
-            dense
-            borderless
-            clearable
-            options-dense
-            use-input
-            hide-selected
-            menu-anchor="bottom left"
-            fill-input
-            class="no-border"
-            data-test="built-in-model-pricing-provider-filter"
-          >
-            <template #option="scope">
-              <q-item v-bind="scope.itemProps" dense>
-                <q-item-section avatar style="min-width: 20px;">
-                  <span
-                    class="provider-dot"
-                    :style="`background: ${providerColor(scope.opt)}`"
-                  />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label>{{ scope.opt }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
-         </div>
-
-        <!-- Refresh -->
-        <div>
-          <q-btn
-            label="Refresh"
-            flat
-            class="o2-secondary-button tw:w-[120px] tw:h-[36px]"
-            @click="refreshModels"
-            :loading="loading"
-            data-test="built-in-model-pricing-refresh-btn"
-          />
-        </div>
+        <q-select
+          v-model="selectedProvider"
+          :options="providerOptions"
+          placeholder="Provider"
+          dense
+          borderless
+          clearable
+          options-dense
+          use-input
+          hide-selected
+          menu-anchor="bottom left"
+          fill-input
+          class="no-border"
+          data-test="built-in-model-pricing-provider-filter"
+        >
+          <template #option="scope">
+            <q-item v-bind="scope.itemProps" dense>
+              <q-item-section avatar style="min-width: 20px;">
+                <span
+                  class="provider-dot"
+                  :style="`background: ${providerColor(scope.opt)}`"
+                />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label>{{ scope.opt }}</q-item-label>
+              </q-item-section>
+            </q-item>
+          </template>
+        </q-select>
       </div>
     </div>
 
@@ -107,18 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-quasar-table tw:h-[calc(100vh-120px)] o2-row-md o2-quasar-table-header-sticky"
           data-test="built-in-model-pricing-table"
         >
-          <!-- Checkbox -->
-          <template #body-cell-select="props">
-            <q-td :props="props">
-              <q-checkbox
-                v-model="props.row.selected"
-                dense
-                size="xs"
-                :data-test="`built-in-model-pricing-checkbox-${props.rowIndex}`"
-              />
-            </q-td>
-          </template>
-
           <!-- Model name + description -->
           <template #body-cell-name="props">
             <q-td :props="props">
@@ -169,11 +142,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="tier-prices">
                     <span
-                      v-for="(price, key) in tier.prices"
+                      v-for="[key, price] in sortedPrices(tier.prices)"
                       :key="key"
                       class="price-chip"
                     >
-                      {{ fmtKey(key as string) }}: ${{ fmtPrice(price as number) }}
+                      {{ fmtKey(key) }}: ${{ fmtPrice(price) }}
                     </span>
                   </div>
                 </div>
@@ -191,9 +164,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #bottom>
             <div class="tw:flex tw:items-center tw:gap-4 tw:py-2 tw:px-1 text-caption text-grey-7">
               <span>{{ filteredModels.length }} model{{ filteredModels.length !== 1 ? 's' : '' }}</span>
-              <span v-if="selectedCount > 0" class="text-primary tw:font-semibold">
-                {{ selectedCount }} selected
-              </span>
             </div>
           </template>
         </q-table>
@@ -221,7 +191,6 @@ interface BuiltInModel {
   provider?: string;
   tiers: ModelTier[];
   sort_order?: number;
-  selected?: boolean;
 }
 
 const PROVIDER_CONFIG: Record<string, { bg: string; text: string }> = {
@@ -237,8 +206,7 @@ function getProvider(name: string | undefined) {
 
 export default defineComponent({
   name: "BuiltInModelPricingTab",
-  emits: ["import-models"],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const q = useQuasar();
 
@@ -249,7 +217,6 @@ export default defineComponent({
     const selectedProvider = ref<string | null>(null);
 
     const columns = [
-      { name: "select",   label: "",         field: "selected",      align: "center" as const, style: "width: 40px" },
       { name: "name",     label: "Model",    field: "name",          align: "left"   as const, sortable: true },
       { name: "provider", label: "Provider", field: "provider",      align: "left"   as const, sortable: true, style: "width: 120px" },
       { name: "pattern",  label: "Pattern",  field: "match_pattern", align: "left"   as const, style: "max-width: 200px" },
@@ -276,11 +243,25 @@ export default defineComponent({
       return result;
     });
 
-    const selectedCount = computed(() => models.value.filter(m => m.selected).length);
-
     function providerColor(name: string | undefined)    { return getProvider(name).bg; }
     function providerBadgeBg(name: string | undefined)  { return getProvider(name).bg; }
     function providerBadgeText(name: string | undefined){ return getProvider(name).text; }
+
+    const KEY_ORDER: Record<string, number> = {
+      input: 0,
+      output: 1,
+      cache_read_input_tokens: 2,
+      cache_creation_input_tokens: 3,
+      output_reasoning_tokens: 4,
+    };
+
+    function sortedPrices(prices: Record<string, number>): [string, number][] {
+      return Object.entries(prices).sort(([a], [b]) => {
+        const oa = KEY_ORDER[a] ?? 99;
+        const ob = KEY_ORDER[b] ?? 99;
+        return oa !== ob ? oa - ob : a.localeCompare(b);
+      });
+    }
 
     function fmtKey(key: string): string {
       return key.replace(/_tokens$/, '').replace(/_/g, '-');
@@ -304,14 +285,8 @@ export default defineComponent({
       if (!clearCache) {
         const cached = ModelPricingCache.get<BuiltInModel[]>(orgId);
         if (cached) {
-          models.value = cached.map((m: BuiltInModel) => ({ ...m, selected: false }));
+          models.value = cached;
           loading.value = false;
-          q.notify({
-            message: `${models.value.length} models loaded`,
-            color: "positive",
-            position: "bottom",
-            timeout: 2000,
-          });
           return;
         }
       }
@@ -320,14 +295,9 @@ export default defineComponent({
         const res = await modelPricingService.getBuiltIn(orgId);
         const fetched: BuiltInModel[] = res.data.models || [];
         ModelPricingCache.set(orgId, fetched);
-        models.value = fetched.map((m: BuiltInModel) => ({ ...m, selected: false }));
-        q.notify({
-          message: `${models.value.length} models loaded`,
-          color: "positive",
-          position: "bottom",
-          timeout: 2000,
-        });
+        models.value = fetched;
       } catch (e: any) {
+        if (e?.response?.status === 403) return;
         error.value = e.response?.data?.message || e.message || "Failed to load models";
         q.notify({ type: "negative", message: error.value, position: "bottom", timeout: 4000 });
       } finally {
@@ -337,29 +307,13 @@ export default defineComponent({
 
     const refreshModels = () => fetchModels(true);
 
-    const importSelectedModels = () => {
-      const selected = models.value.filter(m => m.selected);
-      if (selected.length === 0) {
-        q.notify({ message: "No models selected. Please select at least one model.", color: "warning", position: "bottom", timeout: 2000 });
-        return;
-      }
-      emit("import-models", selected.map(m => ({
-        name: m.name,
-        match_pattern: m.match_pattern,
-        tiers: m.tiers,
-        description: m.description || "",
-        sort_order: m.sort_order ?? 0,
-        enabled: true,
-      })));
-    };
-
     onMounted(() => fetchModels());
 
     return {
       models, loading, error, searchQuery, selectedProvider,
-      columns, providerOptions, filteredModels, selectedCount,
+      columns, providerOptions, filteredModels,
       providerColor, providerBadgeBg, providerBadgeText,
-      fmtKey, fmtPrice, fetchModels, refreshModels, importSelectedModels,
+      fmtKey, fmtPrice, sortedPrices, fetchModels, refreshModels,
     };
   },
 });

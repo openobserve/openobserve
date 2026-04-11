@@ -349,6 +349,7 @@ const q = useQuasar();
 const saving = ref(false);
 const nameTouched = ref(false);
 const patternTouched = ref(false);
+const existingModels = ref<any[]>([]); // loaded once on mount for duplicate-pattern detection
 const addState = ref<Array<{ key: string; value: number }>>([{ key: "", value: 0 }]);
 const showExamples = ref(false);
 const copiedPattern = ref<string | null>(null);
@@ -376,6 +377,8 @@ const nameError = computed(() => {
   const name = model.value.name;
   if (!name || !name.trim()) return "Model name is required";
   if (name.length > 256) return "Model name must be 256 characters or fewer";
+  if (!/^[a-zA-Z]/.test(name)) return "Model name must start with a letter";
+  if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(name)) return "Model name may only contain letters, numbers, underscores, and hyphens";
   return "";
 });
 
@@ -604,6 +607,21 @@ async function save() {
     m.tiers[0].condition = null;
   }
 
+  // Warn if another enabled org entry has the same pattern and higher priority
+  // (same valid_from context → it will shadow this entry at runtime).
+  const patternConflicts = existingModels.value.filter((other: any) => {
+    if (other.id && other.id === m.id) return false; // skip self (edit mode)
+    if (other.match_pattern !== m.match_pattern) return false;
+    const otherVf = other.valid_from ?? 0;
+    const thisVf = m.valid_from ?? 0;
+    if (otherVf !== thisVf) return false; // different time windows — not a conflict
+    // Check if 'other' would win over 'this'
+    const otherSo = other.sort_order ?? 0;
+    const thisSo = m.sort_order ?? 0;
+    if (otherSo !== thisSo) return otherSo < thisSo;
+    return other.name.localeCompare(m.name) < 0;
+  });
+
   saving.value = true;
   try {
     if (m.id) {
@@ -611,7 +629,18 @@ async function save() {
     } else {
       await modelPricingService.create(orgIdentifier.value, m);
     }
-    q.notify({ type: "positive", message: "Model pricing saved", position: "bottom", timeout: 3000 });
+    if (patternConflicts.length > 0) {
+      const winner = patternConflicts[0].name;
+      q.notify({
+        type: "warning",
+        message: `Saved, but this entry is shadowed by "${winner}" which has the same pattern and higher priority. It will never be used for cost calculation unless the other entry is deleted or disabled.`,
+        position: "bottom",
+        timeout: 8000,
+        actions: [{ label: "Dismiss", color: "white" }],
+      });
+    } else {
+      q.notify({ type: "positive", message: "Model pricing saved", position: "bottom", timeout: 3000 });
+    }
     goBack();
   } catch (e: any) {
     notifyError("Failed to save", e);
@@ -623,6 +652,15 @@ async function save() {
 onBeforeMount(async () => {
   const id = route.query.id as string | undefined;
   const isDuplicate = route.query.duplicate === "true";
+
+  // Load all existing org models for duplicate-pattern detection on save
+  try {
+    const listRes = await modelPricingService.list(orgIdentifier.value);
+    existingModels.value = (listRes.data || []).filter(
+      (m: any) => (m.source === 'org' || !m.source) && m.org_id === orgIdentifier.value && m.enabled !== false
+    );
+  } catch { /* non-critical */ }
+
   if (id) {
     try {
       const res = await modelPricingService.get(orgIdentifier.value, id);

@@ -32,49 +32,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
-      <div class="q-table__title tw:font-[600]" data-test="model-pricing-list-title">
-        LLM Model Pricing
+      <div class="tw:flex tw:items-center tw:gap-4">
+        <div class="q-table__title tw:font-[600]" data-test="model-pricing-list-title">
+          LLM Model Pricing
+        </div>
+        <q-tabs
+          v-model="activeTab"
+          dense
+          no-caps
+          align="left"
+          class="model-pricing-tabs"
+          indicator-color="primary"
+          active-color="primary"
+          data-test="model-pricing-tabs"
+        >
+          <q-tab name="my_models" label="My Models" data-test="model-pricing-tab-my" />
+          <q-tab name="built_in" label="Built-in" data-test="model-pricing-tab-builtin" />
+        </q-tabs>
       </div>
       <div class="tw:flex tw:justify-end">
-        <q-input
-          v-model="filterQuery"
-          borderless
-          dense
-          class="q-ml-auto no-border o2-search-input"
-          placeholder="Search models..."
-        >
-          <template #prepend>
-            <q-icon class="o2-search-input-icon" name="search" />
-          </template>
-        </q-input>
-        <q-btn
-          class="o2-secondary-button q-ml-sm tw:h-[36px]"
-          no-caps
-          flat
-          icon="refresh"
-          label="Refresh Built-in"
-          :loading="refreshing"
-          @click="refreshBuiltIn"
-          data-test="model-pricing-refresh-btn"
-        />
-        <q-btn
-          class="o2-secondary-button q-ml-sm tw:h-[36px]"
-          no-caps
-          flat
-          label="Bulk Import"
-          @click="openImport"
-          data-test="model-pricing-import-btn"
-        />
-        <q-btn
-          class="o2-primary-button q-ml-sm tw:h-[36px]"
-          no-caps
-          flat
-          label="New Model"
-          @click="openEditor(null)"
-          data-test="model-pricing-add-btn"
-        />
+        <template v-if="activeTab === 'my_models'">
+          <q-input
+            v-model="filterQuery"
+            borderless
+            dense
+            class="q-ml-auto no-border o2-search-input"
+            placeholder="Search models..."
+          >
+            <template #prepend>
+              <q-icon class="o2-search-input-icon" name="search" />
+            </template>
+          </q-input>
+          <q-btn
+            class="o2-secondary-button q-ml-sm tw:h-[36px]"
+            no-caps
+            flat
+            label="Bulk Import"
+            @click="openImport"
+            data-test="model-pricing-import-btn"
+          />
+          <q-btn
+            class="o2-primary-button q-ml-sm tw:h-[36px]"
+            no-caps
+            flat
+            label="New Model"
+            @click="openEditor(null)"
+            data-test="model-pricing-add-btn"
+          />
+        </template>
+        <template v-else>
+          <q-btn
+            class="o2-secondary-button q-ml-sm tw:h-[36px]"
+            no-caps
+            flat
+            icon="refresh"
+            label="Refresh Built-in"
+            :loading="refreshing"
+            @click="refreshBuiltIn"
+            data-test="model-pricing-refresh-btn"
+          />
+        </template>
       </div>
     </div>
+
+    <!-- Built-in Tab -->
+    <BuiltInModelPricingTab
+      v-if="activeTab === 'built_in'"
+      ref="builtInTabRef"
+      data-test="model-pricing-builtin-tab"
+    />
+
+    <!-- My Models Table (shown only on my_models tab) -->
+    <template v-if="activeTab === 'my_models'">
 
     <!-- List Table -->
     <q-table
@@ -193,19 +222,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template v-else-if="col.name === 'match_pattern'">
-              <div class="o2-table-cell-content">
+              <div style="white-space: normal; word-break: break-all; max-width: 300px;">
                 <code class="text-caption">{{ props.row.match_pattern }}</code>
+                <span
+                  v-if="shadowedIds.has(props.row.id)"
+                  class="pattern-shadow-warn"
+                >
+                  <q-icon name="warning" size="13px" />
+                  Shadowed
+                  <q-tooltip max-width="280px" anchor="top middle" self="bottom middle">
+                    Another enabled model with the same pattern has higher priority
+                    (lower sort order or earlier name) and will always be used for
+                    cost calculation. This entry will never match.
+                  </q-tooltip>
+                </span>
               </div>
             </template>
             <template v-else-if="col.name === 'pricing'">
               <div class="o2-table-cell-content" style="white-space: normal;">
                 <div v-if="getDefaultTier(props.row) && Object.keys(getDefaultTier(props.row).prices || {}).length" class="pricing-chips">
                   <span
-                    v-for="(price, key) in getDefaultTier(props.row).prices"
+                    v-for="[key, price] in sortedPrices(getDefaultTier(props.row).prices)"
                     :key="key"
                     class="price-chip"
                   >
-                    {{ formatPriceKey(key as string) }}: {{ formatPerMillion(price as number) }}
+                    {{ formatPriceKey(key) }}: {{ formatPerMillion(price) }}
                   </span>
                 </div>
                 <span v-else class="text-grey-5">—</span>
@@ -345,6 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </q-table>
+    </template> <!-- end activeTab === 'my_models' -->
     </div> <!-- end v-if="!showImportModelPricingPage" -->
 
   <confirm-dialog
@@ -358,13 +400,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onBeforeMount, onActivated, onMounted } from "vue";
+import { ref, computed, onBeforeMount, onActivated } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { outlinedDelete, outlinedPause, outlinedPlayArrow } from "@quasar/extras/material-icons-outlined";
 import modelPricingService from "@/services/model_pricing";
 import ImportModelPricing from "@/components/settings/ImportModelPricing.vue";
+import BuiltInModelPricingTab from "@/components/settings/BuiltInModelPricingTab.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
@@ -373,6 +416,7 @@ const router = useRouter();
 const q = useQuasar();
 
 const qTableRef = ref<any>(null);
+const builtInTabRef = ref<any>(null);
 const models = ref<any[]>([]);
 const loading = ref(true);
 const refreshing = ref(false);
@@ -390,6 +434,7 @@ const resetConfirmDialog = () => {
 const filterQuery = ref("");
 const showImportModelPricingPage = ref(false);
 const selectedIds = ref<string[]>([]);
+const activeTab = ref("my_models");
 
 const perPageOptions: any = [
   { label: "20", value: 20 },
@@ -416,7 +461,7 @@ const columns = computed(() => {
   cols.push(
     { name: "name", label: "Model", field: "name", align: "left", sortable: true },
     { name: "provider", label: "Provider", field: "provider", align: "left", style: "width: 120px" },
-    { name: "match_pattern", label: "Pattern", field: "match_pattern", align: "left", style: "max-width: 300px; overflow: hidden;" },
+    { name: "match_pattern", label: "Pattern", field: "match_pattern", align: "left", style: "max-width: 300px;" },
     { name: "pricing", label: "Pricing (per 1M tokens)", field: "pricing", align: "left" },
     { name: "actions", label: "Actions", field: "actions", align: "center", style: "width: 140px" },
   );
@@ -476,6 +521,63 @@ function getSource(model: any): string {
   return model.source || 'org';
 }
 
+/**
+ * Returns a Set of model IDs that are "shadowed" — i.e. they share a match_pattern
+ * with another enabled org-level entry that has higher priority and will always win.
+ *
+ * Priority mirrors the backend find_pricing_sync_at():
+ *   1. source (org > meta > built_in) — here we only compare within same source level
+ *   2. valid_from (larger = more recent wins; null treated as 0)
+ *   3. sort_order (lower wins)
+ *   4. name (alphabetically earlier wins)
+ *
+ * An entry is shadowed if at least one other enabled entry with the same pattern
+ * has strictly higher priority for ALL possible span timestamps (i.e. ignoring
+ * valid_from versioning — we warn when valid_from is identical or null on both sides).
+ */
+const shadowedIds = computed((): Set<string> => {
+  const orgModels = models.value.filter(
+    (m: any) => getSource(m) === 'org' && m.org_id === orgIdentifier.value && m.enabled !== false
+  );
+
+  // Group by match_pattern
+  const byPattern = new Map<string, any[]>();
+  for (const m of orgModels) {
+    const p = m.match_pattern;
+    if (!byPattern.has(p)) byPattern.set(p, []);
+    byPattern.get(p)!.push(m);
+  }
+
+  const shadowed = new Set<string>();
+
+  for (const [, group] of byPattern) {
+    if (group.length < 2) continue;
+
+    // Sort the group by backend priority: valid_from desc → sort_order asc → name asc
+    const sorted = [...group].sort((a: any, b: any) => {
+      const va = a.valid_from ?? 0;
+      const vb = b.valid_from ?? 0;
+      if (va !== vb) return vb - va; // higher valid_from wins
+      const sa = a.sort_order ?? 0;
+      const sb = b.sort_order ?? 0;
+      if (sa !== sb) return sa - sb; // lower sort_order wins
+      return a.name.localeCompare(b.name); // alphabetical
+    });
+
+    // The first entry wins. All others with the same valid_from as the winner are shadowed
+    // (if valid_from differs they serve different time windows — not a conflict).
+    const winnerValidFrom = sorted[0].valid_from ?? 0;
+    for (let i = 1; i < sorted.length; i++) {
+      const candidateValidFrom = sorted[i].valid_from ?? 0;
+      if (candidateValidFrom === winnerValidFrom) {
+        shadowed.add(sorted[i].id);
+      }
+    }
+  }
+
+  return shadowed;
+});
+
 /** True when a model entry is read-only (built-in or from another org). */
 function isReadOnly(model: any): boolean {
   return model.source === 'built_in' || model.org_id !== orgIdentifier.value;
@@ -500,10 +602,9 @@ const filteredModels = computed(() => {
         (m.provider || '').toLowerCase().includes(search)
     );
   }
-  // Group by source: org first, then meta_org, then built_in
+  // Group by source: org first, then meta_org (built-in shown in separate tab)
   const orgItems = items.filter((m: any) => getSource(m) === 'org' && m.org_id === orgIdentifier.value);
   const metaItems = items.filter((m: any) => getSource(m) === 'meta_org' || (getSource(m) === 'org' && m.org_id !== orgIdentifier.value));
-  const builtInItems = items.filter((m: any) => getSource(m) === 'built_in');
 
   const sorted: any[] = [];
 
@@ -519,14 +620,7 @@ const filteredModels = computed(() => {
     sorted.push(...metaItems);
   }
 
-  // Add built-in section
-  if (builtInItems.length > 0) {
-    builtInItems[0] = { ...builtInItems[0], __sectionStart: 'built_in' };
-    for (let i = 1; i < builtInItems.length; i++) {
-      builtInItems[i] = { ...builtInItems[i], __sectionStart: null };
-    }
-    sorted.push(...builtInItems);
-  }
+  // Built-in models are shown in the dedicated "Built-in" tab, not here.
 
   // Ensure org items don't have section markers
   for (const item of orgItems) {
@@ -549,18 +643,15 @@ function customSort(rows: any[], sortBy: string, descending: boolean) {
 
   const orgRows = rows.filter((r: any) => getSource(r) === 'org' && r.org_id === orgIdentifier.value);
   const metaRows = rows.filter((r: any) => getSource(r) === 'meta_org' || (getSource(r) === 'org' && r.org_id !== orgIdentifier.value));
-  const builtInRows = rows.filter((r: any) => getSource(r) === 'built_in');
 
   orgRows.sort(compare);
   metaRows.sort(compare);
-  builtInRows.sort(compare);
 
   // Clear and re-apply section markers
-  [...orgRows, ...metaRows, ...builtInRows].forEach((r: any) => { r.__sectionStart = null; });
+  [...orgRows, ...metaRows].forEach((r: any) => { r.__sectionStart = null; });
   if (metaRows.length > 0) metaRows[0].__sectionStart = 'meta_org';
-  if (builtInRows.length > 0) builtInRows[0].__sectionStart = 'built_in';
 
-  return [...orgRows, ...metaRows, ...builtInRows];
+  return [...orgRows, ...metaRows];
 }
 
 function getDefaultTier(model: any) {
@@ -569,6 +660,22 @@ function getDefaultTier(model: any) {
   // entries might have a different order.
   const fallback = model.tiers?.find((t: any) => !t.condition);
   return fallback || model.tiers?.[0];
+}
+
+const KEY_ORDER: Record<string, number> = {
+  input: 0,
+  output: 1,
+  cache_read_input_tokens: 2,
+  cache_creation_input_tokens: 3,
+  output_reasoning_tokens: 4,
+};
+
+function sortedPrices(prices: Record<string, number>): [string, number][] {
+  return Object.entries(prices || {}).sort(([a], [b]) => {
+    const oa = KEY_ORDER[a] ?? 99;
+    const ob = KEY_ORDER[b] ?? 99;
+    return oa !== ob ? oa - ob : a.localeCompare(b);
+  });
 }
 
 /** Shorten usage key for display: replace underscores with hyphens, drop trailing "_tokens". */
@@ -674,6 +781,8 @@ async function refreshBuiltIn() {
   try {
     await modelPricingService.refreshBuiltIn(orgIdentifier.value);
     q.notify({ type: "positive", message: "Built-in models refreshed", position: "bottom", timeout: 3000 });
+    // If the Built-in tab is currently visible, refresh it too
+    builtInTabRef.value?.refreshModels();
     await fetchModels();
   } catch (e: any) {
     notifyError("Refresh failed", e);
@@ -730,7 +839,7 @@ function exportSelected() {
 }
 
 function confirmDeleteSelected() {
-  const count = selectedIds.value.size;
+  const count = selectedIds.value.length;
   confirmDialogMeta.value = {
     show: true,
     title: "Delete Selected Models",
@@ -838,5 +947,41 @@ onActivated(() => {
 body.body--dark .price-chip {
   color: #bbb;
   border-color: #555;
+}
+
+.pattern-shadow-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  cursor: default;
+
+  .body--dark & {
+    color: #fbbf24;
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.3);
+  }
+}
+
+.model-pricing-tabs {
+  min-height: 36px;
+
+  :deep(.q-tab) {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  :deep(.q-tab__label) {
+    font-size: 13px;
+  }
 }
 </style>
