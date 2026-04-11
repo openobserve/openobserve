@@ -41,6 +41,12 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((d: any) => d),
 }));
 
+vi.mock("vue-i18n", () => ({
+  useI18n: vi.fn(() => ({
+    t: (key: string) => key,
+  })),
+}));
+
 vi.mock("quasar", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
