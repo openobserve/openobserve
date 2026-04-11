@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-      <div class="tw:flex tw:flex-col" style="height: calc(100vh - 50px);">
+      <div class="tw:flex tw:flex-col" style="height: calc(100vh - 44px);">
       <!-- TIER 1: Top Bar -->
       <div class="alert-v3-topbar card-container tw:mx-[0.625rem] tw:mb-2 tw:shrink-0">
         <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[48px]">
@@ -36,7 +36,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-icon name="arrow_back_ios_new" size="10px" class="tw:font-semibold" />
             </div>
-            <span v-if="!isAnomalyMode" class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">{{ beingUpdated ? 'Edit Alert' : 'New Alert' }}</span>
+            <template v-if="!isAnomalyMode">
+              <span v-if="beingUpdated" class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">{{ formData.name }}</span>
+              <template v-else>
+                <span class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">New Alert</span>
+                <q-input
+                  v-model="formData.name"
+                  data-test="add-alert-name-input"
+                  dense
+                  borderless
+                  :placeholder="'Alert name'"
+                  class="alert-v3-field tw:text-sm"
+                  style="min-width: 180px;"
+                  hide-bottom-space
+                />
+              </template>
+            </template>
             <template v-else>
               <span class="tw:text-xs tw:font-medium tw:whitespace-nowrap">{{ anomalyEditMode ? t("alerts.updateAnomalyDetection") : t("alerts.newAnomalyDetection") }}</span>
               <template v-if="anomalyEditMode">
@@ -142,158 +157,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- TIER 2: Preview & Summary -->
-      <div
-        class="card-container tw:mx-[0.625rem] tw:mb-2 tw:overflow-hidden tw:transition-all tw:duration-300"
-        :style="{ height: chartCollapsed ? '40px' : '260px' }"
-      >
-        <div
-          class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:h-[40px] tw:select-none tw:border-b tw:shrink-0"
-          :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
-        >
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <div class="tw:flex tw:items-center tw:gap-2 tw:cursor-pointer" @click="chartCollapsed = !chartCollapsed">
-              <q-icon :name="chartCollapsed ? 'expand_more' : 'expand_less'" size="20px" />
-              <span class="tw:text-sm tw:font-medium">{{ isAnomalyMode ? t("alerts.sqlPreview") : (t("alerts.preview") || "Preview") }}</span>
-            </div>
-            <!-- Alert trigger status (standard alerts only) — use floating ref when active -->
-            <template v-if="!isAnomalyMode && !chartCollapsed && activeEvaluationStatus">
-              <div class="tw:w-px tw:h-4" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" />
-              <div class="tw:flex tw:items-center tw:gap-1.5">
-                <q-icon
-                  :name="activeEvaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'"
-                  :color="activeEvaluationStatus.wouldTrigger ? 'positive' : 'grey-5'"
-                  size="16px"
-                />
-                <span
-                  class="tw:text-xs tw:font-semibold"
-                  :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-green-600' : 'tw:text-gray-400'"
-                >
-                  {{ activeEvaluationStatus.wouldTrigger ? 'Would Trigger' : 'Would Not Trigger' }}
-                </span>
-                <span class="tw:text-xs tw:opacity-60">{{ activeEvaluationStatus.reason }}</span>
-              </div>
-            </template>
-          </div>
-          <div v-show="!chartCollapsed && !isAnomalyMode" class="tw:flex tw:items-center tw:gap-1" @click.stop>
-            <q-btn
-              flat dense round
-              size="sm"
-              icon="picture_in_picture_alt"
-              class="tw:opacity-50 hover:tw:opacity-100"
-              @click="floatingPreview = true; chartCollapsed = true"
-            >
-              <q-tooltip :delay="300" anchor="bottom middle" self="top middle">
-                Minimize preview into a floating window
-              </q-tooltip>
-            </q-btn>
-            <DateTimePicker
-              v-model="previewDateTimeValue"
-              class="alert-preview-datetime"
-            />
-          </div>
-        </div>
-        <div v-show="!chartCollapsed" class="tw:h-[calc(100%-40px)]">
-          <!-- Anomaly: SQL Preview -->
-          <template v-if="isAnomalyMode">
-            <div style="height: 100%; overflow: hidden;">
-              <QueryEditor
-                editor-id="anomaly-sql-preview"
-                language="sql"
-                :read-only="true"
-                :show-auto-complete="false"
-                :hide-nl-toggle="true"
-                :query="anomalyPreviewSql"
-                style="height: 100%"
-              />
-            </div>
-          </template>
-          <!-- Standard: Chart Preview or Empty State -->
-          <template v-else>
-            <!-- Empty state when no stream selected -->
-            <div
-              v-if="!formData.stream_name"
-              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2"
-            >
-              <q-icon name="query_stats" size="36px" class="tw:opacity-20" />
-              <span
-                class="tw:text-sm tw:font-medium"
-                :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-              >
-                Select a stream type and stream name to see a preview
-              </span>
-            </div>
-            <!-- Chart preview when stream is selected -->
-            <preview-alert
-              v-else
-              ref="previewAlertRef"
-              style="width: 100%; height: 100%;"
-              :formData="formData"
-              :query="previewQuery"
-              :selectedTab="formData.query_condition.type || 'custom'"
-              :isAggregationEnabled="isAggregationEnabled"
-              :isUsingBackendSql="isUsingBackendSql"
-              :isEditorOpen="isEditorOpen"
-              :previewDateTime="previewDateTimeValue"
-            />
-          </template>
-        </div>
-      </div>
+      <!-- TIER 3 (left 70%) + TIER 2 (right 30%) row -->
+      <div class="tw:flex tw:flex-1 tw:min-h-0 tw:mx-[0.625rem] tw:gap-2 tw:mb-2">
 
-      <!-- Floating mini preview widget -->
-      <div
-        v-if="floatingPreview && formData.stream_name && !isAnomalyMode"
-        ref="floatingWidgetRef"
-        class="floating-preview-widget"
-        :class="store.state.theme === 'dark' ? 'floating-preview-widget--dark' : 'floating-preview-widget--light'"
-        :style="floatingWidgetStyle"
-      >
-        <div
-          class="floating-preview-widget__header"
-          :class="store.state.theme === 'dark' ? 'floating-preview-widget__header--dark' : 'floating-preview-widget__header--light'"
-          @mousedown.prevent="onFloatingDragStart"
-        >
-          <div class="tw:flex tw:items-center tw:gap-1.5 tw:overflow-hidden tw:min-w-0">
-            <q-icon name="query_stats" size="14px" class="tw:opacity-60 tw:shrink-0" />
-            <!-- Trigger status in floating header -->
-            <template v-if="floatingPreviewRef?.evaluationStatus">
-              <q-icon
-                :name="floatingPreviewRef.evaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'"
-                :color="floatingPreviewRef.evaluationStatus.wouldTrigger ? 'positive' : 'grey-5'"
-                size="12px"
-                class="tw:shrink-0"
-              />
-              <span
-                class="tw:text-[11px] tw:font-semibold tw:truncate"
-                :class="floatingPreviewRef.evaluationStatus.wouldTrigger ? 'tw:text-green-600' : 'tw:text-gray-400'"
-              >
-                {{ floatingPreviewRef.evaluationStatus.wouldTrigger ? 'Would Trigger' : 'Would Not Trigger' }}
-              </span>
-              <span class="tw:text-[10px] tw:opacity-50 tw:truncate">{{ floatingPreviewRef.evaluationStatus.reason }}</span>
-            </template>
-          </div>
-          <div class="tw:flex tw:items-center tw:gap-0.5 tw:shrink-0">
-            <q-btn flat dense round size="xs" icon="open_in_full" title="expand preview" @click.stop="floatingPreview = false; chartCollapsed = false" />
-            <q-btn flat dense round size="xs" icon="close" title="close" @click.stop="floatingPreview = false" />
-          </div>
-        </div>
-        <div class="floating-preview-widget__body">
-          <preview-alert
-            ref="floatingPreviewRef"
-            style="width: 100%; height: 100%;"
-            :formData="formData"
-            :query="previewQuery"
-            :selectedTab="formData.query_condition.type || 'custom'"
-            :isAggregationEnabled="isAggregationEnabled"
-            :isUsingBackendSql="isUsingBackendSql"
-            :isEditorOpen="isEditorOpen"
-            :previewDateTime="previewDateTimeValue"
-          />
-        </div>
-      </div>
+      <!-- LEFT column wrapper (flex: 6.5) -->
+      <div style="flex: 6.5; min-height: 0; display: flex; flex-direction: column; gap: 8px;">
 
       <!-- TIER 3: Configuration Tabs -->
-      <div class="alert-v3-tabs card-container tw:mx-[0.625rem]" style="flex: 1; min-height: 250px; display: flex; flex-direction: column;">
+      <div class="alert-v3-tabs card-container" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
         <!-- Tab Headers -->
         <div class="tw:flex tw:border-b tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'">
           <div
@@ -302,17 +173,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               { key: 'anomaly-alerting', label: t('alerts.alerting') || 'Alerting', required: anomalyConfig.alert_enabled },
             ] : [
               { key: 'condition', label: 'Alert Rules', required: true },
-              { key: 'compare', label: t('alerts.steps.compareWithPast'), show: formData.is_real_time === 'false' },
-              { key: 'dedup', label: t('alerts.steps.deduplication'), show: formData.is_real_time === 'false' },
               { key: 'advanced', label: t('alerts.steps.advanced') },
             ]).filter(t => t.show !== false)"
             :key="tab.key"
             class="tw:px-4 tw:py-2.5 tw:cursor-pointer tw:text-sm tw:font-medium tw:relative tw:select-none tw:transition-colors"
-            :class="[
-              activeTab === tab.key
-                ? (store.state.theme === 'dark' ? 'tw:text-blue-400 tw:border-b-2 tw:border-blue-400' : 'tw:text-blue-600 tw:border-b-2 tw:border-blue-600')
-                : (store.state.theme === 'dark' ? 'tw:text-gray-400 hover:tw:text-gray-200' : 'tw:text-gray-500 hover:tw:text-gray-800'),
-            ]"
+            :class="activeTab === tab.key
+              ? 'active-tab'
+              : (store.state.theme === 'dark' ? 'tw:text-gray-400 hover:tw:text-gray-200' : 'tw:text-gray-500 hover:tw:text-gray-800')"
             @click="activeTab = tab.key"
           >
             {{ tab.label }}{{ tab.required ? ' *' : '' }}
@@ -384,46 +251,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Compare with Past Tab (Scheduled only) -->
-          <div v-show="activeTab === 'compare'" class="tw:p-3">
-            <CompareWithPast
-              ref="step3Ref"
-              :multiTimeRange="formData.query_condition.multi_time_range"
-              :period="formData.trigger_condition.period"
-              :frequency="formData.trigger_condition.frequency"
-              :frequencyType="formData.trigger_condition.frequency_type"
-              :cron="formData.trigger_condition.cron"
-              :selectedTab="formData.query_condition.type || 'custom'"
-              @update:multiTimeRange="(val) => (formData.query_condition.multi_time_range = val)"
-              @goToSqlEditor="handleGoToSqlEditor"
-            />
-          </div>
+          <!-- Advanced Tab (includes Compare with Past, Deduplication, and Advanced settings) -->
+          <div v-show="activeTab === 'advanced'" class="tw:p-3 tw:flex tw:flex-col tw:gap-4">
 
-          <!-- Deduplication Tab (Scheduled only) -->
-          <div v-show="activeTab === 'dedup'" class="tw:p-3">
-            <Deduplication
-              :deduplication="formData.deduplication"
-              :columns="filteredColumns"
-              @update:deduplication="(val) => (formData.deduplication = val)"
-            />
-          </div>
+            <!-- Compare with Past (scheduled only) -->
+            <div v-if="formData.is_real_time === 'false'">
+              <CompareWithPast
+                ref="step3Ref"
+                :multiTimeRange="formData.query_condition.multi_time_range"
+                :period="formData.trigger_condition.period"
+                :frequency="formData.trigger_condition.frequency"
+                :frequencyType="formData.trigger_condition.frequency_type"
+                :cron="formData.trigger_condition.cron"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                @update:multiTimeRange="(val) => (formData.query_condition.multi_time_range = val)"
+                @goToSqlEditor="handleGoToSqlEditor"
+              />
+            </div>
 
-          <!-- Advanced Tab -->
-          <div v-show="activeTab === 'advanced'" class="tw:p-3">
-            <Advanced
-              :template="formData.template"
-              :templates="templates"
-              :contextAttributes="formData.context_attributes"
-              :description="formData.description"
-              :rowTemplate="formData.row_template"
-              :rowTemplateType="formData.row_template_type"
-              @update:template="(val) => (formData.template = val)"
-              @refresh:templates="refreshTemplates"
-              @update:contextAttributes="(val) => (formData.context_attributes = val)"
-              @update:description="(val) => (formData.description = val)"
-              @update:rowTemplate="(val) => (formData.row_template = val)"
-              @update:rowTemplateType="(val) => (formData.row_template_type = val)"
-            />
+            <!-- Deduplication (scheduled only) -->
+            <div v-if="formData.is_real_time === 'false'">
+              <Deduplication
+                :deduplication="formData.deduplication"
+                :columns="filteredColumns"
+                @update:deduplication="(val) => (formData.deduplication = val)"
+              />
+            </div>
+
+            <!-- Advanced settings -->
+            <div>
+              <Advanced
+                :template="formData.template"
+                :templates="templates"
+                :contextAttributes="formData.context_attributes"
+                :description="formData.description"
+                :rowTemplate="formData.row_template"
+                :rowTemplateType="formData.row_template_type"
+                @update:template="(val) => (formData.template = val)"
+                @refresh:templates="refreshTemplates"
+                @update:contextAttributes="(val) => (formData.context_attributes = val)"
+                @update:description="(val) => (formData.description = val)"
+                @update:rowTemplate="(val) => (formData.row_template = val)"
+                @update:rowTemplateType="(val) => (formData.row_template_type = val)"
+              />
+            </div>
           </div>
 
           <!-- Anomaly Detection Config Tab -->
@@ -443,43 +314,102 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </q-form>
-      </div>
-      <!-- Footer: Cancel / Save -->
+      </div><!-- end TIER 3 card -->
+
+      <!-- Footer: Cancel / Save (left column, separate card) -->
       <div
-        class="flex q-px-md tw:py-3 tw:mx-[0.625rem] card-container tw:justify-end tw:mt-2 tw:shrink-0"
-        style="position: sticky; bottom: 0px; z-index: 2"
+        class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
       >
-        <div class="tw:flex tw:items-center tw:gap-2 tw:mx-2">
-          <q-btn
-            data-test="add-alert-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            no-caps
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            @click="$emit('cancel:hideform')"
-          />
-          <q-btn
-            data-test="add-alert-submit-btn"
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save')"
-            no-caps
-            flat
-            :loading="isAnomalyMode ? anomalySaving : false"
-            :disable="isAnomalyMode ? !canSaveAlert : false"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            @click="handleSave"
-          />
+        <q-btn
+          data-test="add-alert-cancel-btn"
+          class="o2-secondary-button tw:h-[36px]"
+          :label="t('alerts.cancel')"
+          no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          @click="$emit('cancel:hideform')"
+        />
+        <q-btn
+          data-test="add-alert-submit-btn"
+          class="o2-primary-button no-border tw:h-[36px]"
+          :label="isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save')"
+          no-caps
+          flat
+          :loading="isAnomalyMode ? anomalySaving : false"
+          :disable="isAnomalyMode ? !canSaveAlert : false"
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          @click="handleSave"
+        />
+      </div>
+
+      </div><!-- end LEFT column wrapper -->
+
+      <!-- TIER 2: Preview + Summary (RIGHT 30%) -->
+      <div class="tw:flex tw:flex-col tw:gap-2" style="flex: 3.5; min-height: 0;">
+        <!-- Preview Card -->
+        <div class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
+          <div
+            class="tw:flex tw:items-center tw:px-3 tw:h-[40px] tw:select-none tw:border-b tw:shrink-0 tw:gap-2"
+            :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
+          >
+            <span class="tw:text-sm tw:font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
+            <template v-if="!isAnomalyMode && activeEvaluationStatus">
+              <div class="tw:w-px tw:h-4" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" />
+              <q-icon :name="activeEvaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'" :color="activeEvaluationStatus.wouldTrigger ? 'positive' : 'grey-5'" size="16px" />
+              <span class="tw:text-xs tw:font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-green-600' : 'tw:text-gray-400'">
+                {{ activeEvaluationStatus.wouldTrigger ? 'Would Trigger' : 'Would Not Trigger' }}
+              </span>
+              <span class="tw:text-xs tw:opacity-60">{{ activeEvaluationStatus.reason }}</span>
+            </template>
+          </div>
+          <div class="tw:flex-1 tw:min-h-0" style="overflow: hidden;">
+            <template v-if="isAnomalyMode">
+              <QueryEditor editor-id="anomaly-sql-preview" language="sql" :read-only="true" :show-auto-complete="false" :hide-nl-toggle="true" :query="anomalyPreviewSql" style="height: 100%" />
+            </template>
+            <template v-else>
+              <div v-if="!formData.stream_name" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2">
+                <q-icon name="query_stats" size="36px" class="tw:opacity-20" />
+                <span class="tw:text-sm tw:font-medium" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
+                  Select a stream type and stream name to see a preview
+                </span>
+              </div>
+              <preview-alert
+                v-else
+                ref="previewAlertRef"
+                style="width: 100%; height: 100%;"
+                :formData="formData"
+                :query="previewQuery"
+                :selectedTab="formData.query_condition.type || 'custom'"
+                :isAggregationEnabled="isAggregationEnabled"
+                :isUsingBackendSql="isUsingBackendSql"
+                :isEditorOpen="isEditorOpen"
+                :previewDateTime="previewDateTimeValue"
+              />
+            </template>
+          </div>
+        </div>
+
+        <!-- Summary Card (standard alerts only) -->
+        <div v-if="!isAnomalyMode" class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
+          <div
+            class="tw:flex tw:items-center tw:px-3 tw:h-[40px] tw:select-none tw:border-b tw:shrink-0"
+            :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
+          >
+            <span class="tw:text-sm tw:font-medium">{{ t('alerts.summary.title') || 'Summary' }}</span>
+          </div>
+          <div class="tw:flex-1 tw:min-h-0" style="overflow: auto;">
+            <alert-summary
+              style="height: 100%;"
+              :formData="formData"
+              :destinations="destinations"
+              :previewQuery="previewQuery"
+              :generatedSqlQuery="generatedSqlQuery"
+            />
+          </div>
         </div>
       </div>
+
+      </div><!-- end TIER 3+2 row -->
       </div><!-- end flex column wrapper -->
 
   </div>
@@ -649,6 +579,11 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.active-tab {
+  color: var(--q-primary);
+  border-bottom: 2px solid var(--q-primary);
+}
+
 #editor {
   width: 100%;
   min-height: 5rem;
@@ -930,6 +865,50 @@ export default defineComponent({
 }
 </style>
 <style lang="scss">
+// ── Global compact 28px sizing for alert inputs/selects ────────────────────
+.alert-v3-input {
+  min-height: 28px !important;
+  height: 28px !important;
+  .q-field__control {
+    min-height: 28px !important;
+    max-height: 28px !important;
+    height: 28px !important;
+  }
+  .q-field__control-container {
+    .q-field__native {
+      height: 28px !important;
+      min-height: 28px !important;
+    }
+  }
+}
+
+.alert-v3-select {
+  min-height: 1.75rem !important;
+  .q-field__inner {
+    min-height: 1.75rem !important;
+    max-height: 1.75rem !important;
+  }
+  .q-field__control {
+    min-height: 1.75rem !important;
+    max-height: 1.75rem !important;
+    height: 1.75rem !important;
+  }
+  .q-field__control-container {
+    .q-field__native {
+      min-height: 1.75rem !important;
+      height: 1.75rem !important;
+      padding: 0px !important;
+    }
+  }
+  .q-field__marginal {
+    height: 1.75rem !important;
+  }
+  .q-field__append {
+    height: 1.75rem !important;
+  }
+}
+// ───────────────────────────────────────────────────────────────────────────
+
 .no-case .q-field__native span {
   text-transform: none !important;
 }

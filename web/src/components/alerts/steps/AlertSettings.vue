@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   borderless
                   min="0"
+                  class="alert-v3-input"
                   style="background: none"
                   @update:model-value="$emit('update:trigger', formData.trigger_condition)"
                 />
@@ -307,6 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   borderless
                   min="1"
+                  class="alert-v3-input"
                   style="background: none"
                   debounce="300"
                   @update:model-value="handlePeriodChange"
@@ -359,6 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   borderless
                   min="0"
+                  class="alert-v3-input"
                   debounce="300"
                   @update:model-value="emitTriggerUpdate"
                 />
@@ -413,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="localDestinations"
                 :options="filteredDestinations"
                 data-test="alert-destinations-select"
-                class="no-case q-py-none destinations-select-field"
+                class="no-case q-py-none destinations-select-field alert-v3-select"
                 borderless
                 dense
                 multiple

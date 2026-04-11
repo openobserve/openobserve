@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="isEventBased">
               <!-- Alert if row -->
               <div class="condition-row">
-                <span class="condition-label">Alert if</span>
+                <span class="condition-label">Alert if *</span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
                   <q-select
                     v-model="selectedFunction"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense
                     borderless
                     hide-bottom-space
-                    class="inline-condition-select"
+                    class="alert-v3-select"
                     style="min-width: 130px; max-width: 180px;"
                     @update:model-value="onLogFunctionChange"
                   >
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       hide-bottom-space
                       :placeholder="t('alerts.placeholders.selectColumn')"
                       @filter="filterLogMeasureColumns"
-                      class="inline-condition-select"
+                      class="alert-v3-select"
                       style="min-width: 140px; max-width: 200px;"
                       @update:model-value="onLogMeasureColumnChange"
                     />
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       borderless
                       hide-bottom-space
-                      class="inline-condition-select"
+                      class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onTriggerOperatorChange"
                     />
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       borderless
                       hide-bottom-space
                       @blur="restoreDefaultThreshold"
-                      class="inline-condition-select"
+                      class="alert-v3-input"
                       style="min-width: 60px; max-width: 80px;"
                       min="1"
                       :rules="[(val: any) => !!val || 'Required']"
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       borderless
                       hide-bottom-space
-                      class="inline-condition-select"
+                      class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onConditionOperatorChange"
                     />
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       borderless
                       hide-bottom-space
                       :placeholder="t('alerts.placeholders.value')"
-                      class="inline-condition-select"
+                      class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
                       :rules="[(val: any) => !!val || 'Field is required!']"
                       @update:model-value="onConditionValueChange"
@@ -166,10 +166,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- For any (group by) row (hidden for count mode) -->
+              <!-- group by row (hidden for count mode) -->
               <div v-if="selectedFunction !== 'total_events'" class="condition-row">
-                <span class="condition-label">
-                  For any <span class="condition-label-hint">(group by)</span>
+                <span class="condition-label tw:font-bold">
+                  Group by
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
                     Group results by these fields — alert triggers per unique combination
                   </q-tooltip>
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-select
                         v-model="logGroupBy[index]"
                         :options="filteredFields"
-                        class="inline-condition-select"
+                        class="alert-v3-select"
                         borderless
                         dense
                         use-input
@@ -222,39 +222,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- Atleast row — trigger threshold for measure mode -->
+              <!-- having row — optional trigger threshold for measure mode -->
               <div v-if="selectedFunction !== 'total_events'" class="condition-row">
-                <span class="condition-label">
-                  Atleast
+                <span class="condition-label tw:font-bold">
+                  Having
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    Minimum number of matching groups required to trigger the alert
+                    Optionally filter by the number of matching groups. If not set, triggers on any match (>= 1).
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <q-select
-                    v-model="triggerOperator"
-                    :options="numericOperators"
-                    dense
-                    borderless
-                    hide-bottom-space
-                    class="inline-condition-select"
-                    style="min-width: 70px; max-width: 120px;"
-                    @update:model-value="onTriggerOperatorChange"
-                  />
-                  <q-input
-                    v-model="triggerThreshold"
-                    type="number"
-                    dense
-                    borderless
-                    hide-bottom-space
-                    class="inline-condition-select"
-                    style="min-width: 60px; max-width: 80px;"
-                    min="1"
-                    :rules="[(val: any) => !!val || 'Required']"
-                    @update:model-value="onTriggerThresholdChange"
-                    @blur="restoreDefaultThreshold"
-                  />
-                  <span class="condition-text">matching groups found</span>
+                  <template v-if="!showHaving">
+                    <q-btn icon="add" size="xs" flat round dense color="primary" @click="showHaving = true">
+                      <q-tooltip>Add threshold</q-tooltip>
+                    </q-btn>
+                  </template>
+                  <template v-else>
+                    <q-select
+                      v-model="triggerOperator"
+                      :options="numericOperators"
+                      dense borderless hide-bottom-space
+                      class="alert-v3-select"
+                      style="min-width: 70px; max-width: 120px;"
+                      @update:model-value="onTriggerOperatorChange"
+                    />
+                    <q-input
+                      v-model="triggerThreshold"
+                      type="number"
+                      dense borderless hide-bottom-space
+                      class="alert-v3-input"
+                      style="min-width: 60px; max-width: 80px;"
+                      min="1"
+                      @update:model-value="onTriggerThresholdChange"
+                      @blur="restoreDefaultThreshold"
+                    />
+                    <span class="condition-text">matching groups found</span>
+                    <q-btn icon="close" size="xs" flat round dense class="tw:text-gray-400 hover:tw:text-red-500" @click="clearHaving">
+                      <q-tooltip>Clear (reset to >= 1)</q-tooltip>
+                    </q-btn>
+                  </template>
                 </div>
               </div>
             </template>
@@ -263,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else>
               <!-- Alert if row -->
               <div class="condition-row">
-                <span class="condition-label">Alert if</span>
+                <span class="condition-label">Alert if *</span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
                   <q-select
                     v-model="selectedFunction"
@@ -273,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense
                     borderless
                     hide-bottom-space
-                    class="inline-condition-select"
+                    class="alert-v3-select"
                     style="min-width: 130px; max-width: 180px;"
                     @update:model-value="onMetricFunctionChange"
                   >
@@ -295,22 +300,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- "of [field]" hidden for count mode -->
                   <template v-if="selectedFunction !== 'total_events'">
                     <span class="condition-text">of</span>
-                    <q-select
-                      v-model="inputData.aggregation.having.column"
-                      :options="filteredNumericColumns"
-                      emit-value
-                      dense
-                      borderless
-                      use-input
-                      hide-selected
-                      fill-input
-                      hide-bottom-space
-                      :placeholder="t('alerts.placeholders.selectColumn')"
-                      @filter="filterNumericColumns"
-                      @update:model-value="emitAggregationUpdate"
-                      class="inline-condition-select"
-                      style="min-width: 140px; max-width: 200px;"
-                    />
+                    <div style="position: relative; display: inline-flex;">
+                      <q-select
+                        v-model="inputData.aggregation.having.column"
+                        :options="filteredNumericColumns"
+                        emit-value
+                        dense
+                        borderless
+                        use-input
+                        hide-selected
+                        fill-input
+                        hide-bottom-space
+                        :placeholder="t('alerts.placeholders.selectColumn')"
+                        :readonly="inputData.aggregation.having.column === 'value' && filteredNumericColumns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
+                        :disable="inputData.aggregation.having.column === 'value' && filteredNumericColumns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
+                        @filter="filterNumericColumns"
+                        @update:model-value="emitAggregationUpdate"
+                        class="alert-v3-select"
+                        style="min-width: 140px; max-width: 200px;"
+                      />
+                      <q-tooltip v-if="inputData.aggregation.having.column === 'value'" anchor="bottom middle" self="top middle" :delay="300">
+                        Metrics streams store their measurement in the "value" field by default
+                      </q-tooltip>
+                    </div>
                     <span class="condition-text">is</span>
                   </template>
 
@@ -322,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       borderless
                       hide-bottom-space
-                      class="inline-condition-select"
+                      class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onTriggerOperatorChange"
                     />
@@ -332,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       borderless
                       hide-bottom-space
-                      class="inline-condition-select"
+                      class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
                       :rules="[(val: any) => !!val || 'Field is required!']"
                       @update:model-value="onTriggerThresholdChange"
@@ -348,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       borderless
                       hide-bottom-space
-                      class="inline-condition-select"
+                      class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onConditionOperatorChange"
                     />
@@ -359,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       borderless
                       hide-bottom-space
                       :placeholder="t('alerts.placeholders.value')"
-                      class="inline-condition-select"
+                      class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
                       :rules="[(val: any) => !!val || 'Field is required!']"
                       @update:model-value="onConditionValueChange"
@@ -368,10 +380,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- For any (group by) row — hidden for count mode -->
+              <!-- group by row — hidden for count mode -->
               <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="condition-row">
-                <span class="condition-label">
-                  For any <span class="condition-label-hint">(group by)</span>
+                <span class="condition-label tw:font-bold">
+                  Group by
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
                     Group results by these fields — alert triggers per unique combination
                   </q-tooltip>
@@ -385,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-select
                         v-model="inputData.aggregation.group_by[index]"
                         :options="filteredFields"
-                        class="inline-condition-select"
+                        class="alert-v3-select"
                         borderless
                         dense
                         use-input
@@ -424,39 +436,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- Atleast row — trigger threshold for metrics measure mode -->
+              <!-- having row — optional trigger threshold for metrics measure mode -->
               <div v-if="selectedFunction !== 'total_events'" class="condition-row">
-                <span class="condition-label">
-                  Atleast
+                <span class="condition-label tw:font-bold">
+                  Having
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    Minimum number of matching groups required to trigger the alert
+                    Optionally filter by the number of matching groups. If not set, triggers on any match (>= 1).
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <q-select
-                    v-model="triggerOperator"
-                    :options="numericOperators"
-                    dense
-                    borderless
-                    hide-bottom-space
-                    class="inline-condition-select"
-                    style="min-width: 70px; max-width: 120px;"
-                    @update:model-value="onTriggerOperatorChange"
-                  />
-                  <q-input
-                    v-model="triggerThreshold"
-                    type="number"
-                    dense
-                    borderless
-                    hide-bottom-space
-                    class="inline-condition-select"
-                    style="min-width: 60px; max-width: 80px;"
-                    min="1"
-                    :rules="[(val: any) => !!val || 'Required']"
-                    @update:model-value="onTriggerThresholdChange"
-                    @blur="restoreDefaultThreshold"
-                  />
-                  <span class="condition-text">matching groups found</span>
+                  <template v-if="!showHaving">
+                    <q-btn icon="add" size="xs" flat round dense color="primary" @click="showHaving = true">
+                      <q-tooltip>Add threshold</q-tooltip>
+                    </q-btn>
+                  </template>
+                  <template v-else>
+                    <q-select
+                      v-model="triggerOperator"
+                      :options="numericOperators"
+                      dense borderless hide-bottom-space
+                      class="alert-v3-select"
+                      style="min-width: 70px; max-width: 120px;"
+                      @update:model-value="onTriggerOperatorChange"
+                    />
+                    <q-input
+                      v-model="triggerThreshold"
+                      type="number"
+                      dense borderless hide-bottom-space
+                      class="alert-v3-input"
+                      style="min-width: 60px; max-width: 80px;"
+                      min="1"
+                      @update:model-value="onTriggerThresholdChange"
+                      @blur="restoreDefaultThreshold"
+                    />
+                    <span class="condition-text">matching groups found</span>
+                    <q-btn icon="close" size="xs" flat round dense class="tw:text-gray-400 hover:tw:text-red-500" @click="clearHaving">
+                      <q-tooltip>Clear (reset to >= 1)</q-tooltip>
+                    </q-btn>
+                  </template>
                 </div>
               </div>
             </template>
@@ -464,7 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Check every row -->
             <div class="condition-row tw:!items-start">
               <span class="condition-label" style="line-height: 28px;">
-                Check every
+                Check every *
                 <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
                   How often to check this alert condition
                 </q-tooltip>
@@ -479,8 +496,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       borderless
                       hide-bottom-space
-                      class="inline-condition-select"
-                      style="min-width: 60px; max-width: 80px;"
+                      class="alert-v3-input"
+                      style="min-width: 100px; max-width: 100px;"
                       min="1"
                       :rules="[(val: any) => !!val || 'Required']"
                       @update:model-value="onCheckEveryChange"
@@ -494,9 +511,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       borderless
                       hide-bottom-space
-                      class="inline-condition-select"
+                      class="alert-v3-input"
                       placeholder="0 */10 * * * *"
-                      style="min-width: 140px; max-width: 180px;"
+                      style="min-width: 100px; max-width: 100px;"
                       @update:model-value="onCronExpressionChange"
                     />
                   </template>
@@ -510,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     hide-bottom-space
                     emit-value
                     map-options
-                    class="inline-condition-select frequency-unit-select"
+                    class="alert-v3-select frequency-unit-select"
                     style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
                   />
@@ -528,34 +545,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       fill-input
                       hide-selected
                       :input-debounce="0"
-                      class="inline-condition-select"
+                      class="alert-v3-select"
                       placeholder="timezone"
                       :display-value="cronTimezone || 'timezone'"
-                      style="min-width: 130px; max-width: 180px;"
+                      style="min-width: 100px; max-width: 100px;"
                       @filter="timezoneFilterFn"
                       @update:model-value="onCronTimezoneChange"
-                    />
+                    >
+                    <q-tooltip v-if="cronTimezone" :delay="300" anchor="bottom middle" self="top middle">{{ cronTimezone }}</q-tooltip>
+                  </q-select>
                   </template>
 
                   <span class="condition-text">on these</span>
                   <div
-                    class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle"
+                    class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle tw:px-2 tw:py-0.5 tw:rounded-md tw:transition-colors"
+                    :class="store.state.theme === 'dark'
+                      ? 'tw:bg-gray-700/60 hover:tw:bg-gray-600/70'
+                      : 'tw:bg-gray-100 hover:tw:bg-gray-200'"
                     @click="toggleFilters"
                   >
                     <q-icon
-                      :name="showFilters ? 'expand_more' : 'chevron_right'"
-                      size="16px"
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                      name="filter_alt"
+                      size="14px"
+                      :class="filterCount > 0
+                        ? 'tw:text-[var(--q-primary)]'
+                        : (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500')"
                     />
                     <span class="tw:text-xs tw:font-semibold"
-                          :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-600'">
+                          :class="filterCount > 0
+                            ? 'tw:text-[var(--q-primary)]'
+                            : (store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-600')">
                       filters
                     </span>
                     <span v-if="filterCount > 0"
-                          class="tw:text-xs tw:px-1.5 tw:py-0.5 tw:rounded-full tw:font-medium"
-                          :class="store.state.theme === 'dark' ? 'tw:bg-blue-900 tw:text-blue-200' : 'tw:bg-blue-100 tw:text-blue-700'">
+                          class="tw:text-[11px] tw:px-1.5 tw:py-0 tw:rounded-full tw:font-bold tw:leading-5"
+                          :class="store.state.theme === 'dark' ? 'tw:bg-blue-800 tw:text-blue-200' : 'tw:bg-blue-100 tw:text-blue-700'">
                       {{ filterCount }}
                     </span>
+                    <q-icon
+                      :name="showFilters ? 'expand_more' : 'chevron_right'"
+                      size="14px"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                    />
                     <!-- Review your SQL query hint -->
                     <span v-if="generatedSqlQuery && !showFilters"
                           class="tw:text-xs tw:italic tw:ml-1 sql-query-hint"
@@ -726,6 +757,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model.number="promqlCondition.value"
                         type="number"
                         dense
+                        class="alert-v3-input"
                         borderless
                         style="background: none"
                         debounce="300"
@@ -936,8 +968,12 @@ export default defineComponent({
         props.inputData.aggregation = {
           group_by: [],
           function: "avg",
-          having: { column: "", operator: ">=", value: "" },
+          having: { column: "value", operator: ">=", value: "" },
         };
+      }
+      // Default column to "value" if not already set
+      if (!props.inputData.aggregation?.having?.column) {
+        props.inputData.aggregation.having.column = "value";
       }
     } else {
       // Logs/Traces: event-based, no aggregation
@@ -962,6 +998,7 @@ export default defineComponent({
 
     // Metric function options — always aggregated
     const metricFunctionOptions = [
+      { label: 'value', value: 'value', tooltip: 'Raw value of the metric field' },
       { label: 'total events', value: 'total_events', tooltip: 'Count the total number of metric events matching your filters (COUNT(*))' },
       { label: 'count', value: 'count', tooltip: 'Count non-null values of a specific field (COUNT(field))' },
       { label: 'avg', value: 'avg', tooltip: 'Average value of a numeric field' },
@@ -979,13 +1016,13 @@ export default defineComponent({
     // Numeric-only operators (no Contains/NotContains for thresholds)
     const numericOperators = ["=", "!=", ">=", ">", "<=", "<"];
 
-    // Selected function — for logs defaults to 'total_events', for metrics to 'avg'
+    // Selected function — for logs defaults to 'total_events', for metrics to 'value'
     const selectedFunction = ref(
       isEventBased.value
         ? (props.isAggregationEnabled && props.inputData.aggregation?.function
             ? props.inputData.aggregation.function
             : 'total_events')
-        : (props.inputData.aggregation?.function || 'avg')
+        : (props.inputData.aggregation?.function || 'value')
     );
 
     // Log-specific: measure column and group-by
@@ -1037,6 +1074,23 @@ export default defineComponent({
     // Trigger threshold — "for >= N times" (how many evaluation periods must match)
     const triggerOperator = ref(props.triggerCondition?.operator || '>=');
     const triggerThreshold = ref(props.triggerCondition?.threshold || 3);
+
+    // "having" row is optional for measure/aggregation mode — show only if user explicitly set it
+    // (threshold > 1 means user customized it; default >= 1 means not set)
+    const showHaving = ref(
+      props.triggerCondition?.threshold != null && props.triggerCondition.threshold > 1
+    );
+
+    const clearHaving = () => {
+      showHaving.value = false;
+      triggerThreshold.value = 1;
+      triggerOperator.value = '>=';
+      if (props.triggerCondition) {
+        props.triggerCondition.threshold = 1;
+        props.triggerCondition.operator = '>=';
+        emit("update:triggerCondition", { ...props.triggerCondition });
+      }
+    };
 
     const onTriggerOperatorChange = (value: string) => {
       triggerOperator.value = value;
@@ -1519,6 +1573,7 @@ export default defineComponent({
       } else {
         // Measure mode — uses aggregation, default trigger to "atleast 1 group"
         localIsAggregationEnabled.value = true;
+        showHaving.value = false; // reset to collapsed when switching to measure mode
         if (triggerThreshold.value === 3) {
           // Only change if still at count-mode default
           triggerThreshold.value = 1;
@@ -1662,6 +1717,14 @@ export default defineComponent({
       (newCols) => {
         filteredFields.value = [...newCols];
         filteredNumericColumns.value = [...newCols];
+        // Auto-set column to "value" for metrics if not already set
+        if (!isEventBased.value && !props.inputData.aggregation?.having?.column) {
+          const hasValue = newCols.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
+          if (hasValue && props.inputData.aggregation?.having) {
+            props.inputData.aggregation.having.column = 'value';
+            emitAggregationUpdate();
+          }
+        }
       }
     );
 
@@ -1845,6 +1908,8 @@ export default defineComponent({
       onTriggerOperatorChange,
       onTriggerThresholdChange,
       restoreDefaultThreshold,
+      showHaving,
+      clearHaving,
       checkEveryFrequency,
       onCheckEveryChange,
       restoreDefaultFrequency,
@@ -2097,6 +2162,27 @@ export default defineComponent({
   white-space: nowrap;
 }
 
+.set-threshold-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px dashed color-mix(in srgb, var(--q-primary) 50%, transparent);
+  color: var(--q-primary);
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.65;
+  transition: opacity 0.15s ease, background 0.15s ease;
+
+  &:hover {
+    opacity: 1;
+    background: color-mix(in srgb, var(--q-primary) 10%, transparent);
+  }
+}
+
 .light-mode {
   .condition-label {
     color: rgba(0, 0, 0, 0.8);
@@ -2115,28 +2201,6 @@ export default defineComponent({
   }
 }
 
-// Inline condition sentence styling
-.inline-condition-select {
-  :deep(.q-field__control) {
-    background: rgba(var(--q-primary-rgb, 92, 107, 192), 0.06);
-    border: 1px solid rgba(var(--q-primary-rgb, 92, 107, 192), 0.25);
-    border-radius: 6px;
-    padding: 2px 8px;
-    min-height: 28px;
-    height: 28px;
-  }
-
-  :deep(.q-field__native),
-  :deep(.q-field__input) {
-    color: var(--q-primary);
-    font-weight: 600;
-    font-size: 13px;
-  }
-
-  :deep(.q-field__append) {
-    color: var(--q-primary);
-  }
-}
 
 .ai-hover-btn {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;

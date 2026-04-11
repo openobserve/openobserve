@@ -16,7 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="step-deduplication" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw:px-3 tw:py-4">
+    <div class="step-content card-container">
+      <div class="section-header">
+        <div class="section-header-accent" />
+        <span class="section-header-title">{{ t('alerts.steps.deduplication') }}</span>
+      </div>
+      <div class="tw:px-3 tw:py-2">
       <!-- Fingerprint Fields -->
       <div class="tw:mb-4">
         <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
@@ -93,13 +98,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               borderless
               min="1"
+              class="alert-v3-input"
               :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
               style="background: none;"
               @update:model-value="emitUpdate"
             />
           </div>
           <div
-            style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
+            style="min-width: 90px; margin-left: 0 !important; height: 28px; font-weight: normal"
             :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
             class="flex justify-center items-center"
           >
@@ -107,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+      </div><!-- end tw:px-3 tw:py-2 -->
     </div>
   </div>
 </template>
@@ -227,6 +234,9 @@ export default defineComponent({
       background-color: #212121;
       border: 1px solid #343434;
     }
+    .section-header { border-bottom: 1px solid #343434; }
+    .section-header-title { color: #e0e0e0; }
+    .section-header-accent { background: var(--q-primary); }
   }
 
   &.light-mode {
@@ -234,7 +244,28 @@ export default defineComponent({
       background-color: #ffffff;
       border: 1px solid #e6e6e6;
     }
+    .section-header { border-bottom: 1px solid #eeeeee; }
+    .section-header-title { color: #374151; }
+    .section-header-accent { background: var(--q-primary); }
   }
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 10px 12px;
+}
+.section-header-accent {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+.section-header-title {
+  font-size: 13px;
+  font-weight: 600;
 }
 
 :deep(.fingerprint-select) {
