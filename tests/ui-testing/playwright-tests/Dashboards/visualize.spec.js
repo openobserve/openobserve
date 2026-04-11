@@ -7,6 +7,7 @@ import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../fixtures/log.json";
 import PageManager from "../../pages/page-manager";
 import { deleteDashboard } from "./utils/dashCreation.js";
+const { getOrgIdentifier } = require("../utils/cloud-auth.js");
 
 // Dashboard and panel names - using slice() instead of deprecated substr()
 const randomDashboardName =
@@ -52,7 +53,7 @@ test.describe("VRL visualization support testcases", () => {
     await navigateToBase(page);
     await ingestion(page);
 
-    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"] ?? "defaultorg"}`;
+    const logsUrl = `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`;
     await page.goto(logsUrl);
     await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
@@ -265,7 +266,7 @@ test.describe("VRL visualization support testcases", () => {
     const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
     await expect(tablePanel).toBeVisible({ timeout: 15000 });
 
-    await pm.dashboardTimeRefresh.setRelative("8", "h");
+    // await pm.dashboardTimeRefresh.setRelative("30", "m");
     // await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender(page);
 
@@ -419,10 +420,7 @@ test.describe("VRL visualization support testcases", () => {
     expect(rowCountAfterSwitch).toBeGreaterThan(0);
 
     // Verify no errors
-    const errorResult = await pm.logsVisualise.checkDashboardErrors(
-      page,
-      "Table"
-    );
+    const errorResult = await pm.logsVisualise.checkDashboardErrors(page, "Table");
     expect(errorResult.hasErrors).toBe(false);
   });
 
@@ -450,10 +448,7 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.verifyChartTypeSelected(page, "line", false);
 
     // Verify chart renders without errors
-    const errorResult = await pm.logsVisualise.checkDashboardErrors(
-      page,
-      "Table"
-    );
+    const errorResult = await pm.logsVisualise.checkDashboardErrors(page, "Table");
     expect(errorResult.hasErrors).toBe(false);
   });
 

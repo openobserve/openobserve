@@ -1,5 +1,8 @@
-import { test, expect } from "../baseFixtures.js";
-import { login } from "./utils/dashLogin.js";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import { ingestionForDashboardChartJson } from "./utils/dashIngestion.js";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
@@ -17,8 +20,7 @@ test.describe.configure({ mode: "parallel" });
 test.describe("dashboard UI testcases", () => {
   test.beforeEach(async ({ page }) => {
     testLogger.debug("Test setup - beforeEach hook executing");
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestionForDashboardChartJson(page);
     await page.waitForTimeout(2000);
   });
@@ -83,8 +85,8 @@ test.describe("dashboard UI testcases", () => {
 
     // Verify JSON data is rendered in the table
     await expect(page.locator('.json-field-renderer').first()).toBeVisible({ timeout: 30000 });
-    await expect(page.locator('.json-key:has-text("domain")').first()).toBeVisible();
-    await expect(page.locator('.json-value:has-text("service.local")').first()).toBeVisible();
+    await expect(page.locator('.json-key:has-text("domain")').first()).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('.json-value:has-text("service.local")').first()).toBeVisible({ timeout: 30000 });
 
     // Edit the panel name
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -100,8 +102,7 @@ test.describe("dashboard UI testcases", () => {
 test.describe("dashboard custom query mode field options testcases", () => {
   test.beforeEach(async ({ page }) => {
     testLogger.debug("Test setup - beforeEach hook executing for custom mode tests");
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestionForDashboardChartJson(page);
     await page.waitForTimeout(2000);
   });

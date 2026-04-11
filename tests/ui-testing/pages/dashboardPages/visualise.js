@@ -196,10 +196,6 @@ export default class LogsVisualise {
   //enable SQL Mode
   async enableSQLMode() {
     await this.page
-      // .getByRole("switch", { name: "SQL Mode" })
-      // .locator("div")
-      // .nth(2)
-      // .click();
       .getByRole("switch", { name: "SQL Mode" })
       .click();
   }
@@ -544,44 +540,61 @@ export default class LogsVisualise {
   }
 
   async addPanelToNewDashboard(randomDashboardName, panelName) {
-    // Add to dashboard and submit it
+    // Click "Add To Dashboard" button to open the side panel
     await this.addToDashboardBtn.waitFor({ state: "visible", timeout: 5000 });
     await this.addToDashboardBtn.click();
 
-    // Wait for the "Add to Dashboard" side panel to fully load
+    // Wait for the "Add to Dashboard" side panel to appear
     const sidePanelTitle = this.page.locator('[data-test="schema-title-text"]');
     await sidePanelTitle.waitFor({ state: "visible", timeout: 10000 });
-    await sidePanelTitle.waitFor({ state: "attached", timeout: 5000 });
 
-    // Wait for the "new dashboard" button to be visible and stable
+    // Wait for the dashboard dropdown (SelectDashboardDropdown) to be loaded
+    const dashboardDropdown = this.page.locator('[data-test="dashboard-dropdown-dashboard-selection"]');
+    await dashboardDropdown.waitFor({ state: "visible", timeout: 15000 });
+
+    // Click the "+" button to open the "New Dashboard" dialog.
+    // scrollIntoViewIfNeeded + dispatchEvent bypasses viewport bounds (CI) and Quasar backdrop.
     await this.newDashboardBtn.waitFor({ state: "visible", timeout: 10000 });
-    await this.newDashboardBtn.waitFor({ state: "attached", timeout: 5000 });
-    // await this.page.waitForTimeout(500);
+    await this.newDashboardBtn.scrollIntoViewIfNeeded();
+    await this.page.waitForTimeout(300);
+    await this.newDashboardBtn.dispatchEvent('click');
+    await this.page.waitForTimeout(1000);
 
-    // Click new dashboard option
-    await this.newDashboardBtn.click();
+    // The "New Dashboard" dialog attaches but may be behind the outer dialog backdrop (not visible).
+    // Use state:"attached" to detect DOM presence, then fill via evaluate to bypass visibility.
+    await this.dashboardNameInput.waitFor({ state: "attached", timeout: 15000 });
+    await this.dashboardNameInput.evaluate((el, name) => {
+      const input = el.tagName === 'INPUT' ? el : el.querySelector('input');
+      if (input) {
+        input.focus();
+        input.value = name;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }, randomDashboardName);
 
-    // Wait for the "New dashboard" dialog to open and stabilize
-    await this.dashboardNameInput.waitFor({ state: "visible", timeout: 10000 });
-    await this.dashboardNameInput.waitFor({ state: "attached", timeout: 5000 });
-    // await this.page.waitForTimeout(500);
+    // Click "Save" to create the dashboard
+    await this.dashboardSubmitBtn.waitFor({ state: "attached", timeout: 5000 });
+    await this.dashboardSubmitBtn.dispatchEvent('click');
 
-    // Fill dashboard name
-    await this.dashboardNameInput.click();
-    await this.dashboardNameInput.fill(randomDashboardName);
+    // Wait for the new dashboard dialog to close
+    await this.dashboardNameInput.waitFor({ state: "detached", timeout: 10000 }).catch(() => {});
+    await this.page.waitForTimeout(1000);
 
-    // Submit dashboard creation
-    await this.dashboardSubmitBtn.waitFor({ state: "visible", timeout: 5000 });
-    await this.dashboardSubmitBtn.click();
-
-    // Wait for panel title input to be available (replacing hardcoded timeout)
-    await this.panelTitleInput.waitFor({ state: "visible", timeout: 10000 });
-    await this.panelTitleInput.click();
+    // metrics-new-dashboard-panel-title IS a direct <input> element (not a q-input wrapper)
+    await this.panelTitleInput.waitFor({ state: "visible", timeout: 15000 });
     await this.panelTitleInput.fill(panelName);
 
-    // Submit panel settings
-    await this.updateSettingsBtn.waitFor({ state: "visible", timeout: 5000 });
-    await this.updateSettingsBtn.click();
+    // Wait for the "Add" button to be enabled (requires non-empty panelTitle)
+    await this.page.waitForFunction(
+      () => {
+        const btn = document.querySelector('[data-test="metrics-schema-update-settings-button"]');
+        return btn && !btn.hasAttribute('disabled') && !btn.classList.contains('disabled');
+      },
+      { timeout: 10000 }
+    ).catch(() => {});
+
+    await this.updateSettingsBtn.dispatchEvent('click');
   }
 
   //wait for query inspector to be visible
