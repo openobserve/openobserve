@@ -1278,6 +1278,20 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.analysisInFlight).toBe(false);
     });
 
+    it("sets analysisInFlight false when ai_analysis_failed after ai_analysis_begin", async () => {
+      (incidentsService.getEvents as any).mockResolvedValue({
+        data: {
+          events: [
+            { type: "ai_analysis_begin", timestamp: 100 },
+            { type: "ai_analysis_failed", timestamp: 200, data: { reason: "timeout", error_details: "Query timed out" } },
+          ],
+        },
+      });
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+      expect(wrapper.vm.analysisInFlight).toBe(false);
+    });
+
     it("sets analysisInFlight false when events are empty", async () => {
       (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
       await wrapper.vm.checkAnalysisInFlight("1");

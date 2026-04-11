@@ -185,7 +185,7 @@ pub async fn validator(
 
                 if auth_info.bypass_check
                     || check_permissions(
-                        user_id,
+                        &res.user_email,
                         auth_info.clone(),
                         res.user_role.clone().unwrap_or(get_default_user_role()),
                         !res.is_internal_user,

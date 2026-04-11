@@ -243,12 +243,30 @@ const resolveVariablesWithPrecedence = (
   return resolvedVariables;
 };
 
+/**
+ * Normalize variable syntax by stripping whitespace inside {{ }}, ${ }, and around format specifiers.
+ * e.g., "{{ hello }}" → "{{hello}}", "${ hello : csv }" → "${hello:csv}"
+ */
+export const normalizeVariableSyntax = (str: string): string => {
+  // Normalize mustache: {{ varName }} or {{ varName : format }}
+  str = str.replace(
+    /\{\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*([a-zA-Z]+)\s*)?\}\}/g,
+    (_, name, format) => (format ? `{{${name}:${format}}}` : `{{${name}}}`),
+  );
+  // Normalize dollar-brace: ${ varName } or ${ varName : format }
+  str = str.replace(
+    /\$\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*([a-zA-Z]+)\s*)?\}/g,
+    (_, name, format) => (format ? `\${${name}:${format}}` : `\${${name}}`),
+  );
+  return str;
+};
+
 export const processVariableContent = (
   content: string,
   variablesData: any,
   context?: { tabId?: string; panelId?: string },
 ) => {
-  let processedContent: string = content;
+  let processedContent: string = normalizeVariableSyntax(content);
 
   if (!variablesData || !variablesData.values) {
     return processedContent;
@@ -271,6 +289,13 @@ export const processVariableContent = (
         : variable.value;
 
     const placeholders = [
+      // Mustache forms
+      "{{" + variable.name + "}}",
+      "{{" + variable.name + ":csv}}",
+      "{{" + variable.name + ":pipe}}",
+      "{{" + variable.name + ":doublequote}}",
+      "{{" + variable.name + ":singlequote}}",
+      // Dollar-sign forms (existing)
       "${" + variable.name + "}",
       "${" + variable.name + ":csv}",
       "${" + variable.name + ":pipe}",

@@ -533,55 +533,59 @@ export class LogsPage {
      * @param {number} pollIntervalMs - Interval between checks
      * @returns {Promise<boolean>} True if stream exists, false if timeout
      */
-    async waitForStreamAvailable(streamName, maxWaitMs = 30000, pollIntervalMs = 3000) {
-        testLogger.debug(`waitForStreamAvailable: Waiting for stream ${streamName} to be available`);
+    async waitForStreamAvailable(streamName, maxWaitMs = 30000, pollIntervalMs = 3000, streamType = 'logs') {
         const startTime = Date.now();
 
         const apiUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
-        const orgId = getOrgIdentifier();
+        const orgId = getOrgIdentifier() || 'default';
+        const url = `${apiUrl}/api/${orgId}/streams?type=${streamType}&keyword=${streamName}`;
+        testLogger.info(`waitForStreamAvailable: Waiting for stream ${streamName} (type=${streamType}, timeout=${maxWaitMs}ms)`);
+        let pollCount = 0;
 
         while (Date.now() - startTime < maxWaitMs) {
+            pollCount++;
             try {
-                // Use page.request which automatically includes browser session cookies
-                // This works on both cloud (cookie auth) and self-hosted (Basic Auth via storageState)
-                const response = await this.page.request.get(
-                    `${apiUrl}/api/${orgId}/streams`,
-                    { headers: getAuthHeaders() }
-                );
+                const response = await this.page.request.get(url, { headers: getAuthHeaders() });
+                const status = response.status();
 
                 if (response.ok()) {
                     const data = await response.json();
-                    if (data.list) {
-                        const streamExists = data.list.some(s => s.name === streamName);
-                        if (streamExists) {
-                            testLogger.debug(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms`);
-                            return true;
-                        }
+                    const listCount = data.list ? data.list.length : 0;
+                    const streamExists = data.list && data.list.some(s => s.name === streamName);
+                    if (streamExists) {
+                        testLogger.info(`waitForStreamAvailable: Stream ${streamName} found after ${Date.now() - startTime}ms (poll #${pollCount})`);
+                        return true;
+                    }
+                    if (pollCount <= 3 || pollCount % 10 === 0) {
+                        const names = data.list ? data.list.map(s => s.name).join(', ') : 'none';
+                        testLogger.info(`waitForStreamAvailable: poll #${pollCount} — HTTP ${status}, list=${listCount}, names=[${names}]`);
                     }
                 } else {
-                    testLogger.debug(`waitForStreamAvailable: API returned ${response.status()}, retrying...`);
+                    const bodyText = await response.text().catch(() => 'unreadable');
+                    testLogger.info(`waitForStreamAvailable: poll #${pollCount} — HTTP ${status}, body=${bodyText.substring(0, 200)}`);
                 }
 
-                testLogger.debug(`waitForStreamAvailable: Stream ${streamName} not found yet, waiting ${pollIntervalMs}ms...`);
                 await this.page.waitForTimeout(pollIntervalMs);
             } catch (e) {
-                testLogger.debug(`waitForStreamAvailable: Error checking stream: ${e.message}`);
+                testLogger.info(`waitForStreamAvailable: poll #${pollCount} — error: ${e.message}`);
                 await this.page.waitForTimeout(pollIntervalMs);
             }
         }
 
-        testLogger.warn(`waitForStreamAvailable: Stream ${streamName} not found after ${maxWaitMs}ms`);
+        testLogger.warn(`waitForStreamAvailable: Stream ${streamName} not found after ${maxWaitMs}ms (${pollCount} polls)`);
         return false;
     }
 
-    async selectStream(stream, maxRetries = 3, apiWaitMs = 30000) {
-        testLogger.info(`selectStream: Selecting stream: ${stream}`);
+    async selectStream(stream, maxRetries = 3, apiWaitMs = null) {
+        // Cloud environments need longer for streams to be indexed after ingestion
+        const effectiveApiWaitMs = apiWaitMs ?? (isCloudEnvironment() ? 90000 : 30000);
+        testLogger.info(`selectStream: Selecting stream: ${stream} (apiWait: ${effectiveApiWaitMs}ms)`);
 
         // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
-        if (apiWaitMs > 0) {
-            const streamAvailable = await this.waitForStreamAvailable(stream, apiWaitMs, 3000);
+        if (effectiveApiWaitMs > 0) {
+            const streamAvailable = await this.waitForStreamAvailable(stream, effectiveApiWaitMs, 3000);
             if (!streamAvailable) {
-                testLogger.warn(`selectStream: Stream ${stream} not found via API after ${apiWaitMs}ms, will still try UI selection`);
+                testLogger.warn(`selectStream: Stream ${stream} not found via API after ${effectiveApiWaitMs}ms, will still try UI selection`);
             } else {
                 testLogger.info(`selectStream: Stream ${stream} confirmed available via API`);
             }
@@ -613,6 +617,7 @@ export class LogsPage {
                 if (searchVisible) {
                     testLogger.info(`selectStream: Using search box to filter for: ${stream}`);
                     await searchInput.click();
+                    await searchInput.fill(''); // Clear any previous filter first
                     await searchInput.fill(stream);
                     await this.page.waitForTimeout(1500);
                 }
@@ -1123,6 +1128,26 @@ export class LogsPage {
         await this.page.waitForTimeout(200);
         // Click the q-item directly - it has @click="handleQuickMode" handler
         await this.page.locator(this.quickModeToggle).click();
+    }
+
+    // Click on the Quick Mode text label (not the toggle switch) - for testing #10821
+    async clickQuickModeTextLabel() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        // Click on the text label "Quick Mode" instead of the toggle switch
+        await this.page.locator(this.quickModeToggle).locator('.q-item__label').click();
+        // Close the utilities menu to match the pattern in getQuickModeState()
+        await this.page.keyboard.press('Escape');
+    }
+
+    // Get the current quick mode state (true/false)
+    async getQuickModeState() {
+        await this.page.locator(this.utilitiesMenuButton).click();
+        await this.page.waitForTimeout(200);
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
+        await this.page.keyboard.press('Escape');
+        return isOn;
     }
 
     // Histogram methods
@@ -3350,9 +3375,10 @@ export class LogsPage {
         // Quick mode is now inside the utilities hamburger menu
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        if (toggleInner) {
-            const isSwitchedOff = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const toggleExists = await toggleInner.count() > 0;
+        if (toggleExists) {
+            const isSwitchedOff = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--falsy')).catch(() => false);
             if (isSwitchedOff) {
                 await toggleInner.click();
             } else {
@@ -3468,10 +3494,8 @@ export class LogsPage {
         // Quick mode is now inside the utilities hamburger menu
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const isQuickModeOn = toggleInner
-            ? await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy'))
-            : false;
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isQuickModeOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
 
         if (isQuickModeOn) {
             testLogger.info('Quick Mode is ON - turning it OFF for include/exclude functionality');
@@ -3697,10 +3721,8 @@ export class LogsPage {
         // Quick mode is now inside the utilities hamburger menu
         await this.page.locator(this.utilitiesMenuButton).click();
         await this.page.waitForTimeout(200);
-        const toggleInner = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
-        const isOn = toggleInner
-            ? await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy'))
-            : false;
+        const toggleInner = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] .q-toggle__inner');
+        const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
 
         if (desiredState !== isOn) {
             await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
@@ -6844,5 +6866,39 @@ export class LogsPage {
     async expectVisible(locator) {
         await expect(locator).toBeVisible();
         testLogger.info('Element is visible');
+    }
+
+    /**
+     * Get expand button for a specific field in sidebar (Bug #11041)
+     * @param {string} fieldName - The field name (e.g., "level", "kubernetes_namespace_name")
+     * @returns {Locator}
+     */
+    getFieldExpandButton(fieldName) {
+        return this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+    }
+
+    /**
+     * Get include/exclude button for a specific field value in sidebar (Bug #11041)
+     * @param {string} fieldName - The field name (e.g., "level")
+     * @returns {Locator}
+     */
+    getSubfieldListEqualButton(fieldName) {
+        return this.page.locator(`[data-test*="logs-search-subfield-add-${fieldName}"]`);
+    }
+
+    /**
+     * Get "Include Search Term" menu item (Bug #11041)
+     * @returns {Locator}
+     */
+    getIncludeSearchTermMenuItem() {
+        return this.page.getByText('Include Search Term', { exact: true });
+    }
+
+    /**
+     * Get query editor locator
+     * @returns {Locator}
+     */
+    getQueryEditorLocator() {
+        return this.page.locator(this.logsSearchBarQueryEditor);
     }
 }

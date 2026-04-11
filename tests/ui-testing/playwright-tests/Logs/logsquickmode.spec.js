@@ -95,11 +95,13 @@ test.describe("Logs Quickmode testcases", () => {
     tag: ['@quickModeLogs', '@all', '@logs']
   }, async ({ page }) => {
     testLogger.info('Testing quick mode toggle button visibility');
-    
+
     await pm.logsPage.expectQuickModeToggleVisible();
-    
+
     testLogger.info('Quick mode toggle button visible');
   });
+
+  // Bug #10821 test moved to RegressionSet/logs-regression-bugs.spec.js
 
   test("should click on interesting fields icon in histogram mode and run query", {
     tag: ['@interestingFieldsHistogramModeLogs', '@histogram', '@all', '@logs']

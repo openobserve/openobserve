@@ -19,7 +19,8 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-// Stub TenstackTable — cell rendering and virtualizer are not under test here
+// Stub TenstackTable — renders loading/empty slots and one row of cell slots
+// so that cell-slot split tests can verify which component is rendered.
 vi.mock("@/components/TenstackTable.vue", () => ({
   default: {
     name: "TenstackTable",
@@ -31,8 +32,18 @@ vi.mock("@/components/TenstackTable.vue", () => ({
       "selectedStreamFields",
     ],
     emits: ["click:data-row", "sort-change"],
-    // Mirror the real slot behaviour used by TracesSearchResultList
-    template: `<div data-test="stub-traces-table"><slot v-if="loading && (!rows || rows.length === 0)" name="loading" /><slot v-else name="empty" /></div>`,
+    // Mirror the real slot behaviour used by TracesSearchResultList.
+    // Also render cell slots for the first row so slot-split tests can assert on rendered output.
+    template: `
+      <div data-test="stub-traces-table">
+        <slot v-if="loading && (!rows || rows.length === 0)" name="loading" />
+        <slot v-else name="empty" />
+        <template v-if="rows && rows.length">
+          <div data-test="stub-cell-span_status"><slot name="cell-span_status" :item="rows[0]" /></div>
+          <div data-test="stub-cell-status"><slot name="cell-status" :item="rows[0]" /></div>
+        </template>
+      </div>
+    `,
   },
 }));
 
@@ -315,6 +326,56 @@ describe("TracesSearchResultList", () => {
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       // traces mode: errors > 0 triggers error class
       expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe("oz-table__row--error");
+    });
+  });
+
+  // ─── Cell slot split: span_status vs status ──────────────────────────────
+  describe("cell slot split — span_status and status", () => {
+    const makeSpanHit = (id: string) => ({
+      trace_id: id,
+      service_name: "frontend",
+      operation_name: "GET /",
+      duration: 120000,
+      spans: 1,
+      span_status: "OK",
+      status: "STATUS_CODE_OK",
+      services: {},
+      start_time: Date.now() * 1_000_000,
+    });
+
+    it("renders SpanStatusPill inside #cell-span_status slot", () => {
+      wrapper = mount_(({ hits: [makeSpanHit("s1")], loading: false }) as any);
+      const cell = wrapper.find('[data-test="stub-cell-span_status"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.findComponent({ name: "SpanStatusPill" }).exists()).toBe(true);
+    });
+
+    it("passes item.span_status to SpanStatusPill in #cell-span_status slot", () => {
+      const hit = makeSpanHit("s1");
+      wrapper = mount_(({ hits: [hit], loading: false }) as any);
+      const pill = wrapper
+        .find('[data-test="stub-cell-span_status"]')
+        .findComponent({ name: "SpanStatusPill" });
+      expect(pill.props("status")).toBe("OK");
+    });
+
+    it("renders TraceStatusCell inside #cell-status slot", () => {
+      wrapper = mount_(({ hits: [makeSpanHit("s1")], loading: false }) as any);
+      const cell = wrapper.find('[data-test="stub-cell-status"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.findComponent({ name: "TraceStatusCell" }).exists()).toBe(true);
+    });
+
+    it("does NOT render SpanStatusPill inside #cell-status slot", () => {
+      wrapper = mount_(({ hits: [makeSpanHit("s1")], loading: false }) as any);
+      const statusCell = wrapper.find('[data-test="stub-cell-status"]');
+      expect(statusCell.findComponent({ name: "SpanStatusPill" }).exists()).toBe(false);
+    });
+
+    it("does NOT render TraceStatusCell inside #cell-span_status slot", () => {
+      wrapper = mount_(({ hits: [makeSpanHit("s1")], loading: false }) as any);
+      const spanStatusCell = wrapper.find('[data-test="stub-cell-span_status"]');
+      expect(spanStatusCell.findComponent({ name: "TraceStatusCell" }).exists()).toBe(false);
     });
   });
 

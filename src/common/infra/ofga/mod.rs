@@ -67,6 +67,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_license_permission_migration = false;
     let mut need_sourcemap_permission_migration = false;
     let mut need_logs_pattern_insights_migration = false;
+    let mut need_service_streams_migration = false;
 
     let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
@@ -243,6 +244,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let v0_0_21 = version_compare::Version::from("0.0.21").unwrap();
                 let v0_0_25 = version_compare::Version::from("0.0.25").unwrap();
                 let v0_0_26 = version_compare::Version::from("0.0.26").unwrap();
+                let v0_0_27 = version_compare::Version::from("0.0.27").unwrap();
 
                 if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
                     need_pipeline_migration = true;
@@ -285,6 +287,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 if existing_model_version < v0_0_26 {
                     log::info!("[OFGA:Local] sourcemap permissions migration needed");
                     need_sourcemap_permission_migration = true;
+                }
+                if existing_model_version < v0_0_27 {
+                    log::info!("[OFGA:Local] service_streams permissions migration needed");
+                    need_service_streams_migration = true;
                 }
             }
 
@@ -387,6 +393,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     if need_sourcemap_permission_migration {
                         get_ownership_all_org_tuple(org_name, "sourcemaps", &mut tuples);
+                    }
+                    if need_service_streams_migration {
+                        get_ownership_all_org_tuple(org_name, "service_streams", &mut tuples);
                     }
                     if need_logs_pattern_insights_migration {
                         get_ownership_all_org_tuple(org_name, LOGS_INSIGHTS_KEY, &mut tuples);

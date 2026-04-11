@@ -992,12 +992,13 @@ async fn find_or_create_incident(
     if key_type == KeyType::AlertId {
         let alert_id = alert.get_unique_key();
 
-        if let Some(existing) =
+        // Use the dedicated DB query: junction table lookup + incident fetch
+        if let Some(incident) =
             infra::table::alert_incidents::find_open_incident_by_alert_id(org_id, &alert_id).await?
         {
             // Found existing AlertId incident for this alert - join it
-            let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
-                &existing.id,
+            let _ = infra::table::alert_incidents::add_alert_to_incident(
+                &incident.id,
                 &alert_id,
                 &alert.name,
                 triggered_at,
@@ -1007,7 +1008,7 @@ async fn find_or_create_incident(
 
             if let Err(e) = infra::table::incident_events::record_alert(
                 org_id,
-                &existing.id,
+                &incident.id,
                 &alert_id,
                 &alert.name,
                 triggered_at,
@@ -1016,31 +1017,21 @@ async fn find_or_create_incident(
             {
                 log::error!(
                     "[Incidents] Failed to record alert event for incident {}: {e}",
-                    existing.id
+                    incident.id
                 );
             }
 
             spawn_topology_enrichment(
                 org_id,
-                &existing.id,
+                &incident.id,
                 service_name,
                 &alert_id,
                 &alert.name,
                 triggered_at,
             );
 
-            // AlertId incidents can't have new alert types (always same alert)
-            // but we respect the database result for consistency
-            if is_new_alert_type {
-                log::warn!(
-                    "[incidents] Unexpected new alert type for AlertId incident {}: {}",
-                    existing.id,
-                    alert_id
-                );
-            }
-
             return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
-                incident_id: existing.id,
+                incident_id: incident.id,
                 service_name: service_name.to_string(),
             });
         }

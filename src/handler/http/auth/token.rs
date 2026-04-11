@@ -178,11 +178,12 @@ pub async fn token_validator(
                     }
                     Some(user) => {
                         // Check permissions for the user
+                        let user_email = user.email.clone();
                         let user_role = user.role;
                         let is_external = user.is_external;
                         if auth_info.bypass_check
                             || check_permissions(
-                                user_id,
+                                &user_email,
                                 auth_info.clone(),
                                 user_role.clone(),
                                 is_external,
@@ -190,7 +191,7 @@ pub async fn token_validator(
                             .await
                         {
                             Ok(AuthValidationResult {
-                                user_email: res.0.user_email.clone(),
+                                user_email,
                                 user_role: Some(user_role),
                                 is_internal_user: !is_external,
                             })
