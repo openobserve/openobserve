@@ -49,6 +49,7 @@
             dense
             use-input
             hide-selected
+            class="alert-v3-select"
             fill-input
             hide-bottom-space
             :input-debounce="400"
@@ -59,7 +60,7 @@
               (val: any) => !!val || 'Field is required!',
               validateColumnField
             ]"
-            :class="inputWidth ? inputWidth : ''"
+            :class="[inputWidth ? inputWidth : '']"
             @update:model-value="emits('input:update', 'conditions', condition)"
             :new-value-mode="props.allowCustomColumns ? 'add-unique' : undefined"
           >
@@ -80,8 +81,9 @@
             borderless
             dense
             hide-bottom-space
+            class="alert-v3-select"
             :rules="[(val: any) => !!val || 'Field is required!']"
-            :class="inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[70px]' : computedInputWidth)"
+            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[70px]' : computedInputWidth)]"
             @update:model-value="emits('input:update', 'conditions', condition)"
           >
           <q-tooltip v-if="condition.operator && store.state.isAiChatEnabled">
@@ -103,7 +105,7 @@
             dense
             hide-bottom-space
             :rules="[(val: any) => !!val || 'Field is required!']"
-            :class="inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[110px]' : computedValueWidth)"
+            :class="['alert-v3-input', inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[110px]' : computedValueWidth)]"
             @update:model-value="emits('input:update', 'conditions', condition)"
           >
           <q-tooltip v-if="condition.value && store.state.isAiChatEnabled">
@@ -265,7 +267,7 @@ const validateColumnField = (val: any) => {
 };
   </script>
 
-  <style scoped>
+  <style scoped lang="scss">
 .operator-toggle-btn {
   color: var(--o2-primary-btn-bg) !important;
 }
@@ -273,5 +275,6 @@ const validateColumnField = (val: any) => {
 .operator-toggle-btn:hover {
   background-color: rgba(var(--o2-primary-btn-bg-rgb), 0.1) !important;
 }
+
 </style>
   
