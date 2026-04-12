@@ -16,7 +16,8 @@
 use std::collections::HashMap;
 
 use config::{
-    DEFAULT_STREAM_NAME, MESSAGE_COL_NAME, STREAM_NAME_LABEL, TIMESTAMP_COL_NAME,
+    DEFAULT_STREAM_NAME, MESSAGE_COL_NAME, STREAM_NAME_LABEL, STREAM_NAME_LABEL_OLD,
+    TIMESTAMP_COL_NAME,
     utils::{json, schema::format_stream_name},
 };
 use infra::errors::Result;
@@ -250,11 +251,18 @@ fn parse_prometheus_labels(labels_str: &str) -> Result<HashMap<String, String>, 
 }
 
 fn determine_service_stream_name(labels: &HashMap<String, String>) -> String {
-    labels
-        .get(STREAM_NAME_LABEL)
-        .map(|name| format_stream_name(name.to_string()))
-        .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| DEFAULT_STREAM_NAME.to_string())
+    let name = if let Some(name) = labels.get(STREAM_NAME_LABEL) {
+        name
+    } else if let Some(name) = labels.get(STREAM_NAME_LABEL_OLD) {
+        name
+    } else {
+        ""
+    };
+    if !name.is_empty() {
+        format_stream_name(name.to_string())
+    } else {
+        DEFAULT_STREAM_NAME.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -424,7 +432,7 @@ mod tests {
         let proto_request = loki_rpc::PushRequest {
             streams: vec![
                 loki_rpc::StreamAdapter {
-                    labels: r#"{"o2_stream_name":"auth"}"#.to_string(),
+                    labels: r#"{"stream_name":"auth"}"#.to_string(),
                     entries: vec![loki_rpc::EntryAdapter {
                         timestamp: Some(Timestamp {
                             seconds: 1702834800,
