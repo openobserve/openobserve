@@ -353,6 +353,25 @@ pub async fn create_config(
     };
 
     let result = new_config.insert(db).await?;
+
+    // Broadcast config creation to all super cluster regions for API-read consistency.
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+    {
+        if let Err(e) =
+            o2_enterprise::enterprise::super_cluster::queue::anomaly_config_create(result.clone())
+                .await
+        {
+            log::warn!(
+                "[anomaly_detection {}] failed to broadcast ConfigCreate to super cluster: {e}",
+                result.anomaly_id
+            );
+        }
+    }
+
     let folder_name_owned = folder_name.to_string();
 
     // Register a detection trigger in the shared scheduler so it is driven by the
@@ -522,6 +541,31 @@ pub async fn update_config(
 
     let updated = active_model.update(db).await?;
 
+    // Broadcast config update to all super cluster regions.
+    #[cfg(feature = "enterprise")]
+    {
+        let sc_enabled = o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled;
+        let local_mode = config::get_config().common.local_mode;
+        if sc_enabled && !local_mode {
+            log::debug!(
+                "[anomaly_detection {}] ConfigUpdate broadcast check: super_cluster.enabled={sc_enabled} local_mode={local_mode}",
+                updated.anomaly_id
+            );
+            if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::anomaly_config_update(
+                updated.clone(),
+            )
+            .await
+            {
+                log::warn!(
+                    "[anomaly_detection {}] failed to broadcast ConfigUpdate to super cluster: {e}",
+                    updated.anomaly_id
+                );
+            }
+        }
+    }
+
     // Push the trigger AFTER the DB save so the scheduler always sees enabled=true
     // when it picks up the newly inserted trigger row.
     if push_trigger_after_save {
@@ -604,6 +648,24 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
     config.delete(db).await?;
+
+    // Broadcast config deletion to all super cluster regions.
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+    {
+        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::anomaly_config_delete(
+            org_id, anomaly_id,
+        )
+        .await
+        {
+            log::warn!(
+                "[anomaly_detection {anomaly_id}] failed to broadcast ConfigDelete to super cluster: {e}"
+            );
+        }
+    }
 
     // Remove the detection trigger from the shared scheduler.
     {
