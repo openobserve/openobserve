@@ -121,7 +121,8 @@
     "stopGenerating": "Oluşturmayı bırak",
     "version": "Versiyon",
     "create": "Oluştur",
-    "redirectingHome": "{geri sayım} saniye içinde eve yönlendiriliyor..."
+    "redirectingHome": "{geri sayım} saniye içinde eve yönlendiriliyor...",
+    "resources": "Kaynaklar"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",

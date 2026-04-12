@@ -1,3 +1,4 @@
+// Copyright 2026 OpenObserve Inc.
 import { describe, it, expect, beforeEach } from "vitest";
 import { useMetricsCorrelationDashboard, type MetricsCorrelationConfig } from "./useMetricsCorrelationDashboard";
 import type { StreamInfo } from "@/services/service_streams";
@@ -126,6 +127,81 @@ describe("useMetricsCorrelationDashboard", () => {
       // Second row
       expect(panels[3].layout.x).toBe(0);
       expect(panels[3].layout.y).toBe(16);
+    });
+
+    it("should use default panelWidth=64 and panelHeight=16 in createMetricPanel when not provided", () => {
+      const metricStreams: StreamInfo[] = [
+        { stream_name: "cpu_usage", filters: {} },
+        { stream_name: "memory_usage", filters: {} },
+        { stream_name: "disk_io", filters: {} },
+        { stream_name: "network_rx", filters: {} },
+      ];
+
+      const config: MetricsCorrelationConfig = {
+        serviceName: "test",
+        matchedDimensions: {},
+        metricStreams: [],
+        orgIdentifier: "test-org",
+        timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
+      };
+
+      // No panelWidth / panelHeight passed — defaults apply
+      const dashboard = composable.generateDashboard(metricStreams, config);
+      const panels = dashboard.tabs[0].panels;
+
+      // Width and height use defaults
+      expect(panels[0].layout.w).toBe(64);
+      expect(panels[0].layout.h).toBe(16);
+
+      // x is col * 64 (default panelWidth)
+      expect(panels[0].layout.x).toBe(0);   // col 0
+      expect(panels[1].layout.x).toBe(64);  // col 1
+      expect(panels[2].layout.x).toBe(128); // col 2
+
+      // y is row * 16 (default panelHeight)
+      expect(panels[0].layout.y).toBe(0);   // row 0
+      expect(panels[3].layout.y).toBe(16);  // row 1
+    });
+
+    it("should use custom panelWidth and panelHeight in createMetricPanel when provided", () => {
+      const metricStreams: StreamInfo[] = [
+        { stream_name: "cpu_usage", filters: {} },
+        { stream_name: "memory_usage", filters: {} },
+        { stream_name: "disk_io", filters: {} },
+        { stream_name: "network_rx", filters: {} },
+      ];
+
+      const config: MetricsCorrelationConfig = {
+        serviceName: "test",
+        matchedDimensions: {},
+        metricStreams: [],
+        orgIdentifier: "test-org",
+        timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
+      };
+
+      const customWidth = 100;
+      const customHeight = 20;
+      const dashboard = composable.generateDashboard(
+        metricStreams,
+        config,
+        "dark",
+        customWidth,
+        customHeight,
+      );
+      const panels = dashboard.tabs[0].panels;
+
+      // Width and height use custom values
+      expect(panels[0].layout.w).toBe(customWidth);
+      expect(panels[0].layout.h).toBe(customHeight);
+
+      // x is col * customWidth
+      expect(panels[0].layout.x).toBe(0);           // col 0 * 100
+      expect(panels[1].layout.x).toBe(100);         // col 1 * 100
+      expect(panels[2].layout.x).toBe(200);         // col 2 * 100
+
+      // y is row * customHeight
+      expect(panels[0].layout.y).toBe(0);           // row 0 * 20
+      expect(panels[3].layout.y).toBe(customHeight); // row 1 * 20
     });
   });
 
@@ -330,6 +406,60 @@ describe("useMetricsCorrelationDashboard", () => {
 
       expect(dashboard!.tabs[0].panels[0].config.table_dynamic_columns).toBe(true);
       expect(dashboard!.tabs[0].panels[0].type).toBe("table");
+    });
+
+    it("should use default panelWidth=192 and panelHeight=44 in createCorrelationDashboard when not provided", () => {
+      const logStreams: StreamInfo[] = [
+        { stream_name: "app_logs", filters: {} },
+      ];
+
+      const config: MetricsCorrelationConfig = {
+        serviceName: "api-server",
+        matchedDimensions: {},
+        metricStreams: [],
+        orgIdentifier: "test-org",
+        timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
+      };
+
+      // No panelWidth / panelHeight passed — defaults apply
+      const dashboard = composable.generateLogsDashboard(logStreams, config);
+      const layout = dashboard!.tabs[0].panels[0].layout;
+
+      expect(layout.w).toBe(192);
+      expect(layout.h).toBe(44);
+      // Single-stream panel always positioned at top-left
+      expect(layout.x).toBe(0);
+      expect(layout.y).toBe(0);
+    });
+
+    it("should use custom panelWidth and panelHeight in createCorrelationDashboard when provided", () => {
+      const logStreams: StreamInfo[] = [
+        { stream_name: "app_logs", filters: {} },
+      ];
+
+      const config: MetricsCorrelationConfig = {
+        serviceName: "api-server",
+        matchedDimensions: {},
+        metricStreams: [],
+        orgIdentifier: "test-org",
+        timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
+      };
+
+      const customWidth = 256;
+      const customHeight = 60;
+      const dashboard = composable.generateLogsDashboard(
+        logStreams,
+        config,
+        customWidth,
+        customHeight,
+      );
+      const layout = dashboard!.tabs[0].panels[0].layout;
+
+      expect(layout.w).toBe(customWidth);
+      expect(layout.h).toBe(customHeight);
+      // Position is always fixed at top-left regardless of dimensions
+      expect(layout.x).toBe(0);
+      expect(layout.y).toBe(0);
     });
   });
 

@@ -121,7 +121,8 @@
     "id": "ID",
     "getStarted": "Get Started",
     "reset": "Reset",
-    "retry": "Retry"
+    "retry": "Retry",
+    "resources": "Resources"
   },
   "validation": {
     "required": "This field is required",

@@ -121,7 +121,8 @@
     "stopGenerating": "Stop met genereren",
     "version": "Versie",
     "create": "Creëren",
-    "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden..."
+    "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden...",
+    "resources": "Hulpbronnen"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",

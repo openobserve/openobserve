@@ -121,7 +121,8 @@
     "stopGenerating": "Smetti di generare",
     "version": "Versione",
     "create": "Crea",
-    "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi..."
+    "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi...",
+    "resources": "Risorse"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",

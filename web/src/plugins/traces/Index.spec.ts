@@ -1105,6 +1105,7 @@ describe("Index.vue (Main Traces Page)", () => {
       const serviceGraphData = {
         stream: "default",
         serviceName: "test-service",
+        mode: "spans" as const,
         timeRange: {
           startTime: 1755853746625720,
           endTime: 1755853746725720,
@@ -1114,7 +1115,7 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.handleServiceGraphViewTraces(serviceGraphData);
       await flushPromises();
 
-      // handleServiceGraphViewTraces now sets searchMode = "spans" (not activeTab)
+      // handleServiceGraphViewTraces sets searchMode from data.mode
       expect(mockSearchObj.meta.searchMode).toBe("spans");
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
       expect(mockSearchObj.data.editorValue).toContain("test-service");
@@ -1330,6 +1331,100 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(mockSearchObj.data.editorValue).not.toContain("duration");
+    });
+
+    it("should set searchMode from data.mode when navigating via handleServiceGraphViewTraces", async () => {
+      mockSearchObj.meta.searchMode = "service-graph";
+
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        mode: "traces",
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.meta.searchMode).toBe("traces");
+    });
+
+    it("should append resourceFilter to query when data.resourceFilter is provided", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        mode: "spans",
+        resourceFilter: { field: "service.name", value: "my-service" },
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND service.name = 'my-service'",
+      );
+    });
+
+    it("should escape single quotes in resourceFilter value", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        mode: "spans",
+        resourceFilter: { field: "service.name", value: "it's here" },
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND service.name = 'it''s here'",
+      );
+    });
+
+    it("should call loadServiceGraph on serviceGraphRef when service-graph-refresh event fires from SearchBar", async () => {
+      const mockLoadServiceGraph = vi.fn();
+
+      // Start in service-graph mode so the ServiceGraph stub is rendered
+      mockSearchObj.meta.searchMode = "service-graph";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": {
+              name: "search-bar",
+              template: "<div />",
+              emits: ["service-graph-refresh"],
+            },
+            "index-list": true,
+            "search-result": true,
+            "service-graph": {
+              name: "service-graph",
+              template: "<div />",
+              setup() {
+                return { loadServiceGraph: mockLoadServiceGraph };
+              },
+            },
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      expect(searchBarEl.exists()).toBe(true);
+      await searchBarEl.vm.$emit("service-graph-refresh");
+      await flushPromises();
+
+      expect(mockLoadServiceGraph).toHaveBeenCalledTimes(1);
     });
   });
 

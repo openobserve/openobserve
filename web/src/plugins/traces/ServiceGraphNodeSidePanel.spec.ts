@@ -41,6 +41,12 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((d: any) => d),
 }));
 
+vi.mock("vue-i18n", () => ({
+  useI18n: vi.fn(() => ({
+    t: (key: string) => key,
+  })),
+}));
+
 vi.mock("quasar", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
@@ -169,13 +175,6 @@ describe("ServiceGraphNodeSidePanel", () => {
       ).toBe(true);
     });
 
-    it("should render the show-telemetry button", () => {
-      expect(
-        wrapper
-          .find('[data-test="service-graph-side-panel-show-telemetry-btn"]')
-          .exists(),
-      ).toBe(true);
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -357,64 +356,99 @@ describe("ServiceGraphNodeSidePanel", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Show telemetry button
+  // Metrics tab
   // -------------------------------------------------------------------------
 
-  describe("show telemetry button", () => {
+  describe("metrics tab", () => {
     beforeEach(() => {
-      wrapper = mountPanel();
+      wrapper = mountPanel({ streamFilter: "default" });
     });
 
-    it("should exist in the header", () => {
-      const btn = wrapper.find(
-        '[data-test="service-graph-side-panel-show-telemetry-btn"]',
-      );
-      expect(btn.exists()).toBe(true);
-    });
-
-    it("should call correlate service and show telemetry dialog on success", async () => {
-      vi.mocked(correlateStreams).mockResolvedValueOnce({
-        data: {
-          service_name: "frontend",
-          matched_dimensions: { env: "prod" },
-          additional_dimensions: {},
-          related_streams: {
-            logs: ["app-logs"],
-            metrics: [],
-            traces: [],
-          },
-        },
-      } as any);
-
-      const btn = wrapper.find(
-        '[data-test="service-graph-side-panel-show-telemetry-btn"]',
-      );
-      await btn.trigger("click");
+    it("should render the metrics tab", async () => {
       await flushPromises();
-
-      expect(correlateStreams).toHaveBeenCalledWith(
-        "default",
-        expect.objectContaining({ source_type: "traces" }),
-      );
-      // TelemetryCorrelationDashboard stub is rendered when dialog is shown
       expect(
-        wrapper.find('[data-test="stub-telemetry"]').exists(),
+        wrapper
+          .find('[data-test="service-graph-node-panel-tab-metrics"]')
+          .exists(),
       ).toBe(true);
     });
 
-    it("should NOT open the telemetry dialog when correlate returns no data", async () => {
+    it("should show loading state when metricsCorrelationLoading is true", async () => {
+      // Delay the correlate response so the loading state is visible
+      vi.mocked(correlateStreams).mockImplementationOnce(
+        () => new Promise(() => {}),
+      );
+
+      // Activate the metrics tab to trigger fetchMetricsCorrelation
+      const metricsTab = wrapper.find(
+        '[data-test="service-graph-node-panel-tab-metrics"]',
+      );
+      expect(metricsTab.exists()).toBe(true);
+      await metricsTab.trigger("click");
+      await flushPromises();
+
+      expect(
+        wrapper
+          .find('[data-test="service-graph-side-panel-metrics-loading"]')
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("should show error state when metricsCorrelationError is set", async () => {
+      vi.mocked(correlateStreams).mockRejectedValueOnce(
+        new Error("Network failure"),
+      );
+
+      const metricsTab = wrapper.find(
+        '[data-test="service-graph-node-panel-tab-metrics"]',
+      );
+      expect(metricsTab.exists()).toBe(true);
+      await metricsTab.trigger("click");
+      await flushPromises();
+
+      const errorEl = wrapper.find(
+        '[data-test="service-graph-side-panel-metrics-error"]',
+      );
+      expect(errorEl.exists()).toBe(true);
+      expect(errorEl.text()).toContain("Network failure");
+    });
+
+    it("should call fetchMetricsCorrelation with true when retry button is clicked", async () => {
+      // First call fails to put the component into error state
+      vi.mocked(correlateStreams).mockRejectedValueOnce(
+        new Error("Server error"),
+      );
+
+      const metricsTab = wrapper.find(
+        '[data-test="service-graph-node-panel-tab-metrics"]',
+      );
+      expect(metricsTab.exists()).toBe(true);
+      await metricsTab.trigger("click");
+      await flushPromises();
+
+      const retryBtn = wrapper.find(
+        '[data-test="service-graph-side-panel-metrics-retry-btn"]',
+      );
+      expect(retryBtn.exists()).toBe(true);
+
+      // Second call succeeds
       vi.mocked(correlateStreams).mockResolvedValueOnce({
-        data: null,
+        data: {
+          service_name: "frontend",
+          matched_dimensions: {},
+          additional_dimensions: {},
+          related_streams: { logs: [], metrics: ["prom-stream"], traces: [] },
+        },
       } as any);
 
-      const btn = wrapper.find(
-        '[data-test="service-graph-side-panel-show-telemetry-btn"]',
-      );
-      await btn.trigger("click");
+      await retryBtn.trigger("click");
       await flushPromises();
-      // correlationData remains null — dialog stub must not appear
+
+      // After retry succeeds the error state should be gone
       expect(
-        wrapper.find('[data-test="stub-telemetry"]').exists(),
+        wrapper
+          .find('[data-test="service-graph-side-panel-metrics-error"]')
+          .exists(),
       ).toBe(false);
     });
   });

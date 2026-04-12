@@ -121,7 +121,8 @@
     "stopGenerating": "Generieren beenden",
     "redirectingHome": "In {Countdown} Sekunden wird zur Startseite weitergeleitet...",
     "version": "Version",
-    "create": "Erstellen"
+    "create": "Erstellen",
+    "resources": "Ressourcen"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",

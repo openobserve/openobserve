@@ -1221,4 +1221,58 @@ describe("useTraces", () => {
       expect(searchObj.meta.serviceColors["svc-3"]).toBe("#color-2");
     });
   });
+
+  // -------------------------------------------------------------------------
+  // serviceGraph state initialization — localStorage-backed fields
+  //
+  // These fields are read at module evaluation time (module-level singleton),
+  // so each test must reset modules and dynamically import a fresh copy of
+  // useTraces to observe different localStorage values.
+  // -------------------------------------------------------------------------
+  describe("serviceGraph state initialization", () => {
+    afterEach(() => {
+      localStorage.clear();
+      vi.resetModules();
+    });
+
+    it("should default serviceGraphVisualizationType to 'tree' when localStorage is empty", async () => {
+      localStorage.clear();
+      vi.resetModules();
+
+      const { default: freshUseTraces } = await import("./useTraces");
+      const { searchObj } = freshUseTraces();
+
+      expect(searchObj.meta.serviceGraphVisualizationType).toBe("tree");
+    });
+
+    it("should read serviceGraphVisualizationType from localStorage when set", async () => {
+      localStorage.setItem("serviceGraph_visualizationType", "graph");
+      vi.resetModules();
+
+      const { default: freshUseTraces } = await import("./useTraces");
+      const { searchObj } = freshUseTraces();
+
+      expect(searchObj.meta.serviceGraphVisualizationType).toBe("graph");
+    });
+
+    it("should default serviceGraphLayoutType to 'horizontal' when localStorage is empty", async () => {
+      localStorage.clear();
+      vi.resetModules();
+
+      const { default: freshUseTraces } = await import("./useTraces");
+      const { searchObj } = freshUseTraces();
+
+      expect(searchObj.meta.serviceGraphLayoutType).toBe("horizontal");
+    });
+
+    it("should read serviceGraphLayoutType from localStorage when set", async () => {
+      localStorage.setItem("serviceGraph_layoutType", "vertical");
+      vi.resetModules();
+
+      const { default: freshUseTraces } = await import("./useTraces");
+      const { searchObj } = freshUseTraces();
+
+      expect(searchObj.meta.serviceGraphLayoutType).toBe("vertical");
+    });
+  });
 });
