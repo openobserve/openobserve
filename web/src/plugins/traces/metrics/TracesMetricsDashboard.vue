@@ -236,6 +236,8 @@ const getBaseFilters = () => {
     baseFilters.push(
       parseSpanKindWhereClause(
         typeof parsed === "string" ? parsed : props.filter.trim(),
+        sqlParser.value,
+        searchObj.data.stream.selectedStream.value,
       ),
     );
   }
@@ -279,6 +281,8 @@ const loadDashboard = async () => {
               typeof parsedFilter === "string"
                 ? parsedFilter
                 : props.filter.trim(),
+              sqlParser.value,
+              searchObj.data.stream.selectedStream.value,
             ),
           );
         }

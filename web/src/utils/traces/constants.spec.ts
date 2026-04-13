@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeAll } from "vitest";
 import {
   SPAN_KIND_MAP,
   SPAN_KIND_LABEL_TO_KEY,
@@ -161,6 +161,64 @@ describe("traces/constants", () => {
       const input = "service='api' and span_kind='Client' and duration > 100";
       const output = parseSpanKindWhereClause(input);
       expect(output).toBe("service='api' and span_kind='3' and duration > 100");
+    });
+
+    describe("with SQL parser", () => {
+      let parser: any;
+
+      beforeAll(async () => {
+        const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
+        parser = new mod.default.Parser();
+      });
+
+      it("should replace span_kind='Server' with the numeric key using AST path", () => {
+        const result = parseSpanKindWhereClause("span_kind='Server'", parser);
+        // sqlify adds spaces around the operator
+        expect(result).toBe("span_kind = '2'");
+      });
+
+      it("should replace label case-insensitively when parser is provided", () => {
+        const result = parseSpanKindWhereClause("span_kind='server'", parser);
+        expect(result).toBe("span_kind = '2'");
+      });
+
+      it("should preserve the != operator and replace the label with the numeric key", () => {
+        const result = parseSpanKindWhereClause("span_kind!='Client'", parser);
+        expect(result).toBe("span_kind != '3'");
+      });
+
+      it("should replace both sides of a compound OR clause", () => {
+        const result = parseSpanKindWhereClause(
+          "(span_kind='SERVER' OR span_kind='internal')",
+          parser,
+        );
+        expect(result).toBe("(span_kind = '2' OR span_kind = '1')");
+      });
+
+      it("should leave an unknown label value unchanged", () => {
+        const result = parseSpanKindWhereClause("span_kind='Unknown'", parser);
+        // sqlify normalises spacing but preserves the unrecognised value
+        expect(result).toBe("span_kind = 'Unknown'");
+      });
+
+      it("should return an empty string unchanged", () => {
+        const result = parseSpanKindWhereClause("", parser);
+        expect(result).toBe("");
+      });
+
+      it("should return the original whereClause when the parser throws on malformed SQL", () => {
+        const badClause = "span_kind='";
+        const result = parseSpanKindWhereClause(badClause, parser);
+        expect(result).toBe(badClause);
+      });
+
+      it("should replace all labels in an IN clause with their numeric keys", () => {
+        const result = parseSpanKindWhereClause(
+          "span_kind IN ('Server', 'Client')",
+          parser,
+        );
+        expect(result).toBe("span_kind IN ('2', '3')");
+      });
     });
   });
 });

@@ -345,7 +345,11 @@ const buildSql = (): string => {
     whereClause = durationParseResult;
   }
 
-  whereClause = parseSpanKindWhereClause(whereClause);
+  whereClause = parseSpanKindWhereClause(
+    whereClause,
+    sqlParser.value,
+    searchObj.data.stream.selectedStream.value,
+  );
 
   const streamName = searchObj.data.stream.selectedStream.value;
   let sql = `SELECT * FROM "${streamName}"`;

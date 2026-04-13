@@ -670,7 +670,11 @@ function buildSearch() {
       }
 
       // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
-      whereClause = parseSpanKindWhereClause(whereClause);
+      whereClause = parseSpanKindWhereClause(
+        whereClause,
+        parser,
+        searchObj.data.stream.selectedStream.value,
+      );
 
       whereClause = whereClause
         .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
@@ -880,7 +884,11 @@ async function getQueryData(
     }
 
     // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
-    filter = parseSpanKindWhereClause(filter);
+    filter = parseSpanKindWhereClause(
+      filter,
+      parser,
+      searchObj.data.stream.selectedStream.value,
+    );
 
     const combinedFilter = filter;
 
@@ -1980,6 +1988,11 @@ watch(
 
   .q-field__control-container {
     padding-top: 0px !important;
+  }
+
+  .traces-horizontal-splitter .q-splitter__before {
+    z-index: auto;
+    overflow: visible;
   }
 }
 </style>
