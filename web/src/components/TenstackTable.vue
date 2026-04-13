@@ -1928,10 +1928,10 @@ const renderedDashboardRows = computed(() => {
       .map((vi: any) => ({ row: rows[vi.index], idx: vi.index }))
       .filter((r: any) => r.row);
   }
-  // Paginated mode: use pagedRows with iteration index
-  return (pagedRows.value ?? []).map((row: any, i: number) => ({
+  // Paginated mode: use TanStack's global row index so page 2+ emits correct position
+  return (pagedRows.value ?? []).map((row: any) => ({
     row,
-    idx: i,
+    idx: row.index,
   }));
 });
 

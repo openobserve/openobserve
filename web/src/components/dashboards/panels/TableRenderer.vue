@@ -121,6 +121,9 @@ export default defineComponent({
      * Handles auto-color mode (stable palette per distinct value) and
      * value-mapping color overrides.
      */
+    // Component-level cache: colKey → (value → hex). Avoids mutating prop-derived col objects.
+    const autoColorCache = new Map<string, Map<string, string>>();
+
     const cellStyleFn = computed(() => (cell: any): string => {
       const col = (cell.column.columnDef.meta as any)?._col;
       const value = cell.getValue();
@@ -129,9 +132,9 @@ export default defineComponent({
       if (col?.colorMode === "auto") {
         const palette = getColorForTable;
         const key = String(value);
-        const cacheKey = `__autoColorMap_${col.field ?? col.name}`;
-        if (!col[cacheKey]) col[cacheKey] = new Map<string, string>();
-        const map: Map<string, string> = col[cacheKey];
+        const colKey = col.field ?? col.name;
+        if (!autoColorCache.has(colKey)) autoColorCache.set(colKey, new Map<string, string>());
+        const map = autoColorCache.get(colKey)!;
         if (!map.has(key)) map.set(key, palette[map.size % palette.length]);
         const hex = map.get(key) as string;
         return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;

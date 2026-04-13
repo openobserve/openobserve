@@ -23,6 +23,7 @@ export async function getTableHeaders(page) {
         .trim()
         .replace(/arrow_upward/g, "")
         .replace(/arrow_downward/g, "")
+        .replace(/unfold_more/g, "")
         .replace(/content_copy/g, "")
         .trim()
     )
@@ -46,7 +47,7 @@ export async function getTableCellText(page, rowIndex, colIndex) {
       // TanStack dashboard mode: rows are directly in tbody with class dashboard-data-row
       const rows = Array.from(table.querySelectorAll("tbody tr.dashboard-data-row"));
       // Fall back to any tbody tr if dashboard-data-row class is not present
-      const allRows = rows.length > 0 ? rows : Array.from(table.querySelectorAll("tbody tr")).filter((r) => r.querySelectorAll("td").length > 1);
+      const allRows = rows.length > 0 ? rows : Array.from(table.querySelectorAll("tbody tr")).filter((r) => r.querySelectorAll("td").length >= 1);
       const row = allRows[ri];
       if (!row) return "";
       const cell = row.querySelectorAll("td")[ci];
