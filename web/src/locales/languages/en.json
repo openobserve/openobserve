@@ -3021,6 +3021,7 @@
     "showTraces": "Show Traces",
     "applyAndSearch": "Apply & Search",
     "addToTable": "Add to table",
+    "timestamp": "Timestamp",
     "evaluations": {
       "loading": "Loading evaluation data...",
       "noDataTitle": "No Evaluation Data",

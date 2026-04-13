@@ -37,6 +37,8 @@
 import { ref } from "vue";
 import { type ColumnDef } from "@tanstack/vue-table";
 import { useStore } from "vuex";
+import { timestampToTimezoneDate } from "@/utils/zincutils";
+import { useI18n } from "vue-i18n";
 
 /** IDs of LLM columns injected at runtime — never stored in selectedFields. */
 export const LLM_COLUMN_IDS = new Set([
@@ -162,6 +164,7 @@ export function useTracesTableColumns() {
    */
   const columns = ref<ColumnDef<Record<string, any>>[]>([]);
   const store = useStore();
+  const { t } = useI18n();
 
   const buildColumns = (
     showLlmColumns: boolean,
@@ -172,17 +175,20 @@ export function useTracesTableColumns() {
       toColumnDef(field),
     );
 
-    if (
-      !selectedFields.find(
-        (col) =>
-          col === (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
-      )
-    )
+    const timestampCol =
+      store?.state?.zoConfig?.timestamp_column || "_timestamp";
+    if (!selectedFields.find((col) => col === timestampCol))
       cols.unshift({
-        id: store?.state?.zoConfig?.timestamp_column || "_timestamp",
-        header: "Timestamp",
-        size: 160,
-        meta: { slot: true, sortable: true },
+        id: timestampCol,
+        header: t("traces.timestamp") + ` (${store.state.timezone})`,
+        size: 210,
+        meta: { slot: true, sortable: true, class: "tw:capitalize!" },
+        accessorFn: (row: any) =>
+          timestampToTimezoneDate(
+            row[timestampCol] / 1000,
+            store.state.timezone,
+            "yyyy-MM-dd HH:mm:ss.SSS",
+          ),
       });
 
     // Inject LLM columns just before service_latency in traces mode.
