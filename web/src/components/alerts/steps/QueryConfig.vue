@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="section-header-accent" />
         <span class="section-header-title">Conditions</span>
       </div>
-      <div class="tw:px-3 tw:py-2">
+      <div class="tw:px-3 tw:py-2 tw:min-w-0 tw:w-full tw:box-border">
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
       <div v-if="shouldShowTabs" class="tw:mb-2 tw:flex tw:items-center tw:justify-between">
         <div class="query-mode-tabs" data-test="step2-query-tabs">
@@ -38,15 +38,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
         </div>
 
-        <!-- View Editor Button (only for SQL/PromQL tabs) -->
+        <!-- Open Full Editor (SQL/PromQL tabs) -->
         <q-btn
           v-if="localTab !== 'custom'"
           data-test="step2-view-editor-btn"
-          label="View Editor"
           size="sm"
-          class="o2-secondary-button q-py-sm"
+          flat
+          no-caps
+          class="o2-secondary-button"
           @click="viewSqlEditor = true"
-        />
+        >
+        Open Full Editor
+      </q-btn>
       </div>
 
       <!-- Custom Query Builder -->
@@ -676,34 +679,144 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-form>
       </template>
 
-      <!-- SQL/PromQL Preview Mode -->
+      <!-- SQL/PromQL Inline Editor Mode -->
       <template v-else>
-        <div class="tw:w-full tw:flex tw:flex-col tw:gap-4">
+        <div class="tw:w-full tw:flex tw:flex-col tw:gap-2 tw:overflow-hidden">
 
-          <!-- Preview Boxes Container -->
-          <div class="tw:flex tw:gap-4 tw:w-full">
-            <!-- SQL/PromQL Preview Box (50% or 100% if no VRL) -->
-            <div ref="sqlPromqlPreviewRef" class="preview-box tw:flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" :style="{ height: localTab === 'promql' ? '380px' : '464px' }">
-              <div class="preview-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
-                <span class="preview-title">{{ localTab === 'sql' ? 'SQL' : 'PromQL' }} Preview</span>
-              </div>
-              <div class="preview-content tw:px-3 tw:py-2">
-                <pre class="preview-code">{{ sqlOrPromqlQuery || `No ${localTab === 'sql' ? 'SQL' : 'PromQL'} query defined yet` }}</pre>
-              </div>
-            </div>
+          <!-- Editor area — position:relative shell owns the size; inner absolute never leaks -->
+          <div style="position: relative; height: 320px;">
+            <div style="position: absolute; inset: 0; display: flex; overflow: hidden;">
 
-            <!-- VRL Preview Box (50%) - Only show if VRL function exists -->
-            <div v-if="vrlFunction" class="preview-box tw:flex-1" :class="store.state.theme === 'dark' ? 'dark-mode-preview' : 'light-mode-preview'" :style="{ height: localTab === 'promql' ? '380px' : '464px' }">
-              <div class="preview-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
-                <span class="preview-title">VRL Preview</span>
+              <!-- SQL/PromQL pane — with its own header -->
+              <div style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;"
+                :style="{ width: showVrl && localTab === 'sql' ? '50%' : '100%' }">
+                <div class="inline-editor-header tw:flex tw:items-center tw:justify-between"
+                  :class="store.state.theme === 'dark' ? 'inline-editor-header--dark' : 'inline-editor-header--light'">
+                  <div class="tw:flex tw:items-center tw:gap-2">
+                    <div class="pane-accent-bar pane-accent-bar--primary" />
+                    <span class="inline-editor-title">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
+                  </div>
+                  <!-- fx toggle shown here only when VRL is not yet enabled -->
+                  <q-toggle
+                    v-if="localTab === 'sql' && !showVrl"
+                    v-model="showVrl"
+                    :icon="'img:' + getImageURL('images/common/function.svg')"
+                    size="xs"
+                    class="o2-toggle-button-xs"
+                    :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
+                  >
+                    <q-tooltip class="tw:text-[12px]" :delay="300">show VRL editor</q-tooltip>
+                  </q-toggle>
+                </div>
+                <div style="position: relative; flex: 1; min-height: 0;">
+                  <div style="position: absolute; inset: 0;">
+                    <UnifiedQueryEditor
+                      ref="inlineQueryEditorRef"
+                      :languages="localTab === 'promql' ? ['promql'] : ['sql']"
+                      :default-language="localTab"
+                      :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
+                      editor-height="100%"
+                      :disable-ai="!streamName"
+                      :keywords="autoCompleteKeywords"
+                      :suggestions="autoCompleteSuggestions"
+                      :class="(localTab === 'sql' ? localSqlQuery : localPromqlQuery) === '' && queryEditorPlaceholderFlag ? 'empty-query' : ''"
+                      @focus="queryEditorPlaceholderFlag = false"
+                      @blur="onBlurInlineSqlEditor"
+                      @update:query="handleInlineQueryUpdate"
+                    />
+                  </div>
+                </div>
               </div>
-              <div class="preview-content tw:px-3 tw:py-2">
-                <pre class="preview-code">{{ vrlFunction }}</pre>
+
+              <!-- VRL pane — with its own header, side-by-side with SQL pane -->
+              <div v-if="showVrl && localTab === 'sql'"
+                style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; width: 50%;"
+                :style="{ borderLeft: store.state.theme === 'dark' ? '1px solid #2d3748' : '1px solid #e5e7eb' }">
+                <div class="inline-editor-header tw:flex tw:items-center tw:justify-between"
+                  :class="store.state.theme === 'dark' ? 'inline-editor-header--dark' : 'inline-editor-header--light'">
+                  <div class="tw:flex tw:items-center tw:gap-2">
+                    <div class="pane-accent-bar pane-accent-bar--secondary" />
+                    <span class="inline-editor-title">VRL Editor</span>
+                  </div>
+                  <div class="tw:flex tw:items-center tw:gap-1">
+                    <q-select
+                      :model-value="null"
+                      :options="functionsList"
+                      option-label="name"
+                      option-value="name"
+                      borderless dense use-input hide-selected fill-input
+                      input-debounce="0"
+                      behavior="menu"
+                      clearable
+                      class="mini-select alert-v3-select"
+                      style="width: 130px;"
+                      placeholder="saved functions"
+                      @update:model-value="(fn) => fn && (vrlFunctionContent = fn.function || fn.body || '')"
+                    >
+                      <template #no-option>
+                        <q-item><q-item-section>No functions</q-item-section></q-item>
+                      </template>
+                    </q-select>
+                    <q-toggle
+                      v-model="showVrl"
+                      :icon="'img:' + getImageURL('images/common/function.svg')"
+                      size="xs"
+                      class="o2-toggle-button-xs"
+                      :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
+                    >
+                      <q-tooltip class="tw:text-[12px]" :delay="300">hide VRL editor</q-tooltip>
+                    </q-toggle>
+                  </div>
+                </div>
+                <div style="position: relative; flex: 1; min-height: 0;">
+                  <div style="position: absolute; inset: 0;">
+                    <UnifiedQueryEditor
+                      :languages="['vrl']"
+                      default-language="vrl"
+                      :query="vrlFunctionContent"
+                      editor-height="100%"
+                      :disable-ai="false"
+                      :hide-nl-toggle="false"
+                      :class="vrlFunctionContent === '' && vrlEditorPlaceholderFlag ? 'empty-function' : ''"
+                      @focus="vrlEditorPlaceholderFlag = false"
+                      @blur="onBlurInlineVrlEditor"
+                      @update:query="(v) => { vrlFunctionContent = v; handleVrlFunctionUpdate(v); }"
+                    />
+                  </div>
+                </div>
               </div>
+
             </div>
           </div>
 
-          <!-- PromQL Trigger Condition (only for PromQL tab) - Below the preview -->
+          <!-- Status bar — outside overflow:hidden so borders render correctly -->
+          <div
+            v-if="localTab !== 'promql'"
+            class="inline-sql-status-bar"
+            :class="[inlineStatusState, store.state.theme === 'dark' ? 'sql-status-bar--dark' : 'sql-status-bar--light']"
+          >
+            <div class="sql-status-bar__inner">
+              <template v-if="inlineStatusState === 'sql-status-bar--error'">
+                <q-icon name="error_outline" size="12px" style="flex-shrink:0;" />
+                <span class="sql-status-bar__msg">{{ sqlQueryErrorMsg }}</span>
+              </template>
+              <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
+                <q-icon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
+                <span>write a query to get started</span>
+              </template>
+              <template v-else-if="inlineStatusState === 'sql-status-bar--idle'">
+                <q-icon name="check_circle_outline" size="12px" style="flex-shrink:0;opacity:0.7;" />
+                <span>use open full editor to run and validate</span>
+              </template>
+            </div>
+            <q-tooltip
+              v-if="inlineStatusState === 'sql-status-bar--error'"
+              anchor="top middle" self="bottom middle" max-width="520px"
+              style="font-size:11px;white-space:pre-wrap;word-break:break-word;"
+            >{{ sqlQueryErrorMsg }}</q-tooltip>
+          </div>
+
+          <!-- PromQL Trigger Condition (only for PromQL tab) - Below the editors -->
           <div v-if="localTab === 'promql' && promqlCondition" class="flex justify-start items-start q-mb-xs tw:ml-2 no-wrap">
             <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
               Trigger if the value is *
@@ -727,7 +840,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-select
                     v-model="promqlCondition.operator"
                     :options="triggerOperators"
-                    class="showLabelOnTop no-case q-py-none"
+                    class="showLabelOnTop no-case q-py-none alert-v3-select"
                     borderless
                     dense
                     use-input
@@ -816,18 +929,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, type PropType, defineAsyncComponent, nextTick, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { b64EncodeUnicode, getUUID, convertMinutesToCron, getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval, describeCron } from "@/utils/zincutils";
+import { b64EncodeUnicode, getUUID, convertMinutesToCron, getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval, describeCron, getImageURL } from "@/utils/zincutils";
 import hljs from "highlight.js/lib/core";
 import sql from "highlight.js/lib/languages/sql";
 
 hljs.registerLanguage("sql", sql);
 
+import useSqlSuggestions from "@/composables/useSuggestions";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue")
+);
+const UnifiedQueryEditor = defineAsyncComponent(
+  () => import("@/components/QueryEditor.vue")
 );
 
 export default defineComponent({
@@ -837,6 +954,7 @@ export default defineComponent({
     QueryEditor,
     QueryEditorDialog,
     CustomConfirmDialog,
+    UnifiedQueryEditor,
   },
   props: {
     tab: {
@@ -934,6 +1052,73 @@ export default defineComponent({
     const showFilters = ref(true);
     const showVrl = ref(false);
     const filtersSectionRef = ref<HTMLElement | null>(null);
+    const inlineQueryEditorRef = ref<any>(null);
+
+    // ── Inline editor autocomplete ──────────────────────────────────────────
+    const {
+      autoCompleteData,
+      autoCompleteKeywords,
+      autoCompleteSuggestions,
+      getSuggestions,
+      updateFieldKeywords,
+    } = useSqlSuggestions();
+
+    // Rebuild field keywords whenever columns prop changes
+    watch(
+      () => props.columns,
+      (cols) => {
+        if (cols?.length) {
+          const fields = (cols as any[]).map((c: any) => ({
+            name: typeof c === 'string' ? c : (c.value ?? c.label ?? c),
+            type: c.type ?? 'Utf8',
+          }));
+          updateFieldKeywords(fields);
+        }
+      },
+      { immediate: true, deep: true }
+    );
+
+    // Called on every keystroke in the inline SQL/PromQL editor — updates
+    // the query and feeds autocomplete context (same pattern as QueryEditorDialog)
+    const handleInlineQueryUpdate = (newQuery: string) => {
+      if (localTab.value === 'sql') {
+        updateSqlQuery(newQuery);
+      } else {
+        updatePromqlQuery(newQuery);
+      }
+      autoCompleteData.value.query = newQuery;
+      autoCompleteData.value.cursorIndex = inlineQueryEditorRef.value?.getCursorIndex?.() ?? 0;
+      autoCompleteData.value.org = store.state.selectedOrganization.identifier;
+      autoCompleteData.value.streamType = props.streamType;
+      autoCompleteData.value.streamName = props.streamName;
+      autoCompleteData.value.popup.open = inlineQueryEditorRef.value?.triggerAutoComplete;
+      getSuggestions();
+    };
+
+    // Inline editor status bar state
+    const inlineStatusState = computed(() => {
+      if (props.sqlQueryErrorMsg?.trim()) return 'sql-status-bar--error';
+      const query = localTab.value === 'sql' ? localSqlQuery.value : localPromqlQuery.value;
+      if (!query?.trim()) return 'sql-status-bar--hint';
+      return 'sql-status-bar--idle';
+    });
+
+    // Placeholder flags for inline editors (show image when empty + not focused)
+    const queryEditorPlaceholderFlag = ref(true);
+    const vrlEditorPlaceholderFlag = ref(true);
+
+    const onBlurInlineSqlEditor = () => {
+      queryEditorPlaceholderFlag.value = localTab.value === 'sql'
+        ? localSqlQuery.value === ''
+        : localPromqlQuery.value === '';
+      // Validate SQL on blur (same chain as QueryEditorDialog)
+      if (localTab.value === 'sql') {
+        emit("validate-sql");
+      }
+    };
+    const onBlurInlineVrlEditor = () => {
+      vrlEditorPlaceholderFlag.value = vrlFunctionContent.value === '';
+    };
 
     // Toggle filters and ensure at least one empty condition exists
     const toggleFilters = () => {
@@ -1943,6 +2128,16 @@ export default defineComponent({
       showVrl,
       filterCount,
       emitTriggerUpdate,
+      getImageURL,
+      queryEditorPlaceholderFlag,
+      vrlEditorPlaceholderFlag,
+      onBlurInlineSqlEditor,
+      onBlurInlineVrlEditor,
+      inlineStatusState,
+      inlineQueryEditorRef,
+      autoCompleteKeywords,
+      autoCompleteSuggestions,
+      handleInlineQueryUpdate,
     };
   },
 });
@@ -1951,6 +2146,7 @@ export default defineComponent({
 <style scoped lang="scss">
 .step-query-config {
   width: 100%;
+  min-width: 0;
   height: 100%;
   margin: 0 auto;
   overflow: auto;
@@ -1958,6 +2154,10 @@ export default defineComponent({
   .step-content {
     border-radius: 8px;
     min-height: 100%;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
   }
 
   &.dark-mode {
@@ -2079,6 +2279,95 @@ export default defineComponent({
       color: #3d3d3d;
     }
   }
+}
+
+.inline-editor-pane {
+  border-radius: 8px;
+  overflow: hidden;
+
+  &--light { border: 1px solid #e5e7eb; }
+  &--dark  { border: 1px solid #2d3748; }
+}
+
+.inline-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  flex-shrink: 0;
+  height: 36px;
+
+  &--light {
+    background-color: #f3f4f6;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  &--dark {
+    background-color: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid #2d3748;
+  }
+}
+
+.inline-editor-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inline-sql-status-bar {
+  position: relative;
+  height: 22px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: default;
+
+  .sql-status-bar__inner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 10px;
+    overflow: hidden;
+  }
+
+  .sql-status-bar__msg {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1;
+  }
+
+  &.sql-status-bar--hint    { background: #f3f4f6; color: #9ca3af; }
+  &.sql-status-bar--idle    { background: #f3f4f6; color: #9ca3af; }
+  &.sql-status-bar--error   { background: rgba(239, 68, 68, 0.08); color: #ef4444; cursor: pointer; }
+
+  &.sql-status-bar--light {
+    border-left: 1px solid #e5e7eb;
+    border-right: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+  }
+  &.sql-status-bar--dark {
+    border-left: 1px solid #2d3748;
+    border-right: 1px solid #2d3748;
+    border-bottom: 1px solid #2d3748;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    &.sql-status-bar--hint,
+    &.sql-status-bar--idle { background: rgba(255, 255, 255, 0.04); }
+  }
+}
+
+.pane-accent-bar {
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  flex-shrink: 0;
+
+  &--primary   { background: var(--q-primary); }
+  &--secondary { background: var(--q-secondary); }
 }
 
 .condition-label-hint {
