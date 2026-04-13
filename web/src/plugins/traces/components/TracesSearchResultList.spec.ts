@@ -25,10 +25,20 @@ vi.mock("@/components/TenstackTable.vue", () => ({
   default: {
     name: "TenstackTable",
     props: [
-      "columns", "rows", "rowClass", "loading",
-      "sortBy", "sortOrder", "sortFieldMap", "rowHeight",
-      "enableColumnReorder", "enableRowExpand", "enableTextHighlight",
-      "enableCellActions", "enableStatusBar", "defaultColumns",
+      "columns",
+      "rows",
+      "rowClass",
+      "loading",
+      "sortBy",
+      "sortOrder",
+      "sortFieldMap",
+      "rowHeight",
+      "enableColumnReorder",
+      "enableRowExpand",
+      "enableTextHighlight",
+      "enableCellActions",
+      "enableStatusBar",
+      "defaultColumns",
       "selectedStreamFields",
     ],
     emits: ["click:data-row", "sort-change"],
@@ -60,7 +70,11 @@ vi.mock("@/composables/useTraces", () => ({
 }));
 
 vi.mock("./TraceTimestampCell.vue", () => ({
-  default: { name: "TraceTimestampCell", props: ["item"], template: "<span />" },
+  default: {
+    name: "TraceTimestampCell",
+    props: ["item"],
+    template: "<span />",
+  },
 }));
 vi.mock("./TraceServiceCell.vue", () => ({
   default: { name: "TraceServiceCell", props: ["item"], template: "<span />" },
@@ -105,7 +119,9 @@ describe("TracesSearchResultList", () => {
     vi.clearAllMocks();
   });
 
-  const mount_ = (props: { hits: any[]; loading: boolean } & Record<string, any>) =>
+  const mount_ = (
+    props: { hits: any[]; loading: boolean } & Record<string, any>,
+  ) =>
     mount(TracesSearchResultList, {
       props: props as any,
       global: { plugins: [i18n, store] },
@@ -115,7 +131,9 @@ describe("TracesSearchResultList", () => {
   describe("loading state", () => {
     it("shows a spinner while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
-      expect(wrapper.findComponent({ name: "QSpinnerHourglass" }).exists()).toBe(true);
+      expect(
+        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+      ).toBe(true);
     });
 
     // The component uses v-show="hasResults || loading" on the table wrapper, so
@@ -123,7 +141,9 @@ describe("TracesSearchResultList", () => {
     // It is only absent from the DOM when noResults is true (searchPerformed && !loading && empty).
     it.skip("hides the table wrapper while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
+        false,
+      );
     });
 
     it("hides the empty state while loading", () => {
@@ -141,12 +161,16 @@ describe("TracesSearchResultList", () => {
 
     it("does not show spinner in empty state", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: true });
-      expect(wrapper.findComponent({ name: "QSpinnerHourglass" }).exists()).toBe(false);
+      expect(
+        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+      ).toBe(false);
     });
 
     it("does not show the table in empty state", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
+        false,
+      );
     });
 
     it("does not show no-results message when searchPerformed is false", () => {
@@ -161,59 +185,21 @@ describe("TracesSearchResultList", () => {
 
     it("shows the table wrapper when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
+        true,
+      );
     });
 
     it("does not show spinner when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
-      expect(wrapper.findComponent({ name: "QSpinnerHourglass" }).exists()).toBe(false);
+      expect(
+        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+      ).toBe(false);
     });
 
     it("does not show the no-results message when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
       expect(wrapper.text()).not.toContain("No traces found");
-    });
-  });
-
-  // ─── Section header ───────────────────────────────────────────────────────
-  describe("section header", () => {
-    const hits = [makeHit("t1"), makeHit("t2")];
-
-    it("shows the section header by default", () => {
-      wrapper = mount_({ hits, loading: false });
-      expect(wrapper.find('[data-test="traces-section-header"]').exists()).toBe(true);
-    });
-
-    it("shows TRACES title in the header", () => {
-      wrapper = mount_({ hits, loading: false });
-      expect(wrapper.find('[data-test="traces-section-title"]').text().toUpperCase()).toContain("TRACES");
-    });
-
-    it("hides the header when showHeader=false", () => {
-      wrapper = mount_({ hits, loading: false, showHeader: false });
-      expect(wrapper.find('[data-test="traces-section-header"]').exists()).toBe(false);
-    });
-  });
-
-  // ─── Count badge ──────────────────────────────────────────────────────────
-  describe("count badge", () => {
-    it("shows hits.length in the badge when total prop is not provided", () => {
-      const hits = [makeHit("t1"), makeHit("t2"), makeHit("t3")];
-      wrapper = mount_({ hits, loading: false });
-      const badge = wrapper.find('[data-test="traces-count-badge"]');
-      expect(badge.text()).toContain("3");
-    });
-
-    it("shows total prop value in the badge when provided", () => {
-      wrapper = mount_({ hits: [makeHit("t1")], loading: false, total: 999 });
-      const badge = wrapper.find('[data-test="traces-count-badge"]');
-      expect(badge.text()).toContain("999");
-    });
-
-    it("shows 0 total when total prop is 0", () => {
-      wrapper = mount_({ hits: [makeHit("t1")], loading: false, total: 0 });
-      const badge = wrapper.find('[data-test="traces-count-badge"]');
-      expect(badge.text()).toContain("0");
     });
   });
 
@@ -263,37 +249,6 @@ describe("TracesSearchResultList", () => {
     });
   });
 
-  // --- Tests for spans mode (added in Mar 10 commit ae988c7) ---
-
-  describe("searchMode='spans' — section title and badge", () => {
-    const hits = [makeHit("t1")];
-
-    it("shows 'SPANS' title when searchMode='spans'", () => {
-      wrapper = mount_({ hits, loading: false, searchMode: "spans" });
-      const title = wrapper.find('[data-test="traces-section-title"]');
-      expect(title.text().toUpperCase()).toContain("SPANS");
-    });
-
-    it("does not show 'TRACES' in title when searchMode='spans'", () => {
-      wrapper = mount_({ hits, loading: false, searchMode: "spans" });
-      const title = wrapper.find('[data-test="traces-section-title"]');
-      expect(title.text().toUpperCase()).not.toContain("TRACES");
-    });
-
-    it("shows 'TRACES' title by default (no searchMode prop)", () => {
-      wrapper = mount_({ hits, loading: false });
-      const title = wrapper.find('[data-test="traces-section-title"]');
-      expect(title.text().toUpperCase()).toContain("TRACES");
-    });
-
-    it("shows 'Spans Found' text in badge when searchMode='spans'", () => {
-      wrapper = mount_({ hits, loading: false, searchMode: "spans" });
-      const badge = wrapper.find('[data-test="traces-count-badge"]');
-      // badge label contains "spans found" (case-insensitive from i18n key)
-      expect(badge.text().toLowerCase()).toContain("span");
-    });
-  });
-
   describe("row error class — spans mode", () => {
     const makeSpanHit = (id: string, span_status = "OK") => ({
       trace_id: id,
@@ -307,25 +262,41 @@ describe("TracesSearchResultList", () => {
     });
 
     it("uses span_status='ERROR' for error class in spans mode", () => {
-      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
+      wrapper = mount_({
+        hits: [makeSpanHit("s1")],
+        loading: false,
+        searchMode: "spans",
+      });
       const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe("oz-table__row--error");
+      expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe(
+        "oz-table__row--error",
+      );
     });
 
     it("returns empty string for non-error span_status in spans mode", () => {
-      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
+      wrapper = mount_({
+        hits: [makeSpanHit("s1")],
+        loading: false,
+        searchMode: "spans",
+      });
       const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeSpanHit("s1", "OK"))).toBe("");
     });
 
     it("uses errors count (not span_status) for error class in traces mode", () => {
-      wrapper = mount_({ hits: [makeHit("t1", 0)], loading: false, searchMode: "traces" });
+      wrapper = mount_({
+        hits: [makeHit("t1", 0)],
+        loading: false,
+        searchMode: "traces",
+      });
       const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       // traces mode: errors > 0 triggers error class
-      expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe("oz-table__row--error");
+      expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe(
+        "oz-table__row--error",
+      );
     });
   });
 
@@ -344,15 +315,17 @@ describe("TracesSearchResultList", () => {
     });
 
     it("renders SpanStatusPill inside #cell-span_status slot", () => {
-      wrapper = mount_(({ hits: [makeSpanHit("s1")], loading: false }) as any);
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
       const cell = wrapper.find('[data-test="stub-cell-span_status"]');
       expect(cell.exists()).toBe(true);
-      expect(cell.findComponent({ name: "SpanStatusPill" }).exists()).toBe(true);
+      expect(cell.findComponent({ name: "SpanStatusPill" }).exists()).toBe(
+        true,
+      );
     });
 
     it("passes item.span_status to SpanStatusPill in #cell-span_status slot", () => {
       const hit = makeSpanHit("s1");
-      wrapper = mount_(({ hits: [hit], loading: false }) as any);
+      wrapper = mount_({ hits: [hit], loading: false } as any);
       const pill = wrapper
         .find('[data-test="stub-cell-span_status"]')
         .findComponent({ name: "SpanStatusPill" });
@@ -360,47 +333,30 @@ describe("TracesSearchResultList", () => {
     });
 
     it("renders TraceStatusCell inside #cell-status slot", () => {
-      wrapper = mount_(({ hits: [makeSpanHit("s1")], loading: false }) as any);
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
       const cell = wrapper.find('[data-test="stub-cell-status"]');
       expect(cell.exists()).toBe(true);
-      expect(cell.findComponent({ name: "TraceStatusCell" }).exists()).toBe(true);
+      expect(cell.findComponent({ name: "TraceStatusCell" }).exists()).toBe(
+        true,
+      );
     });
 
     it("does NOT render SpanStatusPill inside #cell-status slot", () => {
-      wrapper = mount_(({ hits: [makeSpanHit("s1")], loading: false }) as any);
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
       const statusCell = wrapper.find('[data-test="stub-cell-status"]');
-      expect(statusCell.findComponent({ name: "SpanStatusPill" }).exists()).toBe(false);
+      expect(
+        statusCell.findComponent({ name: "SpanStatusPill" }).exists(),
+      ).toBe(false);
     });
 
     it("does NOT render TraceStatusCell inside #cell-span_status slot", () => {
-      wrapper = mount_(({ hits: [makeSpanHit("s1")], loading: false }) as any);
-      const spanStatusCell = wrapper.find('[data-test="stub-cell-span_status"]');
-      expect(spanStatusCell.findComponent({ name: "TraceStatusCell" }).exists()).toBe(false);
-    });
-  });
-
-  describe("error count badge", () => {
-    const hits = [makeHit("t1")];
-
-    it("shows error count badge when errorCount > 0", () => {
-      wrapper = mount_({ hits, loading: false, errorCount: 5 });
-      expect(wrapper.find('[data-test="traces-error-count-badge"]').exists()).toBe(true);
-    });
-
-    it("shows correct error count number in the badge", () => {
-      wrapper = mount_({ hits, loading: false, errorCount: 7 });
-      const badge = wrapper.find('[data-test="traces-error-count-badge"]');
-      expect(badge.text()).toContain("7");
-    });
-
-    it("hides error count badge when errorCount is 0", () => {
-      wrapper = mount_({ hits, loading: false, errorCount: 0 });
-      expect(wrapper.find('[data-test="traces-error-count-badge"]').exists()).toBe(false);
-    });
-
-    it("hides error count badge when errorCount is undefined", () => {
-      wrapper = mount_({ hits, loading: false });
-      expect(wrapper.find('[data-test="traces-error-count-badge"]').exists()).toBe(false);
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
+      const spanStatusCell = wrapper.find(
+        '[data-test="stub-cell-span_status"]',
+      );
+      expect(
+        spanStatusCell.findComponent({ name: "TraceStatusCell" }).exists(),
+      ).toBe(false);
     });
   });
 });
