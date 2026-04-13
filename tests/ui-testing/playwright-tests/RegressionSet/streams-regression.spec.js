@@ -323,13 +323,15 @@ test.describe("Streams Regression Bugs", () => {
 
     testLogger.info(`Found ${quickModeIconCount} quick mode icons in stream settings`);
 
-    // PRIMARY ASSERTION 2: Quick mode icons should be present if env variables are configured
-    // Note: This test will pass even if no icons are found, as it depends on env config
-    // But we verify the mechanism exists
-    if (quickModeIconCount > 0) {
-      testLogger.info('✓ Quick mode field indicators visible in stream settings');
+    // PRIMARY ASSERTION 2: Verify quick mode icon rendering mechanism
+    // Bug #7671 Point #2: Quick mode fields from env should show icons
+    // NOTE: Actual icon visibility depends on env config (default_quick_mode_fields)
+    // This test validates the UI mechanism is functional when env is configured
 
-      // Verify the icon is actually an image with the correct path
+    if (quickModeIconCount > 0) {
+      testLogger.info(`✓ Quick mode field indicators visible: ${quickModeIconCount} icon(s) found`);
+
+      // STRONG ASSERTION: Verify the icon is actually an image with the correct path
       const firstIcon = quickModeIcons.first();
       const iconSrc = await firstIcon.getAttribute('src');
       const hasQuickModeImage = iconSrc?.includes('quick_mode') || false;
@@ -337,7 +339,7 @@ test.describe("Streams Regression Bugs", () => {
       expect(hasQuickModeImage, 'Bug #7671 Point #2: Quick mode icon should use quick_mode image').toBe(true);
       testLogger.info(`✓ Quick mode icon has correct image path: ${iconSrc}`);
 
-      // Hover over the icon to check for tooltip
+      // Verify tooltip on hover
       await firstIcon.hover();
       await page.waitForTimeout(1000);
 
@@ -351,16 +353,16 @@ test.describe("Streams Regression Bugs", () => {
         testLogger.info('Quick mode tooltip may require different hover interaction');
       }
     } else {
-      testLogger.info('No quick mode icons found - this is expected if no env quick mode fields are configured');
-      testLogger.info('Verifying the quick mode icon mechanism exists in the UI code');
+      testLogger.warn('No quick mode icons found - env variable default_quick_mode_fields may not be configured');
+      testLogger.info('FALLBACK CHECK: Verifying UI structure supports quick mode icons');
 
-      // Even if no icons are visible, we can verify the mechanism exists
-      // by checking if the schema table has the field name column
+      // Fallback: verify the UI structure exists to support icons when env is configured
       const fieldNameColumn = page.locator('.field-name-text').first();
       const fieldNameExists = await fieldNameColumn.isVisible({ timeout: 5000 }).catch(() => false);
 
-      expect(fieldNameExists, 'Bug #7671: Field name column should exist (prerequisite for quick mode icons)').toBe(true);
-      testLogger.info('✓ Field name column exists - quick mode icon mechanism is in place');
+      expect(fieldNameExists, 'Bug #7671: Field name column should exist (prerequisite for quick mode icon mechanism)').toBe(true);
+      testLogger.info('✓ Field name column exists - UI structure supports quick mode icons');
+      testLogger.info('NOTE: To fully validate Bug #7671 Point #2, configure default_quick_mode_fields env variable');
     }
 
     // ADDITIONAL VERIFICATION: Check that fields table is properly rendered

@@ -538,6 +538,11 @@ test.describe("Alerts Regression Bugs", () => {
       testLogger.info('✓ Added condition');
     }
 
+    // ==================== STEP 3: COMPARE (Skip) ====================
+    await pm.alertsPage.clickContinueButton();
+    await page.waitForTimeout(1000);
+    testLogger.info('✓ Navigated to Step 3: Compare (skipping)');
+
     // ==================== STEP 4: ALERT SETTINGS ====================
     await pm.alertsPage.clickContinueButton();
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});

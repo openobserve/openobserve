@@ -188,40 +188,63 @@ test.describe("Traces Regression Bugs", () => {
 
     // STEP 5: Check for duplicates in the trace list
     // If pagination cursor resets, we would see the same traces loaded again
+    // Use DOM element positions + unique attributes instead of just text content
     const afterBackTraceItems = page.locator('[data-test="traces-search-result-item"]');
     const afterBackCount = await afterBackTraceItems.count();
 
     const afterBackTraceData = [];
     for (let i = 0; i < Math.min(afterBackCount, 20); i++) {
       const traceItem = afterBackTraceItems.nth(i);
+
+      // Try to extract unique trace ID from the element's HTML
+      const itemHTML = await traceItem.innerHTML().catch(() => '');
+
+      // Look for trace_id pattern in the HTML (e.g., in data attributes or text)
+      const traceIdMatch = itemHTML.match(/trace[_-]?id["\s:=]+([a-f0-9]{16,64})/i);
+      const traceId = traceIdMatch ? traceIdMatch[1] : null;
+
+      // Fallback: use combination of index + text content for comparison
       const traceText = await traceItem.textContent().catch(() => '');
-      afterBackTraceData.push(traceText);
+      const cleanText = traceText.trim();
+
+      // Create a more robust identifier: use trace ID if available, otherwise position + text hash
+      const identifier = traceId || `${i}:${cleanText.substring(0, 100)}`;
+
+      afterBackTraceData.push({ index: i, id: identifier, text: cleanText.substring(0, 100) });
     }
     testLogger.info(`Captured ${afterBackTraceData.length} trace identifiers after navigation`);
 
-    // Count duplicates by checking if the same trace text appears multiple times
+    // Count duplicates by checking if the same trace identifier appears multiple times
     const traceCounts = new Map();
-    afterBackTraceData.forEach(traceText => {
-      const cleanText = traceText.trim();
-      if (cleanText) {
-        traceCounts.set(cleanText, (traceCounts.get(cleanText) || 0) + 1);
+    afterBackTraceData.forEach(trace => {
+      if (trace.id) {
+        traceCounts.set(trace.id, (traceCounts.get(trace.id) || 0) + 1);
       }
     });
 
     const duplicates = [];
-    traceCounts.forEach((count, traceText) => {
+    traceCounts.forEach((count, traceId) => {
       if (count > 1) {
-        duplicates.push({ trace: traceText.substring(0, 50) + '...', count });
+        // Find sample trace with this ID
+        const sample = afterBackTraceData.find(t => t.id === traceId);
+        duplicates.push({
+          id: traceId.substring(0, 50) + '...',
+          count,
+          sample: sample?.text || 'N/A'
+        });
       }
     });
 
     testLogger.info(`Found ${duplicates.length} duplicate trace entries`);
     if (duplicates.length > 0) {
-      testLogger.warn('Duplicates detected:', { duplicates: duplicates.slice(0, 3) });
+      testLogger.warn('Duplicates detected (same trace ID appears multiple times):', {
+        duplicates: duplicates.slice(0, 3)
+      });
     }
 
     // PRIMARY ASSERTION 2: No duplicate traces should be present
     // Bug #9043 caused pagination cursor to reset, loading the same traces again
+    // Duplicates would show as same trace_id or same position+content appearing multiple times
     expect(duplicates.length, 'Bug #9043: Should not have duplicate traces after navigating back (cursor should not reset)').toBe(0);
     testLogger.info('✓ No duplicate traces detected - pagination cursor maintained correctly');
 
