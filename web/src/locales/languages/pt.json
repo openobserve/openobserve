@@ -2777,6 +2777,7 @@
     "showTraces": "Mostrar traços",
     "applyAndSearch": "Inscreva-se e pesquise",
     "addToTable": "Adicionar à tabela",
+    "timestamp": "Carimbo de data/hora",
     "evaluations": {
       "loading": "Carregando dados de avaliação...",
       "noDataTitle": "Sem dados de avaliação",

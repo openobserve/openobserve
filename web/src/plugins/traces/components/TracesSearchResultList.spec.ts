@@ -60,7 +60,7 @@ vi.mock("@/composables/useTraces", () => ({
 }));
 
 vi.mock("./TraceTimestampCell.vue", () => ({
-  default: { name: "TraceTimestampCell", props: ["item"], template: "<span />" },
+  default: { name: "TraceTimestampCell", props: ["value"], template: "<span />" },
 }));
 vi.mock("./TraceServiceCell.vue", () => ({
   default: { name: "TraceServiceCell", props: ["item"], template: "<span />" },

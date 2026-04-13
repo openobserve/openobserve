@@ -2798,6 +2798,7 @@
     "showTraces": "トレースを表示",
     "applyAndSearch": "応募と検索",
     "addToTable": "テーブルに追加",
+    "timestamp": "タイムスタンプ",
     "evaluations": {
       "loading": "評価データをロード中...",
       "noDataTitle": "評価データなし",

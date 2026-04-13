@@ -2775,6 +2775,7 @@
     "showTraces": "Mostrar trazas",
     "applyAndSearch": "Aplicar y buscar",
     "addToTable": "Añadir a la tabla",
+    "timestamp": "Marca de tiempo",
     "evaluations": {
       "loading": "Cargando datos de evaluación...",
       "noDataTitle": "Sin datos de evaluación",
