@@ -94,7 +94,7 @@ const emit = defineEmits([
 ]);
 
 const copyLogToClipboard = (value: any) => {
-  emit("copy", props.column.id, value);
+  emit("copy", value);
 };
 const addSearchTerm = (
   field: string,

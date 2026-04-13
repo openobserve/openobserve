@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :hide-search-term-actions="false"
               :hide-ai="true"
-              @copy="copyToClipboard"
+              @copy="copyToClipboard(column.id, row[column.id])"
               @add-search-term="addSearchTerm"
               @send-to-ai-chat="sendToAiChat"
             />
