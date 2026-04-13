@@ -294,7 +294,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     log::info!("[OFGA:Local] service_streams permissions migration needed");
                     need_service_streams_migration = true;
                 }
-                if existing_model_version < v0_0_28 {
+                if meta_version > v0_0_27 && existing_model_version < v0_0_28 {
                     log::info!("[OFGA:Local] eval_templates permissions migration needed");
                     need_eval_templates_migration = true;
                 }

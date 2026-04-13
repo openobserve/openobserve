@@ -16,11 +16,14 @@
 use infra::errors::Result;
 use o2_enterprise::enterprise::super_cluster::queue::{EvalTemplateMessage, Message};
 
+use crate::common::{meta::authz::Authz, utils::auth::set_ownership};
+
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let eval_msg: EvalTemplateMessage = msg.try_into()?;
     match eval_msg {
         EvalTemplateMessage::Put { template } => {
             infra::table::eval_templates::add(&template).await?;
+            set_ownership(&template.org_id, "eval_templates", Authz::new(&template.id)).await;
             log::debug!(
                 "[SUPER_CLUSTER:EVAL_TEMPLATE] Added eval template: {}",
                 template.id
