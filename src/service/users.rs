@@ -410,13 +410,16 @@ pub async fn update_user(
                         message = "Root user role cannot be changed";
                     } else if update_mode.is_self_update() && local_user.role < new_user.role {
                         message = "Self role cannot be upgraded";
-                    } else if local_user.role.ne(&new_user.role) {
+                    } else {
+                        if local_user.role.ne(&new_user.role) {
+                            is_org_updated = true;
+                        }
                         #[cfg(feature = "enterprise")]
                         if new_org_role.custom_role.is_some() {
                             custom_roles_need_change = true;
                             custom_roles.extend(new_org_role.custom_role.unwrap());
+                            is_org_updated = true;
                         }
-                        is_org_updated = true;
                     }
                 }
                 // Token replacement is a privileged operation — only allow if the
