@@ -283,28 +283,25 @@ test.describe("Streams Regression Bugs", () => {
     await pm.streamsPage.searchForField('kubernetes_host');
     await page.waitForTimeout(1000);
 
-    // Check if the index_type column is visible (this is where FTS is shown)
+    // PRIMARY ASSERTION SETUP: Index type select must be visible to validate FTS feature
     const indexTypeSelect = page.locator('[data-test="schema-stream-index-select"]').first();
-    if (await indexTypeSelect.isVisible({ timeout: 5000 }).catch(() => false)) {
-      testLogger.info('✓ Index type select visible in stream settings');
+    await expect(indexTypeSelect, 'Bug #7671 Point #1: Index type select must be visible in stream settings to validate FTS').toBeVisible({ timeout: 5000 });
+    testLogger.info('✓ Index type select visible in stream settings');
 
-      // Click on the index type select to see available options
-      await indexTypeSelect.click();
-      await page.waitForTimeout(1000);
+    // Click on the index type select to see available options
+    await indexTypeSelect.click();
+    await page.waitForTimeout(1000);
 
-      // PRIMARY ASSERTION 1: Verify "Full text search" option exists
-      const fullTextSearchOption = page.locator('.q-item').filter({ hasText: 'Full text search' });
-      const ftsOptionExists = await fullTextSearchOption.count() > 0;
+    // PRIMARY ASSERTION 1: Verify "Full text search" option exists
+    const fullTextSearchOption = page.locator('.q-item').filter({ hasText: 'Full text search' });
+    const ftsOptionExists = await fullTextSearchOption.count() > 0;
 
-      expect(ftsOptionExists, 'Bug #7671 Point #1: Full text search option should be visible in stream settings').toBe(true);
-      testLogger.info('✓ Full text search option exists in index type dropdown');
+    expect(ftsOptionExists, 'Bug #7671 Point #1: Full text search option should be visible in stream settings').toBe(true);
+    testLogger.info('✓ Full text search option exists in index type dropdown');
 
-      // Close the dropdown
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(500);
-    } else {
-      testLogger.warn('Index type select not visible - may need to scroll or field may not support indexing');
-    }
+    // Close the dropdown
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
 
     // PART 2: Verify Quick Mode fields from env variables show icon
     testLogger.info('PART 2: Checking Quick Mode field indicators from environment variables');
@@ -326,43 +323,36 @@ test.describe("Streams Regression Bugs", () => {
     // PRIMARY ASSERTION 2: Verify quick mode icon rendering mechanism
     // Bug #7671 Point #2: Quick mode fields from env should show icons
     // NOTE: Actual icon visibility depends on env config (default_quick_mode_fields)
-    // This test validates the UI mechanism is functional when env is configured
 
-    if (quickModeIconCount > 0) {
-      testLogger.info(`✓ Quick mode field indicators visible: ${quickModeIconCount} icon(s) found`);
+    if (quickModeIconCount === 0) {
+      testLogger.warn('No quick mode icons found - test cannot validate Bug #7671 Point #2 without env configuration');
+      testLogger.info('Skipping quick mode icon validation - requires default_quick_mode_fields env variable to be configured');
+      test.skip(true, 'Quick mode icons require default_quick_mode_fields env variable configuration');
+      return;
+    }
 
-      // STRONG ASSERTION: Verify the icon is actually an image with the correct path
-      const firstIcon = quickModeIcons.first();
-      const iconSrc = await firstIcon.getAttribute('src');
-      const hasQuickModeImage = iconSrc?.includes('quick_mode') || false;
+    testLogger.info(`✓ Quick mode field indicators visible: ${quickModeIconCount} icon(s) found`);
 
-      expect(hasQuickModeImage, 'Bug #7671 Point #2: Quick mode icon should use quick_mode image').toBe(true);
-      testLogger.info(`✓ Quick mode icon has correct image path: ${iconSrc}`);
+    // STRONG ASSERTION: Verify the icon is actually an image with the correct path
+    const firstIcon = quickModeIcons.first();
+    const iconSrc = await firstIcon.getAttribute('src');
+    const hasQuickModeImage = iconSrc?.includes('quick_mode') || false;
 
-      // Verify tooltip on hover
-      await firstIcon.hover();
-      await page.waitForTimeout(1000);
+    expect(hasQuickModeImage, 'Bug #7671 Point #2: Quick mode icon should use quick_mode image').toBe(true);
+    testLogger.info(`✓ Quick mode icon has correct image path: ${iconSrc}`);
 
-      const tooltip = page.locator('.q-tooltip').filter({ hasText: /quick.*mode/i });
-      const tooltipVisible = await tooltip.isVisible({ timeout: 2000 }).catch(() => false);
+    // Verify tooltip on hover
+    await firstIcon.hover();
+    await page.waitForTimeout(1000);
 
-      if (tooltipVisible) {
-        const tooltipText = await tooltip.textContent();
-        testLogger.info(`✓ Quick mode tooltip visible: "${tooltipText}"`);
-      } else {
-        testLogger.info('Quick mode tooltip may require different hover interaction');
-      }
+    const tooltip = page.locator('.q-tooltip').filter({ hasText: /quick.*mode/i });
+    const tooltipVisible = await tooltip.isVisible({ timeout: 2000 }).catch(() => false);
+
+    if (tooltipVisible) {
+      const tooltipText = await tooltip.textContent();
+      testLogger.info(`✓ Quick mode tooltip visible: "${tooltipText}"`);
     } else {
-      testLogger.warn('No quick mode icons found - env variable default_quick_mode_fields may not be configured');
-      testLogger.info('FALLBACK CHECK: Verifying UI structure supports quick mode icons');
-
-      // Fallback: verify the UI structure exists to support icons when env is configured
-      const fieldNameColumn = page.locator('.field-name-text').first();
-      const fieldNameExists = await fieldNameColumn.isVisible({ timeout: 5000 }).catch(() => false);
-
-      expect(fieldNameExists, 'Bug #7671: Field name column should exist (prerequisite for quick mode icon mechanism)').toBe(true);
-      testLogger.info('✓ Field name column exists - UI structure supports quick mode icons');
-      testLogger.info('NOTE: To fully validate Bug #7671 Point #2, configure default_quick_mode_fields env variable');
+      testLogger.info('Quick mode tooltip may require different hover interaction');
     }
 
     // ADDITIONAL VERIFICATION: Check that fields table is properly rendered
