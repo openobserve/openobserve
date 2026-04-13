@@ -359,15 +359,19 @@ export const generateCloudFormationURL = (
   }
 
   const region = 'us-east-1'; // Default region, can be made configurable
-  const stackName = `OpenObserve-${integration.name}`;
+  const stackName = `o2-${integration.name.replace(/\s+/g, '-')}`;
 
   // Encode parameters for URL
+  // Pass both new (OpenObserveEndpoint/OpenObserveAccessKey) and legacy (HttpEndpointUrl/AccessKey)
+  // param names so all CloudFormation templates get auto-filled regardless of naming convention
   const params = new URLSearchParams({
     stackName,
     templateURL: integration.cloudFormationTemplate,
     param_OpenObserveEndpoint: endpoint,
     param_OpenObserveAccessKey: accessKey,
     param_OrganizationId: organizationId,
+    param_HttpEndpointUrl: endpoint,
+    param_AccessKey: accessKey,
   });
 
   return `https://console.aws.amazon.com/cloudformation/home?region=${region}#/stacks/create/review?${params.toString()}`;

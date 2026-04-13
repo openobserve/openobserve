@@ -810,10 +810,15 @@ describe("useTraces", () => {
         "service_name",
         "operation_name",
         "duration",
-        "status",
+        "span_status",
         "status_code",
         "method",
       ]);
+    });
+
+    it("spans columns uses span_status not status", () => {
+      expect(DEFAULT_TRACE_COLUMNS.spans).toContain("span_status");
+      expect(DEFAULT_TRACE_COLUMNS.spans).not.toContain("status");
     });
   });
 
@@ -1068,6 +1073,51 @@ describe("useTraces", () => {
       // The original constant must be unchanged
       expect(DEFAULT_TRACE_COLUMNS.traces).not.toContain("extra_field");
     });
+
+    it("should migrate old 'status' field to 'span_status' in spans mode", () => {
+      const { searchObj, loadLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "org-migrate";
+      searchObj.data.stream.selectedStream = {
+        label: "s",
+        value: "migrate-stream",
+      };
+
+      // Simulate a saved preference that still has the old "status" field
+      localTraceFilterStore.value["org-migrate_migrate-stream"] = {
+        spans: ["operation_name", "status", "status_code"],
+      };
+
+      loadLocalLogFilterField("spans");
+
+      expect(searchObj.data.stream.selectedFields).toEqual([
+        "operation_name",
+        "span_status",
+        "status_code",
+      ]);
+    });
+
+    it("should NOT migrate 'status' to 'span_status' in traces mode", () => {
+      const { searchObj, loadLocalLogFilterField, resetSearchObj } =
+        useTraces();
+      resetSearchObj();
+      searchObj.organizationIdentifier = "org-no-migrate";
+      searchObj.data.stream.selectedStream = {
+        label: "s",
+        value: "no-migrate-stream",
+      };
+
+      localTraceFilterStore.value["org-no-migrate_no-migrate-stream"] = {
+        traces: ["service_name", "status", "spans"],
+      };
+
+      loadLocalLogFilterField("traces");
+
+      // "status" is a valid traces column — must remain unchanged
+      expect(searchObj.data.stream.selectedFields).toContain("status");
+      expect(searchObj.data.stream.selectedFields).not.toContain("span_status");
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1169,6 +1219,60 @@ describe("useTraces", () => {
       // getSpanColorHex is mocked as (index) => `#color-${index}`
       // colorIndex = Object.keys(serviceColors).length = 2 before insertion
       expect(searchObj.meta.serviceColors["svc-3"]).toBe("#color-2");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // serviceGraph state initialization — localStorage-backed fields
+  //
+  // These fields are read at module evaluation time (module-level singleton),
+  // so each test must reset modules and dynamically import a fresh copy of
+  // useTraces to observe different localStorage values.
+  // -------------------------------------------------------------------------
+  describe("serviceGraph state initialization", () => {
+    afterEach(() => {
+      localStorage.clear();
+      vi.resetModules();
+    });
+
+    it("should default serviceGraphVisualizationType to 'tree' when localStorage is empty", async () => {
+      localStorage.clear();
+      vi.resetModules();
+
+      const { default: freshUseTraces } = await import("./useTraces");
+      const { searchObj } = freshUseTraces();
+
+      expect(searchObj.meta.serviceGraphVisualizationType).toBe("tree");
+    });
+
+    it("should read serviceGraphVisualizationType from localStorage when set", async () => {
+      localStorage.setItem("serviceGraph_visualizationType", "graph");
+      vi.resetModules();
+
+      const { default: freshUseTraces } = await import("./useTraces");
+      const { searchObj } = freshUseTraces();
+
+      expect(searchObj.meta.serviceGraphVisualizationType).toBe("graph");
+    });
+
+    it("should default serviceGraphLayoutType to 'horizontal' when localStorage is empty", async () => {
+      localStorage.clear();
+      vi.resetModules();
+
+      const { default: freshUseTraces } = await import("./useTraces");
+      const { searchObj } = freshUseTraces();
+
+      expect(searchObj.meta.serviceGraphLayoutType).toBe("horizontal");
+    });
+
+    it("should read serviceGraphLayoutType from localStorage when set", async () => {
+      localStorage.setItem("serviceGraph_layoutType", "vertical");
+      vi.resetModules();
+
+      const { default: freshUseTraces } = await import("./useTraces");
+      const { searchObj } = freshUseTraces();
+
+      expect(searchObj.meta.serviceGraphLayoutType).toBe("vertical");
     });
   });
 });

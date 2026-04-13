@@ -377,7 +377,32 @@ pub async fn delete_bulk(
     let mut unsuccessful = Vec::with_capacity(req.ids.len());
     let mut err = None;
 
+    // Bulk fetch all users for the org to avoid N+1 queries
+    let org_users = crate::service::db::org_users::list_users_by_org(&org_id)
+        .await
+        .unwrap_or_default();
+
+    // Build a set of SreAgent emails for fast lookup
+    let sre_agent_emails: std::collections::HashSet<String> = org_users
+        .iter()
+        .filter(|user| user.role == UserRole::SreAgent)
+        .map(|user| user.email.clone())
+        .collect();
+
     for email in req.ids {
+        // Check if this is a system service account before attempting deletion
+        let is_system_account = sre_agent_emails.contains(&email)
+            || crate::service::organization::is_system_service_account(&email);
+
+        if is_system_account {
+            log::warn!(
+                "Attempted to delete system service account {org_id}/{email} via bulk delete"
+            );
+            unsuccessful.push(email);
+            err = Some("System service accounts cannot be deleted".to_string());
+            continue;
+        }
+
         match users::remove_user_from_org(&org_id, &email, &initiator_id).await {
             Ok(v) => {
                 if v.status().is_success() {

@@ -173,6 +173,8 @@ pub async fn save(
         Some("Password must be at least 8 characters long")
     } else if user.role.base_role == UserRole::Root {
         Some("Not allowed")
+    } else if user.role.base_role == UserRole::SreAgent {
+        Some("SRE Agent role cannot be assigned via API")
     } else if !is_valid_email(user.email.as_str()) {
         Some("Invalid Email address")
     } else {
@@ -269,6 +271,25 @@ pub async fn update(
             ))
             .unwrap();
     }
+
+    // Prevent assignment of SreAgent role via API
+    if let Some(ref role_request) = user.role
+        && let Ok(parsed_role) = role_request.role.parse::<UserRole>()
+        && parsed_role == UserRole::SreAgent
+    {
+        return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                serde_json::to_string(&meta::http::HttpResponse::error(
+                    axum::http::StatusCode::BAD_REQUEST,
+                    "SRE Agent role cannot be assigned via API".to_string(),
+                ))
+                .unwrap(),
+            ))
+            .unwrap();
+    }
+
     #[cfg(not(feature = "enterprise"))]
     {
         user.role = Some(UserRoleRequest {
@@ -322,6 +343,22 @@ pub async fn add_user_to_org(
 ) -> Response {
     let initiator_id = user_email.user_id;
     let role = UserOrgRole::from(&role);
+
+    // Prevent assignment of SreAgent role via API
+    if role.base_role == UserRole::SreAgent {
+        return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                serde_json::to_string(&meta::http::HttpResponse::error(
+                    axum::http::StatusCode::BAD_REQUEST,
+                    "SRE Agent role cannot be assigned via API".to_string(),
+                ))
+                .unwrap(),
+            ))
+            .unwrap();
+    }
+
     match users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e),
@@ -952,7 +989,10 @@ pub async fn list_roles(Path(_org_id): Path<String>) -> impl IntoResponse {
 }
 
 fn check_role_available(role: &UserRole) -> Option<RolesResponse> {
-    if role.eq(&UserRole::Root) || role.eq(&UserRole::ServiceAccount) {
+    if role.eq(&UserRole::Root)
+        || role.eq(&UserRole::ServiceAccount)
+        || role.eq(&UserRole::SreAgent)
+    {
         None
     } else {
         #[cfg(feature = "enterprise")]
@@ -1144,6 +1184,12 @@ mod tests {
     #[test]
     fn test_check_role_available_filters_service_account() {
         let result = check_role_available(&UserRole::ServiceAccount);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_check_role_available_filters_sre_agent() {
+        let result = check_role_available(&UserRole::SreAgent);
         assert!(result.is_none());
     }
 

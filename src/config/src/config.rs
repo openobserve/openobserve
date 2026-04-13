@@ -105,6 +105,7 @@ pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
 pub const MESSAGE_COL_NAME: &str = "message";
 pub const STREAM_NAME_LABEL: &str = "o2_stream_name";
+pub const STREAM_NAME_LABEL_OLD: &str = "stream_name";
 pub const DEFAULT_STREAM_NAME: &str = "default";
 
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [

@@ -308,7 +308,7 @@ pub async fn find_open_incident_by_alert_id(
     alert_incidents::Entity::find()
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .filter(alert_incidents::Column::Status.ne("resolved"))
-        .filter(alert_incidents::Column::KeyType.eq("alert_id"))
+        .filter(alert_incidents::Column::KeyType.eq("AlertId"))
         .filter(alert_incidents::Column::Id.is_in(incident_ids))
         .one(client)
         .await
