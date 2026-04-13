@@ -242,4 +242,5 @@ mod tests {
         let second_value = values[1].as_object().unwrap();
         assert_eq!(second_value["zo_sql_num"], i64::MIN);
     }
+
 }

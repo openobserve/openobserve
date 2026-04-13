@@ -1044,7 +1044,7 @@ pub async fn build_search_request_per_field(
         stream_type
     };
 
-    let size = req.query.size + req.query.from;
+    let size = req.query.size;
     let mut requests = Vec::new();
     for field in fields {
         let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
@@ -1065,6 +1065,8 @@ pub async fn build_search_request_per_field(
         };
 
         let mut req = req.clone();
+        req.query.size = size;
+        req.query.from = 0;
         req.query.sql = sql;
         requests.push((req, actual_stream_type, field));
     }
