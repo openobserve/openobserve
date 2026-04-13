@@ -206,7 +206,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   // ── Core State ──────────────────────────────────────────────────────────
 
-  let beingUpdated = false;
+  const beingUpdated = ref(false);
   const addAlertForm: any = ref(null);
   const disableColor: any = ref("");
   const formData: any = ref(defaultAlertValue());
@@ -825,7 +825,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       store,
       isAggregationEnabled,
       getSelectedTab,
-      beingUpdated,
+      beingUpdated: beingUpdated.value,
     };
     return getAlertPayloadUtil(formData.value, payloadContext);
   };
@@ -1901,7 +1901,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       conditions: formData.value.query_condition.conditions,
     };
 
-    if (beingUpdated) {
+    if (beingUpdated.value) {
       payload.folder_id =
         router.currentRoute.value.query.folder || "default";
       callAlert = alertsService.update_by_alert_id(
@@ -2002,7 +2002,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60 || 10),
       );
 
-    beingUpdated = props.isUpdated;
+    beingUpdated.value = props.isUpdated;
     updateStreams(false)?.then(() => {
       updateEditorContent(formData.value.stream_name);
     });
@@ -2012,7 +2012,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       props.modelValue.name != undefined &&
       props.modelValue.name != ""
     ) {
-      beingUpdated = true;
+      beingUpdated.value = true;
       disableColor.value = "grey-5";
       formData.value = cloneDeep(props.modelValue);
       isAggregationEnabled.value =
@@ -2603,7 +2603,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     track,
 
     // Core state
-    beingUpdated: computed(() => beingUpdated),
+    beingUpdated,
     addAlertForm,
     disableColor,
     formData,

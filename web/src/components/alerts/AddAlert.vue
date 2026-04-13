@@ -52,16 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
 
-              <!-- Folder -->
-              <div class="tw:flex tw:items-center tw:ml-2 tw:gap-1.5 tw:shrink-0">
-                <label class="alert-v3-inline-label tw:opacity-80 tw:font-semibold">Folder</label>
-                <InlineSelectFolderDropdown
-                  :model-value="activeFolderId"
-                  type="alerts"
-                  width="140px"
-                  @update:model-value="updateActiveFolderId({ value: $event })"
-                />
-              </div>
             </template>
             <template v-else>
               <span class="tw:text-xs tw:font-medium tw:whitespace-nowrap">{{ anomalyEditMode ? t("alerts.updateAnomalyDetection") : t("alerts.newAnomalyDetection") }}</span>
@@ -88,6 +78,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Push everything to the right -->
           <div class="tw:flex-1" />
+
+          <!-- Folder -->
+          <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
+            <label class="alert-v3-inline-label tw:opacity-80 tw:font-semibold">Folder</label>
+            <InlineSelectFolderDropdown
+              :model-value="activeFolderId"
+              type="alerts"
+              width="140px"
+              :disable="beingUpdated"
+              @update:model-value="updateActiveFolderId({ value: $event })"
+            />
+          </div>
+
+          <!-- Separator after Folder -->
+          <div class="tw:w-px tw:h-5 tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600/50' : 'tw:bg-gray-300'" />
 
           <!-- Stream Type -->
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
@@ -144,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Separator before Alert Type -->
           <div class="tw:w-px tw:h-5 tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600/50' : 'tw:bg-gray-300'" />
 
-          <!-- Alert Type (right-aligned) -->
+          <!-- Alert Type -->
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
             <label class="alert-v3-inline-label">{{ t("alerts.alertType") || 'Alert Type' }}</label>
             <div class="alert-type-tabs">

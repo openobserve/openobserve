@@ -225,44 +225,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- having row — optional trigger threshold for measure mode -->
+              <!-- no. of groups row — always visible for measure mode, disabled when no group-by -->
               <div v-if="selectedFunction !== 'total_events'" class="condition-row">
                 <span class="condition-label tw:font-bold">
-                  Having
+                  No. of groups
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    Optionally filter by the number of matching groups. If not set, triggers on any match (>= 1).
+                    Minimum number of groups that must satisfy the condition above to trigger the alert. Add a Group By field to enable this.
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <template v-if="!showHaving">
-                    <q-btn icon="add" size="xs" flat round dense color="primary" @click="showHaving = true">
-                      <q-tooltip>Add threshold</q-tooltip>
-                    </q-btn>
-                  </template>
-                  <template v-else>
-                    <q-select
-                      v-model="triggerOperator"
-                      :options="numericOperators"
-                      dense borderless hide-bottom-space
-                      class="alert-v3-select"
-                      style="min-width: 70px; max-width: 120px;"
-                      @update:model-value="onTriggerOperatorChange"
-                    />
-                    <q-input
-                      v-model="triggerThreshold"
-                      type="number"
-                      dense borderless hide-bottom-space
-                      class="alert-v3-input"
-                      style="min-width: 60px; max-width: 80px;"
-                      min="1"
-                      @update:model-value="onTriggerThresholdChange"
-                      @blur="restoreDefaultThreshold"
-                    />
-                    <span class="condition-text">matching groups found</span>
-                    <q-btn icon="close" size="xs" flat round dense class="tw:text-gray-400 hover:tw:text-red-500" @click="clearHaving">
-                      <q-tooltip>Clear (reset to >= 1)</q-tooltip>
-                    </q-btn>
-                  </template>
+                  <q-select
+                    v-model="triggerOperator"
+                    :options="numericOperators"
+                    dense borderless hide-bottom-space
+                    class="alert-v3-select"
+                    style="min-width: 70px; max-width: 120px;"
+                    :disable="!hasLogGroupByFields"
+                    @update:model-value="onTriggerOperatorChange"
+                  />
+                  <q-input
+                    v-model="triggerThreshold"
+                    type="number"
+                    dense borderless hide-bottom-space
+                    class="alert-v3-input"
+                    style="min-width: 60px; max-width: 80px;"
+                    min="1"
+                    :disable="!hasLogGroupByFields"
+                    @update:model-value="onTriggerThresholdChange"
+                    @blur="restoreDefaultThreshold"
+                  />
                 </div>
               </div>
             </template>
@@ -439,44 +430,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- having row — optional trigger threshold for metrics measure mode -->
+              <!-- no. of groups row — always visible for metrics measure mode, disabled when no group-by -->
               <div v-if="selectedFunction !== 'total_events'" class="condition-row">
                 <span class="condition-label tw:font-bold">
-                  Having
+                  No. of groups
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    Optionally filter by the number of matching groups. If not set, triggers on any match (>= 1).
+                    Minimum number of groups that must satisfy the condition above to trigger the alert. Add a Group By field to enable this.
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <template v-if="!showHaving">
-                    <q-btn icon="add" size="xs" flat round dense color="primary" @click="showHaving = true">
-                      <q-tooltip>Add threshold</q-tooltip>
-                    </q-btn>
-                  </template>
-                  <template v-else>
-                    <q-select
-                      v-model="triggerOperator"
-                      :options="numericOperators"
-                      dense borderless hide-bottom-space
-                      class="alert-v3-select"
-                      style="min-width: 70px; max-width: 120px;"
-                      @update:model-value="onTriggerOperatorChange"
-                    />
-                    <q-input
-                      v-model="triggerThreshold"
-                      type="number"
-                      dense borderless hide-bottom-space
-                      class="alert-v3-input"
-                      style="min-width: 60px; max-width: 80px;"
-                      min="1"
-                      @update:model-value="onTriggerThresholdChange"
-                      @blur="restoreDefaultThreshold"
-                    />
-                    <span class="condition-text">matching groups found</span>
-                    <q-btn icon="close" size="xs" flat round dense class="tw:text-gray-400 hover:tw:text-red-500" @click="clearHaving">
-                      <q-tooltip>Clear (reset to >= 1)</q-tooltip>
-                    </q-btn>
-                  </template>
+                  <q-select
+                    v-model="triggerOperator"
+                    :options="numericOperators"
+                    dense borderless hide-bottom-space
+                    class="alert-v3-select"
+                    style="min-width: 70px; max-width: 120px;"
+                    :disable="!hasMetricGroupByFields"
+                    @update:model-value="onTriggerOperatorChange"
+                  />
+                  <q-input
+                    v-model="triggerThreshold"
+                    type="number"
+                    dense borderless hide-bottom-space
+                    class="alert-v3-input"
+                    style="min-width: 60px; max-width: 80px;"
+                    min="1"
+                    :disable="!hasMetricGroupByFields"
+                    @update:model-value="onTriggerThresholdChange"
+                    @blur="restoreDefaultThreshold"
+                  />
                 </div>
               </div>
             </template>
@@ -712,6 +694,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div style="position: absolute; inset: 0;">
                     <UnifiedQueryEditor
                       ref="inlineQueryEditorRef"
+                      data-test-prefix="alert-inline-sql"
                       :languages="localTab === 'promql' ? ['promql'] : ['sql']"
                       :default-language="localTab"
                       :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
@@ -771,6 +754,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div style="position: relative; flex: 1; min-height: 0;">
                   <div style="position: absolute; inset: 0;">
                     <UnifiedQueryEditor
+                      data-test-prefix="alert-inline-vrl"
                       :languages="['vrl']"
                       default-language="vrl"
                       :query="vrlFunctionContent"
@@ -816,76 +800,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ sqlQueryErrorMsg }}</q-tooltip>
           </div>
 
-          <!-- PromQL Trigger Condition (only for PromQL tab) - Below the editors -->
-          <div v-if="localTab === 'promql' && promqlCondition" class="flex justify-start items-start q-mb-xs tw:ml-2 no-wrap">
-            <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-              Trigger if the value is *
-              <q-icon
-                name="info"
-                size="17px"
-                class="q-ml-xs cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-              >
-                <q-tooltip anchor="center right" self="center left" max-width="300px">
-                  <span style="font-size: 14px">
-                    Defines when the alert should trigger based on the PromQL query result value.<br />
-                    Example: If set to ">= 100", the alert triggers when the query result is greater than or equal to 100.
-                  </span>
-                </q-tooltip>
-              </q-icon>
+          <!-- SQL Trigger Condition (only for SQL tab, scheduled alerts) -->
+          <div v-if="localTab === 'sql' && isRealTime === 'false'" class="condition-rows tw:mt-2 tw:px-1">
+            <div class="condition-row">
+              <span class="condition-label">Alert if No. of events *</span>
+              <div class="tw:flex tw:items-center tw:gap-2">
+                <q-select
+                  v-model="triggerOperator"
+                  :options="numericOperators"
+                  dense borderless hide-bottom-space
+                  class="alert-v3-select"
+                  style="min-width: 70px; max-width: 120px;"
+                  @update:model-value="onTriggerOperatorChange"
+                />
+                <q-input
+                  v-model="triggerThreshold"
+                  type="number"
+                  dense borderless hide-bottom-space
+                  class="alert-v3-input"
+                  style="min-width: 60px; max-width: 80px;"
+                  min="1"
+                  @update:model-value="onTriggerThresholdChange"
+                  @blur="restoreDefaultThreshold"
+                />
+              </div>
             </div>
-            <div style="width: calc(100% - 190px)">
-              <div class="flex justify-start items-start">
-                <div class="tw:flex tw:flex-col">
-                  <q-select
-                    v-model="promqlCondition.operator"
-                    :options="triggerOperators"
-                    class="showLabelOnTop no-case q-py-none alert-v3-select"
-                    borderless
-                    dense
-                    use-input
-                    hide-selected
-                    fill-input
-                    :rules="[(val: any) => !!val || 'Field is required!']"
-                    :style="{
-                      width: (promqlCondition.operator === 'Contains' || promqlCondition.operator === 'NotContains')
-                        ? '124px'
-                        : '88px',
-                      minWidth: '88px'
-                    }"
-                    @update:model-value="emitPromqlConditionUpdate"
-                  />
-                  <div
-                    v-if="!promqlCondition.operator"
-                    class="text-red-8 q-pt-xs"
-                    style="font-size: 11px; line-height: 12px"
-                  >
-                    Field is required!
-                  </div>
-                </div>
-                <div class="flex items-start tw:flex-col" style="border-left: none">
-                  <div class="tw:flex tw:items-center">
-                    <div style="width: 179px; margin-left: 0 !important">
-                      <q-input
-                        v-model.number="promqlCondition.value"
-                        type="number"
-                        dense
-                        class="alert-v3-input"
-                        borderless
-                        style="background: none"
-                        debounce="300"
-                        @update:model-value="emitPromqlConditionUpdate"
-                      />
-                    </div>
-                  </div>
-                  <div
-                    v-if="promqlCondition.value === undefined || promqlCondition.value === null || promqlCondition.value === ''"
-                    class="text-red-8 q-pt-xs"
-                    style="font-size: 11px; line-height: 12px"
-                  >
-                    Field is required!
-                  </div>
-                </div>
+          </div>
+
+          <!-- PromQL Trigger Condition (only for PromQL tab) - Below the editors -->
+          <div v-if="localTab === 'promql' && promqlCondition" class="condition-rows tw:mt-2 tw:px-1">
+            <!-- Per-series value condition -->
+            <div class="condition-row">
+              <span class="condition-label">Alert if the value is *
+                <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                  Alert when the PromQL expression evaluates to this condition for a time series. Example: &gt;= 100 triggers when the result is 100 or more.
+                </q-tooltip>
+              </span>
+              <div class="tw:flex tw:items-center tw:gap-2">
+                <q-select
+                  v-model="promqlCondition.operator"
+                  :options="numericOperators"
+                  dense borderless hide-bottom-space
+                  class="alert-v3-select"
+                  style="min-width: 70px; max-width: 120px;"
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  @update:model-value="emitPromqlConditionUpdate"
+                />
+                <q-input
+                  v-model.number="promqlCondition.value"
+                  type="number"
+                  dense borderless hide-bottom-space
+                  class="alert-v3-input"
+                  style="min-width: 60px; max-width: 120px;"
+                  debounce="300"
+                  :rules="[(val: any) => (val !== undefined && val !== null && val !== '') || 'Field is required!']"
+                  @update:model-value="emitPromqlConditionUpdate"
+                />
+              </div>
+            </div>
+            <!-- No. of series threshold -->
+            <div class="condition-row">
+              <span class="condition-label">No. of series *
+                <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                  Minimum number of time series that must satisfy the condition above to trigger the alert.
+                </q-tooltip>
+              </span>
+              <div class="tw:flex tw:items-center tw:gap-2">
+                <q-select
+                  v-model="triggerOperator"
+                  :options="numericOperators"
+                  dense borderless hide-bottom-space
+                  class="alert-v3-select"
+                  style="min-width: 70px; max-width: 120px;"
+                  @update:model-value="onTriggerOperatorChange"
+                />
+                <q-input
+                  v-model="triggerThreshold"
+                  type="number"
+                  dense borderless hide-bottom-space
+                  class="alert-v3-input"
+                  style="min-width: 60px; max-width: 80px;"
+                  min="1"
+                  @update:model-value="onTriggerThresholdChange"
+                  @blur="restoreDefaultThreshold"
+                />
               </div>
             </div>
           </div>
@@ -1050,7 +1048,7 @@ export default defineComponent({
       (c: any) => c.filterType === 'condition' && c.column && c.column.trim() !== ''
     );
     const showFilters = ref(true);
-    const showVrl = ref(false);
+    const showVrl = ref(!!(props.vrlFunction?.trim()));
     const filtersSectionRef = ref<HTMLElement | null>(null);
     const inlineQueryEditorRef = ref<any>(null);
 
@@ -1256,26 +1254,28 @@ export default defineComponent({
       }
     });
 
-    // Trigger threshold — "for >= N times" (how many evaluation periods must match)
-    const triggerOperator = ref(props.triggerCondition?.operator || '>=');
-    const triggerThreshold = ref(props.triggerCondition?.threshold || 3);
+    // Trigger threshold — only meaningful when group-by fields exist.
+    // If loading an alert with no group-by, reset to defaults so stale values don't show.
+    const hasInitialGroupBy =
+      (props.inputData.aggregation?.group_by || []).filter((g: string) => g?.trim()).length > 0;
+    const triggerOperator = ref(hasInitialGroupBy ? (props.triggerCondition?.operator || '>=') : '>=');
+    const triggerThreshold = ref(hasInitialGroupBy ? (props.triggerCondition?.threshold || 1) : 1);
+    // Sync reset to parent so saving also persists the corrected value
+    if (!hasInitialGroupBy && props.triggerCondition) {
+      props.triggerCondition.threshold = 1;
+      props.triggerCondition.operator = '>=';
+      emit("update:triggerCondition", { ...props.triggerCondition });
+    }
 
-    // "having" row is optional for measure/aggregation mode — show only if user explicitly set it
-    // (threshold > 1 means user customized it; default >= 1 means not set)
-    const showHaving = ref(
-      props.triggerCondition?.threshold != null && props.triggerCondition.threshold > 1
+    // Whether log/trace group-by has at least one non-empty field
+    const hasLogGroupByFields = computed(
+      () => logGroupBy.value.filter((f: string) => f?.trim()).length > 0
     );
 
-    const clearHaving = () => {
-      showHaving.value = false;
-      triggerThreshold.value = 1;
-      triggerOperator.value = '>=';
-      if (props.triggerCondition) {
-        props.triggerCondition.threshold = 1;
-        props.triggerCondition.operator = '>=';
-        emit("update:triggerCondition", { ...props.triggerCondition });
-      }
-    };
+    // Whether metric group-by has at least one non-empty field
+    const hasMetricGroupByFields = computed(
+      () => (props.inputData.aggregation?.group_by || []).filter((f: string) => f?.trim()).length > 0
+    );
 
     const onTriggerOperatorChange = (value: string) => {
       triggerOperator.value = value;
@@ -1758,7 +1758,7 @@ export default defineComponent({
       } else {
         // Measure mode — uses aggregation, default trigger to "atleast 1 group"
         localIsAggregationEnabled.value = true;
-        showHaving.value = false; // reset to collapsed when switching to measure mode
+        // (no showHaving — row is always visible now)
         if (triggerThreshold.value === 3) {
           // Only change if still at count-mode default
           triggerThreshold.value = 1;
@@ -1807,6 +1807,16 @@ export default defineComponent({
     const deleteLogGroupByColumn = (index: number) => {
       logGroupBy.value.splice(index, 1);
       onLogGroupByChange();
+      // Reset threshold to 1 when last group-by field is removed
+      if (logGroupBy.value.filter((f: string) => f?.trim()).length === 0) {
+        triggerThreshold.value = 1;
+        triggerOperator.value = '>=';
+        if (props.triggerCondition) {
+          props.triggerCondition.threshold = 1;
+          props.triggerCondition.operator = '>=';
+          emit("update:triggerCondition", { ...props.triggerCondition });
+        }
+      }
     };
     const onLogGroupByChange = () => {
       if (props.inputData.aggregation) {
@@ -1870,6 +1880,17 @@ export default defineComponent({
       if (props.inputData.aggregation) {
         props.inputData.aggregation.group_by.splice(idx, 1);
         emitAggregationUpdate();
+        // Reset threshold to 1 when last group-by field is removed
+        const remaining = (props.inputData.aggregation.group_by || []).filter((f: string) => f?.trim()).length;
+        if (remaining === 0) {
+          triggerThreshold.value = 1;
+          triggerOperator.value = '>=';
+          if (props.triggerCondition) {
+            props.triggerCondition.threshold = 1;
+            props.triggerCondition.operator = '>=';
+            emit("update:triggerCondition", { ...props.triggerCondition });
+          }
+        }
       }
     };
 
@@ -1884,6 +1905,44 @@ export default defineComponent({
     };
 
     // Watch for SQL editor dialog state changes
+    // Sync local state when parent props update (e.g. after loading an existing alert async)
+    watch(
+      () => props.tab,
+      (newTab) => {
+        if (newTab && newTab !== localTab.value) {
+          localTab.value = newTab;
+        }
+      }
+    );
+    watch(
+      () => props.sqlQuery,
+      (newVal) => {
+        if (newVal !== undefined && newVal !== localSqlQuery.value) {
+          localSqlQuery.value = newVal;
+        }
+      }
+    );
+    watch(
+      () => props.promqlQuery,
+      (newVal) => {
+        if (newVal !== undefined && newVal !== localPromqlQuery.value) {
+          localPromqlQuery.value = newVal;
+        }
+      }
+    );
+    watch(
+      () => props.vrlFunction,
+      (newVal) => {
+        if (newVal !== undefined && newVal !== vrlFunctionContent.value) {
+          vrlFunctionContent.value = newVal;
+        }
+        // Auto-enable VRL pane when a function is present
+        if (newVal?.trim()) {
+          showVrl.value = true;
+        }
+      }
+    );
+
     watch(viewSqlEditor, (newValue, oldValue) => {
       // Emit state change whenever it changes
       console.log("[QueryConfig] SQL Editor state changed:", oldValue, "->", newValue);
@@ -2093,8 +2152,8 @@ export default defineComponent({
       onTriggerOperatorChange,
       onTriggerThresholdChange,
       restoreDefaultThreshold,
-      showHaving,
-      clearHaving,
+      hasLogGroupByFields,
+      hasMetricGroupByFields,
       checkEveryFrequency,
       onCheckEveryChange,
       restoreDefaultFrequency,

@@ -27,15 +27,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       input-debounce="0"
       emit-value
       map-options
+      :disable="disable"
       @update:model-value="$emit('update:modelValue', $event)"
     />
     <q-btn
+      v-if="!disable"
       flat
       dense
       icon="add"
       size="xs"
       class="tw:rounded tw:shrink-0 add-folder-btn"
-      
       title="Add Folder"
       @click="showDialog = true"
     />
@@ -76,6 +77,10 @@ export default defineComponent({
     width: {
       type: String,
       default: "140px",
+    },
+    disable: {
+      type: Boolean,
+      default: false,
     },
   },
   setup(props, { emit }) {
