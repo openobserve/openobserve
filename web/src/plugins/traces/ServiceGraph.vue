@@ -18,6 +18,7 @@
           borderless
           emit-value
           map-options
+          :dark="$q.dark.isActive"
           class="tw:w-[auto] tw:flex-shrink-0 tw:bg-[var(--o2-primary-background)] tw:rounded"
           @update:model-value="onStreamFilterChange"
           :disable="availableStreams.length === 0"
@@ -34,6 +35,7 @@
           v-model="searchFilter"
           borderless
           dense
+          :dark="$q.dark.isActive"
           class="no-border tw:w-[14rem]! tw:h-[36px] tw:bg-[var(--o2-primary-background)] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
           placeholder="Search Services"
           debounce="300"
@@ -1712,6 +1714,7 @@ code {
   font-family: "Courier New", monospace;
   font-size: 0.9em;
 }
+
 </style>
 
 <!-- Flowing edge animation — non-scoped so it reaches inside ECharts SVG output -->
@@ -1734,5 +1737,10 @@ code {
 .graph-container svg path[style*="stroke-dasharray"] {
   animation: sg-edge-flow 0.5s linear infinite;
   animation-fill-mode: both;
+}
+
+.body--dark [data-test="service-graph-stream-selector"] .q-field,
+.body--dark [data-test="service-graph-search-input"] .q-field {
+  background: var(--o2-primary-background);
 }
 </style>
