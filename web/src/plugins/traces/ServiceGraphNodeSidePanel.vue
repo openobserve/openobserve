@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-menu>
             </q-btn>
           </div>
-          <q-tab-panels v-model="activeTab" animated class="tw:h-full!">
+          <q-tab-panels v-model="activeTab" animated>
             <!-- Operations Tab -->
             <q-tab-panel
               name="operations"
@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else
-                  class="tw:max-h-full tw:overflow-hidden tw:rounded"
+                  class="tw:overflow-hidden tw:rounded"
                   data-test="service-graph-side-panel-operations-table"
                 >
                   <TenstackTable
@@ -417,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else
-                  class="tw:max-h-[20rem] tw:overflow-hidden tw:rounded"
+                  class="tw:overflow-hidden tw:rounded"
                   :data-test="`service-graph-side-panel-${cfg.id}-table`"
                 >
                   <TenstackTable
