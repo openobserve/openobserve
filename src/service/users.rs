@@ -758,7 +758,7 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
         }
         Some(user_from_db)
     } else {
-        log::info!("get_user_by_token: User not found even in db {org_id}");
+        log::info!("get_user_by_token: User not found even in db {org_id} {token}");
         None
     }
 }
