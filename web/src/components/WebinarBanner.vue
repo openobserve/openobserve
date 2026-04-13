@@ -33,18 +33,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="webinar-marquee-tag">{{ webinarData.tag }}</span>
           <span class="webinar-marquee-title">{{ webinarData.title }}</span>
           <span v-if="webinarData.date" class="webinar-marquee-date">
-            <q-icon name="schedule" size="0.7rem" class="q-mr-xs" />{{
-              formattedDate
-            }}
+            <q-icon
+              name="schedule"
+              size="0.7rem"
+              class="webinar-marquee-date-icon"
+            />
+            <span class="webinar-marquee-date-text">{{ formattedDate }}</span>
           </span>
           <!-- Spacer so text doesn't abruptly loop -->
           <span class="webinar-marquee-sep" aria-hidden="true">·</span>
           <span class="webinar-marquee-tag">{{ webinarData.tag }}</span>
           <span class="webinar-marquee-title">{{ webinarData.title }}</span>
           <span v-if="webinarData.date" class="webinar-marquee-date">
-            <q-icon name="schedule" size="0.7rem" class="q-mr-xs" />{{
-              formattedDate
-            }}
+            <q-icon
+              name="schedule"
+              size="0.7rem"
+              class="webinar-marquee-date-icon"
+            />
+            <span class="webinar-marquee-date-text">{{ formattedDate }}</span>
           </span>
           <span class="webinar-marquee-sep" aria-hidden="true">·</span>
         </div>
@@ -72,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         flat
         dense
         round
+        size="8px"
         icon="close"
         class="webinar-close-btn q-ml-xs"
         @click="collapse"
@@ -352,11 +359,25 @@ onUnmounted(() => {
 }
 
 .webinar-marquee-date {
-  font-size: 0.7rem;
-  color: var(--o2-text-secondary);
-  margin-right: 0.75rem;
   display: inline-flex;
   align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--o2-text-secondary);
+  margin-right: 0.75rem;
+  vertical-align: middle;
+}
+
+.webinar-marquee-date-icon {
+  display: inline-flex !important;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.webinar-marquee-date-text {
+  line-height: 1;
+  vertical-align: middle;
 }
 
 .webinar-marquee-sep {
@@ -555,5 +576,13 @@ onUnmounted(() => {
   height: 2.375rem !important;
   min-height: 2.375rem !important;
   box-shadow: 0 2px 8px color-mix(in srgb, var(--q-secondary) 35%, transparent) !important;
+}
+</style>
+
+<style lang="scss">
+.webinar-close-btn {
+  .q-icon {
+    font-size: 1rem !important;
+  }
 }
 </style>
