@@ -123,20 +123,13 @@ test.describe("Traces Regression Bugs", () => {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
-    // Check if we have trace results
-    const hasResults = await pm.tracesPage.hasTraceResults();
-    if (!hasResults) {
-      testLogger.warn('No trace results available - skipping test');
-      test.skip(true, 'No trace results available');
-      return;
-    }
-
     // STEP 1: Get initial trace count and capture trace IDs before navigation
     const initialTraceCount = await pm.tracesPage.getTraceCount();
     testLogger.info(`Initial trace count: ${initialTraceCount}`);
 
     // STRONG ASSERTION: We need at least some traces to test pagination
-    expect(initialTraceCount, 'Bug #9043: Should have initial traces to test pagination').toBeGreaterThan(0);
+    // If no results, test will fail with meaningful error message
+    expect(initialTraceCount, 'Bug #9043: Should have initial traces to test pagination (no trace results available for this time range)').toBeGreaterThan(0);
 
     // Capture initial trace IDs by getting the text content of trace result items
     // Trace results usually contain unique trace IDs or span information
@@ -188,7 +181,6 @@ test.describe("Traces Regression Bugs", () => {
 
     // STEP 5: Check for duplicates in the trace list
     // If pagination cursor resets, we would see the same traces loaded again
-    // Use DOM element positions + unique attributes instead of just text content
     const afterBackTraceItems = page.locator('[data-test="traces-search-result-item"]');
     const afterBackCount = await afterBackTraceItems.count();
 
@@ -196,31 +188,55 @@ test.describe("Traces Regression Bugs", () => {
     for (let i = 0; i < Math.min(afterBackCount, 20); i++) {
       const traceItem = afterBackTraceItems.nth(i);
 
-      // Try to extract unique trace ID from the element's HTML
-      const itemHTML = await traceItem.innerHTML().catch(() => '');
+      // Try to extract trace ID from data attributes first (most reliable)
+      let traceId = await traceItem.getAttribute('data-trace-id').catch(() => null);
 
-      // Look for trace_id pattern in the HTML (e.g., in data attributes or text)
-      const traceIdMatch = itemHTML.match(/trace[_-]?id["\s:=]+([a-f0-9]{16,64})/i);
-      const traceId = traceIdMatch ? traceIdMatch[1] : null;
+      if (!traceId) {
+        // Fallback: look for trace_id in other data attributes
+        const allAttrs = await traceItem.evaluate(el => {
+          const attrs = {};
+          for (const attr of el.attributes) {
+            if (attr.name.includes('trace') || attr.name.includes('id')) {
+              attrs[attr.name] = attr.value;
+            }
+          }
+          return attrs;
+        }).catch(() => ({}));
 
-      // Fallback: use text content for comparison
-      const traceText = await traceItem.textContent().catch(() => '');
-      const cleanText = traceText.trim();
+        // Find first attribute that looks like a trace ID (hex string 16-64 chars)
+        for (const [name, value] of Object.entries(allAttrs)) {
+          if (typeof value === 'string' && /^[a-f0-9]{16,64}$/i.test(value)) {
+            traceId = value;
+            testLogger.debug(`Found trace ID in attribute ${name}: ${value.substring(0, 16)}...`);
+            break;
+          }
+        }
+      }
 
-      // Create identifier: use trace ID if available, otherwise text content
-      // NOTE: Text-based comparison may produce false positives if different traces have identical visible text
-      const identifier = traceId || cleanText.substring(0, 100);
+      // If still no trace ID, try to extract from HTML content
+      if (!traceId) {
+        const itemHTML = await traceItem.innerHTML().catch(() => '');
+        const traceIdMatch = itemHTML.match(/trace[_-]?id["\s:=]+([a-f0-9]{16,64})/i);
+        traceId = traceIdMatch ? traceIdMatch[1] : null;
+      }
 
-      afterBackTraceData.push({ index: i, id: identifier, text: cleanText.substring(0, 100) });
+      // Only use traces with valid IDs for duplicate detection
+      // Text-based comparison is too unreliable for this test
+      if (traceId) {
+        afterBackTraceData.push({ index: i, id: traceId, text: traceId.substring(0, 16) + '...' });
+      } else {
+        testLogger.debug(`Trace at index ${i} has no extractable trace_id - skipping duplicate check for this entry`);
+      }
     }
-    testLogger.info(`Captured ${afterBackTraceData.length} trace identifiers after navigation`);
+    testLogger.info(`Captured ${afterBackTraceData.length} trace identifiers with valid IDs (out of ${afterBackCount} total)`);
+
+    // Ensure we have enough valid trace IDs to perform duplicate detection
+    expect(afterBackTraceData.length, 'Bug #9043: Need at least some traces with extractable IDs to validate pagination cursor').toBeGreaterThan(0);
 
     // Count duplicates by checking if the same trace identifier appears multiple times
     const traceCounts = new Map();
     afterBackTraceData.forEach(trace => {
-      if (trace.id) {
-        traceCounts.set(trace.id, (traceCounts.get(trace.id) || 0) + 1);
-      }
+      traceCounts.set(trace.id, (traceCounts.get(trace.id) || 0) + 1);
     });
 
     const duplicates = [];
@@ -245,7 +261,7 @@ test.describe("Traces Regression Bugs", () => {
 
     // PRIMARY ASSERTION 2: No duplicate traces should be present
     // Bug #9043 caused pagination cursor to reset, loading the same traces again
-    // Duplicates would show as same trace_id or same position+content appearing multiple times
+    // Duplicates would show as same trace_id appearing multiple times in the results
     expect(duplicates.length, 'Bug #9043: Should not have duplicate traces after navigating back (cursor should not reset)').toBe(0);
     testLogger.info('✓ No duplicate traces detected - pagination cursor maintained correctly');
 
@@ -254,21 +270,32 @@ test.describe("Traces Regression Bugs", () => {
     const resultsContainer = page.locator('[data-test="traces-search-result-list"], .traces-result-container').first();
     if (await resultsContainer.isVisible({ timeout: 3000 }).catch(() => false)) {
       // Scroll to bottom to trigger pagination/infinite scroll if it exists
-      await resultsContainer.evaluate(el => {
+      const scrollSuccess = await resultsContainer.evaluate(el => {
+        const prevScrollTop = el.scrollTop;
         el.scrollTop = el.scrollHeight;
-      }).catch(() => {
-        testLogger.info('Could not scroll results container - may not support scrolling');
+        return el.scrollTop > prevScrollTop; // Return true if scroll actually happened
+      }).catch((error) => {
+        testLogger.warn('Could not scroll results container - may not support scrolling', { error: error.message });
+        return false;
       });
 
-      await page.waitForTimeout(2000);
-      testLogger.info('✓ Attempted to scroll results to trigger pagination');
+      if (scrollSuccess) {
+        testLogger.info('✓ Scrolled results container to bottom');
 
-      // Check trace count after scroll
-      const afterScrollCount = await pm.tracesPage.getTraceCount();
-      testLogger.info(`Trace count after scroll: ${afterScrollCount}`);
+        // Wait longer for potential lazy-load network response
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        await page.waitForTimeout(3000);
+        testLogger.info('✓ Waited for lazy-load response');
 
-      // If pagination is working, count should be >= the previous count
-      expect(afterScrollCount, 'Bug #9043: Trace count should not decrease after scrolling').toBeGreaterThanOrEqual(afterBackTraceCount);
+        // Check trace count after scroll
+        const afterScrollCount = await pm.tracesPage.getTraceCount();
+        testLogger.info(`Trace count after scroll: ${afterScrollCount}`);
+
+        // If pagination is working, count should be >= the previous count
+        expect(afterScrollCount, 'Bug #9043: Trace count should not decrease after scrolling').toBeGreaterThanOrEqual(afterBackTraceCount);
+      } else {
+        testLogger.info('Container may not support scrolling - skipping scroll verification');
+      }
     }
 
     testLogger.info('✓ PASSED: Pagination cursor persistence test completed');

@@ -578,24 +578,24 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Get the visible text in the selected template display area
     const selectedDisplay = templateSelect.locator('[class*="ellipsis"]').first();
-    if (await selectedDisplay.isVisible({ timeout: 2000 }).catch(() => false)) {
-      const displayedText = await selectedDisplay.textContent();
-      const cleanText = displayedText?.trim() || '';
-      testLogger.info('Template display text', { text: cleanText });
 
-      // Count how many times the template name appears in the displayed text
-      const templateName = selectedTemplateName?.trim() || '';
-      if (templateName && cleanText.includes(templateName)) {
-        // Split by the template name and check occurrences
-        const occurrences = cleanText.split(templateName).length - 1;
+    // PRIMARY ASSERTION SETUP: Display must be visible to validate bug fix
+    await expect(selectedDisplay, 'Bug #10110: Template display area must be visible to verify no duplication').toBeVisible({ timeout: 3000 });
 
-        // PRIMARY ASSERTION: Template name should appear exactly once
-        expect(occurrences, `Bug #10110: Template "${templateName}" should appear once, not ${occurrences} times in input field`).toBe(1);
-        testLogger.info(`✓ Template appears exactly once in display - Bug #10110 is fixed`);
-      } else {
-        testLogger.warn('Could not verify template text duplication - template name not found in display');
-      }
-    }
+    const displayedText = await selectedDisplay.textContent();
+    const cleanText = displayedText?.trim() || '';
+    testLogger.info('Template display text', { text: cleanText });
+
+    // Template name must be non-empty to validate
+    const templateName = selectedTemplateName?.trim() || '';
+    expect(templateName, 'Bug #10110: Selected template name must be non-empty to verify duplication').toBeTruthy();
+
+    // Count how many times the template name appears in the displayed text
+    const occurrences = cleanText.split(templateName).length - 1;
+
+    // PRIMARY ASSERTION: Template name should appear exactly once (UNCONDITIONAL)
+    expect(occurrences, `Bug #10110: Template "${templateName}" should appear once, not ${occurrences} times in input field`).toBe(1);
+    testLogger.info(`✓ Template appears exactly once in display - Bug #10110 is fixed`);
 
     // Additional check: Verify no duplicate class names or rendering issues
     const templateFieldClasses = await templateSelect.getAttribute('class') || '';
