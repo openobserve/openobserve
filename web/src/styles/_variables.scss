@@ -434,7 +434,7 @@ $json-object-dark: #D1D5DB;         // Light gray
 .body--dark {
   --o2-theme-mode: #{$dark-theme-mode};
   // Backgrounds
-  --o2-primary-background: #{$o2-dark-gray-1400};  // Dark mode background
+  --o2-primary-background: #{$o2-dark-gray-200};  // Dark mode background
   --o2-secondary-background: #{$o2-dark-gray-1300}; // Secondary background
   --o2-muted-background: #{$o2-dark-gray-1100};    // Muted background
   
