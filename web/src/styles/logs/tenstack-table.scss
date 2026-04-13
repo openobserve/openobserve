@@ -24,6 +24,9 @@
 .container {
   overflow: auto;
   border-radius: 0.5rem;
+  // Hint the browser to composite the scroll layer on the GPU, which
+  // eliminates paint-phase flicker during fast virtual-scroll updates.
+  will-change: scroll-position;
 }
 
 // Applied to table cells when not in defaultColumns mode

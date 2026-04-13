@@ -44,11 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? width - 12 + 'px'
                   : '100%'
                 : '100%',
-          // Use border-collapse:separate for pivot tables so borders stick
-          // with position:sticky headers (collapse mode paints borders on
-          // the table grid which doesn't move with sticky elements).
-          borderCollapse: isPivotMode ? 'separate' : undefined,
-          borderSpacing: isPivotMode ? '0' : undefined,
+          // Use border-collapse:separate for pivot tables AND tables with
+          // sticky columns so borders stick with position:sticky headers
+          // (collapse mode paints adjacent cells on top of sticky shadows).
+          borderCollapse: usesSeparateBorders ? 'separate' : undefined,
+          borderSpacing: usesSeparateBorders ? '0' : undefined,
         }"
       >
         <!-- ── Pivot multi-level headers (dashboard only) ───────────────────── -->
@@ -173,6 +173,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'tw:text-right!'
                   : '',
                 (header.column.columnDef.meta as any)?.headerClass ?? '',
+                {
+                  'pivot-total-col':
+                    stickyColTotals &&
+                    (header.column.columnDef.meta as any)?._isTotalColumn,
+                },
               ]"
               :style="{
                 width: `calc(var(--header-${sanitizeCssId(header?.id)}-size) * 1px)`,
@@ -397,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="{ row, idx } in renderedDashboardRows"
               :key="row.id"
               class="dashboard-data-row tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
-              :class="{ 'tw:border-b': !isPivotMode }"
+              :class="{ 'tw:border-b': !usesSeparateBorders }"
               @click="
                 handleDataRowClick(row.original, idx as number, $event)
               "
@@ -423,9 +428,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       stickyColTotals &&
                       (cell.column.columnDef.meta as any)?._isTotalColumn,
                   },
-                  // In pivot mode (border-collapse:separate), borders on <tr>
-                  // don't render, so apply the row border on each <td> instead.
-                  { 'tw:border-b': isPivotMode },
+                  // In separate-border mode (pivot or sticky columns),
+                  // <tr> borders don't render — apply the row border on <td>.
+                  { 'tw:border-b': usesSeparateBorders },
                   isPivotMergeNoBorder(
                     row.original,
                     (cell.column.columnDef.meta as any)?._col,
@@ -1279,6 +1284,14 @@ const stickyRowTotals = computed(() => !!props.stickyRowTotals);
 const stickyColTotals = computed(() => !!props.stickyColTotals);
 const stickyTotalRow = computed(() => props.stickyTotalRow || null);
 const isPivotMode = computed(() => pivotHeaderLevels.value.length > 0);
+// Any table with left-sticky columns needs border-collapse:separate so that
+// adjacent cells don't paint over the sticky cell's box-shadow.
+const hasStickyColumns = computed(() =>
+  ((props.columns as any[]) || []).some((c: any) => c.sticky),
+);
+const usesSeparateBorders = computed(
+  () => isPivotMode.value || hasStickyColumns.value,
+);
 
 // Dashboard virtual scroll: enabled when not using logs virtual scroll and not paginated.
 // Uses spacer rows + @tanstack/vue-virtual to render only visible rows (matching
@@ -1412,8 +1425,7 @@ const getStickyTotalColumnStyle = (col: any) => {
     "min-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     "max-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     "background-color": store.state.theme === "dark" ? "#565656" : "#E0E0E0",
-    // Shadow matching bottom total row style (-2px 0 4px)
-    "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
+    "box-shadow": "-4px 0 8px rgba(0, 0, 0, 0.15)",
     "white-space": "normal",
     "word-break": "break-word",
   };
@@ -1437,8 +1449,7 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
     "max-width": `${width}px`,
     // Opaque background so scrolled body content doesn't bleed through
     "background-color": "inherit",
-    // Shadow matching bottom total row style
-    "box-shadow": "-2px 0 4px rgba(0, 0, 0, 0.1)",
+    "box-shadow": "-4px 0 8px rgba(0, 0, 0, 0.15)",
     "white-space": "normal",
     "word-break": "break-word",
     // Remove border so shadow aligns with body total column
@@ -1749,6 +1760,13 @@ const formattedRows = computed(() => {
   return table?.getRowModel().rows;
 });
 
+/** Stable primitive count for the virtualizer.
+ *  Vue skips downstream notifications when a computed returns the same
+ *  primitive value — so `rowVirtualizerOptions` won't re-evaluate (and
+ *  `_willUpdate` / ResizeObserver won't re-fire) when `formattedRows`
+ *  gets a new array reference with the same length. */
+const rowCount = computed(() => formattedRows.value?.length ?? 0);
+
 /** Rows for current page (dashboard).
  *  When pagination is enabled, slices by page. Otherwise returns all rows —
  *  dashboard virtual scroll handles limiting rendered DOM nodes. */
@@ -1807,9 +1825,14 @@ const deferredObserveElementRect = (
   const element = instance.scrollElement;
   if (!element) return;
 
-  // Provide a reasonable initial estimate so getVirtualItems() returns items
-  // on the very first render (ResizeObserver corrects in the next frame).
-  cb({ width: 800, height: 300 });
+  // Use the actual element dimensions for the initial estimate so the
+  // virtualizer renders the correct number of rows on first paint.
+  // Falling back to 800×300 only if layout hasn't been resolved yet.
+  const initialRect = element.getBoundingClientRect();
+  cb({
+    width: Math.round(initialRect.width) || 800,
+    height: Math.round(initialRect.height) || 300,
+  });
 
   const observer = new ResizeObserver((entries) => {
     const entry = entries[0];
@@ -1835,22 +1858,21 @@ const rowVirtualizerOptions = computed(() => {
   // All non-logs tables (paginated + non-paginated dashboard panels)
   const isNonLogs = !props.useVirtualScroll;
   return {
-    count: formattedRows.value.length,
+    count: rowCount.value,
     getScrollElement: () => parentRef.value,
     estimateSize: (index: number) => {
-      // Dashboard virtual scroll: fixed row height, no measurement
-      if (isDashVirtual) return props.rowHeight ?? 22;
-      // Fixed row height mode (e.g. traces table)
       if (props.rowHeight) return props.rowHeight;
-      // Check if this is an expanded row (odd indices after expansion)
+      // Dashboard: 28px matches actual row height (12px font + py-1 padding + border).
+      if (isDashVirtual) return 28;
+      // Logs/traces: check for expanded rows
       const isExpandedRow = formattedRows.value[index]?.original?.isExpandedRow;
       return isExpandedRow
-        ? expandedRowHeights.value[index] || 300 // Default expanded height
-        : (props.rowHeight ?? 28); // Default collapsed height
+        ? expandedRowHeights.value[index] || 300
+        : 28;
     },
-    // Dashboard: low overscan (panels are small, ~13 visible rows).
-    // Logs/traces: high overscan for smooth fast-scroll experience.
-    overscan: isDashVirtual ? 10 : 100,
+    // Dashboard: moderate overscan keeps rows buffered above/below viewport.
+    // Logs/traces: high overscan for smooth fast-scroll.
+    overscan: isDashVirtual ? 20 : 100,
     measureElement: isDashVirtual
       ? undefined
       : // When rowHeight is provided, skip dynamic measurement entirely

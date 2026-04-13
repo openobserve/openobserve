@@ -56,7 +56,7 @@ export function useStickyColumns(props: any, store: any) {
       left: `${leftOffset}px`,
       "z-index": 2,
       "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
-      "box-shadow": "2px 0 4px rgba(0, 0, 0, 0.1)",
+      "box-shadow": "4px 0 8px rgba(0, 0, 0, 0.15)",
     };
   };
 
@@ -80,20 +80,24 @@ export function useStickyColumns(props: any, store: any) {
 
     const scope = `.my-sticky-virtscroll-table[data-sticky-id="${tableId}"]`;
 
+    // Shadow constants — right-sticky uses inset shadow to match TableRenderer scoped style
+    const shadowRight = "4px 0 8px rgba(0, 0, 0, 0.15)";
+    const shadowLeft = "inset 4px 0 6px -2px rgba(0, 0, 0, 0.15)";
+    const shadowBoth = `${shadowRight}, ${shadowLeft}`;
+
     // Generate CSS rules for each column position
     columns.forEach((col: any, colIndex: number) => {
       if (col.sticky) {
         const offset = stickyColumnOffsets.value[col.name] ?? 0;
-        // Target header and body cells by their actual nth-child position (1-based)
-        // Headers get position sticky, left offset, and higher z-index
-        // Body cells with sticky-column class get the same positioning
+        // Left-sticky: shadow on right. If also right-sticky (middle column), shadow on both.
+        const shadow = col._isTotalColumn ? shadowBoth : shadowRight;
         css += `
           ${scope} thead tr th:nth-child(${colIndex + 1}) {
             position: sticky !important;
             left: ${offset}px !important;
             z-index: 4 !important;
-            background-color: ${bgColor} !important;
-            box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1) !important;
+            background-color: var(--o2-table-header-bg) !important;
+            box-shadow: ${shadow} !important;
           }
           ${scope} tbody td:nth-child(${colIndex + 1}).sticky-column {
             left: ${offset}px !important;
@@ -104,14 +108,16 @@ export function useStickyColumns(props: any, store: any) {
       // Right-sticky total columns (for standard single-row headers)
       if (stickyColTotals && col._isTotalColumn) {
         const rightOffset = (col._totalColRightIndex ?? 0) * TOTAL_COL_WIDTH;
+        // Right-sticky: shadow on left. If also left-sticky (middle column), shadow on both.
+        const shadow = col.sticky ? shadowBoth : shadowLeft;
         css += `
           ${scope} thead tr:first-child th:nth-child(${colIndex + 1}) {
             position: sticky !important;
             right: ${rightOffset}px !important;
             z-index: 4 !important;
             min-width: ${TOTAL_COL_WIDTH}px !important;
-            background-color: ${bgColor} !important;
-            box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1) !important;
+            background-color: var(--o2-table-header-bg) !important;
+            box-shadow: ${shadow} !important;
           }
         `;
       }
@@ -120,19 +126,24 @@ export function useStickyColumns(props: any, store: any) {
     // Add base styling for all sticky columns
     css =
       `
-      /* Sticky body cells */
+      /* Left-sticky body cells: shadow on right */
       ${scope} tbody td.sticky-column {
         position: sticky !important;
         z-index: 2 !important;
-        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1) !important;
+        box-shadow: 4px 0 8px rgba(0, 0, 0, 0.15) !important;
       }
 
-      /* Right-sticky total column body cells */
+      /* Right-sticky total column body cells: inset shadow on left */
       ${scope} tbody td.pivot-total-col {
         position: sticky !important;
         z-index: 2 !important;
         background-color: ${bgColor} !important;
         box-shadow: inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
+      }
+
+      /* Middle sticky body cells (left + right): outward right + inset left */
+      ${scope} tbody td.sticky-column.pivot-total-col {
+        box-shadow: 4px 0 8px rgba(0, 0, 0, 0.15), inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
       }
 
       /* Sticky total row (bottom sticky) */
