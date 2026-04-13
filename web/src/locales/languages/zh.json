@@ -2781,6 +2781,7 @@
     "showTraces": "显示追踪",
     "applyAndSearch": "申请并搜索",
     "addToTable": "添加到表格",
+    "timestamp": "时间戳",
     "evaluations": {
       "loading": "正在加载评估数据...",
       "noDataTitle": "没有评估数据",

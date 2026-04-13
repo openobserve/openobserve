@@ -2788,6 +2788,7 @@
     "showTraces": "트레이스 보기",
     "applyAndSearch": "신청 및 검색",
     "addToTable": "테이블에 추가",
+    "timestamp": "타임스탬프",
     "evaluations": {
       "loading": "평가 데이터 로드 중...",
       "noDataTitle": "평가 데이터 없음",

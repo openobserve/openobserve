@@ -2788,6 +2788,7 @@
     "showTraces": "İzleri Göster",
     "applyAndSearch": "Uygula ve Ara",
     "addToTable": "Tabloya ekle",
+    "timestamp": "Zaman damgası",
     "evaluations": {
       "loading": "Değerlendirme verileri yükleniyor...",
       "noDataTitle": "Değerlendirme Verisi Yok",

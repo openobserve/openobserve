@@ -2777,6 +2777,7 @@
     "showTraces": "Spuren einblenden",
     "applyAndSearch": "Bewerben & Suchen",
     "addToTable": "Zur Tabelle hinzufügen",
+    "timestamp": "Zeitstempel",
     "evaluations": {
       "loading": "Bewertungsdaten werden geladen...",
       "noDataTitle": "Keine Bewertungsdaten",

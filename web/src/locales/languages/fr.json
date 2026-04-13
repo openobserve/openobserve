@@ -2777,6 +2777,7 @@
     "showTraces": "Afficher les traces",
     "applyAndSearch": "Postulez et recherchez",
     "addToTable": "Ajouter au tableau",
+    "timestamp": "Horodatage",
     "evaluations": {
       "loading": "Chargement des données d'évaluation...",
       "noDataTitle": "Aucune donnée d'évaluation",
