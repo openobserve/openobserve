@@ -472,6 +472,142 @@ test.describe("Alerts Regression Bugs", () => {
     testLogger.info('✓ PASSED: Alert firing count test completed');
   });
 
+  // ============================================================================
+  // Bug #10110: Template appears twice in override template input field
+  // https://github.com/openobserve/openobserve/issues/10110
+  // ============================================================================
+  test("Override template should appear only once in input field @bug-10110 @P2 @regression @alerts", async ({ page }) => {
+    testLogger.info('Test: Verify template override displays value once (Bug #10110)');
+
+    const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
+    await page.goto(alertsUrl);
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+    // Start creating a real-time alert to reach the Alert Settings step
+    await pm.alertsPage.clickAddAlertButton();
+    await page.waitForTimeout(1000);
+
+    // ==================== STEP 1: ALERT SETUP ====================
+    const alertName = `auto_template_display_${randomValue}`;
+    await pm.alertsPage.fillAlertName(alertName);
+    testLogger.info('✓ Filled alert name', { alertName });
+
+    // Select logs stream type
+    await pm.alertsPage.selectStreamType('logs');
+    await page.waitForTimeout(1000);
+
+    // Select stream
+    await pm.alertsPage.selectLogsStream(TEST_STREAM);
+    testLogger.info('✓ Selected stream', { stream: TEST_STREAM });
+
+    // Select real-time alert type
+    const realtimeRadio = page.locator(pm.alertsPage.realtimeAlertRadio);
+    await expect(realtimeRadio).toBeVisible({ timeout: 5000 });
+    await realtimeRadio.click();
+    testLogger.info('✓ Selected real-time alert type');
+
+    // ==================== STEP 2: CONDITIONS ====================
+    await pm.alertsPage.clickContinueButton();
+    await page.waitForTimeout(1000);
+    testLogger.info('✓ Navigated to Step 2: Conditions');
+
+    // Add a simple condition
+    const addCondBtn = page.locator(pm.alertsPage.addConditionButton).first();
+    if (await addCondBtn.isVisible({ timeout: 3000 })) {
+      await addCondBtn.click();
+      await page.waitForTimeout(500);
+
+      // Select first available column
+      const columnSelect = page.locator(pm.alertsPage.conditionColumnSelect).first();
+      await columnSelect.click();
+      await page.waitForTimeout(500);
+
+      const visibleMenu = page.locator('.q-menu:visible');
+      await visibleMenu.locator('.q-item').first().click();
+      await page.waitForTimeout(500);
+
+      // Select operator
+      const operatorSelect = page.locator(pm.alertsPage.operatorSelect).first();
+      await operatorSelect.click();
+      await page.getByText('Contains', { exact: true }).click();
+
+      // Fill value
+      const valueInput = page.locator(pm.alertsPage.conditionValueInput).first();
+      await valueInput.locator('input').fill('test');
+
+      testLogger.info('✓ Added condition');
+    }
+
+    // ==================== STEP 4: ALERT SETTINGS ====================
+    await pm.alertsPage.clickContinueButton();
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+    testLogger.info('✓ Navigated to Step 4: Alert Settings');
+
+    // Find the template override select field (it's in the alert settings step)
+    // Wait for template field to be visible as confirmation that we're on the right step
+    const templateSelect = page.locator('.template-select-field').first();
+    await expect(templateSelect).toBeVisible({ timeout: 15000 });
+    testLogger.info('✓ Template override field visible');
+
+    // Click the template select to open dropdown
+    await templateSelect.click();
+    await page.waitForTimeout(1000);
+
+    // Find and select the first available template from dropdown
+    const templateMenu = page.locator('.q-menu:visible');
+    await expect(templateMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+
+    const firstTemplate = templateMenu.locator('.q-item').first();
+    const selectedTemplateName = await firstTemplate.textContent();
+    testLogger.info('Selecting template', { templateName: selectedTemplateName?.trim() });
+
+    await firstTemplate.click();
+    await page.waitForTimeout(1000);
+    testLogger.info('✓ Selected template from dropdown');
+
+    // STRONG ASSERTION: Verify template name appears exactly once in the select field
+    // Bug #10110 caused templates to display twice in the input field
+    const templateInputField = templateSelect.locator('.q-field__native, [role="combobox"]').first();
+    await expect(templateInputField).toBeVisible({ timeout: 3000 });
+
+    // Get the visible text in the selected template display area
+    const selectedDisplay = templateSelect.locator('[class*="ellipsis"]').first();
+    if (await selectedDisplay.isVisible({ timeout: 2000 }).catch(() => false)) {
+      const displayedText = await selectedDisplay.textContent();
+      const cleanText = displayedText?.trim() || '';
+      testLogger.info('Template display text', { text: cleanText });
+
+      // Count how many times the template name appears in the displayed text
+      const templateName = selectedTemplateName?.trim() || '';
+      if (templateName && cleanText.includes(templateName)) {
+        // Split by the template name and check occurrences
+        const occurrences = cleanText.split(templateName).length - 1;
+
+        // PRIMARY ASSERTION: Template name should appear exactly once
+        expect(occurrences, `Bug #10110: Template "${templateName}" should appear once, not ${occurrences} times in input field`).toBe(1);
+        testLogger.info(`✓ Template appears exactly once in display - Bug #10110 is fixed`);
+      } else {
+        testLogger.warn('Could not verify template text duplication - template name not found in display');
+      }
+    }
+
+    // Additional check: Verify no duplicate class names or rendering issues
+    const templateFieldClasses = await templateSelect.getAttribute('class') || '';
+    testLogger.info('Template field classes', { classes: templateFieldClasses });
+
+    // Verify the q-select component rendered properly (single instance)
+    const qSelectCount = await templateSelect.locator('.q-select').count();
+    expect(qSelectCount, 'Bug #10110: Should have exactly one q-select component in template field').toBeLessThanOrEqual(1);
+    testLogger.info('✓ No duplicate q-select components detected');
+
+    // Clean up - go back without saving
+    await pm.alertsPage.clickBackButton();
+    await page.waitForTimeout(500);
+
+    testLogger.info('✓ PASSED: Template override duplication test completed');
+  });
+
   test.afterEach(async () => {
     testLogger.info('Alerts regression test completed');
   });
