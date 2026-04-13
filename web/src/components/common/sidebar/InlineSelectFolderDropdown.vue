@@ -1,0 +1,111 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div class="tw:flex tw:items-center tw:gap-1">
+    <q-select
+      :model-value="modelValue"
+      :options="folderOptions"
+      class="alert-v3-select"
+      :style="{ width }"
+      dense
+      borderless
+      behavior="menu"
+      input-debounce="0"
+      emit-value
+      map-options
+      @update:model-value="$emit('update:modelValue', $event)"
+    />
+    <q-btn
+      flat
+      dense
+      icon="add"
+      size="xs"
+      class="tw:rounded tw:shrink-0 add-folder-btn"
+      
+      title="Add Folder"
+      @click="showDialog = true"
+    />
+    <q-dialog
+      v-model="showDialog"
+      position="right"
+      full-height
+      maximized
+    >
+      <AddFolder
+        :type="type"
+        :edit-mode="false"
+        @update:modelValue="onFolderAdded"
+      />
+    </q-dialog>
+  </div>
+</template>
+
+<script lang="ts">
+import { defineComponent, ref, computed, onMounted } from "vue";
+import { useStore } from "vuex";
+import AddFolder from "./AddFolder.vue";
+import { getFoldersListByType } from "@/utils/commons";
+
+export default defineComponent({
+  name: "InlineSelectFolderDropdown",
+  components: { AddFolder },
+  emits: ["update:modelValue"],
+  props: {
+    modelValue: {
+      type: String,
+      default: "default",
+    },
+    type: {
+      type: String,
+      default: "alerts",
+    },
+    width: {
+      type: String,
+      default: "140px",
+    },
+  },
+  setup(props, { emit }) {
+    const store: any = useStore();
+    const showDialog = ref(false);
+
+    const folderOptions = computed(() =>
+      store.state.organizationData.foldersByType[props.type]?.map((f: any) => ({
+        label: f.name,
+        value: f.folderId,
+      })) ?? []
+    );
+
+    const onFolderAdded = (newFolder: any) => {
+      showDialog.value = false;
+      if (newFolder?.data?.folderId) {
+        emit("update:modelValue", newFolder.data.folderId);
+      }
+    };
+
+    onMounted(async () => {
+      await getFoldersListByType(store, props.type);
+    });
+
+    return {
+      store,
+      showDialog,
+      folderOptions,
+      onFolderAdded,
+    };
+  },
+});
+</script>
