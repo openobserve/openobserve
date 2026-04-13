@@ -400,8 +400,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Summary Card (standard alerts only) -->
-        <div v-if="!isAnomalyMode" class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
+        <!-- Summary Card -->
+        <div class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
           <div
             class="tw:flex tw:items-center tw:px-3 tw:h-[40px] tw:select-none tw:border-b tw:shrink-0"
             :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
@@ -409,7 +409,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:text-sm tw:font-medium">{{ t('alerts.summary.title') || 'Summary' }}</span>
           </div>
           <div class="tw:flex-1 tw:min-h-0" style="overflow: auto;">
+            <AnomalySummary
+              v-if="isAnomalyMode"
+              style="height: 100%; overflow: auto;"
+              :config="anomalyConfig"
+              :destinations="destinations"
+              :wizard-step="3"
+            />
             <alert-summary
+              v-else
               style="height: 100%;"
               :formData="formData"
               :destinations="destinations"
