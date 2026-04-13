@@ -307,7 +307,7 @@ test.describe("Streams Regression Bugs", () => {
     testLogger.info('PART 2: Checking Quick Mode field indicators from environment variables');
 
     // Clear any existing field search
-    const fieldSearchInput = page.locator('input[placeholder*="Search Field"], input[placeholder*="search"]').filter({ hasText: '' }).first();
+    const fieldSearchInput = page.locator('input[placeholder*="Search Field"], input[placeholder*="search"]').first();
     if (await fieldSearchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await fieldSearchInput.clear();
       await page.waitForTimeout(500);

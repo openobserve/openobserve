@@ -551,7 +551,8 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Find the template override select field (it's in the alert settings step)
     // Wait for template field to be visible as confirmation that we're on the right step
-    const templateSelect = page.locator('.template-select-field').first();
+    // Note: .template-select-field is a component class from AlertSettings.vue (no data-test attribute available)
+    const templateSelect = page.locator('q-select.template-select-field').first();
     await expect(templateSelect).toBeVisible({ timeout: 15000 });
     testLogger.info('✓ Template override field visible');
 
@@ -583,15 +584,17 @@ test.describe("Alerts Regression Bugs", () => {
     await expect(selectedDisplay, 'Bug #10110: Template display area must be visible to verify no duplication').toBeVisible({ timeout: 3000 });
 
     const displayedText = await selectedDisplay.textContent();
-    const cleanText = displayedText?.trim() || '';
-    testLogger.info('Template display text', { text: cleanText });
+    const cleanDisplayText = displayedText?.trim().replace(/\s+/g, ' ') || '';
+    testLogger.info('Template display text', { text: cleanDisplayText });
 
     // Template name must be non-empty to validate
-    const templateName = selectedTemplateName?.trim() || '';
+    // Normalize whitespace to handle extra spaces/newlines from .q-item
+    const templateName = selectedTemplateName?.trim().replace(/\s+/g, ' ') || '';
     expect(templateName, 'Bug #10110: Selected template name must be non-empty to verify duplication').toBeTruthy();
 
     // Count how many times the template name appears in the displayed text
-    const occurrences = cleanText.split(templateName).length - 1;
+    // Both strings are normalized (trimmed + collapsed whitespace) for accurate comparison
+    const occurrences = cleanDisplayText.split(templateName).length - 1;
 
     // PRIMARY ASSERTION: Template name should appear exactly once (UNCONDITIONAL)
     expect(occurrences, `Bug #10110: Template "${templateName}" should appear once, not ${occurrences} times in input field`).toBe(1);
@@ -601,10 +604,10 @@ test.describe("Alerts Regression Bugs", () => {
     const templateFieldClasses = await templateSelect.getAttribute('class') || '';
     testLogger.info('Template field classes', { classes: templateFieldClasses });
 
-    // Verify the q-select component rendered properly (single instance)
-    const qSelectCount = await templateSelect.locator('.q-select').count();
-    expect(qSelectCount, 'Bug #10110: Should have exactly one q-select component in template field').toBeLessThanOrEqual(1);
-    testLogger.info('✓ No duplicate q-select components detected');
+    // Verify no nested q-select components (templateSelect IS the q-select, so children count should be 0)
+    const nestedQSelectCount = await templateSelect.locator('.q-select').count();
+    expect(nestedQSelectCount, 'Bug #10110: Should have no nested q-select components (templateSelect is already the q-select)').toBe(0);
+    testLogger.info('✓ No nested/duplicate q-select components detected');
 
     // Clean up - go back without saving
     await pm.alertsPage.clickBackButton();

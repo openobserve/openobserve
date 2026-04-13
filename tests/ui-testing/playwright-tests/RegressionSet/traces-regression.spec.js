@@ -131,19 +131,6 @@ test.describe("Traces Regression Bugs", () => {
     // If no results, test will fail with meaningful error message
     expect(initialTraceCount, 'Bug #9043: Should have initial traces to test pagination (no trace results available for this time range)').toBeGreaterThan(0);
 
-    // Capture initial trace IDs by getting the text content of trace result items
-    // Trace results usually contain unique trace IDs or span information
-    const initialTraceItems = page.locator('[data-test="traces-search-result-item"]');
-    const initialTraceCount2 = await initialTraceItems.count();
-
-    const initialTraceData = [];
-    for (let i = 0; i < Math.min(initialTraceCount2, 10); i++) {
-      const traceItem = initialTraceItems.nth(i);
-      const traceText = await traceItem.textContent().catch(() => '');
-      initialTraceData.push(traceText);
-    }
-    testLogger.info(`Captured ${initialTraceData.length} initial trace identifiers`);
-
     // STEP 2: Click on first trace to open trace details
     await pm.tracesPage.clickFirstTraceResult();
     await page.waitForTimeout(2000);
