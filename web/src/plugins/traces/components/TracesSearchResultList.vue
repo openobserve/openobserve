@@ -227,6 +227,7 @@ import {
 } from "../../../utils/zincutils";
 import { useStore } from "vuex";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 
 interface Props {
   hits: any[];
@@ -290,7 +291,11 @@ const addSearchTerm = (
     const isOp = action === "include" ? "is" : "is not";
     searchObj.data.stream.addToFilter = `${field} ${isOp} null`;
   } else {
-    searchObj.data.stream.addToFilter = `${field} ${operator} '${String(fieldValue).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+    const displayValue =
+      field === "span_kind"
+        ? (SPAN_KIND_MAP[String(fieldValue)] ?? String(fieldValue))
+        : String(fieldValue);
+    searchObj.data.stream.addToFilter = `${field} ${operator} '${displayValue.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
   }
 };
 

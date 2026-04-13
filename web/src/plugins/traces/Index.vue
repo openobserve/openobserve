@@ -299,6 +299,7 @@ import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
@@ -665,6 +666,9 @@ function buildSearch() {
         whereClause = durationParseResult;
       }
 
+      // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
+      whereClause = parseSpanKindWhereClause(whereClause);
+
       whereClause = whereClause
         .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
         .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
@@ -871,6 +875,9 @@ async function getQueryData(
     if (typeof filterParseResult === "string") {
       filter = filterParseResult;
     }
+
+    // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
+    filter = parseSpanKindWhereClause(filter);
 
     const combinedFilter = filter;
 
