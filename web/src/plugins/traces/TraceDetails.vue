@@ -1205,7 +1205,7 @@ export default defineComponent({
         { label: "Waterfall", value: "waterfall" },
         { label: "Flame Graph", value: "flame-graph" },
         // { label: "Spans", value: "spans" },
-        { label: "Service Map", value: "map" },
+        { label: "Trace Graph", value: "map" },
       ];
       // Conditionally add DAG tab for LLM traces
       if (hasLLMSpans.value) {
