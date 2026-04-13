@@ -105,7 +105,12 @@ pub fn cors_layer() -> CorsLayer {
             let cfg = config::get_config();
             let web_url = cfg.common.web_url.trim_end_matches('/');
             // In dev/test when web_url is empty, fall back to permissive behaviour.
+            // Log a warning so misconfigured production deployments are visible.
             if web_url.is_empty() {
+                log::warn!(
+                    "ZO_WEB_URL is not configured — CORS is unrestricted. \
+                     Set ZO_WEB_URL to your frontend origin in production."
+                );
                 return true;
             }
             // Extract the origin (scheme://host[:port]) from web_url so that a

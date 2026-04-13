@@ -530,53 +530,76 @@ impl super::Db for SqliteDb {
 
         if with_prefix {
             if key1.is_empty() {
-                let sql = "DELETE FROM meta WHERE module = $1";
-                let sql = if let Some(dt) = start_dt {
-                    format!("{} AND start_dt = {}", sql, dt)
+                // module = $1 [, start_dt = $2]
+                if let Some(dt) = start_dt {
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND start_dt = $2")
+                        .bind(&module)
+                        .bind(dt)
+                        .execute(&*client)
+                        .await?;
                 } else {
-                    sql.to_string()
-                };
-                sqlx::query(&sql).bind(&module).execute(&*client).await?;
+                    sqlx::query("DELETE FROM meta WHERE module = $1")
+                        .bind(&module)
+                        .execute(&*client)
+                        .await?;
+                }
             } else if key2.is_empty() {
-                let sql = "DELETE FROM meta WHERE module = $1 AND key1 = $2";
-                let sql = if let Some(dt) = start_dt {
-                    format!("{} AND start_dt = {}", sql, dt)
-                } else {
-                    sql.to_string()
-                };
-                sqlx::query(&sql)
+                // module = $1, key1 = $2 [, start_dt = $3]
+                if let Some(dt) = start_dt {
+                    sqlx::query(
+                        "DELETE FROM meta WHERE module = $1 AND key1 = $2 AND start_dt = $3",
+                    )
                     .bind(&module)
                     .bind(&key1)
+                    .bind(dt)
                     .execute(&*client)
                     .await?;
-            } else {
-                let sql = "DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4)";
-                let sql = if let Some(dt) = start_dt {
-                    format!("{} AND start_dt = {}", sql, dt)
                 } else {
-                    sql.to_string()
-                };
-                sqlx::query(&sql)
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2")
+                        .bind(&module)
+                        .bind(&key1)
+                        .execute(&*client)
+                        .await?;
+                }
+            } else {
+                // module = $1, key1 = $2, key2 = $3, key2/% = $4 [, start_dt = $5]
+                if let Some(dt) = start_dt {
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4) AND start_dt = $5")
+                        .bind(&module)
+                        .bind(&key1)
+                        .bind(&key2)
+                        .bind(format!("{}/%", key2))
+                        .bind(dt)
+                        .execute(&*client)
+                        .await?;
+                } else {
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4)")
+                        .bind(&module)
+                        .bind(&key1)
+                        .bind(&key2)
+                        .bind(format!("{}/%", key2))
+                        .execute(&*client)
+                        .await?;
+                }
+            }
+        } else {
+            // module = $1, key1 = $2, key2 = $3 [, start_dt = $4]
+            if let Some(dt) = start_dt {
+                sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4")
                     .bind(&module)
                     .bind(&key1)
                     .bind(&key2)
-                    .bind(format!("{}/%", key2))
+                    .bind(dt)
+                    .execute(&*client)
+                    .await?;
+            } else {
+                sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3")
+                    .bind(&module)
+                    .bind(&key1)
+                    .bind(&key2)
                     .execute(&*client)
                     .await?;
             }
-        } else {
-            let sql = "DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3";
-            let sql = if let Some(dt) = start_dt {
-                format!("{} AND start_dt = {}", sql, dt)
-            } else {
-                sql.to_string()
-            };
-            sqlx::query(&sql)
-                .bind(&module)
-                .bind(&key1)
-                .bind(&key2)
-                .execute(&*client)
-                .await?;
         }
         Ok(())
     }

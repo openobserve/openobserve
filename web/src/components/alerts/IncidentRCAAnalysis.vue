@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="rca-stream-content"
         class="tw:text-sm tw:whitespace-pre-wrap rca-content"
-        v-html="DOMPurify.sanitize(formattedRcaContent)"
+        v-html="sanitize(formattedRcaContent)"
       />
     </div>
 
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="rca-existing-content"
         class="tw:text-sm tw:whitespace-pre-wrap rca-content"
-        v-html="DOMPurify.sanitize(formattedRcaContent)"
+        v-html="sanitize(formattedRcaContent)"
       />
     </div>
   </div>
@@ -113,8 +113,10 @@ export default defineComponent({
     },
   },
   emits: ['trigger-rca'],
-  data() {
-    return { DOMPurify };
+  methods: {
+    sanitize(html: string): string {
+      return DOMPurify.sanitize(html);
+    },
   },
 });
 </script>
