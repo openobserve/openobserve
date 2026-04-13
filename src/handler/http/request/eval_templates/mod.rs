@@ -18,10 +18,18 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-#[cfg(feature = "enterprise")]
-use infra::table::eval_templates as db_eval_templates;
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
+#[cfg(feature = "enterprise")]
+use {
+    crate::common::utils::auth::UserEmail,
+    crate::common::{
+        meta::authz::Authz,
+        utils::auth::{remove_ownership, set_ownership},
+    },
+    crate::handler::http::extractors::Headers,
+    infra::table::eval_templates as db_eval_templates,
+};
 
 use crate::common::meta::http::HttpResponse;
 
@@ -62,39 +70,72 @@ pub struct TemplateStats {
 }
 
 /// List all templates for an organization
-pub async fn list(Path(org_id): Path<String>) -> impl IntoResponse {
+pub async fn list(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> impl IntoResponse {
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::ai::evaluation::prompt_manager_singleton;
+        // Get list of permitted eval_template IDs for this user
+        let mut _permitted: Option<Vec<String>> = None;
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id,
+            &user_email.user_id,
+            "GET",
+            "eval_templates",
+        )
+        .await
+        {
+            Ok(list) => {
+                _permitted = list;
+            }
+            Err(e) => {
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(HttpResponse::error(403u16, e.to_string())),
+                )
+                    .into_response();
+            }
+        }
 
-        if let Some(manager) = prompt_manager_singleton::get() {
-            let templates = manager.get_templates_by_org(&org_id).await;
-            let response: Vec<TemplateResponse> = templates
-                .into_iter()
-                .map(|t| TemplateResponse {
-                    id: t.id,
-                    org_id: t.org_id,
-                    response_type: t.response_type,
-                    name: t.name,
-                    description: t.description,
-                    content: t.content,
-                    dimensions: t.dimensions,
-                    version: t.version,
-                    is_active: t.is_active,
-                    created_at: t.created_at,
-                    updated_at: t.updated_at,
-                })
-                .collect();
-            (StatusCode::OK, Json(response)).into_response()
-        } else {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(HttpResponse::error(
-                    500u16,
-                    "Template manager not initialized",
-                )),
-            )
-                .into_response()
+        match db_eval_templates::get_all_by_org(&org_id).await {
+            Ok(db_templates) => {
+                let response: Vec<TemplateResponse> = db_templates
+                    .into_iter()
+                    .filter(|t| match &_permitted {
+                        None => true,
+                        Some(permitted) => {
+                            permitted.contains(&format!("eval_templates:_all_{org_id}"))
+                                || permitted.contains(&format!("eval_templates:{}", t.id))
+                        }
+                    })
+                    .map(|t| TemplateResponse {
+                        id: t.id,
+                        org_id: t.org_id,
+                        response_type: t.response_type,
+                        name: t.name,
+                        description: t.description,
+                        content: t.content,
+                        dimensions: t.dimensions,
+                        version: t.version,
+                        is_active: t.is_active,
+                        created_at: t.created_at,
+                        updated_at: t.updated_at,
+                    })
+                    .collect();
+                (StatusCode::OK, Json(response)).into_response()
+            }
+            Err(e) => {
+                log::error!("Failed to list eval templates from database: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(HttpResponse::error(
+                        500u16,
+                        format!("Failed to list templates: {}", e),
+                    )),
+                )
+                    .into_response()
+            }
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -216,6 +257,23 @@ pub async fn create(
 
             match db_eval_templates::add(&db_template).await {
                 Ok(_) => {
+                    set_ownership(&org_id, "eval_templates", Authz::new(&template.id)).await;
+
+                    // super cluster sync
+                    if o2_enterprise::enterprise::common::config::get_config()
+                        .super_cluster
+                        .enabled
+                        && let Err(e) =
+                            o2_enterprise::enterprise::super_cluster::queue::eval_templates_put(
+                                db_template.clone(),
+                            )
+                            .await
+                    {
+                        log::error!(
+                            "[EvalTemplate] error triggering super cluster event to add eval template: {e}"
+                        );
+                    }
+
                     let response = TemplateResponse {
                         id: template.id,
                         org_id: template.org_id,
@@ -332,6 +390,20 @@ pub async fn update(
 
                     match db_eval_templates::update(&db_template).await {
                         Ok(_) => {
+                            // super cluster sync
+                            if o2_enterprise::enterprise::common::config::get_config()
+                                .super_cluster
+                                .enabled
+                                && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::eval_templates_update(
+                                    db_template.clone(),
+                                )
+                                .await
+                            {
+                                log::error!(
+                                    "[EvalTemplate] error triggering super cluster event to update eval template: {e}"
+                                );
+                            }
+
                             let response = TemplateResponse {
                                 id: template.id,
                                 org_id: template.org_id,
@@ -463,11 +535,33 @@ pub async fn delete(Path((org_id, template_id)): Path<(String, String)>) -> impl
 
                     // Delete from database
                     match db_eval_templates::delete(&template.id).await {
-                        Ok(_) => (
-                            StatusCode::OK,
-                            Json(serde_json::json!({"message": "Template deleted successfully"})),
-                        )
-                            .into_response(),
+                        Ok(_) => {
+                            remove_ownership(&org_id, "eval_templates", Authz::new(&template.id))
+                                .await;
+
+                            // super cluster sync
+                            if o2_enterprise::enterprise::common::config::get_config()
+                                .super_cluster
+                                .enabled
+                                && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::eval_templates_delete(
+                                    &org_id,
+                                    &template.id,
+                                )
+                                .await
+                            {
+                                log::error!(
+                                    "[EvalTemplate] error triggering super cluster event to delete eval template: {e}"
+                                );
+                            }
+
+                            (
+                                StatusCode::OK,
+                                Json(
+                                    serde_json::json!({"message": "Template deleted successfully"}),
+                                ),
+                            )
+                                .into_response()
+                        }
                         Err(e) => {
                             log::error!("Failed to delete template from database: {}", e);
                             (

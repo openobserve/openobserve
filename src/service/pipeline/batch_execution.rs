@@ -1478,6 +1478,28 @@ async fn process_node(
                         })),
                         #[cfg(not(feature = "cloud"))]
                         billing_fn: None,
+                        auth_fn: Some(std::sync::Arc::new(|org_id| {
+                            Box::pin(async move {
+                                match crate::service::organization::get_sre_agent_credentials(
+                                    &org_id,
+                                )
+                                .await
+                                {
+                                    Ok((email, token)) => {
+                                        crate::common::utils::auth::build_basic_auth_header(
+                                            &email, &token,
+                                        )
+                                    }
+                                    Err(e) => {
+                                        log::warn!(
+                                            "[LLM-EVAL] Failed to get SA credentials for org={}: {e}",
+                                            org_id
+                                        );
+                                        String::new()
+                                    }
+                                }
+                            })
+                        })),
                     };
 
                 tokio::spawn(async move {
