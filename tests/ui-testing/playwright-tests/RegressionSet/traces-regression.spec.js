@@ -171,7 +171,7 @@ test.describe("Traces Regression Bugs", () => {
     const afterBackTraceItems = page.locator('[data-test="traces-search-result-item"]');
     const afterBackCount = await afterBackTraceItems.count();
 
-    const afterBackTraceData = [];
+    let afterBackTraceData = [];
     for (let i = 0; i < Math.min(afterBackCount, 20); i++) {
       const traceItem = afterBackTraceItems.nth(i);
 
