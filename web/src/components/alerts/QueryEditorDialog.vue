@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:h-full tw:w-full tw:flex tw:flex-col">
           <!-- Header -->
           <div class="dialog-topbar" :class="store.state.theme === 'dark' ? 'dialog-topbar--dark' : 'dialog-topbar--light'">
-            <!-- Left: back + title -->
+            <!-- Left: back + title + stream info -->
             <div class="tw:flex tw:items-center tw:gap-2.5">
               <div
                 data-test="add-alert-back-btn"
@@ -45,21 +45,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="arrow_back_ios_new" size="9px" />
               </div>
               <span class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">{{ t('alerts.addConditions') }}</span>
-            </div>
 
-            <!-- Right: stream info + AI -->
-            <div class="tw:flex tw:items-center tw:gap-3">
-              <!-- Stream type + stream name -->
+              <!-- Separator -->
+              <div class="tw:w-px tw:h-4 tw:opacity-30" :class="store.state.theme === 'dark' ? 'tw:bg-gray-400' : 'tw:bg-gray-500'" />
+
+              <!-- Stream Type + Stream Name -->
               <div class="tw:flex tw:items-center tw:gap-2">
-                <!-- Stream Type -->
                 <div v-if="streamType" class="topbar-info-chip" :class="store.state.theme === 'dark' ? 'topbar-info-chip--type-dark' : 'topbar-info-chip--type-light'">
                   <span class="topbar-info-chip__label">Stream Type</span>
                   <span class="topbar-info-chip__sep">:</span>
                   <span class="topbar-info-chip__value">{{ streamType }}</span>
                 </div>
-                <!-- Divider -->
                 <span v-if="streamType && streamName" class="tw:opacity-20 tw:select-none">|</span>
-                <!-- Stream Name -->
                 <div class="topbar-info-chip" :class="store.state.theme === 'dark' ? 'topbar-info-chip--name-dark' : 'topbar-info-chip--name-light'">
                   <span class="topbar-info-chip__label">Stream Name</span>
                   <span class="topbar-info-chip__sep">:</span>
@@ -67,6 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span v-else class="topbar-info-chip__value tw:opacity-40 tw:italic">none</span>
                 </div>
               </div>
+            </div>
+
+            <!-- Right: AI -->
+            <div class="tw:flex tw:items-center tw:gap-3">
 
               <!-- AI button -->
               <q-btn
@@ -103,10 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Input Section (40%) -->
-            <div class="tw:flex tw:w-full">
-              <div ref="editorsColumnRef" class="tw:flex tw:w-full tw:flex-col tw:h-full tw:gap-y-2">
+            <div class="tw:flex tw:w-full tw:h-full tw:min-h-0 tw:overflow-y-auto">
+              <div ref="editorsColumnRef" class="tw:flex tw:w-full tw:flex-col tw:min-h-full tw:gap-y-2">
                 <!-- SQL/PromQL Editor Pane + Status Bar wrapper -->
-                <div class="tw:flex-[3] tw:w-full tw:flex tw:flex-col tw:overflow-visible">
+                <div class="tw:flex-[3] tw:w-full tw:flex tw:flex-col tw:overflow-visible" style="min-height: 220px;">
                   <!-- Editor Pane (no overflow:hidden bottom clip issue for status bar) -->
                   <div
                     class="tw:flex-1 tw:w-full tw:flex tw:flex-col tw:overflow-hidden editor-pane"
@@ -140,7 +141,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :disable="localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''"
                           @click="localTab === 'sql' ? runSqlQuery() : runPromqlQuery()"
                         >
-                          <q-icon name="play_arrow" size="16px" class="tw:mr-1" />
                           <span class="tw:text-xs tw:font-semibold">{{ t('alerts.runQuery') }}</span>
                         </q-btn>
                       </div>
@@ -214,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     store.state.theme === 'dark' ? 'editor-pane--dark' : 'editor-pane--light',
                     sqlEditorMaximized ? 'tw:flex-none' : 'tw:flex-[2]'
                   ]"
+                  :style="sqlEditorMaximized ? '' : 'min-height: 160px;'"
                 >
                   <!-- Pane Header -->
                   <div
@@ -264,7 +265,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disable="vrlFunctionContent == ''"
                         @click="runTestFunction"
                       >
-                        <q-icon name="auto_fix_high" size="14px" class="tw:mr-1" />
                         <span class="tw:text-xs tw:font-semibold">{{ t('alerts.applyVRL') }}</span>
                       </q-btn>
                     </div>
@@ -274,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div v-if="!sqlEditorMaximized && vrlContentMounted" class="tw:flex-1 tw:min-h-0 tw:relative">
                     <unified-query-editor
                       data-test="scheduled-alert-vrl-function-editor"
+                      data-test-prefix="alert-dialog-vrl"
                       ref="fnEditorRef"
                       :languages="['vrl']"
                       :default-language="'vrl'"
@@ -304,12 +305,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Output Section (35%) -->
-            <div class="tw:flex tw:flex-col tw:h-full tw:gap-y-2 tw:overflow-hidden">
+            <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:gap-y-2 tw:overflow-y-auto">
 
               <!-- Query Result Pane -->
               <div
                 class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden editor-pane"
                 :class="store.state.theme === 'dark' ? 'editor-pane--dark' : 'editor-pane--light'"
+                style="min-height: 220px;"
               >
                 <!-- Pane Header -->
                 <div class="editor-pane-header" :class="store.state.theme === 'dark' ? 'editor-pane-header--dark' : 'editor-pane-header--light'">
@@ -360,6 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="localTab !== 'promql'"
                 class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden editor-pane"
                 :class="store.state.theme === 'dark' ? 'editor-pane--dark' : 'editor-pane--light'"
+                style="min-height: 200px;"
               >
                 <!-- Pane Header -->
                 <div class="editor-pane-header" :class="store.state.theme === 'dark' ? 'editor-pane-header--dark' : 'editor-pane-header--light'">
