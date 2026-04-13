@@ -556,9 +556,7 @@ export default class LogsVisualise {
     // scrollIntoViewIfNeeded + dispatchEvent bypasses viewport bounds (CI) and Quasar backdrop.
     await this.newDashboardBtn.waitFor({ state: "visible", timeout: 10000 });
     await this.newDashboardBtn.scrollIntoViewIfNeeded();
-    await this.page.waitForTimeout(300);
     await this.newDashboardBtn.dispatchEvent('click');
-    await this.page.waitForTimeout(1000);
 
     // The "New Dashboard" dialog attaches but may be behind the outer dialog backdrop (not visible).
     // Use state:"attached" to detect DOM presence, then fill via evaluate to bypass visibility.
@@ -578,7 +576,7 @@ export default class LogsVisualise {
     await this.dashboardSubmitBtn.dispatchEvent('click');
 
     // Wait for the new dashboard dialog to close
-    await this.dashboardNameInput.waitFor({ state: "detached", timeout: 10000 }).catch(() => {});
+    await this.dashboardNameInput.waitFor({ state: "detached", timeout: 10000 });
     await this.page.waitForTimeout(1000);
 
     // metrics-new-dashboard-panel-title IS a direct <input> element (not a q-input wrapper)
@@ -592,7 +590,7 @@ export default class LogsVisualise {
         return btn && !btn.hasAttribute('disabled') && !btn.classList.contains('disabled');
       },
       { timeout: 10000 }
-    ).catch(() => {});
+    );
 
     await this.updateSettingsBtn.dispatchEvent('click');
   }

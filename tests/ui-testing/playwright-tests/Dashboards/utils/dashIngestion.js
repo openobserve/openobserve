@@ -13,12 +13,6 @@ const removeUTFCharacters = (text) => {
   return text.replace(/[^\x00-\x7F]/g, " ");
 };
 
-// Function to retrieve authentication token — cloud-aware (email:passcode on cloud, email:password on self-hosted)
-const getAuthToken = async () => {
-  const headers = getAuthHeaders();
-  return headers['Authorization'];
-};
-
 // page is passed here to access the page object (currently not used)
 export const ingestion = async (page, streamName = "e2e_automate") => {
   if (!process.env["INGESTION_URL"]) {
@@ -146,4 +140,4 @@ const ingestionForSankey = async (streamName = "sankey_data") => {
 };
 
 // Export only the required functions
-export { ingestionForMaps, ingestionForDashboardChartJson, ingestionForSankey, getAuthToken, removeUTFCharacters };
+export { ingestionForMaps, ingestionForDashboardChartJson, ingestionForSankey, removeUTFCharacters };
