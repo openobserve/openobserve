@@ -203,12 +203,13 @@ test.describe("Traces Regression Bugs", () => {
       const traceIdMatch = itemHTML.match(/trace[_-]?id["\s:=]+([a-f0-9]{16,64})/i);
       const traceId = traceIdMatch ? traceIdMatch[1] : null;
 
-      // Fallback: use combination of index + text content for comparison
+      // Fallback: use text content for comparison
       const traceText = await traceItem.textContent().catch(() => '');
       const cleanText = traceText.trim();
 
-      // Create a more robust identifier: use trace ID if available, otherwise position + text hash
-      const identifier = traceId || `${i}:${cleanText.substring(0, 100)}`;
+      // Create identifier: use trace ID if available, otherwise text content
+      // NOTE: Text-based comparison may produce false positives if different traces have identical visible text
+      const identifier = traceId || cleanText.substring(0, 100);
 
       afterBackTraceData.push({ index: i, id: identifier, text: cleanText.substring(0, 100) });
     }
