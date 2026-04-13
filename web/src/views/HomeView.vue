@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!no_data_ingest && !isLoadingSummary" class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container" :class="store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 40px)]' : 'tw:h-full'" style="display: flex; flex-direction: column; ">
         <!-- 1st section -->
          <div>
+          <WebinarBanner v-if="config.isCloud === 'true'" variant="home" />
           <TrialPeriod></TrialPeriod>
          </div>
           <LicensePeriod @update-license="goToLicensePage"></LicensePeriod>
@@ -431,6 +432,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vue";
+import WebinarBanner from "@/components/WebinarBanner.vue";
 import { useRouter } from "vue-router";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import store from "@/test/unit/helpers/store";
@@ -918,6 +920,7 @@ export default defineComponent({
     LicensePeriod,
     DatabaseDeprecationBanner,
     HomeViewSkeleton,
+    WebinarBanner,
   },
 });
 </script>
