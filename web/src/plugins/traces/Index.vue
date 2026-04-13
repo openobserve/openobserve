@@ -203,8 +203,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="traces-search-error-text"
                     class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
-                    <q-icon name="info" color="primary" size="md" />
-                    {{ searchObj.data.errorMsg }}
+                    <SanitizedHtmlRenderer
+                      data-test="traces-search-detail-error-message"
+                      :htmlContent="searchObj?.data?.errorMsg"
+                      class="tw:pt-[1rem]"
+                    />
                   </div>
                   <div
                     v-else-if="!isStreamSelected"
@@ -1024,7 +1027,8 @@ async function getQueryData(
           const errData = err?.content || err;
           const { message, trace_id, code, error_detail } = errData ?? {};
 
-          let errorMsg = message || err?.message || "Search request failed";
+          let errorMsg =
+            message || err?.message || "Error while processing request";
           if (code) {
             searchObj.data.errorCode = code;
             const customMessage = logsErrorMessage(code);
