@@ -279,7 +279,12 @@ const emit = defineEmits<{
   "send-to-ai-chat": [value: string];
 }>();
 
-const copyToClipboard = (value: any) => qCopyToClipboard(String(value));
+const copyToClipboard = (field: string, value: any) =>
+  qCopyToClipboard(
+    field === "span_kind"
+      ? (SPAN_KIND_MAP[String(value)] ?? String(value))
+      : String(value),
+  );
 
 const addSearchTerm = (
   field: string,
