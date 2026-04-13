@@ -706,43 +706,16 @@ impl super::Db for SqliteDb {
         }
 
         let (min_dt, max_dt) = start_dt.unwrap();
-        let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql =
-            "SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1".to_string();
-        let mut params = Vec::new();
-
-        if !module.is_empty() {
-            sql.push_str(" AND module = $1");
-            params.push(module);
-        }
-        if !key1.is_empty() {
-            sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
-            params.push(key1);
-        }
-        if !key2.is_empty() {
-            sql.push_str(&format!(
-                " AND (key2 = ${} OR key2 LIKE ${})",
-                params.len() + 1,
-                params.len() + 2
-            ));
-            let key2_prefix = format!("{}/%", key2);
-            params.push(key2);
-            params.push(key2_prefix);
-        }
-        sql.push_str(&format!(
-            " AND start_dt >= ${} AND start_dt <= ${}",
-            params.len() + 1,
-            params.len() + 2
-        ));
-        params.push(min_dt.to_string());
-        params.push(max_dt.to_string());
-        sql.push_str(" ORDER BY start_dt ASC");
+        let (sql, str_params) = build_list_by_start_dt_sql(prefix, min_dt, max_dt);
 
         let pool = CLIENT_RO.clone();
         let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
-        for p in params {
+        for p in str_params {
             query = query.bind(p);
         }
+        // Bind min_dt / max_dt as i64 so SQLite receives them as INTEGER, not TEXT.
+        query = query.bind(min_dt);
+        query = query.bind(max_dt);
         let ret = query.fetch_all(&pool).await?;
         Ok(ret
             .into_iter()
@@ -967,6 +940,57 @@ pub async fn drop_column(client: &Pool<Sqlite>, table: &str, column: &str) -> Re
         sqlx::query(&alter_sql).execute(client).await?;
     }
     Ok(())
+}
+
+/// Builds the SQL string and string-typed bind parameters for `list_values_by_start_dt`.
+///
+/// Returns `(sql, str_params)` where `str_params` contains the string-typed positional
+/// parameters (module / key1 / key2). The caller must then bind `min_dt` and `max_dt`
+/// as `i64` **after** the string params so that the database receives them as INTEGER,
+/// not TEXT.
+///
+/// Keeping this logic in a standalone function makes the SQL generation unit-testable
+/// without requiring a live database connection.
+pub(crate) fn build_list_by_start_dt_sql(
+    prefix: &str,
+    min_dt: i64,
+    max_dt: i64,
+) -> (String, Vec<String>) {
+    let (module, key1, key2) = super::parse_key(prefix);
+    let mut sql =
+        "SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1".to_string();
+    let mut params: Vec<String> = Vec::new();
+
+    if !module.is_empty() {
+        sql.push_str(" AND module = $1");
+        params.push(module);
+    }
+    if !key1.is_empty() {
+        sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+        params.push(key1);
+    }
+    if !key2.is_empty() {
+        sql.push_str(&format!(
+            " AND (key2 = ${} OR key2 LIKE ${})",
+            params.len() + 1,
+            params.len() + 2
+        ));
+        let key2_prefix = format!("{key2}/%");
+        params.push(key2);
+        params.push(key2_prefix);
+    }
+    // min_dt / max_dt are intentionally NOT pushed into params here.
+    // The caller binds them as i64 after the string-params loop.
+    let n = params.len();
+    sql.push_str(&format!(
+        " AND start_dt >= ${} AND start_dt <= ${}",
+        n + 1,
+        n + 2
+    ));
+    let _ = (min_dt, max_dt);
+    sql.push_str(" ORDER BY start_dt ASC");
+
+    (sql, params)
 }
 
 #[cfg(test)]
@@ -1258,5 +1282,81 @@ mod tests {
         assert_eq!(module, "module");
         assert_eq!(k1, "key1");
         assert!(k2.starts_with("key2"));
+    }
+
+    // ── build_list_by_start_dt_sql unit tests ─────────────────────────────────
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_full_prefix() {
+        let (sql, params) = build_list_by_start_dt_sql("/module/key1/key2", 100, 200);
+        assert_eq!(params.len(), 4);
+        assert_eq!(params[0], "module");
+        assert_eq!(params[1], "key1");
+        assert_eq!(params[2], "key2");
+        assert_eq!(params[3], "key2/%");
+        assert!(sql.contains("AND module = $1"), "module param missing: {sql}");
+        assert!(sql.contains("AND key1 = $2"), "key1 param missing: {sql}");
+        assert!(
+            sql.contains("AND (key2 = $3 OR key2 LIKE $4)"),
+            "key2 param missing: {sql}"
+        );
+        assert!(
+            sql.contains("AND start_dt >= $5 AND start_dt <= $6"),
+            "start_dt bounds wrong: {sql}"
+        );
+        assert!(sql.ends_with("ORDER BY start_dt ASC"), "missing ORDER BY: {sql}");
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_module_only() {
+        let (sql, params) = build_list_by_start_dt_sql("/module", 1, 999);
+        assert_eq!(params.len(), 1);
+        assert_eq!(params[0], "module");
+        assert!(sql.contains("AND module = $1"));
+        assert!(
+            sql.contains("AND start_dt >= $2 AND start_dt <= $3"),
+            "start_dt bounds wrong: {sql}"
+        );
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_module_and_key1() {
+        let (sql, params) = build_list_by_start_dt_sql("/module/key1", 10, 20);
+        assert_eq!(params.len(), 2);
+        assert_eq!(params[0], "module");
+        assert_eq!(params[1], "key1");
+        assert!(sql.contains("AND module = $1"));
+        assert!(sql.contains("AND key1 = $2"));
+        assert!(
+            sql.contains("AND start_dt >= $3 AND start_dt <= $4"),
+            "start_dt bounds wrong: {sql}"
+        );
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_empty_prefix() {
+        let (sql, params) = build_list_by_start_dt_sql("", 0, 9999);
+        assert!(params.is_empty());
+        assert!(
+            sql.contains("AND start_dt >= $1 AND start_dt <= $2"),
+            "start_dt bounds wrong for empty prefix: {sql}"
+        );
+        assert!(sql.contains("WHERE 1=1"));
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_key2_prefix_pattern() {
+        let (sql, params) = build_list_by_start_dt_sql("/m/k1/k2", 0, 0);
+        assert_eq!(params[3], "k2/%");
+        assert!(sql.contains("OR key2 LIKE $4"));
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_starts_with_base_select() {
+        let (sql, _) = build_list_by_start_dt_sql("/m/k1/k2", 1, 2);
+        assert!(
+            sql.starts_with("SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1"),
+            "unexpected SQL start: {sql}"
+        );
     }
 }
