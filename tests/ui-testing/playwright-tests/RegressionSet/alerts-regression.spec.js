@@ -551,8 +551,8 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Find the template override select field (it's in the alert settings step)
     // Wait for template field to be visible as confirmation that we're on the right step
-    // Note: .template-select-field is a component class from AlertSettings.vue (no data-test attribute available)
-    const templateSelect = page.locator('q-select.template-select-field').first();
+    // Note: Quasar renders <q-select> as <div> in DOM, so use class-only selector
+    const templateSelect = page.locator('.q-select.template-select-field').first();
     await expect(templateSelect).toBeVisible({ timeout: 15000 });
     testLogger.info('✓ Template override field visible');
 

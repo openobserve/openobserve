@@ -328,7 +328,6 @@ test.describe("Streams Regression Bugs", () => {
       testLogger.warn('No quick mode icons found - test cannot validate Bug #7671 Point #2 without env configuration');
       testLogger.info('Skipping quick mode icon validation - requires default_quick_mode_fields env variable to be configured');
       test.skip(true, 'Quick mode icons require default_quick_mode_fields env variable configuration');
-      return;
     }
 
     testLogger.info(`✓ Quick mode field indicators visible: ${quickModeIconCount} icon(s) found`);
