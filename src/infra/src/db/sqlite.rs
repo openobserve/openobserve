@@ -957,8 +957,7 @@ pub(crate) fn build_list_by_start_dt_sql(
     max_dt: i64,
 ) -> (String, Vec<String>) {
     let (module, key1, key2) = super::parse_key(prefix);
-    let mut sql =
-        "SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1".to_string();
+    let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1".to_string();
     let mut params: Vec<String> = Vec::new();
 
     if !module.is_empty() {
@@ -1294,7 +1293,10 @@ mod tests {
         assert_eq!(params[1], "key1");
         assert_eq!(params[2], "key2");
         assert_eq!(params[3], "key2/%");
-        assert!(sql.contains("AND module = $1"), "module param missing: {sql}");
+        assert!(
+            sql.contains("AND module = $1"),
+            "module param missing: {sql}"
+        );
         assert!(sql.contains("AND key1 = $2"), "key1 param missing: {sql}");
         assert!(
             sql.contains("AND (key2 = $3 OR key2 LIKE $4)"),
@@ -1304,7 +1306,10 @@ mod tests {
             sql.contains("AND start_dt >= $5 AND start_dt <= $6"),
             "start_dt bounds wrong: {sql}"
         );
-        assert!(sql.ends_with("ORDER BY start_dt ASC"), "missing ORDER BY: {sql}");
+        assert!(
+            sql.ends_with("ORDER BY start_dt ASC"),
+            "missing ORDER BY: {sql}"
+        );
     }
 
     #[test]

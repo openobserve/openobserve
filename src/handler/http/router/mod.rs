@@ -114,10 +114,10 @@ pub fn cors_layer() -> CorsLayer {
 ///
 /// Rules:
 /// - If `web_url` is empty (dev / unconfigured), allow all origins and log a warning.
-/// - Extract the `scheme://host[:port]` portion of `web_url`, ignoring any path
-///   component, because the `Origin` header per RFC 6454 never carries a path.
-/// - Perform a byte-exact comparison — no prefix-match that could be bypassed by
-///   `https://app.example.com.evil.com` when `web_url=https://app.example.com`.
+/// - Extract the `scheme://host[:port]` portion of `web_url`, ignoring any path component, because
+///   the `Origin` header per RFC 6454 never carries a path.
+/// - Perform a byte-exact comparison — no prefix-match that could be bypassed by `https://app.example.com.evil.com`
+///   when `web_url=https://app.example.com`.
 /// - If `web_url` is malformed (no `://`), deny the request.
 pub(crate) fn is_origin_allowed(request_origin: &[u8], web_url: &str) -> bool {
     if web_url.is_empty() {
@@ -1214,7 +1214,10 @@ mod tests {
     #[test]
     fn test_cors_malformed_web_url_denied() {
         // web_url without "://" is malformed — should deny
-        assert!(!is_origin_allowed(b"https://app.example.com", "app.example.com"));
+        assert!(!is_origin_allowed(
+            b"https://app.example.com",
+            "app.example.com"
+        ));
     }
 
     #[test]
