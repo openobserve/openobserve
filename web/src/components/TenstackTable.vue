@@ -636,6 +636,14 @@ const props = defineProps({
     type: Number as PropType<number>,
     default: 22,
   },
+  /** External scroll container for the virtualizer.
+   *  When provided, the virtualizer watches this element instead of its own root div.
+   *  Use this when TenstackTable sits inside a non-scrolling wrapper and the actual
+   *  overflow-y: auto ancestor is further up the DOM (e.g. traces unified scroll). */
+  scrollEl: {
+    type: Object,
+    default: null,
+  },
   // ── Feature flags (all default true → current logs behavior unchanged) ──
   /** Show VueDraggable column reorder in header. Default: true */
   enableColumnReorder: {
@@ -956,7 +964,7 @@ const expandedRowHeights = ref<{ [key: number]: number }>({});
 const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
-    getScrollElement: () => parentRef.value,
+    getScrollElement: () => (props.scrollEl as any) ?? parentRef.value,
     estimateSize: (index: number) => {
       // Fixed row height mode (e.g. traces table)
       if (props.rowHeight) return props.rowHeight;

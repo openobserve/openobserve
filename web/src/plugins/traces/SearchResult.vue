@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Combined scroll area: RED metrics + trace list scroll together -->
-      <div class="tw:flex-1 tw:overflow-y-auto">
+      <div ref="outerScrollRef" class="tw:flex-1 tw:overflow-y-auto">
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <transition
           enter-active-class="transition-all duration-300 ease-in-out"
@@ -147,6 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-by="searchObj.meta.resultGrid.sortBy"
           :sort-order="searchObj.meta.resultGrid.sortOrder"
           :search-mode="searchObj.meta.searchMode"
+          :scroll-el="outerScrollRef"
           @row-click="expandRowDetail"
           @page-change="changePage"
           @rows-per-page-change="changeRowsPerPage"
@@ -213,6 +214,7 @@ export default defineComponent({
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();
     const metricsDashboardRef: any = ref(null);
+    const outerScrollRef = ref<any>(null);
 
     const expandRowDetail = (props: any) => {
       let from: number;
@@ -325,6 +327,7 @@ export default defineComponent({
       searchObj,
       updatedLocalLogFilterField,
       metricsDashboardRef,
+      outerScrollRef,
       expandRowDetail,
       onMetricsTimeRangeSelected,
       onMetricsFiltersUpdated,

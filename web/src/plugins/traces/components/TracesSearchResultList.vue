@@ -34,10 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="traces-table-wrapper"
       class="column tw:h-auto! tw:flex-1 tw:min-h-0"
     >
-      <!-- Table scroll area -->
+      <!-- Table scroll area: overflow is handled by the outer scroll container in SearchResult.vue -->
       <div
         data-test="traces-search-result-list"
-        class="tw:w-full tw:h-auto! tw:flex-1 tw:overflow-y-auto tw:overflow-x-auto tw:relative"
+        class="tw:w-full tw:h-auto! tw:flex-1 tw:relative"
       >
         <TenstackTable
           class="tw:h-auto!"
@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-order="props.sortOrder"
           :sort-field-map="{ timestamp: 'start_time', duration: 'duration' }"
           :row-height="28"
+          :scroll-el="scrollEl"
           :enable-column-reorder="true"
           :enable-row-expand="false"
           :enable-text-highlight="false"
@@ -251,6 +252,9 @@ interface Props {
   sortOrder?: "asc" | "desc";
   /** Current search mode */
   searchMode?: TraceSearchMode;
+  /** External scroll container element forwarded to TenstackTable's virtualizer.
+   *  Should point to the nearest overflow-y: auto ancestor in SearchResult.vue. */
+  scrollEl?: object | null;
 }
 
 const { t } = useI18n();
@@ -267,6 +271,7 @@ const props = withDefaults(defineProps<Props>(), {
   sortBy: undefined,
   sortOrder: undefined,
   searchMode: "traces",
+  scrollEl: null,
 });
 
 const emit = defineEmits<{
