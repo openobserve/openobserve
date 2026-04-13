@@ -15,88 +15,170 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Header variant: single button; hover shows interactive popover -->
+  <!-- Header variant -->
   <div
     v-if="webinarData && !isExpired && variant === 'header'"
-    class="webinar-btn-wrap"
-    @mouseenter="openMenu"
-    @mouseleave="scheduleClose"
+    class="webinar-header-wrap"
     data-test="webinar-header-banner"
   >
-    <q-btn
-      no-caps
-      dense
-      size="sm"
-      color="secondary"
-      class="webinar-register-btn"
-      :href="webinarData.primaryButton?.link"
-      target="_blank"
-      rel="noopener noreferrer"
-      data-test="webinar-header-register-btn"
-    >
-      <q-icon name="videocam" size="0.9rem" class="q-mr-xs" />
-      {{ webinarData.tag }}
-    </q-btn>
-
-    <!-- Hover popover — stays open while cursor is inside -->
-    <div
-      v-if="menuOpen"
-      class="webinar-popover"
-      @mouseenter="cancelClose"
-      @mouseleave="scheduleClose"
-    >
-      <div class="webinar-popover-title">{{ webinarData.title }}</div>
-      <div v-if="webinarData.date" class="webinar-popover-date">
-        <q-icon name="event" size="0.8rem" class="q-mr-xs" />{{ formattedDate }}
+    <!-- Expanded: marquee + Register + Close -->
+    <div v-if="!collapsed" class="webinar-marquee-wrap" data-test="webinar-marquee-wrap">
+      <!-- Marquee container -->
+      <div class="webinar-marquee-outer">
+        <div
+          class="webinar-marquee-inner"
+          :style="{ animationDuration: `${marqueeSpeed}s` }"
+          @animationiteration="onIteration"
+        >
+          <span class="webinar-marquee-tag">{{ webinarData.tag }}</span>
+          <span class="webinar-marquee-title">{{ webinarData.title }}</span>
+          <span v-if="webinarData.date" class="webinar-marquee-date">
+            <q-icon name="schedule" size="0.7rem" class="q-mr-xs" />{{
+              formattedDate
+            }}
+          </span>
+          <!-- Spacer so text doesn't abruptly loop -->
+          <span class="webinar-marquee-sep" aria-hidden="true">·</span>
+          <span class="webinar-marquee-tag">{{ webinarData.tag }}</span>
+          <span class="webinar-marquee-title">{{ webinarData.title }}</span>
+          <span v-if="webinarData.date" class="webinar-marquee-date">
+            <q-icon name="schedule" size="0.7rem" class="q-mr-xs" />{{
+              formattedDate
+            }}
+          </span>
+          <span class="webinar-marquee-sep" aria-hidden="true">·</span>
+        </div>
       </div>
+
+      <!-- Register button -->
       <q-btn
         v-if="webinarData.primaryButton"
         no-caps
-        color="secondary"
+        dense
         size="sm"
-        class="webinar-popover-btn"
+        color="secondary"
+        class="webinar-action-btn q-ml-xs"
         :href="webinarData.primaryButton.link"
         target="_blank"
         rel="noopener noreferrer"
-        data-test="webinar-popover-register-link"
+        data-test="webinar-marquee-register-btn"
       >
         {{ webinarData.primaryButton.text }}
-        <q-icon name="arrow_forward" size="0.8rem" class="q-ml-xs" />
+        <q-icon name="arrow_forward" size="0.75rem" class="q-ml-xs" />
       </q-btn>
+
+      <!-- Close — collapses to compact button -->
+      <q-btn
+        flat
+        dense
+        round
+        icon="close"
+        class="webinar-close-btn q-ml-xs"
+        @click="collapse"
+        data-test="webinar-marquee-close-btn"
+      >
+        <q-tooltip anchor="top middle" self="bottom middle">Minimize</q-tooltip>
+      </q-btn>
+    </div>
+
+    <!-- Collapsed: compact button with hover popover (existing behaviour) -->
+    <div
+      v-else
+      class="webinar-btn-wrap"
+      @mouseenter="openMenu"
+      @mouseleave="scheduleClose"
+      data-test="webinar-compact-wrap"
+    >
+      <q-btn
+        no-caps
+        dense
+        size="sm"
+        color="secondary"
+        class="webinar-register-btn"
+        :href="webinarData.primaryButton?.link"
+        target="_blank"
+        rel="noopener noreferrer"
+        data-test="webinar-header-register-btn"
+      >
+        <q-icon name="videocam" size="0.9rem" class="q-mr-xs" />
+        {{ webinarData.tag }}
+      </q-btn>
+
+      <!-- Hover popover -->
+      <div
+        v-if="menuOpen"
+        class="webinar-popover"
+        @mouseenter="cancelClose"
+        @mouseleave="scheduleClose"
+      >
+        <div class="webinar-popover-title">{{ webinarData.title }}</div>
+        <div v-if="webinarData.date" class="webinar-popover-date">
+          <q-icon name="event" size="0.8rem" class="q-mr-xs" />{{ formattedDate }}
+        </div>
+        <q-btn
+          v-if="webinarData.primaryButton"
+          no-caps
+          color="secondary"
+          size="sm"
+          class="webinar-popover-btn"
+          :href="webinarData.primaryButton.link"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-test="webinar-popover-register-link"
+        >
+          {{ webinarData.primaryButton.text }}
+          <q-icon name="arrow_forward" size="0.8rem" class="q-ml-xs" />
+        </q-btn>
+      </div>
     </div>
   </div>
 
   <!-- Home variant: larger banner -->
   <div
     v-else-if="webinarData && !isExpired && variant === 'home'"
-    class="webinar-home-banner q-mb-md row items-center justify-between"
+    class="webinar-home-banner q-mb-md"
     data-test="webinar-home-banner"
   >
-    <div class="row items-center no-wrap tw:gap-3">
-      <span class="webinar-home-tag">{{ webinarData.tag }}</span>
-      <div class="column">
-        <span class="webinar-home-title">{{ webinarData.title }}</span>
-        <span v-if="webinarData.date" class="webinar-home-date">{{ formattedDate }}</span>
+    <!-- Decorative blobs -->
+    <div class="webinar-home-blob webinar-home-blob--1" aria-hidden="true" />
+    <div class="webinar-home-blob webinar-home-blob--2" aria-hidden="true" />
+
+    <!-- Content row -->
+    <div class="webinar-home-content">
+      <div class="webinar-home-left">
+        <!-- Live badge -->
+        <div class="webinar-home-badge">
+          <span class="webinar-home-badge-dot" />
+          {{ webinarData.tag }}
+        </div>
+
+        <div class="webinar-home-title">{{ webinarData.title }}</div>
+
+        <div v-if="webinarData.date" class="webinar-home-meta">
+          <q-icon name="schedule" size="0.875rem" />
+          <span>{{ formattedDate }}</span>
+        </div>
       </div>
+
+      <q-btn
+        v-if="webinarData.primaryButton"
+        no-caps
+        color="secondary"
+        class="webinar-home-register-btn"
+        :href="webinarData.primaryButton.link"
+        target="_blank"
+        rel="noopener noreferrer"
+        data-test="webinar-home-register-btn"
+      >
+        {{ webinarData.primaryButton.text }}
+        <q-icon name="arrow_forward" class="q-ml-sm" size="1rem" />
+      </q-btn>
     </div>
-    <q-btn
-      v-if="webinarData.primaryButton"
-      no-caps
-      color="secondary"
-      class="webinar-home-register-btn"
-      :href="webinarData.primaryButton.link"
-      target="_blank"
-      rel="noopener noreferrer"
-      data-test="webinar-home-register-btn"
-    >
-      {{ webinarData.primaryButton.text }}
-      <q-icon name="arrow_forward" class="q-ml-xs" size="1rem" />
-    </q-btn>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 
 defineProps<{
   variant: "header" | "home";
@@ -119,13 +201,33 @@ interface WebinarData {
   primaryButton: PrimaryButton;
 }
 
+const MAX_ROTATIONS = 5;
+const MARQUEE_SPEED = 18; // seconds for one full scroll
+
 const WEBINAR_JSON_URL =
   import.meta.env.VITE_WEBINAR_JSON_URL ??
   "https://openobserve.ai/webinar.json";
 
 const webinarData = ref<WebinarData | null>(null);
+const collapsed = ref(false);
+const iterationCount = ref(0);
+const marqueeSpeed = ref(MARQUEE_SPEED);
+
+// Hover-popover state (collapsed mode)
 const menuOpen = ref(false);
 let closeTimer: ReturnType<typeof setTimeout> | null = null;
+
+const collapse = () => {
+  collapsed.value = true;
+};
+
+const onIteration = () => {
+  // Each inner div has 2 copies of the text, so one CSS animation iteration = 1 visual pass
+  iterationCount.value += 1;
+  if (iterationCount.value >= MAX_ROTATIONS) {
+    collapse();
+  }
+};
 
 const openMenu = () => {
   if (closeTimer) {
@@ -175,15 +277,111 @@ onMounted(async () => {
     // silently ignore — banner simply won't show
   }
 });
+
+onUnmounted(() => {
+  if (closeTimer) clearTimeout(closeTimer);
+});
 </script>
 
 <style scoped lang="scss">
-/* ── Header variant ─────────────────────────────────────── */
-.webinar-btn-wrap {
-  position: relative;
+/* ── Shared header wrapper ───────────────────────────────── */
+.webinar-header-wrap {
   align-self: center;
   flex-shrink: 0;
   margin: 0 0.5rem;
+}
+
+/* ── Marquee (expanded) ──────────────────────────────────── */
+.webinar-marquee-wrap {
+  display: inline-flex;
+  align-items: center;
+  max-width: 32rem;
+  overflow: hidden;
+  border-radius: 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--q-secondary) 30%, transparent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--q-secondary) 12%, var(--o2-primary-background)) 0%,
+    var(--o2-primary-background) 100%
+  );
+  padding: 0 0.375rem;
+  height: 1.75rem;
+}
+
+.webinar-marquee-outer {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+  // fade edges
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 8%,
+    black 92%,
+    transparent 100%
+  );
+}
+
+.webinar-marquee-inner {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee-scroll linear infinite;
+  will-change: transform;
+}
+
+@keyframes marquee-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.webinar-marquee-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--q-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-right: 0.5rem;
+}
+
+.webinar-marquee-title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--o2-text-primary);
+  margin-right: 0.5rem;
+}
+
+.webinar-marquee-date {
+  font-size: 0.7rem;
+  color: var(--o2-text-secondary);
+  margin-right: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.webinar-marquee-sep {
+  font-size: 0.75rem;
+  color: var(--o2-text-secondary);
+  margin-right: 0.5rem;
+}
+
+.webinar-action-btn {
+  flex-shrink: 0;
+  border-radius: 0.25rem !important;
+  font-size: 0.7rem !important;
+  padding: 0 0.5rem !important;
+  height: 1.375rem !important;
+  min-height: 1.375rem !important;
+}
+
+.webinar-close-btn {
+  flex-shrink: 0;
+  color: var(--o2-text-secondary) !important;
+}
+
+/* ── Compact button + popover ───────────────────────────── */
+.webinar-btn-wrap {
+  position: relative;
 }
 
 .webinar-register-btn {
@@ -234,44 +432,128 @@ onMounted(async () => {
 
 /* ── Home variant ───────────────────────────────────────── */
 .webinar-home-banner {
-  border-radius: 0.5rem;
-  padding: 0.875rem 1.25rem;
-  border: 1px solid var(--o2-border);
-  background: var(--o2-primary-background);
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.625rem;
+  border: 1px solid color-mix(in srgb, var(--q-secondary) 35%, transparent);
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--q-secondary) 14%, var(--o2-primary-background)) 0%,
+    var(--o2-primary-background) 55%,
+    color-mix(in srgb, var(--q-secondary) 7%, var(--o2-primary-background)) 100%
+  );
 }
 
-.webinar-home-tag {
-  font-size: 0.75rem;
-  font-weight: 600;
-  white-space: nowrap;
-  padding: 0.25rem 0.625rem;
-  border-radius: 0.25rem;
+/* Decorative background blobs */
+.webinar-home-blob {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.18;
   background: var(--q-secondary);
-  color: #fff;
+  filter: blur(2.5rem);
+}
+
+.webinar-home-blob--1 {
+  width: 10rem;
+  height: 10rem;
+  top: -3rem;
+  left: -2rem;
+}
+
+.webinar-home-blob--2 {
+  width: 8rem;
+  height: 8rem;
+  bottom: -2.5rem;
+  right: 6rem;
+}
+
+/* Inner content sits above blobs */
+.webinar-home-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1rem 1.375rem;
+}
+
+.webinar-home-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* Animated "live" badge */
+.webinar-home-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--q-secondary);
+}
+
+.webinar-home-badge-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--q-secondary);
   flex-shrink: 0;
+  animation: badge-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.5);
+    opacity: 0.5;
+  }
 }
 
 .webinar-home-title {
-  font-size: 0.9375rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   color: var(--o2-text-primary);
-  line-height: 1.4;
+  line-height: 1.35;
+  max-width: 36rem;
 }
 
-.webinar-home-date {
+.webinar-home-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
   font-size: 0.8125rem;
+  line-height: 1;
   color: var(--o2-text-secondary);
-  margin-top: 0.125rem;
+
+  .q-icon {
+    flex-shrink: 0;
+    position: relative;
+    top: 0;
+  }
+
+  span {
+    line-height: 1;
+  }
 }
 
 .webinar-home-register-btn {
   flex-shrink: 0;
   border-radius: 0.25rem !important;
   font-size: 0.875rem !important;
-  padding: 0 1rem !important;
-  height: 2.25rem !important;
-  min-height: 2.25rem !important;
+  padding: 0 1.25rem !important;
+  height: 2.375rem !important;
+  min-height: 2.375rem !important;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--q-secondary) 35%, transparent) !important;
 }
 </style>
