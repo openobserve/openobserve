@@ -586,7 +586,8 @@ where
             } else if method.eq("GET")
                 && (path_columns[1].eq("dashboards")
                     || path_columns[1].eq("folders")
-                    || path_columns[1].eq("actions"))
+                    || path_columns[1].eq("actions")
+                    || path_columns[1].eq("eval_templates"))
             {
                 format!(
                     "{}:{}",
