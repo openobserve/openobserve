@@ -32,8 +32,10 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let msg: AnomalyDetectionMessage = msg.try_into().map_err(|e| {
+        log::error!("[SUPER_CLUSTER:anomaly_detection] failed to deserialize message: {e}");
         infra::errors::Error::Message(format!("[ANOMALY_DETECTION] Failed to deserialize: {e}"))
     })?;
+    log::debug!("[SUPER_CLUSTER:anomaly_detection] deserialized message ok, dispatching to process_msg");
     process_msg(msg).await
 }
 
@@ -42,36 +44,71 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
 
     match msg {
         AnomalyDetectionMessage::ConfigCreate { config } => {
-            log::debug!(
-                "[SUPER_CLUSTER:anomaly_detection] ConfigCreate org={} id={}",
+            log::info!(
+                "[SUPER_CLUSTER:anomaly_detection] ConfigCreate org={} id={} status={} is_trained={}",
                 config.org_id,
-                config.anomaly_id
+                config.anomaly_id,
+                config.status,
+                config.is_trained,
             );
             // Upsert — overwrite if the config already exists from a previous sync.
             let existing = anomaly_detection_config::Entity::find_by_id(&config.anomaly_id)
                 .one(db)
                 .await
-                .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+                .map_err(|e| {
+                    log::error!(
+                        "[SUPER_CLUSTER:anomaly_detection] ConfigCreate find_by_id failed id={}: {e}",
+                        config.anomaly_id
+                    );
+                    infra::errors::Error::Message(e.to_string())
+                })?;
+            log::info!(
+                "[SUPER_CLUSTER:anomaly_detection] ConfigCreate find_by_id id={} row_exists={}",
+                config.anomaly_id,
+                existing.is_some()
+            );
             if existing.is_some() {
                 config
                     .into_active_model()
                     .update(db)
                     .await
-                    .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+                    .map_err(|e| {
+                        log::error!(
+                            "[SUPER_CLUSTER:anomaly_detection] ConfigCreate update failed id={}: {e}",
+                            config.anomaly_id
+                        );
+                        infra::errors::Error::Message(e.to_string())
+                    })?;
+                log::info!(
+                    "[SUPER_CLUSTER:anomaly_detection] ConfigCreate updated existing row id={}",
+                    config.anomaly_id
+                );
             } else {
                 anomaly_detection_config::Entity::insert(config.into_active_model())
                     .exec(db)
                     .await
-                    .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+                    .map_err(|e| {
+                        log::error!(
+                            "[SUPER_CLUSTER:anomaly_detection] ConfigCreate insert failed id={}: {e}",
+                            config.anomaly_id
+                        );
+                        infra::errors::Error::Message(e.to_string())
+                    })?;
+                log::info!(
+                    "[SUPER_CLUSTER:anomaly_detection] ConfigCreate inserted new row id={}",
+                    config.anomaly_id
+                );
             }
         }
         AnomalyDetectionMessage::ConfigUpdate { config } => {
             log::info!(
-                "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate org={} id={} status={} is_trained={}",
+                "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate org={} id={} status={} is_trained={} schedule_interval={} updated_at={}",
                 config.org_id,
                 config.anomaly_id,
                 config.status,
                 config.is_trained,
+                config.schedule_interval,
+                config.updated_at,
             );
             // Upsert: update if the row exists, insert if it somehow doesn't.
             // A plain update would fail with RecordNotUpdated if ConfigCreate was
@@ -79,13 +116,34 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
             let existing = anomaly_detection_config::Entity::find_by_id(&config.anomaly_id)
                 .one(db)
                 .await
-                .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+                .map_err(|e| {
+                    log::error!(
+                        "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate find_by_id failed id={}: {e}",
+                        config.anomaly_id
+                    );
+                    infra::errors::Error::Message(e.to_string())
+                })?;
+            log::info!(
+                "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate find_by_id id={} row_exists={}",
+                config.anomaly_id,
+                existing.is_some()
+            );
             if existing.is_some() {
                 config
                     .into_active_model()
                     .update(db)
                     .await
-                    .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+                    .map_err(|e| {
+                        log::error!(
+                            "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate update failed id={}: {e}",
+                            config.anomaly_id
+                        );
+                        infra::errors::Error::Message(e.to_string())
+                    })?;
+                log::info!(
+                    "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate successfully wrote to DB id={}",
+                    config.anomaly_id
+                );
             } else {
                 log::warn!(
                     "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate: row not found for id={}, inserting instead",
@@ -94,7 +152,17 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                 anomaly_detection_config::Entity::insert(config.into_active_model())
                     .exec(db)
                     .await
-                    .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+                    .map_err(|e| {
+                        log::error!(
+                            "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate insert failed id={}: {e}",
+                            config.anomaly_id
+                        );
+                        infra::errors::Error::Message(e.to_string())
+                    })?;
+                log::info!(
+                    "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate inserted missing row id={}",
+                    config.anomaly_id
+                );
             }
         }
         AnomalyDetectionMessage::ConfigDelete { org_id, config_id } => {
