@@ -1863,4 +1863,134 @@ export class MetricsPage {
         return this.page.locator('text=No results, text=no data, text=No results found');
     }
 
+    // =========================================================================
+    // PromQL Autocomplete helpers
+    // Added for promqlAutocomplete.spec.js
+    // Verified data-test selectors sourced from QueryTypeSelector.vue
+    // =========================================================================
+
+    /**
+     * Switch to PromQL Custom mode on the Metrics page.
+     *
+     * The Metrics page uses the same QueryTypeSelector component as the Dashboard
+     * add-panel flow.  Two clicks are needed:
+     *   1. [data-test="dashboard-promql-query-type"] — select PromQL language
+     *   2. [data-test="dashboard-custom-query-type"]  — switch to Custom (free-text) sub-mode
+     *
+     * The PromQL button may already be selected (Metrics page defaults to PromQL),
+     * so we only click it when it is not yet active.
+     *
+     * @returns {Promise<boolean>} true when both buttons were clicked successfully
+     */
+    async switchToPromQLCustomMode() {
+        // Step 1 — ensure PromQL language is active
+        const promqlBtn = this.page.locator('[data-test="dashboard-promql-query-type"]');
+        if (!await promqlBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+            return false;
+        }
+        const promqlClasses = await promqlBtn.getAttribute('class') || '';
+        if (!promqlClasses.includes('selected')) {
+            await promqlBtn.click();
+            await this.page.waitForTimeout(300);
+        }
+
+        // Step 2 — switch to Custom sub-mode
+        const customBtn = this.page.locator('[data-test="dashboard-custom-query-type"]');
+        if (!await customBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+            return false;
+        }
+        const customClasses = await customBtn.getAttribute('class') || '';
+        if (!customClasses.includes('selected')) {
+            await customBtn.click();
+            await this.page.waitForTimeout(300);
+        }
+        return true;
+    }
+
+    /**
+     * Return the Monaco query editor container locator.
+     * Uses the verified [data-test="dashboard-panel-query-editor"] attribute on
+     * the UnifiedQueryEditor component rendered inside the Metrics page.
+     *
+     * @returns {import('@playwright/test').Locator}
+     */
+    getPromQLEditorContainer() {
+        return this.page.locator('[data-test="dashboard-panel-query-editor"]');
+    }
+
+    /**
+     * Clear the Monaco editor content in a cross-platform way.
+     *
+     * @param {import('@playwright/test').Locator} editorContainer - result of getPromQLEditorContainer()
+     */
+    async clearPromQLEditor(editorContainer) {
+        const monacoEditor = editorContainer.getByRole('code');
+        await monacoEditor.click({ clickCount: 3 });
+        await this.page.keyboard.press('Control+a');
+        await this.page.keyboard.press('Backspace');
+    }
+
+    /**
+     * Type text into the Monaco PromQL editor.
+     * Focuses the editor first, then types the provided text character by character
+     * with a small delay so Monaco's token parser keeps up.
+     *
+     * @param {import('@playwright/test').Locator} editorContainer - result of getPromQLEditorContainer()
+     * @param {string} text - text to type (can include special chars like '{', '=')
+     * @param {number} [delay=50] - typing delay in ms
+     */
+    async typeInPromQLEditor(editorContainer, text, delay = 50) {
+        const monacoEditor = editorContainer.getByRole('code');
+        await monacoEditor.click();
+        await this.page.keyboard.type(text, { delay });
+    }
+
+    /**
+     * Trigger Monaco autocomplete suggestions (Ctrl+Space).
+     */
+    async triggerPromQLSuggestions() {
+        await this.page.keyboard.press('Control+Space');
+    }
+
+    /**
+     * Wait for the Monaco suggest-widget to become visible and return the
+     * suggestion row locator.
+     *
+     * Throws if no suggestions appear within the timeout.
+     *
+     * @param {number} [timeout=10000]
+     * @returns {Promise<import('@playwright/test').Locator>} - suggestion rows locator
+     */
+    async waitForPromQLSuggestions(timeout = 10000) {
+        const suggestWidget = this.page.locator('.monaco-editor .suggest-widget');
+        await suggestWidget.waitFor({ state: 'visible', timeout });
+        const suggestionRows = this.page.locator('.monaco-editor .suggest-widget .monaco-list-row');
+        await suggestionRows.first().waitFor({ state: 'visible', timeout: 5000 });
+        return suggestionRows;
+    }
+
+    /**
+     * Dismiss the Monaco autocomplete widget by pressing Escape.
+     */
+    async dismissPromQLSuggestions() {
+        await this.page.keyboard.press('Escape');
+    }
+
+    /**
+     * Return all visible suggestion label texts as an array of strings.
+     * Reads up to `maxItems` rows from the suggestions widget.
+     *
+     * @param {number} [maxItems=10]
+     * @returns {Promise<string[]>}
+     */
+    async getPromQLSuggestionTexts(maxItems = 10) {
+        const suggestionRows = this.page.locator('.monaco-editor .suggest-widget .monaco-list-row');
+        const count = Math.min(await suggestionRows.count(), maxItems);
+        const texts = [];
+        for (let i = 0; i < count; i++) {
+            texts.push((await suggestionRows.nth(i).textContent()).trim());
+        }
+        return texts;
+    }
+
 }

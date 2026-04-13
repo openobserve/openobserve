@@ -299,6 +299,7 @@ jobs:
                 "metrics-promql-query-persistence.spec.js",
                 "metrics-table-column-order.spec.js",
                 "metrics-promql-builder.spec.js",
+                "promqlAutocomplete.spec.js",
               ]
           - testfolder: "Dashboards-Variables"
             browser: "chrome"
