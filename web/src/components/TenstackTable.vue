@@ -2235,7 +2235,6 @@ defineExpose({
 // Cells hidden by pivot row merging (duplicates suppressed)
 .pivot-no-border {
   border-bottom: none !important;
-  color: transparent !important;
 }
 
 // Left-sticky columns
