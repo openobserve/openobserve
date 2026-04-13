@@ -14,8 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="tw:px-[0.625rem] q-pt-xs" style="overflow-y: auto; min-height: inherit; height: calc(100vh - 40px);" :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''">
-    <div v-if="!no_data_ingest && !isLoadingSummary" class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container" :class="store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 40px)]' : 'tw:h-full'" style="display: flex; flex-direction: column; ">
+  <q-page class="tw:px-[0.625rem] q-pt-xs home-page-wrap" :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''">
+    <div v-if="!no_data_ingest && !isLoadingSummary" class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container home-content-scroll" style="display: flex; flex-direction: column;">
         <!-- 1st section -->
          <div>
           <WebinarBanner v-if="config.isCloud === 'true'" variant="home" />
@@ -926,6 +926,22 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+// q-page fills the remaining viewport — no overflow here
+.home-page-wrap {
+  height: calc(100vh - var(--q-header-size, 120px));
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+// inner content area scrolls
+.home-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
 /*
  * HomeView Styles - Refactored for consistency and maintainability
  *
