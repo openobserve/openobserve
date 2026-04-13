@@ -551,7 +551,9 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Find the template override select field (it's in the alert settings step)
     // Wait for template field to be visible as confirmation that we're on the right step
-    // Note: Quasar renders <q-select> as <div> in DOM, so use class-only selector
+    // NOTE: No data-test attribute exists on this component (AlertSettings.vue line 189)
+    // Using .template-select-field (application-defined class, stable) + .q-select (Quasar component)
+    // TODO: Product team should add data-test="alert-template-override-select" for test stability
     const templateSelect = page.locator('.q-select.template-select-field').first();
     await expect(templateSelect).toBeVisible({ timeout: 15000 });
     testLogger.info('✓ Template override field visible');
@@ -574,16 +576,13 @@ test.describe("Alerts Regression Bugs", () => {
 
     // STRONG ASSERTION: Verify template name appears exactly once in the select field
     // Bug #10110 caused templates to display twice in the input field
-    const templateInputField = templateSelect.locator('.q-field__native, [role="combobox"]').first();
+    // Use .q-field__native (Quasar's public API for the native input element)
+    const templateInputField = templateSelect.locator('.q-field__native').first();
     await expect(templateInputField).toBeVisible({ timeout: 3000 });
 
     // Get the visible text in the selected template display area
-    const selectedDisplay = templateSelect.locator('[class*="ellipsis"]').first();
-
-    // PRIMARY ASSERTION SETUP: Display must be visible to validate bug fix
-    await expect(selectedDisplay, 'Bug #10110: Template display area must be visible to verify no duplication').toBeVisible({ timeout: 3000 });
-
-    const displayedText = await selectedDisplay.textContent();
+    // Using .q-field__native input value instead of brittle [class*="ellipsis"] selector
+    const displayedText = await templateInputField.inputValue();
     const cleanDisplayText = displayedText?.trim().replace(/\s+/g, ' ') || '';
     testLogger.info('Template display text', { text: cleanDisplayText });
 
