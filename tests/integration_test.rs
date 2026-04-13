@@ -2610,9 +2610,7 @@ mod tests {
                 stream_type: StreamType::Logs,
                 query_condition: QueryCondition {
                     query_type: config::meta::alerts::QueryType::SQL,
-                    sql: Some(
-                        "SELECT * FROM \"nonexistent_stream_xyz_abc_test\"".to_string(),
-                    ),
+                    sql: Some("SELECT * FROM \"nonexistent_stream_xyz_abc_test\"".to_string()),
                     ..Default::default()
                 },
                 trigger_condition: TriggerCondition {

@@ -300,6 +300,18 @@ export const useSearchBar = () => {
 
       // Build UNION query once
       const streams = searchObj.data.stream.selectedStream;
+
+      // Persist selected streams to localStorage so they can be restored on next visit
+      if (streams.length > 0 && searchObj.organizationIdentifier) {
+        const key = `logs_last_stream_${searchObj.organizationIdentifier}`;
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            streams,
+            streamType: searchObj.data.stream.streamType || "logs",
+          }),
+        );
+      }
       const unionquery = streams
         .map((stream: string) => `SELECT [FIELD_LIST] FROM "${stream}"`)
         .join(" UNION ALL BY NAME ");

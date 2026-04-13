@@ -344,11 +344,32 @@ const useLogs = () => {
 
   const restoreUrlQueryParams = async (dashboardPanelData: any = null) => {
     searchObj.shouldIgnoreWatcher = true;
-    const queryParams: any = router.currentRoute.value.query;
+    const queryParams: any = { ...router.currentRoute.value.query };
     // Allow SQL mode queries without stream param (will be auto-detected from SQL)
     if (!queryParams.stream && queryParams.sql_mode !== "true") {
-      searchObj.shouldIgnoreWatcher = false;
-      return;
+      // Try to restore last selected stream from localStorage
+      const orgId =
+        searchObj.organizationIdentifier ||
+        store.state?.selectedOrganization?.identifier;
+      if (orgId) {
+        const key = `logs_last_stream_${orgId}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+          try {
+            const { streams, streamType } = JSON.parse(saved);
+            if (Array.isArray(streams) && streams.length > 0) {
+              queryParams.stream = streams.join(",");
+              if (streamType) queryParams.stream_type = streamType;
+            }
+          } catch {
+            // ignore malformed data
+          }
+        }
+      }
+      if (!queryParams.stream) {
+        searchObj.shouldIgnoreWatcher = false;
+        return;
+      }
     }
 
     const date = {
