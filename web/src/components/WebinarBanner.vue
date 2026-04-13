@@ -182,13 +182,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-btn>
     </div>
   </div>
+
+  <!-- Top-bar variant: full-width bar above the entire header -->
+  <div
+    v-else-if="webinarData && !isExpired && variant === 'topbar'"
+    class="webinar-topbar"
+    data-test="webinar-topbar"
+  >
+    <span class="webinar-topbar-tag">{{ webinarData.tag }}</span>
+    <span class="webinar-topbar-divider" aria-hidden="true">|</span>
+    <span class="webinar-topbar-title">{{ webinarData.title }}</span>
+    <a
+      v-if="webinarData.primaryButton"
+      :href="webinarData.primaryButton.link"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="webinar-topbar-link"
+      data-test="webinar-topbar-register-link"
+    >
+      {{ webinarData.primaryButton.text }}
+      <q-icon name="arrow_forward" size="0.8rem" class="q-ml-xs" />
+    </a>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
 
 defineProps<{
-  variant: "header" | "home";
+  variant: "header" | "home" | "topbar";
 }>();
 
 interface PrimaryButton {
@@ -583,6 +605,65 @@ onUnmounted(() => {
 .webinar-close-btn {
   .q-icon {
     font-size: 1rem !important;
+  }
+}
+
+/* ── Top-bar variant ─────────────────────────────────────── */
+.webinar-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  width: 100%;
+  height: 2rem;
+  padding: 0 1rem;
+  background: #f5c518;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.webinar-topbar-tag {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #1a1a1a;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.webinar-topbar-divider {
+  color: #1a1a1a;
+  opacity: 0.4;
+  font-weight: 300;
+  flex-shrink: 0;
+}
+
+.webinar-topbar-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40rem;
+}
+
+.webinar-topbar-link {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #1a1a1a;
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 1.5px solid rgba(26, 26, 26, 0.5);
+  padding-bottom: 1px;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: #1a1a1a;
   }
 }
 </style>

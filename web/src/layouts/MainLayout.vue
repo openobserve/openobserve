@@ -20,8 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[store.state.printMode === true ? 'printMode' : '']"
   >
     <q-header>
-      <!-- Header component containing logo, navigation, and user controls -->
-      <Header
+      <div class="webinar-header-container">
+        <!-- Full-width webinar top bar — sits above the toolbar -->
+        <!-- eslint-disable-next-line vue/max-attributes-per-line -->
+        <WebinarBanner v-if="config.isCloud === 'true'" variant="topbar" />
+
+        <!-- Header component containing logo, navigation, and user controls -->
+        <Header
         :store="store"
         :router="router"
         :config="config"
@@ -50,7 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
         @signout="signout"
-      />
+        />
+      </div>
     </q-header>
 
     <q-drawer
@@ -139,6 +145,7 @@ import {
 } from "quasar";
 import MenuLink from "../components/MenuLink.vue";
 import Header from "../components/Header.vue";
+import WebinarBanner from "../components/WebinarBanner.vue";
 import { useI18n } from "vue-i18n";
 import {
   useLocalCurrentUser,
@@ -218,6 +225,7 @@ export default defineComponent({
   components: {
     "menu-link": MenuLink,
     Header,
+    WebinarBanner,
     "keep-alive": KeepAlive,
     "q-page": QPage,
     "q-page-container": QPageContainer,

@@ -157,9 +157,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
     <div class="header-menu">
-      <!-- WEBINAR FLASH BANNER: Cloud-only upcoming webinar notice -->
-      <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
-
       <!-- UPGRADE TO ENTERPRISE BUTTON: Shows for non-enterprise users -->
       <q-btn
         no-caps
@@ -601,7 +598,6 @@ import { defineComponent, PropType, computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
-import WebinarBanner from "./WebinarBanner.vue";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 import { getImageURL } from "@/utils/zincutils";
 
@@ -610,7 +606,6 @@ export default defineComponent({
   components: {
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
-    WebinarBanner,
   },
   props: {
     // Store instance
