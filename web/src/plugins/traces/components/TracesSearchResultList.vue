@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="traces-search-result-list tw:h-full tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)]"
+    class="traces-search-result-list tw:h-auto! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)]"
   >
     <!-- ════════════════════ Empty State ════════════════════ -->
     <div
@@ -32,14 +32,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       v-show="hasResults || loading"
       data-test="traces-table-wrapper"
-      class="column tw:h-full tw:flex-1 tw:min-h-0"
+      class="column tw:h-auto! tw:flex-1 tw:min-h-0"
     >
       <!-- Table scroll area -->
       <div
         data-test="traces-search-result-list"
-        class="tw:w-full tw:flex-1 tw:overflow-y-auto tw:overflow-x-auto tw:relative"
+        class="tw:w-full tw:h-auto! tw:flex-1 tw:overflow-y-auto tw:overflow-x-auto tw:relative"
       >
         <TenstackTable
+          class="tw:h-auto!"
           :columns="searchObj.data.resultGrid.columns"
           :rows="hits"
           :loading="loading"
