@@ -51,6 +51,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   hide-bottom-space
                 />
               </template>
+
+              <!-- Folder -->
+              <div class="tw:flex tw:items-center tw:ml-2 tw:gap-1.5 tw:shrink-0">
+                <label class="alert-v3-inline-label tw:opacity-80 tw:font-semibold">Folder</label>
+                <InlineSelectFolderDropdown
+                  :model-value="activeFolderId"
+                  type="alerts"
+                  width="140px"
+                  @update:model-value="updateActiveFolderId({ value: $event })"
+                />
+              </div>
             </template>
             <template v-else>
               <span class="tw:text-xs tw:font-medium tw:whitespace-nowrap">{{ anomalyEditMode ? t("alerts.updateAnomalyDetection") : t("alerts.newAnomalyDetection") }}</span>
@@ -446,6 +457,7 @@ import Deduplication from "./steps/Deduplication.vue";
 import Advanced from "./steps/Advanced.vue";
 import AlertWizardRightColumn from "./AlertWizardRightColumn.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
+import InlineSelectFolderDropdown from "../common/sidebar/InlineSelectFolderDropdown.vue";
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
 import DateTimePicker from "@/components/DateTimePicker.vue";
@@ -499,6 +511,7 @@ export default defineComponent({
     AnomalyAlerting,
     AnomalySummary,
     QueryEditor,
+    InlineSelectFolderDropdown,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
