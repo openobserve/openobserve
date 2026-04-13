@@ -1930,9 +1930,23 @@ export default defineComponent({
           if (filterParts) {
             filterQuery = filterParts;
           }
+        } else {
+          $q.notify({
+            type: "warning",
+            message: t("traces.noLogsAvailableForService"),
+            timeout: 3000,
+            position: "bottom",
+          });
+          return;
         }
       } catch {
-        // Fall back to default service_name filter
+        $q.notify({
+          type: "warning",
+          message: t("traces.noLogsAvailableForService"),
+          timeout: 3000,
+          position: "bottom",
+        });
+        return;
       }
 
       const queryParams: any = {
