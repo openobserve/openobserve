@@ -159,9 +159,11 @@ export default defineComponent({
       const rows = (props.data.rows as any[]) || [];
       if (!localSortBy.value) return rows;
       const col = (props.data.columns as any[])?.find(
-        (c: any) => c.name === localSortBy.value,
+        // sort-change now emits col.field (unique data key) as the id, so match on field.
+        // Fall back to name comparison for any legacy or non-field column definitions.
+        (c: any) => (c.field ?? c.name) === localSortBy.value,
       );
-      // col.field is the actual row data key; col.name is the column id used for sort-change
+      // col.field is the actual row data key; localSortBy is the column field id emitted by sort-change
       const dataKey = col?.field ?? localSortBy.value;
       return [...rows].sort((a: any, b: any) => {
         const va = typeof dataKey === "function" ? dataKey(a) : a[dataKey];

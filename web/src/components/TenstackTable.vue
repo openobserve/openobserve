@@ -1255,7 +1255,13 @@ const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
   return (props.columns as any[])
     .filter((col: any) => col.name != null && String(col.name) !== "")
     .map((col: any) => ({
-      id: String(col.name),
+      // Use col.field as the unique TanStack ID instead of col.name (display label).
+      // Multiple dashboard columns can share the same label (e.g. both named "Timestamp"),
+      // but each has a distinct field key (e.g. "x_axis_1" vs "y_axis_1").
+      // TanStack stores columns in a Map keyed by id; duplicate ids cause the last column
+      // to overwrite earlier ones, so row.getValue(id) returns the wrong accessor for every
+      // cell sharing that id — the format function then receives the wrong raw value.
+      id: String(col.field ?? col.name),
       header: String(col.label ?? col.name),
       ...(typeof col.field === "function"
         ? { accessorFn: col.field }
