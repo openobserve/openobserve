@@ -527,6 +527,7 @@ pub enum LegendsType {
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct PanelConfig {
+    #[serde(default = "default_show_legends")]
     show_legends: bool,
     legends_position: Option<LegendsPosition>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -649,6 +650,10 @@ pub struct PanelConfig {
     panel_time_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     panel_time_range: Option<PanelTimeRange>,
+}
+
+fn default_show_legends() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
