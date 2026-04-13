@@ -24,8 +24,14 @@
 .container {
   overflow: auto;
   border-radius: 0.5rem;
-  // Hint the browser to composite the scroll layer on the GPU, which
-  // eliminates paint-phase flicker during fast virtual-scroll updates.
+}
+
+// Hint the browser to composite the scroll layer on the GPU, which
+// eliminates paint-phase flicker during fast virtual-scroll updates.
+// Only applied to logs/traces virtual-scroll tables — dashboard tables
+// must NOT get will-change because the extra compositing layers cause
+// chart canvas flicker when scrolling the dashboard.
+.container.virtual-scroll-active {
   will-change: scroll-position;
 }
 

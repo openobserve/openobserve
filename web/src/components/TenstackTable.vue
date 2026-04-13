@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scroll container: grows to fill available height -->
     <div
       ref="parentRef"
-      class="container table-container tw:flex-1 tw:min-h-0 tw:overflow-auto tw:relative"
+      :class="['container', 'table-container', 'tw:flex-1', 'tw:min-h-0', 'tw:overflow-auto', 'tw:relative', { 'virtual-scroll-active': useVirtualScroll }]"
     >
       <table
         v-if="table"
@@ -401,6 +401,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <tr
               v-for="{ row, idx } in renderedDashboardRows"
               :key="row.id"
+              :data-index="idx"
+              :ref="(node: any) => node && dashVirtualEnabled && rowVirtualizer.measureElement(node)"
               class="dashboard-data-row tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
               :class="{ 'tw:border-b': !usesSeparateBorders }"
               @click="
@@ -1302,8 +1304,12 @@ const usesSeparateBorders = computed(
 // Dashboard virtual scroll: enabled when not using logs virtual scroll and not paginated.
 // Uses spacer rows + @tanstack/vue-virtual to render only visible rows (matching
 // the old Quasar QTable :virtual-scroll behaviour).
+// Disabled when `wrap` is true — wrapped rows have highly variable heights
+// (29-81px) that cause large total-height jumps during scroll, which manifests
+// as visible flicker. Rendering all rows in DOM is acceptable for dashboard
+// panels (typically ≤1000 rows).
 const dashVirtualEnabled = computed(
-  () => !props.useVirtualScroll && !props.showPagination,
+  () => !props.useVirtualScroll && !props.showPagination && !props.wrap,
 );
 
 // Pivot sort state (managed manually — TanStack sort is disabled for pivot).
@@ -1879,15 +1885,20 @@ const rowVirtualizerOptions = computed(() => {
     // Dashboard: moderate overscan keeps rows buffered above/below viewport.
     // Logs/traces: high overscan for smooth fast-scroll.
     overscan: isDashVirtual ? 20 : 100,
-    measureElement: isDashVirtual
-      ? undefined
-      : // When rowHeight is provided, skip dynamic measurement entirely
-        props.rowHeight
+    measureElement:
+      // When rowHeight is provided, skip dynamic measurement entirely
+      props.rowHeight && !isDashVirtual
         ? undefined
         : typeof window !== "undefined" && !isFirefox.value
           ? (element: any) => {
               const index = parseInt(element.dataset.index);
-              // Only measure expanded rows (check if it's actually an expanded row)
+              if (isNaN(index)) return props.rowHeight ?? 28;
+              // Dashboard: always measure so variable-height rows
+              // (wrapping text, etc.) are accounted for.
+              if (isDashVirtual) {
+                return element.getBoundingClientRect().height;
+              }
+              // Logs/traces: only measure expanded or wrapped rows
               const isExpandedRow =
                 formattedRows.value[index]?.original?.isExpandedRow;
               if (isExpandedRow || props.wrap) {
