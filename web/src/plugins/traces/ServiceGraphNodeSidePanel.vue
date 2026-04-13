@@ -772,6 +772,7 @@ export default defineComponent({
     const store = useStore();
     const $q = useQuasar();
     const { t } = useI18n();
+    const router = useRouter();
 
     // RED Charts State
     const dashboardData = ref<any>({});

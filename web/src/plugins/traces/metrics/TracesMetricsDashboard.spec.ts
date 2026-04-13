@@ -351,6 +351,73 @@ describe("TracesMetricsDashboard", () => {
       expect(query).not.toMatch(/WHERE\b/);
     });
 
+    it("should convert span_kind='Server' label to '2' in the Rate panel WHERE clause", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='Server'" });
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const query = getPanelQuery(wrapper, "Rate");
+      expect(query).toContain("span_kind='2'");
+      expect(query).not.toContain("span_kind='Server'");
+    });
+
+    it("should convert span_kind='Server' label to '2' in the Errors panel WHERE clause", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='Server'" });
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const query = getPanelQuery(wrapper, "Errors");
+      expect(query).toContain("span_kind='2'");
+      expect(query).not.toContain("span_kind='Server'");
+    });
+
+    it("should convert span_kind='Client' label to '3' in both Rate and Errors panels", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='Client'" });
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const rateQuery = getPanelQuery(wrapper, "Rate");
+      const errorsQuery = getPanelQuery(wrapper, "Errors");
+      expect(rateQuery).toContain("span_kind='3'");
+      expect(rateQuery).not.toContain("span_kind='Client'");
+      expect(errorsQuery).toContain("span_kind='3'");
+      expect(errorsQuery).not.toContain("span_kind='Client'");
+    });
+
+    it("should leave non-span_kind filter unchanged in the Errors panel WHERE clause", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "service_name = 'api'" });
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const query = getPanelQuery(wrapper, "Errors");
+      expect(query).toContain("service_name = 'api'");
+    });
+
+    it("should leave non-span_kind filter unchanged in the Duration panel WHERE clause", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "service_name = 'api'" });
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const query = getPanelQuery(wrapper, "Duration");
+      expect(query).toContain("service_name = 'api'");
+    });
+
+    it("should convert span_kind label case-insensitively in the Errors panel", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='CONSUMER'" });
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const query = getPanelQuery(wrapper, "Errors");
+      expect(query).toContain("span_kind='5'");
+      expect(query).not.toContain("span_kind='CONSUMER'");
+    });
+
     it("should combine duration range filter and filter prop in Rate panel WHERE clause", async () => {
       mockMetricsRangeFilters.set("panel-dur", {
         panelTitle: "Duration",
@@ -608,6 +675,52 @@ describe("TracesMetricsDashboard", () => {
       wrapper = mountComponent({ filter: "   " });
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toEqual([]);
+    });
+
+    it("should convert span_kind='Server' label to numeric key '2' in the base filter", () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='Server'" });
+      const filters = wrapper.vm.getBaseFilters();
+      expect(filters).toContain("span_kind='2'");
+      expect(filters.join(" ")).not.toContain("span_kind='Server'");
+    });
+
+    it("should convert span_kind='Client' label to numeric key '3' in the base filter", () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='Client'" });
+      const filters = wrapper.vm.getBaseFilters();
+      expect(filters).toContain("span_kind='3'");
+      expect(filters.join(" ")).not.toContain("span_kind='Client'");
+    });
+
+    it("should convert span_kind label case-insensitively in the base filter", () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='SERVER'" });
+      const filters = wrapper.vm.getBaseFilters();
+      expect(filters).toContain("span_kind='2'");
+    });
+
+    it("should leave non-span_kind filters unchanged in the base filter", () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "service_name = 'api'" });
+      const filters = wrapper.vm.getBaseFilters();
+      expect(filters).toContain("service_name = 'api'");
+    });
+
+    it("should convert span_kind label when combined with a duration range filter", () => {
+      mockMetricsRangeFilters.set("panel-dur", {
+        panelTitle: "Duration",
+        start: 100,
+        end: 500,
+        timeStart: null,
+        timeEnd: null,
+      });
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='Internal'" });
+      const filters = wrapper.vm.getBaseFilters();
+      expect(filters).toContain("duration >= 100 and duration <= 500");
+      expect(filters).toContain("span_kind='1'");
+      expect(filters.join(" ")).not.toContain("span_kind='Internal'");
     });
   });
 

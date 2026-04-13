@@ -19,8 +19,59 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-// Stub TenstackTable — renders loading/empty slots and one row of cell slots
-// so that cell-slot split tests can verify which component is rendered.
+// ─── Quasar mock — intercept copyToClipboard ────────────────────────────────
+// vi.mock is hoisted by Vitest, so the factory runs before any const declarations.
+// Use vi.hoisted() to create the spy in the hoisted scope so it's available
+// both inside the factory and in test assertions.
+const { mockQCopyToClipboard } = vi.hoisted(() => ({
+  mockQCopyToClipboard: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("quasar", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    copyToClipboard: mockQCopyToClipboard,
+    useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
+  };
+});
+
+// ─── Shared searchObj reference — lets tests read addToFilter after mutation ─
+const sharedSearchObj = {
+  data: {
+    stream: { selectedStreamFields: [] as string[], addToFilter: "" },
+    resultGrid: { columns: [] as any[] },
+  },
+};
+
+vi.mock("@/composables/useTraces", () => ({
+  default: () => ({
+    searchObj: sharedSearchObj,
+    updatedLocalLogFilterField: vi.fn(),
+  }),
+}));
+
+// ─── CellActions stub — emits copy/add-search-term with the field + value
+// that are passed down from the component via its @copy / @add-search-term
+// bindings on the real CellActions component.  The stub captures the props
+// and re-emits them verbatim so tests can trigger the component's handlers
+// with explicit field/value pairs via wrapper.vm.$emit on the stub.
+vi.mock("@/plugins/logs/data-table/CellActions.vue", () => ({
+  default: {
+    name: "CellActions",
+    props: [
+      "column",
+      "row",
+      "selectedStreamFields",
+      "hideSearchTermActions",
+      "hideAi",
+    ],
+    emits: ["copy", "add-search-term", "send-to-ai-chat"],
+    template: `<div data-test="stub-cell-actions" />`,
+  },
+}));
+
+// ─── TenstackTable stub — renders loading/empty/cell slots ──────────────────
+// Also renders cell-actions slot so CellActions can be exercised in tests.
 vi.mock("@/components/TenstackTable.vue", () => ({
   default: {
     name: "TenstackTable",
@@ -51,22 +102,13 @@ vi.mock("@/components/TenstackTable.vue", () => ({
         <template v-if="rows && rows.length">
           <div data-test="stub-cell-span_status"><slot name="cell-span_status" :item="rows[0]" /></div>
           <div data-test="stub-cell-status"><slot name="cell-status" :item="rows[0]" /></div>
+          <div data-test="stub-cell-actions-wrapper">
+            <slot name="cell-actions" :row="rows[0]" :column="{ columnDef: { meta: { disableCellAction: false } } }" :active="true" />
+          </div>
         </template>
       </div>
     `,
   },
-}));
-
-vi.mock("@/composables/useTraces", () => ({
-  default: () => ({
-    searchObj: {
-      data: {
-        stream: { selectedStreamFields: [], addToFilter: "" },
-        resultGrid: { columns: [] },
-      },
-    },
-    updatedLocalLogFilterField: vi.fn(),
-  }),
 }));
 
 vi.mock("./TraceTimestampCell.vue", () => ({
@@ -117,6 +159,10 @@ describe("TracesSearchResultList", () => {
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
+    // Reset shared searchObj state between tests
+    sharedSearchObj.data.stream.addToFilter = "";
+    sharedSearchObj.data.stream.selectedStreamFields = [];
+    sharedSearchObj.data.resultGrid.columns = [];
   });
 
   const mount_ = (
