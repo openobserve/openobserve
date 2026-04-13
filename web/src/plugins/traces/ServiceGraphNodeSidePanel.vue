@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             no-caps
             size="sm"
-            class="tw:pl-[0.675rem]! tw:border! tw:border-[var(--o2-border-color)]! tw:rounded! tw:text-[0.7rem]! tw:tracking-[0.05rem]! tw:text-[var(--o2-text-2)]!"
+            class="tw:pl-[0.675rem]! tw:border! tw:border-[var(--o2-primary-btn-bg)]! tw:rounded! tw:text-[0.7rem]! tw:tracking-[0.03rem]! tw:text-[var(--o2-primary-btn-bg)]!"
             label="View Related"
             data-test="service-graph-node-panel-view-related-btn"
           >
