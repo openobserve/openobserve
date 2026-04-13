@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="patterns?.length > 0" class="tw:flex tw:flex-col">
       <!-- Table Header -->
       <div
-        class="tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border-color)] tw:sticky tw:top-0 tw:z-10"
-        style="background: var(--o2-table-header-bg); min-width: 100%;"
+        class="tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border-color)]"
+        style="background: var(--o2-table-header-bg); min-width: 100%"
       >
         <!-- Pattern Column Header -->
         <div class="tw:flex-1 tw:min-w-0 tw:px-2 tw:relative table-head tw:text-ellipsis tw:text-left">

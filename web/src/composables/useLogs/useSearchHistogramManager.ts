@@ -85,7 +85,8 @@ export const useSearchHistogramManager = () => {
     }
 
     const isFromZero =
-      queryReq.query.from == 0 && searchObj.data.queryResults.hits?.length > 0;
+      queryReq?.query?.from == 0 &&
+      searchObj.data.queryResults.hits?.length > 0;
 
     const _shouldShowHistogram = shouldShowHistogram(parsedSQL);
 
