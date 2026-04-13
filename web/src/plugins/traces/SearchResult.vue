@@ -95,38 +95,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
 
-      <!-- ════════════════════ RED Metrics Section ════════════════════ -->
-      <transition
-        enter-active-class="transition-all duration-300 ease-in-out"
-        leave-active-class="transition-all duration-300 ease-in-out"
-        enter-from-class="opacity-0 -translate-y-4 max-h-0"
-        enter-to-class="opacity-100 translate-y-0 max-h-[1000px]"
-        leave-from-class="opacity-100 translate-y-0 max-h-[1000px]"
-        leave-to-class="opacity-0 -translate-y-4 max-h-0"
-      >
-        <TracesMetricsDashboard
-          v-show="searchObj.meta.showHistogram"
-          v-if="
-            searchObj.data.stream.selectedStream.value &&
-            searchObj.searchApplied
-          "
-          ref="metricsDashboardRef"
-          :streamName="searchObj.data.stream.selectedStream.value"
-          :timeRange="{
-            startTime: searchObj.data.datetime.startTime,
-            endTime: searchObj.data.datetime.endTime,
-          }"
-          :filter="searchObj.data.editorValue"
-          :streamFields="searchObj.data.stream.selectedStreamFields"
-          :show="
-            searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length
-          "
-          @time-range-selected="onMetricsTimeRangeSelected"
-          @filters-updated="onMetricsFiltersUpdated"
-        />
-      </transition>
+      <!-- Combined scroll area: RED metrics + trace list scroll together -->
+      <div class="tw:flex-1 tw:overflow-y-auto">
+        <!-- ════════════════════ RED Metrics Section ════════════════════ -->
+        <transition
+          enter-active-class="transition-all duration-300 ease-in-out"
+          leave-active-class="transition-all duration-300 ease-in-out"
+          enter-from-class="opacity-0 -translate-y-4 max-h-0"
+          enter-to-class="opacity-100 translate-y-0 max-h-[1000px]"
+          leave-from-class="opacity-100 translate-y-0 max-h-[1000px]"
+          leave-to-class="opacity-0 -translate-y-4 max-h-0"
+        >
+          <TracesMetricsDashboard
+            v-show="searchObj.meta.showHistogram"
+            v-if="
+              searchObj.data.stream.selectedStream.value &&
+              searchObj.searchApplied
+            "
+            ref="metricsDashboardRef"
+            :streamName="searchObj.data.stream.selectedStream.value"
+            :timeRange="{
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
+            }"
+            :filter="searchObj.data.editorValue"
+            :streamFields="searchObj.data.stream.selectedStreamFields"
+            :show="
+              searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length
+            "
+            @time-range-selected="onMetricsTimeRangeSelected"
+            @filters-updated="onMetricsFiltersUpdated"
+          />
+        </transition>
 
-      <div class="tw:flex-1 tw:overflow-hidden tw:relative">
         <TracesSearchResultList
           :hits="hits"
           :loading="searchObj.loading"
