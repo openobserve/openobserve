@@ -100,6 +100,7 @@ mod m20260227_000001_add_alert_creates_incident;
 mod m20260305_000001_create_trial_quota_usage_table;
 mod m20260310_000001_create_anomaly_detection_config_table;
 mod m20260310_000002_create_anomaly_detection_models_table;
+mod m20260312_000001_create_eval_templates_table;
 mod m20260317_000001_add_anomaly_detection_config_columns;
 mod m20260318_000001_recreate_service_streams_schema;
 mod m20260318_000002_drop_service_streams_dimensions;
@@ -107,6 +108,8 @@ mod m20260318_000003_alter_alert_incidents_schema;
 mod m20260318_000004_add_set_id_to_service_streams;
 mod m20260318_000005_add_all_dimensions_to_service_streams;
 mod m20260326_000001_add_field_name_mapping_to_service_streams;
+mod m20260331_000001_create_sys_rca_agent_service_accounts;
+mod m20260402_000001_reports_add_image_fields;
 
 pub struct Migrator;
 
@@ -193,9 +196,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20260212_000001_widen_incident_correlation_key::Migration),
             Box::new(m20260214_000001_create_incident_events_table::Migration),
             Box::new(m20260227_000001_add_alert_creates_incident::Migration),
+            Box::new(m20260305_000001_create_trial_quota_usage_table::Migration),
             Box::new(m20260310_000001_create_anomaly_detection_config_table::Migration),
             Box::new(m20260310_000002_create_anomaly_detection_models_table::Migration),
-            Box::new(m20260305_000001_create_trial_quota_usage_table::Migration),
+            Box::new(m20260312_000001_create_eval_templates_table::Migration),
             Box::new(m20260317_000001_add_anomaly_detection_config_columns::Migration),
             Box::new(m20260318_000001_recreate_service_streams_schema::Migration),
             Box::new(m20260318_000002_drop_service_streams_dimensions::Migration),
@@ -203,6 +207,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260318_000004_add_set_id_to_service_streams::Migration),
             Box::new(m20260318_000005_add_all_dimensions_to_service_streams::Migration),
             Box::new(m20260326_000001_add_field_name_mapping_to_service_streams::Migration),
+            Box::new(m20260331_000001_create_sys_rca_agent_service_accounts::Migration),
+            Box::new(m20260402_000001_reports_add_image_fields::Migration),
         ]
     }
 }

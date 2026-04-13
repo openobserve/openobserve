@@ -115,7 +115,6 @@ const MOCK_REPORT = {
   ],
   destinations: [{ email: "dest@example.com" }],
   enabled: true,
-  media_type: "Pdf",
   title: "Report Title",
   message: "Hello",
   orgId: "test-org",

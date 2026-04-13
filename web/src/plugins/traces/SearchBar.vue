@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -214,6 +214,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           button-size="sm"
         />
       </div>
+
+      <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
+      <div
+        v-if="searchObj.meta.searchMode === 'service-graph'"
+        class="float-right col-auto o2-input-full"
+      >
+        <div class="tw:flex tw:items-center tw:gap-[0.5rem]">
+          <date-time
+            ref="dateTimeRef"
+            auto-apply
+            :default-type="searchObj.data.datetime.type"
+            :default-absolute-time="{
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
+            }"
+            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+            data-test="service-graph-date-time-picker"
+            class="tw:h-[2rem]!"
+            @on:date-change="updateDateTime"
+          />
+          <q-btn
+            data-test="service-graph-refresh-btn"
+            class="tw:mr-[0.375rem] tw:w-[1rem]! tw:min-h-[1.9rem]! tw:h-[1.9rem]! el-border"
+            icon="refresh"
+            @click="$emit('service-graph-refresh')"
+          >
+            <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+          </q-btn>
+          <div class="button-group logs-visualize-toggle element-box-shadow">
+            <div class="row">
+              <div>
+                <q-btn
+                  data-test="service-graph-tree-view-btn"
+                  :class="[
+                    'button button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm tw:h-[1.875rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
+                    searchObj.meta.serviceGraphVisualizationType === 'tree'
+                      ? 'selected'
+                      : '',
+                  ]"
+                  @click="onServiceGraphVisualizationChange('tree')"
+                  no-caps
+                  size="sm"
+                >
+                  Tree View
+                  <q-tooltip>Tree View</q-tooltip>
+                </q-btn>
+              </div>
+              <div>
+                <q-btn
+                  data-test="service-graph-graph-view-btn"
+                  :class="[
+                    'button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm tw:h-[1.875rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]!',
+                    searchObj.meta.serviceGraphVisualizationType === 'graph'
+                      ? 'selected'
+                      : '',
+                  ]"
+                  @click="onServiceGraphVisualizationChange('graph')"
+                  no-caps
+                  size="sm"
+                >
+                  Graph View
+                  <q-tooltip>Graph View</q-tooltip>
+                </q-btn>
+              </div>
+            </div>
+          </div>
+          <q-select
+            v-model="searchObj.meta.serviceGraphLayoutType"
+            :options="serviceGraphLayoutOptions"
+            dense
+            borderless
+            class="tw:w-[7.5rem] tw:min-h-[2rem]! tw:h-[2rem]!"
+            emit-value
+            map-options
+            :disable="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+            @update:model-value="onServiceGraphLayoutChange"
+          />
+        </div>
+      </div>
     </div>
     <div
       v-if="
@@ -267,6 +346,7 @@ import { useStore } from "vuex";
 
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
@@ -286,6 +366,7 @@ export default defineComponent({
   components: {
     DateTime,
     ShareButton,
+    AppTabs,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -298,6 +379,7 @@ export default defineComponent({
     "error-only-toggled",
     "filters-reset",
     "onChangeTimezone",
+    "service-graph-refresh",
   ],
   props: {
     fieldValues: {
@@ -634,6 +716,35 @@ export default defineComponent({
         : getImageURL("images/common/bar_chart_histogram.svg");
     });
 
+    // Service Graph toolbar controls
+    const serviceGraphVisualizationTabs = [
+      { label: "Tree View", value: "tree" },
+      { label: "Graph View", value: "graph" },
+    ];
+
+    const serviceGraphLayoutOptions = computed(() => {
+      if (searchObj.meta.serviceGraphVisualizationType === "graph") {
+        return [{ label: "Force Layout", value: "force" }];
+      }
+      return [
+        { label: "Horizontal", value: "horizontal" },
+        { label: "Vertical", value: "vertical" },
+      ];
+    });
+
+    const onServiceGraphVisualizationChange = (type: "tree" | "graph") => {
+      searchObj.meta.serviceGraphVisualizationType = type;
+      localStorage.setItem("serviceGraph_visualizationType", type);
+      const newLayout = type === "tree" ? "horizontal" : "force";
+      searchObj.meta.serviceGraphLayoutType = newLayout;
+      localStorage.setItem("serviceGraph_layoutType", newLayout);
+    };
+
+    const onServiceGraphLayoutChange = (type: string) => {
+      searchObj.meta.serviceGraphLayoutType = type;
+      localStorage.setItem("serviceGraph_layoutType", type);
+    };
+
     return {
       t,
       router,
@@ -659,6 +770,10 @@ export default defineComponent({
       config,
       applyFilters,
       removeFilterByField,
+      serviceGraphVisualizationTabs,
+      serviceGraphLayoutOptions,
+      onServiceGraphVisualizationChange,
+      onServiceGraphLayoutChange,
     };
   },
   computed: {
@@ -817,6 +932,22 @@ export default defineComponent({
 
   .download-logs-btn {
     height: 30px;
+  }
+
+  .app-tabs-container {
+    :deep(.o2-tabs) {
+      height: 100%;
+
+      .o2-tab {
+        height: 100%;
+        padding-top: 0;
+        padding-bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8125rem;
+      }
+    }
   }
 
   .reset-filters {

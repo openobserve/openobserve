@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -73,61 +73,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-slot:body-selection="scope">
               <q-td auto-width>
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" :disable="scope.row.is_system" />
+              </q-td>
+            </template>
+
+            <template #body-cell-email="props">
+              <q-td :props="props">
+                <template v-if="props.row.is_system">
+                  <span class="text-weight-medium">AI SRE Agent</span>
+                  <q-badge color="blue-2" text-color="blue-8" label="system" class="q-ml-sm q-px-xs" style="font-size: 10px;" />
+                </template>
+                <template v-else>{{ props.row.email }}</template>
+              </q-td>
+            </template>
+
+            <template #body-cell-first_name="props">
+              <q-td :props="props">
+                <template v-if="props.row.is_system && props.row.description">{{ props.row.description }}</template>
+                <template v-else>{{ props.row.first_name }}</template>
               </q-td>
             </template>
 
             <template #body-cell-token="props">
             <q-td :props="props" side>
-              <span class="tw:font-mono">{{ props.row.token || '' }}</span>
+              <span class="tw:font-mono">{{ props.row.token || '************' }}</span>
             </q-td>
           </template>
 
             <template #body-cell-actions="props">
               <q-td :props="props" side>
-                <q-btn
-                  data-test="service-accounts-refresh"
-                  :title="t('serviceAccounts.refresh')"
-                  icon="refresh"
-                  class="q-ml-xs"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  style="cursor: pointer !important"
-                  @click="confirmRefreshAction(props.row)"
-                >
-                </q-btn>
-                <q-btn
-                  data-test="service-accounts-edit"
-                  :title="t('serviceAccounts.update')"
-                  icon="edit"
-                  class="q-ml-xs"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  @click="addRoutePush(props)"
-                  style="cursor: pointer !important"
-                >
-                </q-btn>
-                <q-btn
-                  data-test="service-accounts-delete"
-                  :title="t('serviceAccounts.delete')"
-                  class="q-ml-xs"
-                  :icon="outlinedDelete"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  style="cursor: pointer !important"
-                  @click="confirmDeleteAction(props)"
-                >
-                </q-btn>
-
+                <template v-if="props.row.is_system">
+                  <q-badge color="grey-6" :label="t('serviceAccounts.systemManaged', 'System Managed')" class="q-px-sm q-py-xs">
+                    <q-tooltip v-if="props.row.description">{{ props.row.description }}</q-tooltip>
+                  </q-badge>
+                </template>
+                <template v-else>
+                  <q-btn
+                    data-test="service-accounts-refresh"
+                    :title="t('serviceAccounts.refresh')"
+                    icon="refresh"
+                    class="q-ml-xs"
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    style="cursor: pointer !important"
+                    @click="confirmRefreshAction(props.row)"
+                  >
+                  </q-btn>
+                  <q-btn
+                    data-test="service-accounts-edit"
+                    :title="t('serviceAccounts.update')"
+                    icon="edit"
+                    class="q-ml-xs"
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    @click="addRoutePush(props)"
+                    style="cursor: pointer !important"
+                  >
+                  </q-btn>
+                  <q-btn
+                    data-test="service-accounts-delete"
+                    :title="t('serviceAccounts.delete')"
+                    class="q-ml-xs"
+                    :icon="outlinedDelete"
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
+                    style="cursor: pointer !important"
+                    @click="confirmDeleteAction(props)"
+                  >
+                  </q-btn>
+                </template>
               </q-td>
             </template>
             <template #bottom="scope">
@@ -504,6 +527,9 @@ export default defineComponent({
                 first_name: data.first_name,
                 last_name: data.last_name,
                 token: data.token || '',
+                role: data.role || 'ServiceAccount',
+                is_system: data.is_system || false,
+                description: data.description || null,
               };
             });
 
@@ -573,8 +599,14 @@ export default defineComponent({
     };
 
     const redactToken = (token: string): string => {
-      if (token.length <= 4) return '*'.repeat(token.length);
-      return token.slice(0, 4) + '*'.repeat(token.length - 4);
+      if (!token || token.length === 0) return '*'.repeat(12);
+      if (token.length < 4) {
+        // For tokens shorter than 4 chars, show available chars and pad to 12
+        return token + '*'.repeat(12 - token.length);
+      } else {
+        // For tokens 4+ chars, show first 4 chars + asterisks (matches backend)
+        return token.slice(0, 4) + '*'.repeat(8);
+      }
     };
 
     const addMember = async (res: any, data: any, operationType: string) => {
@@ -658,7 +690,9 @@ export default defineComponent({
     };
 
     const bulkDeleteServiceAccounts = async () => {
-      const accountEmails = selectedAccounts.value.map((account: any) => account.email);
+      const accountEmails = selectedAccounts.value
+        .filter((account: any) => !isSystemAccount(account.email))
+        .map((account: any) => account.email);
 
       try {
         const res = await service_accounts.bulkDelete(
@@ -751,6 +785,10 @@ export default defineComponent({
       URL.revokeObjectURL(link.href); // Cleanup
     };
 
+    const isSystemAccount = (email: string) => {
+      return email.startsWith('o2-sre-agent.org-') && email.endsWith('@openobserve.internal');
+    };
+
     const confirmRefreshAction = (row: any) => {
       confirmRefresh.value = true;
       toBeRefreshed.value = row;
@@ -838,6 +876,7 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteServiceAccounts,
       redactToken,
+      isSystemAccount,
     };
   },
 });

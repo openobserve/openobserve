@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use arrow::array::{BooleanArray, Int64Array, RecordBatch, StringArray};
 use arrow_schema::{DataType, Field, Schema};
@@ -30,7 +30,6 @@ use infra::{
     file_list::{FileId, FileRecord, calculate_max_ts_upper_bound},
 };
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use rayon::slice::ParallelSliceMut;
 
 use crate::service::search::datafusion::{

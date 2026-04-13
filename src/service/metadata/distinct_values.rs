@@ -16,7 +16,7 @@
 use std::{
     collections::HashMap,
     sync::{
-        Arc,
+        Arc, LazyLock as Lazy,
         atomic::{AtomicBool, Ordering},
     },
 };
@@ -34,7 +34,6 @@ use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
 };
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tokio::sync::{RwLock, mpsc};

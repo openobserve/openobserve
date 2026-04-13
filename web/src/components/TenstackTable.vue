@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -397,7 +397,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : wrap
                         ? width - 260 - 12 + 'px'
                         : 'auto',
-                  height: wrap ? 'stretch' : rowHeight != null ? rowHeight + 'px' : undefined,
+                  height: wrap
+                    ? 'stretch'
+                    : rowHeight != null
+                      ? rowHeight + 'px'
+                      : undefined,
                 }"
                 @mouseover="handleCellMouseOver(cell)"
                 @mouseleave="handleCellMouseLeave()"
@@ -536,7 +540,7 @@ import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 
-interface StreamField {
+export interface StreamField {
   name: string;
   isSchemaField: boolean;
 }

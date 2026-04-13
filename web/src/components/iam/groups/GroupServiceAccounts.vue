@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -238,13 +238,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       );
   
       serviceAccountsState.service_accounts_users = cloneDeep(
-        data.map((user: any, index: number) => {
-          return {
-            email: user.email,
-            "#": index + 1,
-            isInGroup: groupUsersMap.value.has(user.email),
-          };
-        })
+        data
+          .filter((user: any) => user.is_system !== true) // Filter out system accounts
+          .map((user: any, index: number) => {
+            return {
+              email: user.email,
+              "#": index + 1,
+              isInGroup: groupUsersMap.value.has(user.email),
+            };
+          })
       );
   
       users.value = cloneDeep(serviceAccountsState.service_accounts_users).map(

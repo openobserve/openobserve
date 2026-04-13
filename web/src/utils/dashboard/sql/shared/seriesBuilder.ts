@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -221,11 +221,12 @@ export function createSeriesBuilders(deps: SeriesDeps) {
         panelSchema.type == "h-stacked") &&
         panelSchema.queries[0].fields.breakdown?.length)
     ) {
+      // Display "(empty)" for empty breakdown values instead of falling
+      // through to the y-axis label, which produces misleading legends
+      const displayKey = xAXisKey === "" ? "(empty)" : xAXisKey;
       return yAxisKeys.length === 1
-        ? xAXisKey !== ""
-          ? xAXisKey
-          : label
-        : `${xAXisKey} (${label})`;
+        ? displayKey
+        : `${displayKey} (${label})`;
     }
 
     return label;

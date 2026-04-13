@@ -161,6 +161,8 @@ const mockSearchObj = {
     searchMode: "traces" as "traces" | "spans" | "service-graph",
     resultGrid: {
       rowsPerPage: 25,
+      sortBy: "start_time" as string,
+      sortOrder: "desc" as "asc" | "desc",
     },
     refreshInterval: 0,
     serviceColors: {},
@@ -653,9 +655,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper
-          .find('[data-test="traces-search-not-started-text"]')
-          .exists(),
+        wrapper.find('[data-test="traces-search-not-started-text"]').exists(),
       ).toBe(true);
     });
 
@@ -769,9 +769,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper
-          .find('[data-test="traces-search-error-text"]')
-          .exists(),
+        wrapper.find('[data-test="traces-search-error-text"]').exists(),
       ).toBe(true);
     });
 
@@ -1107,6 +1105,7 @@ describe("Index.vue (Main Traces Page)", () => {
       const serviceGraphData = {
         stream: "default",
         serviceName: "test-service",
+        mode: "spans" as const,
         timeRange: {
           startTime: 1755853746625720,
           endTime: 1755853746725720,
@@ -1116,7 +1115,7 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.handleServiceGraphViewTraces(serviceGraphData);
       await flushPromises();
 
-      // handleServiceGraphViewTraces now sets searchMode = "spans" (not activeTab)
+      // handleServiceGraphViewTraces sets searchMode from data.mode
       expect(mockSearchObj.meta.searchMode).toBe("spans");
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
       expect(mockSearchObj.data.editorValue).toContain("test-service");
@@ -1268,9 +1267,7 @@ describe("Index.vue (Main Traces Page)", () => {
       });
       await flushPromises();
 
-      expect(mockSearchObj.data.editorValue).toContain(
-        "AND duration <= 20000",
-      );
+      expect(mockSearchObj.data.editorValue).toContain("AND duration <= 20000");
     });
 
     it("should combine all optional filter fields when all are provided", async () => {
@@ -1335,6 +1332,100 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(mockSearchObj.data.editorValue).not.toContain("duration");
     });
+
+    it("should set searchMode from data.mode when navigating via handleServiceGraphViewTraces", async () => {
+      mockSearchObj.meta.searchMode = "service-graph";
+
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        mode: "traces",
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.meta.searchMode).toBe("traces");
+    });
+
+    it("should append resourceFilter to query when data.resourceFilter is provided", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        mode: "spans",
+        resourceFilter: { field: "service.name", value: "my-service" },
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND service.name = 'my-service'",
+      );
+    });
+
+    it("should escape single quotes in resourceFilter value", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        mode: "spans",
+        resourceFilter: { field: "service.name", value: "it's here" },
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND service.name = 'it''s here'",
+      );
+    });
+
+    it("should call loadServiceGraph on serviceGraphRef when service-graph-refresh event fires from SearchBar", async () => {
+      const mockLoadServiceGraph = vi.fn();
+
+      // Start in service-graph mode so the ServiceGraph stub is rendered
+      mockSearchObj.meta.searchMode = "service-graph";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": {
+              name: "search-bar",
+              template: "<div />",
+              emits: ["service-graph-refresh"],
+            },
+            "index-list": true,
+            "search-result": true,
+            "service-graph": {
+              name: "service-graph",
+              template: "<div />",
+              setup() {
+                return { loadServiceGraph: mockLoadServiceGraph };
+              },
+            },
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      expect(searchBarEl.exists()).toBe(true);
+      await searchBarEl.vm.$emit("service-graph-refresh");
+      await flushPromises();
+
+      expect(mockLoadServiceGraph).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("Splitter Behavior", () => {
@@ -1384,9 +1475,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      expect(
-        wrapper.find(".traces-horizontal-splitter").exists(),
-      ).toBe(true);
+      expect(wrapper.find(".traces-horizontal-splitter").exists()).toBe(true);
     });
 
     it("should initialize splitterModel with a default value of 15", async () => {
@@ -1573,6 +1662,97 @@ describe("Index.vue (Main Traces Page)", () => {
 
       // No error should be thrown
       expect(wrapper.vm).toBeTruthy();
+    });
+  });
+
+  describe("onSearchModeChange — sortBy reset", () => {
+    function mountIndexStubbed() {
+      return mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    }
+
+    it("should reset sortBy to start_time when switching to traces mode and sortBy is a spans-only column", async () => {
+      // Simulate a spans-specific sort column being active
+      mockSearchObj.meta.resultGrid.sortBy = "span_status";
+      mockSearchObj.meta.searchMode = "spans";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
+      await flushPromises();
+
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("start_time");
+    });
+
+    it("should NOT reset sortBy when switching to traces mode and sortBy is start_time", async () => {
+      mockSearchObj.meta.resultGrid.sortBy = "start_time";
+      mockSearchObj.meta.searchMode = "spans";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
+      await flushPromises();
+
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("start_time");
+    });
+
+    it("should NOT reset sortBy when switching to traces mode and sortBy is duration", async () => {
+      mockSearchObj.meta.resultGrid.sortBy = "duration";
+      mockSearchObj.meta.searchMode = "spans";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
+      await flushPromises();
+
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("duration");
+    });
+
+    it("should NOT reset sortBy when switching to spans mode", async () => {
+      mockSearchObj.meta.resultGrid.sortBy = "operation_name";
+      mockSearchObj.meta.searchMode = "traces";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "spans");
+      await flushPromises();
+
+      // Switching to spans does not reset sortBy
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("operation_name");
+    });
+
+    it("should reset sortBy to start_time when switching to traces mode and sortBy is operation_name", async () => {
+      mockSearchObj.meta.resultGrid.sortBy = "operation_name";
+      mockSearchObj.meta.searchMode = "spans";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
+      await flushPromises();
+
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("start_time");
     });
   });
 

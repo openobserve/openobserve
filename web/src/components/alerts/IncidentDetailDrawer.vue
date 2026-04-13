@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -561,26 +561,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
 
-                    <!-- Key Type -->
+                    <!-- Correlated By -->
                     <div class="tw:grid tw:gap-2" style="grid-template-columns: 120px 1fr;">
                       <div :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'" class="tw:text-xs tw:font-medium">
-                        Key Type
+                        Correlated By
                       </div>
                       <div
-                        class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:py-1 tw:rounded tw:border tw:text-xs tw:font-mono tw:min-w-0"
+                        class="tw:flex tw:items-center tw:gap-2 tw:px-2.5 tw:py-1 tw:rounded tw:border tw:text-xs tw:min-w-0"
                         :style="{
                           backgroundColor: store.state.theme === 'dark' ? '#1F2021' : '#F9FAFB',
                           borderColor: store.state.theme === 'dark' ? '#444444' : '#E7EAEE',
                           color: store.state.theme === 'dark' ? '#E5E7EB' : '#374151'
                         }"
                       >
-                        <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.key_type || 'N/A' }}</span>
+                        <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ getCorrelationMethodLabel(incidentDetails?.key_type) }}</span>
                         <q-icon
                           :name="copiedField === 'key_type' ? 'check' : 'content_copy'"
                           :class="copiedField === 'key_type' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
-                          @click="copyToClipboard(incidentDetails?.key_type, 'key_type')"
+                          @click="copyToClipboard(getCorrelationMethodLabel(incidentDetails?.key_type), 'key_type')"
                         />
                       </div>
                     </div>
@@ -764,7 +764,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
                         class="tw:text-xs tw:font-medium tw:capitalize tw:min-w-fit"
                       >
-                        {{ key }}:
+                        {{ getSemanticGroupDisplayName(key) }}:
                       </div>
                       <div
                         :class="store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-900'"
@@ -1353,10 +1353,27 @@ export default defineComponent({
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
 
+    // Semantic groups for display name mapping
+    const semanticGroups = ref<Array<{ id: string; display: string; group?: string; fields: string[] }>>([]);
+
     // Computed to check if analysis already exists
     const hasExistingRca = computed(() => {
       return !!incidentDetails.value?.topology_context?.suggested_root_cause;
     });
+
+    // Create a lookup map for semantic group ID to display name
+    const semanticGroupDisplayMap = computed(() => {
+      const map = new Map<string, string>();
+      for (const group of semanticGroups.value) {
+        map.set(group.id, group.display);
+      }
+      return map;
+    });
+
+    // Helper function to get display name for a semantic group ID
+    const getSemanticGroupDisplayName = (id: string): string => {
+      return semanticGroupDisplayMap.value.get(id) || id;
+    };
 
     // True when a background AI analysis run has started but not yet completed.
     // Updated whenever events are fetched (load, tab switch, reopen, etc.) — no polling.
@@ -1371,7 +1388,7 @@ export default defineComponent({
         let lastComplete = -1;
         for (const ev of events) {
           if (ev.type === "ai_analysis_begin") lastBegin = ev.timestamp;
-          if (ev.type === "ai_analysis_complete") lastComplete = ev.timestamp;
+          if (ev.type === "ai_analysis_complete" || ev.type === "ai_analysis_failed") lastComplete = ev.timestamp;
         }
         const nowInFlight = lastBegin > lastComplete;
 
@@ -1985,6 +2002,15 @@ export default defineComponent({
         // Initialize editable status and severity from incident data
         editableStatus.value = response.data.status;
         editableSeverity.value = response.data.severity;
+
+        // Load semantic groups for display name mapping
+        try {
+          const semanticGroupsResponse = await serviceStreamsApi.getSemanticGroups(org);
+          semanticGroups.value = semanticGroupsResponse.data || [];
+        } catch (semanticError) {
+          console.warn("Failed to load semantic groups:", semanticError);
+          semanticGroups.value = [];
+        }
 
         // Check if a background AI analysis is already running
         await checkAnalysisInFlight(incidentId);
@@ -2841,6 +2867,19 @@ export default defineComponent({
       }
     };
 
+    // Humanize key_type for display
+    const getCorrelationMethodLabel = (keyType: string) => {
+      switch (keyType?.toLowerCase()) {
+        case "primary":
+          return t("alerts.incidents.correlatedByServiceDiscovery");
+        case "secondary":
+          return t("alerts.incidents.correlatedBySemanticGroups");
+        case "alert_id":
+          return t("alerts.incidents.correlatedByAlertId");
+        default:
+          return keyType || "Unknown";
+      }
+    };
 
     return {
       t,
@@ -2882,6 +2921,7 @@ export default defineComponent({
       correlationType,
       correlationTooltip,
       alertActivityChartData,
+      getSemanticGroupDisplayName,
       refreshCorrelation,
       close,
       handleSendToAiChat,
@@ -2911,6 +2951,7 @@ export default defineComponent({
       formatCustomConditions,
       formatTimestamp,
       formatTimestampUTC,
+      getCorrelationMethodLabel,
       copyToClipboard,
       copiedField,
       calculateDuration,

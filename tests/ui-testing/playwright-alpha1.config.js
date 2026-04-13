@@ -33,10 +33,10 @@ if (!process.env.ZO_ROOT_USER_PASSWORD && process.env.ALPHA1_USER_PASSWORD) {
   process.env.ZO_ROOT_USER_PASSWORD = process.env.ALPHA1_USER_PASSWORD;
 }
 
-// Ensure INGESTION_URL is set — on cloud, it's the same as the base URL
-if (!process.env.INGESTION_URL) {
+// On cloud, INGESTION_URL must point to the alpha base URL (not localhost from .env)
+if (!process.env.INGESTION_URL || process.env.INGESTION_URL.includes('localhost')) {
   process.env.INGESTION_URL = process.env.ZO_BASE_URL;
-  testLogger.info(`INGESTION_URL defaulted to ZO_BASE_URL: ${process.env.ZO_BASE_URL}`);
+  testLogger.info(`INGESTION_URL set to ZO_BASE_URL: ${process.env.ZO_BASE_URL}`);
 }
 
 // Override ORGNAME with the correct org identifier from cloud-config.json

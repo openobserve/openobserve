@@ -218,7 +218,7 @@ describe("handleStreamingHistogramHits", () => {
     expect(state.errorDetail.message).toBe("");
   });
 
-  it("replaces data when streaming_aggs is true and hits are non-empty", () => {
+  it("replaces data when streaming_aggs is true and hits are non-empty", async () => {
     const { state, handlers } = makeHandlers();
     state.data[0] = [{ id: 99 }];
     state.resultMetaData[0] = [{ streaming_aggs: true }];
@@ -227,6 +227,9 @@ describe("handleStreamingHistogramHits", () => {
       { meta: { currentQueryIndex: 0 } },
       { content: { results: { hits: [{ id: 1 }, { id: 2 }] } } },
     );
+
+    // Wait for microtask flush
+    await Promise.resolve();
 
     expect(state.data[0]).toHaveLength(2);
     expect(state.data[0][0].id).toBe(1);
@@ -245,7 +248,7 @@ describe("handleStreamingHistogramHits", () => {
     expect(state.data[0][0].id).toBe(99);
   });
 
-  it("prepends hits for asc order_by", () => {
+  it("prepends hits for asc order_by", async () => {
     const { state, handlers } = makeHandlers();
     state.data[0] = [{ id: 10 }];
     state.resultMetaData[0] = [{ streaming_aggs: false, order_by: "ASC" }];
@@ -255,11 +258,14 @@ describe("handleStreamingHistogramHits", () => {
       { content: { results: { hits: [{ id: 1 }] } } },
     );
 
+    // Wait for microtask flush
+    await Promise.resolve();
+
     expect(state.data[0][0].id).toBe(1);
     expect(state.data[0][1].id).toBe(10);
   });
 
-  it("appends hits for non-asc order_by", () => {
+  it("appends hits for non-asc order_by", async () => {
     const { state, handlers } = makeHandlers();
     state.data[0] = [{ id: 1 }];
     state.resultMetaData[0] = [{ streaming_aggs: false, order_by: "desc" }];
@@ -268,6 +274,9 @@ describe("handleStreamingHistogramHits", () => {
       { meta: { currentQueryIndex: 0 } },
       { content: { results: { hits: [{ id: 2 }] } } },
     );
+
+    // Wait for microtask flush
+    await Promise.resolve();
 
     expect(state.data[0][0].id).toBe(1);
     expect(state.data[0][1].id).toBe(2);

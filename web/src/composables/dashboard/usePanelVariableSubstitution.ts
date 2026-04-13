@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,7 @@ import {
   formatInterval,
   formatRateInterval,
   getTimeInSecondsBasedOnUnit,
+  normalizeVariableSyntax,
 } from "@/utils/dashboard/variables/variablesUtils";
 import { escapeSingleQuotes } from "@/utils/zincutils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
@@ -52,7 +53,7 @@ export const usePanelVariableSubstitution = ({
             ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
             ?.filter((it: any) => {
               const regexForVariable = new RegExp(
-                `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
+                `(?:\\$\\{?\\s*${it.name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}?)|(?:\\{\\{\\s*${it.name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}\\})`,
               );
 
               return panelSchema.value.queries
@@ -88,7 +89,7 @@ export const usePanelVariableSubstitution = ({
       ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
       ?.filter((it: any) => {
         const regexForVariable = new RegExp(
-          `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
+          `(?:\\$\\{?\\s*${it.name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}?)|(?:\\{\\{\\s*${it.name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}\\})`,
         );
 
         return panelSchema.value.queries
@@ -445,6 +446,9 @@ export const usePanelVariableSubstitution = ({
     endISOTimestamp: any,
     queryType: any,
   ) => {
+    // Normalize spaces inside variable syntax before replacement
+    query = normalizeVariableSyntax(query);
+
     const metadata: any[] = [];
 
     //fixed variables value calculations
@@ -519,13 +523,15 @@ export const usePanelVariableSubstitution = ({
 
     // replace fixed variables with its values
     fixedVariables?.forEach((variable: any) => {
-      // replace $VARIABLE_NAME or ${VARIABLE_NAME} with its value
+      // replace $VARIABLE_NAME, ${VARIABLE_NAME}, or {{VARIABLE_NAME}} with its value
       const variableName = `$${variable.name}`;
       const variableNameWithBrackets = `\${${variable.name}}`;
+      const mustachePlaceholder = `{{${variable.name}}}`;
       const variableValue = variable.value;
       if (
         query.includes(variableName) ||
-        query.includes(variableNameWithBrackets)
+        query.includes(variableNameWithBrackets) ||
+        query.includes(mustachePlaceholder)
       ) {
         metadata.push({
           type: "fixed",
@@ -533,6 +539,7 @@ export const usePanelVariableSubstitution = ({
           value: variable.value,
         });
       }
+      query = query.replaceAll(mustachePlaceholder, variableValue);
       query = query.replaceAll(variableNameWithBrackets, variableValue);
       query = query.replaceAll(variableName, variableValue);
     });
@@ -556,6 +563,29 @@ export const usePanelVariableSubstitution = ({
               )
               .join(",") || "''";
           const possibleVariablesPlaceHolderTypes = [
+            // Mustache forms
+            {
+              placeHolder: `{{${variable.name}:csv}}`,
+              value: valueToUse.join(","),
+            },
+            {
+              placeHolder: `{{${variable.name}:pipe}}`,
+              value: valueToUse.join("|"),
+            },
+            {
+              placeHolder: `{{${variable.name}:doublequote}}`,
+              value:
+                valueToUse.map((value: any) => `"${value}"`).join(",") || '""',
+            },
+            {
+              placeHolder: `{{${variable.name}:singlequote}}`,
+              value: value,
+            },
+            {
+              placeHolder: `{{${variable.name}}}`,
+              value: queryType === "sql" ? value : valueToUse.join("|"),
+            },
+            // Dollar-sign forms (existing)
             {
               placeHolder: `\${${variable.name}:csv}`,
               value: valueToUse.join(","),
@@ -601,9 +631,11 @@ export const usePanelVariableSubstitution = ({
           const valueToUse =
             variable.value === null ? SELECT_ALL_VALUE : variable.value;
           variableValue = `${variable.escapeSingleQuotes ? escapeSingleQuotes(valueToUse) : valueToUse}`;
+          const mustachePlaceholder = `{{${variable.name}}}`;
           if (
             query.includes(variableName) ||
-            query.includes(variableNameWithBrackets)
+            query.includes(variableNameWithBrackets) ||
+            query.includes(mustachePlaceholder)
           ) {
             metadata.push({
               type: "variable",
@@ -611,6 +643,23 @@ export const usePanelVariableSubstitution = ({
               value: valueToUse,
             });
           }
+
+          // Replace all forms of the variable placeholder in the query,
+          // placeholders can be in the form of {{varName}}, ${varName}, ${varName}, {{varName:csv}}, ${varName:csv} etc.
+          // which will be replaced with the variable value. For csv and pipe forms, if the variable value is an array, it will be joined with comma or pipe respectively.
+          // For doublequote form, the variable value will be wrapped with double quotes.
+          // For singlequote form, the variable value will be wrapped with single quotes.
+          query = query.replaceAll(`{{${variable.name}:csv}}`, variableValue);
+          query = query.replaceAll(`{{${variable.name}:pipe}}`, variableValue);
+          query = query.replaceAll(
+            `{{${variable.name}:doublequote}}`,
+            variableValue,
+          );
+          query = query.replaceAll(
+            `{{${variable.name}:singlequote}}`,
+            variableValue,
+          );
+          query = query.replaceAll(mustachePlaceholder, variableValue);
           query = query.replaceAll(variableNameWithBrackets, variableValue);
           query = query.replaceAll(variableName, variableValue);
         }

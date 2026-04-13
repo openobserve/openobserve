@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -5450,41 +5450,42 @@ export default defineComponent({
                     fieldNameSQL,
                     filter,
                   );
-                } else if (query.toLowerCase().includes("order by")) {
-                  const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
-                    query,
-                    "order by",
-                  );
-                  query =
-                    beforeOrderBy.trim() +
-                    " AND " +
-                    filter +
-                    " order by" +
-                    afterOrderBy;
-                } else if (query.toLowerCase().includes("group by")) {
-                  const [beforeGroupBy, afterGroupBy] = queryIndexSplit(
-                    query,
-                    "group by",
-                  );
-                  query =
-                    beforeGroupBy.trim() +
-                    " AND " +
-                    filter +
-                    " group by" +
-                    afterGroupBy;
-                } else if (query.toLowerCase().includes("limit")) {
-                  const [beforeLimit, afterLimit] = queryIndexSplit(
-                    query,
-                    "limit",
-                  );
-                  query =
-                    beforeLimit.trim() +
-                    " AND " +
-                    filter +
-                    " limit" +
-                    afterLimit;
                 } else {
-                  query = query + " AND " + filter;
+                  // Find the earliest clause that ends the WHERE conditions.
+                  // Standard SQL clause order: WHERE → GROUP BY → HAVING → ORDER BY → LIMIT.
+                  // We must insert the new filter before whichever comes first so it
+                  // stays inside the WHERE clause rather than after GROUP BY / ORDER BY.
+                  const terminatingClauses = [
+                    "group by",
+                    "having",
+                    "order by",
+                    "limit",
+                  ];
+                  const lowerQuery = query.toLowerCase();
+                  let firstClause: string | null = null;
+                  let firstIndex = Infinity;
+                  for (const clause of terminatingClauses) {
+                    const idx = lowerQuery.indexOf(clause);
+                    if (idx !== -1 && idx < firstIndex) {
+                      firstIndex = idx;
+                      firstClause = clause;
+                    }
+                  }
+                  if (firstClause) {
+                    const [beforeClause, afterClause] = queryIndexSplit(
+                      query,
+                      firstClause,
+                    );
+                    query =
+                      beforeClause.trim() +
+                      " AND " +
+                      filter +
+                      " " +
+                      firstClause +
+                      afterClause;
+                  } else {
+                    query = query + " AND " + filter;
+                  }
                 }
               } else {
                 if (query.toLowerCase().includes("order by")) {

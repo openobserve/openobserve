@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,7 +25,7 @@ export interface MetricsCorrelationConfig {
   orgIdentifier: string;
   timeRange: {
     startTime: number; // Timestamp in microseconds (16 digits)
-    endTime: number;   // Timestamp in microseconds (16 digits)
+    endTime: number; // Timestamp in microseconds (16 digits)
   };
   sourceStream?: string; // Original stream being viewed
   sourceType?: string; // Type of source stream
@@ -46,9 +46,11 @@ export function useMetricsCorrelationDashboard() {
     streams: StreamInfo[],
     config: MetricsCorrelationConfig,
     _theme: "dark" | "light" = "dark",
+    panelWidth = 64,
+    panelHeight = 16,
   ) => {
     const panels = streams.map((stream, index) => {
-      return createMetricPanel(stream, index, config);
+      return createMetricPanel(stream, index, config, panelWidth, panelHeight);
     });
 
     // No variables in the metrics dashboard - dimensions are managed at the top level
@@ -89,7 +91,9 @@ export function useMetricsCorrelationDashboard() {
   const createMetricPanel = (
     stream: StreamInfo,
     index: number,
-    config: MetricsCorrelationConfig
+    config: MetricsCorrelationConfig,
+    panelWidth = 64,
+    panelHeight = 16,
   ) => {
     // Get schema information for this metric stream
     const schema = config.metricSchemas?.[stream.stream_name];
@@ -99,11 +103,11 @@ export function useMetricsCorrelationDashboard() {
 
     // Map OpenTelemetry/Prometheus units to dashboard units
     const unitMapping: Record<string, string> = {
-      "By": "bytes",
-      "s": "seconds",
-      "ms": "milliseconds",
-      "us": "microseconds",
-      "ns": "nanoseconds",
+      By: "bytes",
+      s: "seconds",
+      ms: "milliseconds",
+      us: "microseconds",
+      ns: "nanoseconds",
       "{cpu}": "percentunit", // CPU as percentage
       "1": "percentunit", // Dimensionless ratio (0-1)
       "%": "percent",
@@ -120,7 +124,7 @@ export function useMetricsCorrelationDashboard() {
     // Build WHERE clause from stream filters
     // Quote field names that contain special characters (hyphens, dots, etc.)
     // Skip filters with SELECT_ALL_VALUE (wildcard - means match all values)
-    
+
     const whereConditions = Object.entries(stream.filters)
       .filter(([field, value]) => {
         const skip = value === SELECT_ALL_VALUE;
@@ -261,10 +265,10 @@ ORDER BY x_axis_1`;
         },
       ],
       layout: {
-        x: col * 64,
-        y: row * 16,
-        w: 64,
-        h: 16,
+        x: col * panelWidth,
+        y: row * panelHeight,
+        w: panelWidth,
+        h: panelHeight,
         i: `${stream.stream_name}_${index}`,
       },
       htmlContent: "",
@@ -278,7 +282,9 @@ ORDER BY x_axis_1`;
    */
   const generateLogsDashboard = (
     streams: StreamInfo[],
-    config: MetricsCorrelationConfig
+    config: MetricsCorrelationConfig,
+    panelWidth = 192,
+    panelHeight = 44,
   ) => {
     // Determine stream and filters based on available data
     let streamName: string;
@@ -289,7 +295,9 @@ ORDER BY x_axis_1`;
       streamName = config.sourceStream;
 
       // Try to find matching stream in API response
-      const matchingStream = streams?.find(s => s.stream_name === config.sourceStream);
+      const matchingStream = streams?.find(
+        (s) => s.stream_name === config.sourceStream,
+      );
       if (matchingStream) {
         // Use filters from API response (best case - backend computed correct field names)
         filters = matchingStream.filters;
@@ -315,9 +323,11 @@ ORDER BY x_axis_1`;
     const whereConditions = Object.entries(filters)
       .filter(([field, value]) => {
         // Only include string values, skip internal fields, and skip SELECT_ALL_VALUE wildcards
-        return typeof value === 'string' &&
-               !field.startsWith('_') &&
-               value !== SELECT_ALL_VALUE;
+        return (
+          typeof value === "string" &&
+          !field.startsWith("_") &&
+          value !== SELECT_ALL_VALUE
+        );
       })
       .map(([field, value]) => {
         const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field}"` : field;
@@ -389,8 +399,8 @@ ORDER BY x_axis_1`;
       layout: {
         x: 0,
         y: 0,
-        w: 192,
-        h: 44,
+        w: panelWidth,
+        h: panelHeight,
         i: 1,
       },
       htmlContent: "",

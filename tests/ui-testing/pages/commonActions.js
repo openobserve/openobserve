@@ -456,4 +456,29 @@ export class CommonActions {
         testLogger.info(`Final count: ${finalResult.count} notifications (expected ${expectedCount})`);
         return { match: finalResult.count === expectedCount, actualCount: finalResult.count, attempts: maxAttempts };
     }
+
+    /**
+     * Find elements containing specific text (case-sensitive)
+     * @param {string} text - Text to search for
+     * @returns {Locator}
+     */
+    getElementsWithText(text) {
+        return this.page.locator(`text="${text}"`);
+    }
+
+    /**
+     * Get page title element (h1, h2, or element with title-related class)
+     * @returns {Locator}
+     */
+    getPageTitle() {
+        return this.page.locator('h1, h2, .page-title, [class*="title"]').first();
+    }
+
+    /**
+     * Get scheduled queries or query management menu item
+     * @returns {Locator}
+     */
+    getQueryManagementMenuItem() {
+        return this.page.locator('[data-test*="scheduled"], [data-test*="query-management"], text=Scheduled, text=Query Management').first();
+    }
 } 

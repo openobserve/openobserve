@@ -180,14 +180,14 @@ async fn can_use_distinct_stream(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("type" = Option<String>, Query, description = "Stream type. Must be one of: logs, metrics, traces. Defaults to logs if not specified."),
+        ("type" = Option<String>, Query, description = "Stream type. one of: logs, metrics, traces. Defaults to logs."),
         ("is_ui_histogram" = Option<bool>, Query, description = "Whether to return histogram data for UI (default: false)"),
         ("is_multi_stream_search" = Option<bool>, Query, description = "Indicate is search is for multi stream (default: false)"),
         ("validate" = Option<bool>, Query, description = "Validate query fields against stream schema and User-Defined Schema (UDS). When enabled, returns error if queried fields are not in schema or not allowed by UDS (default: false)"),
     ),
     request_body(content = inline(Request), description = "Search query", content_type = "application/json", example = json!({
         "query": {
-            "sql": "select * from k8s ",
+            "sql": "select * from k8s",
             "start_time": 1675182660872049i64,
             "end_time": 1675185660872049i64,
             "from": 0,
@@ -225,7 +225,11 @@ async fn can_use_distinct_stream(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Search data with SQL query, you can use `match_all('something')` to search with full text search, also you can use `str_match(field, 'something')` to search in a specific field; start_time, end_time can't be zero, need to valid micro timestamp. Note: in summary mode, response is stripped to hits/total/took/columns/scan_size/function_error and hits are capped at 100. Use LIMIT in your SQL or request detail='full' if you need more.", "category": "search"}))
+        ("x-o2-mcp" = json!({
+            "description": "Search data with SQL, you can use `match_all('foo')` to search with full text search, also you can use `str_match(field, 'bar')` to search in a specific field; start_time, end_time can't be zero, need to be a valid micro timestamp. Note: in summary mode, response is capped at 100 hits, request detail='full' if you need more.",
+            "category": "search",
+            "pinned": true
+        }))
     )
 )]
 pub async fn search(
@@ -2016,18 +2020,17 @@ pub async fn result_schema(
             Err(_) => vec![],
         };
 
-        // Load stream-level cross-links (use first stream name)
-        let stream_links = if let Some(stream_name) = resolve_stream_names(&req.query.sql)
-            .ok()
-            .and_then(|names| names.into_iter().next())
-        {
-            infra::schema::get_settings(&org_id, &stream_name, stream_type)
+        // Load stream-level cross-links for all streams in the query
+        let stream_names = resolve_stream_names(&req.query.sql).unwrap_or_default();
+        let mut stream_links = Vec::new();
+        for stream_name in &stream_names {
+            if let Some(links) = infra::schema::get_settings(&org_id, stream_name, stream_type)
                 .await
                 .map(|s| s.cross_links.clone())
-                .unwrap_or_default()
-        } else {
-            vec![]
-        };
+            {
+                stream_links.extend(links);
+            }
+        }
 
         // Filter and populate alias for stream cross-links
         let filtered_stream: Vec<_> = stream_links

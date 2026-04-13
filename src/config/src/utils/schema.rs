@@ -16,12 +16,11 @@
 use std::{
     borrow::{Borrow, Cow},
     io::{BufRead, Seek},
-    sync::Arc,
+    sync::{Arc, LazyLock as Lazy},
 };
 
 use arrow_json::reader;
 use arrow_schema::{ArrowError, DataType, Field, Schema};
-use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::{Map, Value};
 

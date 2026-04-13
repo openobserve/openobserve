@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -134,11 +134,17 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
             }
         }
         Value::String(s) => {
-            // count the " character in string, as it will be escaped in the input json
+            // count quotes and backslashes in one pass; these add an extra byte when escaped
             // also we use bytes() here as sometimes compiler can optimize it faster with sse
             // see https://users.rust-lang.org/t/count-number-of-z-in-a-string/49763/5
-            let quote_count = s.bytes().filter(|b| *b == b'"').count();
-            let slash_count = s.bytes().filter(|b| *b == b'\\').count();
+            let (quote_count, slash_count) =
+                s.bytes()
+                    .fold((0usize, 0usize), |(quote_count, slash_count), b| {
+                        (
+                            quote_count + usize::from(b == b'"'),
+                            slash_count + usize::from(b == b'\\'),
+                        )
+                    });
             // "?"=>2
             size += s.len() + 2 + quote_count + slash_count;
         }

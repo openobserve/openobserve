@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use arrow_schema::{Field, FieldRef, Fields};
 use datafusion::{
@@ -35,7 +35,6 @@ use datafusion::{
     prelude::create_udf,
     scalar::ScalarValue,
 };
-use once_cell::sync::Lazy;
 
 /// Implementation of regexp_match
 pub(crate) static REGEX_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {

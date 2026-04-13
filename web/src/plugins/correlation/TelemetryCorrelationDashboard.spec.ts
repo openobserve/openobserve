@@ -49,23 +49,23 @@ vi.mock("@/composables/useServiceCorrelation", () => ({
   })),
 }));
 
-vi.mock("@/utils/metrics/metricGrouping", () => ({
-  groupMetricsByCategory: vi.fn((streams: any[]) => ({
-    infra: streams.filter((s: any) => s.stream_name?.includes("infra") || true).slice(0, 2),
-    network: [],
-    others: [],
-    groups: [
-      {
-        id: "infra",
-        label: "Infrastructure",
-        icon: "computer",
-        streams: streams.slice(0, 2),
-      },
-      { id: "network", label: "Network", icon: "network_check", streams: [] },
-      { id: "others", label: "Others", icon: "category", streams: [] },
-    ],
-  })),
-}));
+vi.mock("@/utils/metrics/metricGrouping", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    groupMetricsByCategory: vi.fn((streams: any[]) => {
+      const infraStreams = streams.slice(0, 2);
+      return {
+        byGroup: { infra: infraStreams, network: [], others: [] },
+        groups: [
+          { id: "infra", label: "Infrastructure", icon: "computer", streams: infraStreams },
+          { id: "network", label: "Network", icon: "network_check", streams: [] },
+          { id: "others", label: "Others", icon: "category", streams: [] },
+        ],
+      };
+    }),
+  };
+});
 
 vi.mock("@/services/stream", () => ({
   default: {

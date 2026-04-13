@@ -43,7 +43,16 @@ fn mcp_only_in_enterprise() -> Response {
         .unwrap()
 }
 
+/// MCP protocol version header name (MCP 2025-11-25)
+#[cfg(feature = "enterprise")]
+const MCP_PROTOCOL_VERSION_HEADER: &str = "MCP-Protocol-Version";
+
 /// Handler for MCP POST requests (single request/response)
+///
+/// Per MCP 2025-11-25 (Streamable HTTP transport):
+/// - Requests with `id` → 200 with JSON or SSE response
+/// - Notifications (no `id`) → 202 Accepted, no body
+/// - Validates `MCP-Protocol-Version` header on non-initialize requests
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
     post,
@@ -60,6 +69,8 @@ fn mcp_only_in_enterprise() -> Response {
     request_body(content = inline(MCPRequest), description = "MCP request payload", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json"),
+        (status = 202, description = "Accepted (notification, no response body)"),
+        (status = 400, description = "Bad Request (unsupported protocol version)"),
         (status = 500, description = "Internal Server Error"),
     ),
     extensions(
@@ -72,11 +83,42 @@ pub async fn handle_mcp_post(
     headers: HeaderMap,
     Json(mcp_request): Json<MCPRequest>,
 ) -> Response {
+    use o2_enterprise::enterprise::ai::mcp::MCP_PROTOCOL_VERSION;
+
     // Extract auth token from Authorization header
     let auth_token = headers
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
+
+    // Per MCP 2025-11-25: validate MCP-Protocol-Version header on all
+    // requests after initialization (initialize itself won't have it yet).
+    if mcp_request.method != "initialize"
+        && let Some(client_version) = headers
+            .get(MCP_PROTOCOL_VERSION_HEADER)
+            .and_then(|v| v.to_str().ok())
+        && client_version != MCP_PROTOCOL_VERSION
+    {
+        return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(format!(
+                "{{\"error\": \"Unsupported MCP protocol version '{}', expected '{}'\"}}",
+                client_version, MCP_PROTOCOL_VERSION
+            )))
+            .unwrap();
+    }
+
+    // Per MCP 2025-11-25: JSON-RPC notifications (no `id`) require HTTP 202,
+    // no response body. Process the notification but return 202.
+    if mcp_request.id.is_none() && mcp_request.method != "initialize" {
+        // Fire-and-forget: process notification asynchronously, don't wait
+        let _ = handle_mcp_request(mcp_request, auth_token).await;
+        return Response::builder()
+            .status(StatusCode::ACCEPTED)
+            .body(Body::empty())
+            .unwrap();
+    }
 
     // Check Accept header to determine response format
     let accept_header = headers
@@ -130,6 +172,43 @@ pub async fn handle_mcp_post(
             .body(Body::from(serde_json::to_string(&response).unwrap()))
             .unwrap()
     }
+}
+
+/// Handler for MCP DELETE requests — session termination (MCP 2025-11-25)
+///
+/// Clients may DELETE the MCP endpoint to explicitly terminate a session.
+/// Since O2 MCP is stateless, this always succeeds.
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/mcp",
+    context_path = "/api",
+    tag = "MCP",
+    operation_id = "MCPSessionDelete",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = 204, description = "Session terminated"),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    ),
+)]
+pub async fn handle_mcp_delete(Path(_org_id): Path<String>) -> Response {
+    // O2 MCP is stateless — no session state to clean up.
+    Response::builder()
+        .status(StatusCode::NO_CONTENT)
+        .body(Body::empty())
+        .unwrap()
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn handle_mcp_delete(Path(_org_id): Path<String>, _body: Bytes) -> Response {
+    mcp_only_in_enterprise()
 }
 
 /// Handler for MCP GET requests (streaming)
@@ -291,7 +370,7 @@ pub async fn handle_mcp_get(Path(_org_id): Path<String>, _body: Bytes) -> Respon
     )
 )]
 pub async fn oauth_authorization_server_metadata() -> Response {
-    use once_cell::sync::Lazy;
+    use std::sync::LazyLock as Lazy;
 
     static METADATA: Lazy<OAuthServerMetadata> = Lazy::new(|| {
         let dex_config = o2_dex::config::get_config();
