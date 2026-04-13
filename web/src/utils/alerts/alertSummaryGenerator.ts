@@ -57,9 +57,17 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
   const parts: string[] = [];
   const isRealTime = formData.is_real_time === 'true' || formData.is_real_time === true;
 
+  // Escape user-controlled strings before embedding in HTML (XSS prevention)
+  const esc = (s: string) => String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
   // Helper function to wrap text with clickable span
   const clickable = (text: string, fieldId: string) => {
-    return `<span class="summary-clickable" data-focus-target="${fieldId}">${text}</span>`;
+    return `<span class="summary-clickable" data-focus-target="${fieldId}">${esc(text)}</span>`;
   };
 
   // Build the bullet-point summary based on wizard step
@@ -107,7 +115,7 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
 
       // Create clickable span with query
       const queryLabel = translate('alerts.summary.queryCondition');
-      parts.push(`✓ ${queryLabel}: <span class="summary-clickable" data-focus-target="query">${truncatedQuery}</span>`);
+      parts.push(`✓ ${queryLabel}: <span class="summary-clickable" data-focus-target="query">${esc(truncatedQuery)}</span>`);
     }
   }
 
@@ -169,7 +177,7 @@ export function generateAlertSummary(formData: any, destinations: any[], t?: (ke
   const plainEnglish = generatePlainEnglishSummary(formData, destinations, isRealTime, translate, wizardStep);
   if (plainEnglish) {
     // Return plain English first, then bullet points (with single line break for tighter spacing)
-    return `<div class="plain-english-section">"${plainEnglish}"</div>\n${bulletPoints}`;
+    return `<div class="plain-english-section">"${esc(plainEnglish)}"</div>\n${bulletPoints}`;
   }
 
   return bulletPoints;

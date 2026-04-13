@@ -93,7 +93,35 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-sampled"),
             X_O2_ASSISTANT_SESSION_ID,
         ])
-        .allow_origin(AllowOrigin::mirror_request())
+        // Restrict CORS to the configured web_url origin only.
+        // mirror_request() + allow_credentials(true) allows any origin to make
+        // credentialed requests — effectively disabling same-origin protection.
+        // Only reflect the Origin header back if it matches our own web_url origin exactly.
+        // We extract only the scheme+host+port from web_url (ignoring any path) because
+        // the Origin header per RFC 6454 never contains a path component. This prevents
+        // prefix-match bypasses like https://app.example.com.evil.com matching a
+        // starts_with check against https://app.example.com.
+        .allow_origin(AllowOrigin::predicate(|origin, _parts| {
+            let cfg = config::get_config();
+            let web_url = cfg.common.web_url.trim_end_matches('/');
+            // In dev/test when web_url is empty, fall back to permissive behaviour.
+            if web_url.is_empty() {
+                return true;
+            }
+            // Extract the origin (scheme://host[:port]) from web_url so that a
+            // web_url with a path (e.g. https://app.example.com/o2) still matches
+            // the bare Origin header (https://app.example.com).
+            let allowed_origin = match web_url.find("://") {
+                Some(scheme_end) => {
+                    let after_scheme = &web_url[scheme_end + 3..];
+                    let host_end = after_scheme.find('/').unwrap_or(after_scheme.len());
+                    &web_url[..scheme_end + 3 + host_end]
+                }
+                // Malformed web_url — deny rather than fall back to prefix match.
+                None => return false,
+            };
+            origin.as_bytes() == allowed_origin.as_bytes()
+        }))
         .allow_credentials(true)
         .max_age(Duration::from_secs(3600))
 }

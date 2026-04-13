@@ -128,10 +128,14 @@ impl super::Db for PostgresDb {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let query = format!(
-            "SELECT value FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}' ORDER BY start_dt DESC;"
-        );
-        let value: String = match sqlx::query_scalar(&query).fetch_one(&pool).await {
+        let query = "SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC;";
+        let value: String = match sqlx::query_scalar(query)
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .fetch_one(&pool)
+            .await
+        {
             Ok(v) => v,
             Err(e) => {
                 if let sqlx::Error::RowNotFound = e {
@@ -236,9 +240,12 @@ impl super::Db for PostgresDb {
         } else {
             lock_id as i64
         };
-        let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
         DB_QUERY_NUMS.with_label_values(&["get_lock", ""]).inc();
-        if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
+        if let Err(e) = sqlx::query("SELECT pg_advisory_xact_lock($1)")
+            .bind(lock_id)
+            .execute(&mut *tx)
+            .await
+        {
             if let Err(e) = tx.rollback().await {
                 log::error!("[POSTGRES] rollback get_for_update error: {e}");
             }
@@ -415,56 +422,96 @@ impl super::Db for PostgresDb {
         }
 
         let (module, key1, key2) = super::parse_key(key);
-        // Escape ' (single quote) character with ''
-        let (key1, key2) = (key1.replace("'", "''"), key2.replace("'", "''"));
-        let sql = if with_prefix {
-            if key1.is_empty() {
-                format!(r#"DELETE FROM meta WHERE module = '{module}';"#)
-            } else if key2.is_empty() {
-                format!(r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}';"#)
-            } else {
-                format!(
-                    r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND (key2 = '{key2}' OR key2 LIKE '{key2}/%');"#
-                )
-            }
-        } else {
-            format!(
-                r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}';"#
-            )
-        };
-
-        let sql = if let Some(start_dt) = start_dt {
-            sql.replace(';', &format!(" AND start_dt = {start_dt};"))
-        } else {
-            sql
-        };
-
         let pool = CLIENT.clone();
         DB_QUERY_NUMS.with_label_values(&["delete", "meta"]).inc();
-        sqlx::query(&sql).execute(&pool).await?;
+
+        if with_prefix {
+            if key1.is_empty() {
+                let sql = "DELETE FROM meta WHERE module = $1";
+                let sql = if let Some(dt) = start_dt {
+                    format!("{} AND start_dt = {}", sql, dt)
+                } else {
+                    sql.to_string()
+                };
+                sqlx::query(&sql).bind(&module).execute(&pool).await?;
+            } else if key2.is_empty() {
+                let sql = "DELETE FROM meta WHERE module = $1 AND key1 = $2";
+                let sql = if let Some(dt) = start_dt {
+                    format!("{} AND start_dt = {}", sql, dt)
+                } else {
+                    sql.to_string()
+                };
+                sqlx::query(&sql)
+                    .bind(&module)
+                    .bind(&key1)
+                    .execute(&pool)
+                    .await?;
+            } else {
+                let sql = "DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4)";
+                let sql = if let Some(dt) = start_dt {
+                    format!("{} AND start_dt = {}", sql, dt)
+                } else {
+                    sql.to_string()
+                };
+                sqlx::query(&sql)
+                    .bind(&module)
+                    .bind(&key1)
+                    .bind(&key2)
+                    .bind(format!("{}/%", key2))
+                    .execute(&pool)
+                    .await?;
+            }
+        } else {
+            let sql = "DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3";
+            let sql = if let Some(dt) = start_dt {
+                format!("{} AND start_dt = {}", sql, dt)
+            } else {
+                sql.to_string()
+            };
+            sqlx::query(&sql)
+                .bind(&module)
+                .bind(&key1)
+                .bind(&key2)
+                .execute(&pool)
+                .await?;
+        }
 
         Ok(())
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
+        let mut sql =
+            "SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1".to_string();
+        let mut params = Vec::new();
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            sql.push_str(" AND module = $1");
+            params.push(module);
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+            params.push(key1);
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            sql.push_str(&format!(
+                " AND (key2 = ${} OR key2 LIKE ${})",
+                params.len() + 1,
+                params.len() + 2
+            ));
+            let key2_prefix = format!("{}/%", key2);
+            params.push(key2);
+            params.push(key2_prefix);
         }
-        sql = format!("{sql} ORDER BY start_dt ASC");
+        sql.push_str(" ORDER BY start_dt ASC");
 
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        for p in params {
+            query = query.bind(p);
+        }
+        let ret = query.fetch_all(&pool).await?;
         Ok(ret
             .into_iter()
             .map(|r| {
@@ -478,22 +525,37 @@ impl super::Db for PostgresDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta ".to_string();
+        let mut sql =
+            "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta WHERE 1=1 ".to_string();
+        let mut params = Vec::new();
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            sql.push_str(" AND module = $1");
+            params.push(module);
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+            params.push(key1);
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            sql.push_str(&format!(
+                " AND (key2 = ${} OR key2 LIKE ${})",
+                params.len() + 1,
+                params.len() + 2
+            ));
+            let key2_prefix = format!("{}/%", key2);
+            params.push(key2);
+            params.push(key2_prefix);
         }
-        sql = format!("{sql} ORDER BY start_dt ASC");
+        sql.push_str(" ORDER BY start_dt ASC");
+
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        for p in params {
+            query = query.bind(p);
+        }
+        let ret = query.fetch_all(&pool).await?;
         Ok(ret
             .into_iter()
             .map(|r| format!("/{}/{}/{}", r.module, r.key1, r.key2))
@@ -522,24 +584,45 @@ impl super::Db for PostgresDb {
 
         let (min_dt, max_dt) = start_dt.unwrap();
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
+        let mut sql =
+            "SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1".to_string();
+        let mut params = Vec::new();
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            sql.push_str(" AND module = $1");
+            params.push(module);
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+            params.push(key1);
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            sql.push_str(&format!(
+                " AND (key2 = ${} OR key2 LIKE ${})",
+                params.len() + 1,
+                params.len() + 2
+            ));
+            let key2_prefix = format!("{}/%", key2);
+            params.push(key2);
+            params.push(key2_prefix);
         }
-        sql = format!("{sql} AND start_dt >= {min_dt} AND start_dt <= {max_dt}");
-        sql = format!("{sql} ORDER BY start_dt ASC");
+
+        sql.push_str(&format!(
+            " AND start_dt >= ${} AND start_dt <= ${}",
+            params.len() + 1,
+            params.len() + 2
+        ));
+        params.push(min_dt.to_string());
+        params.push(max_dt.to_string());
+        sql.push_str(" ORDER BY start_dt ASC");
 
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        for p in params {
+            query = query.bind(p);
+        }
+        let ret = query.fetch_all(&pool).await?;
         Ok(ret
             .into_iter()
             .map(|r| (r.start_dt, Bytes::from(r.value)))
@@ -548,19 +631,34 @@ impl super::Db for PostgresDb {
 
     async fn count(&self, prefix: &str) -> Result<i64> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();
+        let mut sql = "SELECT COUNT(*) AS num FROM meta WHERE 1=1".to_string();
+        let mut params = Vec::new();
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            sql.push_str(" AND module = $1");
+            params.push(module);
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+            params.push(key1);
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            sql.push_str(&format!(
+                " AND (key2 = ${} OR key2 LIKE ${})",
+                params.len() + 1,
+                params.len() + 2
+            ));
+            let key2_prefix = format!("{}/%", key2);
+            params.push(key2);
+            params.push(key2_prefix);
         }
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
+        let mut query = sqlx::query_scalar::<_, i64>(&sql);
+        for p in params {
+            query = query.bind(p);
+        }
+        let count: i64 = query.fetch_one(&pool).await?;
         Ok(count)
     }
 

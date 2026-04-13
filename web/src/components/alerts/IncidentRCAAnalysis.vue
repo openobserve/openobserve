@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="rca-stream-content"
         class="tw:text-sm tw:whitespace-pre-wrap rca-content"
-        v-html="formattedRcaContent"
+        v-html="DOMPurify.sanitize(formattedRcaContent)"
       />
     </div>
 
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="rca-existing-content"
         class="tw:text-sm tw:whitespace-pre-wrap rca-content"
-        v-html="formattedRcaContent"
+        v-html="DOMPurify.sanitize(formattedRcaContent)"
       />
     </div>
   </div>
@@ -82,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, PropType } from "vue";
+import DOMPurify from "dompurify";
 
 export default defineComponent({
   name: "IncidentRCAAnalysis",
@@ -112,6 +113,9 @@ export default defineComponent({
     },
   },
   emits: ['trigger-rca'],
+  data() {
+    return { DOMPurify };
+  },
 });
 </script>
 

@@ -64,8 +64,16 @@ impl SsrfGuard {
             .host_str()
             .ok_or_else(|| "URL must have a valid host".to_string())?;
 
-        // Check if host is an IP address
-        if let Ok(ip_addr) = host.parse::<IpAddr>() {
+        // Check if host is an IP address.
+        // The url crate (some versions) returns bracketed IPv6 like "[::1]" from host_str().
+        // Strip brackets so the IP can be parsed by Rust's IpAddr.
+        let unbracketed_host = if host.starts_with('[') && host.ends_with(']') {
+            &host[1..host.len() - 1]
+        } else {
+            host
+        };
+
+        if let Ok(ip_addr) = unbracketed_host.parse::<IpAddr>() {
             // Block private IP ranges to prevent SSRF
             if Self::is_private_ip(&ip_addr) {
                 return Err(format!(
@@ -82,7 +90,6 @@ impl SsrfGuard {
             if lower_host == "localhost"
                 || lower_host.starts_with("localhost.")
                 || lower_host == "127.0.0.1"
-                || lower_host == "[::1]"
             {
                 return Err("Access to localhost is not allowed for security reasons".to_string());
             }
@@ -155,6 +162,11 @@ impl SsrfGuard {
                 (octets[0] >= 240 && !(octets[0] == 255 && octets[1] == 255 && octets[2] == 255 && octets[3] == 255))
             }
             IpAddr::V6(ipv6) => {
+                // IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1) — re-check as IPv4
+                if let Some(v4) = ipv6.to_ipv4_mapped() {
+                    return Self::is_private_ip(&IpAddr::V4(v4));
+                }
+
                 let segments = ipv6.segments();
 
                 // Loopback (::1)
@@ -242,8 +254,28 @@ mod tests {
         assert!(SsrfGuard::is_private_ip(&"169.254.1.1".parse().unwrap()));
         assert!(SsrfGuard::is_private_ip(&"::1".parse().unwrap()));
 
+        // IPv4-mapped IPv6 addresses must also be blocked (SSRF bypass vector)
+        assert!(SsrfGuard::is_private_ip(
+            &"::ffff:127.0.0.1".parse().unwrap()
+        ));
+        assert!(SsrfGuard::is_private_ip(
+            &"::ffff:10.0.0.1".parse().unwrap()
+        ));
+        assert!(SsrfGuard::is_private_ip(
+            &"::ffff:192.168.1.1".parse().unwrap()
+        ));
+
         // Public IPs should not be private
         assert!(!SsrfGuard::is_private_ip(&"8.8.8.8".parse().unwrap()));
         assert!(!SsrfGuard::is_private_ip(&"1.1.1.1".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_block_ipv4_mapped_ipv6() {
+        // IPv4-mapped IPv6 must be blocked to prevent SSRF bypass (NEW-001)
+        assert!(SsrfGuard::validate_url("http://[::ffff:127.0.0.1]/webhook").is_err());
+        assert!(SsrfGuard::validate_url("http://[::ffff:10.0.0.1]/webhook").is_err());
+        assert!(SsrfGuard::validate_url("http://[::ffff:192.168.1.1]/webhook").is_err());
+        assert!(SsrfGuard::validate_url("http://[::ffff:169.254.169.254]/webhook").is_err());
     }
 }
