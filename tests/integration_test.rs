@@ -2670,8 +2670,26 @@ mod tests {
             )],
         };
 
-        // Save pipeline using API call
-        e2e_post_pipeline(pipeline_data.clone()).await;
+        // Save pipeline directly to DB (bypassing API validation) to simulate a pipeline
+        // with an invalid query that was saved before validation was added, or to test
+        // what happens at evaluation time when the stream does not exist.
+        openobserve::service::db::pipeline::set(&pipeline_data)
+            .await
+            .expect("Failed to set pipeline in DB");
+        // Create the scheduler trigger directly with needs_validated=false so the
+        // non-existent stream does not fail the pre-save test run.
+        let derived_stream = match &pipeline_data.source {
+            PipelineSource::Scheduled(ds) => ds.clone(),
+            _ => panic!("Expected scheduled pipeline"),
+        };
+        openobserve::service::alerts::derived_streams::save(
+            derived_stream,
+            &pipeline_data.name,
+            &pipeline_data.id,
+            false,
+        )
+        .await
+        .expect("Failed to save derived stream trigger");
 
         let pipeline = get_pipeline_from_api(pipeline_data.name.as_str()).await;
 
