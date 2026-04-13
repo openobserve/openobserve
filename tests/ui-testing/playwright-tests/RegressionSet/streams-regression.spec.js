@@ -324,34 +324,36 @@ test.describe("Streams Regression Bugs", () => {
     // Bug #7671 Point #2: Quick mode fields from env should show icons
     // NOTE: Actual icon visibility depends on env config (default_quick_mode_fields)
 
+    let quickModeValidated = false;
     if (quickModeIconCount === 0) {
-      testLogger.warn('No quick mode icons found - test cannot validate Bug #7671 Point #2 without env configuration');
-      testLogger.info('Skipping quick mode icon validation - requires default_quick_mode_fields env variable to be configured');
-      test.skip(true, 'Quick mode icons require default_quick_mode_fields env variable configuration');
-    }
-
-    testLogger.info(`✓ Quick mode field indicators visible: ${quickModeIconCount} icon(s) found`);
-
-    // STRONG ASSERTION: Verify the icon is actually an image with the correct path
-    const firstIcon = quickModeIcons.first();
-    const iconSrc = await firstIcon.getAttribute('src');
-    const hasQuickModeImage = iconSrc?.includes('quick_mode') || false;
-
-    expect(hasQuickModeImage, 'Bug #7671 Point #2: Quick mode icon should use quick_mode image').toBe(true);
-    testLogger.info(`✓ Quick mode icon has correct image path: ${iconSrc}`);
-
-    // Verify tooltip on hover
-    await firstIcon.hover();
-    await page.waitForTimeout(1000);
-
-    const tooltip = page.locator('.q-tooltip').filter({ hasText: /quick.*mode/i });
-    const tooltipVisible = await tooltip.isVisible({ timeout: 2000 }).catch(() => false);
-
-    if (tooltipVisible) {
-      const tooltipText = await tooltip.textContent();
-      testLogger.info(`✓ Quick mode tooltip visible: "${tooltipText}"`);
+      testLogger.warn('⚠️  No quick mode icons found - Bug #7671 Point #2 cannot be validated without default_quick_mode_fields env configuration');
+      testLogger.info('Proceeding with FTS validation only (Quick Mode validation skipped)');
     } else {
-      testLogger.info('Quick mode tooltip may require different hover interaction');
+      testLogger.info(`✓ Quick mode field indicators visible: ${quickModeIconCount} icon(s) found`);
+
+      // STRONG ASSERTION: Verify the icon is actually an image with the correct path
+      const firstIcon = quickModeIcons.first();
+      const iconSrc = await firstIcon.getAttribute('src');
+      const hasQuickModeImage = iconSrc?.includes('quick_mode') || false;
+
+      expect(hasQuickModeImage, 'Bug #7671 Point #2: Quick mode icon should use quick_mode image').toBe(true);
+      testLogger.info(`✓ Quick mode icon has correct image path: ${iconSrc}`);
+
+      // Verify tooltip on hover
+      await firstIcon.hover();
+      await page.waitForTimeout(1000);
+
+      const tooltip = page.locator('.q-tooltip').filter({ hasText: /quick.*mode/i });
+      const tooltipVisible = await tooltip.isVisible({ timeout: 2000 }).catch(() => false);
+
+      if (tooltipVisible) {
+        const tooltipText = await tooltip.textContent();
+        testLogger.info(`✓ Quick mode tooltip visible: "${tooltipText}"`);
+      } else {
+        testLogger.info('Quick mode tooltip may require different hover interaction');
+      }
+
+      quickModeValidated = true;
     }
 
     // ADDITIONAL VERIFICATION: Check that fields table is properly rendered
@@ -361,7 +363,10 @@ test.describe("Streams Regression Bugs", () => {
     expect(tableVisible, 'Bug #7671: Schema table should be visible in stream settings').toBe(true);
     testLogger.info('✓ Schema table properly rendered in stream settings');
 
-    testLogger.info('✓ PASSED: FTS and quick mode field indicators test completed');
+    // Report which validations completed
+    const validatedFeatures = ['FTS'];
+    if (quickModeValidated) validatedFeatures.push('Quick Mode');
+    testLogger.info(`✓ PASSED: Bug #7671 field indicators test completed (validated: ${validatedFeatures.join(', ')})`);
   });
 
   test.afterEach(async () => {

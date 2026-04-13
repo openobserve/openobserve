@@ -592,13 +592,11 @@ test.describe("Alerts Regression Bugs", () => {
     const templateName = selectedTemplateName?.trim().replace(/\s+/g, ' ') || '';
     expect(templateName, 'Bug #10110: Selected template name must be non-empty to verify duplication').toBeTruthy();
 
-    // Count how many times the template name appears in the displayed text
+    // PRIMARY ASSERTION: Template display should match the selected template exactly (not duplicated)
+    // Bug #10110 caused the template name to appear twice in the display (e.g., "template1template1")
     // Both strings are normalized (trimmed + collapsed whitespace) for accurate comparison
-    const occurrences = cleanDisplayText.split(templateName).length - 1;
-
-    // PRIMARY ASSERTION: Template name should appear exactly once (UNCONDITIONAL)
-    expect(occurrences, `Bug #10110: Template "${templateName}" should appear once, not ${occurrences} times in input field`).toBe(1);
-    testLogger.info(`✓ Template appears exactly once in display - Bug #10110 is fixed`);
+    expect(cleanDisplayText, `Bug #10110: Template display should show "${templateName}" exactly once, not duplicated`).toBe(templateName);
+    testLogger.info(`✓ Template display matches selected template exactly (no duplication) - Bug #10110 is fixed`);
 
     // Additional check: Verify no duplicate class names or rendering issues
     const templateFieldClasses = await templateSelect.getAttribute('class') || '';
