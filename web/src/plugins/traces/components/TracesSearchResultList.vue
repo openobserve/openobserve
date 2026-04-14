@@ -32,12 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       v-show="hasResults || loading"
       data-test="traces-table-wrapper"
-      class="column tw:h-auto! tw:flex-1 tw:min-h-0"
+      class="column tw:h-auto!"
     >
-      <!-- Table scroll area -->
+      <!-- Table scroll area: no overflow here — parent handles unified scroll -->
       <div
         data-test="traces-search-result-list"
-        class="tw:w-full tw:h-auto! tw:flex-1 tw:overflow-y-auto tw:overflow-x-auto tw:relative"
+        class="tw:w-full tw:h-auto! tw:overflow-x-auto tw:relative"
       >
         <TenstackTable
           class="tw:h-auto!"
