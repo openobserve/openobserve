@@ -611,7 +611,7 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Clean up - go back without saving
     await pm.alertsPage.clickBackButton();
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
 
     testLogger.info('✓ PASSED: Template override duplication test completed');
   });
