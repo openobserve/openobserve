@@ -911,6 +911,11 @@ export default defineComponent({
     .q-field__native {
       height: 28px !important;
       min-height: 28px !important;
+      &::-webkit-inner-spin-button,
+      &::-webkit-outer-spin-button {
+        height: 16px;
+        margin-block: auto;
+      }
     }
   }
 }
