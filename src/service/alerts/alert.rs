@@ -1259,7 +1259,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     // Block SSRF: validate the destination URL before making any outbound request.
     // The test_http_destination handler validates on save/test, but the URL could
     // have been stored before the guard was introduced, or modified directly in DB.
-    if let Err(e) = SsrfGuard::validate_url(&endpoint.url) {
+    if let Err(e) = SsrfGuard::validate_url_with_config(&endpoint.url) {
         return Err(anyhow::anyhow!(
             "Destination URL blocked by SSRF guard: {e}"
         ));

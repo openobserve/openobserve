@@ -39,7 +39,21 @@ use std::net::IpAddr;
 pub struct SsrfGuard;
 
 impl SsrfGuard {
-    /// Check if a URL is safe to request (not an SSRF attempt)
+    /// Check if a URL is safe to request (not an SSRF attempt), reading the
+    /// `ZO_SSRF_ALLOW_LOOPBACK` config flag to decide whether loopback/localhost
+    /// destinations are permitted.
+    ///
+    /// Use this at all alert/destination call sites so that the allow-loopback
+    /// escape-hatch is honoured consistently.
+    pub fn validate_url_with_config(url: &str) -> Result<(), String> {
+        let allow_loopback = config::get_config().common.ssrf_allow_loopback;
+        Self::validate_url_inner(url, allow_loopback)
+    }
+
+    /// Check if a URL is safe to request (not an SSRF attempt).
+    ///
+    /// Loopback/localhost is always blocked.  For a config-aware version that
+    /// respects `ZO_SSRF_ALLOW_LOOPBACK`, use [`validate_url_with_config`].
     ///
     /// # Arguments
     /// * `url` - The URL to validate
@@ -48,6 +62,10 @@ impl SsrfGuard {
     /// * `Ok(())` if the URL is safe
     /// * `Err(String)` with error message if the URL is potentially dangerous
     pub fn validate_url(url: &str) -> Result<(), String> {
+        Self::validate_url_inner(url, false)
+    }
+
+    fn validate_url_inner(url: &str, allow_loopback: bool) -> Result<(), String> {
         // Parse the URL
         let parsed = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
 
@@ -75,7 +93,7 @@ impl SsrfGuard {
 
         if let Ok(ip_addr) = unbracketed_host.parse::<IpAddr>() {
             // Block private IP ranges to prevent SSRF
-            if Self::is_private_ip(&ip_addr) {
+            if Self::is_private_ip_inner(&ip_addr, allow_loopback) {
                 return Err(format!(
                     "Access to private IP address {} is not allowed for security reasons. \
                      This prevents Server-Side Request Forgery (SSRF) attacks.",
@@ -86,10 +104,11 @@ impl SsrfGuard {
             // It's a hostname - check for localhost and internal domains
             let lower_host = host.to_lowercase();
 
-            // Block localhost variations
-            if lower_host == "localhost"
-                || lower_host.starts_with("localhost.")
-                || lower_host == "127.0.0.1"
+            // Block localhost variations (unless loopback is explicitly allowed)
+            if !allow_loopback
+                && (lower_host == "localhost"
+                    || lower_host.starts_with("localhost.")
+                    || lower_host == "127.0.0.1")
             {
                 return Err("Access to localhost is not allowed for security reasons".to_string());
             }
@@ -124,11 +143,23 @@ impl SsrfGuard {
         Ok(())
     }
 
-    /// Check if an IP address is in a private/reserved range
+    /// Check if an IP address is in a private/reserved range (loopback always blocked).
+    /// Used by unit tests; production call sites use `is_private_ip_inner`.
+    #[cfg(test)]
     fn is_private_ip(ip: &IpAddr) -> bool {
+        Self::is_private_ip_inner(ip, false)
+    }
+
+    /// Core private-IP check.  When `allow_loopback` is true, the 127.0.0.0/8
+    /// and ::1 ranges are not treated as blocked so that single-node/test
+    /// deployments can use loopback destinations.
+    fn is_private_ip_inner(ip: &IpAddr, allow_loopback: bool) -> bool {
         match ip {
             IpAddr::V4(ipv4) => {
                 let octets = ipv4.octets();
+
+                // Loopback (127.0.0.0/8) — skip when explicitly allowed
+                (!allow_loopback && octets[0] == 127) ||
 
                 // Private networks (RFC 1918)
                 // 10.0.0.0/8
@@ -137,9 +168,6 @@ impl SsrfGuard {
                 (octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31) ||
                 // 192.168.0.0/16
                 (octets[0] == 192 && octets[1] == 168) ||
-
-                // Loopback (127.0.0.0/8) - already covered but explicit is better
-                (octets[0] == 127) ||
 
                 // Link-local (169.254.0.0/16)
                 (octets[0] == 169 && octets[1] == 254) ||
@@ -164,13 +192,13 @@ impl SsrfGuard {
             IpAddr::V6(ipv6) => {
                 // IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1) — re-check as IPv4
                 if let Some(v4) = ipv6.to_ipv4_mapped() {
-                    return Self::is_private_ip(&IpAddr::V4(v4));
+                    return Self::is_private_ip_inner(&IpAddr::V4(v4), allow_loopback);
                 }
 
                 let segments = ipv6.segments();
 
-                // Loopback (::1)
-                (ipv6.is_loopback()) ||
+                // Loopback (::1) — skip when explicitly allowed
+                (!allow_loopback && ipv6.is_loopback()) ||
 
                 // Link-local (fe80::/10)
                 (segments[0] & 0xffc0) == 0xfe80 ||

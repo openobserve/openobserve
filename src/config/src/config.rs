@@ -874,6 +874,12 @@ pub struct Common {
     /// Example: `http://localhost:8081,https://staging.example.com`
     #[env_config(name = "ZO_CORS_ALLOWED_ORIGINS", default = "")]
     pub cors_allowed_origins: String,
+    /// Allow alert destinations to target loopback/localhost addresses.
+    /// Disabled by default (SSRF protection). Enable only in trusted environments
+    /// such as CI/CD pipelines or self-hosted single-node setups where the
+    /// server legitimately needs to send notifications to itself.
+    #[env_config(name = "ZO_SSRF_ALLOW_LOOPBACK", default = false)]
+    pub ssrf_allow_loopback: bool,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
     pub base_uri: String,
     #[env_config(name = "ZO_DATA_DIR", default = "./data/openobserve/")]
