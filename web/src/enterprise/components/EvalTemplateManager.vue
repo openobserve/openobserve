@@ -33,7 +33,7 @@
       <!-- Main Content Table -->
       <div
         class="q-px-md q-pt-sm q-pb-md eval-page-bg"
-        style="height: calc(100vh - 128px)"
+        style="height: calc(100vh - var(--navbar-height) - 77px)"
       >
         <q-table
           :rows="templates"
@@ -42,7 +42,7 @@
           :loading="loading"
           :pagination="pagination"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          style="width: 100%; height: 100%"
+          style="width: 100%; height: calc(100vh - var(--navbar-height) - 77px)"
         >
           <template v-slot:body-cell-version="props">
             <q-td :props="props">
