@@ -15,7 +15,12 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 
-// All vi.mock() calls must be at top — Vitest hoists them before any import
+// All vi.mock() / vi.unmock() calls must be at top — Vitest hoists them before any import
+
+// The global test setup in __mocks__/http.ts registers a vi.mock for "@/services/http.ts"
+// that only exports `default`. This spec tests the real implementation, so we unmock it
+// here so the actual module (with its named exports) is used instead.
+vi.unmock("@/services/http.ts");
 
 vi.mock("../stores", () => ({
   default: {
