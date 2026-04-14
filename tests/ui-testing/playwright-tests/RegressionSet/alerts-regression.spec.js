@@ -293,6 +293,9 @@ test.describe("Alerts Regression Bugs", () => {
     await expect(groupByLabel).toBeVisible({ timeout: 5000 });
     testLogger.info('✓ Group By section visible');
 
+    // Get the query config section container (Step 2: Conditions)
+    const queryConfigSection = page.locator('.step-query-config');
+
     // Find the Group By input field using POM method with fallback selectors
     const groupByInput = await pm.alertsPage.findGroupByInputWithFallback(queryConfigSection);
 
@@ -575,13 +578,13 @@ test.describe("Alerts Regression Bugs", () => {
 
     // STRONG ASSERTION: Verify template name appears exactly once in the select field
     // Bug #10110 caused templates to display twice in the input field
-    // Use .q-field__native (Quasar's public API for the native input element)
-    const templateInputField = templateSelect.locator('.q-field__native').first();
-    await expect(templateInputField).toBeVisible({ timeout: 3000 });
+    // Use .q-select__display-value (Quasar's public API for the selected option display)
+    const templateDisplayValue = templateSelect.locator('.q-select__display-value').first();
+    await expect(templateDisplayValue).toBeVisible({ timeout: 3000 });
 
     // Get the visible text in the selected template display area
-    // Using .q-field__native input value instead of brittle [class*="ellipsis"] selector
-    const displayedText = await templateInputField.inputValue();
+    // Using .q-select__display-value textContent (semantically correct for reading selected option text)
+    const displayedText = await templateDisplayValue.textContent();
     const cleanDisplayText = displayedText?.trim().replace(/\s+/g, ' ') || '';
     testLogger.info('Template display text', { text: cleanDisplayText });
 
