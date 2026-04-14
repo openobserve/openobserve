@@ -646,22 +646,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="expanded-row"
                   :row="tableRows[virtualRow.index - 1]"
                   :index="calculateActualIndex(virtualRow.index - 1)"
-                  :highlight-query="highlightQuery"
-                  :hide-view-related="hideViewRelatedButton"
                   :hide-field-options="hideExpandFieldOptions"
-                @copy="copyLogToClipboard"
-                  @add-field-to-table="addFieldToTable"
-                  @add-search-term="addSearchTerm"
-                  @view-trace="
-                    viewTrace(formattedRows[virtualRow.index - 1]?.original)
-                  "
-                  @show-correlation="
-                    showCorrelation(
-                      formattedRows[virtualRow.index - 1]?.original,
-                    )
-                  "
-                  :streamName="jsonpreviewStreamName"
-                  @send-to-ai-chat="sendToAiChat"
                 />
               </td>
               <template v-else>
