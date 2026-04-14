@@ -638,7 +638,7 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 .source-maps-container {
-  height: calc(100vh - 8.25rem);
+  height: calc(100vh - var(--navbar-height) - 4.1rem);
   overflow-y: auto;
 }
 
