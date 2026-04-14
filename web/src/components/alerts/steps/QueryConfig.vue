@@ -225,12 +225,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- no. of groups row — always visible for measure mode, disabled when no group-by -->
-              <div v-if="selectedFunction !== 'total_events'" class="alert-condition-row">
+              <!-- no. of groups row — visible only when group-by fields are added -->
+              <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
-                  No. of groups
+                  Having groups
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    Minimum number of groups that must satisfy the condition above to trigger the alert. Add a Group By field to enable this.
+                    Minimum number of groups that must satisfy the condition above to trigger the alert.
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
@@ -240,7 +240,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense borderless hide-bottom-space
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
-                    :disable="!hasLogGroupByFields"
                     @update:model-value="onTriggerOperatorChange"
                   />
                   <q-input
@@ -250,7 +249,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
-                    :disable="!hasLogGroupByFields"
                     @update:model-value="onTriggerThresholdChange"
                     @blur="restoreDefaultThreshold"
                   />
@@ -430,12 +428,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <!-- no. of groups row — always visible for metrics measure mode, disabled when no group-by -->
-              <div v-if="selectedFunction !== 'total_events'" class="alert-condition-row">
+              <!-- no. of groups row — visible only when group-by fields are added -->
+              <div v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
-                  No. of groups
+                  Having groups
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    Minimum number of groups that must satisfy the condition above to trigger the alert. Add a Group By field to enable this.
+                    Minimum number of groups that must satisfy the condition above to trigger the alert.
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
@@ -445,7 +443,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense borderless hide-bottom-space
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
-                    :disable="!hasMetricGroupByFields"
                     @update:model-value="onTriggerOperatorChange"
                   />
                   <q-input
@@ -455,7 +452,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
-                    :disable="!hasMetricGroupByFields"
                     @update:model-value="onTriggerThresholdChange"
                     @blur="restoreDefaultThreshold"
                   />
@@ -576,7 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-if="generatedSqlQuery && !showFilters"
                           class="tw:text-xs tw:italic tw:ml-1 sql-query-hint"
                           :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
-                      review your sql query
+                      view the alert query
                       <q-tooltip
                         anchor="bottom middle"
                         self="top middle"
@@ -658,7 +654,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-if="generatedSqlQuery && !showFilters"
                       class="tw:text-xs tw:italic tw:ml-1 sql-query-hint"
                       :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
-                  review your sql query
+                  view the alert query
                   <q-tooltip
                     anchor="bottom middle"
                     self="top middle"
@@ -928,7 +924,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <!-- PromQL: Alert if the value is + No. of series -->
+            <!-- PromQL: Alert if the value is + Having series -->
             <template v-if="localTab === 'promql' && promqlCondition">
               <div class="alert-condition-row">
                 <span class="condition-label sql-promql-label">Alert if the value is *
@@ -959,7 +955,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="alert-condition-row">
-                <span class="condition-label sql-promql-label">No. of series *
+                <span class="condition-label sql-promql-label">Having series *
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
                     Minimum number of time series that must satisfy the condition above to trigger the alert.
                   </q-tooltip>
@@ -1827,8 +1823,15 @@ export default defineComponent({
         localIsAggregationEnabled.value = false;
         emit("update:isAggregationEnabled", false);
       } else {
-        // Measure mode — aggregation
+        // Measure mode — aggregation, always reset "having groups" to >= 1 on switch
         localIsAggregationEnabled.value = true;
+        triggerThreshold.value = 1;
+        triggerOperator.value = '>=';
+        if (props.triggerCondition) {
+          props.triggerCondition.threshold = 1;
+          props.triggerCondition.operator = '>=';
+          emit("update:triggerCondition", { ...props.triggerCondition });
+        }
         emit("update:isAggregationEnabled", true);
         onFunctionChange(value);
       }
@@ -1874,18 +1877,14 @@ export default defineComponent({
           emit("update:triggerCondition", { ...props.triggerCondition });
         }
       } else {
-        // Measure mode — uses aggregation, default trigger to "atleast 1 group"
+        // Measure mode — uses aggregation, always reset "having groups" to >= 1 on switch
         localIsAggregationEnabled.value = true;
-        // (no showHaving — row is always visible now)
-        // Reset to >= 1 when group-by is empty (field is disabled, user can't correct it)
-        if (!hasLogGroupByFields.value) {
-          triggerThreshold.value = 1;
-          triggerOperator.value = '>=';
-          if (props.triggerCondition) {
-            props.triggerCondition.threshold = 1;
-            props.triggerCondition.operator = '>=';
-            emit("update:triggerCondition", { ...props.triggerCondition });
-          }
+        triggerThreshold.value = 1;
+        triggerOperator.value = '>=';
+        if (props.triggerCondition) {
+          props.triggerCondition.threshold = 1;
+          props.triggerCondition.operator = '>=';
+          emit("update:triggerCondition", { ...props.triggerCondition });
         }
         emit("update:isAggregationEnabled", true);
         const aggFunction = value;
