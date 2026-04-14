@@ -262,9 +262,10 @@ pub async fn save_enrichment_table_from_url(
         return MetaHttpResponse::bad_request("URL cannot be empty");
     }
 
-    // URL validation: Skip if retry mode (we're just reprocessing existing URLs)
-    // Apply validation for normal updates and replace_failed mode
-    if !retry && let Err(err_msg) = validate_enrichment_url(&request_body.url) {
+    // Always validate the URL for SSRF protection, regardless of retry mode.
+    // The retry flag controls job scheduling, not URL sourcing — the body URL
+    // can differ from the original on a retry call, so we cannot skip validation.
+    if let Err(err_msg) = validate_enrichment_url(&request_body.url) {
         return MetaHttpResponse::bad_request(err_msg);
     }
 

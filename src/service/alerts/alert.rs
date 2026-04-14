@@ -70,7 +70,10 @@ use crate::{
     common::{
         infra::config::ORGANIZATIONS,
         meta::authz::Authz,
-        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
+        utils::{
+            auth::{is_ofga_unsupported, remove_ownership, set_ownership},
+            ssrf_guard::SsrfGuard,
+        },
     },
     service::{
         alerts::{QueryConditionExt, build_sql, destinations},
@@ -1252,6 +1255,15 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     } else {
         msg
     };
+
+    // Block SSRF: validate the destination URL before making any outbound request.
+    // The test_http_destination handler validates on save/test, but the URL could
+    // have been stored before the guard was introduced, or modified directly in DB.
+    if let Err(e) = SsrfGuard::validate_url_with_config(&endpoint.url) {
+        return Err(anyhow::anyhow!(
+            "Destination URL blocked by SSRF guard: {e}"
+        ));
+    }
 
     let client = if endpoint.skip_tls_verify {
         reqwest::Client::builder()

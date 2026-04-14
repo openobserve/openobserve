@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <span class="tw:text-sm"
                         :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
-                        v-html="getInlineEventText(event)"
+                        v-html="DOMPurify.sanitize(getInlineEventText(event))"
                       ></span>
                     </template>
                     <!-- For System Events: text, badge -->
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                         <span class="tw:text-sm"
                           :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
-                          v-html="getInlineEventText(event)"
+                          v-html="DOMPurify.sanitize(getInlineEventText(event))"
                         ></span>
                       </template>
                       <!-- For Alert events, show badge first -->
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                         <span class="tw:text-sm"
                           :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
-                          v-html="getInlineEventText(event)"
+                          v-html="DOMPurify.sanitize(getInlineEventText(event))"
                         ></span>
                       </template>
                       <!-- All other system events: text then badge (except severity changes) -->
@@ -342,6 +342,7 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { date } from "quasar";
 import incidentsService from "@/services/incidents";
+import DOMPurify from "dompurify";
 
 interface Props {
   orgId: string;
@@ -546,8 +547,15 @@ const getInlineEventText = (event: any): string => {
   const eventColor = getEventBadgeColor(event);
   const isDark = store.state.theme === 'dark';
   const opacity = isDark ? '50' : '40';
-  const bold = (text: string) => `<span style="font-weight: 600; color: ${eventColor};">${text}</span>`;
-  const severityBadge = (severity: string) => `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background-color: ${getSeverityColor(severity)}${opacity}; color: ${isDark ? '#ffffff' : getSeverityColor(severity)}; border: 1px solid ${getSeverityColor(severity)}${isDark ? '60' : '40'};">${severity}</span>`;
+  // Escape user-controlled strings before embedding in HTML (XSS prevention)
+  const esc = (s: string) => String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  const bold = (text: string) => `<span style="font-weight: 600; color: ${eventColor};">${esc(text)}</span>`;
+  const severityBadge = (severity: string) => `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background-color: ${getSeverityColor(severity)}${opacity}; color: ${isDark ? '#ffffff' : getSeverityColor(severity)}; border: 1px solid ${getSeverityColor(severity)}${isDark ? '60' : '40'};">${esc(severity)}</span>`;
   const isSystemEvent = getUserId(event) === 'System';
 
   switch (event.type) {
@@ -570,8 +578,8 @@ const getInlineEventText = (event: any): string => {
 
     case "SeverityUpgrade":
       return isSystemEvent
-        ? `Severity upgraded from ${severityBadge(data.from)} to ${severityBadge(data.to)}` + (data.reason ? ` - ${data.reason}` : '')
-        : `changed the severity from ${severityBadge(data.from)} to ${severityBadge(data.to)}` + (data.reason ? ` - ${data.reason}` : '');
+        ? `Severity upgraded from ${severityBadge(data.from)} to ${severityBadge(data.to)}` + (data.reason ? ` - ${esc(data.reason)}` : '')
+        : `changed the severity from ${severityBadge(data.from)} to ${severityBadge(data.to)}` + (data.reason ? ` - ${esc(data.reason)}` : '');
 
     case "SeverityOverride":
       return isSystemEvent
