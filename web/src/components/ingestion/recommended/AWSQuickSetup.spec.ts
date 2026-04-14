@@ -21,37 +21,23 @@ vi.mock('@/utils/zincutils', () => ({
   getIngestionURL: vi.fn(() => 'http://localhost:5080'),
 }));
 
+const MOCK_SERVICES = [
+  { label: 'CloudTrail', flag: 'EnableCloudTrail' },
+  { label: 'CloudWatch Metrics', flag: 'EnableCloudWatchMetrics' },
+  { label: 'VPC Flow Logs', flag: 'EnableVPCFlowLogs' },
+];
+
+const MOCK_REGIONS = [
+  { value: 'us-east-1', label: 'US East (N. Virginia)' },
+  { value: 'us-west-2', label: 'US West (Oregon)' },
+  { value: 'eu-west-1', label: 'Europe (Ireland)' },
+];
+
 vi.mock('@/utils/awsIntegrations', () => ({
-  awsIntegrations: [
-    {
-      id: 'cloudwatch-logs',
-      name: 'CloudWatchLogs',
-      displayName: 'CloudWatch Logs',
-      description: 'Collect CloudWatch logs',
-      category: 'logs',
-      cloudFormationTemplate: 'https://example.com/cloudwatch.yaml',
-      hasDashboard: true,
-    },
-    {
-      id: 's3-events',
-      name: 'S3Events',
-      displayName: 'S3 Events',
-      description: 'Collect S3 events',
-      category: 'logs',
-      cloudFormationTemplate: 'https://example.com/s3.yaml',
-      hasDashboard: false,
-    },
-    {
-      id: 'vpc-flow',
-      name: 'VPCFlow',
-      displayName: 'VPC Flow Logs',
-      description: 'Collect VPC flow logs',
-      category: 'networking',
-      hasDashboard: false,
-    },
-  ],
+  awsIntegrations: [],
   generateCloudFormationURL: vi.fn(() => 'https://console.aws.amazon.com/cloudformation'),
-  awsIntegrationCategories: { logs: 'Logs', networking: 'Networking' },
+  AWS_REGIONS: MOCK_REGIONS,
+  QUICK_SETUP_SERVICES: MOCK_SERVICES,
 }));
 
 vi.mock('@/services/segment_analytics', () => ({
@@ -77,7 +63,6 @@ describe('AWSQuickSetup.vue', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Mock window.open
     vi.stubGlobal('open', vi.fn());
   });
 
@@ -86,14 +71,13 @@ describe('AWSQuickSetup.vue', () => {
     vi.unstubAllGlobals();
   });
 
-  const createWrapper = () => {
-    return mount(AWSQuickSetup, {
+  const createWrapper = () =>
+    mount(AWSQuickSetup, {
       global: {
         plugins: [Quasar, mockI18n, mockRouter],
         provide: { store: mockStore },
       },
     });
-  };
 
   describe('Component Rendering', () => {
     it('should mount without errors', () => {
@@ -106,137 +90,115 @@ describe('AWSQuickSetup.vue', () => {
       expect(() => wrapper.unmount()).not.toThrow();
     });
 
-    it('should render Deploy Complete Stack button', () => {
+    it('should have correct component name', () => {
       wrapper = createWrapper();
-      const deployBtn = wrapper.find('[data-test="aws-quick-setup-deploy-btn"]');
-      expect(deployBtn.exists()).toBe(true);
-    });
-
-    it('should render View/Hide Details button', () => {
-      wrapper = createWrapper();
-      const detailsBtn = wrapper.find('[data-test="aws-quick-setup-details-btn"]');
-      expect(detailsBtn.exists()).toBe(true);
+      expect(wrapper.vm.$options.name).toBe('AWSQuickSetup');
     });
 
     it('should render Complete AWS Integration title', () => {
       wrapper = createWrapper();
       expect(wrapper.text()).toContain('Complete AWS Integration');
     });
-  });
 
-  describe('Component Identity', () => {
-    it('should have correct component name', () => {
+    it('should render deployment mode toggle', () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.$options.name).toBe('AWSQuickSetup');
+      expect(wrapper.find('[data-test="aws-deployment-mode-toggle"]').exists()).toBe(true);
+    });
+
+    it('should render launch button', () => {
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test="aws-quick-setup-deploy-btn"]').exists()).toBe(true);
     });
   });
 
-  describe('showDetails Toggle', () => {
-    it('should have showDetails false by default', () => {
+  describe('Deployment Mode', () => {
+    it('should default to single region mode', () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.showDetails).toBe(false);
+      expect((wrapper.vm as any).deploymentMode).toBe('single');
     });
 
-    it('should toggle showDetails when details button is clicked', async () => {
+    it('should show region select in single mode', () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.showDetails).toBe(false);
-      const detailsBtn = wrapper.find('[data-test="aws-quick-setup-details-btn"]');
-      await detailsBtn.trigger('click');
-      expect(vm.showDetails).toBe(true);
+      expect(wrapper.find('[data-test="aws-region-select"]').exists()).toBe(true);
     });
 
-    it('should toggle showDetails back when clicked again', async () => {
+    it('should default selected region to us-east-1', () => {
+      wrapper = createWrapper();
+      expect((wrapper.vm as any).selectedRegion).toBe('us-east-1');
+    });
+
+    it('should switch to stackset mode', async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const detailsBtn = wrapper.find('[data-test="aws-quick-setup-details-btn"]');
-      await detailsBtn.trigger('click');
-      expect(vm.showDetails).toBe(true);
-      await detailsBtn.trigger('click');
-      expect(vm.showDetails).toBe(false);
+      vm.deploymentMode = 'stackset';
+      await wrapper.vm.$nextTick();
+      expect(vm.deploymentMode).toBe('stackset');
     });
   });
 
-  describe('includedServices Computed', () => {
-    it('should compute includedServices with services having CloudFormation templates', () => {
+  describe('Services Selection', () => {
+    it('should start with all services enabled', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.includedServices).toBeDefined();
-      expect(Array.isArray(vm.includedServices)).toBe(true);
+      expect(vm.enabledServices.length).toBe(MOCK_SERVICES.length);
     });
 
-    it('should include services with cloudFormationTemplate', () => {
+    it('should deselect all services', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      // CloudWatch Logs and S3 Events have cloudFormationTemplate
-      expect(vm.includedServices.length).toBeGreaterThan(0);
+      vm.deselectAll();
+      expect(vm.enabledServices.length).toBe(0);
     });
 
-    it('should sort services by name', () => {
+    it('should select all services', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      const names = vm.includedServices.map((s: any) => s.name);
-      const sortedNames = [...names].sort();
-      expect(names).toEqual(sortedNames);
+      vm.deselectAll();
+      vm.selectAll();
+      expect(vm.enabledServices.length).toBe(MOCK_SERVICES.length);
     });
 
-    it('should include service with name and description', () => {
+    it('should start with services section collapsed', () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      if (vm.includedServices.length > 0) {
-        expect(vm.includedServices[0].name).toBeDefined();
-        expect(vm.includedServices[0].description).toBeDefined();
-        expect(vm.includedServices[0].category).toBeDefined();
-      }
+      expect((wrapper.vm as any).showServices).toBe(false);
     });
   });
 
-  describe('getCategoryIcon Function', () => {
-    it('should return icon for logs category', () => {
+  describe('StackSets Mode', () => {
+    it('should default stackset model to self-managed', () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.getCategoryIcon('logs')).toBe('description');
+      expect((wrapper.vm as any).stackSetModel).toBe('self');
     });
 
-    it('should return icon for metrics category', () => {
+    it('should default target regions to us-east-1', () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.getCategoryIcon('metrics')).toBe('speed');
+      expect((wrapper.vm as any).targetRegions).toEqual(['us-east-1']);
     });
 
-    it('should return icon for security category', () => {
+    it('should start with target regions collapsed', () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.getCategoryIcon('security')).toBe('security');
+      expect((wrapper.vm as any).showTargetRegions).toBe(false);
     });
 
-    it('should return cloud icon for unknown category', () => {
+    it('should select all regions', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.getCategoryIcon('unknown')).toBe('cloud');
-    });
-  });
-
-  describe('formatCategory Function', () => {
-    it('should capitalize first letter', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.formatCategory('logs')).toBe('Logs');
+      vm.selectAllRegions();
+      expect(vm.targetRegions.length).toBe(MOCK_REGIONS.length);
     });
 
-    it('should capitalize security', () => {
+    it('should clear target regions', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.formatCategory('security')).toBe('Security');
+      vm.targetRegions = [];
+      expect(vm.targetRegions.length).toBe(0);
     });
   });
 
-  describe('handleDeployStack', () => {
+  describe('handleLaunch - Single Region', () => {
     it('should be exposed as a function', () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(typeof vm.handleDeployStack).toBe('function');
+      expect(typeof (wrapper.vm as any).handleLaunch).toBe('function');
     });
 
     it('should call window.open when endpoint is valid', async () => {
@@ -244,6 +206,82 @@ describe('AWSQuickSetup.vue', () => {
       const deployBtn = wrapper.find('[data-test="aws-quick-setup-deploy-btn"]');
       await deployBtn.trigger('click');
       expect(window.open).toHaveBeenCalled();
+    });
+
+    it('should not call window.open when no services selected', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.deselectAll();
+      await wrapper.vm.$nextTick();
+      const deployBtn = wrapper.find('[data-test="aws-quick-setup-deploy-btn"]');
+      await deployBtn.trigger('click');
+      expect(window.open).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleLaunch - StackSets', () => {
+    it('should open stacksets console URL in stackset mode', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.deploymentMode = 'stackset';
+      await wrapper.vm.$nextTick();
+      vm.handleLaunch();
+      expect(window.open).toHaveBeenCalledWith(
+        expect.stringContaining('stacksets/create'),
+        '_blank',
+        'noopener,noreferrer',
+      );
+    });
+
+    it('should show param helper after stackset launch', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.deploymentMode = 'stackset';
+      await wrapper.vm.$nextTick();
+      vm.handleLaunch();
+      expect(vm.showParamHelper).toBe(true);
+    });
+
+    it('should not launch stackset when no target regions selected', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.deploymentMode = 'stackset';
+      vm.targetRegions = [];
+      await wrapper.vm.$nextTick();
+      vm.handleLaunch();
+      expect(window.open).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('stackSetParams computed', () => {
+    it('should include template URL as first param', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      const params = vm.stackSetParams;
+      expect(params[0].key).toBe('Amazon S3 URL (template)');
+      expect(params[0].value).toContain('aws_complete.yaml');
+    });
+
+    it('should include TemplateS3Bucket param', () => {
+      wrapper = createWrapper();
+      const params = (wrapper.vm as any).stackSetParams;
+      const bucket = params.find((p: any) => p.key === 'TemplateS3Bucket');
+      expect(bucket?.value).toBe('openobserve-datasources-bucket');
+    });
+
+    it('should include OpenObserveEndpoint param', () => {
+      wrapper = createWrapper();
+      const params = (wrapper.vm as any).stackSetParams;
+      const ep = params.find((p: any) => p.key === 'OpenObserveEndpoint');
+      expect(ep?.value).toContain('localhost');
+    });
+
+    it('should include a param for each service flag', () => {
+      wrapper = createWrapper();
+      const params = (wrapper.vm as any).stackSetParams;
+      MOCK_SERVICES.forEach(({ flag }) => {
+        expect(params.find((p: any) => p.key === flag)).toBeDefined();
+      });
     });
   });
 });
