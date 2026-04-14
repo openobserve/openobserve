@@ -671,11 +671,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "service_streams_cleanup",
-        3600u64, // 1 hour
+        config::get_config().service_streams.cleanup_interval_mins * 60, // convert minutes to seconds
         {
             use config::metrics;
 
-            const STALE_AGE_US: i64 = 30 * 24 * 3600 * 1_000_000; // 30 days
+            let stale_age_us = config::get_config().service_streams.stale_threshold_hours as i64 * 3600 * 1_000_000; // convert hours to microseconds
 
             // Leader election: smallest UUID ingester runs cleanup
             let is_leader = match infra::cluster::get_cached_online_ingester_nodes().await {
@@ -701,7 +701,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 }
             };
 
-            let cutoff_us = chrono::Utc::now().timestamp_micros() - STALE_AGE_US;
+            let cutoff_us = chrono::Utc::now().timestamp_micros() - stale_age_us;
 
             for org_id in &orgs {
                 let start = std::time::Instant::now();
