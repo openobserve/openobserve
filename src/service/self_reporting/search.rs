@@ -30,7 +30,18 @@ use proto::cluster_rpc::GetLicenseUsageResponse;
 
 use crate::service::search as SearchService;
 
-pub async fn get_usage(sql: String, start_time: i64, end_time: i64) -> Result<Vec<json::Value>> {
+pub async fn get_usage(
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+    local: bool,
+) -> Result<Vec<json::Value>> {
+    let (clusters, regions) = if local {
+        (vec!["local".into()], vec!["local".into()])
+    } else {
+        (vec![], vec![])
+    };
+
     let req = SearchRequest {
         query: Query {
             sql,
@@ -52,8 +63,8 @@ pub async fn get_usage(sql: String, start_time: i64, end_time: i64) -> Result<Ve
             histogram_interval: 0,
         },
         encoding: RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
+        regions,
+        clusters,
         timeout: 0,
         search_type: Some(SearchEventType::Other),
         search_event_context: None,
