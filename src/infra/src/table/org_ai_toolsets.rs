@@ -305,7 +305,8 @@ mod tests {
     #[test]
     fn test_encrypt_decrypt_roundtrip() {
         let dek = random_bytes(64);
-        let plaintext = r#"{"url":"https://api.example.com/mcp/","headers":{"Authorization":"Bearer tok"}}"#;
+        let plaintext =
+            r#"{"url":"https://api.example.com/mcp/","headers":{"Authorization":"Bearer tok"}}"#;
 
         let encrypted = encrypt_data(&dek, plaintext).unwrap();
         // Encrypted value must differ from plaintext

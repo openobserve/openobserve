@@ -135,8 +135,7 @@ mod tests {
     #[test]
     fn test_random_bytes_distribution() {
         // Collect 100 × 16-byte buffers and verify at least 90 are unique.
-        let values: HashSet<Vec<u8>> =
-            HashSet::from_iter((0..100).map(|_| random_bytes(16)));
+        let values: HashSet<Vec<u8>> = HashSet::from_iter((0..100).map(|_| random_bytes(16)));
         assert!(values.len() > 90);
     }
 }
