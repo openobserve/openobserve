@@ -88,9 +88,41 @@ vi.mock("@/components/alerts/CustomConfirmDialog.vue", () => ({
   },
 }));
 
+// Mock vuex so useStore() works
+vi.mock("vuex", async () => {
+  const actual = await vi.importActual<typeof import("vuex")>("vuex");
+  return {
+    ...actual,
+    useStore: vi.fn(() => mockStoreInstance),
+  };
+});
+
+// Module-level store reference updated in beforeEach
+let mockStoreInstance: any;
+
+// Mock useSuggestions composable
+vi.mock("@/composables/useSuggestions", () => ({
+  default: vi.fn(() => ({
+    autoCompleteData: { value: { query: "", cursorIndex: 0, org: "", streamType: "", streamName: "", popup: { open: null } } },
+    autoCompleteIsSuggesting: { value: false },
+    updateFieldValues: vi.fn(),
+    updateFieldKeywords: vi.fn(),
+    getSuggestions: vi.fn().mockResolvedValue([]),
+  })),
+}));
+
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({
-  b64EncodeUnicode: vi.fn((str: string) => Buffer.from(str).toString('base64')),
+  b64EncodeUnicode: vi.fn((str: string) => Buffer.from(str).toString("base64")),
+  getUUID: vi.fn(() => "mock-uuid"),
+  getImageURL: vi.fn((name: string) => `/images/${name}`),
+  convertMinutesToCron: vi.fn((minutes: number) => `0 */${minutes} * * * *`),
+  getCronIntervalDifferenceInSeconds: vi.fn((cron: string) => {
+    if (cron === "invalid") throw new Error("Invalid cron");
+    return 600;
+  }),
+  isAboveMinRefreshInterval: vi.fn(() => true),
+  describeCron: vi.fn((cron: string) => `Every ${cron}`),
 }));
 
 describe("QueryConfig.vue", () => {
@@ -100,6 +132,7 @@ describe("QueryConfig.vue", () => {
 
   beforeEach(() => {
     mockStore = createMockStore();
+    mockStoreInstance = mockStore;
     mockInputData = {
       conditions: {
         filterType: "group",
@@ -161,6 +194,7 @@ describe("QueryConfig.vue", () => {
 
     it("should render with correct theme class (dark mode)", async () => {
       const darkStore = createMockStore({ theme: "dark" });
+      mockStoreInstance = darkStore;
       const darkWrapper = mount(QueryConfig, {
         global: {
           mocks: { $store: darkStore },
@@ -186,6 +220,7 @@ describe("QueryConfig.vue", () => {
 
       expect(darkWrapper.find(".step-query-config.dark-mode").exists()).toBe(true);
       darkWrapper.unmount();
+      mockStoreInstance = mockStore;
     });
 
     it("should initialize with custom tab by default", () => {
@@ -931,6 +966,7 @@ describe("QueryConfig.vue", () => {
 
     it("should apply dark mode theme", async () => {
       const darkStore = createMockStore({ theme: "dark" });
+      mockStoreInstance = darkStore;
       const darkWrapper = mount(QueryConfig, {
         global: {
           mocks: { $store: darkStore },
@@ -956,6 +992,7 @@ describe("QueryConfig.vue", () => {
 
       expect(darkWrapper.find(".dark-mode").exists()).toBe(true);
       darkWrapper.unmount();
+      mockStoreInstance = mockStore;
     });
   });
 
@@ -970,6 +1007,7 @@ describe("QueryConfig.vue", () => {
       const emptyStore = createMockStore({
         organizationData: { functions: [] },
       });
+      mockStoreInstance = emptyStore;
       const emptyWrapper = mount(QueryConfig, {
         global: {
           mocks: { $store: emptyStore },
@@ -995,6 +1033,7 @@ describe("QueryConfig.vue", () => {
 
       expect(emptyWrapper.vm.functionsList).toEqual([]);
       emptyWrapper.unmount();
+      mockStoreInstance = mockStore;
     });
   });
 });

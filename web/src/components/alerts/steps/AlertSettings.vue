@@ -912,6 +912,13 @@ export default defineComponent({
       emitDestinationsUpdate,
       routeToCreateDestination,
       handlePeriodChange,
+      // Timezone
+      browserTimezone,
+      filteredTimezone,
+      showTimezoneWarning,
+      timezoneFilterFn,
+      // Frequency type switching
+      handleFrequencyTypeChange,
       // Cron validation
       cronJobError,
       validateFrequency,
