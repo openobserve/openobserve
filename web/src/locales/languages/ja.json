@@ -2238,7 +2238,8 @@
     },
     "updateAnomalyDetection": "異常検出の更新:",
     "anomalyCreated": "異常検知設定が作成されました。トレーニングはまもなく開始されます。",
-    "editJson": "アラート JSON の編集"
+    "editJson": "アラート JSON の編集",
+    "additional_settings": "その他の設定"
   },
   "alert_templates": {
     "header": "テンプレート",
