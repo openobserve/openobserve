@@ -1818,8 +1818,8 @@ export default defineComponent({
 
     // When metric function dropdown changes — handles count vs aggregation modes
     const onMetricFunctionChange = (value: string) => {
-      if (value === 'total_events' || value === 'count') {
-        // total_events / count — no aggregation, same path as logs total_events
+      if (value === 'total_events') {
+        // total_events (COUNT(*)) — no aggregation, trigger threshold shown inline
         localIsAggregationEnabled.value = false;
         emit("update:isAggregationEnabled", false);
       } else {
@@ -1863,8 +1863,8 @@ export default defineComponent({
 
     // When log function mode changes (count / unique_count / avg / etc.)
     const onLogFunctionChange = (value: string) => {
-      if (value === 'total_events' || value === 'count') {
-        // Count mode — no aggregation, trigger threshold shown inline
+      if (value === 'total_events') {
+        // total_events (COUNT(*)) — no aggregation, trigger threshold shown inline
         localIsAggregationEnabled.value = false;
         emit("update:isAggregationEnabled", false);
         logMeasureColumn.value = '';
