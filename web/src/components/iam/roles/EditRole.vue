@@ -791,6 +791,24 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         }
       }
 
+      if (!resourceMapper[resource] && resource === "report") {
+        if (!resourceMapper["rfolder"]) {
+          resourceMapper["rfolder"] = getResourceByName(
+            permissionsState.permissions,
+            "rfolder",
+          ) as Resource;
+        }
+
+        await getResourceEntities(resourceMapper["rfolder"]);
+
+        if (!resourceMapper[resource]) {
+          resourceMapper[resource] = getResourceByName(
+            permissionsState.permissions,
+            resource,
+          ) as Resource;
+        }
+      }
+
       if (!resourceMapper[resource]) continue;
 
       if (
@@ -830,6 +848,13 @@ const updateRolePermissions = async (permissions: Permission[]) => {
           (e: Entity) => e.name === folderId,
         );
         await getResourceEntities(alertResource as Entity);
+      } else if (resource === "report") {
+        const [folderId] = entity.split("/");
+
+        const reportResource = resourceMapper["rfolder"].entities.find(
+          (e: Entity) => e.name === folderId,
+        );
+        await getResourceEntities(reportResource as Entity);
       } else if (
         resource === "logs" ||
         resource === "metrics" ||
@@ -1024,6 +1049,12 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["afolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
+      } else if (resource === "report") {
+        const [folderId] = entity.split("/");
+
+        resourceDetails = resourceMapper.value["rfolder"].entities.find(
+          (e: Entity) => e.name === folderId,
+        ) as Entity;
       } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
@@ -1074,6 +1105,12 @@ const updateJsonInTable = () => {
         const [folderId] = entity.split("/");
 
         resourceDetails = resourceMapper.value["afolder"].entities.find(
+          (e: Entity) => e.name === folderId,
+        ) as Entity;
+      } else if (resource === "report") {
+        const [folderId] = entity.split("/");
+
+        resourceDetails = resourceMapper.value["rfolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
       } else if (entity === "_all_" + getOrgId()) {
@@ -1412,6 +1449,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     action_scripts: getActionScripts,
     cipher_keys: getCipherKeys,
     afolder: getAlertFolders,
+    rfolder: getReportFolders,
     re_patterns: getRePatterns,
     logs_pattern: getLogsPatternStreams,
     logs_insights: getLogsInsightsStreams,
@@ -1779,12 +1817,47 @@ const getStreamsTypes = async () => {
   });
 };
 
-const getReports = async () => {
-  const reports = await reportService.list(
+const getReportFolders = async () => {
+  const folders: any = await commonService.list_Folders(
     store.state.selectedOrganization.identifier,
+    "reports",
   );
 
-  updateResourceEntities("report", ["name"], [...reports.data]);
+  let isDefaultPresent = folders.data.list.find(
+    (folder: any) => folder.folderId === "default",
+  );
+
+  if (!isDefaultPresent) {
+    folders.data.list.unshift({ folderId: "default", name: "default" });
+  }
+
+  updateResourceEntities(
+    "rfolder",
+    ["folderId"],
+    [...folders.data.list],
+    true,
+    "name",
+    "report",
+  );
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getReports = async (resource: Entity | Resource) => {
+  const reports: any = await reportService.listByFolderId(
+    store.state.selectedOrganization.identifier,
+    resource.name,
+  );
+
+  updateEntityEntities(
+    resource,
+    ["report_id"],
+    [...(reports.data.list ?? reports.data)],
+    false,
+    "name",
+  );
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1856,6 +1929,9 @@ const updateEntityEntities = (
       }
       if (entity.childName === "alert") {
         entityName = entity["name"] + "/" + _entity["alert_id"];
+      }
+      if (entity.childName === "report") {
+        entityName = entity["name"] + "/" + _entity["report_id"];
       }
     }
 

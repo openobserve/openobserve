@@ -449,7 +449,7 @@ where
                 path_columns[0]
             )
         } else if url_len == 3 {
-            // Handle /v2 alert apis
+            // Handle /v2 alert and report apis
             if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("alerts") {
                 if method.eq("GET") {
                     method = "LIST".to_string();
@@ -457,6 +457,15 @@ where
                 format!(
                     "{}:{}",
                     OFGA_MODELS.get("alert_folders").unwrap().key,
+                    folder
+                )
+            } else if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("reports") {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                }
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("report_folders").unwrap().key,
                     folder
                 )
             } else if path_columns[1] == "re_patterns" && path_columns[2] == "test" {
@@ -617,9 +626,9 @@ where
                 )
             }
         } else if url_len == 4 {
-            // Handle /v2 alert apis
+            // Handle /v2 alert and report apis
             if path_columns[0].eq(V2_API_PREFIX) {
-                if path_columns[2].eq("alerts") {
+                if path_columns[2].eq("alerts") || path_columns[2].eq("reports") {
                     format!(
                         "{}:{}",
                         OFGA_MODELS
@@ -633,6 +642,8 @@ where
                     }
                     let ofga_type = if path_columns[3].eq("alerts") {
                         "alert_folders"
+                    } else if path_columns[3].eq("reports") {
+                        "report_folders"
                     } else {
                         "folders"
                     };
