@@ -538,6 +538,16 @@ export default defineComponent({
       }
     });
 
+    watch(
+      () => store.state.isWebinarBannerVisible,
+      (visible) => {
+        const navbarHeight = visible
+          ? "calc(36px + 27px)"
+          : "36px";
+        document.documentElement.style.setProperty("--navbar-height", navbarHeight);
+      },
+    );
+
     onMounted(async () => {
       filterMenus();
 
