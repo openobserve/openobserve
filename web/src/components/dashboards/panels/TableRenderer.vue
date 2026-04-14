@@ -34,6 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :rows-per-page="rowsPerPage"
       :enable-column-reorder="false"
       :enable-cell-copy="true"
+      :enable-text-highlight="false"
+      :enable-row-expand="false"
+      :enable-status-bar="false"
+      :enable-ai-context-button="false"
       data-test="dashboard-panel-table"
       @click:dataRow="(row: any, _idx: number, evt?: MouseEvent) => $emit('row-click', evt ?? null, row, _idx)"
     >
