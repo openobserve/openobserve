@@ -279,3 +279,89 @@ pub async fn remove(org: &str, id: &str) -> Result<(), errors::Error> {
     drop(_lock);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use base64::{Engine, prelude::BASE64_STANDARD};
+    use config::utils::rand::random_bytes;
+
+    use super::*;
+
+    // -----------------------------------------------------------------------
+    // ListFilter
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_list_filter_default() {
+        let f = ListFilter::default();
+        assert!(f.name.is_none());
+        assert!(f.kind.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // encrypt_data / decrypt_data roundtrip
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_encrypt_decrypt_roundtrip() {
+        let dek = random_bytes(64);
+        let plaintext = r#"{"url":"https://api.example.com/mcp/","headers":{"Authorization":"Bearer tok"}}"#;
+
+        let encrypted = encrypt_data(&dek, plaintext).unwrap();
+        // Encrypted value must differ from plaintext
+        assert_ne!(encrypted, plaintext);
+        // Must be valid base64
+        assert!(BASE64_STANDARD.decode(&encrypted).is_ok());
+
+        let decrypted = decrypt_data(&dek, &encrypted).unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_different_plaintexts() {
+        let dek = random_bytes(64);
+        let a = encrypt_data(&dek, "plaintext-a").unwrap();
+        let b = encrypt_data(&dek, "plaintext-b").unwrap();
+        // Different inputs must produce different ciphertexts
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn test_decrypt_with_wrong_dek_fails() {
+        let dek1 = random_bytes(64);
+        let dek2 = random_bytes(64);
+        let encrypted = encrypt_data(&dek1, "secret data").unwrap();
+        // Decrypting with a different key must fail (AES-SIV authentication)
+        assert!(decrypt_data(&dek2, &encrypted).is_err());
+    }
+
+    #[test]
+    fn test_encrypt_with_invalid_dek_size_fails() {
+        let bad_dek = vec![0u8; 16]; // too short for AES-256-SIV
+        assert!(encrypt_data(&bad_dek, "test").is_err());
+    }
+
+    #[test]
+    fn test_decrypt_invalid_base64_fails() {
+        let dek = random_bytes(64);
+        assert!(decrypt_data(&dek, "not-valid-base64!!!").is_err());
+    }
+
+    #[test]
+    fn test_decrypt_tampered_ciphertext_fails() {
+        let dek = random_bytes(64);
+        let encrypted = encrypt_data(&dek, "original").unwrap();
+        let mut raw = BASE64_STANDARD.decode(&encrypted).unwrap();
+        raw[0] ^= 0xFF; // flip a bit
+        let tampered = BASE64_STANDARD.encode(raw);
+        assert!(decrypt_data(&dek, &tampered).is_err());
+    }
+
+    #[test]
+    fn test_encrypt_empty_string() {
+        let dek = random_bytes(64);
+        let encrypted = encrypt_data(&dek, "").unwrap();
+        let decrypted = decrypt_data(&dek, &encrypted).unwrap();
+        assert_eq!(decrypted, "");
+    }
+}

@@ -101,4 +101,42 @@ mod tests {
         // We should have at least 90 different values out of 100 calls
         assert!(values.len() > 90);
     }
+
+    // -----------------------------------------------------------------------
+    // random_bytes
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_random_bytes_correct_length() {
+        assert_eq!(random_bytes(0).len(), 0);
+        assert_eq!(random_bytes(16).len(), 16);
+        assert_eq!(random_bytes(32).len(), 32);
+        assert_eq!(random_bytes(64).len(), 64); // DEK size for AES-256-SIV
+    }
+
+    #[test]
+    fn test_random_bytes_uniqueness() {
+        // Two calls must produce distinct results (the probability of collision
+        // for 32 random bytes is ~1 in 2^256 — negligible).
+        let a = random_bytes(32);
+        let b = random_bytes(32);
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn test_random_bytes_not_all_zeros() {
+        let bytes = random_bytes(64);
+        assert!(
+            !bytes.iter().all(|&b| b == 0),
+            "random_bytes should not return all zeros"
+        );
+    }
+
+    #[test]
+    fn test_random_bytes_distribution() {
+        // Collect 100 × 16-byte buffers and verify at least 90 are unique.
+        let values: HashSet<Vec<u8>> =
+            HashSet::from_iter((0..100).map(|_| random_bytes(16)));
+        assert!(values.len() > 90);
+    }
 }

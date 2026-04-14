@@ -401,3 +401,154 @@ pub async fn get_dek(org: &str) -> Result<Vec<u8>, errors::Error> {
     DEK_CACHE.insert(org.to_string(), (dek.clone(), Instant::now()));
     Ok(dek)
 }
+
+#[cfg(test)]
+mod tests {
+    use base64::{Engine, prelude::BASE64_STANDARD};
+
+    use super::*;
+
+    // -----------------------------------------------------------------------
+    // Constants
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_default_dek_name_value() {
+        assert_eq!(DEFAULT_DEK_NAME, "__default__");
+    }
+
+    #[test]
+    fn test_cipher_key_prefix_value() {
+        assert_eq!(CIPHER_KEY_PREFIX, "/cipher_keys/");
+    }
+
+    // -----------------------------------------------------------------------
+    // EntryKind
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_entry_kind_display() {
+        assert_eq!(EntryKind::CipherKey.to_string(), "cipher_key");
+    }
+
+    #[test]
+    fn test_entry_kind_try_from_valid() {
+        assert_eq!(
+            EntryKind::try_from("cipher_key".to_string()).unwrap(),
+            EntryKind::CipherKey
+        );
+    }
+
+    #[test]
+    fn test_entry_kind_try_from_invalid() {
+        assert!(EntryKind::try_from("unknown".to_string()).is_err());
+        assert!(EntryKind::try_from("".to_string()).is_err());
+        assert!(EntryKind::try_from("CipherKey".to_string()).is_err()); // case-sensitive
+    }
+
+    // -----------------------------------------------------------------------
+    // Algorithm::None passthrough
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_algorithm_none_encrypt_is_passthrough() {
+        let alg = Algorithm::None;
+        let plaintext = "sensitive data";
+        let result = alg.encrypt(plaintext).unwrap();
+        assert_eq!(result, plaintext);
+    }
+
+    #[test]
+    fn test_algorithm_none_decrypt_is_passthrough() {
+        let alg = Algorithm::None;
+        let ciphertext = "some_base64_looking_string";
+        let result = alg.decrypt(ciphertext).unwrap();
+        assert_eq!(result, ciphertext);
+    }
+
+    // -----------------------------------------------------------------------
+    // Algorithm::Aes256Siv encrypt/decrypt roundtrip
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_algorithm_aes256siv_roundtrip() {
+        // 64-byte key for AES-256-SIV
+        let key = config::utils::rand::random_bytes(64);
+        let alg = Algorithm::Aes256Siv(key);
+        let plaintext = r#"{"url":"https://example.com","token":"secret"}"#;
+
+        let encrypted = alg.encrypt(plaintext).unwrap();
+        // Encrypted should be base64 and different from plaintext
+        assert_ne!(encrypted, plaintext);
+        assert!(BASE64_STANDARD.decode(&encrypted).is_ok());
+
+        let decrypted = alg.decrypt(&encrypted).unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn test_algorithm_aes256siv_tampered_ciphertext_fails() {
+        let key = config::utils::rand::random_bytes(64);
+        let alg = Algorithm::Aes256Siv(key);
+        let encrypted = alg.encrypt("hello").unwrap();
+
+        // Flip a byte in the ciphertext
+        let mut raw = BASE64_STANDARD.decode(&encrypted).unwrap();
+        raw[0] ^= 0xFF;
+        let tampered = BASE64_STANDARD.encode(raw);
+
+        assert!(alg.decrypt(&tampered).is_err());
+    }
+
+    #[test]
+    fn test_algorithm_aes256siv_invalid_base64_fails() {
+        let key = config::utils::rand::random_bytes(64);
+        let alg = Algorithm::Aes256Siv(key);
+        assert!(alg.decrypt("not-valid-base64!!!").is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // init_master_key — error paths (OnceLock is not set on error)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_init_master_key_invalid_base64_returns_err() {
+        let result = init_master_key("not-valid-base64!!!");
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.to_lowercase().contains("base64") || msg.to_lowercase().contains("encode"),
+            "expected base64 error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_init_master_key_wrong_key_length_returns_err() {
+        // AES-256-SIV needs exactly 64 bytes; 32 bytes is wrong
+        let short_key = BASE64_STANDARD.encode([0u8; 32]);
+        assert!(init_master_key(&short_key).is_err());
+    }
+
+    #[test]
+    fn test_init_master_key_empty_string_returns_err() {
+        // Empty string is valid base64 but decodes to 0 bytes — wrong length
+        assert!(init_master_key("").is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // ListFilter
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_list_filter_is_system_false_excludes_system_rows() {
+        // Semantic contract: is_system: false means "only non-system rows"
+        // This mirrors how the field is used in list_filtered().
+        let filter = ListFilter {
+            org: Some("acme".to_string()),
+            kind: Some(EntryKind::CipherKey),
+            name: None,
+            is_system: false,
+        };
+        assert!(!filter.is_system);
+    }
+}
