@@ -1860,13 +1860,6 @@ describe("AddAlert Component", () => {
       w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
     });
 
-    it('should pass formData to AlertSetup', () => {
-      const alertSetup = w.findComponent({ name: 'AlertSetup' });
-      if (alertSetup.exists()) {
-        expect(alertSetup.props().formData).toBeDefined();
-      }
-    });
-
     it('should pass formData to QueryConfig', () => {
       const queryConfig = w.findComponent({ name: 'QueryConfig' });
       if (queryConfig.exists()) {

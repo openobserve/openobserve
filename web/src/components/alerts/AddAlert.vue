@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
       <div class="tw:flex tw:flex-col" style="height: calc(100vh - 44px);">
-      <!-- TIER 1: Top Bar -->
       <div class="alert-v3-topbar card-container tw:mx-[0.625rem] tw:mb-2 tw:shrink-0">
         <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[48px]">
 
@@ -184,7 +183,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- TIER 3 (left 70%) + TIER 2 (right 30%) row -->
       <div class="tw:flex tw:flex-1 tw:min-h-0 tw:mx-[0.625rem] tw:gap-2 tw:mb-2">
 
       <!-- LEFT column wrapper (flex: 6.5) -->
@@ -444,8 +442,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      </div><!-- end TIER 3+2 row -->
-      </div><!-- end flex column wrapper -->
+      </div>
+      </div>
 
   </div>
 
@@ -473,7 +471,6 @@ import { defineComponent, ref, reactive, computed, watch, onBeforeUnmount } from
 
 import JsonEditor from "../common/JsonEditor.vue";
 import HorizontalStepper from "./HorizontalStepper.vue";
-import AlertSetup from "./steps/AlertSetup.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
 import AlertSettings from "./steps/AlertSettings.vue";
 import CompareWithPast from "./steps/CompareWithPast.vue";
@@ -520,7 +517,6 @@ export default defineComponent({
   components: {
     JsonEditor,
     HorizontalStepper,
-    AlertSetup,
     QueryConfig,
     AlertSettings,
     CompareWithPast,
