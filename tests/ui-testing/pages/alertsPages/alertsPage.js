@@ -97,6 +97,8 @@ export class AlertsPage {
             contextAttributeKeyInput: '[data-test="alert-variables-key-input"]',
             contextAttributeValueInput: '[data-test="alert-variables-value-input"]',
             rowTemplateTextarea: '[data-test="add-alert-row-input-textarea"]',
+            templateOverrideSelect: '.q-select.template-select-field',
+            visibleDropdownMenu: '.q-menu:visible',
 
             // Query Editor Dialog selectors
             // The alerts dialog has TWO editors: SQL/PromQL (top) and VRL (bottom)
@@ -2137,6 +2139,72 @@ export class AlertsPage {
     async selectScheduledAlertType() {
         await this.page.locator(this.locators.scheduledAlertRadio).click();
         testLogger.info('Selected scheduled alert type');
+    }
+
+    /**
+     * Select real-time alert type
+     */
+    async selectRealtimeAlertType() {
+        const realtimeRadio = this.page.locator(this.locators.realtimeAlertRadio);
+        await expect(realtimeRadio).toBeVisible({ timeout: 5000 });
+        await realtimeRadio.click();
+        testLogger.info('Selected real-time alert type');
+    }
+
+    /**
+     * Expect real-time alert radio button to be visible
+     */
+    async expectRealtimeRadioVisible(timeout = 5000) {
+        await expect(this.page.locator(this.locators.realtimeAlertRadio)).toBeVisible({ timeout });
+    }
+
+    /**
+     * Get the Add Condition button
+     */
+    getAddConditionButton() {
+        return this.page.locator(this.locators.addConditionButton).first();
+    }
+
+    /**
+     * Get the condition column select dropdown
+     */
+    getConditionColumnSelect() {
+        return this.page.locator(this.locators.conditionColumnSelect).first();
+    }
+
+    /**
+     * Get the operator select dropdown
+     */
+    getOperatorSelect() {
+        return this.page.locator(this.locators.operatorSelect).first();
+    }
+
+    /**
+     * Get the condition value input field
+     */
+    getConditionValueInput() {
+        return this.page.locator(this.locators.conditionValueInput).first();
+    }
+
+    /**
+     * Get the visible dropdown menu (.q-menu:visible)
+     */
+    getVisibleMenu() {
+        return this.page.locator(this.locators.visibleDropdownMenu);
+    }
+
+    /**
+     * Get the template override select field
+     */
+    getTemplateOverrideSelect() {
+        return this.page.locator(this.locators.templateOverrideSelect).first();
+    }
+
+    /**
+     * Expect template override select to be visible
+     */
+    async expectTemplateOverrideSelectVisible(timeout = 15000) {
+        await expect(this.getTemplateOverrideSelect()).toBeVisible({ timeout });
     }
 
     /**

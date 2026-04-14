@@ -32,7 +32,9 @@ test.describe("Traces Regression Bugs", () => {
   // Bug #10769: Traces UI: Column sorting support
   // https://github.com/openobserve/openobserve/issues/10769
   // ==========================================================================
-  test("Trace columns should support sorting @bug-10769 @P1 @regression @sorting", async ({ page }) => {
+  test("Trace columns should support sorting", {
+    tag: ['@bug-10769', '@P1', '@regression', '@tracesRegression', '@sorting']
+  }, async ({ page }) => {
     testLogger.info('Test: Verify trace column sorting (Bug #10769)');
 
     // Wait for traces page to be ready
@@ -104,7 +106,9 @@ test.describe("Traces Regression Bugs", () => {
   // Bug #9043: Trace pagination cursor resets when navigating back from trace details
   // https://github.com/openobserve/openobserve/issues/9043
   // ==========================================================================
-  test("Pagination cursor should not reset after navigating back from trace details @bug-9043 @P1 @regression @pagination", async ({ page }) => {
+  test("Pagination cursor should not reset after navigating back from trace details", {
+    tag: ['@bug-9043', '@P1', '@regression', '@tracesRegression', '@pagination']
+  }, async ({ page }) => {
     testLogger.info('Test: Verify pagination cursor persists after trace detail navigation (Bug #9043)');
 
     // Set a time range that will have enough traces
@@ -137,7 +141,7 @@ test.describe("Traces Regression Bugs", () => {
     testLogger.info('✓ Clicked first trace to open details');
 
     // Wait for trace details to load (either sidebar, dialog, or inline view)
-    const traceDetailsVisible = await page.locator('[data-test="trace-details-header"], [data-test="trace-details-tree"], [data-test="trace-details-sidebar"]')
+    const traceDetailsVisible = await pm.tracesPage.getTraceDetailsElements()
       .first()
       .isVisible({ timeout: 5000 })
       .catch(() => false);
@@ -168,7 +172,7 @@ test.describe("Traces Regression Bugs", () => {
 
     // STEP 5: Check for duplicates in the trace list
     // If pagination cursor resets, we would see the same traces loaded again
-    const afterBackTraceItems = page.locator('[data-test="traces-search-result-item"]');
+    const afterBackTraceItems = pm.tracesPage.getTraceResultItems();
     const afterBackCount = await afterBackTraceItems.count();
 
     let afterBackTraceData = [];
@@ -261,7 +265,7 @@ test.describe("Traces Regression Bugs", () => {
 
     // STEP 6: Verify that scrolling/pagination works correctly after navigation
     // Try to scroll the results container to trigger potential lazy loading
-    const resultsContainer = page.locator('[data-test="traces-search-result-list"], .traces-result-container').first();
+    const resultsContainer = pm.tracesPage.getResultsContainer();
     if (await resultsContainer.isVisible({ timeout: 3000 }).catch(() => false)) {
       // Scroll to bottom to trigger pagination/infinite scroll if it exists
       const scrollSuccess = await resultsContainer.evaluate(el => {

@@ -501,9 +501,8 @@ test.describe("Alerts Regression Bugs", () => {
     testLogger.info('✓ Selected stream', { stream: TEST_STREAM });
 
     // Select real-time alert type
-    const realtimeRadio = page.locator(pm.alertsPage.realtimeAlertRadio);
-    await expect(realtimeRadio).toBeVisible({ timeout: 5000 });
-    await realtimeRadio.click();
+    await pm.alertsPage.expectRealtimeRadioVisible();
+    await pm.alertsPage.selectRealtimeAlertType();
     testLogger.info('✓ Selected real-time alert type');
 
     // ==================== STEP 2: CONDITIONS ====================
@@ -512,27 +511,27 @@ test.describe("Alerts Regression Bugs", () => {
     testLogger.info('✓ Navigated to Step 2: Conditions');
 
     // Add a simple condition
-    const addCondBtn = page.locator(pm.alertsPage.addConditionButton).first();
+    const addCondBtn = pm.alertsPage.getAddConditionButton();
     if (await addCondBtn.isVisible({ timeout: 3000 })) {
       await addCondBtn.click();
       await page.waitForTimeout(500);
 
       // Select first available column
-      const columnSelect = page.locator(pm.alertsPage.conditionColumnSelect).first();
+      const columnSelect = pm.alertsPage.getConditionColumnSelect();
       await columnSelect.click();
       await page.waitForTimeout(500);
 
-      const visibleMenu = page.locator('.q-menu:visible');
+      const visibleMenu = pm.alertsPage.getVisibleMenu();
       await visibleMenu.locator('.q-item').first().click();
       await page.waitForTimeout(500);
 
       // Select operator
-      const operatorSelect = page.locator(pm.alertsPage.operatorSelect).first();
+      const operatorSelect = pm.alertsPage.getOperatorSelect();
       await operatorSelect.click();
       await page.getByText('Contains', { exact: true }).click();
 
       // Fill value
-      const valueInput = page.locator(pm.alertsPage.conditionValueInput).first();
+      const valueInput = pm.alertsPage.getConditionValueInput();
       await valueInput.locator('input').fill('test');
 
       testLogger.info('✓ Added condition');
@@ -554,8 +553,8 @@ test.describe("Alerts Regression Bugs", () => {
     // NOTE: No data-test attribute exists on this component (AlertSettings.vue line 189)
     // Using .template-select-field (application-defined class, stable) + .q-select (Quasar component)
     // TODO: Product team should add data-test="alert-template-override-select" for test stability
-    const templateSelect = page.locator('.q-select.template-select-field').first();
-    await expect(templateSelect).toBeVisible({ timeout: 15000 });
+    const templateSelect = pm.alertsPage.getTemplateOverrideSelect();
+    await pm.alertsPage.expectTemplateOverrideSelectVisible();
     testLogger.info('✓ Template override field visible');
 
     // Click the template select to open dropdown
@@ -563,7 +562,7 @@ test.describe("Alerts Regression Bugs", () => {
     await page.waitForTimeout(1000);
 
     // Find and select the first available template from dropdown
-    const templateMenu = page.locator('.q-menu:visible');
+    const templateMenu = pm.alertsPage.getVisibleMenu();
     await expect(templateMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
 
     const firstTemplate = templateMenu.locator('.q-item').first();

@@ -284,16 +284,15 @@ test.describe("Streams Regression Bugs", () => {
     await page.waitForTimeout(1000);
 
     // PRIMARY ASSERTION SETUP: Index type select must be visible to validate FTS feature
-    const indexTypeSelect = page.locator('[data-test="schema-stream-index-select"]').first();
-    await expect(indexTypeSelect, 'Bug #7671 Point #1: Index type select must be visible in stream settings to validate FTS').toBeVisible({ timeout: 5000 });
+    await pm.streamsPage.expectIndexTypeSelectVisible(5000);
     testLogger.info('✓ Index type select visible in stream settings');
 
     // Click on the index type select to see available options
-    await indexTypeSelect.click();
+    await pm.streamsPage.indexTypeSelect.click();
     await page.waitForTimeout(1000);
 
     // PRIMARY ASSERTION 1: Verify "Full text search" option exists
-    const fullTextSearchOption = page.locator('.q-item').filter({ hasText: 'Full text search' });
+    const fullTextSearchOption = pm.streamsPage.getFullTextSearchOption();
     const ftsOptionExists = await fullTextSearchOption.count() > 0;
 
     expect(ftsOptionExists, 'Bug #7671 Point #1: Full text search option should be visible in stream settings').toBe(true);
@@ -307,7 +306,7 @@ test.describe("Streams Regression Bugs", () => {
     testLogger.info('PART 2: Checking Quick Mode field indicators from environment variables');
 
     // Clear any existing field search
-    const fieldSearchInput = page.locator('input[placeholder*="Search Field"], input[placeholder*="search"]').first();
+    const fieldSearchInput = pm.streamsPage.fieldSearchInput;
     if (await fieldSearchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await fieldSearchInput.clear();
       await page.waitForTimeout(500);
@@ -315,8 +314,7 @@ test.describe("Streams Regression Bugs", () => {
 
     // Check for quick mode icon on fields
     // The quick mode icon appears next to field names that are in default_quick_mode_fields env variable
-    const quickModeIcons = page.locator('img[alt*="quick"], img[alt*="Quick"]');
-    const quickModeIconCount = await quickModeIcons.count();
+    const quickModeIconCount = await pm.streamsPage.getQuickModeIconsCount();
 
     testLogger.info(`Found ${quickModeIconCount} quick mode icons in stream settings`);
 
@@ -334,7 +332,7 @@ test.describe("Streams Regression Bugs", () => {
     testLogger.info(`✓ Quick mode field indicators visible: ${quickModeIconCount} icon(s) found`);
 
     // STRONG ASSERTION: Verify the icon is actually an image element with valid src
-    const firstIcon = quickModeIcons.first();
+    const firstIcon = pm.streamsPage.quickModeIcons.first();
     await expect(firstIcon, 'Bug #7671 Point #2: Quick mode icon must be visible').toBeVisible({ timeout: 3000 });
 
     const iconSrc = await firstIcon.getAttribute('src');
@@ -347,21 +345,17 @@ test.describe("Streams Regression Bugs", () => {
     await firstIcon.hover();
     await page.waitForTimeout(1000);
 
-    const tooltip = page.locator('.q-tooltip').filter({ hasText: /quick.*mode/i });
-    const tooltipVisible = await tooltip.isVisible({ timeout: 2000 }).catch(() => false);
+    const tooltipVisible = await pm.streamsPage.isTooltipVisible(2000);
 
     if (tooltipVisible) {
-      const tooltipText = await tooltip.textContent();
+      const tooltipText = await pm.streamsPage.quickModeTooltip.textContent();
       testLogger.info(`✓ Quick mode tooltip visible: "${tooltipText}"`);
     } else {
       testLogger.info('Quick mode tooltip may require different hover interaction');
     }
 
     // ADDITIONAL VERIFICATION: Check that fields table is properly rendered
-    const schemaTable = page.locator('.q-table').first();
-    const tableVisible = await schemaTable.isVisible({ timeout: 5000 }).catch(() => false);
-
-    expect(tableVisible, 'Bug #7671: Schema table should be visible in stream settings').toBe(true);
+    await pm.streamsPage.expectSchemaTableVisible(5000);
     testLogger.info('✓ Schema table properly rendered in stream settings');
 
     testLogger.info('✓ PASSED: Bug #7671 field indicators test completed (FTS + Quick Mode validated)');
