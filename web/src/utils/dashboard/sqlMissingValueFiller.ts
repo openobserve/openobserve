@@ -19,6 +19,77 @@ import { format } from "date-fns";
 import { isTimeSeries } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
 
+type MissingValueCacheEntry = {
+  filledData: any[];
+  binnedFillStartMs: number;
+  binnedDateMs: number;
+  anchorTimes: string[];
+  anchorEntryCount: number;
+  timeKey: string;
+  uniqueKey?: string;
+  hasBreakdown: boolean;
+  uniqueValues: Set<any>;
+  interval: number;
+  noValueConfigOption: any;
+  endTimeForFill: string;
+};
+
+const missingValueCache = new Map<string, MissingValueCacheEntry>();
+
+const formatUtc = (date: Date) =>
+  format(toZonedTime(date, "UTC"), "yyyy-MM-dd'T'HH:mm:ss");
+
+const areSetsEqual = (a: Set<any>, b: Set<any>) => {
+  if (a.size !== b.size) return false;
+  for (const value of a) {
+    if (!b.has(value)) return false;
+  }
+  return true;
+};
+
+const areAnchorTimesEqual = (a: string[], b: string[]) => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+};
+
+const getStreamingCacheKey = (
+  metadata: any,
+  panelSchema: any,
+  interval: number,
+  xAxisKeys: string[],
+  yAxisKeys: string[],
+  zAxisKeys: string[],
+  breakDownKeys: string[],
+  noValueConfigOption: any,
+) => {
+  const panelId = metadata?.panelId ?? panelSchema?.id;
+  const queryIndex = metadata?.queryIndex;
+  if (panelId == null || queryIndex == null) return null;
+
+  const query = metadata?.queries?.[0]?.query ?? "";
+  const startTime = metadata?.queries?.[0]?.startTime ?? "";
+  const endTime = metadata?.queries?.[0]?.endTime ?? "";
+  const type = panelSchema?.type ?? "";
+
+  return JSON.stringify({
+    panelId,
+    queryIndex,
+    query,
+    startTime,
+    endTime,
+    type,
+    interval,
+    xAxisKeys,
+    yAxisKeys,
+    zAxisKeys,
+    breakDownKeys,
+    noValueConfigOption,
+  });
+};
+
 /**
  * Fills in missing time-series data points between the start and end time
  * based on the histogram interval, inserting null/no-value entries where data
@@ -105,10 +176,7 @@ export const fillMissingValues = (
   // Use metadata endTime for the fill range end (user's selected end time).
   const metaDataEndTime = metadata?.queries[0]?.endTime?.toString() ?? 0;
   const endTime = new Date(parseInt(metaDataEndTime) / 1000);
-  const endTimeForFill = format(
-    toZonedTime(endTime, "UTC"),
-    "yyyy-MM-dd'T'HH:mm:ss",
-  );
+  const endTimeForFill = formatUtc(endTime);
 
   // Use resultMetaData's last entry's time_offset.start_time as the fill start.
   // Chunks arrive right-to-left (latest first), so the last entry has the earliest start.
@@ -118,6 +186,17 @@ export const fillMissingValues = (
     ? new Date(resultMetaStartTime / 1000)
     : binnedDate;
   const binnedFillStart = dateBin(interval, fillStartTime, origin);
+
+  const cacheKey = getStreamingCacheKey(
+    metadata,
+    panelSchema,
+    interval,
+    xAxisKeys,
+    yAxisKeys,
+    zAxisKeys,
+    breakDownKeys,
+    noValueConfigOption,
+  );
 
   // Build map from processedData for O(1) lookup
   const hasBreakdown =
@@ -146,12 +225,10 @@ export const fillMissingValues = (
   // Always insert a null anchor at the user's selected start time when the fill
   // loop doesn't yet cover it. This pins the ECharts x-axis left edge to the
   // user's query range from the very first chunk.
+  const anchorTimes: string[] = [];
   if (binnedFillStart > binnedDate) {
-    const anchorFormattedTime = format(
-      toZonedTime(binnedDate, "UTC"),
-      "yyyy-MM-dd'T'HH:mm:ss",
-    );
-    const anchorTimes = [anchorFormattedTime];
+    const anchorFormattedTime = formatUtc(binnedDate);
+    anchorTimes.push(anchorFormattedTime);
 
     // Also insert a phantom point one interval after the user's selected start
     // time when data is sparse (< 3 unique time slots). This gives ECharts a
@@ -165,14 +242,113 @@ export const fillMissingValues = (
       const nearAnchorTime = new Date(binnedDate.getTime() + interval * 1000);
       // Only add the near-anchor if it's strictly before the first real data
       if (nearAnchorTime < binnedFillStart) {
-        const nearAnchorFormattedTime = format(
-          toZonedTime(nearAnchorTime, "UTC"),
-          "yyyy-MM-dd'T'HH:mm:ss",
-        );
-        anchorTimes.push(nearAnchorFormattedTime);
+        anchorTimes.push(formatUtc(nearAnchorTime));
       }
     }
+  }
 
+  const hasTimeOffset = Boolean(
+    resultMetaData?.[resultMetaData.length - 1]?.time_offset?.start_time,
+  );
+
+  if (cacheKey) {
+    const cacheEntry = missingValueCache.get(cacheKey);
+    if (
+      cacheEntry &&
+      cacheEntry.anchorTimes.length > 0 &&
+      binnedFillStart.getTime() <= cacheEntry.binnedDateMs
+    ) {
+      // Real data has reached the user's start time. Drop cached anchors and
+      // rebuild once so anchors are replaced by actual data points.
+      missingValueCache.delete(cacheKey);
+    }
+    if (
+      hasTimeOffset &&
+      cacheEntry &&
+      cacheEntry.interval === interval &&
+      cacheEntry.noValueConfigOption === noValueConfigOption &&
+      cacheEntry.timeKey === timeKey &&
+      cacheEntry.hasBreakdown === hasBreakdown &&
+      cacheEntry.endTimeForFill === endTimeForFill &&
+      cacheEntry.binnedDateMs === binnedDate.getTime() &&
+      cacheEntry.anchorEntryCount ===
+        (cacheEntry.anchorTimes.length *
+          (cacheEntry.hasBreakdown ? cacheEntry.uniqueValues.size : 1) || 0) &&
+      cacheEntry.binnedFillStartMs > binnedFillStart.getTime() &&
+      areAnchorTimesEqual(cacheEntry.anchorTimes, anchorTimes) &&
+      areSetsEqual(cacheEntry.uniqueValues, uniqueXAxisValues)
+    ) {
+      const prependStart = binnedFillStart;
+      const prependEnd = new Date(
+        cacheEntry.binnedFillStartMs - intervalMillis,
+      );
+
+      const patchData: any[] = [];
+
+      let currentTime = prependStart;
+      let currentFormattedTime = formatUtc(currentTime);
+      const prependEndFormatted = formatUtc(prependEnd);
+
+      while (currentFormattedTime <= prependEndFormatted) {
+        if (!hasBreakdown) {
+          const key = `${currentFormattedTime}`;
+          const currentData = searchDataMap.get(key);
+          if (currentData) {
+            patchData.push(currentData);
+          } else {
+            const nullEntry: any = { [timeKey]: currentFormattedTime };
+            keys.forEach((key) => {
+              if (key !== timeKey) nullEntry[key] = noValueConfigOption;
+            });
+            patchData.push(nullEntry);
+          }
+        } else {
+          uniqueXAxisValues.forEach((uniqueValue: any) => {
+            const key = `${currentFormattedTime}-${uniqueValue}`;
+            const currentData = searchDataMap.get(key);
+            if (currentData) {
+              patchData.push(currentData);
+            } else {
+              const nullEntry: any = {
+                [timeKey]: currentFormattedTime,
+                [uniqueKey]: uniqueValue,
+              };
+              keys.forEach((key) => {
+                if (key !== timeKey && key !== uniqueKey) {
+                  nullEntry[key] = noValueConfigOption;
+                }
+              });
+              patchData.push(nullEntry);
+            }
+          });
+        }
+
+        currentTime = new Date(currentTime.getTime() + intervalMillis);
+        currentFormattedTime = formatUtc(currentTime);
+      }
+
+      const combined = patchData.concat(cacheEntry.filledData);
+      missingValueCache.set(cacheKey, {
+        filledData: combined,
+        binnedFillStartMs: binnedFillStart.getTime(),
+        binnedDateMs: binnedDate.getTime(),
+        anchorTimes,
+        anchorEntryCount:
+          anchorTimes.length * (hasBreakdown ? uniqueXAxisValues.size : 1),
+        timeKey,
+        uniqueKey,
+        hasBreakdown,
+        uniqueValues: new Set(uniqueXAxisValues),
+        interval,
+        noValueConfigOption,
+        endTimeForFill,
+      });
+
+      return combined;
+    }
+  }
+
+  if (anchorTimes.length > 0) {
     if (!hasBreakdown) {
       anchorTimes.forEach((t) => {
         const anchorEntry: any = { [timeKey]: t };
@@ -203,10 +379,7 @@ export const fillMissingValues = (
   // (resultMetaData start) to endTimeForFill (user's end).
   // Only covers the range where streaming data has been received.
   let currentTime = binnedFillStart;
-  let currentFormattedTime = format(
-    toZonedTime(currentTime, "UTC"),
-    "yyyy-MM-dd'T'HH:mm:ss",
-  );
+  let currentFormattedTime = formatUtc(currentTime);
 
   while (currentFormattedTime <= endTimeForFill) {
     if (!hasBreakdown) {
@@ -243,10 +416,25 @@ export const fillMissingValues = (
     }
 
     currentTime = new Date(currentTime.getTime() + intervalMillis);
-    currentFormattedTime = format(
-      toZonedTime(currentTime, "UTC"),
-      "yyyy-MM-dd'T'HH:mm:ss",
-    );
+    currentFormattedTime = formatUtc(currentTime);
+  }
+
+  if (cacheKey) {
+    missingValueCache.set(cacheKey, {
+      filledData,
+      binnedFillStartMs: binnedFillStart.getTime(),
+      binnedDateMs: binnedDate.getTime(),
+      anchorTimes,
+      anchorEntryCount:
+        anchorTimes.length * (hasBreakdown ? uniqueXAxisValues.size : 1),
+      timeKey,
+      uniqueKey,
+      hasBreakdown,
+      uniqueValues: new Set(uniqueXAxisValues),
+      interval,
+      noValueConfigOption,
+      endTimeForFill,
+    });
   }
 
   return filledData;
