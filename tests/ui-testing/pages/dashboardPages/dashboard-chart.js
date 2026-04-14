@@ -89,7 +89,8 @@ export default class ChartTypeSelector {
         await streamInput.fill(streamName);
 
         // Wait for dropdown options to filter
-        await this.page.locator('[role="listbox"]').waitFor({ state: "visible", timeout: 10000 });
+        // Use .q-menu selector to avoid strict mode violation with Monaco editor's [role="listbox"]
+        await this.page.locator('.q-menu[role="listbox"]').waitFor({ state: "visible", timeout: 10000 });
 
         const streamOption = this.page
           .getByRole("option", { name: streamName, exact: true })

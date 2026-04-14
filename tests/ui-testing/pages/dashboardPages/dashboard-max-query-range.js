@@ -24,22 +24,31 @@ export default class DashboardMaxQueryRange {
    */
   async setMaxQueryRange(hours, streamName = DEFAULT_STREAM) {
     const orgId = process.env.ORGNAME || "default";
+    // Use INGESTION_URL (direct API server) or fall back to constructing from ZO_BASE_URL
+    const base = process.env.INGESTION_URL || process.env.ZO_BASE_URL || "http://localhost:5080";
     const payload = { max_query_range: hours };
 
+    const basicAuth = Buffer.from(
+      `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
+    ).toString("base64");
+
     const result = await this.page.evaluate(
-      async ({ orgId, streamName, payload }) => {
+      async ({ base, orgId, streamName, payload, basicAuth }) => {
         const r = await fetch(
-          `/api/${orgId}/streams/${streamName}/settings?type=logs`,
+          `${base}/api/${orgId}/streams/${streamName}/settings?type=logs`,
           {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Basic ${basicAuth}`,
+            },
             body: JSON.stringify(payload),
           }
         );
         const text = await r.text();
         return { status: r.status, body: text };
       },
-      { orgId, streamName, payload }
+      { base, orgId, streamName, payload, basicAuth }
     );
 
     if (result.status === 200) {
@@ -81,11 +90,28 @@ export default class DashboardMaxQueryRange {
   createSearchResponsePromise() {
     const orgName = process.env.ORGNAME || "default";
     return this.page.waitForResponse(
-      (resp) =>
-        resp.url().includes(`/api/${orgName}/`) &&
-        resp.url().includes("_search") &&
-        resp.url().includes("type=logs") &&
-        resp.status() === 200,
+      (resp) => {
+        const matches =
+          resp.url().includes(`/api/${orgName}/`) &&
+          resp.url().includes("_search") &&
+          resp.url().includes("type=logs") &&
+          resp.status() === 200;
+        if (matches) {
+          // Non-blocking body inspection for diagnostics ΓÇö does not delay resolution
+          resp
+            .text()
+            .then((body) => {
+              testLogger.info("Search response captured", {
+                url: resp.url(),
+                bodySnippet: body.substring(0, 300),
+                hasFunctionError: body.includes("function_error"),
+                hasNewStartTime: body.includes("new_start_time"),
+              });
+            })
+            .catch(() => {});
+        }
+        return matches;
+      },
       { timeout: 30000 }
     );
   }

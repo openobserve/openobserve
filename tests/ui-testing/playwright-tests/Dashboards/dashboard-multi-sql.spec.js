@@ -12,6 +12,7 @@ import {
   setupBarPanelWithBreakdownAndConfig,
   reopenPanelConfig,
 } from "./utils/configPanelHelpers.js";
+import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time.js";
 const testLogger = require("../utils/test-logger.js");
 
 test.describe.configure({ mode: "parallel" });
@@ -69,6 +70,46 @@ async function addAndConfigureSecondQuery(pm, { yField = "kubernetes_namespace_n
     await pm.chartTypeSelector.searchAndAddField(xField, "x");
   }
   await pm.chartTypeSelector.searchAndAddField(yField, "y");
+}
+
+/**
+ * Enable the VRL editor for the currently active query tab and type a program.
+ * Uses waitForFunction instead of waitForTimeout for Monaco debounce detection.
+ * No page.waitForTimeout calls ΓÇö compliant with the no-timeout policy.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} vrlProgram - VRL program to type (may be empty string for no-op)
+ */
+async function enterVrlForActiveQuery(page, vrlProgram) {
+  const vrlToggle = page.locator(
+    '[data-test="logs-search-bar-show-query-toggle-btn"]'
+  );
+  const vrlEditor = page.locator('[data-test="dashboard-vrl-function-editor"]');
+  if (!(await vrlEditor.isVisible())) {
+    await vrlToggle.waitFor({ state: "visible", timeout: 10000 });
+    await vrlToggle.click();
+  }
+  await vrlEditor.waitFor({ state: "visible", timeout: 10000 });
+
+  if (!vrlProgram) return; // empty program = no-op, just ensure toggle is on
+
+  const monacoInput = vrlEditor.getByRole("code");
+  await monacoInput.click({ clickCount: 3 });
+  await page.keyboard.press("Control+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type(vrlProgram, { delay: 20 });
+  await page.keyboard.press("Escape");
+
+  // Wait deterministically for Monaco to reflect the typed content
+  const snippet = vrlProgram.trim().substring(0, 8);
+  await page.waitForFunction(
+    ({ sel, text }) => {
+      const el = document.querySelector(sel);
+      return el && el.textContent.includes(text);
+    },
+    { sel: '[data-test="dashboard-vrl-function-editor"]', text: snippet },
+    { timeout: 10000 }
+  );
 }
 
 // ============================================================================
@@ -698,6 +739,1068 @@ test.describe("Multi-SQL Query Support", () => {
       await expect(errorWrapper).toBeVisible();
 
       await cleanupTestDashboard(page, pm, dashboardName);
+    }
+  );
+
+  // ==========================================================================
+  // 12 ΓÇö Reset Query on Chart Type Change
+  // ==========================================================================
+
+  test.describe("Reset Query on Chart Type Change", () => {
+    // These tests interact with the chart type selector in ways that can race
+    // under heavy parallel load (Apply / Save buttons temporarily covered by
+    // loading overlays). Running them serially prevents CPU-contention timeouts
+    // while still allowing other describe blocks to run in parallel.
+    test.describe.configure({ mode: "serial" });
+
+    test(
+      "12.1 ΓÇö single query: reset clears y-function when switching to pie",
+      { tag: ["@multiSQL", "@resetQuery", "@P0", "@smoke"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+        await pm.chartTypeSelector.selectChartType("pie");
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+        await pm.dashboardPanelActions.verifyChartRenders(expect);
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "12.2 ΓÇö single query: reset clears z-axis and breakdown when switching to bar",
+      { tag: ["@multiSQL", "@resetQuery", "@P1"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        // Start with a bar panel ΓÇö Q1's x-axis is auto-populated with
+        // histogram(_timestamp) by the panel initializer. No xField needed.
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+
+        // Switch to heatmap ΓÇö fields are preserved but z-field is missing;
+        // a chart error here is acceptable (not the assertion under test).
+        await pm.chartTypeSelector.selectChartType("heatmap");
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+        // Switch back to bar ΓÇö heatmap-only config (z-field) is cleared.
+        await pm.chartTypeSelector.selectChartType("bar");
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+        // Bar with x=histogram(_timestamp) + y=kubernetes_container_hash
+        // must render without crash.
+        await pm.dashboardPanelActions.verifyChartRenders(expect);
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "12.3 ΓÇö multi-query: switching to pie resets all queries' y-functions and breakdown",
+      { tag: ["@multiSQL", "@resetQuery", "@P0", "@smoke"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+        await addAndConfigureSecondQuery(pm);
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+        await pm.chartTypeSelector.selectChartType("pie");
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+        await expect(
+          page.locator('[data-test="dashboard-error"]').first()
+        ).not.toBeVisible({ timeout: 5000 });
+        await pm.dashboardPanelActions.verifyChartRenders(expect);
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "12.4 ΓÇö multi-query: switching to metric resets all queries' y-functions and clears x/breakdown",
+      { tag: ["@multiSQL", "@resetQuery", "@P1"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+        await addAndConfigureSecondQuery(pm);
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+        await pm.chartTypeSelector.selectChartType("metric");
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+        await expect(
+          page.locator('[data-test="dashboard-error"]').first()
+        ).not.toBeVisible({ timeout: 5000 });
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "12.5 ΓÇö multi-query: switching to heatmap resets all queries' y-functions to null",
+      { tag: ["@multiSQL", "@resetQuery", "@P1"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+        await addAndConfigureSecondQuery(pm);
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+        // Switch to heatmap ΓÇö y-functions reset; missing z-field may cause
+        // a chart error which is acceptable (the reset is what we're testing).
+        await pm.chartTypeSelector.selectChartType("heatmap");
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+        // Switch back to bar ΓÇö both query tabs must still be intact after
+        // the round-trip through heatmap.
+        await pm.chartTypeSelector.selectChartType("bar");
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+        await expect(msql.queryTab(0)).toBeVisible();
+        await expect(msql.queryTab(1)).toBeVisible();
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "12.6 ΓÇö multi-query: tab switch after two chart type changes does not re-introduce stale fields",
+      { tag: ["@multiSQL", "@resetQuery", "@P2"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+        await addAndConfigureSecondQuery(pm);
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+        await pm.chartTypeSelector.selectChartType("gauge");
+        await pm.chartTypeSelector.selectChartType("bar");
+
+        // Switch to Q2 tab ΓÇö verify tabs remain intact after two chart-type switches
+        await msql.switchToQueryTab(1);
+        await expect(msql.queryTab(1)).toBeVisible();
+
+        // Switch back to Q1 and apply
+        await msql.switchToQueryTab(0);
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+  });
+
+  // ==========================================================================
+  // 13 ΓÇö X-Axis Alias Inconsistency Warning
+  // ==========================================================================
+
+  test.describe("X-Axis Alias Inconsistency Warning", () => {
+    // The warning button lives in PanelErrorButtons.vue (panel editor header).
+    // It reacts to field config changes without needing an Apply click.
+    const xAliasWarning = (page) =>
+      page.locator('[data-test="panel-x-alias-inconsistency-warning"]');
+
+    /**
+     * Remove the first x-axis field from the currently active query tab.
+     * Needed for tests that must replace the auto-populated _timestamp with a
+     * non-histogram field.
+     */
+    async function removeFirstXField(page) {
+      const btn = page
+        .locator('[data-test="dashboard-x-layout"] [data-test$="-remove"]')
+        .first();
+      await btn.waitFor({ state: "visible", timeout: 8000 });
+      await btn.click();
+    }
+
+    // NOTE: When addPanel() is called, the panel editor auto-populates
+    // histogram(_timestamp) into Q1's x-axis. So buildPanel() must NOT pass
+    // xField ΓÇö Q1 already has the histogram x-field. New query tabs (Q2+)
+    // always start empty, so addField calls on those work normally.
+
+    test(
+      "13.1 ΓÇö no warning with a single query using histogram x-alias",
+      { tag: ["@multiSQL", "@xAliasWarning", "@P0", "@smoke"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        // Q1 has auto-populated histogram(_timestamp) from panel initializer
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+
+        // Single query with histogram x ΓåÆ queriesWithX.length < 2 ΓåÆ no warning
+        await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 3000 });
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "13.2 ΓÇö no warning when both queries use histogram x-alias",
+      { tag: ["@multiSQL", "@xAliasWarning", "@P0", "@smoke"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        // Q1 auto-has histogram(_timestamp)
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+
+        // Add Q2 also with _timestamp (histogram) ΓÇö Q2 starts empty so +X works
+        await msql.addQueryTab(1);
+        await pm.chartTypeSelector.selectStreamType("logs");
+        await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.searchAndAddField(
+          "kubernetes_namespace_name",
+          "y"
+        );
+
+        // Both Q1 and Q2 use histogram ΓåÆ no inconsistency
+        await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 3000 });
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "13.3 ΓÇö no warning when both queries use non-histogram x-alias",
+      { tag: ["@multiSQL", "@xAliasWarning", "@P1"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        // Q1 auto-has histogram(_timestamp); remove it then add non-histogram field
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+        await removeFirstXField(page); // removes auto _timestamp
+        await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
+
+        // Add Q2 also with non-histogram x ΓÇö Q2 starts empty so +X works
+        await msql.addQueryTab(1);
+        await pm.chartTypeSelector.selectStreamType("logs");
+        await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
+        await pm.chartTypeSelector.searchAndAddField(
+          "kubernetes_namespace_name",
+          "y"
+        );
+
+        await msql.switchToQueryTab(0);
+        // Both Q1 and Q2 have non-histogram x ΓåÆ no inconsistency
+        await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 3000 });
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "13.4 ΓÇö warning appears when Q1 has histogram x-alias and Q2 has non-histogram x-alias",
+      { tag: ["@multiSQL", "@xAliasWarning", "@P0", "@smoke"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        // Q1: auto-has histogram(_timestamp)
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+
+        // Q2: non-histogram x (kubernetes_host) ΓÇö Q2 starts empty so +X works
+        await msql.addQueryTab(1);
+        await pm.chartTypeSelector.selectStreamType("logs");
+        await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
+        await pm.chartTypeSelector.searchAndAddField(
+          "kubernetes_namespace_name",
+          "y"
+        );
+
+        await msql.switchToQueryTab(0);
+        // Q1 histogram, Q2 non-histogram ΓåÆ warning must appear
+        await expect(xAliasWarning(page)).toBeVisible({ timeout: 5000 });
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "13.5 ΓÇö warning appears when Q1 is non-histogram and Q2 is histogram (order independence)",
+      { tag: ["@multiSQL", "@xAliasWarning", "@P1"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        // Q1: replace auto _timestamp with non-histogram (kubernetes_host)
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+        await removeFirstXField(page); // removes auto _timestamp
+        await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
+
+        // Q2: histogram(_timestamp) ΓÇö Q2 starts empty so +X works
+        await msql.addQueryTab(1);
+        await pm.chartTypeSelector.selectStreamType("logs");
+        await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.searchAndAddField(
+          "kubernetes_namespace_name",
+          "y"
+        );
+
+        await msql.switchToQueryTab(0);
+        // Q1 non-histogram, Q2 histogram ΓåÆ warning shown regardless of order
+        await expect(xAliasWarning(page)).toBeVisible({ timeout: 5000 });
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "13.6 ΓÇö warning disappears when inconsistency is resolved",
+      { tag: ["@multiSQL", "@xAliasWarning", "@P1"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        // Create inconsistent state: Q1 auto-histogram, Q2 non-histogram
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+        await msql.addQueryTab(1);
+        await pm.chartTypeSelector.selectStreamType("logs");
+        await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
+        await pm.chartTypeSelector.searchAndAddField(
+          "kubernetes_namespace_name",
+          "y"
+        );
+        await msql.switchToQueryTab(0);
+        await expect(xAliasWarning(page)).toBeVisible({ timeout: 5000 });
+
+        // Resolve: switch to Q2 and remove the non-histogram x-field
+        await msql.switchToQueryTab(1);
+        await removeFirstXField(page); // removes kubernetes_host from Q2
+
+        await msql.switchToQueryTab(0);
+        // Q2 now has no x-field ΓåÆ excluded from check ΓåÆ warning gone
+        await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 5000 });
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "13.7 ΓÇö no warning when one query has no x-field",
+      { tag: ["@multiSQL", "@xAliasWarning", "@P1"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        // Q1 auto-has histogram(_timestamp)
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+
+        // Q2 with ONLY a y-field ΓÇö no x-field added
+        await msql.addQueryTab(1);
+        await pm.chartTypeSelector.selectStreamType("logs");
+        await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.searchAndAddField(
+          "kubernetes_namespace_name",
+          "y"
+        );
+
+        await msql.switchToQueryTab(0);
+        // Q2 has no x-field ΓåÆ excluded from inconsistency check ΓåÆ no warning
+        await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 3000 });
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "13.8 ΓÇö warning absent when mismatched query is hidden, restored when it is unhidden",
+      { tag: ["@multiSQL", "@xAliasWarning", "@P2"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        // Create inconsistent state (same as 13.4)
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+        await msql.addQueryTab(1);
+        await pm.chartTypeSelector.selectStreamType("logs");
+        await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
+        await pm.chartTypeSelector.searchAndAddField(
+          "kubernetes_namespace_name",
+          "y"
+        );
+        await msql.switchToQueryTab(0);
+        await expect(xAliasWarning(page)).toBeVisible({ timeout: 5000 });
+
+        // Hide Q2 ΓåÆ hidden queries excluded from check ΓåÆ warning gone
+        await msql.toggleQueryVisibility(1);
+        await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 5000 });
+
+        // Unhide Q2 ΓåÆ inconsistency restored ΓåÆ warning reappears
+        await msql.toggleQueryVisibility(1);
+        await expect(xAliasWarning(page)).toBeVisible({ timeout: 5000 });
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "13.9 ΓÇö warning is only in the panel header, not inside y-axis or breakdown sections",
+      { tag: ["@multiSQL", "@xAliasWarning", "@P1"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        // Create inconsistent state (same as 13.4)
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+        await msql.addQueryTab(1);
+        await pm.chartTypeSelector.selectStreamType("logs");
+        await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
+        await pm.chartTypeSelector.searchAndAddField(
+          "kubernetes_namespace_name",
+          "y"
+        );
+        await msql.switchToQueryTab(0);
+        await expect(xAliasWarning(page)).toBeVisible({ timeout: 5000 });
+
+        // Warning must NOT appear nested inside axis layout sections
+        await expect(
+          page.locator(
+            '[data-test="dashboard-y-layout"] [data-test="panel-x-alias-inconsistency-warning"]'
+          )
+        ).not.toBeVisible({ timeout: 2000 });
+        await expect(
+          page.locator(
+            '[data-test="dashboard-breakdown-layout"] [data-test="panel-x-alias-inconsistency-warning"]'
+          )
+        ).not.toBeVisible({ timeout: 2000 });
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+  });
+
+  // ==========================================================================
+  // 14 ΓÇö VRL Function with Multiple Queries
+  // ==========================================================================
+
+  test.describe("VRL Function with Multiple Queries", () => {
+    // Identity VRL for kubernetes_container_hash field (safe no-op transform)
+    const VRL_Q1 = '.kubernetes_container_hash = .kubernetes_container_hash';
+    // Identity VRL for kubernetes_namespace_name field
+    const VRL_Q2 = '.kubernetes_namespace_name = .kubernetes_namespace_name';
+
+    test(
+      "14.1 ΓÇö bar chart renders when VRL is applied to a single query",
+      { tag: ["@multiSQL", "@vrl", "@P0", "@smoke"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+        await enterVrlForActiveQuery(page, VRL_Q1);
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+        await pm.dashboardPanelActions.verifyChartRenders(expect);
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "14.2 ΓÇö VRL applies independently to each query in multi-query mode",
+      { tag: ["@multiSQL", "@vrl", "@P0", "@smoke"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+
+        // VRL on Q1
+        await msql.switchToQueryTab(0);
+        await enterVrlForActiveQuery(page, VRL_Q1);
+
+        // Add Q2 with x-field + y-field + its own VRL
+        await msql.addQueryTab(1);
+        await pm.chartTypeSelector.selectStreamType("logs");
+        await pm.chartTypeSelector.selectStream("e2e_automate");
+        // Q2 starts with empty x-axis; add _timestamp so the bar chart renders
+        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.searchAndAddField(
+          "kubernetes_namespace_name",
+          "y"
+        );
+        await enterVrlForActiveQuery(page, VRL_Q2);
+
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+        await pm.dashboardPanelActions.verifyChartRenders(expect);
+        await expect(
+          page.locator('[data-test="dashboard-error"]').first()
+        ).not.toBeVisible({ timeout: 5000 });
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "14.3 ΓÇö empty VRL on both queries is a no-op, chart renders normally",
+      { tag: ["@multiSQL", "@vrl", "@P1"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+        await addAndConfigureSecondQuery(pm);
+
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+        await pm.dashboardPanelActions.verifyChartRenders(expect);
+
+        // Enable VRL toggle on Q1 but leave editor empty (no program typed)
+        await msql.switchToQueryTab(0);
+        await enterVrlForActiveQuery(page, ""); // empty = toggle ON only
+
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+        await pm.dashboardPanelActions.verifyChartRenders(expect);
+        await expect(
+          page.locator('[data-test="dashboard-error"]').first()
+        ).not.toBeVisible({ timeout: 5000 });
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "14.4 ΓÇö VRL on Q1 does not affect Q2 (query isolation)",
+      { tag: ["@multiSQL", "@vrl", "@P1"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+
+        // VRL on Q1 only
+        await msql.switchToQueryTab(0);
+        await enterVrlForActiveQuery(page, VRL_Q1);
+
+        // Add Q2 without VRL (x-field needed so chart renders without error)
+        await msql.addQueryTab(1);
+        await pm.chartTypeSelector.selectStreamType("logs");
+        await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.searchAndAddField(
+          "kubernetes_namespace_name",
+          "y"
+        );
+
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+        await pm.dashboardPanelActions.verifyChartRenders(expect);
+        await expect(
+          page.locator('[data-test="dashboard-error"]').first()
+        ).not.toBeVisible({ timeout: 5000 });
+
+        // Inspector should show at least 2 SELECT statements (one per query)
+        const pageContent = await msql.openQueryInspector();
+        const selectCount = (pageContent.match(/SELECT/gi) || []).length;
+        expect(selectCount).toBeGreaterThanOrEqual(2);
+        await msql.closeQueryInspector();
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "14.5 ΓÇö VRL persists after save and reopen",
+      { tag: ["@multiSQL", "@vrl", "@P1"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+        await msql.switchToQueryTab(0);
+        await enterVrlForActiveQuery(page, VRL_Q1);
+
+        await msql.addQueryTab(1);
+        await pm.chartTypeSelector.selectStreamType("logs");
+        await pm.chartTypeSelector.selectStream("e2e_automate");
+        // Q2 starts with empty x-axis; add _timestamp so save validates cleanly
+        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.searchAndAddField(
+          "kubernetes_namespace_name",
+          "y"
+        );
+        await enterVrlForActiveQuery(page, VRL_Q2);
+
+        // Apply before save so the panel state includes both VRLs
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+        await pm.dashboardPanelActions.verifyChartRenders(expect);
+
+        await msql.applyAndSave(pm);
+        await reopenPanelConfig(page, pm);
+
+        // Verify persistence: both query tabs are intact after reopen
+        await expect(msql.queryTab(0)).toBeVisible();
+        await expect(msql.queryTab(1)).toBeVisible();
+
+        // Verify the VRL toggle is still ON for Q1 (persisted with panel).
+        // When VRL is saved, the toggle stays on when the panel is reopened.
+        await msql.switchToQueryTab(0);
+        const vrlEditorQ1 = page.locator(
+          '[data-test="dashboard-vrl-function-editor"]'
+        );
+        // If toggle was NOT persisted, click it to show editor
+        if (!(await vrlEditorQ1.isVisible().catch(() => false))) {
+          await page
+            .locator('[data-test="logs-search-bar-show-query-toggle-btn"]')
+            .click();
+          await vrlEditorQ1.waitFor({ state: "visible", timeout: 10000 });
+        } else {
+          // Toggle IS persisted ΓÇö VRL survived save/reopen
+          await vrlEditorQ1.waitFor({ state: "visible", timeout: 5000 });
+        }
+
+        // Chart must render correctly after reopen ΓÇö confirms VRL didn't break anything
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+        await pm.dashboardPanelActions.verifyChartRenders(expect);
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
+      "14.6 ΓÇö line chart renders correctly with VRL applied to both queries",
+      { tag: ["@multiSQL", "@vrl", "@P1"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "line",
+          // Q1's x-axis is auto-populated with histogram(_timestamp) on panel init;
+          // passing xField here would hit the disabled +X button.
+          yField: "kubernetes_container_hash",
+        });
+        await msql.switchToQueryTab(0);
+        await enterVrlForActiveQuery(page, VRL_Q1);
+
+        await msql.addQueryTab(1);
+        await pm.chartTypeSelector.selectStreamType("logs");
+        await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.searchAndAddField(
+          "kubernetes_namespace_name",
+          "y"
+        );
+        await enterVrlForActiveQuery(page, VRL_Q2);
+
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+        await pm.dashboardPanelActions.verifyChartRenders(expect);
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+  });
+
+  // ==========================================================================
+  // 15 ΓÇö Partial Error for Streams with Different max_query_range
+  // ==========================================================================
+
+  test.describe(
+    "Partial Error for Streams with Different max_query_range",
+    () => {
+      // Serial mode: tests mutate shared stream settings; avoid race conditions
+      test.describe.configure({ mode: "default" });
+
+      // Ingest data into e2e_max_query_range for each test in this section
+      test.beforeEach(async ({ page }) => {
+        await ingestion(page, "e2e_max_query_range");
+      });
+
+      // Always reset both stream settings after each test in this section
+      test.afterEach(async ({ page }) => {
+        const pm = new PageManager(page);
+        await pm.dashboardMaxQueryRange.resetMaxQueryRange("e2e_automate");
+        await pm.dashboardMaxQueryRange.resetMaxQueryRange(
+          "e2e_max_query_range"
+        );
+      });
+
+      test(
+        "15.1 ΓÇö warning icon appears when the single-query stream range is exceeded (baseline)",
+        { tag: ["@multiSQL", "@partialError", "@P0", "@smoke"] },
+        async ({ page }) => {
+          const pm = new PageManager(page);
+          const msql = pm.dashboardMultiSQL;
+          const mqr = pm.dashboardMaxQueryRange;
+          const dashboardName = generateDashboardName();
+
+          await buildPanel(page, pm, dashboardName, {
+            chartType: "bar",
+            yField: "kubernetes_container_hash",
+          });
+          // Switch Q1 stream to e2e_max_query_range ΓÇö it has no prior single-stream
+          // persistent cache (unlike e2e_automate which sections 12-14 have cached).
+          // A cache miss forces do_partitioned_search to run and set function_error.
+          await pm.chartTypeSelector.selectStream("e2e_max_query_range");
+          await pm.dashboardPanelActions.applyDashboardBtn();
+          await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+          await msql.applyAndSave(pm);
+
+          await mqr.setMaxQueryRange(2, "e2e_max_query_range");
+
+          await waitForDateTimeButtonToBeEnabled(page);
+          const searchDone = mqr.createSearchResponsePromise();
+          await pm.dateTimeHelper.setRelativeTimeRange("2-d");
+          await searchDone;
+
+          await expect(
+            page
+              .locator('[data-test="panel-max-duration-warning"]')
+              .first()
+          ).toBeVisible({ timeout: 30000 });
+
+          await cleanupTestDashboard(page, pm, dashboardName);
+        }
+      );
+
+      test(
+        "15.2 ΓÇö both query restriction warnings appear in tooltip with two restricted streams",
+        { tag: ["@multiSQL", "@partialError", "@P0", "@smoke"] },
+        async ({ page }) => {
+          const pm = new PageManager(page);
+          const msql = pm.dashboardMultiSQL;
+          const mqr = pm.dashboardMaxQueryRange;
+          const dashboardName = generateDashboardName();
+
+          // Build a 2-query panel: Q1=e2e_automate, Q2=e2e_max_query_range
+          await buildPanel(page, pm, dashboardName, {
+            chartType: "bar",
+            yField: "kubernetes_container_hash",
+          });
+          await msql.addQueryTab(1);
+          await pm.chartTypeSelector.selectStreamType("logs");
+          await pm.chartTypeSelector.selectStream("e2e_max_query_range");
+          // Q2 needs x-field so the bar chart renders and the panel saves cleanly
+          await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+          await pm.chartTypeSelector.searchAndAddField(
+            "kubernetes_namespace_name",
+            "y"
+          );
+          await pm.dashboardPanelActions.applyDashboardBtn();
+          await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+          await msql.applyAndSave(pm);
+          // Now on dashboard page
+
+          await mqr.setMaxQueryRange(2, "e2e_automate");
+          await mqr.setMaxQueryRange(3, "e2e_max_query_range");
+
+          await waitForDateTimeButtonToBeEnabled(page);
+          const allSearchDone = mqr.createSearchResponsePromise();
+          await pm.dateTimeHelper.setRelativeTimeRange("2-d");
+          await allSearchDone;
+
+          // Warning icon must be visible
+          const warningIcon = page
+            .locator('[data-test="panel-max-duration-warning"]')
+            .first();
+          await expect(warningIcon).toBeVisible({ timeout: 30000 });
+
+          // Hover to read tooltip
+          const tooltipText = await mqr.getWarningTooltipText();
+          expect(tooltipText).toContain(
+            "Query duration is modified due to query range restriction"
+          );
+
+          // Both queries are restricted ΓÇö "Data returned for:" must appear at least twice
+          const dataReturnedMatches = (
+            tooltipText.match(/Data returned for:/g) || []
+          ).length;
+          expect(dataReturnedMatches).toBeGreaterThanOrEqual(2);
+
+          await cleanupTestDashboard(page, pm, dashboardName);
+        }
+      );
+
+      test(
+        "15.3 ΓÇö only one warning when only one stream is restricted",
+        { tag: ["@multiSQL", "@partialError", "@P1"] },
+        async ({ page }) => {
+          const pm = new PageManager(page);
+          const msql = pm.dashboardMultiSQL;
+          const mqr = pm.dashboardMaxQueryRange;
+          const dashboardName = generateDashboardName();
+
+          // 2-query panel
+          await buildPanel(page, pm, dashboardName, {
+            chartType: "bar",
+            yField: "kubernetes_container_hash",
+          });
+          await msql.addQueryTab(1);
+          await pm.chartTypeSelector.selectStreamType("logs");
+          await pm.chartTypeSelector.selectStream("e2e_max_query_range");
+          // Q2 needs x-field so the bar chart renders and the panel saves cleanly
+          await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+          await pm.chartTypeSelector.searchAndAddField(
+            "kubernetes_namespace_name",
+            "y"
+          );
+          await pm.dashboardPanelActions.applyDashboardBtn();
+          await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+          await msql.applyAndSave(pm);
+
+          // Only restrict e2e_automate (Q1); leave e2e_max_query_range unrestricted
+          await mqr.setMaxQueryRange(2, "e2e_automate");
+          await mqr.resetMaxQueryRange("e2e_max_query_range");
+
+          await waitForDateTimeButtonToBeEnabled(page);
+          const searchDone = mqr.createSearchResponsePromise();
+          await pm.dateTimeHelper.setRelativeTimeRange("2-d");
+          await searchDone;
+
+          await expect(
+            page
+              .locator('[data-test="panel-max-duration-warning"]')
+              .first()
+          ).toBeVisible({ timeout: 30000 });
+
+          const tooltipText = await mqr.getWarningTooltipText();
+          expect(tooltipText).toContain("Data returned for:");
+          // Only Q1 is restricted: exactly one "Data returned for:" occurrence
+          const occurrences = (
+            tooltipText.match(/Data returned for:/g) || []
+          ).length;
+          expect(occurrences).toBe(1);
+
+          await cleanupTestDashboard(page, pm, dashboardName);
+        }
+      );
+
+      test(
+        "15.4 ΓÇö no warning when both queries are within their stream limits",
+        { tag: ["@multiSQL", "@partialError", "@P1"] },
+        async ({ page }) => {
+          const pm = new PageManager(page);
+          const msql = pm.dashboardMultiSQL;
+          const mqr = pm.dashboardMaxQueryRange;
+          const dashboardName = generateDashboardName();
+
+          await buildPanel(page, pm, dashboardName, {
+            chartType: "bar",
+            yField: "kubernetes_container_hash",
+          });
+          await msql.addQueryTab(1);
+          await pm.chartTypeSelector.selectStreamType("logs");
+          await pm.chartTypeSelector.selectStream("e2e_max_query_range");
+          // Q2 needs x-field so the bar chart renders and the panel saves cleanly
+          await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+          await pm.chartTypeSelector.searchAndAddField(
+            "kubernetes_namespace_name",
+            "y"
+          );
+          await pm.dashboardPanelActions.applyDashboardBtn();
+          await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+          await msql.applyAndSave(pm);
+
+          await mqr.setMaxQueryRange(2, "e2e_automate");
+          await mqr.setMaxQueryRange(3, "e2e_max_query_range");
+
+          await waitForDateTimeButtonToBeEnabled(page);
+          // 1-hour range is within both 2h and 3h limits
+          const searchDone = mqr.createSearchResponsePromise();
+          await pm.dateTimeHelper.setRelativeTimeRange("1-h");
+          await searchDone;
+          await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+          await expect(
+            page.locator('[data-test="panel-max-duration-warning"]').first()
+          ).not.toBeVisible({ timeout: 5000 });
+
+          await cleanupTestDashboard(page, pm, dashboardName);
+        }
+      );
+
+      test(
+        "15.5 ΓÇö warning disappears when time range is changed to within both stream limits",
+        { tag: ["@multiSQL", "@partialError", "@P1"] },
+        async ({ page }) => {
+          const pm = new PageManager(page);
+          const msql = pm.dashboardMultiSQL;
+          const mqr = pm.dashboardMaxQueryRange;
+          const dashboardName = generateDashboardName();
+
+          // Build 2-query panel
+          await buildPanel(page, pm, dashboardName, {
+            chartType: "bar",
+            yField: "kubernetes_container_hash",
+          });
+          await msql.addQueryTab(1);
+          await pm.chartTypeSelector.selectStreamType("logs");
+          await pm.chartTypeSelector.selectStream("e2e_max_query_range");
+          // Q2 needs x-field so the bar chart renders and the panel saves cleanly
+          await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+          await pm.chartTypeSelector.searchAndAddField(
+            "kubernetes_namespace_name",
+            "y"
+          );
+          await pm.dashboardPanelActions.applyDashboardBtn();
+          await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+          await msql.applyAndSave(pm);
+
+          await mqr.setMaxQueryRange(2, "e2e_automate");
+          await mqr.setMaxQueryRange(3, "e2e_max_query_range");
+
+          await waitForDateTimeButtonToBeEnabled(page);
+          const searchDoneWide = mqr.createSearchResponsePromise();
+          await pm.dateTimeHelper.setRelativeTimeRange("2-d");
+          await searchDoneWide;
+
+          // Warning must be visible with the wide range
+          await expect(
+            page
+              .locator('[data-test="panel-max-duration-warning"]')
+              .first()
+          ).toBeVisible({ timeout: 30000 });
+
+          // Switch to 1-hour range ΓÇö within both limits
+          await waitForDateTimeButtonToBeEnabled(page);
+          const searchDoneNarrow = mqr.createSearchResponsePromise();
+          await pm.dateTimeHelper.setRelativeTimeRange("1-h");
+          await searchDoneNarrow;
+          await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+
+          // Warning must disappear
+          await expect(
+            page.locator('[data-test="panel-max-duration-warning"]').first()
+          ).not.toBeVisible({ timeout: 10000 });
+
+          await cleanupTestDashboard(page, pm, dashboardName);
+        }
+      );
     }
   );
 });
