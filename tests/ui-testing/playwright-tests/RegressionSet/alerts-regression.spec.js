@@ -583,8 +583,9 @@ test.describe("Alerts Regression Bugs", () => {
 
     // STRONG ASSERTION: Verify template name appears exactly once in the select field
     // Bug #10110 caused templates to display twice in the input field
-    // Get all text from the template select component (includes all visible text)
-    const displayedText = await templateSelect.innerText();
+    // Get text from the input element only (excludes icons)
+    const templateInputElement = templateSelect.locator('.q-field__input');
+    const displayedText = await templateInputElement.innerText();
     const cleanDisplayText = displayedText?.trim().replace(/\s+/g, ' ') || '';
     testLogger.info('Template display text', { text: cleanDisplayText });
 
