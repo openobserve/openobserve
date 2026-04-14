@@ -111,13 +111,24 @@ export const parseSpanKindWhereClause = (
   }
 
   // Regex fallback when no parser is available or parsing failed.
-  return whereClause.replace(
-    /\bspan_kind\s*(!?=)\s*'([^']*)'/gi,
-    (match, op: string, label: string) => {
-      const key = SPAN_KIND_LABEL_TO_KEY[label.toLowerCase()];
-      return key !== undefined ? `span_kind${op}'${key}'` : match;
-    },
-  );
+  return whereClause
+    .replace(
+      /\bspan_kind\s*(!?=)\s*'([^']*)'/gi,
+      (match, op: string, label: string) => {
+        const key = SPAN_KIND_LABEL_TO_KEY[label.toLowerCase()];
+        return key !== undefined ? `span_kind${op}'${key}'` : match;
+      },
+    )
+    .replace(
+      /\bspan_kind\s+IN\s*\(([^)]*)\)/gi,
+      (_match, items: string) => {
+        const converted = items.replace(/'([^']*)'/g, (_m, lbl: string) => {
+          const k = SPAN_KIND_LABEL_TO_KEY[lbl.toLowerCase()];
+          return k !== undefined ? `'${k}'` : `'${lbl}'`;
+        });
+        return `span_kind IN (${converted})`;
+      },
+    );
 };
 
 /** OTEL span kind ID for UNSPECIFIED (0) */
