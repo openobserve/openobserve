@@ -13,11 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::LazyLock as Lazy;
+use std::{
+    sync::{LazyLock, OnceLock},
+    time::{Duration, Instant},
+};
 
 use aes_siv::{KeyInit, siv::Aes256Siv};
 use base64::{Engine, prelude::BASE64_STANDARD};
-use config::get_config;
+use config::{
+    RwHashMap,
+    utils::{rand::random_bytes, time::now_micros},
+};
 use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set, SqlErr};
 use serde::{Deserialize, Serialize};
 
@@ -34,26 +40,44 @@ pub enum EntryKind {
 
 // DBKey to set cipher keys
 pub const CIPHER_KEY_PREFIX: &str = "/cipher_keys/";
-static MASTER_KEY: Lazy<Algorithm> = Lazy::new(|| {
-    let cfg = get_config();
-    // we currently only support one algorithm, so directly get key
-    let key = match BASE64_STANDARD.decode(&cfg.encryption.master_key) {
-        Ok(v) => v,
-        Err(e) => {
-            log::debug!("potential error in configuring master encryption for cipher table: {e}");
-            log::info!("configuring cipher table master key as None");
-            return Algorithm::None;
-        }
-    };
-    match Aes256Siv::new_from_slice(&key) {
-        Ok(_) => Algorithm::Aes256Siv(key),
-        Err(e) => {
-            log::debug!("potential error in configuring master encryption for cipher table: {e}");
-            log::info!("configuring cipher table master key as None");
-            Algorithm::None
-        }
-    }
-});
+
+/// Name used for the auto-provisioned per-org DEK (Data Encryption Key).
+/// This entry is stored with `is_system = true` and is never exposed via the
+/// public API.
+pub const DEFAULT_DEK_NAME: &str = "__default__";
+
+/// In-memory DEK cache: org → (raw key bytes, time of last load).
+static DEK_CACHE: LazyLock<RwHashMap<String, (Vec<u8>, Instant)>> = LazyLock::new(Default::default);
+const DEK_CACHE_TTL: Duration = Duration::from_secs(300);
+
+/// Master Key Encryption Key (KEK). Set once at server startup via
+/// [`init_master_key`]. Defaults to [`Algorithm::None`] (no encryption) when
+/// not initialised — this is the case in non-enterprise builds.
+static MASTER_KEY: OnceLock<Algorithm> = OnceLock::new();
+
+fn get_master_key() -> &'static Algorithm {
+    MASTER_KEY.get_or_init(|| Algorithm::None)
+}
+
+/// Initialise the master KEK from a base64-encoded key string.
+///
+/// Must be called **once** at server startup (before any cipher table
+/// operations). Called from `init_enterprise()` in the main server when the
+/// enterprise encryption config (`O2_MASTER_ENCRYPTION_KEY`) is present.
+///
+/// Returns an error if the key is not valid base64 or has the wrong length for
+/// AES-256-SIV (64 bytes / 512 bits). A second call is silently ignored.
+pub fn init_master_key(key_b64: &str) -> Result<(), errors::Error> {
+    let key = BASE64_STANDARD.decode(key_b64).map_err(|e| {
+        errors::Error::Message(format!(
+            "master encryption key is not properly base64 encoded: {e}"
+        ))
+    })?;
+    Aes256Siv::new_from_slice(&key)
+        .map_err(|e| errors::Error::Message(format!("invalid master encryption key: {e}")))?;
+    let _ = MASTER_KEY.set(Algorithm::Aes256Siv(key));
+    Ok(())
+}
 
 enum Algorithm {
     Aes256Siv(Vec<u8>),
@@ -123,6 +147,11 @@ impl TryFrom<String> for EntryKind {
 pub struct ListFilter {
     pub org: Option<String>,
     pub kind: Option<EntryKind>,
+    /// Exact match on the `name` column.
+    pub name: Option<String>,
+    /// When `false`, rows with `is_system = true` are excluded from results.
+    /// The public API always sets this to `false` so system DEKs are hidden.
+    pub is_system: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -133,6 +162,8 @@ pub struct CipherEntry {
     pub name: String,
     pub data: String,
     pub kind: EntryKind,
+    /// Whether this entry is an internally auto-provisioned system key.
+    pub is_system: bool,
 }
 
 impl TryInto<CipherEntry> for Model {
@@ -145,12 +176,13 @@ impl TryInto<CipherEntry> for Model {
             kind: self.kind.try_into().unwrap(), // we can be fairly certain that this will not fail
             name: self.name,
             data: self.data,
+            is_system: self.is_system,
         })
     }
 }
 
 pub async fn add(entry: CipherEntry) -> Result<(), errors::Error> {
-    let encrypted = MASTER_KEY.encrypt(&entry.data)?;
+    let encrypted = get_master_key().encrypt(&entry.data)?;
     let record = ActiveModel {
         org: Set(entry.org),
         created_by: Set(entry.created_by),
@@ -158,6 +190,7 @@ pub async fn add(entry: CipherEntry) -> Result<(), errors::Error> {
         name: Set(entry.name),
         kind: Set(entry.kind.to_string()),
         data: Set(encrypted),
+        is_system: Set(entry.is_system),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -184,7 +217,7 @@ pub async fn add(entry: CipherEntry) -> Result<(), errors::Error> {
 }
 
 pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
-    let encrypted = MASTER_KEY.encrypt(&entry.data)?;
+    let encrypted = get_master_key().encrypt(&entry.data)?;
     let record = ActiveModel {
         org: Set(entry.org),
         created_by: Set(entry.created_by),
@@ -192,6 +225,7 @@ pub async fn update(entry: CipherEntry) -> Result<(), errors::Error> {
         name: Set(entry.name),
         kind: Set(entry.kind.to_string()),
         data: Set(encrypted),
+        is_system: Set(entry.is_system),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
@@ -228,7 +262,7 @@ pub async fn get_data(
 ) -> Result<Option<String>, errors::Error> {
     let res = get(org, kind, name).await?;
     match res {
-        Some(m) => MASTER_KEY.decrypt(&m.data).map(Some),
+        Some(m) => get_master_key().decrypt(&m.data).map(Some),
         None => Ok(None),
     }
 }
@@ -260,13 +294,15 @@ pub async fn list_all(limit: Option<i64>) -> Result<Vec<CipherEntry>, errors::Er
 
     records
         .into_iter()
-        .map(|mut c: CipherEntry| match MASTER_KEY.decrypt(&c.data) {
-            Ok(d) => {
-                c.data = d;
-                Ok(c)
-            }
-            Err(e) => Err(e),
-        })
+        .map(
+            |mut c: CipherEntry| match get_master_key().decrypt(&c.data) {
+                Ok(d) => {
+                    c.data = d;
+                    Ok(c)
+                }
+                Err(e) => Err(e),
+            },
+        )
         .collect()
 }
 
@@ -282,6 +318,10 @@ pub async fn list_filtered(
     if let Some(ref kind) = filter.kind {
         res = res.filter(Column::Kind.eq(kind.to_string()));
     }
+    if let Some(ref name) = filter.name {
+        res = res.filter(Column::Name.contains(name));
+    }
+    res = res.filter(Column::IsSystem.eq(filter.is_system));
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }
@@ -294,13 +334,15 @@ pub async fn list_filtered(
 
     records
         .into_iter()
-        .map(|mut c: CipherEntry| match MASTER_KEY.decrypt(&c.data) {
-            Ok(d) => {
-                c.data = d;
-                Ok(c)
-            }
-            Err(e) => Err(e),
-        })
+        .map(
+            |mut c: CipherEntry| match get_master_key().decrypt(&c.data) {
+                Ok(d) => {
+                    c.data = d;
+                    Ok(c)
+                }
+                Err(e) => Err(e),
+            },
+        )
         .collect()
 }
 
@@ -312,4 +354,50 @@ pub async fn clear() -> Result<(), errors::Error> {
     Entity::delete_many().exec(client).await?;
 
     Ok(())
+}
+
+/// Returns the per-org DEK (Data Encryption Key) raw bytes, creating and
+/// persisting a new one if none exists yet (lazy provisioning).
+///
+/// The DEK is a 512-bit random value stored in `cipher_keys` as a system entry
+/// (`is_system = true`, `name = DEFAULT_DEK_NAME`). It is itself encrypted at
+/// rest by the master key via the normal `add()` path.
+pub async fn get_or_create_dek(org: &str) -> Result<Vec<u8>, errors::Error> {
+    // Attempt to load an existing DEK from the database.
+    if let Some(b64) = get_data(org, EntryKind::CipherKey, DEFAULT_DEK_NAME).await? {
+        return BASE64_STANDARD.decode(b64).map_err(|e| {
+            errors::Error::Message(format!("failed to decode DEK for org {org}: {e}"))
+        });
+    }
+
+    // No DEK yet — generate a new 512-bit key (AES-256-SIV requires 64 bytes).
+    let dek = random_bytes(64);
+
+    add(CipherEntry {
+        org: org.to_string(),
+        name: DEFAULT_DEK_NAME.to_string(),
+        kind: EntryKind::CipherKey,
+        is_system: true,
+        data: BASE64_STANDARD.encode(&dek),
+        created_by: "system".to_string(),
+        created_at: now_micros(),
+    })
+    .await
+    .map_err(|e| errors::Error::Message(format!("failed to persist DEK for org {org}: {e}")))?;
+
+    Ok(dek)
+}
+
+/// Returns the per-org DEK, using an in-memory cache with a 5-minute TTL to
+/// avoid a database round-trip on every encryption/decryption operation.
+pub async fn get_dek(org: &str) -> Result<Vec<u8>, errors::Error> {
+    if let Some(entry) = DEK_CACHE.get(org)
+        && entry.1.elapsed() < DEK_CACHE_TTL
+    {
+        return Ok(entry.0.clone());
+    }
+
+    let dek = get_or_create_dek(org).await?;
+    DEK_CACHE.insert(org.to_string(), (dek.clone(), Instant::now()));
+    Ok(dek)
 }

@@ -2245,7 +2245,6 @@ dependencies = [
 name = "config"
 version = "0.1.0"
 dependencies = [
- "aes-siv",
  "ahash 0.8.12",
  "anyhow",
  "arc-swap",

@@ -44,6 +44,15 @@ pub fn get_rand_u128() -> u128 {
     u128::from_le_bytes(buf)
 }
 
+/// Generate `n` cryptographically random bytes.
+///
+/// Intended for generating cryptographic key material (e.g. DEKs).
+pub fn random_bytes(n: usize) -> Vec<u8> {
+    let mut buf = vec![0u8; n];
+    rand::rng().fill(buf.as_mut_slice());
+    buf
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;

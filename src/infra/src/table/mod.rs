@@ -39,6 +39,7 @@ pub mod folders;
 pub mod incident_events;
 pub mod kv_store;
 mod migration;
+pub mod org_ai_toolsets;
 pub mod org_users;
 pub mod organizations;
 pub mod ratelimit;

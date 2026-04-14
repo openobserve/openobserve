@@ -1627,7 +1627,7 @@ pub async fn trigger_rca_for_incident(
 ) -> Result<(), anyhow::Error> {
     use config::meta::alerts::incidents::IncidentTopology;
     use o2_enterprise::enterprise::{
-        alerts::rca_agent::get_agent_client, common::config::get_config as get_o2_config,
+        ai::client::get_agent_client, common::config::get_config as get_o2_config,
     };
 
     let config = get_o2_config();

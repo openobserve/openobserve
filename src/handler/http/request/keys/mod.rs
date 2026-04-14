@@ -99,6 +99,7 @@ pub async fn save(
         name: req.name.clone(),
         data: serde_json::to_string(&cd).unwrap(),
         kind: infra::table::cipher::EntryKind::CipherKey,
+        is_system: false,
     })
     .await
     {
@@ -238,6 +239,8 @@ pub async fn list(Path(org_id): Path<String>) -> Response {
         let filter = infra::table::cipher::ListFilter {
             org: Some(org_id),
             kind: Some(infra::table::cipher::EntryKind::CipherKey),
+            name: None,
+            is_system: false,
         };
 
         let kdata = match infra::table::cipher::list_filtered(filter, None).await {
@@ -488,6 +491,7 @@ pub async fn update(
         name: req.name,
         data: serde_json::to_string(&cd).unwrap(),
         kind: infra::table::cipher::EntryKind::CipherKey,
+        is_system: false,
     })
     .await
     {
