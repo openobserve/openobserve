@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="{ row, idx } in renderedDashboardRows"
               :key="row.id"
               :data-index="idx"
-              :ref="(node: any) => node && dashVirtualEnabled && rowVirtualizer.measureElement(node)"
+              :ref="(node: any) => measureDashboardRow(node)"
               class="dashboard-data-row tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
               :class="{ 'tw:border-b': !usesSeparateBorders }"
               @click="
@@ -1873,9 +1873,12 @@ const rowVirtualizerOptions = computed(() => {
     count: rowCount.value,
     getScrollElement: () => parentRef.value,
     estimateSize: (index: number) => {
-      if (props.rowHeight) return props.rowHeight;
-      // Dashboard: 28px matches actual row height (12px font + py-1 padding + border).
+      // Dashboard virtual scroll: always use 28px regardless of rowHeight prop.
+      // The rowHeight prop (default 22) is the *cell content* height and does not
+      // account for padding (py-1 = 8px) + border (1px), so using it here would
+      // cause a ~6px-per-row underestimate and a visible layout jump after measurement.
       if (isDashVirtual) return 28;
+      if (props.rowHeight) return props.rowHeight;
       // Logs/traces: check for expanded rows
       const isExpandedRow = formattedRows.value[index]?.original?.isExpandedRow;
       return isExpandedRow
@@ -1936,6 +1939,14 @@ const rowVirtualizerOptions = computed(() => {
 });
 
 const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
+
+/** Defers measureElement outside Vue's synchronous render flush to prevent
+ *  recursive reactive update warnings. Called via :ref on dashboard rows. */
+const measureDashboardRow = (node: any) => {
+  if (node && dashVirtualEnabled.value) {
+    queueMicrotask(() => rowVirtualizer.value.measureElement(node));
+  }
+};
 
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 
