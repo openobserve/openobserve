@@ -637,6 +637,14 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}", put(dashboards::timed_annotations::update_annotations))
         .route("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}", delete(dashboards::timed_annotations::delete_annotation_panels))
 
+        // Reports (v2) — /bulk and /move must precede /{report_id} to avoid route conflicts
+        .route("/v2/{org_id}/reports", get(dashboards::reports::list_reports_v2).post(dashboards::reports::create_report_v2))
+        .route("/v2/{org_id}/reports/bulk", delete(dashboards::reports::delete_report_bulk_v2))
+        .route("/v2/{org_id}/reports/move", patch(dashboards::reports::move_reports))
+        .route("/v2/{org_id}/reports/{report_id}", get(dashboards::reports::get_report_v2).put(dashboards::reports::update_report_v2).delete(dashboards::reports::delete_report_v2))
+        .route("/v2/{org_id}/reports/{report_id}/enable", patch(dashboards::reports::enable_report_v2))
+        .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
+
         // Folders (v2)
         .route("/v2/{org_id}/folders/{folder_type}", get(folders::list_folders).post(folders::create_folder))
         .route("/v2/{org_id}/folders/{folder_type}/{folder_id}", get(folders::get_folder).put(folders::update_folder).delete(folders::delete_folder))

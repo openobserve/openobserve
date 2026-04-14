@@ -20,13 +20,16 @@ use chromiumoxide::{Page, browser::Browser, cdp::browser_protocol::page::PrintTo
 use chrono::Timelike;
 use config::{
     SMTP_CLIENT, get_chrome_launch_options, get_config,
-    meta::dashboards::{
-        datetime_now,
-        reports::{
-            HttpReportPayload, Report, ReportDashboard, ReportDestination,
-            ReportEmailAttachmentType, ReportEmailDetails, ReportFrequencyType, ReportListFilters,
-            ReportMediaType, ReportTimerangeType,
+    meta::{
+        dashboards::{
+            datetime_now,
+            reports::{
+                HttpReportPayload, Report, ReportDashboard, ReportDestination,
+                ReportEmailAttachmentType, ReportEmailDetails, ReportFrequencyType,
+                ReportListFilters, ReportMediaType, ReportTimerangeType,
+            },
         },
+        folder::Folder,
     },
     utils::time::now_micros,
 };
@@ -104,10 +107,14 @@ pub enum ReportError {
 
     #[error("Error creating default reports folder")]
     CreateDefaultFolderError,
+
+    #[error("Folder not found")]
+    FolderNotFound,
 }
 
 pub async fn save(
     org_id: &str,
+    folder_id: &str,
     name: &str,
     mut report: Report,
     create: bool,
@@ -157,7 +164,7 @@ pub async fn save(
         report.frequency.interval = 1;
     }
 
-    match db::dashboards::reports::get(conn, org_id, "default", &report.name).await {
+    match db::dashboards::reports::get(conn, org_id, folder_id, &report.name).await {
         Ok(old_report) => {
             if create {
                 return Err(ReportError::CreateReportNameAlreadyUsed);
@@ -222,16 +229,21 @@ pub async fn save(
     }
 
     if create {
-        let report_name = report.name.clone();
-        db::dashboards::reports::create(conn, "default", report)
+        let report_id = db::dashboards::reports::create(conn, folder_id, report)
             .await
             .map_err(ReportError::DbError)?;
-        if !name.is_empty() {
-            set_ownership(org_id, "reports", Authz::new(&report_name)).await;
-            // todo: set parent folder
-        }
+        set_ownership(
+            org_id,
+            "reports",
+            Authz {
+                obj_id: report_id,
+                parent_type: "report_folders".to_owned(),
+                parent: folder_id.to_owned(),
+            },
+        )
+        .await;
     } else {
-        db::dashboards::reports::update(conn, "default", None, report)
+        db::dashboards::reports::update(conn, folder_id, None, report)
             .await
             .map_err(ReportError::DbError)?;
     }
@@ -239,11 +251,20 @@ pub async fn save(
     Ok(())
 }
 
-pub async fn get(org_id: &str, name: &str) -> Result<Report, ReportError> {
+pub async fn get(org_id: &str, folder_id: &str, name: &str) -> Result<Report, ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    db::dashboards::reports::get(conn, org_id, "default", name)
+    db::dashboards::reports::get(conn, org_id, folder_id, name)
         .await
         .map_err(|_| ReportError::ReportNotFound)
+}
+
+pub async fn get_by_id(org_id: &str, report_id: &str) -> Result<(Folder, Report), ReportError> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match table::reports::get_by_id(conn, report_id).await {
+        Ok(Some((folder, report))) if report.org_id == org_id => Ok((folder, report)),
+        Ok(_) => Err(ReportError::ReportNotFound),
+        Err(e) => Err(ReportError::DbError(anyhow::anyhow!(e))),
+    }
 }
 
 pub async fn list(
@@ -273,30 +294,61 @@ pub async fn list(
     Ok(result)
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), ReportError> {
+pub async fn delete(org_id: &str, folder_id: &str, name: &str) -> Result<(), ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    // TODO: If we are going to perform both the "get" and "delete" operations then they should be
-    // in a transaction.
-    if db::dashboards::reports::get(conn, org_id, "default", name)
+    // Existence check — db::delete returns empty string if not found.
+    if db::dashboards::reports::get(conn, org_id, folder_id, name)
         .await
         .is_err()
     {
         return Err(ReportError::ReportNotFound);
     }
 
-    match db::dashboards::reports::delete(conn, org_id, "default", name).await {
-        Ok(_) => {
-            remove_ownership(org_id, "reports", Authz::new(name)).await;
-            Ok(())
-        }
-        Err(e) => Err(ReportError::DbError(e)),
+    // db::delete now returns the KSUID of the deleted report.
+    let report_id = db::dashboards::reports::delete(conn, org_id, folder_id, name)
+        .await
+        .map_err(ReportError::DbError)?;
+
+    if !report_id.is_empty() {
+        remove_ownership(
+            org_id,
+            "reports",
+            Authz {
+                obj_id: report_id,
+                parent_type: "report_folders".to_owned(),
+                parent: folder_id.to_owned(),
+            },
+        )
+        .await;
     }
+    Ok(())
 }
 
-pub async fn trigger(org_id: &str, name: &str) -> Result<(), ReportError> {
+pub async fn delete_by_id(org_id: &str, report_id: &str) -> Result<(), ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let report = match db::dashboards::reports::get(conn, org_id, "default", name).await {
+    let (folder, _) = get_by_id(org_id, report_id).await?;
+
+    db::dashboards::reports::delete_by_id(conn, org_id, report_id)
+        .await
+        .map_err(ReportError::DbError)?;
+
+    remove_ownership(
+        org_id,
+        "reports",
+        Authz {
+            obj_id: report_id.to_string(),
+            parent_type: "report_folders".to_owned(),
+            parent: folder.folder_id,
+        },
+    )
+    .await;
+    Ok(())
+}
+
+pub async fn trigger(org_id: &str, folder_id: &str, name: &str) -> Result<(), ReportError> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let report = match db::dashboards::reports::get(conn, org_id, folder_id, name).await {
         Ok(report) => report,
         _ => {
             return Err(ReportError::ReportNotFound);
@@ -306,20 +358,163 @@ pub async fn trigger(org_id: &str, name: &str) -> Result<(), ReportError> {
     Ok(())
 }
 
-pub async fn enable(org_id: &str, name: &str, value: bool) -> Result<(), ReportError> {
+pub async fn trigger_by_id(org_id: &str, report_id: &str) -> Result<(), ReportError> {
+    let (_, report) = get_by_id(org_id, report_id).await?;
+    report.send_subscribers().await?;
+    Ok(())
+}
+
+pub async fn enable(
+    org_id: &str,
+    folder_id: &str,
+    name: &str,
+    value: bool,
+) -> Result<(), ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     // TODO: The "get" and "update" operations should be in a transaction.
-    let mut report = match db::dashboards::reports::get(conn, org_id, "default", name).await {
+    let mut report = match db::dashboards::reports::get(conn, org_id, folder_id, name).await {
         Ok(report) => report,
         _ => {
             return Err(ReportError::ReportNotFound);
         }
     };
     report.enabled = value;
-    db::dashboards::reports::update(conn, "default", None, report)
+    db::dashboards::reports::update(conn, folder_id, None, report)
         .await
         .map_err(ReportError::DbError)
+}
+
+pub async fn enable_by_id(org_id: &str, report_id: &str, value: bool) -> Result<(), ReportError> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let (_, mut report) = get_by_id(org_id, report_id).await?;
+    report.enabled = value;
+    db::dashboards::reports::update_by_id(conn, report_id, None, report)
+        .await
+        .map_err(ReportError::DbError)
+}
+
+pub async fn update_by_id(
+    org_id: &str,
+    report_id: &str,
+    new_folder_id: Option<&str>,
+    mut report: Report,
+) -> Result<(), ReportError> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let cfg = get_config();
+
+    if cfg.common.report_server_url.is_empty() {
+        if !cfg.smtp.smtp_enabled && !report.destinations.is_empty() {
+            return Err(ReportError::SmtpNotEnabled);
+        }
+        if !cfg.chrome.chrome_enabled || cfg.chrome.chrome_path.is_empty() {
+            return Err(ReportError::ChromeNotEnabled);
+        }
+        if cfg.common.report_user_name.is_empty() || cfg.common.report_user_password.is_empty() {
+            return Err(ReportError::ReportUsernamePasswordNotSet);
+        }
+    }
+
+    if is_ofga_unsupported(&report.name) {
+        return Err(ReportError::NameContainsOpenFgaUnsupportedCharacters);
+    }
+    if report.name.is_empty() {
+        return Err(ReportError::NameIsEmpty);
+    }
+    if report.name.contains('/') {
+        return Err(ReportError::NameContainsForwardSlash);
+    }
+
+    if report.frequency.frequency_type == ReportFrequencyType::Cron {
+        let now = chrono::Utc::now().second();
+        report.frequency.cron =
+            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
+        if let Err(e) = Schedule::from_str(&report.frequency.cron) {
+            return Err(ReportError::ParseCronError(e));
+        }
+    } else if report.frequency.interval == 0 {
+        report.frequency.interval = 1;
+    }
+
+    if report.dashboards.is_empty() {
+        return Err(ReportError::NoDashboards);
+    }
+    if report.dashboards.iter().any(|d| {
+        d.report_type == ReportMediaType::Pdf
+            && d.email_attachment_type == ReportEmailAttachmentType::Inline
+    }) {
+        return Err(ReportError::InlineAttachmentTypeNotSupportedForPdf);
+    }
+
+    let (curr_folder, old_report) = get_by_id(org_id, report_id).await?;
+    report.owner = old_report.owner;
+    report.updated_at = Some(datetime_now());
+
+    db::dashboards::reports::update_by_id(conn, report_id, new_folder_id, report)
+        .await
+        .map_err(ReportError::DbError)?;
+
+    // Update OpenFGA parent relation if the report is being moved to a different folder.
+    if let Some(dst_folder_id) = new_folder_id {
+        remove_ownership(
+            org_id,
+            "reports",
+            Authz {
+                obj_id: report_id.to_string(),
+                parent_type: "report_folders".to_owned(),
+                parent: curr_folder.folder_id,
+            },
+        )
+        .await;
+        set_ownership(
+            org_id,
+            "reports",
+            Authz {
+                obj_id: report_id.to_string(),
+                parent_type: "report_folders".to_owned(),
+                parent: dst_folder_id.to_owned(),
+            },
+        )
+        .await;
+    }
+    Ok(())
+}
+
+pub async fn move_to_folder(
+    org_id: &str,
+    report_ids: &[String],
+    dst_folder_id: &str,
+) -> Result<(), ReportError> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    for report_id in report_ids {
+        let (curr_folder, report) = get_by_id(org_id, report_id).await?;
+
+        db::dashboards::reports::update_by_id(conn, report_id, Some(dst_folder_id), report)
+            .await
+            .map_err(ReportError::DbError)?;
+
+        remove_ownership(
+            org_id,
+            "reports",
+            Authz {
+                obj_id: report_id.clone(),
+                parent_type: "report_folders".to_owned(),
+                parent: curr_folder.folder_id,
+            },
+        )
+        .await;
+        set_ownership(
+            org_id,
+            "reports",
+            Authz {
+                obj_id: report_id.clone(),
+                parent_type: "report_folders".to_owned(),
+                parent: dst_folder_id.to_owned(),
+            },
+        )
+        .await;
+    }
+    Ok(())
 }
 
 #[derive(Debug, thiserror::Error)]

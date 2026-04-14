@@ -16,13 +16,15 @@
 use std::collections::HashMap;
 
 use axum::{
-    extract::{Path, Query},
+    extract::{OriginalUri, Path, Query},
     response::Response,
 };
 use config::meta::{
     dashboards::reports::{Report, ReportListFilters},
+    folder::DEFAULT_FOLDER,
     triggers::{Trigger, TriggerModule},
 };
+use serde::Deserialize;
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
@@ -31,7 +33,10 @@ use crate::{
     handler::http::{
         extractors::Headers,
         models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
-        request::{BulkDeleteRequest, BulkDeleteResponse},
+        request::{
+            BulkDeleteRequest, BulkDeleteResponse,
+            dashboards::get_folder,
+        },
     },
     service::{
         dashboards::reports::{self, ReportError},
@@ -63,8 +68,15 @@ impl From<ReportError> for Response {
             ReportError::DbError(e) => MetaHttpResponse::internal_error(e),
             ReportError::SendReportError(e) => MetaHttpResponse::internal_error(e),
             ReportError::CreateDefaultFolderError => MetaHttpResponse::internal_error(value),
+            ReportError::FolderNotFound => MetaHttpResponse::not_found(value),
         }
     }
+}
+
+#[derive(Debug, serde::Serialize, Deserialize, utoipa::ToSchema)]
+pub struct MoveReportsRequestBody {
+    pub report_ids: Vec<String>,
+    pub dst_folder_id: String,
 }
 
 /// CreateReport
@@ -112,7 +124,7 @@ pub async fn create_report(
     if report.owner.is_empty() {
         report.owner = user_email.user_id;
     }
-    match reports::save(&org_id, "", report, true).await {
+    match reports::save(&org_id, DEFAULT_FOLDER, "", report, true).await {
         Ok(_) => MetaHttpResponse::ok("Report saved"),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -159,7 +171,7 @@ pub async fn update_report(
 ) -> Response {
     let mut report = report;
     report.last_edited_by = user_email.user_id;
-    match reports::save(&org_id, &name, report, false).await {
+    match reports::save(&org_id, DEFAULT_FOLDER, &name, report, false).await {
         Ok(_) => MetaHttpResponse::ok("Report saved"),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -298,7 +310,7 @@ pub async fn list_reports(
     )
 )]
 pub async fn get_report(Path((org_id, name)): Path<(String, String)>) -> Response {
-    match reports::get(&org_id, &name).await {
+    match reports::get(&org_id, DEFAULT_FOLDER, &name).await {
         Ok(data) => MetaHttpResponse::json(data),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -334,7 +346,7 @@ pub async fn get_report(Path((org_id, name)): Path<(String, String)>) -> Respons
     )
 )]
 pub async fn delete_report(Path((org_id, name)): Path<(String, String)>) -> Response {
-    match reports::delete(&org_id, &name).await {
+    match reports::delete(&org_id, DEFAULT_FOLDER, &name).await {
         Ok(_) => MetaHttpResponse::ok("Report deleted"),
         Err(e) => match e {
             ReportError::ReportNotFound => MetaHttpResponse::not_found(e),
@@ -392,7 +404,7 @@ pub async fn delete_report_bulk(
     let mut err = None;
 
     for name in req.ids {
-        match reports::delete(&org_id, &name).await {
+        match reports::delete(&org_id, DEFAULT_FOLDER, &name).await {
             Ok(_) => successful.push(name),
             Err(e) => match e {
                 ReportError::ReportNotFound => successful.push(name),
@@ -448,7 +460,7 @@ pub async fn enable_report(
     };
     let mut resp = HashMap::new();
     resp.insert("enabled".to_string(), enable);
-    match reports::enable(&org_id, &name, enable).await {
+    match reports::enable(&org_id, DEFAULT_FOLDER, &name, enable).await {
         Ok(_) => MetaHttpResponse::json(resp),
         Err(e) => match e {
             ReportError::ReportNotFound => MetaHttpResponse::not_found(e),
@@ -487,11 +499,416 @@ pub async fn enable_report(
     )
 )]
 pub async fn trigger_report(Path((org_id, name)): Path<(String, String)>) -> Response {
-    match reports::trigger(&org_id, &name).await {
+    match reports::trigger(&org_id, DEFAULT_FOLDER, &name).await {
         Ok(_) => MetaHttpResponse::ok("Report triggered"),
         Err(e) => match e {
             ReportError::ReportNotFound => MetaHttpResponse::not_found(e),
             e => MetaHttpResponse::internal_error(e),
         },
+    }
+}
+
+// ─── V2 handlers (folder-aware, ID-based) ──────────────────────────────────
+
+/// CreateReportV2
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/reports",
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "CreateReportV2",
+    summary = "Create dashboard report (v2)",
+    description = "Creates a new automated dashboard report in the specified folder. \
+                   Pass `?folder=<folder_id>` to place the report in a non-default folder.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Folder ID (defaults to 'default')"),
+    ),
+    request_body(content = inline(Report), description = "Report details"),
+    responses(
+        (status = StatusCode::OK, description = "Report created", body = ()),
+        (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "create"})),
+    )
+)]
+pub async fn create_report_v2(
+    Path(org_id): Path<String>,
+    OriginalUri(uri): OriginalUri,
+    Headers(user_email): Headers<UserEmail>,
+    axum::Json(mut report): axum::Json<Report>,
+) -> Response {
+    let folder_id = get_folder(uri.query().unwrap_or(""));
+    if report.owner.is_empty() {
+        report.owner = user_email.user_id;
+    }
+    match reports::save(&org_id, &folder_id, "", report, true).await {
+        Ok(_) => MetaHttpResponse::ok("Report saved"),
+        Err(e) => e.into(),
+    }
+}
+
+/// ListReportsV2
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/reports",
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "ListReportsV2",
+    summary = "List dashboard reports (v2)",
+    description = "Lists reports for the organization, optionally filtered by folder.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Folder ID filter"),
+        ("dashboard_id" = Option<String>, Query, description = "Dashboard ID filter"),
+        ("cache" = Option<bool>, Query, description = "Filter destination-less (cache) reports"),
+    ),
+    responses(
+        (status = StatusCode::OK, body = inline(Vec<Report>)),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "list"})),
+    )
+)]
+pub async fn list_reports_v2(
+    Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    // Reuse the v1 list handler logic — it already reads ?folder as a filter.
+    // Re-map the query key from "folder" to "folder_id" if needed by the service.
+    let folder = query.get("folder").map(|s| s.to_owned());
+    let dashboard = query.get("dashboard_id").map(|s| s.to_owned());
+    let destination_less = query
+        .get("cache")
+        .and_then(|s| s.parse::<bool>().ok());
+    let filters = ReportListFilters {
+        folder,
+        dashboard,
+        destination_less,
+    };
+
+    let mut _permitted = None;
+    #[cfg(feature = "enterprise")]
+    {
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id,
+            &user_email.user_id,
+            "GET",
+            "report",
+        )
+        .await
+        {
+            Ok(list) => _permitted = list,
+            Err(e) => return MetaHttpResponse::forbidden(e.to_string()),
+        }
+    }
+
+    let scheduled_jobs = scheduler::list_by_org(&org_id, Some(TriggerModule::Report))
+        .await
+        .unwrap_or_default();
+    let mut scheduled_jobs: HashMap<String, Trigger> = scheduled_jobs
+        .into_iter()
+        .map(|t| (t.module_key.clone(), t))
+        .collect();
+
+    let data = match reports::list(&org_id, filters, _permitted).await {
+        Ok(data) => ListReportsResponseBody(
+            data.into_iter()
+                .map(|d| {
+                    let scheduled_job = scheduled_jobs.remove(&d.report_id);
+                    match ListReportsResponseBodyItem::try_from(d) {
+                        Ok(mut item) => {
+                            item.last_triggered_at =
+                                scheduled_job.and_then(|t| t.start_time);
+                            Some(item)
+                        }
+                        Err(e) => {
+                            log::error!("Error converting report to response body: {e}");
+                            None
+                        }
+                    }
+                })
+                .collect::<Option<Vec<_>>>()
+                .unwrap_or_default(),
+        ),
+        Err(e) => return MetaHttpResponse::bad_request(e),
+    };
+    MetaHttpResponse::json(data)
+}
+
+/// GetReportV2
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/reports/{report_id}",
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "GetReportV2",
+    summary = "Get dashboard report by ID (v2)",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("report_id" = String, Path, description = "Report ID (KSUID)"),
+    ),
+    responses(
+        (status = StatusCode::OK, body = inline(Report)),
+        (status = StatusCode::NOT_FOUND, description = "Not found", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "get"})),
+    )
+)]
+pub async fn get_report_v2(Path((org_id, report_id)): Path<(String, String)>) -> Response {
+    match reports::get_by_id(&org_id, &report_id).await {
+        Ok((_, report)) => MetaHttpResponse::json(report),
+        Err(e) => e.into(),
+    }
+}
+
+/// UpdateReportV2
+#[utoipa::path(
+    put,
+    path = "/v2/{org_id}/reports/{report_id}",
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "UpdateReportV2",
+    summary = "Update dashboard report by ID (v2)",
+    description = "Updates an existing report. Pass `?folder=<folder_id>` to move the report \
+                   to a different folder at the same time.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("report_id" = String, Path, description = "Report ID (KSUID)"),
+        ("folder" = Option<String>, Query, description = "Move to this folder ID"),
+    ),
+    request_body(content = inline(Report), description = "Report details"),
+    responses(
+        (status = StatusCode::OK, description = "Updated", body = ()),
+        (status = StatusCode::NOT_FOUND, description = "Not found", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"})),
+    )
+)]
+pub async fn update_report_v2(
+    Path((org_id, report_id)): Path<(String, String)>,
+    OriginalUri(uri): OriginalUri,
+    Headers(user_email): Headers<UserEmail>,
+    axum::Json(mut report): axum::Json<Report>,
+) -> Response {
+    report.last_edited_by = user_email.user_id;
+    // ?folder on update means "move to this folder"; absent means stay in current folder.
+    let new_folder: Option<String> = uri.query().and_then(|q| {
+        url::form_urlencoded::parse(q.as_bytes())
+            .find(|(k, _)| k == "folder")
+            .map(|(_, v)| v.into_owned())
+    });
+    match reports::update_by_id(&org_id, &report_id, new_folder.as_deref(), report).await {
+        Ok(_) => MetaHttpResponse::ok("Report updated"),
+        Err(e) => e.into(),
+    }
+}
+
+/// DeleteReportV2
+#[utoipa::path(
+    delete,
+    path = "/v2/{org_id}/reports/{report_id}",
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "DeleteReportV2",
+    summary = "Delete dashboard report by ID (v2)",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("report_id" = String, Path, description = "Report ID (KSUID)"),
+    ),
+    responses(
+        (status = StatusCode::OK, description = "Deleted", body = ()),
+        (status = StatusCode::NOT_FOUND, description = "Not found", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
+    )
+)]
+pub async fn delete_report_v2(Path((org_id, report_id)): Path<(String, String)>) -> Response {
+    match reports::delete_by_id(&org_id, &report_id).await {
+        Ok(_) => MetaHttpResponse::ok("Report deleted"),
+        Err(e) => e.into(),
+    }
+}
+
+/// DeleteReportBulkV2
+#[utoipa::path(
+    delete,
+    path = "/v2/{org_id}/reports/bulk",
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "DeleteReportBulkV2",
+    summary = "Delete multiple dashboard reports by ID (v2)",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "Report IDs (KSUIDs)"),
+    responses(
+        (status = StatusCode::OK, description = "Success", body = BulkDeleteResponse),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "delete"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn delete_report_bulk_v2(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    axum::Json(req): axum::Json<BulkDeleteRequest>,
+) -> Response {
+    let _user_id = user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
+        if !check_permissions(id, &org_id, &_user_id, "reports", "DELETE", None).await {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for report_id in req.ids {
+        match reports::delete_by_id(&org_id, &report_id).await {
+            Ok(_) => successful.push(report_id),
+            Err(ReportError::ReportNotFound) => successful.push(report_id), // idempotent
+            Err(e) => {
+                log::error!("error deleting report {org_id}/{report_id}: {e}");
+                unsuccessful.push(report_id);
+                err = Some(e.to_string());
+            }
+        }
+    }
+    MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    })
+}
+
+/// EnableReportV2
+#[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/reports/{report_id}/enable",
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "EnableReportV2",
+    summary = "Enable or disable a report by ID (v2)",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("report_id" = String, Path, description = "Report ID (KSUID)"),
+        ("value" = bool, Query, description = "true to enable, false to disable"),
+    ),
+    responses(
+        (status = 200, description = "Success", body = Object),
+        (status = 404, description = "Not found", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"})),
+    )
+)]
+pub async fn enable_report_v2(
+    Path((org_id, report_id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let enable = query
+        .get("value")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or(false);
+    match reports::enable_by_id(&org_id, &report_id, enable).await {
+        Ok(_) => {
+            let mut resp = HashMap::new();
+            resp.insert("enabled", enable);
+            MetaHttpResponse::json(resp)
+        }
+        Err(e) => e.into(),
+    }
+}
+
+/// TriggerReportV2
+#[utoipa::path(
+    put,
+    path = "/v2/{org_id}/reports/{report_id}/trigger",
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "TriggerReportV2",
+    summary = "Manually trigger a report by ID (v2)",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("report_id" = String, Path, description = "Report ID (KSUID)"),
+    ),
+    responses(
+        (status = 200, description = "Success", body = Object),
+        (status = 404, description = "Not found", body = ()),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn trigger_report_v2(Path((org_id, report_id)): Path<(String, String)>) -> Response {
+    match reports::trigger_by_id(&org_id, &report_id).await {
+        Ok(_) => MetaHttpResponse::ok("Report triggered"),
+        Err(e) => e.into(),
+    }
+}
+
+/// MoveReports
+#[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/reports/move",
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "MoveReports",
+    summary = "Move reports between folders (v2)",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(
+        content = inline(MoveReportsRequestBody),
+        description = "Report IDs and destination folder",
+    ),
+    responses(
+        (status = 200, description = "Success", body = Object),
+        (status = 404, description = "Not found", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"})),
+    )
+)]
+pub async fn move_reports(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    axum::Json(req): axum::Json<MoveReportsRequestBody>,
+) -> Response {
+    let _user_id = user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.report_ids {
+        if !check_permissions(id, &org_id, &_user_id, "reports", "PUT", None).await {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+
+    match reports::move_to_folder(&org_id, &req.report_ids, &req.dst_folder_id).await {
+        Ok(_) => MetaHttpResponse::ok(if req.report_ids.len() == 1 {
+            "Report moved"
+        } else {
+            "Reports moved"
+        }),
+        Err(e) => e.into(),
     }
 }
