@@ -579,18 +579,18 @@ test.describe("Alerts Regression Bugs", () => {
     testLogger.info('Selecting template', { templateName: selectedTemplateName?.trim() });
 
     await firstTemplate.click();
+    // Wait for dropdown menu to close (indicates selection completed)
+    await expect(templateMenu).not.toBeVisible({ timeout: 5000 });
     testLogger.info('✓ Selected template from dropdown');
 
     // STRONG ASSERTION: Verify template name appears exactly once in the select field
     // Bug #10110 caused templates to display twice in the input field
-    // Use .q-select__display-value (Quasar's public API for the selected option display)
-    const templateDisplayValue = templateSelect.locator('.q-select__display-value').first();
-    // Wait for template display value to update after selection
-    await expect(templateDisplayValue).toBeVisible({ timeout: 3000 });
+    // Use .q-field__native (where Quasar stores the display value)
+    const templateInputField = templateSelect.locator('.q-field__native').first();
 
     // Get the visible text in the selected template display area
-    // Using .q-select__display-value textContent (semantically correct for reading selected option text)
-    const displayedText = await templateDisplayValue.textContent();
+    // Using textContent() which works on any element (not inputValue() which only works on inputs)
+    const displayedText = await templateInputField.textContent();
     const cleanDisplayText = displayedText?.trim().replace(/\s+/g, ' ') || '';
     testLogger.info('Template display text', { text: cleanDisplayText });
 
