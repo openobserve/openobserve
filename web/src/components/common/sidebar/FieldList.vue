@@ -293,6 +293,8 @@ export default defineComponent({
     // Per-field pagination state: cumulative size (grows on "load more")
     const currentSizePerField: Ref<Record<string, number>> = ref({});
     const currentKeyword: Ref<Record<string, string>> = ref({});
+    // Pinned time range per field so "load more" pages cover the same window.
+    const fieldValuesTimeRange: Ref<Record<string, { start_time: number; end_time: number }>> = ref({});
 
     const defaultValuesCount = computed(
       () => store.state.zoConfig?.query_values_default_num || 10,
@@ -383,6 +385,7 @@ export default defineComponent({
       cancelFieldStream(name);
       currentSizePerField.value[name] = defaultValuesCount.value;
       currentKeyword.value[name] = "";
+      fieldValuesTimeRange.value[name] = { start_time: props.timeStamp.startTime, end_time: props.timeStamp.endTime };
       resetFieldValues(name, true);
 
       const resolvedStream = stream_name || props.streamName;
@@ -406,6 +409,7 @@ export default defineComponent({
       expandedRows.value[fieldName] = false;
       currentSizePerField.value[fieldName] = 0;
       currentKeyword.value[fieldName] = "";
+      delete fieldValuesTimeRange.value[fieldName];
       resetFieldValues(fieldName);
     };
 
@@ -422,12 +426,13 @@ export default defineComponent({
       delete fieldValuesFinalizedValues.value[fieldName];
       cancelFieldStream(fieldName);
       resetFieldValues(fieldName, true);
+      const pinnedTime = fieldValuesTimeRange.value[fieldName];
       fetchFieldValues({
         fields: [fieldName],
         size: defaultValuesCount.value,
         no_count: false,
-        start_time: props.timeStamp.startTime,
-        end_time: props.timeStamp.endTime,
+        start_time: pinnedTime?.start_time ?? props.timeStamp.startTime,
+        end_time: pinnedTime?.end_time ?? props.timeStamp.endTime,
         stream_name: resolvedStream,
         stream_type: props.streamType,
         sql: buildSql(resolvedStream, props.query || undefined),
@@ -453,12 +458,13 @@ export default defineComponent({
         ...(fieldValues.value[fieldName]?.values || []),
       ];
 
+      const pinnedTime = fieldValuesTimeRange.value[fieldName];
       fetchFieldValues({
         fields: [fieldName],
         size: newSize,
         no_count: false,
-        start_time: props.timeStamp.startTime,
-        end_time: props.timeStamp.endTime,
+        start_time: pinnedTime?.start_time ?? props.timeStamp.startTime,
+        end_time: pinnedTime?.end_time ?? props.timeStamp.endTime,
         stream_name: resolvedStream,
         stream_type: props.streamType,
         sql: buildSql(resolvedStream, props.query || undefined),
