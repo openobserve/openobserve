@@ -188,28 +188,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-btn>
 
-        <!-- Go to View Editor Button with Info Icon - shows when comparison windows are added -->
-        <div v-if="localMultiTimeRange.length > 0" class="tw:flex tw:items-center tw:gap-2">
-          <q-btn
-            data-test="go-to-view-editor-btn"
-            :label="t('alerts.compareWithPast.goToConditions')"
-            size="md"
-            class="o2-secondary-button"
-            style="font-size: 14px;"
-            no-caps
-            @click="handleGoToSqlEditor"
-          >
-          <q-tooltip
-              ref="goToConditionsTooltipRef"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="300px"
-              :offset="[0, 8]"
-            >
-              {{ t('alerts.compareWithPast.goToConditionsTooltip') }}
-            </q-tooltip>
-        </q-btn>
-        </div>
       </div>
       </div><!-- end tw:px-3 tw:py-2 -->
     </div>
@@ -259,13 +237,12 @@ export default defineComponent({
       default: "custom",
     },
   },
-  emits: ["update:multiTimeRange", "goToSqlEditor"],
+  emits: ["update:multiTimeRange"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
 
     const multiWindowContainerRef = ref<HTMLElement | null>(null);
-    const goToConditionsTooltipRef = ref<any>(null);
     const localMultiTimeRange = ref<TimeShiftPicker[]>([...(props.multiTimeRange || [])]);
 
     // Watch for prop changes
@@ -283,10 +260,8 @@ export default defineComponent({
     });
 
     const comparisonDisabledTooltip = computed(() => {
-      if (props.selectedTab === "custom") {
-        return "Please switch to SQL mode in conditions step to enable comparison windows";
-      } else if (props.selectedTab === "promql") {
-        return "Please switch to SQL mode in conditions step to enable comparison windows";
+      if (props.selectedTab !== "sql") {
+        return "Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.";
       }
       return "";
     });
@@ -352,23 +327,10 @@ export default defineComponent({
       }
     };
 
-    const goToSqlEditor = () => {
-      emit("goToSqlEditor");
-    };
-
-    const handleGoToSqlEditor = () => {
-      // Hide the tooltip before navigating
-      if (goToConditionsTooltipRef.value) {
-        goToConditionsTooltipRef.value.hide();
-      }
-      goToSqlEditor();
-    };
-
     return {
       t,
       store,
       multiWindowContainerRef,
-      goToConditionsTooltipRef,
       localMultiTimeRange,
       addTimeShift,
       removeTimeShift,
@@ -377,8 +339,6 @@ export default defineComponent({
       convertMinutesToDisplayValue,
       isComparisonDisabled,
       comparisonDisabledTooltip,
-      goToSqlEditor,
-      handleGoToSqlEditor,
     };
   },
 });
