@@ -219,7 +219,7 @@ describe("useStickyColumns", () => {
         left: "0px",
         "z-index": 2,
         "background-color": "#fff",
-        "box-shadow": "2px 0 4px rgba(0, 0, 0, 0.1)",
+        "box-shadow": "4px 0 8px rgba(0, 0, 0, 0.15)",
       });
     });
 
