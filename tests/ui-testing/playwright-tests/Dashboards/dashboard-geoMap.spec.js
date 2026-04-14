@@ -1,5 +1,4 @@
-import { test, expect } from "../baseFixtures.js";
-import { login } from "./utils/dashLogin.js";
+const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 import { ingestionForMaps } from "./utils/dashIngestion.js";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
@@ -15,8 +14,7 @@ test.describe.configure({ mode: "parallel" });
 test.describe("dashboard maps testcases", () => {
   test.beforeEach(async ({ page }) => {
     testLogger.debug("Test setup - beforeEach hook executing");
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestionForMaps(page);
     await page.waitForTimeout(2000);
   });

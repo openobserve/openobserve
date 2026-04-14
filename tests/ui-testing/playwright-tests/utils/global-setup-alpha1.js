@@ -4,6 +4,7 @@ const fs = require('fs');
 const testLogger = require('./test-logger.js');
 const logsdata = require('../../../test-data/logs_data.json');
 const dashboardChartJsonData = require('../../../test-data/dashboard_chart_json.json');
+const geoMapData = require('../../../test-data/geo_map.json');
 
 /**
  * Global setup for Alpha1 cloud tests
@@ -298,6 +299,7 @@ async function performGlobalIngestion(page) {
     { name: 'e2e_automate', data: logsdata },
     { name: 'auto_playwright_stream', data: [{ level: 'info', job: 'test', log: 'test message for openobserve' }] },
     { name: 'kubernetes', data: dashboardChartJsonData },
+    { name: 'geojson', data: geoMapData },
   ];
 
   for (const stream of streams) {
@@ -344,11 +346,12 @@ async function performGlobalIngestion(page) {
         const hasE2e = streamsResult.names.includes('e2e_automate');
         const hasAuto = streamsResult.names.includes('auto_playwright_stream');
         const hasKubernetes = streamsResult.names.includes('kubernetes');
-        if (hasE2e && hasAuto && hasKubernetes) {
+        const hasGeojson = streamsResult.names.includes('geojson');
+        if (hasE2e && hasAuto && hasKubernetes && hasGeojson) {
           testLogger.info(`[alpha1] All streams indexed after ${Date.now() - startTime}ms`);
           break;
         }
-        testLogger.debug(`[alpha1] Streams not yet indexed (e2e_automate=${hasE2e}, auto_playwright_stream=${hasAuto}, kubernetes=${hasKubernetes}), waiting...`);
+        testLogger.debug(`[alpha1] Streams not yet indexed (e2e_automate=${hasE2e}, auto_playwright_stream=${hasAuto}, kubernetes=${hasKubernetes}, geojson=${hasGeojson}), waiting...`);
       } else {
         testLogger.debug(`[alpha1] Streams API returned ${streamsResult.status}, retrying...`);
       }
