@@ -168,6 +168,7 @@ jobs:
                 "alerts-ui-operations.spec.js",
                 "alerts-import.spec.js",
                 "alerts-advanced.spec.js",
+                "alerts-scheduled-features.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
                 "alerts-vrl-encoding.spec.js",
               ]
@@ -185,6 +186,7 @@ jobs:
                 "dashboard-promql-suggestions.spec.js",
                 "dashboard-share-link.spec.js",
                 "crossLinking.spec.js",
+                "crossLinkMultiStream.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
@@ -279,6 +281,9 @@ jobs:
                 "enrichment-regression.spec.js",
                 "ui-regression.spec.js",
                 "pipeline-regression.spec.js",
+                "alerts-regression.spec.js",
+                "metrics-regression.spec.js",
+                "traces-regression.spec.js",
               ]
           - testfolder: "Metrics"
             browser: "chrome"
@@ -294,6 +299,7 @@ jobs:
                 "metrics-promql-query-persistence.spec.js",
                 "metrics-table-column-order.spec.js",
                 "metrics-promql-builder.spec.js",
+                "promqlAutocomplete.spec.js",
               ]
           - testfolder: "Dashboards-Variables"
             browser: "chrome"
@@ -310,6 +316,7 @@ jobs:
                 "dashboard-variables-default-values-chain.spec.js",
                 "dashboard-variables-custom-parents.spec.js",
                 "dashboard-variables-stream-field.spec.js",
+                "dashboard-mustache-variables.spec.js",
               ]
           - testfolder: "Dashboard-Table-Pagination"
             browser: "chrome"

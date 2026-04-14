@@ -801,9 +801,9 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
 
             // Evaluation Templates
-            .route("/{org_id}/eval-templates", get(eval_templates::list).post(eval_templates::create))
-            .route("/{org_id}/eval-templates/{template_id}", get(eval_templates::get).put(eval_templates::update).delete(eval_templates::delete))
-            .route("/{org_id}/eval-templates/{template_id}/stats", get(eval_templates::get_stats))
+            .route("/{org_id}/eval_templates", get(eval_templates::list).post(eval_templates::create))
+            .route("/{org_id}/eval_templates/{template_id}", get(eval_templates::get).put(eval_templates::update).delete(eval_templates::delete))
+            .route("/{org_id}/eval_templates/{template_id}/stats", get(eval_templates::get_stats))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))

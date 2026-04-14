@@ -7,7 +7,7 @@ const logsdata = require('../../../test-data/logs_data.json');
 /**
  * Global setup for Alpha1 cloud tests
  * Handles Dex "Continue with Email" login flow:
- *   alpha1.dev.zinclabs.dev → dex-alpha1.dev.zinclabs.dev → email/password → approval → redirect back
+ *   alpha.o2aks1.internal.zinclabs.dev → Dex → email/password → approval → redirect back
  */
 async function globalSetup() {
   testLogger.info('[alpha1] Starting global setup - Dex email login');

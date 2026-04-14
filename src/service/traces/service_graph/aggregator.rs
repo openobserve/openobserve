@@ -18,8 +18,13 @@
 //! Aggregates raw edges into minute-bucketed summaries for stream storage.
 //! Used by the service graph daemon (not inline with trace ingestion).
 
-/// Write SQL-aggregated edge records directly to stream
-/// Used when SQL query already performed aggregation
+/// Write SQL-aggregated edge records to the _o2_service_graph stream.
+///
+/// Forwards to an ingester via gRPC using the internal token — no root
+/// credentials required. Works in all deployment topologies:
+/// - Single-node: the local node registers itself in the NODES cache on startup (even in local
+///   mode), so the gRPC lookup finds it and the call loops back to the same process.
+/// - Distributed / cloud: routes to a separate ingester node.
 #[cfg(feature = "enterprise")]
 pub async fn write_sql_aggregated_edges(
     org_id: &str,
@@ -30,106 +35,60 @@ pub async fn write_sql_aggregated_edges(
         return Ok(());
     }
 
+    let record_count = aggregated_records.len();
     log::info!(
         "[ServiceGraph] Writing {} SQL-aggregated edges for {}/{}",
-        aggregated_records.len(),
+        record_count,
         org_id,
         stream_name
     );
 
-    // Build bulk request body
-    let mut bulk_body = String::new();
-    let record_count = aggregated_records.len();
-
-    for record in aggregated_records {
-        // Transform SQL result to match expected schema
-        let enriched_record = if let Some(obj) = record.as_object() {
-            // Map SQL field names to storage schema using json! macro
-            // Use 'end' timestamp so edges are recent and queryable by API
+    // Transform SQL results to storage schema and collect as a JSON array.
+    let enriched: Vec<serde_json::Value> = aggregated_records
+        .into_iter()
+        .filter_map(|v| match v {
+            serde_json::Value::Object(o) => Some(o),
+            _ => None,
+        })
+        .map(|mut obj| {
             config::utils::json::json!({
-                "_timestamp": obj.get("end").cloned().unwrap_or(serde_json::json!(0)),
+                "_timestamp": obj.remove("end").unwrap_or(serde_json::json!(0)),
                 "org_id": org_id,
                 "trace_stream_name": stream_name,
-                "client_service": obj.get("client").cloned().unwrap_or(serde_json::json!(null)),
-                "server_service": obj.get("server").cloned().unwrap_or(serde_json::json!("")),
-                "total_requests": obj.get("total_requests").cloned().unwrap_or(serde_json::json!(0)),
-                "failed_requests": obj.get("errors").cloned().unwrap_or(serde_json::json!(0)),
-                "error_rate": obj.get("error_rate").cloned().unwrap_or(serde_json::json!(0.0)),
-                "p50_latency_ns": obj.get("p50").cloned().unwrap_or(serde_json::json!(0)),
-                "p95_latency_ns": obj.get("p95").cloned().unwrap_or(serde_json::json!(0)),
-                "p99_latency_ns": obj.get("p99").cloned().unwrap_or(serde_json::json!(0)),
+                "client_service": obj.remove("client").unwrap_or(serde_json::json!(null)),
+                "server_service": obj.remove("server").unwrap_or(serde_json::json!("")),
+                "total_requests": obj.remove("total_requests").unwrap_or(serde_json::json!(0)),
+                "failed_requests": obj.remove("errors").unwrap_or(serde_json::json!(0)),
+                "error_rate": obj.remove("error_rate").unwrap_or(serde_json::json!(0.0)),
+                "p50_latency_ns": obj.remove("p50").unwrap_or(serde_json::json!(0)),
+                "p95_latency_ns": obj.remove("p95").unwrap_or(serde_json::json!(0)),
+                "p99_latency_ns": obj.remove("p99").unwrap_or(serde_json::json!(0)),
             })
-        } else {
-            record
-        };
+        })
+        .collect();
 
-        // Add bulk action line
-        let action = config::utils::json::json!({"index": {"_index": "_o2_service_graph"}});
-        bulk_body.push_str(&serde_json::to_string(&action)?);
-        bulk_body.push('\n');
-
-        // Add data line
-        bulk_body.push_str(&serde_json::to_string(&enriched_record)?);
-        bulk_body.push('\n');
-    }
-
-    // Write to stream via HTTP POST to an ingester node.
-    // The alertmanager is not an ingester so we cannot call logs::bulk::ingest
-    // directly — forward the write to an online ingester instead (same pattern
-    // as write_anomalies_to_stream in anomaly_detection.rs).
-    if !bulk_body.is_empty() {
-        let ingester = infra::cluster::get_cached_online_ingester_nodes()
-            .await
-            .and_then(|nodes| nodes.into_iter().next())
-            .ok_or_else(|| {
-                anyhow::anyhow!("No online ingester node available to write _o2_service_graph")
-            })?;
-
-        let cfg = config::get_config();
-        let url = format!(
-            "{}{}/api/{org_id}/_bulk",
-            ingester.http_addr, cfg.common.base_uri,
-        );
-
-        let client = reqwest::Client::new();
-        let resp = client
-            .post(&url)
-            .header("Content-Type", "application/x-ndjson")
-            .header(
-                "Authorization",
-                format!(
-                    "Basic {}",
-                    base64::Engine::encode(
-                        &base64::engine::general_purpose::STANDARD,
-                        format!(
-                            "{}:{}",
-                            cfg.auth.root_user_email, cfg.auth.root_user_password
-                        )
-                    )
-                ),
-            )
-            .body(bulk_body)
-            .send()
-            .await
-            .map_err(|e| anyhow::anyhow!("HTTP request to ingester failed: {e}"))
-            .inspect_err(|e| {
-                log::error!("[ServiceGraph] Failed to write SQL-aggregated edges: {e}");
-            })?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            let e = anyhow::anyhow!("Ingester returned {status} writing _o2_service_graph: {body}");
+    use proto::cluster_rpc;
+    let req = cluster_rpc::IngestionRequest {
+        org_id: org_id.to_string(),
+        stream_type: config::meta::stream::StreamType::ServiceGraph
+            .as_str()
+            .to_string(),
+        stream_name: "_o2_service_graph".to_string(),
+        data: Some(cluster_rpc::IngestionData {
+            data: serde_json::to_vec(&enriched)?,
+        }),
+        ingestion_type: Some(cluster_rpc::IngestionType::Json as i32),
+        metadata: None,
+    };
+    crate::service::ingestion::ingestion_service::ingest(req)
+        .await
+        .map(|_| ())
+        .map_err(|e| anyhow::anyhow!("{e}"))
+        .inspect_err(|e| {
             log::error!("[ServiceGraph] Failed to write SQL-aggregated edges: {e}");
-            return Err(e);
-        }
-    }
+        })?;
 
-    log::info!(
-        "[ServiceGraph] Wrote {} SQL-aggregated edge summaries for {}",
-        record_count,
-        org_id
-    );
+    log::info!("[ServiceGraph] Wrote {record_count} SQL-aggregated edge summaries for {org_id}");
     Ok(())
 }
 

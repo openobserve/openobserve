@@ -586,7 +586,8 @@ where
             } else if method.eq("GET")
                 && (path_columns[1].eq("dashboards")
                     || path_columns[1].eq("folders")
-                    || path_columns[1].eq("actions"))
+                    || path_columns[1].eq("actions")
+                    || path_columns[1].eq("eval_templates"))
             {
                 format!(
                     "{}:{}",
@@ -1397,8 +1398,12 @@ pub async fn check_permissions(
         }
         .clone();
 
+        // user_id here is generally safe because it comes from the `user_id` request header,
+        // which the auth middleware sets to the DB-resolved email. However, we use user.email
+        // directly to avoid any inconsistency between the input identifier and the canonical
+        // DB email (e.g. casing differences or aliased identifiers).
         return crate::handler::http::auth::validator::check_permissions(
-            user_id,
+            &user.email,
             AuthExtractor {
                 auth: "".to_string(),
                 method: method.to_string(),

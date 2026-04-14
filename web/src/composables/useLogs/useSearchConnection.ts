@@ -15,6 +15,7 @@
 
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useNotifications from "@/composables/useNotifications";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useStreamingSearch from "@/composables/useStreamingSearch";
@@ -27,9 +28,17 @@ import { generateTraceContext } from "@/utils/zincutils";
 
 export const useSearchConnection = () => {
   const { showErrorNotification } = useNotifications();
-  const { addTraceId, removeTraceId } = logsUtils();
+  const {
+    addTraceId,
+    removeTraceId,
+    fnParsedSQL,
+    isLimitQuery,
+    isDistinctQuery,
+    isWithQuery,
+  } = logsUtils();
   const store = useStore();
   const { searchObj, notificationMsg, searchPartitionMap } = searchState();
+  const { resetHistogramWithError } = useHistogram();
 
   const {
     fetchQueryDataWithWebSocket,
@@ -77,22 +86,22 @@ export const useSearchConnection = () => {
   const initializeSearchConnection = (
     payload: any,
   ): string | Promise<void> | null => {
-      payload.searchType = "ui";
-      payload.pageType = searchObj.data.stream.streamType;
-      return fetchQueryDataWithHttpStream(payload, {
-        data: (payload: any, response: any) => {
-          if (payload.onData) payload.onData(payload, response);
-        },
-        error: (payload: any, error: any) => {
-          if (payload.onError) payload.onError(payload, error);
-        },
-        complete: (payload: any, response: any) => {
-          if (payload.onComplete) payload.onComplete(payload, response);
-        },
-        reset: (data: any, traceId?: string) => {
-          if (payload.onReset) payload.onReset(data, traceId);
-        },
-      }) as Promise<void>;
+    payload.searchType = "ui";
+    payload.pageType = searchObj.data.stream.streamType;
+    return fetchQueryDataWithHttpStream(payload, {
+      data: (payload: any, response: any) => {
+        if (payload.onData) payload.onData(payload, response);
+      },
+      error: (payload: any, error: any) => {
+        if (payload.onError) payload.onError(payload, error);
+      },
+      complete: (payload: any, response: any) => {
+        if (payload.onComplete) payload.onComplete(payload, response);
+      },
+      reset: (data: any, traceId?: string) => {
+        if (payload.onReset) payload.onReset(data, traceId);
+      },
+    }) as Promise<void>;
   };
 
   const sendSearchMessage = (queryReq: any) => {
@@ -152,6 +161,25 @@ export const useSearchConnection = () => {
 
       if (!isPagination && searchObj.meta.refreshInterval == 0) {
         searchObj.data.queryResults.hits = [];
+
+        // Determine up front whether this query is ineligible for histogram.
+        // Checking here — before any async work — prevents the histogram from
+        // flashing visible while table data is loading.
+        let initialHistogramErrorCode = 0;
+        let initialHistogramErrorMsg = "";
+        if (searchObj.meta.sqlMode && searchObj.meta.showHistogram) {
+          const parsedSQL = fnParsedSQL();
+          if (
+            isLimitQuery(parsedSQL) ||
+            isDistinctQuery(parsedSQL) ||
+            isWithQuery(parsedSQL)
+          ) {
+            initialHistogramErrorCode = -1;
+            initialHistogramErrorMsg =
+              "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.";
+          }
+        }
+
         searchObj.data.histogram = {
           xData: [],
           yData: [],
@@ -160,13 +188,19 @@ export const useSearchConnection = () => {
             unparsed_x_data: [],
             timezone: "",
           },
-          errorCode: 0,
-          errorMsg: "",
+          errorCode: initialHistogramErrorCode,
+          errorMsg: initialHistogramErrorMsg,
           errorDetail: "",
         };
       }
 
-      const payload = buildWebSocketPayload(queryReq, isPagination, "search", {}, searchObj.meta.clearCache);
+      const payload = buildWebSocketPayload(
+        queryReq,
+        isPagination,
+        "search",
+        {},
+        searchObj.meta.clearCache,
+      );
 
       // Add callbacks to payload
       payload.onData = callbacks.onData;
@@ -186,7 +220,7 @@ export const useSearchConnection = () => {
         queryReq.query.from = 0;
         searchObj.meta.refreshHistogram = false;
       }
-      
+
       const requestId = initializeSearchConnection(payload);
 
       if (!requestId) {

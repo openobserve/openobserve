@@ -137,6 +137,31 @@ const usePromqlSuggestions = () => {
       }
     }
 
+    // Handle unclosed braces: cursor is after a { with no matching } yet.
+    // The closed-brace regex above won't match in this case, leaving
+    // isFocused=false and causing stream names to appear instead of labels.
+    if (!labelMeta.isFocused) {
+      const textUpToCursor = query.substring(0, cursorIndex + 1);
+      const lastOpen = textUpToCursor.lastIndexOf("{");
+      if (lastOpen !== -1 && textUpToCursor.lastIndexOf("}") < lastOpen) {
+        labelMeta.hasLabels = true;
+        labelMeta.isFocused = true;
+        const content = textUpToCursor.substring(lastOpen + 1);
+        labelMeta.isEmpty = content.length === 0;
+
+        // Value context: label name followed by any PromQL matcher (=, !=, =~, !~)
+        // with an optional partial quoted value
+        const valueMatch = content.match(/(\w+)\s*(?:=~|!=|!~|=)(?:"[^"]*)?$/);
+        if (valueMatch) {
+          labelMeta.focusOn = "value";
+          labelMeta.meta.label = valueMatch[1];
+        } else {
+          // Label context: right after { or after a comma
+          labelMeta.focusOn = "label";
+        }
+      }
+    }
+
     return labelMeta;
   }
 

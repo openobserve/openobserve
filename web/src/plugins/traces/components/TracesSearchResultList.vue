@@ -174,9 +174,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template
-            #[`cell-${store.state.zoConfig.timestamp_column}`]="{ item }"
+            #[`cell-${store.state.zoConfig.timestamp_column}`]="{ cell }"
           >
-            <TraceTimestampCell :item="item" :search-mode="props.searchMode" />
+            <TraceTimestampCell :value="cell.getValue()" />
           </template>
 
           <template #cell-service_name="{ item }">
@@ -216,11 +216,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <template #cell-status="{ item }">
-            <TraceStatusCell v-if="props.searchMode !== 'spans'" :item="item" />
-            <SpanStatusPill v-else :status="item.span_status" />
+          <template #cell-span_status="{ item }">
+            <SpanStatusPill :status="item.span_status" />
           </template>
 
+          <template #cell-status="{ item }">
+            <TraceStatusCell :item="item" />
+          </template>
           <template #cell-input_tokens="{ item }">
             <span class="text-caption" data-test="trace-row-input-tokens">
               {{
