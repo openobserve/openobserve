@@ -37,7 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="arrow_back_ios_new" size="10px" class="tw:font-semibold" />
             </div>
             <template v-if="!isAnomalyMode">
-              <span v-if="beingUpdated" class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">{{ formData.name }}</span>
+              <span v-if="beingUpdated" class="tw:text-sm tw:font-semibold tw:max-w-[160px] tw:truncate tw:inline-block">
+                {{ formData.name }}
+                <q-tooltip v-if="formData.name?.length > 20" class="tw:text-sm">{{ formData.name }}</q-tooltip>
+              </span>
               <template v-else>
                 <span class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">New Alert</span>
                 <q-input
@@ -54,14 +57,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </template>
             <template v-else>
-              <span class="tw:text-xs tw:font-medium tw:whitespace-nowrap">{{ anomalyEditMode ? t("alerts.updateAnomalyDetection") : t("alerts.newAnomalyDetection") }}</span>
+              <span v-if="!anomalyEditMode" class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">{{ t("alerts.newAnomalyDetection") }}</span>
               <template v-if="anomalyEditMode">
-                <span
-                  class="tw:text-xs tw:font-medium tw:px-1.5 tw:py-0.5 tw:rounded tw:max-w-[150px] tw:truncate tw:inline-block"
-                  :class="store.state.theme === 'dark' ? 'tw:text-blue-400 tw:bg-blue-900/50' : 'tw:text-blue-600 tw:bg-blue-50'"
-                >
+                <span class="tw:text-sm tw:font-semibold tw:max-w-[160px] tw:truncate tw:inline-block">
                   {{ anomalyConfig.name }}
-                  <q-tooltip v-if="anomalyConfig.name?.length > 15" class="tw:text-sm">{{ anomalyConfig.name }}</q-tooltip>
+                  <q-tooltip v-if="anomalyConfig.name?.length > 20" class="tw:text-sm">{{ anomalyConfig.name }}</q-tooltip>
                 </span>
                 <q-badge v-if="anomalyConfig.status" :color="anomalyStatusColor" :label="anomalyConfig.status" class="text-caption" />
                 <span
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :model-value="activeFolderId"
               type="alerts"
               width="140px"
-              :disable="beingUpdated"
+              :disable="beingUpdated || anomalyEditMode"
               @update:model-value="updateActiveFolderId({ value: $event })"
             />
           </div>
@@ -110,8 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               hide-selected
               hide-bottom-space
               :input-debounce="200"
-              :readonly="beingUpdated"
-              :disable="beingUpdated"
+              :readonly="beingUpdated || anomalyEditMode"
+              :disable="beingUpdated || anomalyEditMode"
               @filter="(val, update) => update(() => {})"
               @update:model-value="updateStreams()"
               behavior="menu"
@@ -136,8 +136,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               hide-bottom-space
               fill-input
               :input-debounce="400"
-              :readonly="beingUpdated"
-              :disable="beingUpdated || !formData.stream_type"
+              :readonly="beingUpdated || anomalyEditMode"
+              :disable="beingUpdated || anomalyEditMode || !formData.stream_type"
               @filter="filterStreams"
               @update:model-value="updateStreamFields"
               behavior="menu"
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="tab.key"
                 class="alert-type-tab"
                 :class="{ active: formData.is_real_time === tab.key }"
-                :disabled="beingUpdated"
+                :disabled="beingUpdated || anomalyEditMode"
                 @click="formData.is_real_time = tab.key"
               >
                 {{ tab.label }}
@@ -228,6 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :streamName="formData.stream_name"
               :sqlQueryErrorMsg="sqlQueryErrorMsg"
               :isAggregationEnabled="isAggregationEnabled"
+              :beingUpdated="beingUpdated"
               :promqlCondition="formData.query_condition.promql_condition"
               :triggerCondition="formData.trigger_condition"
               @update:tab="updateTab"
@@ -281,7 +282,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :cron="formData.trigger_condition.cron"
                 :selectedTab="formData.query_condition.type || 'custom'"
                 @update:multiTimeRange="(val) => (formData.query_condition.multi_time_range = val)"
-                @goToSqlEditor="handleGoToSqlEditor"
               />
             </div>
 

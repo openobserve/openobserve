@@ -930,8 +930,14 @@ const triggerPromqlQuery = async () => {
       step: '0'
     });
 
-    if (res?.data?.data?.result.length > 0) {
-      outputEvents.value = JSON.stringify(res?.data?.data?.result, null, 2);
+    const result = res?.data?.data?.result;
+    if (result?.length > 0) {
+      outputEvents.value = JSON.stringify(result, null, 2);
+      // Count total data points across all series so the status bar shows a meaningful number
+      queryHitCount.value = result.reduce(
+        (sum: number, series: any) => sum + (Array.isArray(series.values) ? series.values.length : 0),
+        0,
+      );
     }
   } catch (err: any) {
     runPromqlError.value = err.response?.data?.error ?? t('search.somethingWentWrong');
@@ -940,6 +946,7 @@ const triggerPromqlQuery = async () => {
 
 const runPromqlQuery = async () => {
   runPromqlError.value = "";
+  queryHitCount.value = 0;
   tempRunQuery.value = true;
   expandSqlOutput.value = true;
   runQueryLoading.value = true;

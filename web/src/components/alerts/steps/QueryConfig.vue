@@ -57,12 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-form ref="customConditionsForm" greedy>
 
           <!-- Section 1: Alert condition sentence — scheduled only -->
-          <div v-if="isRealTime === 'false'" class="condition-rows">
+          <div v-if="isRealTime === 'false'" class="alert-condition-rows">
 
             <!-- LOGS/TRACES -->
             <template v-if="isEventBased">
               <!-- Alert if row -->
-              <div class="condition-row">
+              <div class="alert-condition-row">
                 <span class="condition-label">Alert if *</span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
                   <q-select
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- group by row (hidden for count mode) -->
-              <div v-if="selectedFunction !== 'total_events'" class="condition-row">
+              <div v-if="selectedFunction !== 'total_events'" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
                   Group by
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- no. of groups row — always visible for measure mode, disabled when no group-by -->
-              <div v-if="selectedFunction !== 'total_events'" class="condition-row">
+              <div v-if="selectedFunction !== 'total_events'" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
                   No. of groups
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
@@ -261,12 +261,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- METRICS -->
             <template v-else>
               <!-- Alert if row -->
-              <div class="condition-row">
+              <div class="alert-condition-row">
                 <span class="condition-label">Alert if *</span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
                   <q-select
                     v-model="selectedFunction"
-                    :options="metricFunctionOptions"
+                    :options="logFunctionOptions"
                     emit-value
                     map-options
                     dense
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:model-value="onMetricFunctionChange"
                   >
                     <q-tooltip :delay="400">
-                      {{ metricFunctionOptions.find((o: any) => o.value === selectedFunction)?.tooltip || '' }}
+                      {{ logFunctionOptions.find((o: any) => o.value === selectedFunction)?.tooltip || '' }}
                     </q-tooltip>
                     <template #option="{ opt, itemProps }">
                       <q-item v-bind="itemProps" dense>
@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- group by row — hidden for count mode -->
-              <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="condition-row">
+              <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
                   Group by
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- no. of groups row — always visible for metrics measure mode, disabled when no group-by -->
-              <div v-if="selectedFunction !== 'total_events'" class="condition-row">
+              <div v-if="selectedFunction !== 'total_events'" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
                   No. of groups
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
@@ -464,7 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <!-- Check every row -->
-            <div class="condition-row tw:!items-start">
+            <div class="alert-condition-row tw:!items-start">
               <span class="condition-label" style="line-height: 28px;">
                 Check every *
                 <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
@@ -622,40 +622,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Realtime — no threshold sentence, just filters always visible -->
-          <div v-else ref="customPreviewRef" class="tw:mb-1 tw:px-3">
-            <div class="tw:flex tw:items-center tw:gap-1.5 tw:py-1">
-              <span class="tw:text-xs tw:font-semibold"
-                    :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-600'">
-                Filters
-              </span>
-              <span v-if="generatedSqlQuery"
-                    class="tw:text-xs tw:italic tw:ml-2 sql-query-hint"
-                    :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
-                review your sql query
-                <q-tooltip
-                  anchor="bottom middle"
-                  self="top middle"
-                  :delay="200"
-                  max-width="500px"
-                  class="sql-preview-tooltip"
-                >
-                  <pre class="hljs tw:text-xs tw:m-0 tw:whitespace-pre-wrap tw:font-mono tw:p-2 tw:rounded" v-html="highlightedSqlQuery" />
-                </q-tooltip>
-              </span>
+          <div v-else class="tw:mb-1 tw:px-3">
+            <div class="tw:flex tw:items-center tw:gap-2 tw:py-1">
+              <div
+                class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle tw:px-2 tw:py-0.5 tw:rounded-md tw:transition-colors"
+                :class="store.state.theme === 'dark'
+                  ? 'tw:bg-gray-700/60 hover:tw:bg-gray-600/70'
+                  : 'tw:bg-gray-100 hover:tw:bg-gray-200'"
+                @click="toggleFilters"
+              >
+                <q-icon
+                  name="filter_alt"
+                  size="14px"
+                  :class="filterCount > 0
+                    ? 'tw:text-[var(--q-primary)]'
+                    : (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500')"
+                />
+                <span class="tw:text-xs tw:font-semibold"
+                      :class="filterCount > 0
+                        ? 'tw:text-[var(--q-primary)]'
+                        : (store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-600')">
+                  filters
+                </span>
+                <span v-if="filterCount > 0"
+                      class="tw:text-[11px] tw:px-1.5 tw:py-0 tw:rounded-full tw:font-bold tw:leading-5"
+                      :class="store.state.theme === 'dark' ? 'tw:bg-blue-800 tw:text-blue-200' : 'tw:bg-blue-100 tw:text-blue-700'">
+                  {{ filterCount }}
+                </span>
+                <q-icon
+                  :name="showFilters ? 'expand_more' : 'chevron_right'"
+                  size="14px"
+                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                />
+                <!-- Review your SQL query hint -->
+                <span v-if="generatedSqlQuery && !showFilters"
+                      class="tw:text-xs tw:italic tw:ml-1 sql-query-hint"
+                      :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
+                  review your sql query
+                  <q-tooltip
+                    anchor="bottom middle"
+                    self="top middle"
+                    :delay="200"
+                    max-width="500px"
+                    class="sql-preview-tooltip"
+                  >
+                    <pre class="hljs tw:text-xs tw:m-0 tw:whitespace-pre-wrap tw:font-mono tw:p-2 tw:rounded" v-html="highlightedSqlQuery" />
+                  </q-tooltip>
+                </span>
+              </div>
             </div>
-            <FilterGroup
-              :stream-fields="columns"
-              :stream-fields-map="streamFieldsMap"
-              :show-sql-preview="false"
-              :sql-query="generatedSqlQuery"
-              :group="inputData.conditions"
-              :depth="0"
-              module="alerts"
-              @add-condition="updateGroup"
-              @add-group="updateGroup"
-              @remove-group="removeConditionGroup"
-              @input:update="onInputUpdate"
-            />
+            <div v-show="showFilters" ref="customPreviewRef">
+              <FilterGroup
+                :stream-fields="columns"
+                :stream-fields-map="streamFieldsMap"
+                :show-sql-preview="false"
+                :sql-query="generatedSqlQuery"
+                :group="inputData.conditions"
+                :depth="0"
+                module="alerts"
+                @add-condition="updateGroup"
+                @add-group="updateGroup"
+                @remove-group="removeConditionGroup"
+                @input:update="onInputUpdate"
+              />
+            </div>
           </div>
 
         </q-form>
@@ -800,71 +830,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ sqlQueryErrorMsg }}</q-tooltip>
           </div>
 
-          <!-- SQL Trigger Condition (only for SQL tab, scheduled alerts) -->
-          <div v-if="localTab === 'sql' && isRealTime === 'false'" class="condition-rows tw:mt-2 tw:px-1">
-            <div class="condition-row">
-              <span class="condition-label">Alert if No. of events *</span>
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <q-select
-                  v-model="triggerOperator"
-                  :options="numericOperators"
-                  dense borderless hide-bottom-space
-                  class="alert-v3-select"
-                  style="min-width: 70px; max-width: 120px;"
-                  @update:model-value="onTriggerOperatorChange"
-                />
-                <q-input
-                  v-model="triggerThreshold"
-                  type="number"
-                  dense borderless hide-bottom-space
-                  class="alert-v3-input"
-                  style="min-width: 60px; max-width: 80px;"
-                  min="1"
-                  @update:model-value="onTriggerThresholdChange"
-                  @blur="restoreDefaultThreshold"
-                />
-              </div>
-            </div>
-          </div>
+          <!-- SQL/PromQL condition rows (scheduled only): Check every + Alert if in one block -->
+          <div v-if="isRealTime === 'false'" class="alert-condition-rows tw:mt-2 tw:px-1">
 
-          <!-- PromQL Trigger Condition (only for PromQL tab) - Below the editors -->
-          <div v-if="localTab === 'promql' && promqlCondition" class="condition-rows tw:mt-2 tw:px-1">
-            <!-- Per-series value condition -->
-            <div class="condition-row">
-              <span class="condition-label">Alert if the value is *
+            <!-- Check every -->
+            <div class="alert-condition-row tw:!items-start">
+              <span class="condition-label sql-promql-label" style="line-height: 28px;">
+                Check every *
                 <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                  Alert when the PromQL expression evaluates to this condition for a time series. Example: &gt;= 100 triggers when the result is 100 or more.
+                  How often to check this alert condition
                 </q-tooltip>
               </span>
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <q-select
-                  v-model="promqlCondition.operator"
-                  :options="numericOperators"
-                  dense borderless hide-bottom-space
-                  class="alert-v3-select"
-                  style="min-width: 70px; max-width: 120px;"
-                  :rules="[(val: any) => !!val || 'Field is required!']"
-                  @update:model-value="emitPromqlConditionUpdate"
-                />
-                <q-input
-                  v-model.number="promqlCondition.value"
-                  type="number"
-                  dense borderless hide-bottom-space
-                  class="alert-v3-input"
-                  style="min-width: 60px; max-width: 120px;"
-                  debounce="300"
-                  :rules="[(val: any) => (val !== undefined && val !== null && val !== '') || 'Field is required!']"
-                  @update:model-value="emitPromqlConditionUpdate"
-                />
+              <div class="tw:flex tw:flex-col tw:gap-1">
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <template v-if="frequencyMode !== 'cron'">
+                    <q-input
+                      v-model="checkEveryFrequency"
+                      type="number"
+                      dense borderless hide-bottom-space
+                      class="alert-v3-input"
+                      style="min-width: 100px; max-width: 100px;"
+                      min="1"
+                      :rules="[(val: any) => !!val || 'Required']"
+                      @update:model-value="onCheckEveryChange"
+                      @blur="restoreDefaultFrequency"
+                    />
+                  </template>
+                  <template v-else>
+                    <q-input
+                      v-model="cronExpression"
+                      dense borderless hide-bottom-space
+                      class="alert-v3-input"
+                      placeholder="0 */10 * * * *"
+                      style="min-width: 100px; max-width: 100px;"
+                      @update:model-value="onCronExpressionChange"
+                    />
+                  </template>
+                  <q-select
+                    :model-value="frequencyMode"
+                    :options="frequencyUnitOptions"
+                    dense borderless hide-bottom-space
+                    emit-value map-options
+                    class="alert-v3-select frequency-unit-select"
+                    style="min-width: 80px; max-width: 100px;"
+                    @update:model-value="onFrequencyUnitChange"
+                  />
+                  <template v-if="frequencyMode === 'cron'">
+                    <q-select
+                      v-model="cronTimezone"
+                      :options="filteredTimezones"
+                      dense borderless hide-bottom-space
+                      use-input emit-value fill-input hide-selected
+                      :input-debounce="0"
+                      class="alert-v3-select"
+                      placeholder="timezone"
+                      :display-value="cronTimezone || 'timezone'"
+                      style="min-width: 100px; max-width: 100px;"
+                      @filter="timezoneFilterFn"
+                      @update:model-value="onCronTimezoneChange"
+                    >
+                      <q-tooltip v-if="cronTimezone" :delay="300" anchor="bottom middle" self="top middle">{{ cronTimezone }}</q-tooltip>
+                    </q-select>
+                  </template>
+                </div>
+                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:italic"
+                     :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
+                  {{ cronDescription }}
+                </div>
+                <div v-if="frequencyMode === 'cron' && cronError" class="tw:text-red-500 tw:text-[11px]">
+                  {{ cronError }}
+                </div>
               </div>
             </div>
-            <!-- No. of series threshold -->
-            <div class="condition-row">
-              <span class="condition-label">No. of series *
-                <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                  Minimum number of time series that must satisfy the condition above to trigger the alert.
-                </q-tooltip>
-              </span>
+
+            <!-- SQL: Alert if No. of events -->
+            <div v-if="localTab === 'sql'" class="alert-condition-row">
+              <span class="condition-label sql-promql-label">Alert if No. of events *</span>
               <div class="tw:flex tw:items-center tw:gap-2">
                 <q-select
                   v-model="triggerOperator"
@@ -886,6 +927,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
+
+            <!-- PromQL: Alert if the value is + No. of series -->
+            <template v-if="localTab === 'promql' && promqlCondition">
+              <div class="alert-condition-row">
+                <span class="condition-label sql-promql-label">Alert if the value is *
+                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                    Alert when the PromQL expression evaluates to this condition for a time series. Example: &gt;= 100 triggers when the result is 100 or more.
+                  </q-tooltip>
+                </span>
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <q-select
+                    v-model="promqlCondition.operator"
+                    :options="numericOperators"
+                    dense borderless hide-bottom-space
+                    class="alert-v3-select"
+                    style="min-width: 70px; max-width: 120px;"
+                    :rules="[(val: any) => !!val || 'Field is required!']"
+                    @update:model-value="emitPromqlConditionUpdate"
+                  />
+                  <q-input
+                    v-model.number="promqlCondition.value"
+                    type="number"
+                    dense borderless hide-bottom-space
+                    class="alert-v3-input"
+                    style="min-width: 60px; max-width: 120px;"
+                    debounce="300"
+                    :rules="[(val: any) => (val !== undefined && val !== null && val !== '') || 'Field is required!']"
+                    @update:model-value="emitPromqlConditionUpdate"
+                  />
+                </div>
+              </div>
+              <div class="alert-condition-row">
+                <span class="condition-label sql-promql-label">No. of series *
+                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
+                    Minimum number of time series that must satisfy the condition above to trigger the alert.
+                  </q-tooltip>
+                </span>
+                <div class="tw:flex tw:items-center tw:gap-2">
+                  <q-select
+                    v-model="triggerOperator"
+                    :options="numericOperators"
+                    dense borderless hide-bottom-space
+                    class="alert-v3-select"
+                    style="min-width: 70px; max-width: 120px;"
+                    @update:model-value="onTriggerOperatorChange"
+                  />
+                  <q-input
+                    v-model="triggerThreshold"
+                    type="number"
+                    dense borderless hide-bottom-space
+                    class="alert-v3-input"
+                    style="min-width: 60px; max-width: 80px;"
+                    min="1"
+                    @update:model-value="onTriggerThresholdChange"
+                    @blur="restoreDefaultThreshold"
+                  />
+                </div>
+              </div>
+            </template>
+
           </div>
         </div>
       </template>
@@ -1008,6 +1109,10 @@ export default defineComponent({
       default: "",
     },
     isAggregationEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    beingUpdated: {
       type: Boolean,
       default: false,
     },
@@ -1144,19 +1249,24 @@ export default defineComponent({
 
     // Set aggregation state based on stream type on mount
     if (!isEventBased.value) {
-      // Metrics: always aggregation-enabled
-      localIsAggregationEnabled.value = true;
-      // Initialize aggregation object if missing
-      if (!props.inputData.aggregation) {
-        props.inputData.aggregation = {
-          group_by: [],
-          function: "avg",
-          having: { column: "value", operator: ">=", value: "" },
-        };
-      }
-      // Default column to "value" if not already set
-      if (!props.inputData.aggregation?.having?.column) {
-        props.inputData.aggregation.having.column = "value";
+      if (!props.isAggregationEnabled) {
+        // total_events selected — no aggregation, same path as logs
+        localIsAggregationEnabled.value = false;
+      } else {
+        // Metrics: aggregation-enabled
+        localIsAggregationEnabled.value = true;
+        // Initialize aggregation object if missing
+        if (!props.inputData.aggregation) {
+          props.inputData.aggregation = {
+            group_by: [],
+            function: "avg",
+            having: { column: "value", operator: ">=", value: "" },
+          };
+        }
+        // Default column to "value" if not already set
+        if (!props.inputData.aggregation?.having?.column) {
+          props.inputData.aggregation.having.column = "value";
+        }
       }
     } else {
       // Logs/Traces: event-based, no aggregation
@@ -1179,33 +1289,18 @@ export default defineComponent({
       { label: 'p99', value: 'p99', tooltip: '99th percentile of a numeric field' },
     ];
 
-    // Metric function options — always aggregated
-    const metricFunctionOptions = [
-      { label: 'value', value: 'value', tooltip: 'Raw value of the metric field' },
-      { label: 'total events', value: 'total_events', tooltip: 'Count the total number of metric events matching your filters (COUNT(*))' },
-      { label: 'count', value: 'count', tooltip: 'Count non-null values of a specific field (COUNT(field))' },
-      { label: 'avg', value: 'avg', tooltip: 'Average value of a numeric field' },
-      { label: 'min', value: 'min', tooltip: 'Minimum value of a numeric field' },
-      { label: 'max', value: 'max', tooltip: 'Maximum value of a numeric field' },
-      { label: 'sum', value: 'sum', tooltip: 'Sum of values of a numeric field' },
-      { label: 'median', value: 'median', tooltip: 'Median value of a numeric field' },
-      { label: 'p50', value: 'p50', tooltip: '50th percentile of a numeric field' },
-      { label: 'p75', value: 'p75', tooltip: '75th percentile of a numeric field' },
-      { label: 'p90', value: 'p90', tooltip: '90th percentile of a numeric field' },
-      { label: 'p95', value: 'p95', tooltip: '95th percentile of a numeric field' },
-      { label: 'p99', value: 'p99', tooltip: '99th percentile of a numeric field' },
-    ];
-
     // Numeric-only operators (no Contains/NotContains for thresholds)
     const numericOperators = ["=", "!=", ">=", ">", "<=", "<"];
 
-    // Selected function — for logs defaults to 'total_events', for metrics to 'value'
+    // Selected function — defaults to 'total_events' when no aggregation, 'avg' otherwise
     const selectedFunction = ref(
       isEventBased.value
         ? (props.isAggregationEnabled && props.inputData.aggregation?.function
             ? props.inputData.aggregation.function
             : 'total_events')
-        : (props.inputData.aggregation?.function || 'value')
+        : (!props.isAggregationEnabled
+            ? 'total_events'
+            : (props.inputData.aggregation?.function || 'avg'))
     );
 
     // Log-specific: measure column and group-by
@@ -1232,24 +1327,47 @@ export default defineComponent({
         : (props.inputData.aggregation?.having?.value || '')
     );
 
-    // Watch stream type changes to reset defaults
+    // Watch stream type changes to restore saved state or set new-alert defaults.
+    // Fires when stream type prop changes (e.g. async load on edit, or user switching stream type).
     watch(isEventBased, (eventBased) => {
       if (eventBased) {
-        // Switched to logs/traces
-        selectedFunction.value = 'total_events';
-        localIsAggregationEnabled.value = false;
-      } else {
-        // Switched to metrics — default to avg
-        selectedFunction.value = 'avg';
-        localIsAggregationEnabled.value = true;
-        if (!props.inputData.aggregation) {
-          props.inputData.aggregation = {
-            group_by: [],
-            function: "avg",
-            having: { column: "", operator: ">=", value: "" },
-          };
+        // Switched to logs/traces — restore saved function or default to total_events
+        if (props.isAggregationEnabled && props.inputData.aggregation?.function) {
+          selectedFunction.value = props.inputData.aggregation.function;
+          localIsAggregationEnabled.value = true;
         } else {
-          props.inputData.aggregation.function = 'avg';
+          selectedFunction.value = 'total_events';
+          localIsAggregationEnabled.value = false;
+          emit("update:isAggregationEnabled", false);
+        }
+      } else {
+        // Switched to metrics
+        if (props.isAggregationEnabled && props.inputData.aggregation?.function) {
+          // Edit mode: restore saved aggregation function
+          selectedFunction.value = props.inputData.aggregation.function;
+          localIsAggregationEnabled.value = true;
+        } else if (!props.isAggregationEnabled && props.beingUpdated) {
+          // Edit mode: alert was saved with total_events (aggregation: null)
+          selectedFunction.value = 'total_events';
+          localIsAggregationEnabled.value = false;
+        } else {
+          // New alert switching to metrics — default to avg + init aggregation
+          selectedFunction.value = 'avg';
+          localIsAggregationEnabled.value = true;
+          emit("update:isAggregationEnabled", true);
+          if (!props.inputData.aggregation) {
+            props.inputData.aggregation = {
+              group_by: [],
+              function: "avg",
+              having: { column: "value", operator: ">=", value: "" },
+            };
+          } else {
+            props.inputData.aggregation.function = 'avg';
+            if (!props.inputData.aggregation.having?.column) {
+              props.inputData.aggregation.having.column = "value";
+            }
+          }
+          emitAggregationUpdate();
         }
       }
     });
@@ -1704,8 +1822,8 @@ export default defineComponent({
 
     // When metric function dropdown changes — handles count vs aggregation modes
     const onMetricFunctionChange = (value: string) => {
-      if (value === 'count') {
-        // Count mode — same as logs count, use trigger_condition
+      if (value === 'total_events' || value === 'count') {
+        // total_events / count — no aggregation, same path as logs total_events
         localIsAggregationEnabled.value = false;
         emit("update:isAggregationEnabled", false);
       } else {
@@ -1742,8 +1860,8 @@ export default defineComponent({
 
     // When log function mode changes (count / unique_count / avg / etc.)
     const onLogFunctionChange = (value: string) => {
-      if (value === 'count') {
-        // Simple count mode — no aggregation, trigger threshold shown inline
+      if (value === 'total_events' || value === 'count') {
+        // Count mode — no aggregation, trigger threshold shown inline
         localIsAggregationEnabled.value = false;
         emit("update:isAggregationEnabled", false);
         logMeasureColumn.value = '';
@@ -1977,6 +2095,26 @@ export default defineComponent({
       () => props.isAggregationEnabled,
       (newVal) => {
         localIsAggregationEnabled.value = newVal;
+        // Sync all aggregation-dependent UI state when aggregation becomes enabled during load
+        // (e.g. editing a logs/traces alert that was saved with avg/sum/etc.)
+        if (newVal && props.inputData.aggregation) {
+          const agg = props.inputData.aggregation;
+          if (agg.function) {
+            selectedFunction.value = agg.function;
+          }
+          if (agg.having?.column) {
+            logMeasureColumn.value = agg.having.column;
+          }
+          if (agg.having?.operator) {
+            conditionOperator.value = agg.having.operator;
+          }
+          if (agg.having?.value !== undefined && agg.having?.value !== null) {
+            conditionValue.value = agg.having.value;
+          }
+          if (agg.group_by?.length) {
+            logGroupBy.value = [...agg.group_by.filter((g: string) => g?.trim())];
+          }
+        }
       }
     );
 
@@ -2142,7 +2280,6 @@ export default defineComponent({
       // V3.1 inline condition
       isEventBased,
       logFunctionOptions,
-      metricFunctionOptions,
       numericOperators,
       selectedFunction,
       conditionOperator,
@@ -2481,13 +2618,13 @@ export default defineComponent({
 }
 
 // Condition rows layout
-.condition-rows {
+.alert-condition-rows {
   display: flex;
   flex-direction: column;
   gap: 0;
 }
 
-.condition-row {
+.alert-condition-row {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2617,5 +2754,11 @@ export default defineComponent({
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
     }
   }
+}
+
+// Fixed label width for SQL/PromQL condition rows so inputs align
+.sql-promql-label {
+  min-width: 160px;
+  width: 160px;
 }
 </style>

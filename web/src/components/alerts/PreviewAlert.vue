@@ -675,16 +675,11 @@ const handleChartDataUpdate = (resultMetaData: any) => {
           firstQueryMetadata[firstQueryMetadata.length - 1];
 
         // Determine result count based on query mode
-        // SQL mode and custom with aggregations: mirror backend behavior exactly.
-        // The backend groups by ONLY the user's group_by fields (no time bucket) over the full
-        // evaluation window, then counts distinct groups passing the HAVING condition.
-        // The preview chart adds histogram(_timestamp) for visualization, so hits contain
-        // (time_bucket × group) rows. We must re-aggregate per group across all time buckets
-        // before applying the having condition — otherwise time-bucketed rows inflate the count.
-        if (
-          props.selectedTab === "sql" ||
-          (props.selectedTab === "custom" && props.isAggregationEnabled)
-        ) {
+        // Custom builder with aggregation: re-aggregate per group across time buckets
+        // before applying the having condition — histogram adds time-bucket rows that
+        // would otherwise inflate the count.
+        // SQL mode uses simple row count (trigger = "did SQL return >= N rows?")
+        if (props.selectedTab === "custom" && props.isAggregationEnabled) {
           const havingValue = props.formData.query_condition?.aggregation?.having?.value;
           const havingOperator = props.formData.query_condition?.aggregation?.having?.operator || ">=";
           const aggFunction = props.formData.query_condition?.aggregation?.function || "avg";
@@ -754,6 +749,14 @@ const handleChartDataUpdate = (resultMetaData: any) => {
           // Fallback: if no hits available, use total row count
           if (resultCount === 0 && allHits.length === 0 && firstQueryMetadata.some((p: any) => p?.total !== undefined)) {
             resultCount = firstQueryMetadata.reduce((sum: number, p: any) => sum + (p?.total || 0), 0);
+          }
+        }
+        // SQL mode: trigger = "SQL returned >= N rows", so count total rows returned
+        else if (props.selectedTab === "sql") {
+          if (firstQueryMetadata.some((p: any) => p?.total !== undefined)) {
+            resultCount = firstQueryMetadata.reduce((sum: number, p: any) => sum + (p?.total || 0), 0);
+          } else if (Array.isArray(latestPartition?.hits)) {
+            resultCount = latestPartition.hits.length;
           }
         }
         // PromQL mode: count time series or data points
@@ -1027,6 +1030,13 @@ const refreshData = () => {
     dashboardPanelData.data.queryType = "promql";
     dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
 
+    // Add threshold mark line from promql_condition
+    const promqlThreshold = props.formData.query_condition?.promql_condition?.value;
+    dashboardPanelData.data.config.mark_line =
+      promqlThreshold !== undefined && promqlThreshold !== null && promqlThreshold !== ""
+        ? [{ name: "Threshold", type: "yAxis", value: String(promqlThreshold) }]
+        : [];
+
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
     const newTimeObj = { ...dashboardPanelData.meta.dateTime };
@@ -1147,6 +1157,7 @@ watch(
     props.formData.trigger_condition?.period,
     props.formData.trigger_condition?.threshold,
     props.formData.trigger_condition?.operator,
+    props.formData.query_condition?.promql_condition?.value,
     props.selectedTab,
     props.isUsingBackendSql,
   ],
@@ -1159,6 +1170,7 @@ watch(
     // Skip the first watch trigger on mount since onMounted will handle it
     if (isInitialLoad) {
       isInitialLoad = false;
+      lastRefreshTime = Date.now(); // stamp so 200ms debounce blocks rapid follow-up
       return;
     }
 

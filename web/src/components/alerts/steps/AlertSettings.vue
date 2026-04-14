@@ -175,113 +175,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- For Scheduled Alerts -->
       <template v-else>
-        <!-- Threshold — now handled by inline condition sentence in QueryConfig (V3.1) -->
-        <div v-if="false" class="flex justify-start items-start q-mb-xs no-wrap alert-settings-row">
-          <div class="tw:font-semibold flex items-center" style="width: 190px; height: 36px">
-            {{ t("alerts.threshold") + " *" }}
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-            >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.thresholdTooltip') }}
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div style="width: calc(100% - 190px)">
-            <div ref="thresholdFieldRef" class="flex tw:flex-col justify-start items-start tw:w-full">
-                <!-- Main threshold input row -->
-                <div class="flex items-start tw:w-full">
-                  <div class="tw:flex tw:flex-col">
-                    <q-select
-                      v-model="formData.trigger_condition.operator"
-                      :options="triggerOperators"
-                      data-test="alert-threshold-operator-select"
-                      class="showLabelOnTop no-case q-py-none"
-                      borderless
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      :rules="[(val: any) => !!val || 'Field is required!']"
-                      :style="{
-                        width: (formData.trigger_condition.operator === 'Contains' || formData.trigger_condition.operator === 'NotContains')
-                          ? '124px'
-                          : '88px',
-                        minWidth: '88px'
-                      }"
-                      @update:model-value="emitTriggerUpdate"
-                    />
-                    <div
-                      v-if="!formData.trigger_condition.operator"
-                      class="text-red-8 q-pt-xs"
-                      style="font-size: 11px; line-height: 12px"
-                    >
-                      Field is required!
-                    </div>
-                  </div>
-                  <div class="flex items-start tw:flex-col" style="border-left: none">
-                    <div class="tw:flex tw:items-center">
-                      <div style="width: 89px; margin-left: 0 !important">
-                        <q-input
-                          v-model.number="formData.trigger_condition.threshold"
-                          data-test="alert-threshold-value-input"
-                          type="number"
-                          dense
-                          borderless
-                          min="1"
-                          style="background: none"
-                          debounce="300"
-                          @update:model-value="emitTriggerUpdate"
-                        />
-                      </div>
-                      <div class="tw:ml-2 tw:flex tw:items-center" style="height: 36px; font-weight: normal">
-                        <span class="tw:text-sm">{{ thresholdMetricType }}</span>
-                      </div>
-                    </div>
-                    <div
-                      v-if="!Number(formData.trigger_condition.threshold)"
-                      class="text-red-8 q-pt-xs"
-                      style="font-size: 11px; line-height: 12px"
-                    >
-                      Field is required!
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Context lines (GROUP BY and HAVING) -->
-                <div v-if="showGroupByContext || showHavingContext" class="tw:mt-3 tw:ml-0 tw:text-sm tw:space-y-2" style="line-height: 1.6">
-                  <div v-if="showGroupByContext" class="tw:flex tw:flex-row tw:items-center tw:gap-2">
-                    <span class="tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'">
-                      {{ t('alerts.thresholdDynamic.contextLabels.groupedBy') }}
-                    </span>
-                    <span
-                      class="tw:px-2 tw:py-1 tw:rounded tw:font-mono tw:text-xs"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:text-gray-200' : 'tw:bg-gray-100 tw:text-gray-800'"
-                    >
-                      {{ groupByFieldsText }}
-                    </span>
-                  </div>
-                  <div v-if="showHavingContext" class="tw:flex tw:flex-row tw:items-center tw:gap-2">
-                    <span class="tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'">
-                      {{ t('alerts.thresholdDynamic.contextLabels.havingConditions') }}
-                    </span>
-                    <span
-                      class="tw:px-2 tw:py-1 tw:rounded tw:font-mono tw:text-xs"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:text-gray-200' : 'tw:bg-gray-100 tw:text-gray-800'"
-                    >
-                      {{ havingFieldsText }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-          </div>
-        </div>
-
         <!-- Period -->
         <div class="flex items-start q-mr-sm alert-settings-row">
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
@@ -297,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t('alerts.alertSettings.periodTooltip') }}
                 </span>
               </q-tooltip>
-            </q-icon>
+          </q-icon>
           </div>
           <div>
             <div ref="periodFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
@@ -518,7 +411,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-toggle
           v-model="formData.creates_incident"
           data-test="alert-creates-incident-toggle"
-          color="primary"
           size="30px"
           class="o2-toggle-button-xs"
         />
@@ -538,7 +430,6 @@ import {
   isAboveMinRefreshInterval,
   convertMinutesToCron,
 } from "@/utils/zincutils";
-import searchService from "@/services/search";
 
 export default defineComponent({
   name: "Step3AlertConditions",
@@ -607,130 +498,6 @@ export default defineComponent({
     // Cron validation
     const cronJobError = ref("");
 
-    // Query schema information from result_schema API
-    interface HavingCondition {
-      type: 'condition';
-      expression: string;
-      alias?: string;
-      operator: string;
-      value: string;
-    }
-
-    interface HavingLogicalOp {
-      type: 'logical_op';
-      operator: 'AND' | 'OR';
-      conditions: HavingNode[];
-    }
-
-    type HavingNode = HavingCondition | HavingLogicalOp;
-
-    const querySchema = ref<{
-      group_by: string[];
-      having: HavingNode | null;
-      projections: string[];
-    }>({
-      group_by: [],
-      having: null,
-      projections: [],
-    });
-
-    // Fetch query schema from result_schema API
-    const fetchQuerySchema = async () => {
-      // Only fetch if we have a SQL query (not PromQL - PromQL doesn't need schema analysis)
-      const sqlQuery = props.formData.query_condition?.sql;
-      const queryType = props.formData.query_condition?.type;
-
-      // Skip for PromQL mode - it doesn't use result_schema
-      if (queryType === 'promql') {
-        querySchema.value = { group_by: [], having: null, projections: [] };
-        return;
-      }
-
-      if (!sqlQuery) {
-        // Reset schema if no query
-        querySchema.value = { group_by: [], having: null, projections: [] };
-        return;
-      }
-
-      try {
-        const query = {
-          query: {
-            sql: sqlQuery,
-            query_fn: null,
-            size: -1,
-            streaming_output: false,
-            streaming_id: null,
-          },
-        };
-
-        const response = await searchService.result_schema(
-          {
-            org_identifier: store.state.selectedOrganization.identifier,
-            query,
-            start_time: (Date.now() - 3600000) * 1000,
-            end_time: Date.now() * 1000,
-            page_type: props.formData.stream_type || "logs",
-            is_streaming: false,
-          },
-          "ui"
-        );
-
-        if (response.data) {
-          querySchema.value = {
-            group_by: response.data.group_by || [],
-            having: response.data.having || null,
-            projections: response.data.projections || [],
-          };
-          console.log('Query schema fetched:', querySchema.value);
-        }
-      } catch (error) {
-        console.error("Error fetching query schema:", error);
-        // Reset on error
-        querySchema.value = { group_by: [], having: null, projections: [] };
-      }
-    };
-
-    // Clean up DataFusion expression to make it more readable
-    const cleanExpression = (expr: string): string => {
-      // Replace count(Int64(1)) with count(*)
-      expr = expr.replace(/count\(Int64\(\d+\)\)/gi, 'count(*)');
-
-      // Replace qualified table names: default.field_name -> field_name
-      expr = expr.replace(/\w+\.(\w+)/g, '$1');
-
-      // Replace Utf8("string") with just "string"
-      expr = expr.replace(/Utf8\("([^"]+)"\)/g, '"$1"');
-
-      // Replace Int64(number) with just number
-      expr = expr.replace(/Int64\((\d+)\)/g, '$1');
-
-      // Replace Float64(number) with just number
-      expr = expr.replace(/Float64\(([\d.]+)\)/g, '$1');
-
-      return expr;
-    };
-
-    // Parse HavingNode tree into human-readable text
-    const parseHavingNode = (node: HavingNode, isRoot: boolean = true): string => {
-      if (node.type === 'condition') {
-        // Use alias if present, otherwise clean up the expression
-        const field = node.alias || cleanExpression(node.expression);
-        return `${field} ${node.operator} ${node.value}`;
-      } else if (node.type === 'logical_op') {
-        // Recursively parse child conditions
-        const childTexts = node.conditions.map(child => parseHavingNode(child, false));
-
-        // Join with the logical operator
-        const joinedText = childTexts.join(` ${node.operator} `);
-
-        // Only wrap in parentheses if this is not the root and has multiple conditions
-        const needsParentheses = !isRoot && childTexts.length > 1;
-
-        return needsParentheses ? `(${joinedText})` : joinedText;
-      }
-      return '';
-    };
-
     // Initialize timezone
     const initializeTimezone = () => {
       try {
@@ -766,14 +533,6 @@ export default defineComponent({
     // Initialize on mount
     initializeTimezone();
 
-    // Watch for SQL/PromQL query changes
-    watch(
-      () => [props.formData.query_condition?.sql, props.formData.query_condition?.promql],
-      () => {
-        fetchQuerySchema();
-      },
-      { immediate: true }
-    );
 
     // Watch for prop changes
     watch(
@@ -821,127 +580,6 @@ export default defineComponent({
 
     // Trigger operators
     const triggerOperators = ["=", "!=", ">=", ">", "<=", "<", "Contains", "NotContains"];
-
-    const havingFieldsText = computed(() => {
-      if (!querySchema.value.having) {
-        return '';
-      }
-      return parseHavingNode(querySchema.value.having);
-    });
-
-    // Dynamic threshold description based on query schema
-    // CRITICAL: Threshold compares RESULT ROW COUNT, not aggregated column values
-    // See: /test-data/ALERTS_UI_TEXT_COMPLETE.md for detailed examples
-    //
-    // Natural Language Strategy:
-    // 1. "matching logs found" - Simple log searches (SELECT * WHERE...)
-    // 2. "metrics match criteria" - PromQL value checks (cpu > 80)
-    // 3. "distinct groups affected" - GROUP BY queries (impact-focused)
-    // 4. "results passed filter" - HAVING/aggregations (clarifies row counting)
-    const thresholdMetricType = computed(() => {
-      const hasGroupBy = querySchema.value.group_by.length > 0;
-      const hasHaving = querySchema.value.having !== null;
-      const isAggEnabled = localIsAggregationEnabled.value && props.formData.query_condition.aggregation;
-      const isPromQL = queryType.value === 'promql';
-
-      // Case 1: Complex Filters (HAVING) & Aggregations
-      // Logic: HAVING count > 5 or SELECT COUNT(*)
-      // Natural: "results passed filter"
-      // Why: Clarifies we count output rows, not logs inside them
-      //      "passed filter" reminds user the logic happened in HAVING clause
-      // Example SQL: SELECT service, COUNT(*) FROM logs WHERE level='error'
-      //              GROUP BY service HAVING COUNT(*) > 10
-      // Reality: Counts number of services (groups) that passed HAVING filter
-      if (hasGroupBy && hasHaving) {
-        return t('alerts.thresholdDynamic.metricTypes.resultsPassedFilter') || 'results passed filter';
-      }
-
-      // Case 2: Grouped Data (GROUP BY)
-      // Logic: GROUP BY service
-      // Natural: "distinct groups affected"
-      // Why: "Affected" is powerful - shifts focus from counting to impact
-      //      Implies the group (server/service) is experiencing the issue
-      // Example SQL: SELECT service, COUNT(*) FROM logs WHERE level='error' GROUP BY service
-      // Example PromQL: avg(cpu_usage) by (hostname)
-      // Reality: Counts number of distinct groups (services/hostnames)
-      if (hasGroupBy) {
-        return t('alerts.thresholdDynamic.metricTypes.distinctGroupsAffected') || 'distinct groups affected';
-      }
-
-      // Case 3: SQL/PromQL without GROUP BY
-      if (queryType.value === 'sql' || queryType.value === 'promql') {
-        const hasAggregates = querySchema.value.projections.some(p =>
-          p.toLowerCase().includes('count') ||
-          p.toLowerCase().includes('sum') ||
-          p.toLowerCase().includes('avg') ||
-          p.toLowerCase().includes('min') ||
-          p.toLowerCase().includes('max')
-        );
-
-        // Case 3a: With aggregation (COUNT/SUM/AVG)
-        // Natural: "results passed filter"
-        // ⚠️ MAJOR CONFUSION: Scalar aggregations always return exactly 1 row
-        // Example SQL: SELECT COUNT(*) FROM logs WHERE level='error'
-        // Example PromQL: count(http_requests_total)
-        // Reality: Always returns 1 row. Threshold > 1 will NEVER trigger!
-        // Fix: Use HAVING clause for SQL, or use PromQL conditions with 'value > X'
-        if (hasAggregates) {
-          return t('alerts.thresholdDynamic.metricTypes.resultsPassedFilter') || 'results passed filter';
-        }
-
-        // Case 3b: Simple query without aggregation
-        // For PromQL: "metrics match criteria" - value checks (cpu > 80)
-        // For SQL: "matching logs found" - direct log searches
-        // Example SQL: SELECT * FROM logs WHERE level='error'
-        // Example PromQL: cpu_usage_percent{hostname="server-01"}
-        if (isPromQL) {
-          return t('alerts.thresholdDynamic.metricTypes.metricsMatchCriteria') || 'metrics match criteria';
-        }
-        return t('alerts.thresholdDynamic.metricTypes.matchingLogsFound') || 'matching logs found';
-      }
-
-      // Case 4: Custom query with aggregation
-      if (isAggEnabled) {
-        const hasGroupByFields = props.formData.query_condition.aggregation.group_by?.length > 0 &&
-                                  props.formData.query_condition.aggregation.group_by[0]?.trim() !== "";
-
-        // Case 4a: Custom with GROUP BY - counts distinct groups
-        // Natural: "distinct groups affected"
-        // Example: Conditions: level='error', Aggregation: COUNT, Group By: service
-        // Reality: ✅ Correctly counts number of distinct services
-        // Note: This is already handled by Case 2 above, but kept for clarity
-        if (hasGroupByFields) {
-          return t('alerts.thresholdDynamic.metricTypes.distinctGroupsAffected') || 'distinct groups affected';
-        }
-
-        // Case 4b: Custom with aggregation only (no GROUP BY)
-        // Natural: "results passed filter"
-        // ⚠️ MAJOR CONFUSION: Same issue as Case 3a - always returns 1 row
-        // Fix: Add GROUP BY or use HAVING conditions
-        return t('alerts.thresholdDynamic.metricTypes.resultsPassedFilter') || 'results passed filter';
-      }
-
-      // Default: Standard Log Searches (Simple SQL/Custom)
-      // Logic: SELECT * ... (No groupings, no math)
-      // Natural: "matching logs found"
-      // Why: Direct and conversational - you searched for logs, system found logs
-      // Reality: ✅ Correctly counts number of matching rows/events
-      return t('alerts.thresholdDynamic.metricTypes.matchingLogsFound') || 'matching logs found';
-    });
-
-    const showGroupByContext = computed(() => {
-      const hasGroupBy = querySchema.value.group_by.length > 0;
-      return (queryType.value === 'sql' || queryType.value === 'promql') && hasGroupBy;
-    });
-
-    const showHavingContext = computed(() => {
-      const hasHaving = querySchema.value.having !== null;
-      return (queryType.value === 'sql' || queryType.value === 'promql') && hasHaving;
-    });
-
-    const groupByFieldsText = computed(() => {
-      return querySchema.value.group_by.join(', ');
-    });
 
     // Filtered numeric columns for aggregation
     const filteredNumericColumns = ref([...props.columns]);
@@ -1285,14 +923,6 @@ export default defineComponent({
       thresholdFieldRef,
       silenceFieldRef,
       destinationsFieldRef,
-      // Query schema
-      querySchema,
-      // Dynamic threshold description
-      thresholdMetricType,
-      showGroupByContext,
-      showHavingContext,
-      groupByFieldsText,
-      havingFieldsText,
       emitPromqlConditionUpdate,
     };
   },
