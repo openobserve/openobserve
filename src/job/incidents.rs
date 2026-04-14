@@ -30,9 +30,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
             return Ok(());
         }
 
-        if config.incidents.auto_resolve_after_minutes < 0 {
+        if config.incidents.auto_resolve_after_minutes <= 0 {
             log::info!(
-                "[INCIDENTS::JOB] Auto-resolve is disabled (auto_resolve_after_minutes=-1), only manual resolution allowed"
+                "[INCIDENTS::JOB] Auto-resolve is disabled (auto_resolve_after_minutes=0), only manual resolution allowed"
             );
             return Ok(());
         }

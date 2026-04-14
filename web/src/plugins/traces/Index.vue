@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filters-reset="onFiltersReset"
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
+              @service-graph-refresh="serviceGraphRef?.loadServiceGraph()"
             />
           </div>
         </template>
@@ -63,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
           >
             <service-graph
+              ref="serviceGraphRef"
               class="tw:h-full"
               @view-traces="handleServiceGraphViewTraces"
             />
@@ -331,6 +333,7 @@ const { fnParsedSQL } = logsUtils();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
+const serviceGraphRef = ref<any>(null);
 const splitterModel = ref(15);
 let parser: any;
 const fieldValues = ref({});
@@ -893,10 +896,7 @@ async function getQueryData(
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
-      const sortCol =
-        searchObj.meta.resultGrid.sortBy === "duration"
-          ? "duration"
-          : "start_time";
+      const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
       const sortOrd = (
         searchObj.meta.resultGrid.sortOrder || "desc"
       ).toUpperCase();
@@ -1540,6 +1540,13 @@ const onErrorOnlyToggled = (value: boolean) => {
 const onSearchModeChange = (mode: "traces" | "spans" | "service-graph") => {
   searchObj.meta.searchMode = mode;
   if (mode === "service-graph") return;
+  if (
+    mode === "traces" &&
+    searchObj.meta.resultGrid.sortBy !== "start_time" &&
+    searchObj.meta.resultGrid.sortBy !== "duration"
+  ) {
+    searchObj.meta.resultGrid.sortBy = "start_time";
+  }
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.data.queryResults = {
     hits: [],
@@ -1834,7 +1841,7 @@ watch(moveSplitter, () => {
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
   // Switch to search tab
-  searchObj.meta.searchMode = "spans";
+  searchObj.meta.searchMode = data.mode;
 
   // Set the selected stream in dropdown
   if (data.stream) {
@@ -1859,6 +1866,10 @@ const handleServiceGraphViewTraces = (data: any) => {
     if (data.podName) {
       const escapedPodName = escapeSingleQuotes(data.podName);
       filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
+    }
+    if (data.resourceFilter?.field && data.resourceFilter?.value) {
+      const escapedValue = escapeSingleQuotes(data.resourceFilter.value);
+      filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
     }
     if (data.errorsOnly) {
       filterQuery += ` AND span_status = 'ERROR'`;

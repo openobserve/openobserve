@@ -110,7 +110,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t('function.enrichmentTables') }}
                   </q-tooltip>
                 </q-route-tab>
-                />
                 <q-route-tab
                   v-if="config.isEnterprise == 'true'"
                   data-test="eval-templates-tab"
