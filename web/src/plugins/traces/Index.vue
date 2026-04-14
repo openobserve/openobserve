@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page
-    class="tracePage tw:h-[calc(100vh-2.25rem)] tw:min-h-[calc(100vh-2.25rem)]! tw:max-h-[calc(100vh-2.25rem)]! tw:overflow-hidden!"
+    class="tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
