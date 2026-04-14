@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="[
           store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8',
           wrap
-            ? 'tw:flex-wrap'
+            ? 'tw:flex-wrap tw:break-all'
             : 'tw:flex-nowrap tw:overflow-hidden',
         ]"
         :data-test="`pattern-card-${index}-template`"
@@ -135,11 +135,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="6px"
         flat
         round
+        :data-test="`pattern-card-${index}-details-icon`"
+        @click.stop="$emit('click', pattern, index)"
+      >
+        <q-icon name="info" size="13px" />
+        <q-tooltip>{{
+          t("search.showPatternDetails", {
+            variables: pattern.examples?.[0]?.variables
+              ? Object.keys(pattern.examples[0].variables).length
+              : 0,
+            examples: pattern.examples?.length || 0,
+          })
+        }}</q-tooltip>
+      </q-btn>
+      <q-btn
+        size="6px"
+        flat
+        round
         color="warning"
         @click.stop="$emit('create-alert', pattern)"
         :data-test="`pattern-card-${index}-create-alert-btn`"
       >
-        <q-icon name="notifications" size="10px" />
+        <q-icon name="notifications" size="15px" />
         <q-tooltip>{{ t("search.createAlertFromPattern") }}</q-tooltip>
       </q-btn>
     </div>
