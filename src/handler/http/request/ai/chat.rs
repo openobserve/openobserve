@@ -112,7 +112,7 @@ fn extract_passthrough_headers(
     post,
     path = "/{org_id}/ai/chat",
     context_path = "/api",
-    tag = "Ai",
+    tag = "AI",
     operation_id = "Chat",
     summary = "Generate AI chat response",
     description = "Generates an AI-powered response to user queries and requests.",
@@ -409,7 +409,7 @@ impl TraceInfo {
     post,
     path = "/{org_id}/ai/chat_stream",
     context_path = "/api",
-    tag = "Ai",
+    tag = "AI",
     operation_id = "ChatStream",
     summary = "Generate streaming AI chat response",
     description = "Generates an AI response with real-time streaming for improved user experience. \
@@ -964,7 +964,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
     post,
     path = "/{org_id}/ai/confirm/{session_id}",
     context_path = "/api",
-    tag = "Ai",
+    tag = "AI",
     operation_id = "ConfirmAction",
     summary = "Confirm or reject a destructive AI tool action",
     description = "Forwards user confirmation or rejection to the o2-sre-agent service \

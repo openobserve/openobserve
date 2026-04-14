@@ -40,6 +40,7 @@ use crate::{
     post,
     path = "/{org_id}/ai/toolsets",
     context_path = "/api",
+    tag = "AI",
     operation_id = "CreateAiToolset",
     summary = "Create an AI toolset",
     description = "Creates a new AI toolset (MCP server, CLI tool, skill, or generic config). \
@@ -55,7 +56,6 @@ use crate::{
         (status = 400, description = "Invalid request", content_type = "application/json"),
         (status = 409, description = "Toolset with this name already exists", content_type = "application/json"),
     ),
-    tag = "AiToolsets",
     extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn create(
@@ -114,6 +114,7 @@ pub async fn create(
     get,
     path = "/{org_id}/ai/toolsets/{id}",
     context_path = "/api",
+    tag = "AI",
     operation_id = "GetAiToolset",
     summary = "Get an AI toolset",
     description = "Retrieves a single AI toolset by its id. Only available in enterprise deployments.",
@@ -126,7 +127,6 @@ pub async fn create(
         (status = 404, description = "Toolset not found", content_type = "application/json"),
         (status = 403, description = "Feature not supported", content_type = "application/json"),
     ),
-    tag = "AiToolsets",
     extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn get(Path(path): Path<(String, String)>) -> Response {
@@ -157,6 +157,7 @@ pub struct ListQuery {
     get,
     path = "/{org_id}/ai/toolsets",
     context_path = "/api",
+    tag = "AI",
     operation_id = "ListAiToolsets",
     summary = "List AI toolsets",
     description = "Lists AI toolsets for the org with optional filtering. Only available in enterprise deployments.",
@@ -170,7 +171,6 @@ pub struct ListQuery {
         (status = 200, description = "List of toolsets", content_type = "application/json"),
         (status = 403, description = "Feature not supported", content_type = "application/json"),
     ),
-    tag = "AiToolsets",
     extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn list(Path(org_id): Path<String>, Query(params): Query<ListQuery>) -> Response {
@@ -197,6 +197,7 @@ pub async fn list(Path(org_id): Path<String>, Query(params): Query<ListQuery>) -
     put,
     path = "/{org_id}/ai/toolsets/{id}",
     context_path = "/api",
+    tag = "AI",
     operation_id = "UpdateAiToolset",
     summary = "Update an AI toolset",
     description = "Updates the description and/or data of an existing AI toolset. \
@@ -216,7 +217,6 @@ pub async fn list(Path(org_id): Path<String>, Query(params): Query<ListQuery>) -
         (status = 400, description = "Invalid request", content_type = "application/json"),
         (status = 404, description = "Toolset not found", content_type = "application/json"),
     ),
-    tag = "AiToolsets",
     extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn update(
@@ -272,6 +272,7 @@ pub async fn update(
     delete,
     path = "/{org_id}/ai/toolsets/{id}",
     context_path = "/api",
+    tag = "AI",
     operation_id = "DeleteAiToolset",
     summary = "Delete an AI toolset",
     description = "Permanently deletes an AI toolset. Only available in enterprise deployments.",
@@ -284,7 +285,6 @@ pub async fn update(
         (status = 404, description = "Toolset not found", content_type = "application/json"),
         (status = 403, description = "Feature not supported", content_type = "application/json"),
     ),
-    tag = "AiToolsets",
     extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn delete(Path(path): Path<(String, String)>) -> Response {

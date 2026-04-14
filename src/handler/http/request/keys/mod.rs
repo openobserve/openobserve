@@ -190,8 +190,10 @@ pub async fn get(Path(path): Path<(String, String)>) -> Response {
             Err(e) => return MetaHttpResponse::internal_error(e),
         };
 
-        // we can be fairly certain that in db we have proper json
-        let cd: CipherData = serde_json::from_str(&kdata).unwrap();
+        let cd: CipherData = match serde_json::from_str(&kdata) {
+            Ok(v) => v,
+            Err(e) => return MetaHttpResponse::internal_error(format!("cipher key data is corrupt: {e}")),
+        };
 
         let res = KeyGetResponse {
             name: key_name,
@@ -250,11 +252,16 @@ pub async fn list(Path(org_id): Path<String>) -> Response {
 
         let kdata = kdata
             .into_iter()
-            .map(|d| {
-                let cd = serde_json::from_str::<CipherData>(&d.data).unwrap();
-                KeyInfo {
-                    name: d.name,
-                    key: cd.into(),
+            .filter_map(|d| {
+                match serde_json::from_str::<CipherData>(&d.data) {
+                    Ok(cd) => Some(KeyInfo {
+                        name: d.name,
+                        key: cd.into(),
+                    }),
+                    Err(e) => {
+                        log::warn!("cipher key '{}' has unreadable data, skipping: {e}", d.name);
+                        None
+                    }
                 }
             })
             .collect::<Vec<_>>();
@@ -469,8 +476,10 @@ pub async fn update(
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
 
-    // we can be fairly certain that in db we have proper json
-    let existing: CipherData = serde_json::from_str(&kdata).unwrap();
+    let existing: CipherData = match serde_json::from_str(&kdata) {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::internal_error(format!("cipher key data is corrupt: {e}")),
+    };
 
     let cd = merge_updates(existing, incoming);
 

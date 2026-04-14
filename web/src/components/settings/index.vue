@@ -150,6 +150,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </q-route-tab>
                 <q-route-tab
+                  v-if="config.isEnterprise == 'true'"
+                  data-test="ai-toolsets-tab"
+                  name="ai_toolsets"
+                  :to="{
+                    name: 'aiToolsets',
+                    query: {
+                      org_identifier: store.state.selectedOrganization?.identifier,
+                    },
+                  }"
+                  content-class="tab_content"
+                  icon="smart_toy"
+                  :label="t('settings.aiToolsets')"
+                >
+                </q-route-tab>
+                <q-route-tab
                     v-if="config.isEnterprise == 'true' && isMetaOrg"
                     data-test="license-tab"
                     name="license"
