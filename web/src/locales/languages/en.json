@@ -2093,7 +2093,7 @@
     "realTime": "Realtime",
     "scheduled": "Scheduled",
     "anomalyDetection": "Anomalies",
-    "newAnomalyDetection": "New anomaly detection",
+    "newAnomalyDetection": "New anomaly",
     "editAnomalyDetection": "Edit anomaly detection",
     "updateAnomalyDetection": "Update anomaly detection:",
     "anomalyDetectionSubtitle": "Detect anomalies in your observability data using machine learning",

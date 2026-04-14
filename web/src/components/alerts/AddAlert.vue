@@ -57,7 +57,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </template>
             <template v-else>
-              <span v-if="!anomalyEditMode" class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">{{ t("alerts.newAnomalyDetection") }}</span>
+              <template v-if="!anomalyEditMode">
+                <span class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">{{ t("alerts.newAnomalyDetection") }}</span>
+                <q-input
+                  v-model="anomalyConfig.name"
+                  dense
+                  borderless
+                  placeholder="Anomaly name"
+                  class="alert-v3-field tw:text-sm"
+                  style="min-width: 180px;"
+                  hide-bottom-space
+                />
+              </template>
               <template v-if="anomalyEditMode">
                 <span class="tw:text-sm tw:font-semibold tw:max-w-[160px] tw:truncate tw:inline-block">
                   {{ anomalyConfig.name }}
@@ -157,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="tab in [
                   { key: 'false', label: t('alerts.scheduled') },
                   { key: 'true', label: t('alerts.realTime') },
-                  { key: 'anomaly', label: t('alerts.anomalyDetection') },
+                  ...(isAnomalyDetectionEnabled ? [{ key: 'anomaly', label: t('alerts.anomalyDetection') }] : []),
                 ]"
                 :key="tab.key"
                 class="alert-type-tab"
@@ -529,6 +540,10 @@ export default defineComponent({
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
 
+    const isAnomalyDetectionEnabled = computed(
+      () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
+    );
+
     // Auto-expand preview when stream name is selected, collapse when cleared
     watch(
       () => alertForm.formData.value.stream_name,
@@ -592,6 +607,7 @@ export default defineComponent({
 
     return {
       ...alertForm,
+      isAnomalyDetectionEnabled,
       floatingPreview,
       floatingPreviewRef,
       activeEvaluationStatus,
@@ -932,6 +948,64 @@ export default defineComponent({
   .q-field__append {
     height: 1.75rem !important;
   }
+}
+// ───────────────────────────────────────────────────────────────────────────
+
+// ── Global query-mode-tabs (Builder / SQL toggle used in alert forms) ───────
+.query-mode-tabs {
+  display: flex;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  padding: 3px;
+  width: fit-content;
+
+  .query-mode-tab {
+    padding: 4px 12px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: rgba(0, 0, 0, 0.4);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    line-height: 1.4;
+
+    &:hover { color: rgba(0, 0, 0, 0.7); }
+
+    &.active {
+      background: #fff;
+      color: #1a1a1a;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    }
+  }
+}
+
+body.body--dark .query-mode-tabs {
+  background: rgba(255, 255, 255, 0.05);
+
+  .query-mode-tab {
+    color: rgba(255, 255, 255, 0.6);
+
+    &:hover { color: rgba(255, 255, 255, 0.85); }
+
+    &.active {
+      background: #374151;
+      color: #e4e7eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    }
+  }
+}
+// ───────────────────────────────────────────────────────────────────────────
+
+// ── static-text: inline label/hint aligned to 28px row height ──────────────
+.static-text {
+  display: inline-flex;
+  align-items: center;
+  height: 1.75rem;
+  line-height: 1.75rem;
+  font-size: 12px;
 }
 // ───────────────────────────────────────────────────────────────────────────
 
