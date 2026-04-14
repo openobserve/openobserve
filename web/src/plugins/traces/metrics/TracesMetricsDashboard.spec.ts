@@ -198,20 +198,10 @@ describe("TracesMetricsDashboard", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render the dashboard header when show is true", () => {
-      const header = wrapper.find(".dashboard-header");
-      expect(header.exists()).toBe(true);
-    });
-
-    it("should not render the dashboard header when show is false", async () => {
+    it("should not render the charts-wrapper when show is false", async () => {
       await wrapper.setProps({ show: false });
-      const header = wrapper.find(".dashboard-header");
-      expect(header.exists()).toBe(false);
-    });
-
-    it("should render the insights button when show is true", () => {
-      const btn = wrapper.find('[data-test="insights-button"]');
-      expect(btn.exists()).toBe(true);
+      const charts = wrapper.find('[data-test="render-dashboard-charts"]');
+      expect(charts.exists()).toBe(false);
     });
 
     it("should render the dashboard charts component when show is true and histogram is visible", () => {
@@ -230,24 +220,6 @@ describe("TracesMetricsDashboard", () => {
         '[data-test="traces-analysis-dashboard"]',
       );
       expect(analysisDashboard.exists()).toBe(false);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Collapse behaviour
-  // -------------------------------------------------------------------------
-  describe("collapse behaviour", () => {
-    it("should toggle showHistogram to false when header is clicked", async () => {
-      const header = wrapper.find(".dashboard-header");
-      await header.trigger("click");
-      expect(mockSearchObj.meta.showHistogram).toBe(false);
-    });
-
-    it("should re-expand showHistogram to true when header is clicked again", async () => {
-      const header = wrapper.find(".dashboard-header");
-      await header.trigger("click");
-      await header.trigger("click");
-      expect(mockSearchObj.meta.showHistogram).toBe(true);
     });
   });
 
@@ -528,18 +500,19 @@ describe("TracesMetricsDashboard", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Insights button
+  // Insights button — driven via the exposed openUnifiedAnalysisDashboard API
+  // (the insights button DOM element was removed from the template; the
+  //  function is invoked by the parent via defineExpose)
   // -------------------------------------------------------------------------
   describe("insights button", () => {
-    it("should open the analysis dashboard when the insights button is clicked", async () => {
-      const btn = wrapper.find('[data-test="insights-button"]');
-      await btn.trigger("click");
+    it("should open the analysis dashboard when openUnifiedAnalysisDashboard is called", async () => {
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
       expect(wrapper.vm.showAnalysisDashboard).toBe(true);
     });
 
-    it("should render TracesAnalysisDashboard after insights button click", async () => {
-      const btn = wrapper.find('[data-test="insights-button"]');
-      await btn.trigger("click");
+    it("should render TracesAnalysisDashboard after openUnifiedAnalysisDashboard is called", async () => {
+      wrapper.vm.openUnifiedAnalysisDashboard();
       await flushPromises();
       const analysisDashboard = wrapper.find(
         '[data-test="traces-analysis-dashboard"]',
@@ -548,8 +521,8 @@ describe("TracesMetricsDashboard", () => {
     });
 
     it("should set defaultAnalysisTab to volume when no brush selection exists", async () => {
-      const btn = wrapper.find('[data-test="insights-button"]');
-      await btn.trigger("click");
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
       expect(wrapper.vm.defaultAnalysisTab).toBe("volume");
     });
   });
@@ -573,6 +546,10 @@ describe("TracesMetricsDashboard", () => {
     it("should expose rangeFiltersVersion as a ref", () => {
       // rangeFiltersVersion is a numeric ref — it must be a number
       expect(typeof wrapper.vm.rangeFiltersVersion).toBe("number");
+    });
+
+    it("should expose the openUnifiedAnalysisDashboard method", () => {
+      expect(typeof wrapper.vm.openUnifiedAnalysisDashboard).toBe("function");
     });
   });
 

@@ -16,15 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:items-center tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover"
+    class="tw:flex tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover"
+    :class="wrap ? 'tw:items-start' : 'tw:items-center'"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
   >
     <!-- Pattern Column -->
-    <div class="tw:flex-1 tw:min-w-0 tw:px-2">
+    <div class="tw:flex-1 tw:min-w-0 tw:overflow-hidden tw:px-2">
       <!-- Template rendered as tokenized chips so wildcards are visually distinct -->
       <div
-        class="pattern-template-text tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px]"
+        class="pattern-template-text tw:flex tw:items-baseline tw:gap-x-[2px] tw:gap-y-[1px] tw:w-full"
         :class="[
           store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8',
           wrap
@@ -35,7 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="pattern.template"
       >
         <template v-for="(tok, i) in templateTokens" :key="i">
-          <span v-if="tok.kind === 'text'" class="tw:whitespace-pre">{{ tok.value }}</span>
+          <span
+            v-if="tok.kind === 'text'"
+            :class="wrap ? 'tw:whitespace-pre-wrap tw:break-all' : 'tw:whitespace-pre'"
+          >{{ tok.value }}</span>
           <q-chip
             v-else
             dense
@@ -99,58 +103,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Actions Column -->
-    <div class="tw:w-24 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center">
+    <div
+      class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center tw:justify-center tw:gap-[2px]"
+      :class="wrap ? 'tw:pt-1' : ''"
+    >
       <q-btn
         size="6px"
+        flat
+        round
         @click.stop="$emit('include', pattern)"
         :title="t('search.includePatternInSearch')"
-        round
         :data-test="`pattern-card-${index}-include-btn`"
       >
         <q-icon style="height: 8px; width: 8px">
-          <EqualIcon></EqualIcon>
+          <EqualIcon />
         </q-icon>
       </q-btn>
       <q-btn
         size="6px"
+        flat
+        round
         @click.stop="$emit('exclude', pattern)"
         :title="t('search.excludePatternFromSearch')"
-        round
         :data-test="`pattern-card-${index}-exclude-btn`"
       >
         <q-icon style="height: 8px; width: 8px">
-          <NotEqualIcon></NotEqualIcon>
+          <NotEqualIcon />
         </q-icon>
       </q-btn>
       <q-btn
         size="6px"
-        class="cursor-pointer pattern-details-btn"
+        flat
         round
         :data-test="`pattern-card-${index}-details-icon`"
         @click.stop="$emit('click', pattern, index)"
       >
-        <q-icon name="info" style="height: 8px; width: 8px">
-          <q-tooltip>{{
-            t("search.showPatternDetails", {
-              variables: pattern.examples?.[0]?.variables
-                ? Object.keys(pattern.examples[0].variables).length
-                : 0,
-              examples: pattern.examples?.length || 0,
-            })
-          }}</q-tooltip>
-        </q-icon>
+        <q-icon name="info" size="13px" />
+        <q-tooltip>{{
+          t("search.showPatternDetails", {
+            variables: pattern.examples?.[0]?.variables
+              ? Object.keys(pattern.examples[0].variables).length
+              : 0,
+            examples: pattern.examples?.length || 0,
+          })
+        }}</q-tooltip>
       </q-btn>
       <q-btn
         size="6px"
-        class="cursor-pointer pattern-details-btn"
-        color="warning"
+        flat
         round
-        :data-test="`pattern-card-${index}-create-alert-btn`"
+        color="warning"
         @click.stop="$emit('create-alert', pattern)"
+        :data-test="`pattern-card-${index}-create-alert-btn`"
       >
-        <q-icon name="add_alert" style="height: 8px; width: 8px">
-          <q-tooltip>{{ t("search.createAlertFromPattern") }}</q-tooltip>
-        </q-icon>
+        <q-icon name="notifications" size="15px" />
+        <q-tooltip>{{ t("search.createAlertFromPattern") }}</q-tooltip>
       </q-btn>
     </div>
   </div>
@@ -211,9 +218,6 @@ const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, 
 
 <style lang="scss">
 @import "@/assets/styles/log-highlighting.css";
-.pattern-details-btn > span.q-btn__content {
-  display: block !important;
-}
 .wildcard-chip {
   font-family: monospace;
   font-size: 10px;

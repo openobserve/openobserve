@@ -31,6 +31,10 @@ vi.mock("@/utils/zincutils", () => ({
   getUUID: vi.fn(() => "test-uuid-1234-5678-9012"),
 }));
 
+vi.mock("@/services/http", () => ({
+  attemptTokenRefresh: vi.fn(),
+}));
+
 // Mock Web Worker
 class MockWorker {
     workerDataSent: any = null;
@@ -84,6 +88,7 @@ Object.defineProperty(window, 'Worker', {
 vi.stubGlobal('Worker', WorkerConstructor);
 
 import useHttpStreaming from "./useStreamingSearch";
+import { attemptTokenRefresh } from "@/services/http";
 
 describe("useHttpStreaming", () => {
 
@@ -517,6 +522,109 @@ let onDataSpy: any;
       type: type,
     });
   });
+
+  describe("401 handling", () => {
+    const mockData401: any = {
+      queryReq: {
+        query: {
+          sql: 'SELECT * FROM "default"',
+          start_time: 1750062322477000,
+          end_time: 1750062327477000,
+          size: 0,
+          sql_mode: "full",
+          track_total_hits: true,
+        },
+      },
+      type: "values",
+      isPagination: false,
+      traceId: "401-trace-id-aabbccddeeff0011",
+      org_id: "test-org",
+      searchType: "ui",
+      pageType: "logs",
+    };
+
+    const mock401Handlers = {
+      data: vi.fn(),
+      error: vi.fn(),
+      complete: vi.fn(),
+      reset: vi.fn(),
+    };
+
+    beforeEach(() => {
+      vi.mocked(attemptTokenRefresh).mockReset();
+      mock401Handlers.data.mockReset();
+      mock401Handlers.error.mockReset();
+      mock401Handlers.complete.mockReset();
+      mock401Handlers.reset.mockReset();
+    });
+
+    it("should attempt token refresh and retry fetch when initial response is 401", async () => {
+      // First fetch returns 401; second fetch returns a successful (but empty) response.
+      // The values endpoint produces a GET request with no body, so the response
+      // needs no readable body for this test — we just verify the retry.
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          json: vi.fn().mockResolvedValue({ message: "Unauthorized" }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          json: vi.fn().mockResolvedValue({ message: "Server Error" }),
+          body: null,
+        });
+
+      vi.mocked(attemptTokenRefresh).mockResolvedValue(undefined);
+
+      await httpStreaming.fetchQueryDataWithHttpStream(mockData401, mock401Handlers);
+      await flushPromises();
+
+      expect(attemptTokenRefresh).toHaveBeenCalledTimes(1);
+      // The URL passed to attemptTokenRefresh should contain the values endpoint
+      expect(vi.mocked(attemptTokenRefresh).mock.calls[0][0]).toContain(
+        "_values_stream",
+      );
+      // fetch must have been called twice (initial + retry)
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("should return early without calling onError when token refresh fails on 401", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: vi.fn().mockResolvedValue({ message: "Unauthorized" }),
+      });
+
+      vi.mocked(attemptTokenRefresh).mockRejectedValue(
+        new Error("Refresh failed"),
+      );
+
+      const onErrorSpy = vi.spyOn(httpStreaming, "onError");
+
+      await httpStreaming.fetchQueryDataWithHttpStream(mockData401, mock401Handlers);
+      await flushPromises();
+
+      // Only one fetch attempt — no retry after failed refresh
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      // onError must NOT be called — the composable returns early silently
+      expect(onErrorSpy).not.toHaveBeenCalled();
+    });
+
+    // TODO: The mid-stream 401 path (Path 2) fires inside the async IIFE that
+    // reads the stream via a ReadableStream reader. Reaching that catch block
+    // requires the fetch to succeed and then the reader to throw an object with
+    // { status: 401 }. The module-scoped streamWorker and the Worker constructor
+    // mock complexity (the worker receives the stream only after postMessage
+    // "startStream") make it impractical to control reader throw timing without
+    // deep restructuring of the mock setup. This test is skipped until the
+    // Worker mock infrastructure is fixed to support mid-stream scenarios.
+    it.skip("should call onError after token refresh on mid-stream 401", async () => {
+      // Requires fetch to succeed AND the stream reader to throw { status: 401 }.
+      // Worker mock complexity prevents reliable simulation — see TODO above.
+    });
+  });
+
   });
   describe("WebSocket response converters", () => {
     const traceId = "0534c2294079426a86bd88b13775253120";

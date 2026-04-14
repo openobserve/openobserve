@@ -36,7 +36,7 @@
                 :data-test="`stream-field-select-option-${child.name}`"
               >
                 <q-item-section>
-                  <q-item-label v-html="child.name"></q-item-label>
+                  <q-item-label>{{ child.name }}</q-item-label>
                 </q-item-section>
               </q-item>
             </template>

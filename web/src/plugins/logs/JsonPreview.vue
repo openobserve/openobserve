@@ -33,7 +33,7 @@
         data-test="log-correlation-btn"
       >
         <q-tooltip>
-          {{ t('search.viewRelatedTooltip') }}
+          {{ t("search.viewRelatedTooltip") }}
         </q-tooltip>
       </q-btn>
       <div
@@ -117,8 +117,7 @@
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <q-spinner-hourglass v-if="loading"
-size="lg" color="primary" />
+      <q-spinner-hourglass v-if="loading" size="lg" color="primary" />
       <div v-if="!loading">
         <code-query-editor
           v-model:query="unflattendData"
@@ -138,6 +137,7 @@ size="lg" color="primary" />
         :key="key"
       >
         <q-btn-dropdown
+          v-if="!hideFieldOptions"
           data-test="log-details-include-exclude-field-btn"
           size="0.5rem"
           flat
@@ -156,7 +156,8 @@ size="lg" color="primary" />
                 !hideSearchTermActions &&
                 searchObj.data.stream.selectedStreamFields.some((item: any) =>
                   item.name === key ? item.isSchemaField : '',
-                ) && multiStreamFields.includes(key)
+                ) &&
+                multiStreamFields.includes(key)
               "
               @click.stop="addSearchTerm(key, value[key], 'include')"
               data-test="log-details-include-field-btn"
@@ -184,7 +185,8 @@ size="lg" color="primary" />
                 !hideSearchTermActions &&
                 searchObj.data.stream.selectedStreamFields.some((item: any) =>
                   item.name === key ? item.isSchemaField : '',
-                ) && multiStreamFields.includes(key)
+                ) &&
+                multiStreamFields.includes(key)
               "
               @click.stop="addSearchTerm(key, value[key], 'exclude')"
               data-test="log-details-exclude-field-btn"
@@ -315,19 +317,20 @@ size="lg" color="primary" />
           :data-test="`log-expand-detail-key-${key}`"
           :class="store.state.theme === 'dark' ? 'dark' : ''"
         >
-          <span class="log-key">{{ key }}</span><span class="log-separator">: </span><span
-          ><ChunkedContent
-            v-if="getContentSize(value[key]) > 50000"
-            :data="value[key]"
-            :field-key="`json_preview_${key}`"
-            :query-string="highlightQuery"
-            :simple-mode="false"
-          /><LogsHighLighting
-            v-else
-            :data="value[key]"
-            :show-braces="false"
-            :query-string="highlightQuery"
-          /></span><span v-if="index < Object.keys(value).length - 1">,</span>
+          <span class="log-key">{{ key }}</span
+          ><span class="log-separator">: </span
+          ><span
+            ><ChunkedContent
+              v-if="getContentSize(value[key]) > 50000"
+              :data="value[key]"
+              :field-key="`json_preview_${key}`"
+              :query-string="highlightQuery"
+              :simple-mode="false" /><LogsHighLighting
+              v-else
+              :data="value[key]"
+              :show-braces="false"
+              :query-string="highlightQuery" /></span
+          ><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>
       </div>
       }
@@ -347,8 +350,7 @@ size="lg" color="primary" />
         "
       >
         <div class="context-menu-item" @click="copySelectedText">
-          <q-icon name="content_copy"
-size="xs" class="q-mr-sm" />
+          <q-icon name="content_copy" size="xs" class="q-mr-sm" />
           Copy
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">
@@ -475,6 +477,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    hideFieldOptions: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     NotEqualIcon,
@@ -561,7 +567,9 @@ export default {
     const { searchObj, searchAggData } = searchState();
 
     // Cross-linking: get all matching cross-links for a field using result_schema data
-    const getCrossLinksForField = (fieldName: string): Array<{ name: string; resolvedUrl: string }> => {
+    const getCrossLinksForField = (
+      fieldName: string,
+    ): Array<{ name: string; resolvedUrl: string }> => {
       if (!store.state.zoConfig?.enable_cross_linking) return [];
 
       const crossLinks = searchObj.data.crossLinks;
@@ -590,16 +598,30 @@ export default {
       const results: Array<{ name: string; resolvedUrl: string }> = [];
 
       for (const link of stream_links) {
-        if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
-          const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
+        if (
+          link.fields?.some((f: any) => f.name === originalFieldName && f.alias)
+        ) {
+          const resolved = resolveCrossLinkUrl(
+            link.url,
+            originalFieldName,
+            fieldValue,
+          );
           results.push({ name: link.name, resolvedUrl: resolved });
         }
       }
 
       if (!streamCoveredFields.has(originalFieldName)) {
         for (const link of org_links) {
-          if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
-            const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
+          if (
+            link.fields?.some(
+              (f: any) => f.name === originalFieldName && f.alias,
+            )
+          ) {
+            const resolved = resolveCrossLinkUrl(
+              link.url,
+              originalFieldName,
+              fieldValue,
+            );
             results.push({ name: link.name, resolvedUrl: resolved });
           }
         }
@@ -619,7 +641,10 @@ export default {
 
       return urlTemplate
         .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))
-        .replace(/\$\{field\.__value\}/g, encodeURIComponent(String(fieldValue ?? "")))
+        .replace(
+          /\$\{field\.__value\}/g,
+          encodeURIComponent(String(fieldValue ?? "")),
+        )
         .replace(/\$\{start_time\}/g, String(startTime))
         .replace(/\$\{end_time\}/g, String(endTime))
         .replace(/\$\{query\}/g, encodeURIComponent(query))
@@ -630,7 +655,9 @@ export default {
     const crossLinkDropdownVisible = ref(false);
     const crossLinkDropdownX = ref(0);
     const crossLinkDropdownY = ref(0);
-    const crossLinkDropdownItems = ref<Array<{ name: string; resolvedUrl: string }>>([]);
+    const crossLinkDropdownItems = ref<
+      Array<{ name: string; resolvedUrl: string }>
+    >([]);
 
     const onCrossLinkClick = (event: MouseEvent, fieldName: string) => {
       const links = getCrossLinksForField(fieldName);
@@ -673,15 +700,24 @@ export default {
         // AND service_streams is enabled in config
         // AND hideViewRelated prop is not set (used by DetailTable drawer to hide the button)
         // Mode can be 'sidebar' (when opened from sidebar) or 'expanded' (when log row is expanded in table)
-        const isDetailView = props.mode === 'sidebar' || props.mode === 'expanded';
-        const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
-        
-        if(isDetailView && serviceStreamsEnabled) {
+        const isDetailView =
+          props.mode === "sidebar" || props.mode === "expanded";
+        const serviceStreamsEnabled =
+          store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
+
+        if (isDetailView && serviceStreamsEnabled) {
           const available = await isCorrelationAvailable();
-          showViewRelatedBtn.value = available && isDetailView && serviceStreamsEnabled && !props.hideViewRelated;
+          showViewRelatedBtn.value =
+            available &&
+            isDetailView &&
+            serviceStreamsEnabled &&
+            !props.hideViewRelated;
         }
       } catch (err) {
-        console.error("[JsonPreview] Error checking correlation availability:", err);
+        console.error(
+          "[JsonPreview] Error checking correlation availability:",
+          err,
+        );
         showViewRelatedBtn.value = false;
       }
     });
@@ -711,7 +747,8 @@ export default {
 
     const setViewTraceBtn = () => {
       // Hide view traces button when service_streams_enabled is true
-      const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false;
+      const serviceStreamsEnabled =
+        store.state.zoConfig.service_streams_enabled !== false;
 
       showViewTraceBtn.value =
         !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
@@ -855,7 +892,7 @@ export default {
           multiStreamFields.value.push(item.name);
         }
       });
-    }
+    };
 
     watch(activeTab, async () => {
       if (activeTab.value === "unflattened") {
