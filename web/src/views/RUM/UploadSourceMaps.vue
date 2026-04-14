@@ -308,7 +308,7 @@ const uploadSourceMaps = async () => {
 
 <style lang="scss" scoped>
 .upload-source-maps-page {
-  height: calc(100vh - 5.25rem);
+  height: calc(100vh - var(--navbar-height) - 1.25rem);
   display: flex;
   flex-direction: column;
   background-color: var(--q-background);
