@@ -212,38 +212,22 @@ export const fillMissingValues = (
 
   const filledData: any = [];
 
-  // Count unique time slots up to 3. We only need to know if there are < 3
-  // (phantom anchor needed) or >= 3 (ECharts can derive interval from data).
-  // Break early once 3 distinct slots are found to avoid iterating all rows.
-  const uniqueTimeSlots = new Set<string>();
-  for (const d of processedData) {
-    uniqueTimeSlots.add(getDataValue(d, timeKey));
-    if (uniqueTimeSlots.size >= 3) break;
-  }
-  const uniqueTimeSlotCount = uniqueTimeSlots.size;
-
-  // Always insert a null anchor at the user's selected start time when the fill
-  // loop doesn't yet cover it. This pins the ECharts x-axis left edge to the
-  // user's query range from the very first chunk.
+  // Insert anchors when the fill loop doesn't yet cover the user's selected
+  // start time. This pins the ECharts x-axis left edge to the user's query
+  // range from the very first chunk.
   const anchorTimes: string[] = [];
   if (binnedFillStart > binnedDate) {
     const anchorFormattedTime = formatUtc(binnedDate);
     anchorTimes.push(anchorFormattedTime);
 
-    // Also insert a phantom point one interval after the user's selected start
-    // time when data is sparse (< 3 unique time slots). This gives ECharts a
-    // known 30s consecutive gap at the left edge of the axis so it sizes bars
-    // correctly instead of using the huge gap from user-start to first chunk
-    // (~hours/days). Only added when it falls strictly before the first real
-    // data point (binnedFillStart), otherwise it would overlap real data.
-    // Once there are >= 3 real time slots ECharts can derive the interval from
-    // the data itself and the phantom is no longer needed.
-    if (uniqueTimeSlotCount < 3) {
-      const nearAnchorTime = new Date(binnedDate.getTime() + interval * 1000);
-      // Only add the near-anchor if it's strictly before the first real data
-      if (nearAnchorTime < binnedFillStart) {
-        anchorTimes.push(formatUtc(nearAnchorTime));
-      }
+    // Insert a phantom point one interval before the first real data point.
+    // This gives ECharts a consecutive pair (nearAnchor → first data) so it
+    // can derive the correct bar width, instead of using the huge gap from
+    // user-start to first chunk (~hours/days).
+    const nearAnchorTime = new Date(binnedFillStart.getTime() - interval * 1000);
+    // Only add the near-anchor if it's strictly after the starting anchor
+    if (nearAnchorTime > binnedDate) {
+      anchorTimes.push(formatUtc(nearAnchorTime));
     }
   }
 
