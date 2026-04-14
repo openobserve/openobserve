@@ -102,6 +102,15 @@ vi.mock("@/utils/dashboard/panelValidation", () => ({
   findFirstValidMappedValue: vi.fn().mockReturnValue(null),
 }));
 
+vi.mock("@/utils/dashboard/colorPalette", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    // Prepend a dark color so auto-color mode can assign it and trigger white text logic.
+    getColorForTable: ["#000000", ...actual.getColorForTable],
+  };
+});
+
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
     showErrorNotification: vi.fn(),
@@ -405,8 +414,10 @@ describe("TableRenderer", () => {
       wrapper = createWrapper();
       vi.mocked(findFirstValidMappedValue).mockReturnValue(null);
 
-      // Force a known dark color into the auto map
-      const col: any = { colorMode: "auto", field: "status", __autoColorMap_status: new Map([["dark-value", "#000000"]]) };
+      // "dark-value" is the first value assigned in a fresh autoColorCache, so it
+      // receives the first palette color (#000000 — dark). isDashboardColor() returns
+      // true → text color must be #ffffff.
+      const col: any = { colorMode: "auto", field: "status" };
       const cell = {
         column: { id: "status", columnDef: { meta: { _col: col } } },
         getValue: () => "dark-value",
