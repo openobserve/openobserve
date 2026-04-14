@@ -2219,7 +2219,8 @@
     "anomalyCreated": "이상 탐지 구성이 생성되었습니다.훈련이 곧 시작될 예정입니다.",
     "editJson": "알림 JSON 편집",
     "importedFromPattern": "로그 패턴으로 미리 채워진 경고",
-    "importedFromAnomalyPattern": "비정상적인 로그 패턴으로 미리 채워진 경고 — 긴급 설정 검토"
+    "importedFromAnomalyPattern": "비정상적인 로그 패턴으로 미리 채워진 경고 — 긴급 설정 검토",
+    "additional_settings": "추가 설정"
   },
   "alert_templates": {
     "header": "템플릿",

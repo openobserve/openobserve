@@ -2219,7 +2219,8 @@
     "anomalyCreated": "Configuratie voor anomaliedetectie gemaakt. De training start binnenkort.",
     "editJson": "Waarschuwings-JSON bewerken",
     "importedFromPattern": "Waarschuwing vooraf ingevuld op basis van logpatroon",
-    "importedFromAnomalyPattern": "Waarschuwing vooraf ingevuld op basis van een abnormaal logpatroon — bekijk de urgentie-instellingen"
+    "importedFromAnomalyPattern": "Waarschuwing vooraf ingevuld op basis van een abnormaal logpatroon — bekijk de urgentie-instellingen",
+    "additional_settings": "Aanvullende instellingen"
   },
   "alert_templates": {
     "header": "Sjablonen",

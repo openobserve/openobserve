@@ -2219,7 +2219,8 @@
     "anomalyCreated": "Anomali algılama yapılandırması oluşturuldu. Eğitim kısa süre içinde başlayacak.",
     "editJson": "Uyarı JSON'unu Düzenle",
     "importedFromPattern": "Günlük düzeninden önceden doldurulmuş uyarı",
-    "importedFromAnomalyPattern": "Anormal günlük düzeninden önceden doldurulmuş uyarı - aciliyet ayarlarını gözden geçirin"
+    "importedFromAnomalyPattern": "Anormal günlük düzeninden önceden doldurulmuş uyarı - aciliyet ayarlarını gözden geçirin",
+    "additional_settings": "Ek Ayarlar"
   },
   "alert_templates": {
     "header": "Şablonlar",

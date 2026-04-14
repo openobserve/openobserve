@@ -2221,7 +2221,8 @@
     },
     "updateAnomalyDetection": "Anomalieerkennung aktualisieren:",
     "anomalyCreated": "Konfiguration zur Erkennung von Anomalien wurde erstellt. Die Schulung beginnt in Kürze.",
-    "editJson": "Alert-JSON bearbeiten"
+    "editJson": "Alert-JSON bearbeiten",
+    "additional_settings": "Zusätzliche Einstellungen"
   },
   "alert_templates": {
     "header": "Vorlagen",
