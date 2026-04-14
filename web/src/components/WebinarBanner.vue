@@ -100,9 +100,12 @@ size="1rem" />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
+import { useStore } from "vuex";
 
-defineProps<{
+const store = useStore();
+
+const props = defineProps<{
   variant: "header" | "home";
 }>();
 
@@ -130,17 +133,29 @@ const WEBINAR_JSON_URL =
 const webinarData = ref<WebinarData | null>(null);
 const isDismissed = ref(false);
 
+const isExpired = computed(() => {
+  if (!webinarData.value?.date) return false;
+  return new Date(webinarData.value.date) < new Date();
+});
+
+const isBannerVisible = computed(
+  () =>
+    props.variant === "header" &&
+    !!webinarData.value &&
+    !isExpired.value &&
+    !isDismissed.value,
+);
+
+watch(isBannerVisible, (visible) => {
+  store.dispatch("setIsWebinarBannerVisible", visible);
+});
+
 const dismiss = () => {
   isDismissed.value = true;
   if (webinarData.value?.id) {
     localStorage.setItem(`webinar_dismissed_${webinarData.value.id}`, "1");
   }
 };
-
-const isExpired = computed(() => {
-  if (!webinarData.value?.date) return false;
-  return new Date(webinarData.value.date) < new Date();
-});
 
 const formattedDate = computed(() => {
   if (!webinarData.value?.date) return "";
