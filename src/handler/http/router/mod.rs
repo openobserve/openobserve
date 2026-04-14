@@ -93,18 +93,30 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-sampled"),
             X_O2_ASSISTANT_SESSION_ID,
         ])
-        // Restrict CORS to the configured web_url origin only.
-        // mirror_request() + allow_credentials(true) allows any origin to make
-        // credentialed requests — effectively disabling same-origin protection.
-        // Only reflect the Origin header back if it matches our own web_url origin exactly.
-        // We extract only the scheme+host+port from web_url (ignoring any path) because
-        // the Origin header per RFC 6454 never contains a path component. This prevents
-        // prefix-match bypasses like https://app.example.com.evil.com matching a
-        // starts_with check against https://app.example.com.
+        // Restrict CORS to the configured web_url origin, plus any extra origins in
+        // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
+        // allows any origin to make credentialed requests — effectively disabling same-origin
+        // protection.  Only reflect the Origin header back if it matches one of our allowed origins.
+        // We extract only the scheme+host+port from each URL (ignoring any path) because the Origin
+        // header per RFC 6454 never carries a path component.  This prevents prefix-match bypasses
+        // like https://app.example.com.evil.com when the allowed URL is https://app.example.com.
         .allow_origin(AllowOrigin::predicate(|origin, _parts| {
             let cfg = config::get_config();
             let web_url = cfg.common.web_url.trim_end_matches('/');
-            is_origin_allowed(origin.as_bytes(), web_url)
+            if is_origin_allowed(origin.as_bytes(), web_url) {
+                return true;
+            }
+            // Also check any extra origins in ZO_CORS_ALLOWED_ORIGINS.
+            let extra = cfg.common.cors_allowed_origins.trim();
+            if !extra.is_empty() {
+                for url in extra.split(',') {
+                    let url = url.trim().trim_end_matches('/');
+                    if is_origin_allowed(origin.as_bytes(), url) {
+                        return true;
+                    }
+                }
+            }
+            false
         }))
         .allow_credentials(true)
         .max_age(Duration::from_secs(3600))
