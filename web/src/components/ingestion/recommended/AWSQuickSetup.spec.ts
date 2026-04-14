@@ -6,6 +6,19 @@ import { createI18n } from 'vue-i18n';
 import { createRouter, createWebHistory } from 'vue-router';
 import AWSQuickSetup from './AWSQuickSetup.vue';
 
+const { MOCK_SERVICES, MOCK_REGIONS } = vi.hoisted(() => ({
+  MOCK_SERVICES: [
+    { label: 'CloudTrail', flag: 'EnableCloudTrail' },
+    { label: 'CloudWatch Metrics', flag: 'EnableCloudWatchMetrics' },
+    { label: 'VPC Flow Logs', flag: 'EnableVPCFlowLogs' },
+  ],
+  MOCK_REGIONS: [
+    { value: 'us-east-1', label: 'US East (N. Virginia)' },
+    { value: 'us-west-2', label: 'US West (Oregon)' },
+    { value: 'eu-west-1', label: 'Europe (Ireland)' },
+  ],
+}));
+
 vi.mock('../../../aws-exports', () => ({
   default: { API_ENDPOINT: 'http://localhost:5080', region: 'us-east-1' },
 }));
@@ -20,18 +33,6 @@ vi.mock('@/utils/zincutils', () => ({
   })),
   getIngestionURL: vi.fn(() => 'http://localhost:5080'),
 }));
-
-const MOCK_SERVICES = [
-  { label: 'CloudTrail', flag: 'EnableCloudTrail' },
-  { label: 'CloudWatch Metrics', flag: 'EnableCloudWatchMetrics' },
-  { label: 'VPC Flow Logs', flag: 'EnableVPCFlowLogs' },
-];
-
-const MOCK_REGIONS = [
-  { value: 'us-east-1', label: 'US East (N. Virginia)' },
-  { value: 'us-west-2', label: 'US West (Oregon)' },
-  { value: 'eu-west-1', label: 'Europe (Ireland)' },
-];
 
 vi.mock('@/utils/awsIntegrations', () => ({
   awsIntegrations: [],
