@@ -1,7 +1,4 @@
-import { test, expect } from "../baseFixtures.js";
-import logData from "../../fixtures/log.json";
-import logsdata from "../../../test-data/logs_data.json";
-import { login } from "./utils/dashLogin.js";
+const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import PageManager from "../../pages/page-manager";
@@ -15,16 +12,9 @@ test.describe.configure({ mode: "parallel" });
 test.describe("dashboard multi y axis testcases", () => {
   test.beforeEach(async ({ page }) => {
     testLogger.debug("Test setup - beforeEach hook executing");
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestion(page);
     await page.waitForTimeout(2000);
-
-    // Navigate to the organization-specific logs URL
-    const orgNavigation = page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
-    await orgNavigation;
   });
 
   test("Should correctly add multiple Y-axes to the stacked chart type.", async ({
