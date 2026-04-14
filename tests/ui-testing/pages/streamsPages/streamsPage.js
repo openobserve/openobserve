@@ -1009,8 +1009,8 @@ export class StreamsPage {
      * Search for a specific field in the schema view
      */
     async searchForField(fieldName) {
-        await this.fieldSearchInput.fill(fieldName);
-        testLogger.info('Searched for field', { fieldName });
+        await this.page.locator('[data-test="schema-field-search-input"]').click();
+        await this.page.locator('[data-test="schema-field-search-input"]').fill(fieldName);
     }
 
     /**
