@@ -133,6 +133,8 @@ const makeSearchObj = () =>
       serviceColors: {},
       redirectedFromLogs: false,
       searchApplied: false,
+      serviceGraphVisualizationType: "tree" as "tree" | "graph",
+      serviceGraphLayoutType: "horizontal" as string,
     },
     data: {
       query: "",
@@ -1162,6 +1164,104 @@ describe("SearchBar", () => {
 
   // -------------------------------------------------------------------------
   // [auto-generated] Props
+  // -------------------------------------------------------------------------
+  describe("service-graph mode toolbar", () => {
+    beforeEach(() => {
+      searchObjInstance.meta.searchMode = "service-graph";
+    });
+
+    it("should render service-graph-date-time-picker when searchMode is service-graph", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="service-graph-date-time-picker"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should render service-graph-refresh-btn when searchMode is service-graph", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="service-graph-refresh-btn"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should render tree-view and graph-view toggle buttons when searchMode is service-graph", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="service-graph-tree-view-btn"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-graph-graph-view-btn"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should emit service-graph-refresh when refresh btn is clicked", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const refreshBtn = wrapper.find('[data-test="service-graph-refresh-btn"]');
+      expect(refreshBtn.exists()).toBe(true);
+      await refreshBtn.trigger("click");
+
+      expect(wrapper.emitted("service-graph-refresh")).toBeTruthy();
+      expect(wrapper.emitted("service-graph-refresh")).toHaveLength(1);
+    });
+
+    it("should call onServiceGraphVisualizationChange with 'tree' when tree-view btn is clicked", async () => {
+      searchObjInstance.meta.serviceGraphVisualizationType = "graph";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const treeBtn = wrapper.find('[data-test="service-graph-tree-view-btn"]');
+      expect(treeBtn.exists()).toBe(true);
+      await treeBtn.trigger("click");
+
+      expect(searchObjInstance.meta.serviceGraphVisualizationType).toBe("tree");
+      expect(searchObjInstance.meta.serviceGraphLayoutType).toBe("horizontal");
+    });
+
+    it("should call onServiceGraphVisualizationChange with 'graph' when graph-view btn is clicked", async () => {
+      searchObjInstance.meta.serviceGraphVisualizationType = "tree";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const graphBtn = wrapper.find(
+        '[data-test="service-graph-graph-view-btn"]',
+      );
+      expect(graphBtn.exists()).toBe(true);
+      await graphBtn.trigger("click");
+
+      expect(searchObjInstance.meta.serviceGraphVisualizationType).toBe(
+        "graph",
+      );
+      expect(searchObjInstance.meta.serviceGraphLayoutType).toBe("force");
+    });
+
+    it("should hide service-graph toolbar when searchMode is not service-graph", async () => {
+      searchObjInstance.meta.searchMode = "traces";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="service-graph-date-time-picker"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="service-graph-refresh-btn"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="service-graph-tree-view-btn"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="service-graph-graph-view-btn"]').exists(),
+      ).toBe(false);
+    });
+  });
+
   // -------------------------------------------------------------------------
   describe("props", () => {
     it("should accept updated fieldValues without errors", async () => {

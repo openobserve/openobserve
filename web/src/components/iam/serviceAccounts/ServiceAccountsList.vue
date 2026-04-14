@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #body-cell-token="props">
             <q-td :props="props" side>
-              <span class="tw:font-mono">{{ props.row.token || '' }}</span>
+              <span class="tw:font-mono">{{ props.row.token || '************' }}</span>
             </q-td>
           </template>
 
@@ -599,9 +599,14 @@ export default defineComponent({
     };
 
     const redactToken = (token: string): string => {
-      const visible = Math.min(token.length, 4);
-      const prefix = token.slice(0, visible);
-      return prefix + '*'.repeat(12 - visible);
+      if (!token || token.length === 0) return '*'.repeat(12);
+      if (token.length < 4) {
+        // For tokens shorter than 4 chars, show available chars and pad to 12
+        return token + '*'.repeat(12 - token.length);
+      } else {
+        // For tokens 4+ chars, show first 4 chars + asterisks (matches backend)
+        return token.slice(0, 4) + '*'.repeat(8);
+      }
     };
 
     const addMember = async (res: any, data: any, operationType: string) => {

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn rounded flat dense :ripple="false" @click="toggleDarkMode">
+  <q-btn data-test="navbar-theme-toggle-btn" rounded flat dense :ripple="false" @click="toggleDarkMode">
     <q-icon :name="DarkModeIcon" class="header-icon"></q-icon>
     <q-tooltip anchor="top middle" self="bottom middle">
       {{ tooltipText }}

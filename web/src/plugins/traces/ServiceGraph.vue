@@ -1,250 +1,181 @@
 <template>
-  <q-card flat class="tw:h-full">
-    <q-card-section
-      class="tw:p-[0.375rem] tw:h-full card-container service-graph-container"
-    >
-      <!-- Top row with search and control buttons -->
-      <div class="row items-center q-col-gutter-sm q-mb-md">
-        <div class="col-12 col-md-5 tw:flex tw:gap-[0.5rem]">
-          <!-- Stream selector - synced from traces page, no "All Streams" -->
-          <q-select
-            v-model="streamFilter"
-            :options="
-              availableStreams.length > 0
-                ? availableStreams.map((s) => ({ label: s, value: s }))
-                : []
-            "
-            dense
-            borderless
-            emit-value
-            map-options
-            class="tw:w-[180px] tw:flex-shrink-0"
-            @update:model-value="onStreamFilterChange"
-            :disable="availableStreams.length === 0"
-          >
-            <template #prepend>
-              <q-icon name="storage" size="xs" />
-            </template>
-            <q-tooltip v-if="availableStreams.length === 0">
-              No streams detected. Ensure service graph metrics include
-              stream_name labels.
-            </q-tooltip>
-          </q-select>
-
-          <!-- Search input -->
-          <q-input
-            v-model="searchFilter"
-            borderless
-            dense
-            class="no-border tw:h-[36px]"
-            placeholder="Search services..."
-            debounce="300"
-            @update:model-value="applyFilters"
-            clearable
-          >
-            <template #prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
-            </template>
-          </q-input>
-        </div>
-        <div
-          class="col-12 col-md-7 tw:flex tw:justify-end tw:items-center tw:gap-[0.75rem]"
+  <q-card flat class="tw:h-full tw:flex tw:flex-col">
+    <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
+    <div class="tw:flex tw:items-center tw:gap-2 tw:p-[0.375rem] tw:pb-0">
+      <!-- Stream selector -->
+      <div
+        data-test="service-graph-stream-selector"
+        class="tw:w-[11rem] tw:flex-shrink-0"
+      >
+        <q-select
+          v-model="streamFilter"
+          :options="
+            availableStreams.length > 0
+              ? availableStreams.map((s) => ({ label: s, value: s }))
+              : []
+          "
+          dense
+          borderless
+          emit-value
+          map-options
+          :dark="$q.dark.isActive"
+          class="tw:w-[auto] tw:flex-shrink-0 tw:bg-[var(--o2-primary-background)] tw:rounded"
+          @update:model-value="onStreamFilterChange"
+          :disable="availableStreams.length === 0"
         >
-          <!-- 1. Time range selector -->
-          <date-time
-            ref="dateTimeRef"
-            auto-apply
-            :default-type="searchObj.data.datetime.type"
-            :default-absolute-time="{
-              startTime: searchObj.data.datetime.startTime,
-              endTime: searchObj.data.datetime.endTime,
-            }"
-            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
-            data-test="service-graph-date-time-picker"
-            class="tw:h-[2rem]"
-            @on:date-change="updateTimeRange"
-          />
-
-          <!-- 2. Refresh button -->
-          <q-btn
-            data-test="service-graph-refresh-btn"
-            no-caps
-            flat
-            class="o2-secondary-button"
-            @click="loadServiceGraph"
-            :loading="loading"
+          <q-tooltip v-if="availableStreams.length === 0">
+            No streams detected. Ensure service graph metrics include
+            stream_name labels.
+          </q-tooltip>
+        </q-select>
+      </div>
+      <!-- Search input -->
+      <div data-test="service-graph-search-input">
+        <q-input
+          v-model="searchFilter"
+          borderless
+          dense
+          :dark="$q.dark.isActive"
+          class="no-border tw:w-[14rem]! tw:h-[36px] tw:bg-[var(--o2-primary-background)] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
+          placeholder="Search Services"
+          debounce="300"
+          @update:model-value="applyFilters"
+          clearable
+        >
+          <template #prepend>
+            <q-icon class="o2-search-input-icon" size="1rem" name="search" />
+          </template>
+        </q-input>
+      </div>
+      <!-- Spacer -->
+      <div class="tw:flex-1" />
+      <!-- Legends (horizontal) -->
+      <div
+        data-test="service-graph-legends"
+        class="tw:flex tw:flex-row tw:items-center tw:gap-3 tw:p-[0.325rem] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
+      >
+        <div
+          data-test="sg-legend"
+          class="tw:flex tw:flex-row tw:items-center tw:gap-3 tw:min-w-0"
+        >
+          <!-- Border Color -->
+          <div
+            class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
           >
-            Refresh
-          </q-btn>
-
-          <!-- 3. Graph/Tree view toggle -->
-          <div class="app-tabs-container tw:h-[36px]">
-            <app-tabs
-              data-test="service-graph-view-tabs"
-              class="tabs-selection-container"
-              :tabs="visualizationTabs"
-              v-model:active-tab="visualizationType"
-              @update:active-tab="setVisualizationType"
-            />
+            Border Color
+            <span class="sg-legend-subtitle">| Errors</span>
           </div>
-
-          <!-- 4. Layout dropdown (only meaningful for tree view) -->
-          <q-select
-            v-model="layoutType"
-            :options="layoutOptions"
-            dense
-            borderless
-            class="tw:w-[160px]"
-            emit-value
-            map-options
-            @update:model-value="setLayout"
-            :disable="visualizationType === 'graph'"
-          />
+          <div class="tw:flex! tw:flex-row tw:gap-2">
+            <div
+              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+            >
+              <div class="sg-legend-dot" style="border-color: #52c41a"></div>
+              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+                <div
+                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                >
+                  Healthy
+                </div>
+                <div class="sg-legend-color-value tw:text-left">&lt; 1%</div>
+              </div>
+            </div>
+            <div
+              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+            >
+              <div class="sg-legend-dot" style="border-color: #faad14"></div>
+              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+                <div
+                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                >
+                  Degraded
+                </div>
+                <div class="sg-legend-color-value tw:text-left">1 – 5%</div>
+              </div>
+            </div>
+            <div
+              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+            >
+              <div class="sg-legend-dot" style="border-color: #fa8c16"></div>
+              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+                <div
+                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                >
+                  Warning
+                </div>
+                <div class="sg-legend-color-value tw:text-left">5 – 10%</div>
+              </div>
+            </div>
+            <div
+              class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+            >
+              <div class="sg-legend-dot" style="border-color: #f5222d"></div>
+              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
+                <div
+                  class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
+                >
+                  Critical
+                </div>
+                <div class="sg-legend-color-value tw:text-left">&gt; 10%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <q-separator
+          vertical
+          v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+          class="tw:self-stretch tw:mx-1"
+        />
+        <div
+          v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+          data-test="sg-node-size-info"
+          class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:min-w-0"
+        >
+          <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
+          <div
+            class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
+          >
+            Node Size
+            <span class="sg-legend-subtitle">| Requests</span>
+          </div>
+          <div class="sg-legend-row sg-legend-sizes tw:py-0!">
+            <div
+              class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
+            >
+              <div
+                class="sg-legend-circle"
+                style="width: 16px; height: 16px; border-color: #52c41a"
+              ></div>
+              <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
+                >Low</span
+              >
+            </div>
+            <div class="sg-legend-size-dots tw:mb-0">···</div>
+            <div
+              class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
+            >
+              <div
+                class="sg-legend-circle"
+                style="width: 28px; height: 28px; border-color: #52c41a"
+              ></div>
+              <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
+                >High</span
+              >
+            </div>
+          </div>
         </div>
       </div>
-
+    </div>
+    <q-card-section
+      class="tw:p-[0.375rem]! tw:flex-1 tw:min-h-0 card-container service-graph-container"
+    >
       <!-- Graph Visualization -->
-      <q-card flat bordered class="graph-card tw:h-[calc(100%-4rem)]">
+      <q-card flat bordered class="graph-card tw:h-full">
         <q-card-section class="q-pa-none tw:h-full" style="height: 100%">
           <div
+            data-test="service-graph-container"
             class="graph-container tw:h-full tw:bg-[var(--o2-bg)]"
             style="position: relative"
           >
-            <div
-              class="tw:absolute tw:p-[0.325rem] tw:rounded tw:border tw:border-[var(--o2-border-color)]! tw:top-[0.62rem] tw:flex tw:flex-col tw:left-[0.62rem]"
-            >
-              <div
-                data-test="sg-legend"
-                class="tw:w-fit tw:flex tw:flex-col tw:items-center tw:gap-2 tw:min-w-0"
-              >
-                <!-- Border Color -->
-                <div
-                  class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
-                >
-                  Border Color
-                  <span class="sg-legend-subtitle">| Errors</span>
-                </div>
-                <div class="tw:flex! tw:flex-col tw:gap-2">
-                  <div
-                    class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
-                  >
-                    <div
-                      class="sg-legend-dot"
-                      style="border-color: #52c41a"
-                    ></div>
-                    <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
-                      <div
-                        class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
-                      >
-                        Healthy
-                      </div>
-                      <div class="sg-legend-color-value tw:text-left">
-                        &lt; 1%
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
-                  >
-                    <div
-                      class="sg-legend-dot"
-                      style="border-color: #faad14"
-                    ></div>
-                    <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
-                      <div
-                        class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
-                      >
-                        Degraded
-                      </div>
-                      <div class="sg-legend-color-value tw:text-left">
-                        1 – 5%
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
-                  >
-                    <div
-                      class="sg-legend-dot"
-                      style="border-color: #fa8c16"
-                    ></div>
-                    <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
-                      <div
-                        class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
-                      >
-                        Warning
-                      </div>
-                      <div class="sg-legend-color-value tw:text-left">
-                        5 – 10%
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    class="sg-legend-color-item tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
-                  >
-                    <div
-                      class="sg-legend-dot"
-                      style="border-color: #f5222d"
-                    ></div>
-                    <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
-                      <div
-                        class="sg-legend-color-label tw:text-left tw:text-[var(--o2-text-2)]!"
-                      >
-                        Critical
-                      </div>
-                      <div class="sg-legend-color-value tw:text-left">
-                        &gt; 10%
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <q-separator
-                v-if="visualizationType === 'graph'"
-                class="tw:my-[0.5rem]!"
-              />
-              <div
-                v-if="visualizationType === 'graph'"
-                data-test="sg-node-size-info"
-                class="tw:flex tw:flex-row tw:items-center tw:gap-4 tw:min-w-0"
-              >
-                <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
-                <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
-                  <div
-                    class="sg-legend-title tw:mb-0! tw:whitespace-nowrap tw:text-[var(--o2-text-4)]!"
-                  >
-                    Node Size
-                    <span class="sg-legend-subtitle">| Requests</span>
-                  </div>
-                  <div class="sg-legend-row sg-legend-sizes tw:py-0!">
-                    <div
-                      class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
-                    >
-                      <div
-                        class="sg-legend-circle"
-                        style="width: 16px; height: 16px; border-color: #52c41a"
-                      ></div>
-                      <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
-                        >Low</span
-                      >
-                    </div>
-                    <div class="sg-legend-size-dots tw:mb-0">···</div>
-                    <div
-                      class="sg-legend-size-item tw:flex-row tw:items-center tw:gap-1.5"
-                    >
-                      <div
-                        class="sg-legend-circle"
-                        style="width: 28px; height: 28px; border-color: #52c41a"
-                      ></div>
-                      <span class="sg-legend-label tw:text-[var(--o2-text-2)]!"
-                        >High</span
-                      >
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <div v-if="loading" class="flex flex-center tw:h-full">
               <div class="text-center tw:flex tw:flex-col tw:items-center">
                 <q-spinner-hourglass color="primary" size="4em" />
@@ -372,9 +303,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import serviceGraphService from "@/services/service_graph";
-import AppTabs from "@/components/common/AppTabs.vue";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
-import DateTime from "@/components/DateTime.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import {
   convertServiceGraphToTree,
@@ -395,9 +324,7 @@ import useTraces from "@/composables/useTraces";
 export default defineComponent({
   name: "ServiceGraph",
   components: {
-    AppTabs,
     ChartRenderer,
-    DateTime,
     ServiceGraphSidePanel,
   },
   emits: ["view-traces"],
@@ -417,27 +344,6 @@ export default defineComponent({
     const selectedNode = ref<any>(null);
     const showSidePanel = ref(false);
 
-    // Persist visualization type in localStorage
-    const storedVisualizationType = localStorage.getItem(
-      "serviceGraph_visualizationType",
-    );
-    const visualizationType = ref<"tree" | "graph">(
-      (storedVisualizationType as "tree" | "graph") || "tree",
-    );
-
-    // Visualization tabs configuration
-    const visualizationTabs = [
-      { label: "Tree View", value: "tree" },
-      { label: "Graph View", value: "graph" },
-    ];
-
-    // Initialize layout type based on visualization type
-    const storedLayoutType = localStorage.getItem("serviceGraph_layoutType");
-    let defaultLayoutType = "force";
-    if (visualizationType.value === "tree") {
-      defaultLayoutType = "horizontal";
-    }
-    const layoutType = ref(storedLayoutType || defaultLayoutType);
     const chartRendererRef = ref<any>(null);
     const graphContainerRef = ref<HTMLElement | null>(null);
 
@@ -463,33 +369,19 @@ export default defineComponent({
 
     const stats = ref<any>(null);
 
-    // Use shared datetime from searchObj instead of local timeRange
-    // searchObj.data.datetime is managed by useTraces composable and shared across tabs
-
-    const dateTimeRef = ref<any>(null);
-
     // Key to control chart recreation - only change when layout/visualization type changes
     const chartKey = ref(0);
 
     // Track last chart options to prevent unnecessary recreation for graph view
     const lastChartOptions = ref<any>(null);
 
-    // Layout options based on visualization type
-    const layoutOptions = computed(() => {
-      if (visualizationType.value === "tree") {
-        return [
-          { label: "Horizontal", value: "horizontal" },
-          { label: "Vertical", value: "vertical" },
-        ];
-      } else {
-        return [{ label: "Force Directed", value: "force" }];
-      }
-    });
-
     const chartData = computed(() => {
       if (!filteredGraphData.value.nodes.length) {
         return { options: {}, notMerge: true };
       }
+
+      const vizType = searchObj.meta.serviceGraphVisualizationType;
+      const layoutType = searchObj.meta.serviceGraphLayoutType;
 
       // Don't use cache if filters are active (search filter)
       const hasActiveFilters = searchFilter.value?.trim();
@@ -497,7 +389,7 @@ export default defineComponent({
       // Use cached options if chartKey hasn't changed (prevents double rendering)
       // BUT only if no filters are active and no new baselines have arrived
       if (
-        visualizationType.value === "graph" &&
+        vizType === "graph" &&
         lastChartOptions.value &&
         chartKey.value === lastChartOptions.value.key &&
         !hasActiveFilters
@@ -511,15 +403,15 @@ export default defineComponent({
       }
 
       const newOptions =
-        visualizationType.value === "tree"
+        vizType === "tree"
           ? convertServiceGraphToTree(
               filteredGraphData.value,
-              layoutType.value,
+              layoutType,
               $q.dark.isActive,
             )
           : convertServiceGraphToNetwork(
               filteredGraphData.value,
-              layoutType.value,
+              layoutType,
               new Map(),
               $q.dark.isActive,
               undefined,
@@ -529,7 +421,7 @@ export default defineComponent({
 
       // Cache the options for graph view
       // BUT only if no filters are active (to avoid caching filtered states)
-      if (visualizationType.value === "graph" && !hasActiveFilters) {
+      if (vizType === "graph" && !hasActiveFilters) {
         lastChartOptions.value = {
           key: chartKey.value,
           data: newOptions,
@@ -541,7 +433,7 @@ export default defineComponent({
 
       return {
         ...newOptions,
-        notMerge: visualizationType.value === "graph" ? false : true, // Merge for graph, replace for tree
+        notMerge: vizType === "graph" ? false : true, // Merge for graph, replace for tree
         lazyUpdate: true, // Prevent viewport reset when only styles change
         silent: true, // Disable animations during update to prevent position jumps
       };
@@ -644,7 +536,7 @@ export default defineComponent({
 
       // Tree view: emphasis.focus:'relative' in the series config handles dimming natively.
       // No manual dispatch needed — ECharts triggers it on mouseover automatically.
-      if (visualizationType.value !== "graph") return;
+      if (searchObj.meta.serviceGraphVisualizationType !== "graph") return;
 
       const rawEdges: any[] = filteredGraphData.value.edges || [];
 
@@ -1197,7 +1089,7 @@ export default defineComponent({
     // but the series type swaps via setOption. Re-register tooltip handlers so both
     // ZRender (tree) and ECharts edge events (graph) work correctly after the swap.
     watch(
-      () => visualizationType.value,
+      () => searchObj.meta.serviceGraphVisualizationType,
       async () => {
         if (edgeTooltipCleanup) {
           edgeTooltipCleanup();
@@ -1480,45 +1372,34 @@ export default defineComponent({
       filteredGraphData.value = { nodes, edges };
     };
 
-    const setLayout = (type: string) => {
-      layoutType.value = type;
-      // Persist layout type to localStorage
-      localStorage.setItem("serviceGraph_layoutType", type);
-      // Force chart recreation when layout changes
-      chartKey.value++;
-    };
+    // Watch composable viz/layout state changes from SearchBar toolbar
+    watch(
+      () => searchObj.meta.serviceGraphVisualizationType,
+      () => {
+        lastChartOptions.value = null;
+      },
+    );
 
-    const setVisualizationType = (type: "tree" | "graph") => {
-      visualizationType.value = type;
-      localStorage.setItem("serviceGraph_visualizationType", type);
-      if (type === "tree") {
-        layoutType.value = "horizontal";
-      } else {
-        layoutType.value = "force";
-      }
-      // Bust the options cache so chartData recomputes for the new series type,
-      // but do NOT increment chartKey — that destroys the component and replays
-      // the full expand animation. setOption with notMerge:true handles the swap.
-      lastChartOptions.value = null;
-    };
+    watch(
+      () => searchObj.meta.serviceGraphLayoutType,
+      () => {
+        chartKey.value++;
+      },
+    );
+
+    // Watch shared datetime — reload when SearchBar changes time range
+    watch(
+      () => searchObj.data.datetime,
+      () => {
+        loadServiceGraph();
+      },
+      { deep: true },
+    );
 
     const formatNumber = (num: number) => {
       if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
       if (num >= 1000) return (num / 1000).toFixed(1) + "K";
       return num.toString();
-    };
-
-    const updateTimeRange = (value: any) => {
-      searchObj.data.datetime = {
-        startTime: value.startTime,
-        endTime: value.endTime,
-        relativeTimePeriod:
-          value.relativeTimePeriod ||
-          searchObj.data.datetime.relativeTimePeriod,
-        type: value.relativeTimePeriod ? "relative" : "absolute",
-      };
-      // Reload service graph with new time range
-      loadServiceGraph();
     };
 
     // Load trace streams using the same method as the Traces search page
@@ -1607,22 +1488,15 @@ export default defineComponent({
       searchFilter,
       streamFilter,
       availableStreams,
-      visualizationType,
-      visualizationTabs,
-      layoutType,
-      layoutOptions,
       chartData,
       chartKey,
       chartRendererRef,
+      graphContainerRef,
       searchObj,
-      dateTimeRef,
       loadServiceGraph,
       formatNumber,
       applyFilters,
       onStreamFilterChange,
-      setLayout,
-      setVisualizationType,
-      updateTimeRange,
       resetSettings,
       // Node side panel
       selectedNode,
@@ -1840,6 +1714,7 @@ code {
   font-family: "Courier New", monospace;
   font-size: 0.9em;
 }
+
 </style>
 
 <!-- Flowing edge animation — non-scoped so it reaches inside ECharts SVG output -->
@@ -1862,5 +1737,10 @@ code {
 .graph-container svg path[style*="stroke-dasharray"] {
   animation: sg-edge-flow 0.5s linear infinite;
   animation-fill-mode: both;
+}
+
+.body--dark [data-test="service-graph-stream-selector"] .q-field,
+.body--dark [data-test="service-graph-search-input"] .q-field {
+  background: var(--o2-primary-background);
 }
 </style>

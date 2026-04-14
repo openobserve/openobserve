@@ -182,6 +182,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.layout.currentQueryIndex
                   ].customQuery
                 "
+                :keywords="currentEditorKeywords"
+                :suggestions="currentEditorSuggestions"
                 @update:query="handleQueryUpdate"
                 @language-change="handleLanguageChange"
                 @ask-ai="handleAskAI"
@@ -429,6 +431,20 @@ export default defineComponent({
 
     const queryEditorRef = ref(null);
 
+    const currentEditorKeywords = computed(() => {
+      if (dashboardPanelData.data.queryType === "promql") {
+        return promqlAutoCompleteKeywords.value;
+      }
+      return sqlAutoCompleteKeywords.value;
+    });
+
+    const currentEditorSuggestions = computed(() => {
+      if (dashboardPanelData.data.queryType === "promql") {
+        return [];
+      }
+      return sqlAutoCompleteSuggestions.value;
+    });
+
     const functionEditorPlaceholderFlag = ref(true);
     const vrlFnEditorRef = ref(null);
 
@@ -533,6 +549,27 @@ export default defineComponent({
           splitterModel.value = 70;
         }
       },
+    );
+
+    // Feed stream names into PromQL metric keyword autocomplete
+    watch(
+      [
+        () => dashboardPanelData.meta?.stream?.streamResults,
+        () => promqlMode.value,
+      ],
+      ([newResults]) => {
+        if (promqlMode.value && newResults?.length) {
+          updateMetricKeywords(
+            newResults.map((stream: any) => ({
+              label: stream.name,
+              type: stream.metrics_meta?.metric_type || "",
+            })),
+          );
+        } else {
+          updateMetricKeywords([]);
+        }
+      },
+      { immediate: true },
     );
 
     const removeTab = async (index) => {
@@ -806,6 +843,8 @@ export default defineComponent({
       startEditQueryName,
       saveQueryName,
       cancelQueryNameEdit,
+      currentEditorKeywords,
+      currentEditorSuggestions,
     };
   },
 });

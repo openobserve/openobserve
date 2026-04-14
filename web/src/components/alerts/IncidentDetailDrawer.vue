@@ -1388,7 +1388,7 @@ export default defineComponent({
         let lastComplete = -1;
         for (const ev of events) {
           if (ev.type === "ai_analysis_begin") lastBegin = ev.timestamp;
-          if (ev.type === "ai_analysis_complete") lastComplete = ev.timestamp;
+          if (ev.type === "ai_analysis_complete" || ev.type === "ai_analysis_failed") lastComplete = ev.timestamp;
         }
         const nowInFlight = lastBegin > lastComplete;
 
