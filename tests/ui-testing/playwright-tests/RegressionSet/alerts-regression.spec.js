@@ -488,7 +488,8 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Start creating a real-time alert to reach the Alert Settings step
     await pm.alertsPage.clickAddAlertButton();
-    await page.waitForTimeout(1000);
+    // Wait for alert name input to be visible (indicates dialog opened)
+    await expect(page.locator('[data-test="add-alert-name-input"]')).toBeVisible({ timeout: 5000 });
 
     // ==================== STEP 1: ALERT SETUP ====================
     const alertName = `auto_template_display_${randomValue}`;
@@ -497,7 +498,8 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Select logs stream type
     await pm.alertsPage.selectStreamType('logs');
-    await page.waitForTimeout(1000);
+    // Wait for stream dropdown to be ready
+    await expect(page.locator('[data-test="alert-stream-select"]')).toBeVisible({ timeout: 5000 });
 
     // Select stream
     await pm.alertsPage.selectLogsStream(TEST_STREAM);
@@ -510,27 +512,31 @@ test.describe("Alerts Regression Bugs", () => {
 
     // ==================== STEP 2: CONDITIONS ====================
     await pm.alertsPage.clickContinueButton();
-    await page.waitForTimeout(1000);
+    // Wait for Step 2 (Conditions) to load
+    await expect(pm.alertsPage.getAddConditionButton()).toBeVisible({ timeout: 5000 });
     testLogger.info('✓ Navigated to Step 2: Conditions');
 
     // Add a simple condition
     const addCondBtn = pm.alertsPage.getAddConditionButton();
     if (await addCondBtn.isVisible({ timeout: 3000 })) {
       await addCondBtn.click();
-      await page.waitForTimeout(500);
+      // Wait for condition column select to appear
+      await expect(pm.alertsPage.getConditionColumnSelect()).toBeVisible({ timeout: 5000 });
 
       // Select first available column
       const columnSelect = pm.alertsPage.getConditionColumnSelect();
       await columnSelect.click();
-      await page.waitForTimeout(500);
-
+      // Wait for dropdown menu to appear
       const visibleMenu = pm.alertsPage.getVisibleMenu();
+      await expect(visibleMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+
       await visibleMenu.locator('.q-item').first().click();
-      await page.waitForTimeout(500);
 
       // Select operator
       const operatorSelect = pm.alertsPage.getOperatorSelect();
       await operatorSelect.click();
+      // Wait for operator dropdown to appear, then select Contains
+      await expect(page.getByText('Contains', { exact: true })).toBeVisible({ timeout: 5000 });
       await page.getByText('Contains', { exact: true }).click();
 
       // Fill value
@@ -542,13 +548,15 @@ test.describe("Alerts Regression Bugs", () => {
 
     // ==================== STEP 3: COMPARE (Skip) ====================
     await pm.alertsPage.clickContinueButton();
-    await page.waitForTimeout(1000);
+    // No need to wait - immediately clicking continue to skip this step
+
     testLogger.info('✓ Navigated to Step 3: Compare (skipping)');
 
     // ==================== STEP 4: ALERT SETTINGS ====================
     await pm.alertsPage.clickContinueButton();
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
+    // Wait for template select to appear (confirms Step 4 loaded)
+    await pm.alertsPage.expectTemplateOverrideSelectVisible();
     testLogger.info('✓ Navigated to Step 4: Alert Settings');
 
     // Find the template override select field (it's in the alert settings step)
@@ -557,29 +565,27 @@ test.describe("Alerts Regression Bugs", () => {
     // Using .template-select-field (application-defined class, stable) + .q-select (Quasar component)
     // TODO: Product team should add data-test="alert-template-override-select" for test stability
     const templateSelect = pm.alertsPage.getTemplateOverrideSelect();
-    await pm.alertsPage.expectTemplateOverrideSelectVisible();
     testLogger.info('✓ Template override field visible');
 
     // Click the template select to open dropdown
     await templateSelect.click();
-    await page.waitForTimeout(1000);
-
-    // Find and select the first available template from dropdown
+    // Wait for dropdown menu to appear
     const templateMenu = pm.alertsPage.getVisibleMenu();
     await expect(templateMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
 
+    // Find and select the first available template from dropdown
     const firstTemplate = templateMenu.locator('.q-item').first();
     const selectedTemplateName = await firstTemplate.textContent();
     testLogger.info('Selecting template', { templateName: selectedTemplateName?.trim() });
 
     await firstTemplate.click();
-    await page.waitForTimeout(1000);
     testLogger.info('✓ Selected template from dropdown');
 
     // STRONG ASSERTION: Verify template name appears exactly once in the select field
     // Bug #10110 caused templates to display twice in the input field
     // Use .q-select__display-value (Quasar's public API for the selected option display)
     const templateDisplayValue = templateSelect.locator('.q-select__display-value').first();
+    // Wait for template display value to update after selection
     await expect(templateDisplayValue).toBeVisible({ timeout: 3000 });
 
     // Get the visible text in the selected template display area
