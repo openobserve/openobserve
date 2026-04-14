@@ -115,8 +115,7 @@ fn extract_passthrough_headers(
     tag = "Ai",
     operation_id = "Chat",
     summary = "Generate AI chat response",
-    description = "Generates an AI-powered response to user queries and requests. \
-                   This endpoint redirects to the o2-sre-agent service for processing.",
+    description = "Generates an AI-powered response to user queries and requests.",
     security(
         ("Authorization" = [])
     ),
