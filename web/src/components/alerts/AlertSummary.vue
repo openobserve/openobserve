@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="alert-summary">
     <div class="summary-content" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
-      <p v-if="summaryText" class="summary-text" v-html="summaryText" @click="handleSummaryClick"></p>
+      <p v-if="summaryText" class="summary-text" v-html="DOMPurify.sanitize(summaryText)" @click="handleSummaryClick"></p>
       <p v-else class="summary-placeholder">{{ t('alerts.summary.configureAlert') }}</p>
     </div>
 
@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, nextTick, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
+import DOMPurify from 'dompurify';
 import { generateAlertSummary } from '@/utils/alerts/alertSummaryGenerator';
 
 const { t } = useI18n();

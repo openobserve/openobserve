@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
           <q-item style="cursor: pointer">
             <q-item-section @click="handleSingleStreamSelect(opt)">
-              <q-item-label v-html="opt.label" />
+              <q-item-label>{{ opt.label }}</q-item-label>
             </q-item-section>
             <q-item-section side>
               <q-toggle
