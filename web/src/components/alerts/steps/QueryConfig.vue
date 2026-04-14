@@ -1877,8 +1877,8 @@ export default defineComponent({
         // Measure mode — uses aggregation, default trigger to "atleast 1 group"
         localIsAggregationEnabled.value = true;
         // (no showHaving — row is always visible now)
-        if (triggerThreshold.value === 3) {
-          // Only change if still at count-mode default
+        // Reset to >= 1 when group-by is empty (field is disabled, user can't correct it)
+        if (!hasLogGroupByFields.value) {
           triggerThreshold.value = 1;
           triggerOperator.value = '>=';
           if (props.triggerCondition) {
@@ -2144,8 +2144,23 @@ export default defineComponent({
           isUserTriggerChange.value = false;
           return;
         }
-        triggerOperator.value = tc.operator ?? '>=';
-        triggerThreshold.value = tc.threshold ?? 3;
+        // In measure mode with empty group-by, always reset to >= 1 (field is disabled, user can't edit it)
+        const inMeasureMode = selectedFunction.value !== 'total_events';
+        const groupByEmpty = isEventBased.value
+          ? !hasLogGroupByFields.value
+          : !hasMetricGroupByFields.value;
+        if (inMeasureMode && groupByEmpty) {
+          triggerOperator.value = '>=';
+          triggerThreshold.value = 1;
+          if (tc.operator !== '>=' || tc.threshold !== 1) {
+            tc.operator = '>=';
+            tc.threshold = 1;
+            emit("update:triggerCondition", { ...tc });
+          }
+        } else {
+          triggerOperator.value = tc.operator ?? '>=';
+          triggerThreshold.value = tc.threshold ?? 3;
+        }
         const freq = tc.frequency ?? 10;
         if (tc.frequency_type === 'cron') {
           frequencyMode.value = 'cron';
@@ -2162,6 +2177,23 @@ export default defineComponent({
       },
       { deep: true, immediate: false }
     );
+
+    // When function switches to measure mode, reset threshold to >= 1 if group-by is empty
+    watch(selectedFunction, (value) => {
+      if (value === 'total_events') return;
+      const groupByEmpty = isEventBased.value
+        ? !hasLogGroupByFields.value
+        : !hasMetricGroupByFields.value;
+      if (groupByEmpty) {
+        triggerThreshold.value = 1;
+        triggerOperator.value = '>=';
+        if (props.triggerCondition) {
+          props.triggerCondition.threshold = 1;
+          props.triggerCondition.operator = '>=';
+          emit("update:triggerCondition", { ...props.triggerCondition });
+        }
+      }
+    });
 
     // Validation function for Step 2
     const validate = async () => {
