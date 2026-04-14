@@ -41,15 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tooltip v-if="formData.name?.length > 20" class="tw:text-sm">{{ formData.name }}</q-tooltip>
               </span>
               <template v-else>
-                <span class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">New Alert</span>
                 <q-input
                   v-model="formData.name"
                   data-test="add-alert-name-input"
                   dense
                   borderless
                   :placeholder="'Alert name'"
-                  class="alert-v3-field tw:text-sm"
-                  style="min-width: 180px;"
+                  class="alert-v3-field topbar-name-input tw:text-sm"
                   hide-bottom-space
                 />
               </template>
@@ -57,14 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else>
               <template v-if="!anomalyEditMode">
-                <span class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">{{ t("alerts.newAnomalyDetection") }}</span>
                 <q-input
                   v-model="anomalyConfig.name"
                   dense
                   borderless
                   placeholder="Anomaly name"
-                  class="alert-v3-field tw:text-sm"
-                  style="min-width: 180px;"
+                  class="alert-v3-field topbar-name-input tw:text-sm"
                   hide-bottom-space
                 />
               </template>
@@ -95,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <InlineSelectFolderDropdown
               :model-value="activeFolderId"
               type="alerts"
-              width="140px"
+              :width="folderDropdownWidth"
               :disable="beingUpdated || anomalyEditMode"
               @update:model-value="updateActiveFolderId({ value: $event })"
             />
@@ -112,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.stream_type"
               :options="streamTypes"
               :popup-content-style="{ textTransform: 'lowercase' }"
-              class="no-case alert-v3-field"
+              class="no-case alert-v3-field topbar-stream-type"
               dense
               borderless
               use-input
@@ -125,7 +121,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filter="(val, update) => update(() => {})"
               @update:model-value="updateStreams()"
               behavior="menu"
-              style="width: 150px;"
             />
           </div>
 
@@ -138,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="filteredStreams"
               :loading="isFetchingStreams"
               color="input-border"
-              class="no-case alert-v3-field"
+              class="no-case alert-v3-field topbar-stream-name"
               dense
               borderless
               use-input
@@ -151,7 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filter="filterStreams"
               @update:model-value="updateStreamFields"
               behavior="menu"
-              style="width: 150px;"
             />
             <q-tooltip v-if="!formData.stream_type">Select a stream type first</q-tooltip>
           </div>
@@ -159,10 +153,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Separator before Alert Type -->
           <div class="tw:w-px tw:h-5 tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600/50' : 'tw:bg-gray-300'" />
 
-          <!-- Alert Type -->
+          <!-- Alert Type — tabs normally, dropdown when AI chat is open -->
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
             <label class="alert-v3-inline-label">{{ t("alerts.alertType") || 'Alert Type' }}</label>
-            <div class="alert-type-tabs">
+
+            <!-- Tabs: default -->
+            <div v-if="!store.state.isAiChatEnabled" class="alert-type-tabs">
               <button
                 v-for="tab in [
                   { key: 'false', label: t('alerts.scheduled') },
@@ -178,6 +174,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ tab.label }}
               </button>
             </div>
+
+            <!-- Dropdown: when AI chat is open -->
+            <q-select
+              v-else
+              v-model="formData.is_real_time"
+              :options="[
+                { label: t('alerts.scheduled'), value: 'false' },
+                { label: t('alerts.realTime'), value: 'true' },
+                ...(isAnomalyDetectionEnabled ? [{ label: t('alerts.anomalyDetection'), value: 'anomaly' }] : []),
+              ]"
+              emit-value
+              map-options
+              dense
+              borderless
+              hide-bottom-space
+              :disable="beingUpdated || anomalyEditMode"
+              class="alert-v3-field"
+              style="min-width: 110px;"
+            />
           </div>
 
         </div>
@@ -596,6 +611,12 @@ export default defineComponent({
       document.removeEventListener('mouseup', onFloatingDragEnd);
     });
 
+    // Responsive folder dropdown width — shrinks when AI chat is open
+    const folderDropdownWidth = computed(() => {
+      if (alertForm.store.state.isAiChatEnabled) return '85px';
+      return '120px';
+    });
+
     return {
       ...alertForm,
       isAnomalyDetectionEnabled,
@@ -605,6 +626,7 @@ export default defineComponent({
       floatingWidgetRef,
       floatingWidgetStyle,
       onFloatingDragStart,
+      folderDropdownWidth,
     };
   },
 
@@ -1237,4 +1259,40 @@ body.body--dark .query-mode-tabs {
   border-left: 3px solid #bdbdbd;
   padding-left: 12px !important;
 }
+
+// ── Responsive topbar: container queries so AI chat panel triggers shrink too
+.alert-v3-topbar {
+  container-type: inline-size;
+  container-name: topbar;
+}
+
+// Base (widest) — full widths
+.topbar-name-input        { min-width: 160px; max-width: 200px; }
+.topbar-folder-field      { width: 140px; }
+.topbar-stream-type       { width: 150px; }
+.topbar-stream-name       { width: 160px; }
+// Medium — screen ~1280-1400px
+@container topbar (max-width: 1050px) {
+  .topbar-name-input   { min-width: 120px; }
+  .topbar-folder-field { width: 110px; }
+  .topbar-stream-type  { width: 110px; }
+  .topbar-stream-name  { width: 120px; }
+}
+
+// Compact — AI chat open (inputs shrink further)
+@container topbar (max-width: 850px) {
+  .topbar-name-input   { min-width: 90px; }
+  .topbar-folder-field { width: 85px; }
+  .topbar-stream-type  { width: 90px; }
+  .topbar-stream-name  { width: 95px; }
+}
+
+// Minimum — AI chat + small viewport
+@container topbar (max-width: 680px) {
+  .topbar-name-input   { min-width: 70px; }
+  .topbar-folder-field { width: 70px; }
+  .topbar-stream-type  { width: 75px; }
+  .topbar-stream-name  { width: 80px; }
+}
+// ───────────────────────────────────────────────────────────────────────────
 </style>
