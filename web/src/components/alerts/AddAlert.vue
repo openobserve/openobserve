@@ -208,11 +208,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="activeTab = tab.key"
           >
             {{ tab.label }}{{ tab.required ? ' *' : '' }}
-            <!-- Error indicator dot -->
-            <span
-              v-if="tabErrors[tab.key]"
-              class="tw:absolute tw:top-1.5 tw:right-1 tw:w-2 tw:h-2 tw:rounded-full tw:bg-red-500"
-            />
           </div>
         </div>
 
