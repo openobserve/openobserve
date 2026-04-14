@@ -497,6 +497,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const canSaveAlert = computed(() => {
     if (formData.value.is_real_time === "anomaly") {
+      if (!anomalyConfig.value.name?.trim()) {
+        return false;
+      }
       if (
         anomalyConfig.value.alert_enabled &&
         anomalyConfig.value.alert_destination_ids.length === 0
@@ -1606,6 +1609,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // ── Save Methods ────────────────────────────────────────────────────────
 
   const saveAnomalyDetection = async () => {
+    if (!anomalyConfig.value.name?.trim()) {
+      q.notify({
+        type: "negative",
+        message: "Anomaly name is required.",
+        timeout: 2000,
+      });
+      return;
+    }
+
     if (anomalyStep2Ref.value) {
       const step2Valid = await anomalyStep2Ref.value.validate();
       if (!step2Valid) {
