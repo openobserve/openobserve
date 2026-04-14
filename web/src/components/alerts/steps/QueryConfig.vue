@@ -130,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       borderless
                       hide-bottom-space
+                      no-error-icon
                       @blur="restoreDefaultThreshold"
                       class="alert-v3-input"
                       style="min-width: 60px; max-width: 80px;"
@@ -159,6 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       borderless
                       hide-bottom-space
+                      no-error-icon
                       :placeholder="t('alerts.placeholders.value')"
                       class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
@@ -311,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="alert-v3-select"
                         style="min-width: 140px; max-width: 200px;"
                       />
-                      <q-tooltip v-if="inputData.aggregation.having.column === 'value'" anchor="bottom middle" self="top middle" :delay="300">
+                      <q-tooltip v-if="inputData.aggregation.having.column === 'value' && filteredNumericColumns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" anchor="bottom middle" self="top middle" :delay="300">
                         Metrics streams store their measurement in the "value" field by default
                       </q-tooltip>
                     </div>
@@ -336,6 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       borderless
                       hide-bottom-space
+                      no-error-icon
                       class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
                       :rules="[(val: any) => !!val || 'Field is required!']"
@@ -362,6 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       borderless
                       hide-bottom-space
+                      no-error-icon
                       :placeholder="t('alerts.placeholders.value')"
                       class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
@@ -477,6 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       borderless
                       hide-bottom-space
+                      no-error-icon
                       class="alert-v3-input"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
@@ -529,7 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="alert-v3-select"
                       placeholder="timezone"
                       :display-value="cronTimezone || 'timezone'"
-                      style="min-width: 100px; max-width: 100px;"
+                      style="min-width: 150px; max-width: 150px;"
                       @filter="timezoneFilterFn"
                       @update:model-value="onCronTimezoneChange"
                     >
@@ -844,6 +849,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="checkEveryFrequency"
                       type="number"
                       dense borderless hide-bottom-space
+                      no-error-icon
                       class="alert-v3-input"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
@@ -937,6 +943,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="promqlCondition.operator"
                     :options="numericOperators"
                     dense borderless hide-bottom-space
+                    no-error-icon
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     :rules="[(val: any) => !!val || 'Field is required!']"
@@ -946,6 +953,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model.number="promqlCondition.value"
                     type="number"
                     dense borderless hide-bottom-space
+                    no-error-icon
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 120px;"
                     debounce="300"
@@ -1256,12 +1264,15 @@ export default defineComponent({
           props.inputData.aggregation = {
             group_by: [],
             function: "avg",
-            having: { column: "value", operator: ">=", value: "" },
+            having: { column: "", operator: ">=", value: "" },
           };
         }
-        // Default column to "value" if not already set
+        // Default column to "value" only if the stream actually has a "value" field
         if (!props.inputData.aggregation?.having?.column) {
-          props.inputData.aggregation.having.column = "value";
+          const hasValueField = props.columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
+          if (hasValueField && props.inputData.aggregation?.having) {
+            props.inputData.aggregation.having.column = 'value';
+          }
         }
       }
     } else {
@@ -1355,12 +1366,15 @@ export default defineComponent({
             props.inputData.aggregation = {
               group_by: [],
               function: "avg",
-              having: { column: "value", operator: ">=", value: "" },
+              having: { column: "", operator: ">=", value: "" },
             };
           } else {
             props.inputData.aggregation.function = 'avg';
             if (!props.inputData.aggregation.having?.column) {
-              props.inputData.aggregation.having.column = "value";
+              const hasValueField = props.columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
+              if (hasValueField) {
+                props.inputData.aggregation.having.column = 'value';
+              }
             }
           }
           emitAggregationUpdate();
@@ -2078,12 +2092,26 @@ export default defineComponent({
       (newCols) => {
         filteredFields.value = [...newCols];
         filteredNumericColumns.value = [...newCols];
-        // Auto-set column to "value" for metrics if not already set
-        if (!isEventBased.value && !props.inputData.aggregation?.having?.column) {
-          const hasValue = newCols.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
-          if (hasValue && props.inputData.aggregation?.having) {
-            props.inputData.aggregation.having.column = 'value';
+
+        if (!isEventBased.value && props.inputData.aggregation?.having) {
+          const currentCol = props.inputData.aggregation.having.column;
+          const colExistsInNewStream = currentCol
+            ? newCols.some((c: any) => (typeof c === 'string' ? c : c.value) === currentCol)
+            : false;
+
+          if (currentCol && !colExistsInNewStream) {
+            // Stream changed — previously selected column is no longer valid, clear it
+            // and auto-set to "value" only if the new stream has it
+            const hasValue = newCols.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
+            props.inputData.aggregation.having.column = hasValue ? 'value' : '';
             emitAggregationUpdate();
+          } else if (!currentCol) {
+            // Column not set yet — auto-set to "value" if new stream has it
+            const hasValue = newCols.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value');
+            if (hasValue) {
+              props.inputData.aggregation.having.column = 'value';
+              emitAggregationUpdate();
+            }
           }
         }
       }

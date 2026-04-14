@@ -2448,12 +2448,6 @@
       "correlatedByServiceDiscovery": "Dimensions",
       "correlatedBySemanticGroups": "Dimensions",
       "correlatedByAlertId": "Alert ID",
-      "correlationServiceDiscovery": "Dimensions",
-      "correlationPrimaryMatch": "Dimensions",
-      "correlationSecondaryMatch": "Dimensions",
-      "correlationServiceDiscoveryTooltip": "Correlated by service dimensions",
-      "correlationPrimaryMatchTooltip": "Correlated by primary dimensions",
-      "correlationSecondaryMatchTooltip": "Correlated by secondary dimensions",
       "filterByStatus": "Filter by status",
       "allStatuses": "All Statuses",
       "loading": "Loading incidents...",
@@ -2564,7 +2558,8 @@
       "rowTemplateTooltip": "Row Template is used to format the alert message.",
       "templateType": "Template Type:"
     },
-    "editJson": "Edit Alert JSON"
+    "editJson": "Edit Alert JSON",
+    "additional_settings":"Additional Settings"
   },
   "alert_templates": {
     "header": "Templates",

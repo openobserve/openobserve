@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Section header -->
       <div class="section-header">
         <div class="section-header-accent" />
-        <span class="section-header-title">{{ t('alerts.steps.advanced') || 'Additional Settings' }}</span>
+        <span class="section-header-title">{{ t('alerts.additional_settings') || 'Additional Settings' }}</span>
       </div>
 
       <div class="tw:px-3 tw:py-3 tw:flex tw:flex-col tw:gap-4">
