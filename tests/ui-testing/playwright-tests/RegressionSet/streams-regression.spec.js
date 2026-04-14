@@ -44,11 +44,10 @@ test.describe("Streams Regression Bugs", () => {
     await pm.streamsPage.exploreStream();
 
     // Wait for navigation to stream explorer
-    await page.waitForTimeout(2000);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Navigated to logs page after stream explorer click');
 
-    // Verify expand button exists after stream explorer navigation
+    // Verify expand button exists after stream explorer navigation (this will wait for element)
     await pm.logsPage.expectQueryEditorFullScreenBtnVisible();
     testLogger.info('Query expand button found after stream explorer navigation');
 
@@ -106,31 +105,27 @@ test.describe("Streams Regression Bugs", () => {
       testLogger.info(`Data ingested to ${longStreamNames[i]}`, { response });
     });
 
-    await page.waitForTimeout(3000);
+    // Wait for ingestion to complete
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${orgId}`);
 
-    // Select the first long-named stream
+    // Select the first long-named stream (selectStream includes waits)
     await pm.logsPage.selectStream(longStreamNames[0]);
-    await page.waitForTimeout(2000);
 
     // Enable all fields and apply query
     await pm.logsPage.clickQuickModeToggle();
     await pm.logsPage.clickAllFieldsButton();
-    await page.waitForTimeout(1000);
 
     // Add remaining long-named streams
     testLogger.info('Adding additional long-named streams to trigger ellipsis');
     for (let i = 1; i < longStreamNames.length; i++) {
       await pm.logsPage.fillStreamFilter(longStreamNames[i]);
-      await page.waitForTimeout(2000);
       await pm.logsPage.toggleStreamSelection(longStreamNames[i]);
-      await page.waitForTimeout(3000);
+      // Wait for stream to be selected
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
     }
-
-    // Wait for UI to stabilize
-    await page.waitForTimeout(2000);
 
     testLogger.info('Multiple long-named streams selected, checking UI behavior');
 
@@ -161,9 +156,9 @@ test.describe("Streams Regression Bugs", () => {
       // SECONDARY ASSERTION: Try to find and verify tooltip on hover (using POM)
       testLogger.info('Hovering over stream display to check for tooltip');
       await pm.logsPage.hoverStreamDisplay();
-      await page.waitForTimeout(1500);
 
       // Look for tooltip containing any of the long stream names (using POM)
+      // isTooltipVisible already includes a timeout
       const tooltipVisible = await pm.logsPage.isTooltipVisible(3000);
 
       if (tooltipVisible) {
@@ -268,11 +263,9 @@ test.describe("Streams Regression Bugs", () => {
 
     // Click on the stream to open schema/settings view
     await pm.streamsPage.clickStream('e2e_automate');
-    await page.waitForTimeout(2000);
-    testLogger.info('✓ Opened stream schema/settings');
-
     // Wait for stream details/schema to be visible
     await pm.streamsPage.expectStreamDetailsVisible();
+    testLogger.info('✓ Opened stream schema/settings');
     testLogger.info('✓ Stream details visible');
 
     // PART 1: Verify Full Text Search fields are visually indicated
@@ -281,7 +274,6 @@ test.describe("Streams Regression Bugs", () => {
     // Search for a specific field that might have FTS enabled
     // First, let's search for any field to get to the schema table
     await pm.streamsPage.searchForField('kubernetes_host');
-    await page.waitForTimeout(1000);
 
     // PRIMARY ASSERTION SETUP: Index type select must be visible to validate FTS feature
     await pm.streamsPage.expectIndexTypeSelectVisible(5000);
@@ -289,10 +281,11 @@ test.describe("Streams Regression Bugs", () => {
 
     // Click on the index type select to see available options
     await pm.streamsPage.indexTypeSelect.click();
-    await page.waitForTimeout(1000);
+    // Wait for dropdown options to appear
+    const fullTextSearchOption = pm.streamsPage.getFullTextSearchOption();
+    await expect(fullTextSearchOption.first()).toBeVisible({ timeout: 3000 }).catch(() => {});
 
     // PRIMARY ASSERTION 1: Verify "Full text search" option exists
-    const fullTextSearchOption = pm.streamsPage.getFullTextSearchOption();
     const ftsOptionExists = await fullTextSearchOption.count() > 0;
 
     expect(ftsOptionExists, 'Bug #7671 Point #1: Full text search option should be visible in stream settings').toBe(true);
@@ -300,7 +293,6 @@ test.describe("Streams Regression Bugs", () => {
 
     // Close the dropdown
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(500);
 
     // PART 2: Verify Quick Mode fields from env variables show icon
     testLogger.info('PART 2: Checking Quick Mode field indicators from environment variables');
@@ -309,7 +301,6 @@ test.describe("Streams Regression Bugs", () => {
     const fieldSearchInput = pm.streamsPage.fieldSearchInput;
     if (await fieldSearchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await fieldSearchInput.clear();
-      await page.waitForTimeout(500);
     }
 
     // Check for quick mode icon on fields
@@ -343,8 +334,8 @@ test.describe("Streams Regression Bugs", () => {
 
     // Verify tooltip on hover
     await firstIcon.hover();
-    await page.waitForTimeout(1000);
 
+    // isTooltipVisible includes timeout wait
     const tooltipVisible = await pm.streamsPage.isTooltipVisible(2000);
 
     if (tooltipVisible) {

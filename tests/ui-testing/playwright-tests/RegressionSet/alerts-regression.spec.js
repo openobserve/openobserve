@@ -305,7 +305,6 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Click to open dropdown/autocomplete
     await groupByInput.click();
-    await page.waitForTimeout(500);
     testLogger.info('✓ Clicked Group By input');
 
     // Type characters to trigger autocomplete
@@ -488,20 +487,17 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Start creating a real-time alert to reach the Alert Settings step
     await pm.alertsPage.clickAddAlertButton();
-    // Wait for alert name input to be visible (indicates dialog opened)
-    await expect(page.locator('[data-test="add-alert-name-input"]')).toBeVisible({ timeout: 5000 });
 
     // ==================== STEP 1: ALERT SETUP ====================
     const alertName = `auto_template_display_${randomValue}`;
+    // fillAlertName includes wait for input to be visible
     await pm.alertsPage.fillAlertName(alertName);
     testLogger.info('✓ Filled alert name', { alertName });
 
     // Select logs stream type
     await pm.alertsPage.selectStreamType('logs');
-    // Wait for stream dropdown to be ready
-    await expect(page.locator('[data-test="alert-stream-select"]')).toBeVisible({ timeout: 5000 });
 
-    // Select stream
+    // Select stream (selectLogsStream includes wait for dropdown to be visible)
     await pm.alertsPage.selectLogsStream(TEST_STREAM);
     testLogger.info('✓ Selected stream', { stream: TEST_STREAM });
 
@@ -535,9 +531,11 @@ test.describe("Alerts Regression Bugs", () => {
       // Select operator
       const operatorSelect = pm.alertsPage.getOperatorSelect();
       await operatorSelect.click();
-      // Wait for operator dropdown to appear, then select Contains
-      await expect(page.getByText('Contains', { exact: true })).toBeVisible({ timeout: 5000 });
-      await page.getByText('Contains', { exact: true }).click();
+      // Wait for operator dropdown menu to appear
+      const operatorMenu = pm.alertsPage.getVisibleMenu();
+      await expect(operatorMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+      // Select Contains operator from dropdown
+      await operatorMenu.getByText('Contains', { exact: true }).click();
 
       // Fill value
       const valueInput = pm.alertsPage.getConditionValueInput();
@@ -585,12 +583,8 @@ test.describe("Alerts Regression Bugs", () => {
 
     // STRONG ASSERTION: Verify template name appears exactly once in the select field
     // Bug #10110 caused templates to display twice in the input field
-    // Use .q-field__native (where Quasar stores the display value)
-    const templateInputField = templateSelect.locator('.q-field__native').first();
-
-    // Get the visible text in the selected template display area
-    // Using textContent() which works on any element (not inputValue() which only works on inputs)
-    const displayedText = await templateInputField.textContent();
+    // Get all text from the template select component (includes all visible text)
+    const displayedText = await templateSelect.innerText();
     const cleanDisplayText = displayedText?.trim().replace(/\s+/g, ' ') || '';
     testLogger.info('Template display text', { text: cleanDisplayText });
 

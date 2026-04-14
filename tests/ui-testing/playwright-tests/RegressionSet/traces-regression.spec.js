@@ -23,7 +23,6 @@ test.describe("Traces Regression Bugs", () => {
     // Navigate to traces page
     await pm.tracesPage.navigateToTraces();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(1000);
 
     testLogger.info('Traces regression test setup completed');
   });
@@ -39,13 +38,13 @@ test.describe("Traces Regression Bugs", () => {
 
     // Wait for traces page to be ready
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(1000);
 
     // Try to run a search to get results
     const runBtn = pm.tracesPage.getRunQueryButton().first();
     if (await runBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await runBtn.click();
-      await page.waitForTimeout(2000);
+      // Wait for search results to load
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       testLogger.info('✓ Ran trace search');
     } else {
       testLogger.info('Run button not visible, checking existing results');
@@ -67,7 +66,6 @@ test.describe("Traces Regression Bugs", () => {
 
     if (await durationHeader.isVisible({ timeout: 3000 }).catch(() => false)) {
       await durationHeader.click();
-      await page.waitForTimeout(1000);
       testLogger.info('✓ Clicked Duration column header');
       sortedColumnFound = true;
 
@@ -78,11 +76,9 @@ test.describe("Traces Regression Bugs", () => {
 
       // Click again to toggle sort direction
       await durationHeader.click();
-      await page.waitForTimeout(1000);
       testLogger.info('✓ Toggled sort direction');
     } else if (await timestampHeader.isVisible({ timeout: 3000 }).catch(() => false)) {
       await timestampHeader.click();
-      await page.waitForTimeout(1000);
       testLogger.info('✓ Clicked Timestamp column header');
       sortedColumnFound = true;
     } else {
@@ -90,7 +86,6 @@ test.describe("Traces Regression Bugs", () => {
       const firstHeader = columnHeaders.first();
       if (await firstHeader.isVisible()) {
         await firstHeader.click();
-        await page.waitForTimeout(1000);
         testLogger.info('✓ Clicked first available column header');
         sortedColumnFound = true;
       }
@@ -119,13 +114,11 @@ test.describe("Traces Regression Bugs", () => {
     const runBtn = pm.tracesPage.getRunQueryButton().first();
     if (await runBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await runBtn.click();
-      await page.waitForTimeout(3000);
       testLogger.info('✓ Ran trace search');
     }
 
     // Wait for traces to load
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // STEP 1: Get initial trace count and capture trace IDs before navigation
     const initialTraceCount = await pm.tracesPage.getTraceCount();
@@ -137,7 +130,6 @@ test.describe("Traces Regression Bugs", () => {
 
     // STEP 2: Click on first trace to open trace details
     await pm.tracesPage.clickFirstTraceResult();
-    await page.waitForTimeout(2000);
     testLogger.info('✓ Clicked first trace to open details');
 
     // Wait for trace details to load (either sidebar, dialog, or inline view)
@@ -154,12 +146,10 @@ test.describe("Traces Regression Bugs", () => {
 
     // STEP 3: Navigate back from trace details
     await pm.tracesPage.navigateBackFromTraceDetails();
-    await page.waitForTimeout(2000);
     testLogger.info('✓ Navigated back from trace details');
 
     // Wait for traces list to be visible again
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(1000);
 
     // STEP 4: Get trace count after navigation back
     const afterBackTraceCount = await pm.tracesPage.getTraceCount();
@@ -280,9 +270,8 @@ test.describe("Traces Regression Bugs", () => {
       if (scrollSuccess) {
         testLogger.info('✓ Scrolled results container to bottom');
 
-        // Wait longer for potential lazy-load network response
+        // Wait for potential lazy-load network response
         await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-        await page.waitForTimeout(3000);
         testLogger.info('✓ Waited for lazy-load response');
 
         // Check trace count after scroll
