@@ -72,7 +72,7 @@ export default class DashboardMultiSQL {
   /**
    * Locator for the X-axis alias inconsistency warning icon.
    * Rendered by PanelErrorButtons.vue inside the panel editor header (reactive,
-   * no Apply needed ΓÇö updates as fields are added/removed).
+   * no Apply needed — updates as fields are added/removed).
    */
   get xAliasInconsistencyWarning() {
     return this.page.locator('[data-test="panel-x-alias-inconsistency-warning"]');

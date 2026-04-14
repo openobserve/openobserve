@@ -75,7 +75,7 @@ async function addAndConfigureSecondQuery(pm, { yField = "kubernetes_namespace_n
 /**
  * Enable the VRL editor for the currently active query tab and type a program.
  * Uses waitForFunction instead of waitForTimeout for Monaco debounce detection.
- * No page.waitForTimeout calls ΓÇö compliant with the no-timeout policy.
+ * No page.waitForTimeout calls — compliant with the no-timeout policy.
  *
  * @param {import('@playwright/test').Page} page
  * @param {string} vrlProgram - VRL program to type (may be empty string for no-op)
@@ -743,7 +743,7 @@ test.describe("Multi-SQL Query Support", () => {
   );
 
   // ==========================================================================
-  // 12 ΓÇö Reset Query on Chart Type Change
+  // 12 — Reset Query on Chart Type Change
   // ==========================================================================
 
   test.describe("Reset Query on Chart Type Change", () => {
@@ -754,7 +754,7 @@ test.describe("Multi-SQL Query Support", () => {
     test.describe.configure({ mode: "serial" });
 
     test(
-      "12.1 ΓÇö single query: reset clears y-function when switching to pie",
+      "single query: reset clears y-function when switching to pie",
       { tag: ["@multiSQL", "@resetQuery", "@P0", "@smoke"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -776,27 +776,27 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "12.2 ΓÇö single query: reset clears z-axis and breakdown when switching to bar",
+      "single query: reset clears z-axis and breakdown when switching to bar",
       { tag: ["@multiSQL", "@resetQuery", "@P1"] },
       async ({ page }) => {
         const pm = new PageManager(page);
         const msql = pm.dashboardMultiSQL;
         const dashboardName = generateDashboardName();
 
-        // Start with a bar panel ΓÇö Q1's x-axis is auto-populated with
+        // Start with a bar panel — Q1's x-axis is auto-populated with
         // histogram(_timestamp) by the panel initializer. No xField needed.
         await buildPanel(page, pm, dashboardName, {
           chartType: "bar",
           yField: "kubernetes_container_hash",
         });
 
-        // Switch to heatmap ΓÇö fields are preserved but z-field is missing;
+        // Switch to heatmap — fields are preserved but z-field is missing;
         // a chart error here is acceptable (not the assertion under test).
         await pm.chartTypeSelector.selectChartType("heatmap");
         await pm.dashboardPanelActions.applyDashboardBtn();
         await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
 
-        // Switch back to bar ΓÇö heatmap-only config (z-field) is cleared.
+        // Switch back to bar — heatmap-only config (z-field) is cleared.
         await pm.chartTypeSelector.selectChartType("bar");
         await pm.dashboardPanelActions.applyDashboardBtn();
         await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
@@ -811,7 +811,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "12.3 ΓÇö multi-query: switching to pie resets all queries' y-functions and breakdown",
+      "multi-query: switching to pie resets all queries' y-functions and breakdown",
       { tag: ["@multiSQL", "@resetQuery", "@P0", "@smoke"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -841,7 +841,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "12.4 ΓÇö multi-query: switching to metric resets all queries' y-functions and clears x/breakdown",
+      "multi-query: switching to metric resets all queries' y-functions and clears x/breakdown",
       { tag: ["@multiSQL", "@resetQuery", "@P1"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -870,7 +870,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "12.5 ΓÇö multi-query: switching to heatmap resets all queries' y-functions to null",
+      "multi-query: switching to heatmap resets all queries' y-functions to null",
       { tag: ["@multiSQL", "@resetQuery", "@P1"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -885,13 +885,13 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.dashboardPanelActions.applyDashboardBtn();
         await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
 
-        // Switch to heatmap ΓÇö y-functions reset; missing z-field may cause
+        // Switch to heatmap — y-functions reset; missing z-field may cause
         // a chart error which is acceptable (the reset is what we're testing).
         await pm.chartTypeSelector.selectChartType("heatmap");
         await pm.dashboardPanelActions.applyDashboardBtn();
         await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
 
-        // Switch back to bar ΓÇö both query tabs must still be intact after
+        // Switch back to bar — both query tabs must still be intact after
         // the round-trip through heatmap.
         await pm.chartTypeSelector.selectChartType("bar");
         await pm.dashboardPanelActions.applyDashboardBtn();
@@ -906,7 +906,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "12.6 ΓÇö multi-query: tab switch after two chart type changes does not re-introduce stale fields",
+      "multi-query: tab switch after two chart type changes does not re-introduce stale fields",
       { tag: ["@multiSQL", "@resetQuery", "@P2"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -924,7 +924,7 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.chartTypeSelector.selectChartType("gauge");
         await pm.chartTypeSelector.selectChartType("bar");
 
-        // Switch to Q2 tab ΓÇö verify tabs remain intact after two chart-type switches
+        // Switch to Q2 tab — verify tabs remain intact after two chart-type switches
         await msql.switchToQueryTab(1);
         await expect(msql.queryTab(1)).toBeVisible();
 
@@ -940,7 +940,7 @@ test.describe("Multi-SQL Query Support", () => {
   });
 
   // ==========================================================================
-  // 13 ΓÇö X-Axis Alias Inconsistency Warning
+  // 13 — X-Axis Alias Inconsistency Warning
   // ==========================================================================
 
   test.describe("X-Axis Alias Inconsistency Warning", () => {
@@ -964,11 +964,11 @@ test.describe("Multi-SQL Query Support", () => {
 
     // NOTE: When addPanel() is called, the panel editor auto-populates
     // histogram(_timestamp) into Q1's x-axis. So buildPanel() must NOT pass
-    // xField ΓÇö Q1 already has the histogram x-field. New query tabs (Q2+)
+    // xField — Q1 already has the histogram x-field. New query tabs (Q2+)
     // always start empty, so addField calls on those work normally.
 
     test(
-      "13.1 ΓÇö no warning with a single query using histogram x-alias",
+      "no warning with a single query using histogram x-alias",
       { tag: ["@multiSQL", "@xAliasWarning", "@P0", "@smoke"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -981,7 +981,7 @@ test.describe("Multi-SQL Query Support", () => {
           yField: "kubernetes_container_hash",
         });
 
-        // Single query with histogram x ΓåÆ queriesWithX.length < 2 ΓåÆ no warning
+        // Single query with histogram x → queriesWithX.length < 2 → no warning
         await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 3000 });
 
         await msql.applyAndSave(pm);
@@ -990,7 +990,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "13.2 ΓÇö no warning when both queries use histogram x-alias",
+      "no warning when both queries use histogram x-alias",
       { tag: ["@multiSQL", "@xAliasWarning", "@P0", "@smoke"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1003,7 +1003,7 @@ test.describe("Multi-SQL Query Support", () => {
           yField: "kubernetes_container_hash",
         });
 
-        // Add Q2 also with _timestamp (histogram) ΓÇö Q2 starts empty so +X works
+        // Add Q2 also with _timestamp (histogram) — Q2 starts empty so +X works
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
@@ -1013,7 +1013,7 @@ test.describe("Multi-SQL Query Support", () => {
           "y"
         );
 
-        // Both Q1 and Q2 use histogram ΓåÆ no inconsistency
+        // Both Q1 and Q2 use histogram → no inconsistency
         await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 3000 });
 
         await msql.applyAndSave(pm);
@@ -1022,7 +1022,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "13.3 ΓÇö no warning when both queries use non-histogram x-alias",
+      "no warning when both queries use non-histogram x-alias",
       { tag: ["@multiSQL", "@xAliasWarning", "@P1"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1037,7 +1037,7 @@ test.describe("Multi-SQL Query Support", () => {
         await removeFirstXField(page); // removes auto _timestamp
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
 
-        // Add Q2 also with non-histogram x ΓÇö Q2 starts empty so +X works
+        // Add Q2 also with non-histogram x — Q2 starts empty so +X works
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
@@ -1048,7 +1048,7 @@ test.describe("Multi-SQL Query Support", () => {
         );
 
         await msql.switchToQueryTab(0);
-        // Both Q1 and Q2 have non-histogram x ΓåÆ no inconsistency
+        // Both Q1 and Q2 have non-histogram x → no inconsistency
         await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 3000 });
 
         await msql.applyAndSave(pm);
@@ -1057,7 +1057,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "13.4 ΓÇö warning appears when Q1 has histogram x-alias and Q2 has non-histogram x-alias",
+      "warning appears when Q1 has histogram x-alias and Q2 has non-histogram x-alias",
       { tag: ["@multiSQL", "@xAliasWarning", "@P0", "@smoke"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1070,7 +1070,7 @@ test.describe("Multi-SQL Query Support", () => {
           yField: "kubernetes_container_hash",
         });
 
-        // Q2: non-histogram x (kubernetes_host) ΓÇö Q2 starts empty so +X works
+        // Q2: non-histogram x (kubernetes_host) — Q2 starts empty so +X works
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
@@ -1081,7 +1081,7 @@ test.describe("Multi-SQL Query Support", () => {
         );
 
         await msql.switchToQueryTab(0);
-        // Q1 histogram, Q2 non-histogram ΓåÆ warning must appear
+        // Q1 histogram, Q2 non-histogram → warning must appear
         await expect(xAliasWarning(page)).toBeVisible({ timeout: 5000 });
 
         await msql.applyAndSave(pm);
@@ -1090,7 +1090,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "13.5 ΓÇö warning appears when Q1 is non-histogram and Q2 is histogram (order independence)",
+      "warning appears when Q1 is non-histogram and Q2 is histogram (order independence)",
       { tag: ["@multiSQL", "@xAliasWarning", "@P1"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1105,7 +1105,7 @@ test.describe("Multi-SQL Query Support", () => {
         await removeFirstXField(page); // removes auto _timestamp
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
 
-        // Q2: histogram(_timestamp) ΓÇö Q2 starts empty so +X works
+        // Q2: histogram(_timestamp) — Q2 starts empty so +X works
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
@@ -1116,7 +1116,7 @@ test.describe("Multi-SQL Query Support", () => {
         );
 
         await msql.switchToQueryTab(0);
-        // Q1 non-histogram, Q2 histogram ΓåÆ warning shown regardless of order
+        // Q1 non-histogram, Q2 histogram → warning shown regardless of order
         await expect(xAliasWarning(page)).toBeVisible({ timeout: 5000 });
 
         await msql.applyAndSave(pm);
@@ -1125,7 +1125,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "13.6 ΓÇö warning disappears when inconsistency is resolved",
+      "warning disappears when inconsistency is resolved",
       { tag: ["@multiSQL", "@xAliasWarning", "@P1"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1153,7 +1153,7 @@ test.describe("Multi-SQL Query Support", () => {
         await removeFirstXField(page); // removes kubernetes_host from Q2
 
         await msql.switchToQueryTab(0);
-        // Q2 now has no x-field ΓåÆ excluded from check ΓåÆ warning gone
+        // Q2 now has no x-field → excluded from check → warning gone
         await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 5000 });
 
         await msql.applyAndSave(pm);
@@ -1162,7 +1162,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "13.7 ΓÇö no warning when one query has no x-field",
+      "no warning when one query has no x-field",
       { tag: ["@multiSQL", "@xAliasWarning", "@P1"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1175,7 +1175,7 @@ test.describe("Multi-SQL Query Support", () => {
           yField: "kubernetes_container_hash",
         });
 
-        // Q2 with ONLY a y-field ΓÇö no x-field added
+        // Q2 with ONLY a y-field — no x-field added
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
@@ -1185,7 +1185,7 @@ test.describe("Multi-SQL Query Support", () => {
         );
 
         await msql.switchToQueryTab(0);
-        // Q2 has no x-field ΓåÆ excluded from inconsistency check ΓåÆ no warning
+        // Q2 has no x-field → excluded from inconsistency check → no warning
         await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 3000 });
 
         await msql.applyAndSave(pm);
@@ -1194,7 +1194,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "13.8 ΓÇö warning absent when mismatched query is hidden, restored when it is unhidden",
+      "warning absent when mismatched query is hidden, restored when it is unhidden",
       { tag: ["@multiSQL", "@xAliasWarning", "@P2"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1217,11 +1217,11 @@ test.describe("Multi-SQL Query Support", () => {
         await msql.switchToQueryTab(0);
         await expect(xAliasWarning(page)).toBeVisible({ timeout: 5000 });
 
-        // Hide Q2 ΓåÆ hidden queries excluded from check ΓåÆ warning gone
+        // Hide Q2 → hidden queries excluded from check → warning gone
         await msql.toggleQueryVisibility(1);
         await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 5000 });
 
-        // Unhide Q2 ΓåÆ inconsistency restored ΓåÆ warning reappears
+        // Unhide Q2 → inconsistency restored → warning reappears
         await msql.toggleQueryVisibility(1);
         await expect(xAliasWarning(page)).toBeVisible({ timeout: 5000 });
 
@@ -1231,7 +1231,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "13.9 ΓÇö warning is only in the panel header, not inside y-axis or breakdown sections",
+      "warning is only in the panel header, not inside y-axis or breakdown sections",
       { tag: ["@multiSQL", "@xAliasWarning", "@P1"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1273,7 +1273,7 @@ test.describe("Multi-SQL Query Support", () => {
   });
 
   // ==========================================================================
-  // 14 ΓÇö VRL Function with Multiple Queries
+  // 14 — VRL Function with Multiple Queries
   // ==========================================================================
 
   test.describe("VRL Function with Multiple Queries", () => {
@@ -1283,7 +1283,7 @@ test.describe("Multi-SQL Query Support", () => {
     const VRL_Q2 = '.kubernetes_namespace_name = .kubernetes_namespace_name';
 
     test(
-      "14.1 ΓÇö bar chart renders when VRL is applied to a single query",
+      "bar chart renders when VRL is applied to a single query",
       { tag: ["@multiSQL", "@vrl", "@P0", "@smoke"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1305,7 +1305,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "14.2 ΓÇö VRL applies independently to each query in multi-query mode",
+      "VRL applies independently to each query in multi-query mode",
       { tag: ["@multiSQL", "@vrl", "@P0", "@smoke"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1346,7 +1346,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "14.3 ΓÇö empty VRL on both queries is a no-op, chart renders normally",
+      "empty VRL on both queries is a no-op, chart renders normally",
       { tag: ["@multiSQL", "@vrl", "@P1"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1380,7 +1380,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "14.4 ΓÇö VRL on Q1 does not affect Q2 (query isolation)",
+      "VRL on Q1 does not affect Q2 (query isolation)",
       { tag: ["@multiSQL", "@vrl", "@P1"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1425,7 +1425,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "14.5 ΓÇö VRL persists after save and reopen",
+      "VRL persists after save and reopen",
       { tag: ["@multiSQL", "@vrl", "@P1"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1475,11 +1475,11 @@ test.describe("Multi-SQL Query Support", () => {
             .click();
           await vrlEditorQ1.waitFor({ state: "visible", timeout: 10000 });
         } else {
-          // Toggle IS persisted ΓÇö VRL survived save/reopen
+          // Toggle IS persisted — VRL survived save/reopen
           await vrlEditorQ1.waitFor({ state: "visible", timeout: 5000 });
         }
 
-        // Chart must render correctly after reopen ΓÇö confirms VRL didn't break anything
+        // Chart must render correctly after reopen — confirms VRL didn't break anything
         await pm.dashboardPanelActions.applyDashboardBtn();
         await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
         await pm.dashboardPanelActions.verifyChartRenders(expect);
@@ -1490,7 +1490,7 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
-      "14.6 ΓÇö line chart renders correctly with VRL applied to both queries",
+      "line chart renders correctly with VRL applied to both queries",
       { tag: ["@multiSQL", "@vrl", "@P1"] },
       async ({ page }) => {
         const pm = new PageManager(page);
@@ -1527,7 +1527,7 @@ test.describe("Multi-SQL Query Support", () => {
   });
 
   // ==========================================================================
-  // 15 ΓÇö Partial Error for Streams with Different max_query_range
+  // 15 — Partial Error for Streams with Different max_query_range
   // ==========================================================================
 
   test.describe(
@@ -1551,7 +1551,7 @@ test.describe("Multi-SQL Query Support", () => {
       });
 
       test(
-        "15.1 ΓÇö warning icon appears when the single-query stream range is exceeded (baseline)",
+        "warning icon appears when the single-query stream range is exceeded (baseline)",
         { tag: ["@multiSQL", "@partialError", "@P0", "@smoke"] },
         async ({ page }) => {
           const pm = new PageManager(page);
@@ -1563,7 +1563,7 @@ test.describe("Multi-SQL Query Support", () => {
             chartType: "bar",
             yField: "kubernetes_container_hash",
           });
-          // Switch Q1 stream to e2e_max_query_range ΓÇö it has no prior single-stream
+          // Switch Q1 stream to e2e_max_query_range — it has no prior single-stream
           // persistent cache (unlike e2e_automate which sections 12-14 have cached).
           // A cache miss forces do_partitioned_search to run and set function_error.
           await pm.chartTypeSelector.selectStream("e2e_max_query_range");
@@ -1589,7 +1589,7 @@ test.describe("Multi-SQL Query Support", () => {
       );
 
       test(
-        "15.2 ΓÇö both query restriction warnings appear in tooltip with two restricted streams",
+        "both query restriction warnings appear in tooltip with two restricted streams",
         { tag: ["@multiSQL", "@partialError", "@P0", "@smoke"] },
         async ({ page }) => {
           const pm = new PageManager(page);
@@ -1636,7 +1636,7 @@ test.describe("Multi-SQL Query Support", () => {
             "Query duration is modified due to query range restriction"
           );
 
-          // Both queries are restricted ΓÇö "Data returned for:" must appear at least twice
+          // Both queries are restricted — "Data returned for:" must appear at least twice
           const dataReturnedMatches = (
             tooltipText.match(/Data returned for:/g) || []
           ).length;
@@ -1647,7 +1647,7 @@ test.describe("Multi-SQL Query Support", () => {
       );
 
       test(
-        "15.3 ΓÇö only one warning when only one stream is restricted",
+        "only one warning when only one stream is restricted",
         { tag: ["@multiSQL", "@partialError", "@P1"] },
         async ({ page }) => {
           const pm = new PageManager(page);
@@ -1701,7 +1701,7 @@ test.describe("Multi-SQL Query Support", () => {
       );
 
       test(
-        "15.4 ΓÇö no warning when both queries are within their stream limits",
+        "no warning when both queries are within their stream limits",
         { tag: ["@multiSQL", "@partialError", "@P1"] },
         async ({ page }) => {
           const pm = new PageManager(page);
@@ -1745,7 +1745,7 @@ test.describe("Multi-SQL Query Support", () => {
       );
 
       test(
-        "15.5 ΓÇö warning disappears when time range is changed to within both stream limits",
+        "warning disappears when time range is changed to within both stream limits",
         { tag: ["@multiSQL", "@partialError", "@P1"] },
         async ({ page }) => {
           const pm = new PageManager(page);
@@ -1786,7 +1786,7 @@ test.describe("Multi-SQL Query Support", () => {
               .first()
           ).toBeVisible({ timeout: 30000 });
 
-          // Switch to 1-hour range ΓÇö within both limits
+          // Switch to 1-hour range — within both limits
           await waitForDateTimeButtonToBeEnabled(page);
           const searchDoneNarrow = mqr.createSearchResponsePromise();
           await pm.dateTimeHelper.setRelativeTimeRange("1-h");

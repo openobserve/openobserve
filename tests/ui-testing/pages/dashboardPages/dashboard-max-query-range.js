@@ -97,7 +97,7 @@ export default class DashboardMaxQueryRange {
           resp.url().includes("type=logs") &&
           resp.status() === 200;
         if (matches) {
-          // Non-blocking body inspection for diagnostics ΓÇö does not delay resolution
+          // Non-blocking body inspection for diagnostics — does not delay resolution
           resp
             .text()
             .then((body) => {

@@ -920,7 +920,7 @@ export const usePanelFields = ({
   };
 
   const resetFields = () => {
-    // Preserve stream name and type across field resets ΓÇö these identify
+    // Preserve stream name and type across field resets — these identify
     // which stream the query targets and should not change when chart type
     // or field layout changes.
     const currentFields =
