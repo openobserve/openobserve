@@ -475,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-linear-progress
                 dark
                 size="10px"
-                class="progresbar tw:w-[80%] inline-block"
+                class="progresbar tw:w-[80%]! tw:max-w-[80%] inline-block"
                 rounded
                 :value="props.row.cpu_usage / 100"
                 :color="props.row.cpu_usage > 85 ? 'red-9' : 'primary'"
@@ -489,7 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-linear-progress
                 dark
                 size="10px"
-                class="progresbar tw:w-[80%] inline-block"
+                class="progresbar tw:w-[80%]! tw:max-w-[80%] inline-block"
                 rounded
                 :value="props.row.percentage_memory_usage / 100"
                 :color="props.row.percentage_memory_usage > 85 ? 'red-9' : 'primary'"
