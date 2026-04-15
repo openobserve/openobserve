@@ -704,15 +704,15 @@ describe("QueryConfig.vue", () => {
       });
     });
 
-    it("should always validate successfully in PromQL mode", async () => {
+    it("should fail validation when PromQL query is empty (default)", async () => {
       const result = await wrapper.vm.validate();
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
 
-    it("should validate with empty PromQL query", async () => {
+    it("should fail validation with empty PromQL query", async () => {
       await wrapper.setProps({ promqlQuery: "" });
       const result = await wrapper.vm.validate();
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
 
     it("should validate with non-empty PromQL query", async () => {
