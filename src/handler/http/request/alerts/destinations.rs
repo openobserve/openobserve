@@ -169,7 +169,7 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
     }
 
     // SSRF protection: Validate URL before making request
-    if let Err(error_msg) = SsrfGuard::validate_url(url) {
+    if let Err(error_msg) = SsrfGuard::validate_url_with_config(url) {
         return MetaHttpResponse::json(TestDestinationResponse {
             success: false,
             status_code: None,

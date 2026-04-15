@@ -598,6 +598,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-columns="false"
               :row-height="28"
               :enable-ai-context-button="false"
+              :hide-view-related-button="true"
+              :hide-expand-field-options="true"
+              @copy="copyContentToClipboard"
               @update:columnOrder="handleEventsColumnOrder"
               @update:columnSizes="handleEventsColumnSizes"
             />
@@ -2069,6 +2072,16 @@ export default defineComponent({
       ),
     );
 
+    const copyContentToClipboard = (log: any) => {
+      copyToClipboard(JSON.stringify(log)).then(() =>
+        q.notify({
+          type: "positive",
+          message: "Content Copied Successfully!",
+          timeout: 1000,
+        }),
+      );
+    };
+
     return {
       t,
       activeTab,
@@ -2126,6 +2139,7 @@ export default defineComponent({
       DOMPurify,
       serviceIconUrl,
       getImageURL,
+      copyContentToClipboard,
     };
   },
 });
