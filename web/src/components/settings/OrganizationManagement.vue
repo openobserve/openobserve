@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter-method="filterData"
         :loading="loading"
         table-style="table-layout: fixed"
+        style="width: 100%; height: calc(100vh - var(--navbar-height) - 87px); overflow-y: auto;""
       >
         <template #no-data>
           <NoData />
