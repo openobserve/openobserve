@@ -731,20 +731,31 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const generateSqlFromBackend = async () => {
     try {
-      if (
-        !formData.value.stream_name ||
-        !formData.value.query_condition?.conditions ||
-        Object.keys(formData.value.query_condition.conditions).length === 0
-      ) {
+      // If no stream name or not custom mode, nothing to do
+      if (!formData.value.stream_name) {
         return;
       }
       if (formData.value.query_condition.type !== "custom") {
         return;
       }
-      if (!allConditionsValid(formData.value.query_condition.conditions)) {
-        return;
-      }
-      if (!isAggregationValid()) {
+
+      const hasConditions =
+        formData.value.query_condition?.conditions &&
+        Object.keys(formData.value.query_condition.conditions).length > 0;
+      const conditionsValid =
+        hasConditions &&
+        allConditionsValid(formData.value.query_condition.conditions);
+      const aggregationValid = isAggregationValid();
+
+      // If conditions are incomplete/missing, fall back to local SQL so the
+      // preview chart still loads with raw stream data (no WHERE clause).
+      if (!conditionsValid || !aggregationValid) {
+        const localSql = generateSqlQueryLocal();
+        generatedSqlQuery.value = localSql;
+        previewQuery.value = localSql;
+        isUsingBackendSql.value = false;
+        await nextTick();
+        previewAlertRef.value?.refreshData();
         return;
       }
 
