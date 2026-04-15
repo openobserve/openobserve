@@ -179,7 +179,7 @@ const getError = () => {
 
 <style scoped>
 .error-viewer-container {
-  height: calc(100vh - 3.25rem);
+  height: calc(100vh - var(--navbar-height) - 1rem);
   overflow-y: auto;
 }
 </style>

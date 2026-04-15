@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+  <q-page class="q-pa-none" style="min-height: inherit;">
     <div>
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
     <div>
       <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-[calc(100vh-127px)]">
+      <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
       <q-table
       ref="qTable"
       :rows="visibleRows"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
       style="overflow-y: auto;"
       :style="hasVisibleRows
-            ? 'height: calc(100vh - 127px); overflow-y: auto;' 
+            ? 'height: calc(100vh - var(--navbar-height) - 92px); overflow-y: auto;' 
             : ''"
     >
       <template #no-data><NoData /></template>

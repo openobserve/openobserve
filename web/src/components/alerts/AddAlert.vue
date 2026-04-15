@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="wizard-view-container tw:mb-2"
       style="
-        max-height: calc(100vh - 194px);
+        max-height: calc(100vh  - var(--navbar-height) - 157px);
         overflow-y: auto;
         scroll-behavior: smooth;
       "
