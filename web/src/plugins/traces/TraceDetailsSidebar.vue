@@ -580,7 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- TenstackTable for events -->
           <div
-            class="tw:flex-1 tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded"
+            class="tw:flex-1 traces-events-table-container tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded"
             :class="
               isLLMSpan && llmMetrics && span.llm_model_name
                 ? 'tab-content-with-llm-metrics'
@@ -2170,6 +2170,12 @@ export default defineComponent({
 :deep(.traces-correlated-logs-container) {
   .logs-table-container .container {
     height: 100% !important;
+  }
+}
+
+:deep(.traces-events-table-container) {
+  .table-container {
+    border-radius: 0 !important;
   }
 }
 
