@@ -161,6 +161,8 @@ const mockSearchObj = {
     searchMode: "traces" as "traces" | "spans" | "service-graph",
     resultGrid: {
       rowsPerPage: 25,
+      sortBy: "start_time" as string,
+      sortOrder: "desc" as "asc" | "desc",
     },
     refreshInterval: 0,
     serviceColors: {},
@@ -263,6 +265,21 @@ vi.mock("@/composables/useDurationPercentiles", async (importOriginal) => {
   return {
     ...actual,
     parseDurationWhereClause: vi.fn((whereClause: string) => whereClause),
+  };
+});
+
+// Hoisted so tests can assert on the spy and override its return value per test.
+const { mockParseSpanKindWhereClause } = vi.hoisted(() => ({
+  mockParseSpanKindWhereClause: vi.fn((whereClause: string) => whereClause),
+}));
+
+// Use importOriginal so SPAN_KIND_MAP and SPAN_KIND_LABEL_TO_KEY remain available,
+// but replace parseSpanKindWhereClause with an inspectable spy that defaults to passthrough.
+vi.mock("@/utils/traces/constants", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    parseSpanKindWhereClause: mockParseSpanKindWhereClause,
   };
 });
 
@@ -653,9 +670,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper
-          .find('[data-test="traces-search-not-started-text"]')
-          .exists(),
+        wrapper.find('[data-test="traces-search-not-started-text"]').exists(),
       ).toBe(true);
     });
 
@@ -769,9 +784,7 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
 
       expect(
-        wrapper
-          .find('[data-test="traces-search-error-text"]')
-          .exists(),
+        wrapper.find('[data-test="traces-search-error-text"]').exists(),
       ).toBe(true);
     });
 
@@ -1107,6 +1120,7 @@ describe("Index.vue (Main Traces Page)", () => {
       const serviceGraphData = {
         stream: "default",
         serviceName: "test-service",
+        mode: "spans" as const,
         timeRange: {
           startTime: 1755853746625720,
           endTime: 1755853746725720,
@@ -1116,7 +1130,7 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.handleServiceGraphViewTraces(serviceGraphData);
       await flushPromises();
 
-      // handleServiceGraphViewTraces now sets searchMode = "spans" (not activeTab)
+      // handleServiceGraphViewTraces sets searchMode from data.mode
       expect(mockSearchObj.meta.searchMode).toBe("spans");
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
       expect(mockSearchObj.data.editorValue).toContain("test-service");
@@ -1268,9 +1282,7 @@ describe("Index.vue (Main Traces Page)", () => {
       });
       await flushPromises();
 
-      expect(mockSearchObj.data.editorValue).toContain(
-        "AND duration <= 20000",
-      );
+      expect(mockSearchObj.data.editorValue).toContain("AND duration <= 20000");
     });
 
     it("should combine all optional filter fields when all are provided", async () => {
@@ -1335,6 +1347,100 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(mockSearchObj.data.editorValue).not.toContain("duration");
     });
+
+    it("should set searchMode from data.mode when navigating via handleServiceGraphViewTraces", async () => {
+      mockSearchObj.meta.searchMode = "service-graph";
+
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        mode: "traces",
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.meta.searchMode).toBe("traces");
+    });
+
+    it("should append resourceFilter to query when data.resourceFilter is provided", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        mode: "spans",
+        resourceFilter: { field: "service.name", value: "my-service" },
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND service.name = 'my-service'",
+      );
+    });
+
+    it("should escape single quotes in resourceFilter value", async () => {
+      wrapper = mountIndexComponent();
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "svc",
+        mode: "spans",
+        resourceFilter: { field: "service.name", value: "it's here" },
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain(
+        "AND service.name = 'it''s here'",
+      );
+    });
+
+    it("should call loadServiceGraph on serviceGraphRef when service-graph-refresh event fires from SearchBar", async () => {
+      const mockLoadServiceGraph = vi.fn();
+
+      // Start in service-graph mode so the ServiceGraph stub is rendered
+      mockSearchObj.meta.searchMode = "service-graph";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": {
+              name: "search-bar",
+              template: "<div />",
+              emits: ["service-graph-refresh"],
+            },
+            "index-list": true,
+            "search-result": true,
+            "service-graph": {
+              name: "service-graph",
+              template: "<div />",
+              setup() {
+                return { loadServiceGraph: mockLoadServiceGraph };
+              },
+            },
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      expect(searchBarEl.exists()).toBe(true);
+      await searchBarEl.vm.$emit("service-graph-refresh");
+      await flushPromises();
+
+      expect(mockLoadServiceGraph).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("Splitter Behavior", () => {
@@ -1384,9 +1490,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      expect(
-        wrapper.find(".traces-horizontal-splitter").exists(),
-      ).toBe(true);
+      expect(wrapper.find(".traces-horizontal-splitter").exists()).toBe(true);
     });
 
     it("should initialize splitterModel with a default value of 15", async () => {
@@ -1573,6 +1677,97 @@ describe("Index.vue (Main Traces Page)", () => {
 
       // No error should be thrown
       expect(wrapper.vm).toBeTruthy();
+    });
+  });
+
+  describe("onSearchModeChange — sortBy reset", () => {
+    function mountIndexStubbed() {
+      return mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    }
+
+    it("should reset sortBy to start_time when switching to traces mode and sortBy is a spans-only column", async () => {
+      // Simulate a spans-specific sort column being active
+      mockSearchObj.meta.resultGrid.sortBy = "span_status";
+      mockSearchObj.meta.searchMode = "spans";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
+      await flushPromises();
+
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("start_time");
+    });
+
+    it("should NOT reset sortBy when switching to traces mode and sortBy is start_time", async () => {
+      mockSearchObj.meta.resultGrid.sortBy = "start_time";
+      mockSearchObj.meta.searchMode = "spans";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
+      await flushPromises();
+
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("start_time");
+    });
+
+    it("should NOT reset sortBy when switching to traces mode and sortBy is duration", async () => {
+      mockSearchObj.meta.resultGrid.sortBy = "duration";
+      mockSearchObj.meta.searchMode = "spans";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
+      await flushPromises();
+
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("duration");
+    });
+
+    it("should NOT reset sortBy when switching to spans mode", async () => {
+      mockSearchObj.meta.resultGrid.sortBy = "operation_name";
+      mockSearchObj.meta.searchMode = "traces";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "spans");
+      await flushPromises();
+
+      // Switching to spans does not reset sortBy
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("operation_name");
+    });
+
+    it("should reset sortBy to start_time when switching to traces mode and sortBy is operation_name", async () => {
+      mockSearchObj.meta.resultGrid.sortBy = "operation_name";
+      mockSearchObj.meta.searchMode = "spans";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      await searchBarEl.vm.$emit("update:searchMode", "traces");
+      await flushPromises();
+
+      expect(mockSearchObj.meta.resultGrid.sortBy).toBe("start_time");
     });
   });
 
@@ -1944,6 +2139,119 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(thrownError).toBeNull();
       expect(parseSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("parseSpanKindWhereClause integration", () => {
+    // Shared mount factory — keeps stub config in one place.
+    function mountIndexStubbed() {
+      return mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    }
+
+    beforeEach(() => {
+      // Provide a selected stream so getQueryData does not early-return.
+      mockSearchObj.data.stream.selectedStream = {
+        label: "default",
+        value: "default",
+      };
+      mockSearchObj.data.stream.streamLists = [
+        { label: "default", value: "default" },
+      ];
+      // Clear call history so earlier tests in the suite do not pollute
+      // toHaveBeenCalledWith assertions (the component auto-searches on mount
+      // and accumulates calls before the explicit searchData() call).
+      mockFetchQueryDataWithHttpStream.mockClear();
+      // Default: spy passes the where clause through unchanged (real-implementation behaviour).
+      mockParseSpanKindWhereClause.mockImplementation(
+        (whereClause: string) => whereClause,
+      );
+      // Reset parseDurationWhereClause to passthrough so bleed-through from
+      // the parseDurationWhereClause integration tests does not alter the
+      // where clause before parseSpanKindWhereClause sees it.
+      vi.mocked(
+        useDurationPercentilesModule.parseDurationWhereClause,
+      ).mockImplementation((whereClause: string) => whereClause);
+    });
+
+    it("should call parseSpanKindWhereClause when buildSearch runs with a non-empty where clause", async () => {
+      mockSearchObj.data.editorValue = "span_kind='Server'";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      await wrapper.vm.searchData();
+      await flushPromises();
+
+      expect(mockParseSpanKindWhereClause).toHaveBeenCalled();
+    });
+
+    it("should call parseSpanKindWhereClause with the where-clause portion of editorValue", async () => {
+      mockSearchObj.data.editorValue = "span_kind='Server'";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      await wrapper.vm.searchData();
+      await flushPromises();
+
+      const calls = mockParseSpanKindWhereClause.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      // At least one call must have received the span_kind filter string.
+      const matchingCall = calls.find(([arg]) =>
+        (arg as string).includes("span_kind"),
+      );
+      expect(matchingCall).toBeDefined();
+      expect(matchingCall![0]).toContain("span_kind='Server'");
+    });
+
+    it("should not call parseSpanKindWhereClause when the where clause is empty", async () => {
+      mockSearchObj.data.editorValue = "";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      await wrapper.vm.searchData();
+      await flushPromises();
+
+      // parseSpanKindWhereClause is guarded by `whereClause.trim() != ""` in buildSearch;
+      // for an empty editorValue the spy must not have been called with a non-empty string.
+      const callsWithNonEmpty = mockParseSpanKindWhereClause.mock.calls.filter(
+        ([clause]) => typeof clause === "string" && clause.trim() !== "",
+      );
+      expect(callsWithNonEmpty.length).toBe(0);
+    });
+
+    it("should pass only the WHERE-clause portion to parseSpanKindWhereClause when editorValue contains a pipe prefix", async () => {
+      mockSearchObj.data.editorValue = "someFunc | span_kind='Consumer'";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      await wrapper.vm.searchData();
+      await flushPromises();
+
+      const nonEmptyCalls = mockParseSpanKindWhereClause.mock.calls.filter(
+        ([clause]) => typeof clause === "string" && clause.trim() !== "",
+      );
+      expect(nonEmptyCalls.length).toBeGreaterThan(0);
+      for (const [clause] of nonEmptyCalls) {
+        // The pipe-prefix (function expression) must not be forwarded.
+        expect(clause).not.toContain("|");
+        expect(clause).not.toContain("someFunc");
+      }
     });
   });
 });

@@ -562,3 +562,55 @@ body.desktop .q-hoverable:hover > .q-focus-helper{
     }
   }
 }
+
+.o2-input-full {
+  .q-field {
+    &.showLabelOnTop {
+      padding-top: 26px;
+    }
+
+    .q-field__inner, .q-field__native{
+      height: 100% !important;
+      min-height: 100% !important;
+    }
+
+    .q-field__control {
+      height: 100% !important;
+      min-height: 100% !important;
+      background-color: var(--o2-page-bg);
+      border: 1px solid var(--o2-border-color);
+
+      .q-field__control-container {
+        height: calc(100% - 1px) !important;
+        padding-top: 0px;
+
+        .q-field__native {
+          min-height: 100% !important;
+          height: 100% !important;
+        }
+
+        .q-field__label {
+          top: 8px;
+        }
+      }
+
+      .q-field__marginal {
+        height: 100% !important;
+
+        .q-icon {
+          font-size: 20px;
+          transform: none !important
+        }
+      }
+    }
+
+    &.q-field--dark .q-field__control {
+      background-color: var(--o2-dark-page-bg);
+    }
+
+    .q-field__bottom {
+      padding: 0.1rem 0 0;
+      min-height: fit-content !important;
+    }
+  }
+}

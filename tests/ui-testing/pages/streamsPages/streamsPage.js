@@ -715,6 +715,11 @@ export class StreamsPage {
     get closeStreamButton() { return this.page.locator('[data-test="add-stream-close-btn"]'); }
     get streamsTable() { return this.page.locator('[data-test="log-stream-table"]'); }
     get searchStreamInput() { return this.page.locator('[data-test="streams-search-stream-input"] input'); }
+    get indexTypeSelect() { return this.page.locator('[data-test="schema-stream-index-select"]').first(); }
+    get fieldSearchInput() { return this.page.locator('input[placeholder*="Search Field"], input[placeholder*="search"]').first(); }
+    get quickModeIcons() { return this.page.locator('img[alt*="quick"], img[alt*="Quick"]'); }
+    get quickModeTooltip() { return this.page.locator('.q-tooltip').filter({ hasText: /quick.*mode/i }); }
+    get schemaTable() { return this.page.locator('.q-table').first(); }
 
     /**
      * Click Add Stream button to open the modal
@@ -931,6 +936,27 @@ export class StreamsPage {
     }
 
     /**
+     * Navigate directly to streams page with explicit org identifier.
+     * Uses page.goto instead of menu click to avoid cloud _meta org redirect bug.
+     */
+    async navigateToStreamsPage(baseUrl, orgId) {
+        await this.page.goto(`${baseUrl}/web/streams?org_identifier=${orgId}`);
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
+
+    /**
+     * Assert an exact-match stream name cell is visible in the streams table.
+     * Uses getByRole('cell', { exact: true }) to avoid strict mode violations
+     * when multiple streams share a common prefix (e.g. e2e_automate, e2e_automate1).
+     */
+    async expectExactStreamCellVisible(streamName, timeout = 10000) {
+        await expect(
+            this.page.getByRole('cell', { name: streamName, exact: true }).first()
+        ).toBeVisible({ timeout });
+        testLogger.info(`Stream cell visible: ${streamName}`);
+    }
+
+    /**
      * Check if stream is visible
      * Bug #9354 - FTS auto-add
      */
@@ -977,5 +1003,48 @@ export class StreamsPage {
         const detailsPanel = this.page.locator('.q-dialog--maximized, [data-test="schema-log-stream-field-mapping-table"], .schema-container').first();
         await expect(detailsPanel).toBeVisible({ timeout: 15000 });
         testLogger.info('Stream schema/details dialog is visible');
+    }
+
+    /**
+     * Search for a specific field in the schema view
+     */
+    async searchForField(fieldName) {
+        await this.page.locator('[data-test="schema-field-search-input"]').click();
+        await this.page.locator('[data-test="schema-field-search-input"]').fill(fieldName);
+    }
+
+    /**
+     * Expect index type select to be visible
+     */
+    async expectIndexTypeSelectVisible(timeout = 5000) {
+        await expect(this.indexTypeSelect).toBeVisible({ timeout });
+    }
+
+    /**
+     * Get full text search option from dropdown
+     */
+    getFullTextSearchOption() {
+        return this.page.locator('.q-item').filter({ hasText: 'Full text search' });
+    }
+
+    /**
+     * Get quick mode icons count
+     */
+    async getQuickModeIconsCount() {
+        return await this.quickModeIcons.count();
+    }
+
+    /**
+     * Check if tooltip is visible
+     */
+    async isTooltipVisible(timeout = 3000) {
+        return await this.quickModeTooltip.isVisible({ timeout }).catch(() => false);
+    }
+
+    /**
+     * Expect schema table to be visible
+     */
+    async expectSchemaTableVisible(timeout = 5000) {
+        await expect(this.schemaTable).toBeVisible({ timeout });
     }
 }

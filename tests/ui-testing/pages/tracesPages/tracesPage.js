@@ -123,6 +123,19 @@ export class TracesPage {
     this.signOutButton = page.getByText('Sign Out');
   }
 
+  // Getter methods for common trace elements
+  getTraceDetailsElements() {
+    return this.page.locator('[data-test="trace-details-header"], [data-test="trace-details-tree"], [data-test="trace-details-sidebar"]');
+  }
+
+  getTraceResultItems() {
+    return this.page.locator(this.searchResultItem);
+  }
+
+  getResultsContainer() {
+    return this.page.locator('[data-test="traces-search-result-list"], .traces-result-container').first();
+  }
+
   async navigateToTraces() {
     await this.tracesMenuItem.click();
     // Cloud: sidebar click may silently fail — verify URL and fallback to direct navigation
@@ -1277,6 +1290,36 @@ export class TracesPage {
   }
 
   /**
+   * Get the currently selected stream name from the stream selector
+   * @returns {Promise<string|null>} - The selected stream name or null if not found
+   */
+  async getSelectedStreamName() {
+    const streamSelector = this.page.locator(this.streamSelect);
+    if (await streamSelector.isVisible({ timeout: 3000 }).catch(() => false)) {
+      // The selected streams are shown as chips/tags inside the selector
+      const selectedChip = this.page.locator('[data-test*="stream-toggle-"][class*="truthy"], [data-test*="stream-chip"]').first();
+      if (await selectedChip.isVisible({ timeout: 2000 }).catch(() => false)) {
+        const text = await selectedChip.textContent();
+        return text?.trim() || null;
+      }
+      // Fallback: try to get from input value
+      const inputValue = await streamSelector.inputValue().catch(() => null);
+      return inputValue;
+    }
+    return null;
+  }
+
+  /**
+   * Navigate to logs page
+   */
+  async navigateToLogs() {
+    const logsMenuItem = this.page.locator('[data-test="menu-link-\\/logs-item"]');
+    await logsMenuItem.click();
+    await this.page.waitForURL('**/logs**', { timeout: 10000 }).catch(() => {});
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  /**
    * Check if trace details tree is visible
    * @returns {Promise<boolean>}
    */
@@ -1888,6 +1931,70 @@ export class TracesPage {
    */
   async waitForDashboardClose() {
     await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+  }
+
+  // ============================================
+  // TRACES SEARCH TEST METHODS (Bug fixes)
+  // ============================================
+
+  /**
+   * Get run query button
+   * @returns {Locator}
+   */
+  getRunQueryButton() {
+    return this.page.locator('[data-test="logs-search-bar-refresh-btn"]');
+  }
+
+  /**
+   * Get column headers from trace results table
+   * @returns {Locator}
+   */
+  getTraceResultColumnHeaders() {
+    return this.page.locator('[data-test*="trace-result"] th, .traces-table th, [class*="trace"] thead th');
+  }
+
+  /**
+   * Get duration column header
+   * @returns {Locator}
+   */
+  getDurationHeader() {
+    return this.page.locator('th:has-text("Duration"), th:has-text("duration")');
+  }
+
+  /**
+   * Get timestamp column header
+   * @returns {Locator}
+   */
+  getTimestampHeader() {
+    return this.page.locator('th:has-text("Timestamp"), th:has-text("timestamp"), th:has-text("Time")');
+  }
+
+  /**
+   * Get sort indicator element
+   * @returns {Locator}
+   */
+  getSortIndicator() {
+    return this.page.locator('[class*="sort"], [data-test*="sort"], .q-icon:has-text("arrow")');
+  }
+
+  /**
+   * Get stream selector dropdown
+   * @returns {Locator}
+   */
+  getStreamSelector() {
+    return this.page.locator('[data-test="log-search-index-list-select-stream"]');
+  }
+
+  /**
+   * Get selected/active stream indicator
+   * For traces, checks if stream dropdown has a selected value
+   * Uses stable selectors that don't rely on Quasar internal classes
+   * @returns {Locator}
+   */
+  getSelectedStreamToggle() {
+    // Look for selected stream toggles or chips (indicated by 'truthy' class or stream-chip data-test)
+    // Also check for stream selector with non-empty aria-label as fallback
+    return this.page.locator('[data-test*="stream-toggle-"][class*="truthy"], [data-test*="stream-chip"], [data-test="log-search-index-list-select-stream"][aria-label]:not([aria-label=""])');
   }
 
 }

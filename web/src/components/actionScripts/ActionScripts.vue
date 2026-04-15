@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="id"
             :pagination="pagination"
             style="width: 100%;"
-            :style="{ height: hasVisibleRows ? 'calc(100vh - 124px)' : '' }"
+            :style="{ height: hasVisibleRows ? 'calc(100vh - var(--navbar-height) - 77px)' : '' }"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky o2-last-row-border"
             selection="multiple"
             v-model:selected="selectedActionScripts"

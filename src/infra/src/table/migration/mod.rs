@@ -213,8 +213,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20260326_000001_add_field_name_mapping_to_service_streams::Migration),
             Box::new(m20260331_000001_create_sys_rca_agent_service_accounts::Migration),
             Box::new(m20260402_000001_reports_add_image_fields::Migration),
-            Box::new(m20260403_000001_create_model_pricing_table::Migration),
-            Box::new(m20260403_000002_add_source_to_model_pricing::Migration),
+            Box::new(m20260414_000001_add_is_system_to_cipher_keys::Migration),
+            Box::new(m20260414_000002_create_org_ai_toolsets::Migration),
+            Box::new(m20260415_000001_create_model_pricing_table::Migration),
+            Box::new(m20260415_000002_add_source_to_model_pricing::Migration),
         ]
     }
 }

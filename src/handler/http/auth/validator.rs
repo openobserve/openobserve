@@ -185,7 +185,7 @@ pub async fn validator(
 
                 if auth_info.bypass_check
                     || check_permissions(
-                        user_id,
+                        &res.user_email,
                         auth_info.clone(),
                         res.user_role.clone().unwrap_or(get_default_user_role()),
                         !res.is_internal_user,
@@ -926,7 +926,7 @@ async fn oo_validator_internal(
                 Some(value) => value,
                 None => return Err(AuthError::Unauthorized("Unauthorized Access".to_string())),
             };
-            log::info!("Auth ext token found: validating: {username} {password}");
+            log::info!("Auth ext token found: validating: {username}");
             validator(req_data, &username, &password, auth_info, path_prefix).await
         }
     } else {

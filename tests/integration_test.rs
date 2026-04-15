@@ -2594,22 +2594,23 @@ mod tests {
     }
 
     async fn e2e_handle_derived_stream_evaluation_failure() {
-        let auth = setup();
-        // Create a pipeline with invalid SQL to cause evaluation failure
+        // Create a pipeline that queries a non-existent stream to cause evaluation failure.
+        // evaluate_scheduled() returns Err when the stream is not found in schema cache,
+        // which should increment the trigger's retries counter.
         let pipeline_data = Pipeline {
             id: "test_derived_stream_pipeline_invalid".to_string(),
             version: 1,
             enabled: true,
             org: "e2e".to_string(),
             name: "test_derived_stream_invalid".to_string(),
-            description: "Test pipeline with invalid SQL".to_string(),
+            description: "Test pipeline with non-existent stream to cause evaluation failure"
+                .to_string(),
             source: PipelineSource::Scheduled(DerivedStream {
                 org_id: "e2e".to_string(),
                 stream_type: StreamType::Logs,
                 query_condition: QueryCondition {
                     query_type: config::meta::alerts::QueryType::SQL,
-                    sql: Some("SELECT _timestamp, city FROM \"olympics_schema\"".to_string()), /* Invalid
-                                                                                                * SQL */
+                    sql: Some("SELECT * FROM \"nonexistent_stream_xyz_abc_test\"".to_string()),
                     ..Default::default()
                 },
                 trigger_condition: TriggerCondition {
@@ -2622,7 +2623,7 @@ mod tests {
                 delay: None,
             }),
             nodes: vec![
-                // Source node (query node for scheduled pipeline with invalid SQL)
+                // Source node (query node for scheduled pipeline with non-existent stream)
                 config::meta::pipeline::components::Node::new(
                     "source-node-2".to_string(),
                     config::meta::pipeline::components::NodeData::Query(DerivedStream {
@@ -2631,7 +2632,7 @@ mod tests {
                         query_condition: QueryCondition {
                             query_type: config::meta::alerts::QueryType::SQL,
                             sql: Some(
-                                "SELECT _timestamp, city FROM \"olympics_schema\"".to_string(),
+                                "SELECT * FROM \"nonexistent_stream_xyz_abc_test\"".to_string(),
                             ),
                             ..Default::default()
                         },
@@ -2669,28 +2670,26 @@ mod tests {
             )],
         };
 
-        // Save pipeline using API call
-        e2e_post_pipeline(pipeline_data.clone()).await;
-
-        // Check if pipeline was saved successfully by doing a list using API
-        let app = init_test_router();
-
-        // delete the city field from the stream
-        // Make a PUT call to `e2e/streams/olympics_schema/delete_fields` api
-        // with `{"fields":["method"]}` as the payload
-        let delete_fields_url = "/api/e2e/streams/olympics_schema/delete_fields";
-        let delete_fields_payload = serde_json::json!({"fields": ["city"]});
-
-        let headers = auth_headers(auth);
-        let (status, _body) = make_request(
-            &app,
-            Method::PUT,
-            delete_fields_url,
-            Some(headers),
-            Some(serde_json::to_string(&delete_fields_payload).unwrap()),
+        // Save pipeline directly to DB (bypassing API validation) to simulate a pipeline
+        // with an invalid query that was saved before validation was added, or to test
+        // what happens at evaluation time when the stream does not exist.
+        openobserve::service::db::pipeline::set(&pipeline_data)
+            .await
+            .expect("Failed to set pipeline in DB");
+        // Create the scheduler trigger directly with needs_validated=false so the
+        // non-existent stream does not fail the pre-save test run.
+        let derived_stream = match &pipeline_data.source {
+            PipelineSource::Scheduled(ds) => ds.clone(),
+            _ => panic!("Expected scheduled pipeline"),
+        };
+        openobserve::service::alerts::derived_streams::save(
+            derived_stream,
+            &pipeline_data.name,
+            &pipeline_data.id,
+            false,
         )
-        .await;
-        assert!(status.is_success(), "Failed to delete fields");
+        .await
+        .expect("Failed to save derived stream trigger");
 
         let pipeline = get_pipeline_from_api(pipeline_data.name.as_str()).await;
 

@@ -184,7 +184,10 @@ import {
   outlinedArrowBackIos,
   outlinedArrowForwardIos,
 } from "@quasar/extras/material-icons-outlined";
-import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import {
+  SPAN_KIND_MAP,
+  parseSpanKindWhereClause,
+} from "@/utils/traces/constants";
 
 const props = defineProps({
   row: {
@@ -282,7 +285,7 @@ const mappedFieldValues = computed(() => {
     ...entry,
     values: entry.values.map((v: { key: string; count: number }) => ({
       ...v,
-      label:
+      key:
         v.key === null || v.key === undefined || v.key === ""
           ? "Unspecified"
           : (SPAN_KIND_MAP[v.key] ?? v.key),
@@ -341,6 +344,12 @@ const buildSql = (): string => {
   if (typeof durationParseResult === "string") {
     whereClause = durationParseResult;
   }
+
+  whereClause = parseSpanKindWhereClause(
+    whereClause,
+    sqlParser.value,
+    searchObj.data.stream.selectedStream.value,
+  );
 
   const streamName = searchObj.data.stream.selectedStream.value;
   let sql = `SELECT * FROM "${streamName}"`;

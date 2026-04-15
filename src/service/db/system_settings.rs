@@ -705,7 +705,7 @@ mod tests {
         use config::meta::correlation::{FieldAlias, IdentitySet};
 
         // Simulate semantic groups that would be loaded
-        let semantic_groups = vec![
+        let semantic_groups = [
             FieldAlias::with_group("environment", "Environment", "Common", &["env"]),
             FieldAlias::with_group("region", "Region", "Common", &["region"]),
             FieldAlias::with_group("k8s-cluster", "K8s Cluster", "Kubernetes", &["cluster"]),

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page
-    class="tracePage tw:h-[calc(100vh-2.25rem)] tw:min-h-[calc(100vh-2.25rem)]! tw:max-h-[calc(100vh-2.25rem)]! tw:overflow-hidden!"
+    class="tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filters-reset="onFiltersReset"
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
+              @service-graph-refresh="serviceGraphRef?.loadServiceGraph()"
             />
           </div>
         </template>
@@ -63,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
           >
             <service-graph
+              ref="serviceGraphRef"
               class="tw:h-full"
               @view-traces="handleServiceGraphViewTraces"
             />
@@ -201,8 +203,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="traces-search-error-text"
                     class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
-                    <q-icon name="info" color="primary" size="md" />
-                    {{ searchObj.data.errorMsg }}
+                    <SanitizedHtmlRenderer
+                      data-test="traces-search-detail-error-message"
+                      :htmlContent="searchObj?.data?.errorMsg"
+                      class="tw:pt-[1rem]"
+                    />
                   </div>
                   <div
                     v-else-if="!isStreamSelected"
@@ -297,6 +302,7 @@ import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
@@ -331,6 +337,7 @@ const { fnParsedSQL } = logsUtils();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
+const serviceGraphRef = ref<any>(null);
 const splitterModel = ref(15);
 let parser: any;
 const fieldValues = ref({});
@@ -662,6 +669,13 @@ function buildSearch() {
         whereClause = durationParseResult;
       }
 
+      // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
+      whereClause = parseSpanKindWhereClause(
+        whereClause,
+        parser,
+        searchObj.data.stream.selectedStream.value,
+      );
+
       whereClause = whereClause
         .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
         .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
@@ -869,6 +883,13 @@ async function getQueryData(
       filter = filterParseResult;
     }
 
+    // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
+    filter = parseSpanKindWhereClause(
+      filter,
+      parser,
+      searchObj.data.stream.selectedStream.value,
+    );
+
     const combinedFilter = filter;
 
     if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
@@ -893,10 +914,7 @@ async function getQueryData(
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
-      const sortCol =
-        searchObj.meta.resultGrid.sortBy === "duration"
-          ? "duration"
-          : "start_time";
+      const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
       const sortOrd = (
         searchObj.meta.resultGrid.sortOrder || "desc"
       ).toUpperCase();
@@ -1017,7 +1035,8 @@ async function getQueryData(
           const errData = err?.content || err;
           const { message, trace_id, code, error_detail } = errData ?? {};
 
-          let errorMsg = message || err?.message || "Search request failed";
+          let errorMsg =
+            message || err?.message || "Error while processing request";
           if (code) {
             searchObj.data.errorCode = code;
             const customMessage = logsErrorMessage(code);
@@ -1540,6 +1559,13 @@ const onErrorOnlyToggled = (value: boolean) => {
 const onSearchModeChange = (mode: "traces" | "spans" | "service-graph") => {
   searchObj.meta.searchMode = mode;
   if (mode === "service-graph") return;
+  if (
+    mode === "traces" &&
+    searchObj.meta.resultGrid.sortBy !== "start_time" &&
+    searchObj.meta.resultGrid.sortBy !== "duration"
+  ) {
+    searchObj.meta.resultGrid.sortBy = "start_time";
+  }
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.data.queryResults = {
     hits: [],
@@ -1834,7 +1860,7 @@ watch(moveSplitter, () => {
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
   // Switch to search tab
-  searchObj.meta.searchMode = "spans";
+  searchObj.meta.searchMode = data.mode;
 
   // Set the selected stream in dropdown
   if (data.stream) {
@@ -1859,6 +1885,10 @@ const handleServiceGraphViewTraces = (data: any) => {
     if (data.podName) {
       const escapedPodName = escapeSingleQuotes(data.podName);
       filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
+    }
+    if (data.resourceFilter?.field && data.resourceFilter?.value) {
+      const escapedValue = escapeSingleQuotes(data.resourceFilter.value);
+      filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
     }
     if (data.errorsOnly) {
       filterQuery += ` AND span_status = 'ERROR'`;
@@ -1958,6 +1988,11 @@ watch(
 
   .q-field__control-container {
     padding-top: 0px !important;
+  }
+
+  .traces-horizontal-splitter .q-splitter__before {
+    z-index: auto;
+    overflow: visible;
   }
 }
 </style>

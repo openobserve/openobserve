@@ -1,9 +1,9 @@
 <template>
-  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] tw:bg-white">
+  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] eval-page-bg">
     <!-- LIST VIEW -->
     <template v-if="!showCreateForm">
       <!-- Header Toolbar -->
-      <div class="tw:bg-white tw:mb-[0.8rem] tw:border-b tw:border-gray-200">
+      <div class="eval-header-bar tw:mb-[0.8rem] tw:border-b eval-border-color">
         <div
           class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]"
         >
@@ -32,8 +32,8 @@
 
       <!-- Main Content Table -->
       <div
-        class="q-px-md q-pt-sm q-pb-md tw:bg-white"
-        style="height: calc(100vh - 128px)"
+        class="q-px-md q-pt-sm q-pb-md eval-page-bg"
+        style="height: calc(100vh - var(--navbar-height) - 77px)"
       >
         <q-table
           :rows="templates"
@@ -42,7 +42,7 @@
           :loading="loading"
           :pagination="pagination"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          style="width: 100%; height: 100%"
+          style="width: 100%; height: calc(100vh - var(--navbar-height) - 77px)"
         >
           <template v-slot:body-cell-version="props">
             <q-td :props="props">
@@ -71,15 +71,6 @@
                 @click="deleteTemplate(props.row)"
                 :title="t('common.delete')"
               />
-              <q-btn
-                flat
-                round
-                dense
-                icon="bar_chart"
-                size="sm"
-                @click="showStats(props.row)"
-                :title="t('pipeline.statistics')"
-              />
             </q-td>
           </template>
 
@@ -95,7 +86,7 @@
     <!-- CREATE/EDIT FORM VIEW -->
     <template v-else>
       <!-- Header Toolbar -->
-      <div class="tw:bg-white tw:mb-[0.8rem] tw:border-b tw:border-gray-200">
+      <div class="eval-header-bar tw:mb-[0.8rem] tw:border-b eval-border-color">
         <div
           class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]"
         >
@@ -202,76 +193,6 @@
       </div>
     </template>
 
-    <!-- Stats Dialog -->
-    <q-dialog v-model="showStatsDialog">
-      <q-card style="width: 500px">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">{{ t("evalTemplate.statsTitle") }}</div>
-          <q-space />
-          <q-btn icon="close"
-flat round
-dense v-close-popup />
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section v-if="selectedStats" class="scroll q-px-lg q-py-md">
-          <div class="q-mb-lg">
-            <div class="text-h6">{{ selectedStats.name }}</div>
-            <div class="text-caption text-grey-6">
-              v{{ selectedStats.version }}
-            </div>
-          </div>
-
-          <div class="q-mb-lg">
-            <div class="text-subtitle2 q-mb-sm">{{ t("evalTemplate.avgQualityScore") }}</div>
-            <q-linear-progress
-              :value="selectedStats.avg_quality_score"
-              color="primary"
-              class="q-mb-md"
-            />
-            <div class="text-body2">
-              {{ (selectedStats.avg_quality_score * 100).toFixed(1) }}%
-            </div>
-          </div>
-
-          <q-separator class="q-my-lg" />
-
-          <div>
-            <div class="text-subtitle2 q-mb-md">{{ t("evalTemplate.usageStats") }}</div>
-            <q-list bordered separator>
-              <q-item>
-                <q-item-section>
-                  <div class="text-subtitle2">{{ t("evalTemplate.totalEvaluations") }}</div>
-                </q-item-section>
-                <q-item-section side>
-                  <div class="text-weight-bold">
-                    {{ selectedStats.total_evaluations }}
-                  </div>
-                </q-item-section>
-              </q-item>
-              <q-item>
-                <q-item-section>
-                  <div class="text-subtitle2">{{ t("evalTemplate.lastUsed") }}</div>
-                </q-item-section>
-                <q-item-section side>
-                  <div class="text-caption">
-                    {{ formatDate(selectedStats.last_used) }}
-                  </div>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </div>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-actions align="right" class="q-pa-md">
-          <q-btn flat :label="t('common.close')"
-color="primary" v-close-popup />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
   </div>
 </template>
 
@@ -295,14 +216,6 @@ interface Template {
   updated_at: number;
 }
 
-interface Stats {
-  template_id: string;
-  name: string;
-  version: number;
-  total_evaluations: number;
-  avg_quality_score: number;
-  last_used: number;
-}
 
 const $q = useQuasar();
 const { t } = useI18n();
@@ -312,9 +225,7 @@ const templates = ref<Template[]>([]);
 const loading = ref(false);
 const saving = ref(false);
 const showCreateForm = ref(false);
-const showStatsDialog = ref(false);
 const editingTemplate = ref<Template | null>(null);
-const selectedStats = ref<Stats | null>(null);
 
 const form = ref({
   name: "",
@@ -389,12 +300,11 @@ const columns = [
   { name: "version", label: t("common.version"), field: "version", align: "center" },
   {
     name: "updated_at",
-    label: t("pipeline.updated"),
+    label: t("common.updated_at"),
     field: "updated_at",
     align: "left",
     format: formatDate,
   },
-  { name: "stats", label: t("pipeline.statistics"), align: "center" },
   { name: "actions", label: t("common.actions"), align: "center" },
 ];
 
@@ -536,26 +446,6 @@ const deleteTemplate = async (template: Template) => {
   });
 };
 
-const showStats = async (template: Template) => {
-  try {
-    const orgId =
-      (route.query.org_identifier as string) ||
-      localStorage.getItem("org_id") ||
-      "default";
-    selectedStats.value = await evalTemplateService.getTemplateStats(
-      orgId,
-      template.id,
-    );
-    showStatsDialog.value = true;
-  } catch (error) {
-    $q.notify({
-      type: "negative",
-      message: t("evalTemplate.statsLoadFailed"),
-      caption: String(error),
-    });
-  }
-};
-
 const resetForm = () => {
   form.value = {
     name: "",
@@ -569,8 +459,21 @@ const resetForm = () => {
 </script>
 
 <style scoped lang="scss">
+.eval-page-bg {
+  background: var(--o2-app-bg, var(--q-color-page));
+}
+
+.eval-header-bar {
+  background: var(--o2-app-bg, var(--q-color-page));
+}
+
+.eval-border-color {
+  border-color: var(--o2-border-color, rgba(0, 0, 0, 0.12));
+}
+
 .card-container {
-  background: var(--q-color-page);
+  background: var(--o2-card-bg, var(--q-color-page));
+  border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.12));
   border-radius: 4px;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
 }

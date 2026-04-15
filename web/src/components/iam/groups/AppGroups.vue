@@ -52,11 +52,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div>
     <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-[calc(100vh-127px)]">      
+      <div class="card-container"  style="height: calc(100vh - var(--navbar-height) - 92px)">      
         <app-table
         data-test="iam-groups-table-section"
         class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
-        :tableStyle="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
+        :tableStyle="hasVisibleRows ? 'height: calc(100vh - var(--navbar-height) - 92px); overflow-y: auto;' : ''"
         :rows="visibleRows"
         :columns="columns"
         pagination

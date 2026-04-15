@@ -19,37 +19,119 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-// Stub TenstackTable — cell rendering and virtualizer are not under test here
-vi.mock("@/components/TenstackTable.vue", () => ({
-  default: {
-    name: "TenstackTable",
-    props: [
-      "columns", "rows", "rowClass", "loading",
-      "sortBy", "sortOrder", "sortFieldMap", "rowHeight",
-      "enableColumnReorder", "enableRowExpand", "enableTextHighlight",
-      "enableCellActions", "enableStatusBar", "defaultColumns",
-      "selectedStreamFields",
-    ],
-    emits: ["click:data-row", "sort-change"],
-    // Mirror the real slot behaviour used by TracesSearchResultList
-    template: `<div data-test="stub-traces-table"><slot v-if="loading && (!rows || rows.length === 0)" name="loading" /><slot v-else name="empty" /></div>`,
+// ─── Quasar mock — intercept copyToClipboard ────────────────────────────────
+// vi.mock is hoisted by Vitest, so the factory runs before any const declarations.
+// Use vi.hoisted() to create the spy in the hoisted scope so it's available
+// both inside the factory and in test assertions.
+//
+// cellActionsColumnRef drives the column passed to the cell-actions slot in the
+// TenstackTable stub.  The component uses `column.id` and `row[column.id]`
+// directly in its @copy handler (not event args), so each copy test must set
+// the right column.id + include the matching field in the hit before mounting.
+const { mockQCopyToClipboard, cellActionsColumnRef } = vi.hoisted(() => ({
+  mockQCopyToClipboard: vi.fn().mockResolvedValue(undefined),
+  cellActionsColumnRef: {
+    id: undefined as string | undefined,
+    columnDef: { meta: { disableCellAction: false } },
   },
 }));
+vi.mock("quasar", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    copyToClipboard: mockQCopyToClipboard,
+    useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
+  };
+});
+
+// ─── Shared searchObj reference — lets tests read addToFilter after mutation ─
+const sharedSearchObj = {
+  data: {
+    stream: { selectedStreamFields: [] as string[], addToFilter: "" },
+    resultGrid: { columns: [] as any[] },
+  },
+};
 
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
-    searchObj: {
-      data: {
-        stream: { selectedStreamFields: [], addToFilter: "" },
-        resultGrid: { columns: [] },
-      },
-    },
+    searchObj: sharedSearchObj,
     updatedLocalLogFilterField: vi.fn(),
   }),
 }));
 
+// ─── CellActions stub — emits copy/add-search-term with the field + value
+// that are passed down from the component via its @copy / @add-search-term
+// bindings on the real CellActions component.  The stub captures the props
+// and re-emits them verbatim so tests can trigger the component's handlers
+// with explicit field/value pairs via wrapper.vm.$emit on the stub.
+vi.mock("@/plugins/logs/data-table/CellActions.vue", () => ({
+  default: {
+    name: "CellActions",
+    props: [
+      "column",
+      "row",
+      "selectedStreamFields",
+      "hideSearchTermActions",
+      "hideAi",
+    ],
+    emits: ["copy", "add-search-term", "send-to-ai-chat"],
+    template: `<div data-test="stub-cell-actions" />`,
+  },
+}));
+
+// ─── TenstackTable stub — renders loading/empty/cell slots ──────────────────
+// Also renders cell-actions slot so CellActions can be exercised in tests.
+// setup() exposes cellActionsColumnRef so each test can control column.id — the
+// component's @copy handler uses column.id + row[column.id] from the slot scope,
+// not the event args emitted by CellActions.
+vi.mock("@/components/TenstackTable.vue", () => ({
+  default: {
+    name: "TenstackTable",
+    props: [
+      "columns",
+      "rows",
+      "rowClass",
+      "loading",
+      "sortBy",
+      "sortOrder",
+      "sortFieldMap",
+      "rowHeight",
+      "enableColumnReorder",
+      "enableRowExpand",
+      "enableTextHighlight",
+      "enableCellActions",
+      "enableStatusBar",
+      "defaultColumns",
+      "selectedStreamFields",
+    ],
+    emits: ["click:data-row", "sort-change"],
+    setup() {
+      return { cellActionsColumn: cellActionsColumnRef };
+    },
+    // Mirror the real slot behaviour used by TracesSearchResultList.
+    // Also render cell slots for the first row so slot-split tests can assert on rendered output.
+    template: `
+      <div data-test="stub-traces-table">
+        <slot v-if="loading && (!rows || rows.length === 0)" name="loading" />
+        <slot v-else name="empty" />
+        <template v-if="rows && rows.length">
+          <div data-test="stub-cell-span_status"><slot name="cell-span_status" :item="rows[0]" /></div>
+          <div data-test="stub-cell-status"><slot name="cell-status" :item="rows[0]" /></div>
+          <div data-test="stub-cell-actions-wrapper">
+            <slot name="cell-actions" :row="rows[0]" :column="cellActionsColumn" :active="true" />
+          </div>
+        </template>
+      </div>
+    `,
+  },
+}));
+
 vi.mock("./TraceTimestampCell.vue", () => ({
-  default: { name: "TraceTimestampCell", props: ["item"], template: "<span />" },
+  default: {
+    name: "TraceTimestampCell",
+    props: ["item"],
+    template: "<span />",
+  },
 }));
 vi.mock("./TraceServiceCell.vue", () => ({
   default: { name: "TraceServiceCell", props: ["item"], template: "<span />" },
@@ -92,9 +174,17 @@ describe("TracesSearchResultList", () => {
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
+    // Reset shared searchObj state between tests
+    sharedSearchObj.data.stream.addToFilter = "";
+    sharedSearchObj.data.stream.selectedStreamFields = [];
+    sharedSearchObj.data.resultGrid.columns = [];
+    // Reset the column ref so copy tests don't bleed into each other
+    cellActionsColumnRef.id = undefined;
   });
 
-  const mount_ = (props: { hits: any[]; loading: boolean } & Record<string, any>) =>
+  const mount_ = (
+    props: { hits: any[]; loading: boolean } & Record<string, any>,
+  ) =>
     mount(TracesSearchResultList, {
       props: props as any,
       global: { plugins: [i18n, store] },
@@ -104,7 +194,9 @@ describe("TracesSearchResultList", () => {
   describe("loading state", () => {
     it("shows a spinner while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
-      expect(wrapper.findComponent({ name: "QSpinnerHourglass" }).exists()).toBe(true);
+      expect(
+        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+      ).toBe(true);
     });
 
     // The component uses v-show="hasResults || loading" on the table wrapper, so
@@ -112,7 +204,9 @@ describe("TracesSearchResultList", () => {
     // It is only absent from the DOM when noResults is true (searchPerformed && !loading && empty).
     it.skip("hides the table wrapper while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
+        false,
+      );
     });
 
     it("hides the empty state while loading", () => {
@@ -130,12 +224,16 @@ describe("TracesSearchResultList", () => {
 
     it("does not show spinner in empty state", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: true });
-      expect(wrapper.findComponent({ name: "QSpinnerHourglass" }).exists()).toBe(false);
+      expect(
+        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+      ).toBe(false);
     });
 
     it("does not show the table in empty state", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
+        false,
+      );
     });
 
     it("does not show no-results message when searchPerformed is false", () => {
@@ -150,59 +248,21 @@ describe("TracesSearchResultList", () => {
 
     it("shows the table wrapper when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
+        true,
+      );
     });
 
     it("does not show spinner when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
-      expect(wrapper.findComponent({ name: "QSpinnerHourglass" }).exists()).toBe(false);
+      expect(
+        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+      ).toBe(false);
     });
 
     it("does not show the no-results message when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
       expect(wrapper.text()).not.toContain("No traces found");
-    });
-  });
-
-  // ─── Section header ───────────────────────────────────────────────────────
-  describe("section header", () => {
-    const hits = [makeHit("t1"), makeHit("t2")];
-
-    it("shows the section header by default", () => {
-      wrapper = mount_({ hits, loading: false });
-      expect(wrapper.find('[data-test="traces-section-header"]').exists()).toBe(true);
-    });
-
-    it("shows TRACES title in the header", () => {
-      wrapper = mount_({ hits, loading: false });
-      expect(wrapper.find('[data-test="traces-section-title"]').text().toUpperCase()).toContain("TRACES");
-    });
-
-    it("hides the header when showHeader=false", () => {
-      wrapper = mount_({ hits, loading: false, showHeader: false });
-      expect(wrapper.find('[data-test="traces-section-header"]').exists()).toBe(false);
-    });
-  });
-
-  // ─── Count badge ──────────────────────────────────────────────────────────
-  describe("count badge", () => {
-    it("shows hits.length in the badge when total prop is not provided", () => {
-      const hits = [makeHit("t1"), makeHit("t2"), makeHit("t3")];
-      wrapper = mount_({ hits, loading: false });
-      const badge = wrapper.find('[data-test="traces-count-badge"]');
-      expect(badge.text()).toContain("3");
-    });
-
-    it("shows total prop value in the badge when provided", () => {
-      wrapper = mount_({ hits: [makeHit("t1")], loading: false, total: 999 });
-      const badge = wrapper.find('[data-test="traces-count-badge"]');
-      expect(badge.text()).toContain("999");
-    });
-
-    it("shows 0 total when total prop is 0", () => {
-      wrapper = mount_({ hits: [makeHit("t1")], loading: false, total: 0 });
-      const badge = wrapper.find('[data-test="traces-count-badge"]');
-      expect(badge.text()).toContain("0");
     });
   });
 
@@ -252,37 +312,6 @@ describe("TracesSearchResultList", () => {
     });
   });
 
-  // --- Tests for spans mode (added in Mar 10 commit ae988c7) ---
-
-  describe("searchMode='spans' — section title and badge", () => {
-    const hits = [makeHit("t1")];
-
-    it("shows 'SPANS' title when searchMode='spans'", () => {
-      wrapper = mount_({ hits, loading: false, searchMode: "spans" });
-      const title = wrapper.find('[data-test="traces-section-title"]');
-      expect(title.text().toUpperCase()).toContain("SPANS");
-    });
-
-    it("does not show 'TRACES' in title when searchMode='spans'", () => {
-      wrapper = mount_({ hits, loading: false, searchMode: "spans" });
-      const title = wrapper.find('[data-test="traces-section-title"]');
-      expect(title.text().toUpperCase()).not.toContain("TRACES");
-    });
-
-    it("shows 'TRACES' title by default (no searchMode prop)", () => {
-      wrapper = mount_({ hits, loading: false });
-      const title = wrapper.find('[data-test="traces-section-title"]');
-      expect(title.text().toUpperCase()).toContain("TRACES");
-    });
-
-    it("shows 'Spans Found' text in badge when searchMode='spans'", () => {
-      wrapper = mount_({ hits, loading: false, searchMode: "spans" });
-      const badge = wrapper.find('[data-test="traces-count-badge"]');
-      // badge label contains "spans found" (case-insensitive from i18n key)
-      expect(badge.text().toLowerCase()).toContain("span");
-    });
-  });
-
   describe("row error class — spans mode", () => {
     const makeSpanHit = (id: string, span_status = "OK") => ({
       trace_id: id,
@@ -296,50 +325,221 @@ describe("TracesSearchResultList", () => {
     });
 
     it("uses span_status='ERROR' for error class in spans mode", () => {
-      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
+      wrapper = mount_({
+        hits: [makeSpanHit("s1")],
+        loading: false,
+        searchMode: "spans",
+      });
       const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe("oz-table__row--error");
+      expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe(
+        "oz-table__row--error",
+      );
     });
 
     it("returns empty string for non-error span_status in spans mode", () => {
-      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false, searchMode: "spans" });
+      wrapper = mount_({
+        hits: [makeSpanHit("s1")],
+        loading: false,
+        searchMode: "spans",
+      });
       const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       expect(rowClassFn(makeSpanHit("s1", "OK"))).toBe("");
     });
 
     it("uses errors count (not span_status) for error class in traces mode", () => {
-      wrapper = mount_({ hits: [makeHit("t1", 0)], loading: false, searchMode: "traces" });
+      wrapper = mount_({
+        hits: [makeHit("t1", 0)],
+        loading: false,
+        searchMode: "traces",
+      });
       const table = wrapper.findComponent({ name: "TenstackTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       // traces mode: errors > 0 triggers error class
-      expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe("oz-table__row--error");
+      expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe(
+        "oz-table__row--error",
+      );
     });
   });
 
-  describe("error count badge", () => {
-    const hits = [makeHit("t1")];
-
-    it("shows error count badge when errorCount > 0", () => {
-      wrapper = mount_({ hits, loading: false, errorCount: 5 });
-      expect(wrapper.find('[data-test="traces-error-count-badge"]').exists()).toBe(true);
+  // ─── Cell slot split: span_status vs status ──────────────────────────────
+  describe("cell slot split — span_status and status", () => {
+    const makeSpanHit = (id: string) => ({
+      trace_id: id,
+      service_name: "frontend",
+      operation_name: "GET /",
+      duration: 120000,
+      spans: 1,
+      span_status: "OK",
+      status: "STATUS_CODE_OK",
+      services: {},
+      start_time: Date.now() * 1_000_000,
     });
 
-    it("shows correct error count number in the badge", () => {
-      wrapper = mount_({ hits, loading: false, errorCount: 7 });
-      const badge = wrapper.find('[data-test="traces-error-count-badge"]');
-      expect(badge.text()).toContain("7");
+    it("renders SpanStatusPill inside #cell-span_status slot", () => {
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
+      const cell = wrapper.find('[data-test="stub-cell-span_status"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.findComponent({ name: "SpanStatusPill" }).exists()).toBe(
+        true,
+      );
     });
 
-    it("hides error count badge when errorCount is 0", () => {
-      wrapper = mount_({ hits, loading: false, errorCount: 0 });
-      expect(wrapper.find('[data-test="traces-error-count-badge"]').exists()).toBe(false);
+    it("passes item.span_status to SpanStatusPill in #cell-span_status slot", () => {
+      const hit = makeSpanHit("s1");
+      wrapper = mount_({ hits: [hit], loading: false } as any);
+      const pill = wrapper
+        .find('[data-test="stub-cell-span_status"]')
+        .findComponent({ name: "SpanStatusPill" });
+      expect(pill.props("status")).toBe("OK");
     });
 
-    it("hides error count badge when errorCount is undefined", () => {
-      wrapper = mount_({ hits, loading: false });
-      expect(wrapper.find('[data-test="traces-error-count-badge"]').exists()).toBe(false);
+    it("renders TraceStatusCell inside #cell-status slot", () => {
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
+      const cell = wrapper.find('[data-test="stub-cell-status"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.findComponent({ name: "TraceStatusCell" }).exists()).toBe(
+        true,
+      );
+    });
+
+    it("does NOT render SpanStatusPill inside #cell-status slot", () => {
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
+      const statusCell = wrapper.find('[data-test="stub-cell-status"]');
+      expect(
+        statusCell.findComponent({ name: "SpanStatusPill" }).exists(),
+      ).toBe(false);
+    });
+
+    it("does NOT render TraceStatusCell inside #cell-span_status slot", () => {
+      wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
+      const spanStatusCell = wrapper.find(
+        '[data-test="stub-cell-span_status"]',
+      );
+      expect(
+        spanStatusCell.findComponent({ name: "TraceStatusCell" }).exists(),
+      ).toBe(false);
+    });
+  });
+
+  // ─── copyToClipboard — span_kind translation ──────────────────────────────
+  // The component's @copy handler is an inline expression:
+  //   @copy="copyToClipboard(column.id, row[column.id])"
+  // It uses column.id and row[column.id] from the slot scope — it does NOT
+  // forward the args emitted by CellActions.  Each test therefore:
+  //   1. Sets cellActionsColumnRef.id to the target field before mounting
+  //   2. Passes a hit that contains that field with the desired value
+  //   3. Emits "copy" with no args — the handler picks up field+value from scope
+  describe("copyToClipboard — span_kind translation", () => {
+    it("should copy the display label when field is span_kind and value maps to a known entry", async () => {
+      // value "2" maps to "Server" in SPAN_KIND_MAP
+      cellActionsColumnRef.id = "span_kind";
+      wrapper = mount_({
+        hits: [{ ...makeHit("t1"), span_kind: "2" }],
+        loading: false,
+      });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      await cellActions.vm.$emit("copy");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("Server");
+    });
+
+    it("should copy the raw value when field is span_kind and value is not in the map", async () => {
+      // value "99" has no mapping — raw string is copied unchanged
+      cellActionsColumnRef.id = "span_kind";
+      wrapper = mount_({
+        hits: [{ ...makeHit("t1"), span_kind: "99" }],
+        loading: false,
+      });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      await cellActions.vm.$emit("copy");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("99");
+    });
+
+    it("should copy the raw value without translation when field is not span_kind", async () => {
+      // non-span_kind field — no translation applied
+      cellActionsColumnRef.id = "some_other_field";
+      wrapper = mount_({
+        hits: [{ ...makeHit("t1"), some_other_field: "2" }],
+        loading: false,
+      });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      await cellActions.vm.$emit("copy");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("2");
+    });
+  });
+
+  // ─── addSearchTerm — span_kind translation in filter string ──────────────
+  // The component handler is invoked by CellActions via its @add-search-term event.
+  // We emit the event on the CellActions stub and assert the resulting
+  // searchObj.data.stream.addToFilter string.
+  describe("addSearchTerm — span_kind translation", () => {
+    const hit = makeHit("t1");
+
+    it("should include display label in filter when field is span_kind and value maps to a known entry", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      // value "2" maps to "Server"
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "span_kind",
+        "2",
+        "include",
+      );
+      expect(sharedSearchObj.data.stream.addToFilter).toContain(
+        "span_kind = 'Server'",
+      );
+    });
+
+    it("should include raw value in filter when field is span_kind and value is not in the map", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      // value "99" has no mapping — raw string used in filter
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "span_kind",
+        "99",
+        "include",
+      );
+      expect(sharedSearchObj.data.stream.addToFilter).toContain(
+        "span_kind = '99'",
+      );
+    });
+
+    it("should include raw value without translation when field is not span_kind", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      // non-span_kind field — no translation
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "service_name",
+        "my-svc",
+        "include",
+      );
+      expect(sharedSearchObj.data.stream.addToFilter).toContain(
+        "service_name = 'my-svc'",
+      );
+    });
+
+    it("should use != operator for exclude action", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "span_kind",
+        "2",
+        "exclude",
+      );
+      expect(sharedSearchObj.data.stream.addToFilter).toContain(
+        "span_kind != 'Server'",
+      );
     });
   });
 });

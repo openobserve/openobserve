@@ -15,6 +15,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe("Landing Page Test Cases", () => {
   test.describe.configure({ mode: 'serial' });
@@ -66,7 +67,7 @@ test.describe("Landing Page Test Cases", () => {
    */
   async function setupLogsState(page, pm) {
     // Navigate to logs page
-    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
+    const logsUrl = `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`;
     await page.goto(logsUrl);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
@@ -423,7 +424,7 @@ test.describe("Landing Page Test Cases", () => {
     pm = new PageManager(page);
 
     // Navigate to home page
-    const homeUrl = `/web/?org_identifier=${process.env["ORGNAME"]}`;
+    const homeUrl = `/web/?org_identifier=${getOrgIdentifier()}`;
     await page.goto(homeUrl);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 

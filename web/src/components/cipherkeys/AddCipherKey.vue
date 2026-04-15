@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="addCipherKeyFormRef"
       @submit="onSubmit"
     >
-    <div style="height: calc(100vh - 180px); overflow: auto">
+    <div style="height: calc(100vh -  var(--navbar-height) - 155px); overflow: auto">
       <div class="row">
         <div class="col-4 o2-input flex q-mx-md q-mt-md">
           <q-input
@@ -73,12 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <div style="height: calc(100vh -  var(--navbar-height) - 300px);">
       <q-stepper
         v-model="step"
         vertical
         color="primary"
         animated
-        class="q-mx-md q-pa-none"
+        class="q-mx-md q-pa-none tw:h-full"
         header-nav
       >
         <q-step
@@ -156,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-stepper-navigation>
         </q-step>
       </q-stepper>
+      </div>
     </div>
     <div class="tw:mx-2">
             <div class="flex justify-end q-px-sm q-py-lg full-width"

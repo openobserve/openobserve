@@ -142,13 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <span class="tw:text-sm"
                         :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
-                        v-html="getInlineEventText(event)"
+                        v-html="DOMPurify.sanitize(getInlineEventText(event))"
                       ></span>
                     </template>
                     <!-- For System Events: text, badge -->
                     <template v-else>
                       <!-- AI events: "AI SRE" badge first, then message text -->
-                      <template v-if="event.type === 'ai_analysis_begin' || event.type === 'ai_analysis_complete'">
+                      <template v-if="event.type === 'ai_analysis_begin' || event.type === 'ai_analysis_complete' || event.type === 'ai_analysis_failed'">
                         <span
                           class="tw:inline-flex tw:items-center tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold"
                           :style="{
@@ -156,10 +156,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
                             color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
                           }"
-                        >AI SRE</span>
+                        >
+                          AI SRE
+                          <q-tooltip v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)" :delay="300" class="tw:max-w-sm" anchor="bottom left" self="top left">
+                            {{ getFailureTooltip(event) }}
+                          </q-tooltip>
+                        </span>
                         <span class="tw:text-sm"
                           :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
-                          v-html="getInlineEventText(event)"
+                          v-html="DOMPurify.sanitize(getInlineEventText(event))"
                         ></span>
                       </template>
                       <!-- For Alert events, show badge first -->
@@ -176,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                         <span class="tw:text-sm"
                           :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
-                          v-html="getInlineEventText(event)"
+                          v-html="DOMPurify.sanitize(getInlineEventText(event))"
                         ></span>
                       </template>
                       <!-- All other system events: text then badge (except severity changes) -->
@@ -337,6 +342,7 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { date } from "quasar";
 import incidentsService from "@/services/incidents";
+import DOMPurify from "dompurify";
 
 interface Props {
   orgId: string;
@@ -478,6 +484,7 @@ const getEventIcon = (event: any): string => {
     case "AssignmentChanged": return "person_add";
     case "ai_analysis_begin": return "psychology";
     case "ai_analysis_complete": return "check";
+    case "ai_analysis_failed": return "error_outline";
     default: return "circle";
   }
 };
@@ -497,6 +504,7 @@ const getEventBadgeColor = (event: any): string => {
     case "AssignmentChanged": return "#06B6D4"; // cyan
     case "ai_analysis_begin":
     case "ai_analysis_complete": return "#8B5CF6"; // purple
+    case "ai_analysis_failed": return "#EF4444"; // red
     default: return "#6B7280"; // gray
   }
 };
@@ -516,6 +524,7 @@ const getEventBadgeText = (event: any): string => {
     case "AssignmentChanged": return "Assignment";
     case "ai_analysis_begin": return "AI Analysis";
     case "ai_analysis_complete": return "AI Complete";
+    case "ai_analysis_failed": return "AI Failed";
     default: return event.type;
   }
 };
@@ -538,8 +547,15 @@ const getInlineEventText = (event: any): string => {
   const eventColor = getEventBadgeColor(event);
   const isDark = store.state.theme === 'dark';
   const opacity = isDark ? '50' : '40';
-  const bold = (text: string) => `<span style="font-weight: 600; color: ${eventColor};">${text}</span>`;
-  const severityBadge = (severity: string) => `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background-color: ${getSeverityColor(severity)}${opacity}; color: ${isDark ? '#ffffff' : getSeverityColor(severity)}; border: 1px solid ${getSeverityColor(severity)}${isDark ? '60' : '40'};">${severity}</span>`;
+  // Escape user-controlled strings before embedding in HTML (XSS prevention)
+  const esc = (s: string) => String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  const bold = (text: string) => `<span style="font-weight: 600; color: ${eventColor};">${esc(text)}</span>`;
+  const severityBadge = (severity: string) => `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background-color: ${getSeverityColor(severity)}${opacity}; color: ${isDark ? '#ffffff' : getSeverityColor(severity)}; border: 1px solid ${getSeverityColor(severity)}${isDark ? '60' : '40'};">${esc(severity)}</span>`;
   const isSystemEvent = getUserId(event) === 'System';
 
   switch (event.type) {
@@ -562,8 +578,8 @@ const getInlineEventText = (event: any): string => {
 
     case "SeverityUpgrade":
       return isSystemEvent
-        ? `Severity upgraded from ${severityBadge(data.from)} to ${severityBadge(data.to)}` + (data.reason ? ` - ${data.reason}` : '')
-        : `changed the severity from ${severityBadge(data.from)} to ${severityBadge(data.to)}` + (data.reason ? ` - ${data.reason}` : '');
+        ? `Severity upgraded from ${severityBadge(data.from)} to ${severityBadge(data.to)}` + (data.reason ? ` - ${esc(data.reason)}` : '')
+        : `changed the severity from ${severityBadge(data.from)} to ${severityBadge(data.to)}` + (data.reason ? ` - ${esc(data.reason)}` : '');
 
     case "SeverityOverride":
       return isSystemEvent
@@ -587,9 +603,17 @@ const getInlineEventText = (event: any): string => {
     case "ai_analysis_complete":
       return "Finished the analysis";
 
+    case "ai_analysis_failed":
+      return bold(data.reason || "Analysis failed");
+
     default:
       return "";
   }
+};
+
+// Get tooltip text for AI analysis failure events
+const getFailureTooltip = (event: any): string => {
+  return event.data?.error_details || "";
 };
 
 // Format relative time
