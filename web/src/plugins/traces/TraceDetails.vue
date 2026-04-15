@@ -140,13 +140,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Span Count Badge -->
             <div
               data-test="trace-details-spans-count"
-              class="tw:flex tw:items-center tw:space-x-1 tw:px-3 tw:py-1 tw:bg-white tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:bg-[var(--o2-card-bg)]!"
+              class="tw:flex tw:items-center tw:space-x-1 tw:px-3 tw:py-1 tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:bg-[var(--o2-card-bg)]!"
             >
               <q-icon name="hub" size="14px" />
-              <span data-test="span-count-text"
-                >{{ formatLargeNumber(effectiveSpanList.length) }}
-                {{ t("traces.spansLabel") }}</span
-              >
+              <span data-test="span-count-text">
+                <template v-if="searchObj.data.traceDetails.spansTruncated">
+                  <span class="tw:text-orange-500">{{ formatLargeNumber(effectiveSpanList.length) }}</span><span class="tw:text-[var(--o2-text-primary)]">/{{ formatLargeNumber(searchObj.data.traceDetails.totalSpanCount) }}</span>
+                </template>
+                <template v-else>{{ formatLargeNumber(effectiveSpanList.length) }}</template>
+                {{ t("traces.spansLabel") }}
+              </span>
+              <q-tooltip v-if="searchObj.data.traceDetails.spansTruncated" anchor="bottom middle" self="top middle">
+                {{ t("traces.spansTruncatedWarning", { count: effectiveSpanList.length, total: searchObj.data.traceDetails.totalSpanCount }) }}
+              </q-tooltip>
             </div>
 
             <!-- Error Count Badge -->
@@ -572,6 +578,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :spans="flatSpans"
                 :selected-span-id="selectedSpanId"
                 :trace-duration="traceMetadata?.duration_ms || 0"
+                :is-truncated="searchObj.data.traceDetails.spansTruncated"
+                :total-span-count="searchObj.data.traceDetails.totalSpanCount"
                 @span-selected="updateSelectedSpan"
               />
             </div>
@@ -1038,6 +1046,9 @@ export default defineComponent({
       const sidebarWidthPx = Math.max(remainingWidth * 0.84, 300); // Minimum 300px
       return `${sidebarWidthPx}px`;
     });
+
+    /** Maximum number of spans fetched per trace. Truncation warning is shown when this limit is hit. */
+    const MAX_SPANS_PER_TRACE = 2500;
 
     const serviceColorIndex = ref(0);
     const colors = ref(getAllSpanColors());
@@ -1575,10 +1586,26 @@ export default defineComponent({
       };
     };
 
+    const buildTraceCountQuery = (trace: any) => {
+      const req = getDefaultRequest();
+      req.query.from = 0;
+      req.query.size = 1;
+      req.query.start_time = trace.from;
+      req.query.end_time = trace.to;
+      req.query.sql = b64EncodeUnicode(
+        `SELECT COUNT(*) as total FROM "${trace.stream}" WHERE trace_id = '${trace.trace_id}'`,
+      ) as string;
+      return req;
+    };
+
     const buildTraceSearchQuery = (trace: any) => {
       const req = getDefaultRequest();
       req.query.from = 0;
-      req.query.size = 2500;
+      // Prefer operator-configured limit from backend config; fall back to the
+      // frontend default. When the backend exposes max_spans_per_trace via /config
+      // it is picked up automatically without any code changes.
+      req.query.size =
+        store.state.zoConfig.max_spans_per_trace ?? MAX_SPANS_PER_TRACE;
       req.query.start_time = trace.from;
       req.query.end_time = trace.to;
 
@@ -1732,14 +1759,27 @@ export default defineComponent({
       try {
         searchObj.data.traceDetails.isLoadingTraceDetails = true;
         searchObj.data.traceDetails.spanList = [];
+        searchObj.data.traceDetails.spansTruncated = false;
+        searchObj.data.traceDetails.totalSpanCount = 0;
         const req = buildTraceSearchQuery(data);
+        const countReq = buildTraceCountQuery(data);
 
-        // Fetch trace spans
+        // Fetch trace spans, total span count, and RUM events in parallel
         const tracePromise = searchService.search(
           {
             org_identifier: router.currentRoute.value.query
               ?.org_identifier as string,
             query: req,
+            page_type: "traces",
+          },
+          "ui",
+        );
+
+        const countPromise = searchService.search(
+          {
+            org_identifier: router.currentRoute.value.query
+              ?.org_identifier as string,
+            query: countReq,
             page_type: "traces",
           },
           "ui",
@@ -1752,9 +1792,9 @@ export default defineComponent({
           req.query.end_time,
         );
 
-        // Wait for both requests to complete
-        Promise.all([tracePromise, rumPromise])
-          .then(([traceRes, rumEvents]) => {
+        // Wait for all requests to complete
+        Promise.all([tracePromise, countPromise, rumPromise])
+          .then(([traceRes, countRes, rumEvents]) => {
             if (!traceRes.data?.hits?.length) {
               showTraceDetailsError();
               return;
@@ -1763,7 +1803,13 @@ export default defineComponent({
             // Combine trace spans and RUM events
             const traceSpans = traceRes.data?.hits || [];
             const rumSpans = formatRumEventsAsSpans(rumEvents);
-
+            const limit =
+              store.state.zoConfig.max_spans_per_trace ?? MAX_SPANS_PER_TRACE;
+            const totalFromCount: number =
+              countRes.data?.hits?.[0]?.total ?? traceSpans.length;
+            searchObj.data.traceDetails.totalSpanCount = totalFromCount;
+            searchObj.data.traceDetails.spansTruncated =
+              traceSpans.length >= limit;
             searchObj.data.traceDetails.spanList = [...rumSpans, ...traceSpans];
             updateServiceColors();
             buildTracesTree();
@@ -1912,6 +1958,8 @@ export default defineComponent({
 
         const span = formattedSpanMap[spanList.value[i].span_id];
 
+        if (!span) continue;
+
         span.style.color = getSpanKindColorHex(
           span.spanKind,
           store.state.theme === "dark" ? "dark" : "light",
@@ -1932,6 +1980,12 @@ export default defineComponent({
           if (!parentSpan.spans) parentSpan.spans = [];
           parentSpan.spans.push(span);
         }
+      }
+
+      if (!traceTree.value.length) {
+        console.warn("buildTracesTree: no root spans found — trace may have missing or malformed span IDs");
+        showTraceDetailsError();
+        return;
       }
 
       // Purposely converting to microseconds to avoid floating point precision issues
