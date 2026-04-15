@@ -316,6 +316,7 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
 // ---------------------------------------------------------------------------
 
 fn toolset_to_response(t: OrgToolset) -> ToolsetResponse {
+    let kind = ToolsetKind::try_from(t.kind.as_str()).unwrap_or(ToolsetKind::Generic);
     let data = t
         .data
         .as_deref()
@@ -330,11 +331,13 @@ fn toolset_to_response(t: OrgToolset) -> ToolsetResponse {
                 None
             }
         });
+    // Redact sensitive credential values before returning to the caller.
+    let data = o2_enterprise::enterprise::ai::toolsets::redact_response_data(kind, data);
     ToolsetResponse {
         id: t.id,
         org: t.org,
         name: t.name,
-        kind: ToolsetKind::try_from(t.kind.as_str()).unwrap_or(ToolsetKind::Generic),
+        kind,
         description: t.description,
         data,
         created_by: t.created_by,
