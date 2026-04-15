@@ -68,13 +68,8 @@ fn get_master_key() -> &'static Algorithm {
 /// Returns an error if the key is not valid base64 or has the wrong length for
 /// AES-256-SIV (64 bytes / 512 bits). A second call is silently ignored.
 pub fn init_master_key(key_b64: &str) -> Result<(), errors::Error> {
-    let key = BASE64_STANDARD.decode(key_b64).map_err(|e| {
-        errors::Error::Message(format!(
-            "master encryption key is not properly base64 encoded: {e}"
-        ))
-    })?;
-    Aes256Siv::new_from_slice(&key)
-        .map_err(|e| errors::Error::Message(format!("invalid master encryption key: {e}")))?;
+    let key = config::utils::encryption::decode_encryption_key(key_b64)
+        .map_err(errors::Error::Message)?;
     let _ = MASTER_KEY.set(Algorithm::Aes256Siv(key));
     Ok(())
 }
