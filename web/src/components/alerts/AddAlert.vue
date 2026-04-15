@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:px-4 tw:py-2.5 tw:cursor-pointer tw:text-sm tw:font-medium tw:relative tw:select-none tw:transition-colors"
             :class="activeTab === tab.key
               ? 'active-tab'
-              : (store.state.theme === 'dark' ? 'tw:text-gray-400 hover:tw:text-gray-200' : 'tw:text-gray-500 hover:tw:text-gray-800')"
+              : (store.state.theme === 'dark' ? 'tw:text-gray-300 hover:tw:text-white' : 'tw:text-gray-600 hover:tw:text-gray-900')"
             @click="activeTab = tab.key"
           >
             {{ tab.label }}{{ tab.required ? ' *' : '' }}
@@ -629,6 +629,12 @@ export default defineComponent({
 .active-tab {
   color: var(--q-primary);
   border-bottom: 2px solid var(--q-primary);
+  font-weight: 600;
+}
+
+.body--dark .active-tab {
+  color: #fff;
+  border-bottom-color: var(--q-primary);
 }
 
 #editor {
