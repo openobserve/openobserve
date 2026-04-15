@@ -349,6 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :options="[
                               { label: 'PDF (default)', value: 'pdf' },
                               { label: 'PNG (Image)', value: 'png' },
+                              { label: 'CSV (Data)', value: 'csv' },
                             ]"
                             emit-value
                             map-options
@@ -365,6 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <!-- Email Attachment Type -->
                         <div
+                          v-if="dashboard.report_type !== 'csv'"
                           class="col-auto o2-input"
                           data-test="add-report-attachment-type-select"
                         >
@@ -430,6 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Custom Dimensions (Advanced) -->
                       <div
+                        v-if="dashboard.report_type !== 'csv'"
                         class="q-mt-md"
                         data-test="add-report-custom-dimensions-section"
                       >
@@ -1126,7 +1129,7 @@ const defaultReport = {
         from: 0,
         to: 0,
       },
-      report_type: "pdf" as "pdf" | "png",
+      report_type: "pdf" as "pdf" | "png" | "csv",
       email_attachment_type: "standard" as "standard" | "inline",
       attachment_dimensions: null as { width: number; height: number } | null,
     },
