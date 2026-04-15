@@ -2170,6 +2170,10 @@ describe("Index.vue (Main Traces Page)", () => {
       mockSearchObj.data.stream.streamLists = [
         { label: "default", value: "default" },
       ];
+      // Clear call history so earlier tests in the suite do not pollute
+      // toHaveBeenCalledWith assertions (the component auto-searches on mount
+      // and accumulates calls before the explicit searchData() call).
+      mockFetchQueryDataWithHttpStream.mockClear();
       // Default: spy passes the where clause through unchanged (real-implementation behaviour).
       mockParseSpanKindWhereClause.mockImplementation(
         (whereClause: string) => whereClause,
@@ -2213,7 +2217,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(matchingCall![0]).toContain("span_kind='Server'");
     });
 
-    it.skip("should rewrite span_kind display label to numeric key before sending to the backend (traces mode)", async () => {
+    it("should rewrite span_kind display label to numeric key before sending to the backend (traces mode)", async () => {
       // Use the real implementation so the actual rewrite is exercised.
       mockParseSpanKindWhereClause.mockImplementation((whereClause: string) => {
         // Inline the same logic as the real parseSpanKindWhereClause.
@@ -2254,7 +2258,7 @@ describe("Index.vue (Main Traces Page)", () => {
       );
     });
 
-    it.skip("should rewrite span_kind negation operator correctly (span_kind!='Client' → span_kind!='3')", async () => {
+    it("should rewrite span_kind negation operator correctly (span_kind!='Client' → span_kind!='3')", async () => {
       mockParseSpanKindWhereClause.mockImplementation((whereClause: string) => {
         const labelToKey: Record<string, string> = {
           unspecified: "0",
@@ -2292,7 +2296,7 @@ describe("Index.vue (Main Traces Page)", () => {
       );
     });
 
-    it.skip("should match span_kind labels case-insensitively (span_kind='server' → span_kind='2')", async () => {
+    it("should match span_kind labels case-insensitively (span_kind='server' → span_kind='2')", async () => {
       mockParseSpanKindWhereClause.mockImplementation((whereClause: string) => {
         const labelToKey: Record<string, string> = {
           unspecified: "0",
@@ -2330,8 +2334,7 @@ describe("Index.vue (Main Traces Page)", () => {
       );
     });
 
-    // Skipping flicky test cases for now, it runs with it.only
-    it.skip("should not alter non-span_kind filters when passed through parseSpanKindWhereClause", async () => {
+    it("should not alter non-span_kind filters when passed through parseSpanKindWhereClause", async () => {
       // Passthrough: non-span_kind filter must reach the backend unchanged.
       mockParseSpanKindWhereClause.mockImplementation(
         (whereClause: string) => whereClause,
