@@ -1295,7 +1295,7 @@ const getBtnLogo = computed(() => {
   position: relative;
   height: 22px;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   cursor: default;
 
@@ -1326,8 +1326,8 @@ const getBtnLogo = computed(() => {
     background: #10b981;
   }
 
-  &--hint    { background: #f3f4f6; color: #9ca3af; }
-  &--idle    { background: #f3f4f6; color: #9ca3af; }
+  &--hint    { background: #f3f4f6; color: #6b7280; }
+  &--idle    { background: #f3f4f6; color: #6b7280; }
   &--loading { background: rgba(139, 92, 246, 0.06); color: #8b5cf6; }
   &--error   { background: rgba(239, 68, 68, 0.08); color: #ef4444; cursor: pointer; }
   &--empty   { background: rgba(245, 158, 11, 0.06); color: #f59e0b; }
@@ -1350,6 +1350,7 @@ const getBtnLogo = computed(() => {
     &.sql-status-bar--hint,
     &.sql-status-bar--idle {
       background: rgba(255, 255, 255, 0.04);
+      color: #d1d5db;
     }
   }
 }
