@@ -592,15 +592,6 @@ test.describe("Alerts Regression Bugs", () => {
     expect(occurrences, `Bug #10110: Template "${templateName}" should appear exactly once in display, not ${occurrences} times`).toBe(1);
     testLogger.info(`✓ Template display matches selected template exactly (no duplication) - Bug #10110 is fixed`);
 
-    // Additional check: Verify no duplicate class names or rendering issues
-    const templateFieldClasses = await templateSelect.getAttribute('class') || '';
-    testLogger.info('Template field classes', { classes: templateFieldClasses });
-
-    // Verify no nested q-select components (templateSelect IS the q-select, so children count should be 0)
-    const nestedQSelectCount = await pm.alertsPage.getNestedQSelectCount();
-    expect(nestedQSelectCount, 'Bug #10110: Should have no nested q-select components (templateSelect is already the q-select)').toBe(0);
-    testLogger.info('✓ No nested/duplicate q-select components detected');
-
     // Clean up - go back without saving
     await pm.alertsPage.clickBackButton();
     await page.waitForLoadState('domcontentloaded').catch(() => {});

@@ -98,8 +98,8 @@ export class AlertsPage {
             contextAttributeKeyInput: '[data-test="alert-variables-key-input"]',
             contextAttributeValueInput: '[data-test="alert-variables-value-input"]',
             rowTemplateTextarea: '[data-test="add-alert-row-input-textarea"]',
-            templateOverrideSelect: '.q-select.template-select-field',
-            visibleDropdownMenu: '.q-menu:visible',
+            templateOverrideSelect: '.template-select-field',
+            visibleDropdownMenu: '[role="listbox"]:visible, [role="menu"]:visible',
 
             // Query Editor Dialog selectors
             // The alerts dialog has TWO editors: SQL/PromQL (top) and VRL (bottom)
@@ -2181,15 +2181,6 @@ export class AlertsPage {
     }
 
     /**
-     * Get count of nested q-select components within the template override select
-     * Used to detect duplicate/nested rendering issues (Bug #10110)
-     */
-    async getNestedQSelectCount() {
-        const templateSelect = this.getTemplateOverrideSelect();
-        return await templateSelect.locator('.q-select').count();
-    }
-
-    /**
      * Get the operator select dropdown
      */
     getOperatorSelect() {
@@ -2251,7 +2242,6 @@ export class AlertsPage {
     async clickContinueButton() {
         await this.page.getByRole('button', { name: 'Continue' }).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(500);
     }
 
     /**
@@ -2302,7 +2292,6 @@ export class AlertsPage {
 
         await this.selectScheduledAlertType();
         await this.clickContinueButton();
-        await this.page.waitForTimeout(1000);
         testLogger.info('Wizard setup complete: on Step 2', { alertName, streamName });
     }
 
