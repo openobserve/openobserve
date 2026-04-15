@@ -554,7 +554,7 @@ export default defineComponent({
     const alertForm = useAlertForm(props, emit);
 
     const isAnomalyDetectionEnabled = computed(
-      () => alertForm.store.state.zoConfig.anomaly_detection_enabled === false,
+      () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
     );
 
     // Auto-expand preview when stream name is selected, collapse when cleared
