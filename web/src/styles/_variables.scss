@@ -430,6 +430,17 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-status-error-bg: #{$o2-red-100};
   --o2-status-neutral-text: #{$o2-gray-900};
   --o2-status-neutral-bg: #{$o2-gray-200};
+  // Span kind semantic colors (light mode)
+  --o2-span-kind-client-text: #{$o2-blue-700};
+  --o2-span-kind-client-bg: #{$o2-blue-200};
+  --o2-span-kind-server-text: #{$o2-green-800};
+  --o2-span-kind-server-bg: #{$o2-green-100};
+  --o2-span-kind-producer-text: #{$o2-purple-700};
+  --o2-span-kind-producer-bg: #{$o2-purple-200};
+  --o2-span-kind-consumer-text: #{$o2-teal-700};
+  --o2-span-kind-consumer-bg: #{$o2-teal-200};
+  --o2-span-kind-internal-text: #{$o2-gray-900};
+  --o2-span-kind-internal-bg: #{$o2-gray-300};
 }
 
 // Semantic Colors - Dark Mode
@@ -552,6 +563,17 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-status-error-bg: #{$o2-dark-red-100};
   --o2-status-neutral-text: #{$o2-dark-gray-900};
   --o2-status-neutral-bg: #{$o2-dark-gray-200};
+  // Span kind semantic colors (dark mode)
+  --o2-span-kind-client-text: #{$o2-dark-iris-1100};
+  --o2-span-kind-client-bg: #{$o2-dark-iris-200};
+  --o2-span-kind-server-text: #{$o2-dark-green-900};
+  --o2-span-kind-server-bg: #{$o2-dark-green-100};
+  --o2-span-kind-producer-text: #{$o2-dark-purple-900};
+  --o2-span-kind-producer-bg: #{$o2-dark-purple-100};
+  --o2-span-kind-consumer-text: #{$o2-dark-teal-800};
+  --o2-span-kind-consumer-bg: #{$o2-dark-teal-100};
+  --o2-span-kind-internal-text: #{$o2-dark-gray-900};
+  --o2-span-kind-internal-bg: #{$o2-dark-gray-200};
 
   
 

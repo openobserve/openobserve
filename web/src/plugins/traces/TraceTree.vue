@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (spanDimensions?.gap ?? 15) * (depth - 1) +
                   'px',
                 top: '0',
-                height: nextSiblingMap[(virtualRow.index as number)]
+                height: nextSiblingMap[virtualRow.index as number]
                   ? spanDimensions.height + 'px'
                   : depth === 1
                     ? spanDimensions.height / 2 + 'px'
@@ -199,23 +199,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <div
-                    class="ellipsis q-pl-xs cursor-pointer span-name-section tw:flex tw:items-center"
+                    class="ellipsis q-pl-xs cursor-pointer span-name-section tw:w-[calc(100%-2rem)]!"
+                    :class="
+                      isLLMTrace((spans as any[])[virtualRow.index])
+                        ? 'tw:flex-col tw:items-start'
+                        : ' tw:flex tw:items-center'
+                    "
                     :data-test="`trace-tree-span-select-btn-${(spans as any[])[virtualRow.index].spanId}`"
                   >
                     <div
                       class="ellipsis flex items-center span-name-section-content"
                     >
-                      <img
-                        :src="
-                          spanServiceIconUrlMap.get(
-                            `${(spans as any[])[virtualRow.index].serviceName}/${(spans as any[])[virtualRow.index].style?.color ?? ''}`,
-                          )
-                        "
-                        class="q-mr-xs tw:shrink-0 tw:w-[1.125rem] tw:h-[1.125rem] tw:inline-block"
-                        aria-hidden="true"
-                        alt=""
-                        :data-test="`trace-tree-span-service-icon-${(spans as any[])[virtualRow.index].spanId}`"
-                      />
                       <q-icon
                         v-if="
                           (spans as any[])[virtualRow.index].spanStatus ===
@@ -245,20 +239,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ (spans as any[])[virtualRow.index].serviceName }}
                       </span>
-                      <q-icon
-                        v-if="(spans as any[])[virtualRow.index].spanKind"
-                        :name="
-                          getKindIcon(
-                            (spans as any[])[
-                              virtualRow.index
-                            ].spanKind.toUpperCase(),
-                          )
-                        "
-                        size="0.875rem"
-                        class="text-grey-6 q-mr-xs"
-                        :title="(spans as any[])[virtualRow.index].spanKind"
-                        :data-test="`trace-tree-span-kind-icon-${(spans as any[])[virtualRow.index].spanId}`"
+                      <SpanKindBadge
+                        v-if="(spans as any[])[virtualRow.index]?.spanKind"
+                        :kind="(spans as any[])[virtualRow.index]?.spanKind"
                       />
+
                       <img
                         v-if="
                           spanTechIconUrlMap.get(
@@ -426,6 +411,7 @@ import {
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
 import SpanBlock from "./SpanBlock.vue";
+import SpanKindBadge from "./components/SpanKindBadge.vue";
 import { useI18n } from "vue-i18n";
 
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
@@ -825,7 +811,7 @@ export default defineComponent({
       ancestorSiblingMap,
     };
   },
-  components: { SpanBlock },
+  components: { SpanBlock, SpanKindBadge },
 });
 </script>
 
