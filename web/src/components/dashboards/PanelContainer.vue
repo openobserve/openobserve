@@ -419,7 +419,9 @@ import {
   defineAsyncComponent,
   watch,
   onBeforeUnmount,
+  onMounted,
 } from "vue";
+import { panelDownloadRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -893,8 +895,27 @@ export default defineComponent({
       isPartialData.value = isPartial;
     };
 
+    // Register in the module-level download registry so that
+    // window.oo_downloadAllPanelsCSV() and window.oo_downloadAllPanelsJSON()
+    // can trigger downloads from the console.
+    onMounted(() => {
+      const panelId = props.data?.id;
+      if (panelId) {
+        panelDownloadRegistry.set(panelId, {
+          csv: () => PanleSchemaRendererRef.value?.downloadDataAsCSV(props.data?.title),
+          json: () => PanleSchemaRendererRef.value?.logDataAsJSON(props.data?.title),
+        });
+      }
+    });
+
     // Add cleanup on component unmount
     onBeforeUnmount(() => {
+      // Unregister from download registry
+      const panelId = props.data?.id;
+      if (panelId) {
+        panelDownloadRegistry.delete(panelId);
+      }
+
       // Clear any pending timeouts or intervals
       // Reset refs to help with garbage collection
       metaData.value = null;
@@ -1034,6 +1055,9 @@ export default defineComponent({
           panelData: encodedData,
         },
       });
+    },
+    downloadCSV() {
+      this.PanleSchemaRendererRef?.downloadDataAsCSV(this.props.data.title);
     },
   },
 });

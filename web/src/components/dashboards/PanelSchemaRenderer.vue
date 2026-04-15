@@ -1338,6 +1338,15 @@ export default defineComponent({
       showPopupsAndOverlays,
       downloadDataAsCSV,
       downloadDataAsJSON,
+      logDataAsJSON: (title: string) => {
+        const chartData =
+          panelSchema.value?.queryType === "promql"
+            ? filteredData.value
+            : data.value;
+        console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
+        console.log(chartData);
+        console.groupEnd();
+      },
       loadingProgressPercentage,
       isPartialData,
       contextMenuVisible,
