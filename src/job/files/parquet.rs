@@ -866,7 +866,7 @@ async fn merge_files(
             &o2_enterprise::enterprise::common::config::get_config().service_streams;
 
         // Skip self-reporting streams from _meta organization to avoid processing internal metrics
-        if service_streams_config.node_matches_processing_mode(&LOCAL_NODE)
+        if service_streams_config.node_matches_processing_node(&LOCAL_NODE)
             && service_streams_config.enabled
             && org_id != config::META_ORG_ID
             && (stream_type == StreamType::Logs
