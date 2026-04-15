@@ -5,10 +5,10 @@
 
 <template>
   <div class="query-editor tw:w-full tw:relative" :style="rootStyle">
-    <!-- AI Input Bar (shown in NL Mode) - Absolutely positioned so it doesn't shift layout -->
+    <!-- AI Input Bar (shown in NL Mode) - Positioned at top -->
     <div
       v-if="isAIMode"
-      class="ai-input-bar tw:p-2 tw:z-10"
+      class="ai-input-bar tw:p-2 tw:flex-shrink-0 tw:z-10"
     >
       <!-- Show streaming status with spinner + stop button -->
       <div v-if="isGenerating" :class="aiBarStreamingClass">
@@ -78,8 +78,8 @@
       </div>
     </div>
 
-    <!-- Code Editor fills full area; when AI bar is visible it overlays the top -->
-    <div class="editor-container tw:relative tw:flex-1 tw:min-h-0 tw:w-full tw:h-full">
+    <!-- Code Editor with relative positioning for floating button -->
+    <div class="editor-container tw:relative tw:flex-1 tw:min-h-0">
       <CodeQueryEditor
         :ref="(el) => (editorRef = el)"
         :editor-id="`${dataTestPrefix}-editor-${currentLanguage}`"
@@ -645,14 +645,8 @@ defineExpose({
 
 /* AI Input Bar Styling */
 .ai-input-bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 10;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
   border-bottom: 1px solid var(--o2-border-color);
-  backdrop-filter: blur(4px);
 }
 
 .ai-input-field :deep(.q-field__control) {
