@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="fullscreenDiv"
       :class="{
         fullscreen: isFullscreen,
-        'tw:h-[calc(100vh-105px)]': !store.state.printMode,
+        'tw:h-[calc(100vh- var(--navbar-height) - 77px)]': !store.state.printMode,
         'print-mode-container': store.state.printMode,
       }"
       class="tw:mx-[0.625rem] q-pt-xs"
