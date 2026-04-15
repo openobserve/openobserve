@@ -165,7 +165,6 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Navigate to Step 2: Conditions
     await pm.alertsPage.clickContinueButton();
-    await page.waitForTimeout(500);
 
     // ✅ COVERAGE: P1 - PromQL tab visibility for metrics streams
     await pm.alertsPage.expectPromqlTabVisible();
@@ -182,7 +181,6 @@ test.describe("Alerts Regression Bugs", () => {
     // Navigate to Step 4 to verify promql_condition fields
     await pm.alertsPage.clickContinueButton(); // Step 3
     await pm.alertsPage.clickContinueButton(); // Step 4
-    await page.waitForTimeout(500);
 
     // ✅ COVERAGE: P1 - "Trigger if the value is" fields appear in Step 4
     await pm.alertsPage.expectPromqlConditionRowVisible();
@@ -239,7 +237,6 @@ test.describe("Alerts Regression Bugs", () => {
 
       // Verify alert appears in the list using page object
       await pm.alertsPage.searchAlert(alertName);
-      await page.waitForTimeout(2000);
       await pm.alertsPage.expectAlertRowVisible(alertName);
       testLogger.info(`✅ P0/P1: Alert with operator ${operator} saved successfully`);
     }
@@ -278,23 +275,21 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Navigate to Step 2: Conditions
     await pm.alertsPage.clickContinueButton();
-    await page.waitForTimeout(1000);
-    testLogger.info('✓ Navigated to Step 2');
 
     // Enable aggregation to show Group By section
     const aggregationToggle = pm.alertsPage.getAggregationToggle();
     await aggregationToggle.waitFor({ state: 'visible', timeout: 5000 });
+    testLogger.info('✓ Navigated to Step 2');
     await expect(aggregationToggle).toBeEnabled({ timeout: 3000 });
     await aggregationToggle.click();
-    await page.waitForTimeout(1000);
 
     // STRONG ASSERTION: Verify group-by section appeared
     const groupByLabel = pm.alertsPage.getGroupByLabel().first();
     await expect(groupByLabel).toBeVisible({ timeout: 5000 });
     testLogger.info('✓ Group By section visible');
 
-    // Get the query config section container (Step 2: Conditions)
-    const queryConfigSection = page.locator('.step-query-config');
+    // Get the query config section container (Step 2: Conditions) using POM
+    const queryConfigSection = pm.alertsPage.getStepQueryConfigSection();
 
     // Find the Group By input field using POM method with fallback selectors
     const groupByInput = await pm.alertsPage.findGroupByInputWithFallback(queryConfigSection);
@@ -309,11 +304,12 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Type characters to trigger autocomplete
     await groupByInput.fill('k8s');
-    await page.waitForTimeout(1000);
     testLogger.info('✓ Typed "k8s" to trigger autocomplete');
 
     // STRONG ASSERTION: Check for autocomplete suggestions using POM
     const suggestions = pm.alertsPage.getAutocompleteSuggestions();
+    // Wait for autocomplete dropdown to appear after typing
+    await suggestions.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     const suggestionCount = await suggestions.count();
     testLogger.info(`Autocomplete suggestions found: ${suggestionCount}`);
 
@@ -329,7 +325,7 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Clean up
     await pm.alertsPage.clickBackButton();
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     testLogger.info('✓ PASSED: Group By autocomplete test completed');
   });
@@ -354,7 +350,7 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Navigate to create new alert
     await pm.alertsPage.clickCreateAlertButton();
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Check if multi-window/compare options are available
     const compareWithPastContainer = pm.alertsPage.getCompareWithPastContainer();
@@ -363,7 +359,7 @@ test.describe("Alerts Regression Bugs", () => {
     // Try to find and enable multi-window mode
     if (await compareWithPastContainer.first().isVisible({ timeout: 5000 }).catch(() => false)) {
       await compareWithPastContainer.first().click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
       testLogger.info('✓ Compare with Past container found');
     } else {
       testLogger.info('Compare with Past container not found - may need to navigate to condition step first');
@@ -373,7 +369,7 @@ test.describe("Alerts Regression Bugs", () => {
     const conditionTab = pm.alertsPage.getConditionTab();
     if (await conditionTab.first().isVisible({ timeout: 3000 }).catch(() => false)) {
       await conditionTab.first().click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
     }
 
     // Look for VRL editor or apply VRL button
@@ -403,7 +399,7 @@ test.describe("Alerts Regression Bugs", () => {
     // PRIMARY ASSERTION: Apply VRL button should be available
     await expect(applyVrlButton).toBeVisible({ timeout: 3000 });
     await applyVrlButton.click();
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('✓ Apply VRL button clicked');
 
     // STRONG ASSERTION: Check for error messages - the bug would cause an error here
@@ -701,7 +697,8 @@ async function ingestMetricsData(page) {
     testLogger.warn('Metrics ingestion may have failed', { error: e.message });
   }
 
-  await page.waitForTimeout(3000); // Allow time for indexing
+  // Allow time for indexing by waiting for network activity to settle
+  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 }
 
 /**

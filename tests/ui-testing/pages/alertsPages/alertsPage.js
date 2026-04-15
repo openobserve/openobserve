@@ -81,6 +81,7 @@ export class AlertsPage {
             deleteConditionButton: '[data-test="alert-conditions-delete-condition-btn"]',
             columnInput: '[data-test="alert-conditions-select-column"]',
             valueInput: '[data-test="alert-conditions-value-input"]',
+            stepQueryConfig: '.step-query-config',
 
             // Step 3: Compare with Past (Scheduled only)
             multiTimeRangeAddButton: '[data-test="multi-time-range-alerts-add-btn"]',
@@ -2170,6 +2171,13 @@ export class AlertsPage {
      */
     getConditionColumnSelect() {
         return this.page.locator(this.locators.conditionColumnSelect).first();
+    }
+
+    /**
+     * Get the Step 2: Query Config section container
+     */
+    getStepQueryConfigSection() {
+        return this.page.locator(this.locators.stepQueryConfig);
     }
 
     /**
