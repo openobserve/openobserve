@@ -37,7 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-icon>
         </div>
-        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
+        <div
+          class="tw:text-sm tw:mb-2"
+          :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
+        >
           {{ t("alerts.deduplication.fingerprintFieldsHint") }}
         </div>
         <div class="tw:relative">
@@ -87,7 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-icon>
         </div>
-        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
+        <div
+          class="tw:text-sm tw:mb-2"
+          :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
+        >
           {{ t("alerts.deduplication.timeWindowHint") }}
         </div>
         <div class="tw:flex tw:items-center">

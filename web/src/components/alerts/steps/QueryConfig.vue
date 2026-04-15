@@ -2571,7 +2571,7 @@ export default defineComponent({
   position: relative;
   height: 22px;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   cursor: default;
 
@@ -2593,8 +2593,8 @@ export default defineComponent({
     flex: 1;
   }
 
-  &.sql-status-bar--hint    { background: #f3f4f6; color: #9ca3af; }
-  &.sql-status-bar--idle    { background: #f3f4f6; color: #9ca3af; }
+  &.sql-status-bar--hint    { background: #f3f4f6; color: #6b7280; }
+  &.sql-status-bar--idle    { background: #f3f4f6; color: #6b7280; }
   &.sql-status-bar--error   { background: rgba(239, 68, 68, 0.08); color: #ef4444; cursor: pointer; }
 
   &.sql-status-bar--light {
@@ -2611,7 +2611,7 @@ export default defineComponent({
     border-bottom-left-radius: 8px;
     border-bottom-right-radius: 8px;
     &.sql-status-bar--hint,
-    &.sql-status-bar--idle { background: rgba(255, 255, 255, 0.04); }
+    &.sql-status-bar--idle { background: rgba(255, 255, 255, 0.04); color: #d1d5db; }
   }
 }
 
