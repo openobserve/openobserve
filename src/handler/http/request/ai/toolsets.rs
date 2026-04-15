@@ -103,7 +103,7 @@ pub async fn create(
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
 
-    (StatusCode::OK, Json(toolset_to_response(saved))).into_response()
+    (StatusCode::OK, Json(ToolsetResponse::from_toolset(saved))).into_response()
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@ pub async fn create(
 pub async fn get(Path(path): Path<(String, String)>) -> Response {
     let (org_id, id) = path;
     match infra::table::org_ai_toolsets::get(&org_id, &id).await {
-        Ok(Some(t)) => Json(toolset_to_response(t)).into_response(),
+        Ok(Some(t)) => Json(ToolsetResponse::from_toolset(t)).into_response(),
         Ok(None) => MetaHttpResponse::not_found(format!("toolset '{id}' not found")),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
@@ -181,7 +181,10 @@ pub async fn list(Path(org_id): Path<String>, Query(params): Query<ListQuery>) -
     match infra::table::org_ai_toolsets::list(&org_id, filter, params.limit).await {
         Ok(toolsets) => {
             let res = ToolsetListResponse {
-                toolsets: toolsets.into_iter().map(toolset_to_response).collect(),
+                toolsets: toolsets
+                    .into_iter()
+                    .map(ToolsetResponse::from_toolset)
+                    .collect(),
             };
             Json(res).into_response()
         }
@@ -261,7 +264,7 @@ pub async fn update(
         return MetaHttpResponse::internal_error(e);
     }
 
-    Json(toolset_to_response(updated)).into_response()
+    Json(ToolsetResponse::from_toolset(updated)).into_response()
 }
 
 // ---------------------------------------------------------------------------
@@ -309,39 +312,4 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
         )),
     )
         .into_response()
-}
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-fn toolset_to_response(t: OrgToolset) -> ToolsetResponse {
-    let kind = ToolsetKind::try_from(t.kind.as_str()).unwrap_or(ToolsetKind::Generic);
-    let data = t
-        .data
-        .as_deref()
-        .and_then(|s| match serde_json::from_str(s) {
-            Ok(v) => Some(v),
-            Err(e) => {
-                log::warn!(
-                    "toolset '{}' (id={}) has unreadable data: {e}",
-                    t.name,
-                    t.id
-                );
-                None
-            }
-        });
-    // Redact sensitive credential values before returning to the caller.
-    let data = o2_enterprise::enterprise::ai::toolsets::redact_response_data(kind, data);
-    ToolsetResponse {
-        id: t.id,
-        org: t.org,
-        name: t.name,
-        kind,
-        description: t.description,
-        data,
-        created_by: t.created_by,
-        created_at: t.created_at,
-        updated_at: t.updated_at,
-    }
 }
