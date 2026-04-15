@@ -326,6 +326,7 @@ import {
   resolvePanelTimeValue,
 } from "@/utils/dashboard/panelTimeUtils";
 import "gridstack/dist/gridstack.min.css";
+import { panelDownloadRegistry } from "@/utils/panelDownloadRegistry";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -1174,6 +1175,10 @@ export default defineComponent({
         gridStackInstance.destroy(false);
         gridStackInstance = null;
       }
+      // Remove console helpers
+      delete (window as any).oo_downloadAllPanelsCSV;
+      delete (window as any).oo_logAllPanelsJSON;
+      panelDownloadRegistry.clear();
     });
 
     /**
@@ -1333,6 +1338,9 @@ export default defineComponent({
 
     // Store refs to panel datetime picker components using a Map (not reactive)
     const panelDateTimePickerRefs = new Map<string, any>();
+
+    // panelDownloadRegistry is a module-level singleton (see utils/panelDownloadRegistry.ts).
+    // PanelContainer instances register themselves on mount; no provide/inject needed.
 
     // Track panels that are initializing (to prevent spurious change events)
     const panelsInitializing = ref<Set<string>>(new Set());
@@ -1525,6 +1533,30 @@ export default defineComponent({
     // Initialize panel times when component is mounted
     onMounted(() => {
       initializePanelTimes();
+
+      // Console helpers available from any dashboard:
+      //   window.oo_downloadAllPanelsCSV()  → downloads a CSV file per panel
+      //   window.oo_logAllPanelsJSON()      → prints each panel's raw data to the console
+      const runForAll = (format: "csv" | "json") => {
+        const total = panelDownloadRegistry.size;
+        if (total === 0) {
+          console.warn("[oo] No panels found on the current tab.");
+          return;
+        }
+        if (format === "csv") {
+          console.log(`[oo] Downloading CSV for ${total} panel(s)…`);
+        }
+        panelDownloadRegistry.forEach((entry, id) => {
+          try {
+            entry[format]();
+          } catch (e) {
+            console.warn(`[oo] Error on panel ${id}`, e);
+          }
+        });
+      };
+
+      (window as any).oo_downloadAllPanelsCSV = () => runForAll("csv");
+      (window as any).oo_logAllPanelsJSON = () => runForAll("json");
     });
 
     // Re-initialize panel times when panels change or when global time changes
