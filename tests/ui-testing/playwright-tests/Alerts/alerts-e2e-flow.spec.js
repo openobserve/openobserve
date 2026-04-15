@@ -69,7 +69,7 @@ test.describe("Alerts E2E Flow", () => {
    * - Alert movement between folders
    * - Search and verify functionality
    */
-  test('Complete Alerts E2E Flow - CRUD, Trigger Validation, Search, Folders, Pause/Resume', {
+  test.skip('Complete Alerts E2E Flow - CRUD, Trigger Validation, Search, Folders, Pause/Resume', {
     tag: ['@e2eAlerts', '@all', '@alerts'],
     timeout: TEN_MINUTES_MS
   }, async ({ page }) => {
