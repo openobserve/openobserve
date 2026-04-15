@@ -114,21 +114,26 @@ export const getSpanColorHex = (
 };
 
 /**
+ * Hash a string to a palette color index (1–50).
+ * Same string always produces the same index — used for deterministic color
+ * assignment for service names, unknown span kinds, and any other dynamic values.
+ */
+const hashToColorIndex = (value: string): number => {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = value.charCodeAt(i) + ((hash << 5) - hash);
+    hash = hash & hash; // clamp to 32-bit integer
+  }
+  return (Math.abs(hash) % 50) + 1;
+};
+
+/**
  * Generate a consistent color for a service name using hashing
  * @param serviceName - Name of the service
  * @returns CSS variable string
  */
 export const getServiceColor = (serviceName: string): string => {
-  // Simple hash function to get consistent color for same service
-  let hash = 0;
-  for (let i = 0; i < serviceName.length; i++) {
-    hash = serviceName.charCodeAt(i) + ((hash << 5) - hash);
-    hash = hash & hash; // Convert to 32bit integer
-  }
-
-  // Map hash to color index (1-50)
-  const colorIndex = (Math.abs(hash) % 50) + 1;
-  return `var(--o2-span-${colorIndex})`;
+  return `var(--o2-span-${hashToColorIndex(serviceName)})`;
 };
 
 /**
@@ -141,16 +146,7 @@ export const getServiceColorHex = (
   serviceName: string,
   theme: "light" | "dark" = "light",
 ): string => {
-  // Simple hash function to get consistent color for same service
-  let hash = 0;
-  for (let i = 0; i < serviceName.length; i++) {
-    hash = serviceName.charCodeAt(i) + ((hash << 5) - hash);
-    hash = hash & hash; // Convert to 32bit integer
-  }
-
-  // Map hash to color index (1-50)
-  const colorIndex = (Math.abs(hash) % 50) + 1;
-  return getSpanColorHex(colorIndex, theme);
+  return getSpanColorHex(hashToColorIndex(serviceName), theme);
 };
 
 /**
@@ -206,12 +202,7 @@ export const generateServiceColorMap = (
 
   serviceNames.forEach((serviceName, index) => {
     // Use hash for consistency, but track used colors to maximize distinction
-    let hash = 0;
-    for (let i = 0; i < serviceName.length; i++) {
-      hash = serviceName.charCodeAt(i) + ((hash << 5) - hash);
-    }
-
-    let colorIndex = (Math.abs(hash) % 50) + 1;
+    let colorIndex = hashToColorIndex(serviceName);
 
     // If color is already used, find next available
     let attempts = 0;
@@ -258,4 +249,41 @@ export const spanKindColors = {
   consumer: "var(--o2-span-4)", // Purple
   internal: "var(--o2-span-10)", // Amber
   unspecified: "var(--o2-gray-700)",
+};
+
+/**
+ * Hex equivalents of spanKindColors — needed where CSS variables cannot be used
+ * (e.g. adjustOpacity, which appends a hex alpha suffix to the color string).
+ */
+export const SPAN_KIND_COLORS_HEX: Record<
+  string,
+  { light: string; dark: string }
+> = {
+  client: { light: "#3B82F6", dark: "#60A5FA" }, // Blue
+  server: { light: "#10B981", dark: "#34D399" }, // Green
+  producer: { light: "#D946EF", dark: "#F472B6" }, // Pink
+  consumer: { light: "#6366F1", dark: "#818CF8" }, // Purple
+  internal: { light: "#F59E0B", dark: "#FBBF24" }, // Amber
+  unspecified: { light: "#9CA3AF", dark: "#6B7280" }, // Gray
+};
+
+/**
+ * Return the hex color for a given span kind label (case-insensitive).
+ * Accepts the title-case labels from SPAN_KIND_MAP ("Client", "Server", etc.)
+ * as well as lowercase equivalents.
+ * @param spanKind - span kind label (e.g. "Client", "SERVER", "internal")
+ * @param theme    - "light" or "dark" (default: "light")
+ */
+export const getSpanKindColorHex = (
+  spanKind: string | undefined,
+  theme: "light" | "dark" = "light",
+): string => {
+  const key = (spanKind ?? "unspecified").toLowerCase();
+  const entry = SPAN_KIND_COLORS_HEX[key];
+  if (entry) {
+    return theme === "dark" ? entry.dark : entry.light;
+  }
+  // Unknown / dynamic value — hash to a palette color so the same value always
+  // gets the same color across the waterfall.
+  return getSpanColorHex(hashToColorIndex(key), theme);
 };

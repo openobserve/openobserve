@@ -761,7 +761,10 @@ import {
   convertTimelineData,
   convertTraceServiceMapData,
 } from "@/utils/traces/convertTraceData";
-import { getAllSpanColors } from "@/utils/traces/traceColors";
+import {
+  getAllSpanColors,
+  getSpanKindColorHex,
+} from "@/utils/traces/traceColors";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import {
   SPAN_KIND_MAP,
@@ -1909,7 +1912,10 @@ export default defineComponent({
 
         const span = formattedSpanMap[spanList.value[i].span_id];
 
-        span.style.color = searchObj.meta.serviceColors[span.serviceName];
+        span.style.color = getSpanKindColorHex(
+          span.spanKind,
+          store.state.theme === "dark" ? "dark" : "light",
+        );
 
         span.style.backgroundColor = adjustOpacity(span.style.color, 0.2);
 
@@ -1933,8 +1939,10 @@ export default defineComponent({
       traceTree.value[0].lowestStartTime =
         convertTimeFromNsToUs(lowestStartTime);
       traceTree.value[0].highestEndTime = convertTimeFromNsToUs(highestEndTime);
-      traceTree.value[0].style.color =
-        searchObj.meta.serviceColors[traceTree.value[0].serviceName];
+      traceTree.value[0].style.color = getSpanKindColorHex(
+        traceTree.value[0].spanKind,
+        store.state.theme === "dark" ? "dark" : "light",
+      );
 
       traceTree.value.forEach((span: any) => {
         addSpansPositions(span, 0);
