@@ -239,7 +239,7 @@ export default defineComponent({
         name: "actions",
         field: "actions",
         label: t("cipherKey.actions"),
-        align: "left",
+        align: "center",
         sortable: false,
         classes:'actions-column'
       },
