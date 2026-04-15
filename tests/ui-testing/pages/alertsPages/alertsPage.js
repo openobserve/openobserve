@@ -81,6 +81,7 @@ export class AlertsPage {
             deleteConditionButton: '[data-test="alert-conditions-delete-condition-btn"]',
             columnInput: '[data-test="alert-conditions-select-column"]',
             valueInput: '[data-test="alert-conditions-value-input"]',
+            stepQueryConfig: '.step-query-config',
 
             // Step 3: Compare with Past (Scheduled only)
             multiTimeRangeAddButton: '[data-test="multi-time-range-alerts-add-btn"]',
@@ -97,6 +98,8 @@ export class AlertsPage {
             contextAttributeKeyInput: '[data-test="alert-variables-key-input"]',
             contextAttributeValueInput: '[data-test="alert-variables-value-input"]',
             rowTemplateTextarea: '[data-test="add-alert-row-input-textarea"]',
+            templateOverrideSelect: '.template-select-field',
+            visibleDropdownMenu: '[role="listbox"]:visible, [role="menu"]:visible',
 
             // Query Editor Dialog selectors
             // The alerts dialog has TWO editors: SQL/PromQL (top) and VRL (bottom)
@@ -2140,12 +2143,105 @@ export class AlertsPage {
     }
 
     /**
+     * Select real-time alert type
+     */
+    async selectRealtimeAlertType() {
+        const realtimeRadio = this.page.locator(this.locators.realtimeAlertRadio);
+        await expect(realtimeRadio).toBeVisible({ timeout: 5000 });
+        await realtimeRadio.click();
+        testLogger.info('Selected real-time alert type');
+    }
+
+    /**
+     * Expect real-time alert radio button to be visible
+     */
+    async expectRealtimeRadioVisible(timeout = 5000) {
+        await expect(this.page.locator(this.locators.realtimeAlertRadio)).toBeVisible({ timeout });
+    }
+
+    /**
+     * Get the Add Condition button
+     */
+    getAddConditionButton() {
+        return this.page.locator(this.locators.addConditionButton).first();
+    }
+
+    /**
+     * Get the condition column select dropdown
+     */
+    getConditionColumnSelect() {
+        return this.page.locator(this.locators.conditionColumnSelect).first();
+    }
+
+    /**
+     * Get the Step 2: Query Config section container
+     */
+    getStepQueryConfigSection() {
+        return this.page.locator(this.locators.stepQueryConfig);
+    }
+
+    /**
+     * Get the operator select dropdown
+     */
+    getOperatorSelect() {
+        return this.page.locator(this.locators.operatorSelect).first();
+    }
+
+    /**
+     * Get the condition value input field
+     */
+    getConditionValueInput() {
+        return this.page.locator(this.locators.conditionValueInput).first();
+    }
+
+    /**
+     * Get the visible dropdown menu (.q-menu:visible)
+     */
+    getVisibleMenu() {
+        return this.page.locator(this.locators.visibleDropdownMenu);
+    }
+
+    /**
+     * Get menu items from the visible dropdown menu
+     */
+    getMenuItems() {
+        return this.getVisibleMenu().locator('.q-item');
+    }
+
+    /**
+     * Get first menu item from visible dropdown
+     */
+    getFirstMenuItem() {
+        return this.getMenuItems().first();
+    }
+
+    /**
+     * Get the inner input element from condition value input container
+     */
+    getConditionValueInputElement() {
+        return this.getConditionValueInput().locator('input');
+    }
+
+    /**
+     * Get the template override select field
+     */
+    getTemplateOverrideSelect() {
+        return this.page.locator(this.locators.templateOverrideSelect).first();
+    }
+
+    /**
+     * Expect template override select to be visible
+     */
+    async expectTemplateOverrideSelectVisible(timeout = 15000) {
+        await expect(this.getTemplateOverrideSelect()).toBeVisible({ timeout });
+    }
+
+    /**
      * Click the Continue button to advance wizard steps
      */
     async clickContinueButton() {
         await this.page.getByRole('button', { name: 'Continue' }).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(500);
     }
 
     /**
@@ -2196,7 +2292,6 @@ export class AlertsPage {
 
         await this.selectScheduledAlertType();
         await this.clickContinueButton();
-        await this.page.waitForTimeout(1000);
         testLogger.info('Wizard setup complete: on Step 2', { alertName, streamName });
     }
 

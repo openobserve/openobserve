@@ -123,6 +123,19 @@ export class TracesPage {
     this.signOutButton = page.getByText('Sign Out');
   }
 
+  // Getter methods for common trace elements
+  getTraceDetailsElements() {
+    return this.page.locator('[data-test="trace-details-header"], [data-test="trace-details-tree"], [data-test="trace-details-sidebar"]');
+  }
+
+  getTraceResultItems() {
+    return this.page.locator(this.searchResultItem);
+  }
+
+  getResultsContainer() {
+    return this.page.locator('[data-test="traces-search-result-list"], .traces-result-container').first();
+  }
+
   async navigateToTraces() {
     await this.tracesMenuItem.click();
     // Cloud: sidebar click may silently fail — verify URL and fallback to direct navigation
