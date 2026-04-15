@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-      <div class="tw:flex tw:flex-col" style="height: calc(100vh - 44px);">
+      <div class="tw:flex tw:flex-col" style="height: calc(100vh - var(--navbar-height) - 5px);">
       <div class="alert-v3-topbar card-container tw:mx-[0.625rem] tw:mb-2 tw:shrink-0">
         <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[48px]">
 
