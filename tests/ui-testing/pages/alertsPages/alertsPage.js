@@ -2211,6 +2211,27 @@ export class AlertsPage {
     }
 
     /**
+     * Get menu items from the visible dropdown menu
+     */
+    getMenuItems() {
+        return this.getVisibleMenu().locator('.q-item');
+    }
+
+    /**
+     * Get first menu item from visible dropdown
+     */
+    getFirstMenuItem() {
+        return this.getMenuItems().first();
+    }
+
+    /**
+     * Get the inner input element from condition value input container
+     */
+    getConditionValueInputElement() {
+        return this.getConditionValueInput().locator('input');
+    }
+
+    /**
      * Get the template override select field
      */
     getTemplateOverrideSelect() {

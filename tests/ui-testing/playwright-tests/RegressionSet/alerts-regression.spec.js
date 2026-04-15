@@ -519,23 +519,19 @@ test.describe("Alerts Regression Bugs", () => {
       const columnSelect = pm.alertsPage.getConditionColumnSelect();
       await columnSelect.click();
       // Wait for dropdown menu to appear
-      const visibleMenu = pm.alertsPage.getVisibleMenu();
-      await expect(visibleMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
-
-      await visibleMenu.locator('.q-item').first().click();
+      await expect(pm.alertsPage.getFirstMenuItem()).toBeVisible({ timeout: 5000 });
+      await pm.alertsPage.getFirstMenuItem().click();
 
       // Select operator
       const operatorSelect = pm.alertsPage.getOperatorSelect();
       await operatorSelect.click();
       // Wait for operator dropdown menu to appear
-      const operatorMenu = pm.alertsPage.getVisibleMenu();
-      await expect(operatorMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+      await expect(pm.alertsPage.getFirstMenuItem()).toBeVisible({ timeout: 5000 });
       // Select Contains operator from dropdown
-      await operatorMenu.getByText('Contains', { exact: true }).click();
+      await pm.alertsPage.getVisibleMenu().getByText('Contains', { exact: true }).click();
 
       // Fill value
-      const valueInput = pm.alertsPage.getConditionValueInput();
-      await valueInput.locator('input').fill('test');
+      await pm.alertsPage.getConditionValueInputElement().fill('test');
 
       testLogger.info('✓ Added condition');
     }
@@ -564,17 +560,16 @@ test.describe("Alerts Regression Bugs", () => {
     // Click the template select to open dropdown
     await templateSelect.click();
     // Wait for dropdown menu to appear
-    const templateMenu = pm.alertsPage.getVisibleMenu();
-    await expect(templateMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+    await expect(pm.alertsPage.getFirstMenuItem()).toBeVisible({ timeout: 5000 });
 
     // Find and select the first available template from dropdown
-    const firstTemplate = templateMenu.locator('.q-item').first();
+    const firstTemplate = pm.alertsPage.getFirstMenuItem();
     const selectedTemplateName = await firstTemplate.textContent();
     testLogger.info('Selecting template', { templateName: selectedTemplateName?.trim() });
 
     await firstTemplate.click();
     // Wait for dropdown menu to close (indicates selection completed)
-    await expect(templateMenu).not.toBeVisible({ timeout: 5000 });
+    await expect(pm.alertsPage.getVisibleMenu()).not.toBeVisible({ timeout: 5000 });
     testLogger.info('✓ Selected template from dropdown');
 
     // STRONG ASSERTION: Verify template name appears exactly once in the select field
