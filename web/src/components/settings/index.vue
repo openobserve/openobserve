@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="">
+  <q-page class="tw:h-full">
     <!-- <div class="head q-table__title tw:mx-2 tw:mb-2 tw:px-2 q-py-sm o2-management-header">
       {{ t("settings.header") }}
     </div> -->
@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       unit="px"
     >
       <template v-slot:before>
-        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-          <div class="card-container tw:mb-[0.625rem]">
+        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs tw:overflow-hidden">
+          <div class="card-container tw:mb-[0.625rem]" style="height: calc(100vh - var(--navbar-height) - 15px)">
             <div class="flex tw:h-[calc(100vh-50px)]">
               <div class="full-width" v-if="showManagementTabs">
                 <q-tabs
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:after>
         <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
             <div
-              class="card-container tw:h-[calc(100vh-50px)] tw:overflow-auto"
+              class="card-container tw:h-[calc(100vh-var(--navbar-height)-15px)] tw:overflow-auto"
             >
              <router-view title=""> </router-view>
           </div>
