@@ -152,9 +152,6 @@ watch(isBannerVisible, (visible) => {
 
 const dismiss = () => {
   isDismissed.value = true;
-  if (webinarData.value?.id) {
-    localStorage.setItem(`webinar_dismissed_${webinarData.value.id}`, "1");
-  }
 };
 
 const formattedDate = computed(() => {
@@ -175,11 +172,6 @@ onMounted(async () => {
     if (!res.ok) return;
     const json = await res.json();
     webinarData.value = json?.data ?? null;
-    if (webinarData.value?.id) {
-      isDismissed.value =
-        localStorage.getItem(`webinar_dismissed_${webinarData.value.id}`) ===
-        "1";
-    }
   } catch {
     // silently ignore — banner simply won't show
   }
