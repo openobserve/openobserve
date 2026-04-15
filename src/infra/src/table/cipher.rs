@@ -250,6 +250,26 @@ pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors
     Ok(())
 }
 
+/// Decrypt a stored cipher entry value using the current master key.
+///
+/// If decryption fails the entry was likely stored before a master key was
+/// configured (plaintext storage). The raw value is returned as-is so
+/// existing data keeps working, and a warning is logged so operators know
+/// a re-encryption step is needed (update the entry to trigger re-encryption).
+fn decrypt_entry(name: &str, org: &str, raw: String) -> String {
+    match get_master_key().decrypt(&raw) {
+        Ok(v) => v,
+        Err(_) => {
+            log::warn!(
+                "cipher entry '{name}' (org={org}) could not be decrypted with the current \
+                 master key — it may have been stored without encryption. \
+                 Returning as plaintext. Re-encrypt by updating the entry."
+            );
+            raw
+        }
+    }
+}
+
 pub async fn get_data(
     org: &str,
     kind: EntryKind,
@@ -257,7 +277,7 @@ pub async fn get_data(
 ) -> Result<Option<String>, errors::Error> {
     let res = get(org, kind, name).await?;
     match res {
-        Some(m) => get_master_key().decrypt(&m.data).map(Some),
+        Some(m) => Ok(Some(decrypt_entry(name, org, m.data))),
         None => Ok(None),
     }
 }
@@ -289,15 +309,10 @@ pub async fn list_all(limit: Option<i64>) -> Result<Vec<CipherEntry>, errors::Er
 
     records
         .into_iter()
-        .map(
-            |mut c: CipherEntry| match get_master_key().decrypt(&c.data) {
-                Ok(d) => {
-                    c.data = d;
-                    Ok(c)
-                }
-                Err(e) => Err(e),
-            },
-        )
+        .map(|mut c: CipherEntry| {
+            c.data = decrypt_entry(&c.name, &c.org, c.data);
+            Ok(c)
+        })
         .collect()
 }
 
@@ -329,15 +344,10 @@ pub async fn list_filtered(
 
     records
         .into_iter()
-        .map(
-            |mut c: CipherEntry| match get_master_key().decrypt(&c.data) {
-                Ok(d) => {
-                    c.data = d;
-                    Ok(c)
-                }
-                Err(e) => Err(e),
-            },
-        )
+        .map(|mut c: CipherEntry| {
+            c.data = decrypt_entry(&c.name, &c.org, c.data);
+            Ok(c)
+        })
         .collect()
 }
 
