@@ -896,15 +896,13 @@ export default defineComponent({
     };
 
     // Register in the module-level download registry so that
-    // window.oo_downloadAllPanelsCSV() and window.oo_downloadAllPanelsJSON()
-    // can trigger downloads from the console.
+    // window.oo_logAllPanelsJSON() can print panel data from the console.
     onMounted(() => {
       const panelId = props.data?.id;
       if (panelId) {
-        panelDownloadRegistry.set(panelId, {
-          csv: () => PanleSchemaRendererRef.value?.downloadDataAsCSV(props.data?.title),
-          json: () => PanleSchemaRendererRef.value?.logDataAsJSON(props.data?.title),
-        });
+        panelDownloadRegistry.set(panelId, () =>
+          PanleSchemaRendererRef.value?.logDataAsJSON(props.data?.title),
+        );
       }
     });
 
@@ -1055,9 +1053,6 @@ export default defineComponent({
           panelData: encodedData,
         },
       });
-    },
-    downloadCSV() {
-      this.PanleSchemaRendererRef?.downloadDataAsCSV(this.props.data.title);
     },
   },
 });

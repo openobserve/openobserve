@@ -14,18 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Module-level singleton registry used by the console helpers:
- *   window.oo_downloadAllPanelsCSV()
- *   window.oo_downloadAllPanelsJSON()
+ * Module-level singleton registry used by window.oo_logAllPanelsJSON().
  *
- * PanelContainer registers callbacks here on mount and removes them on unmount.
+ * PanelContainer registers a callback here on mount and removes it on unmount.
  * Using a module singleton (instead of provide/inject or :ref) means the Map is
  * always the same object regardless of Vue's component lifecycle or GridStack
  * DOM manipulation.
  */
-export interface PanelDownloadEntry {
-  csv: () => void;
-  json: () => void;
-}
-
-export const panelDownloadRegistry = new Map<string, PanelDownloadEntry>();
+export const panelDownloadRegistry = new Map<string, () => void>();

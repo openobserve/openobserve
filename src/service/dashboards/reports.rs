@@ -127,22 +127,13 @@ pub async fn save(
             return Err(ReportError::SmtpNotEnabled);
         }
 
-        // CSV reports don't use headless Chrome — skip Chrome checks when all dashboards are CSV.
-        let needs_chrome = report
-            .dashboards
-            .iter()
-            .any(|d| d.report_type != ReportMediaType::Csv);
-        if needs_chrome {
-            // Check if Chrome is enabled, otherwise don't save the report
-            if !cfg.chrome.chrome_enabled || cfg.chrome.chrome_path.is_empty() {
-                return Err(ReportError::ChromeNotEnabled);
-            }
+        // Check if Chrome is enabled, otherwise don't save the report
+        if !cfg.chrome.chrome_enabled || cfg.chrome.chrome_path.is_empty() {
+            return Err(ReportError::ChromeNotEnabled);
+        }
 
-            if cfg.common.report_user_name.is_empty()
-                || cfg.common.report_user_password.is_empty()
-            {
-                return Err(ReportError::ReportUsernamePasswordNotSet);
-            }
+        if cfg.common.report_user_name.is_empty() || cfg.common.report_user_password.is_empty() {
+            return Err(ReportError::ReportUsernamePasswordNotSet);
         }
     }
 
@@ -620,25 +611,19 @@ impl SendReport for Report {
             }
             Ok(())
         } else {
-            // CSV reports bypass headless Chrome — query data directly and email CSV files.
+            // Currently only one `ReportDashboard` can be captured and sent
             let dashboard = &self.dashboards[0];
-            if dashboard.report_type == ReportMediaType::Csv {
-                let csv_files = generate_csv_files(self).await?;
-                send_csv_email(self, csv_files).await
-            } else {
-                // Currently only one `ReportDashboard` can be captured and sent
-                let report = generate_report(
-                    dashboard,
-                    &self.org_id,
-                    &cfg.common.report_user_name,
-                    &cfg.common.report_user_password,
-                    &self.timezone,
-                    no_of_recipients,
-                    &self.name,
-                )
-                .await?;
-                send_email(self, &report.0, report.1).await
-            }
+            let report = generate_report(
+                dashboard,
+                &self.org_id,
+                &cfg.common.report_user_name,
+                &cfg.common.report_user_password,
+                &self.timezone,
+                no_of_recipients,
+                &self.name,
+            )
+            .await?;
+            send_email(self, &report.0, report.1).await
         }
     }
 }
