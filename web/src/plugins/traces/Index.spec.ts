@@ -268,6 +268,21 @@ vi.mock("@/composables/useDurationPercentiles", async (importOriginal) => {
   };
 });
 
+// Hoisted so tests can assert on the spy and override its return value per test.
+const { mockParseSpanKindWhereClause } = vi.hoisted(() => ({
+  mockParseSpanKindWhereClause: vi.fn((whereClause: string) => whereClause),
+}));
+
+// Use importOriginal so SPAN_KIND_MAP and SPAN_KIND_LABEL_TO_KEY remain available,
+// but replace parseSpanKindWhereClause with an inspectable spy that defaults to passthrough.
+vi.mock("@/utils/traces/constants", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    parseSpanKindWhereClause: mockParseSpanKindWhereClause,
+  };
+});
+
 // Mock services
 vi.mock("@/services/search", () => ({
   default: {
@@ -2124,6 +2139,119 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(thrownError).toBeNull();
       expect(parseSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("parseSpanKindWhereClause integration", () => {
+    // Shared mount factory — keeps stub config in one place.
+    function mountIndexStubbed() {
+      return mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    }
+
+    beforeEach(() => {
+      // Provide a selected stream so getQueryData does not early-return.
+      mockSearchObj.data.stream.selectedStream = {
+        label: "default",
+        value: "default",
+      };
+      mockSearchObj.data.stream.streamLists = [
+        { label: "default", value: "default" },
+      ];
+      // Clear call history so earlier tests in the suite do not pollute
+      // toHaveBeenCalledWith assertions (the component auto-searches on mount
+      // and accumulates calls before the explicit searchData() call).
+      mockFetchQueryDataWithHttpStream.mockClear();
+      // Default: spy passes the where clause through unchanged (real-implementation behaviour).
+      mockParseSpanKindWhereClause.mockImplementation(
+        (whereClause: string) => whereClause,
+      );
+      // Reset parseDurationWhereClause to passthrough so bleed-through from
+      // the parseDurationWhereClause integration tests does not alter the
+      // where clause before parseSpanKindWhereClause sees it.
+      vi.mocked(
+        useDurationPercentilesModule.parseDurationWhereClause,
+      ).mockImplementation((whereClause: string) => whereClause);
+    });
+
+    it("should call parseSpanKindWhereClause when buildSearch runs with a non-empty where clause", async () => {
+      mockSearchObj.data.editorValue = "span_kind='Server'";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      await wrapper.vm.searchData();
+      await flushPromises();
+
+      expect(mockParseSpanKindWhereClause).toHaveBeenCalled();
+    });
+
+    it("should call parseSpanKindWhereClause with the where-clause portion of editorValue", async () => {
+      mockSearchObj.data.editorValue = "span_kind='Server'";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      await wrapper.vm.searchData();
+      await flushPromises();
+
+      const calls = mockParseSpanKindWhereClause.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      // At least one call must have received the span_kind filter string.
+      const matchingCall = calls.find(([arg]) =>
+        (arg as string).includes("span_kind"),
+      );
+      expect(matchingCall).toBeDefined();
+      expect(matchingCall![0]).toContain("span_kind='Server'");
+    });
+
+    it("should not call parseSpanKindWhereClause when the where clause is empty", async () => {
+      mockSearchObj.data.editorValue = "";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      await wrapper.vm.searchData();
+      await flushPromises();
+
+      // parseSpanKindWhereClause is guarded by `whereClause.trim() != ""` in buildSearch;
+      // for an empty editorValue the spy must not have been called with a non-empty string.
+      const callsWithNonEmpty = mockParseSpanKindWhereClause.mock.calls.filter(
+        ([clause]) => typeof clause === "string" && clause.trim() !== "",
+      );
+      expect(callsWithNonEmpty.length).toBe(0);
+    });
+
+    it("should pass only the WHERE-clause portion to parseSpanKindWhereClause when editorValue contains a pipe prefix", async () => {
+      mockSearchObj.data.editorValue = "someFunc | span_kind='Consumer'";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      await wrapper.vm.searchData();
+      await flushPromises();
+
+      const nonEmptyCalls = mockParseSpanKindWhereClause.mock.calls.filter(
+        ([clause]) => typeof clause === "string" && clause.trim() !== "",
+      );
+      expect(nonEmptyCalls.length).toBeGreaterThan(0);
+      for (const [clause] of nonEmptyCalls) {
+        // The pipe-prefix (function expression) must not be forwarded.
+        expect(clause).not.toContain("|");
+        expect(clause).not.toContain("someFunc");
+      }
     });
   });
 });

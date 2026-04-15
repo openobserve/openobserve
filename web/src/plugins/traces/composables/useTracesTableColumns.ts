@@ -39,6 +39,7 @@ import { type ColumnDef } from "@tanstack/vue-table";
 import { useStore } from "vuex";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 
 /** IDs of LLM columns injected at runtime — never stored in selectedFields. */
 export const LLM_COLUMN_IDS = new Set([
@@ -89,6 +90,13 @@ const KNOWN_COLUMN_META: Record<
       cellClass: "tw:text-[var(--o2-text-1)]!",
     },
     accessorFn: (row: any) => row.spans,
+  },
+  span_kind: {
+    header: "Span Kind",
+    size: 120,
+    meta: { align: "center", slot: false, closable: true },
+    accessorFn: (row: any) =>
+      SPAN_KIND_MAP[row.span_kind] ?? row.span_kind ?? "",
   },
   span_status: {
     header: "Span Status",

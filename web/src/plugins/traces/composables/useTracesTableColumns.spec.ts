@@ -36,6 +36,17 @@ vi.mock("@/utils/zincutils", () => ({
   ),
 }));
 
+vi.mock("@/utils/traces/constants", () => ({
+  SPAN_KIND_MAP: {
+    "0": "Unspecified",
+    "1": "Internal",
+    "2": "Server",
+    "3": "Client",
+    "4": "Producer",
+    "5": "Consumer",
+  },
+}));
+
 import { useTracesTableColumns, LLM_COLUMN_IDS } from "./useTracesTableColumns";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 
@@ -173,6 +184,70 @@ describe("useTracesTableColumns", () => {
       );
       expect(col?.header).toBe("Method");
       expect(col?.size).toBe(140);
+    });
+  });
+
+  // ── span_kind column metadata and accessorFn ──────────────────────────────
+
+  describe("span_kind column metadata and accessorFn", () => {
+    function getSpanKindCol() {
+      return buildCols(false, "spans", ["span_kind"]).find(
+        (c) => c.id === "span_kind",
+      );
+    }
+
+    it("should use 'Span Kind' as the header", () => {
+      expect(getSpanKindCol()?.header).toBe("Span Kind");
+    });
+
+    it("should use size 120", () => {
+      expect(getSpanKindCol()?.size).toBe(120);
+    });
+
+    it("should have meta.align=center, slot=false, closable=true", () => {
+      const meta = getSpanKindCol()?.meta as Record<string, unknown>;
+      expect(meta?.align).toBe("center");
+      expect(meta?.slot).toBe(false);
+      expect(meta?.closable).toBe(true);
+    });
+
+    it("should have an accessorFn defined", () => {
+      expect(typeof (getSpanKindCol() as any)?.accessorFn).toBe("function");
+    });
+
+    it("should return 'Server' when span_kind is '2'", () => {
+      const accessorFn = (getSpanKindCol() as any)?.accessorFn as (
+        row: any,
+      ) => string;
+      expect(accessorFn({ span_kind: "2" })).toBe("Server");
+    });
+
+    it("should return 'Unspecified' when span_kind is '0'", () => {
+      const accessorFn = (getSpanKindCol() as any)?.accessorFn as (
+        row: any,
+      ) => string;
+      expect(accessorFn({ span_kind: "0" })).toBe("Unspecified");
+    });
+
+    it("should pass through the raw value when span_kind is unknown (e.g. '99')", () => {
+      const accessorFn = (getSpanKindCol() as any)?.accessorFn as (
+        row: any,
+      ) => string;
+      expect(accessorFn({ span_kind: "99" })).toBe("99");
+    });
+
+    it("should return empty string when span_kind is undefined", () => {
+      const accessorFn = (getSpanKindCol() as any)?.accessorFn as (
+        row: any,
+      ) => string;
+      expect(accessorFn({ span_kind: undefined })).toBe("");
+    });
+
+    it("should return empty string when span_kind is missing from the row", () => {
+      const accessorFn = (getSpanKindCol() as any)?.accessorFn as (
+        row: any,
+      ) => string;
+      expect(accessorFn({})).toBe("");
     });
   });
 

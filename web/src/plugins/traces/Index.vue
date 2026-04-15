@@ -203,8 +203,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="traces-search-error-text"
                     class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
-                    <q-icon name="info" color="primary" size="md" />
-                    {{ searchObj.data.errorMsg }}
+                    <SanitizedHtmlRenderer
+                      data-test="traces-search-detail-error-message"
+                      :htmlContent="searchObj?.data?.errorMsg"
+                      class="tw:pt-[1rem]"
+                    />
                   </div>
                   <div
                     v-else-if="!isStreamSelected"
@@ -299,6 +302,7 @@ import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
@@ -665,6 +669,13 @@ function buildSearch() {
         whereClause = durationParseResult;
       }
 
+      // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
+      whereClause = parseSpanKindWhereClause(
+        whereClause,
+        parser,
+        searchObj.data.stream.selectedStream.value,
+      );
+
       whereClause = whereClause
         .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
         .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
@@ -872,6 +883,13 @@ async function getQueryData(
       filter = filterParseResult;
     }
 
+    // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
+    filter = parseSpanKindWhereClause(
+      filter,
+      parser,
+      searchObj.data.stream.selectedStream.value,
+    );
+
     const combinedFilter = filter;
 
     if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
@@ -1017,7 +1035,8 @@ async function getQueryData(
           const errData = err?.content || err;
           const { message, trace_id, code, error_detail } = errData ?? {};
 
-          let errorMsg = message || err?.message || "Search request failed";
+          let errorMsg =
+            message || err?.message || "Error while processing request";
           if (code) {
             searchObj.data.errorCode = code;
             const customMessage = logsErrorMessage(code);
@@ -1969,6 +1988,11 @@ watch(
 
   .q-field__control-container {
     padding-top: 0px !important;
+  }
+
+  .traces-horizontal-splitter .q-splitter__before {
+    z-index: auto;
+    overflow: visible;
   }
 }
 </style>
