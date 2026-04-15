@@ -110,7 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="ellipsis flex items-center span-name-section-content"
                 >
                   <img
-                    :src="spanServiceIconUrlMap.get(`${span.serviceName}/${span.style?.color ?? ''}`)"
+                    :src="
+                      spanServiceIconUrlMap.get(
+                        `${span.serviceName}/${span.style?.color ?? ''}`,
+                      )
+                    "
                     class="q-mr-xs tw:shrink-0 tw:w-[1.125rem] tw:h-[1.125rem] tw:inline-block"
                     aria-hidden="true"
                     alt=""
@@ -123,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     title="Error Span"
                     :data-test="`trace-tree-span-error-icon-${span.spanId}`"
                   />
+                  <SpanKindBadge v-if="span.spanKind" :kind="span.spanKind" />
                   <span
                     class="text-subtitle2 text-bold q-mr-sm"
                     :class="{
@@ -258,6 +263,7 @@ import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
 import SpanBlock from "./SpanBlock.vue";
+import SpanKindBadge from "./components/SpanKindBadge.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
@@ -628,7 +634,7 @@ export default defineComponent({
       spanServiceIconUrlMap,
     };
   },
-  components: { SpanBlock },
+  components: { SpanBlock, SpanKindBadge },
 });
 </script>
 
