@@ -110,8 +110,10 @@ mod m20260318_000005_add_all_dimensions_to_service_streams;
 mod m20260326_000001_add_field_name_mapping_to_service_streams;
 mod m20260331_000001_create_sys_rca_agent_service_accounts;
 mod m20260402_000001_reports_add_image_fields;
-mod m20260403_000001_create_model_pricing_table;
-mod m20260403_000002_add_source_to_model_pricing;
+mod m20260414_000001_add_is_system_to_cipher_keys;
+mod m20260414_000002_create_org_ai_toolsets;
+mod m20260415_000001_create_model_pricing_table;
+mod m20260415_000002_add_source_to_model_pricing;
 
 pub struct Migrator;
 
