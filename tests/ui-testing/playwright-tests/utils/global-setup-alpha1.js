@@ -97,7 +97,13 @@ async function globalSetup() {
     );
 
     await submitButton.first().waitFor({ state: 'visible', timeout: 10000 });
-    await submitButton.first().click();
+    // Use force:true to bypass any overlay on the Dex login page (AKS env has a transparent
+    // overlay that intercepts the click — same pattern as Quasar backdrops in the main UI)
+    await submitButton.first().click({ force: true }).catch(async () => {
+      // Fallback: submit via Enter key if click is still blocked
+      testLogger.info('[alpha1] click() blocked, submitting via Enter key');
+      await page.keyboard.press('Enter');
+    });
     await Promise.race([
       page.waitForURL(/web\/|dex\/approval|dex\/auth.*error/, { timeout: 15000 }),
       page.locator('.flash-error, .alert, [class*="error"]').first()
