@@ -452,9 +452,6 @@ where
             && path_columns[1].eq("ai")
             && path_columns[2].eq("toolsets")
         {
-            if method.eq("GET") && path_columns.len() == 3 {
-                method = "LIST".to_string();
-            }
             let key = "ai_toolsets";
             format!(
                 "{}:{}",
@@ -987,11 +984,11 @@ where
         };
 
         log::debug!(
-            "AuthExtractor: path='{}', auth_str_empty={}, auth_type='{}', auth_str_len={}",
+            "AuthExtractor: path='{}', auth_str_empty={}, auth_type='{}', auth_str_len={}, object_type='{object_type}'",
             local_path,
             auth_str.is_empty(),
             auth_type,
-            auth_str.len()
+            auth_str.len(),
         );
 
         // if let Some(auth_header) = parts.headers.get("Authorization") {
