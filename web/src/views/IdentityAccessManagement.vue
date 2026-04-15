@@ -1,5 +1,5 @@
 <template>
-  <q-page data-test="iam-page" class="q-pa-none" style="min-height: inherit">
+  <div data-test="iam-page" class="q-pa-none tw:overflow-hidden">
     <q-splitter
       v-model="splitterModel"
       unit="px"
@@ -8,7 +8,7 @@
     >
       <template v-slot:before>
         <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-        <div v-if="showSidebar" class="iam-tabs spitter-container card-container o2-container-navbarheight" style="height: calc(100vh - 50px);">
+        <div v-if="showSidebar" class="iam-tabs spitter-container card-container o2-container-navbarheight" style="height: calc(100vh - var(--navbar-height) - 14px);">
           <route-tabs
             ref="iamRouteTabsRef"
             dataTest="iam-tabs"
@@ -34,13 +34,13 @@
       </template>
       <template v-slot:after>
         <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-          <div class="o2-container-navbarheight">
+          <div class="tw:overflow-hidden">
             <RouterView />
           </div>
         </div>
       </template>
     </q-splitter>
-  </q-page>
+  </div>
 </template>
 
 <script setup lang="ts">
