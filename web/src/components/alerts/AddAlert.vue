@@ -91,7 +91,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <InlineSelectFolderDropdown
               :model-value="activeFolderId"
               type="alerts"
-              :width="folderDropdownWidth"
               :disable="beingUpdated || anomalyEditMode"
               @update:model-value="updateActiveFolderId({ value: $event })"
             />
@@ -547,7 +546,7 @@ export default defineComponent({
     const alertForm = useAlertForm(props, emit);
 
     const isAnomalyDetectionEnabled = computed(
-      () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
+      () => alertForm.store.state.zoConfig.anomaly_detection_enabled === false,
     );
 
     // Auto-expand preview when stream name is selected, collapse when cleared
@@ -611,12 +610,6 @@ export default defineComponent({
       document.removeEventListener('mouseup', onFloatingDragEnd);
     });
 
-    // Responsive folder dropdown width — shrinks when AI chat is open
-    const folderDropdownWidth = computed(() => {
-      if (alertForm.store.state.isAiChatEnabled) return '85px';
-      return '120px';
-    });
-
     return {
       ...alertForm,
       isAnomalyDetectionEnabled,
@@ -626,7 +619,6 @@ export default defineComponent({
       floatingWidgetRef,
       floatingWidgetStyle,
       onFloatingDragStart,
-      folderDropdownWidth,
     };
   },
 
@@ -1267,32 +1259,29 @@ body.body--dark .query-mode-tabs {
 }
 
 // Base (widest) — full widths
-.topbar-name-input        { min-width: 160px; max-width: 200px; }
-.topbar-folder-field      { width: 140px; }
-.topbar-stream-type       { width: 150px; }
-.topbar-stream-name       { width: 160px; }
-// Medium — screen ~1280-1400px
-@container topbar (max-width: 1050px) {
-  .topbar-name-input   { min-width: 120px; }
-  .topbar-folder-field { width: 110px; }
-  .topbar-stream-type  { width: 110px; }
-  .topbar-stream-name  { width: 120px; }
+.topbar-name-input  { min-width: 120px; max-width: 150px; }
+.topbar-stream-type { width: 150px; }
+.topbar-stream-name { width: 160px; }
+
+// Medium — topbar ~1050–1300px
+@container topbar (max-width: 1300px) {
+  .topbar-name-input  { min-width: 100px; }
+  .topbar-stream-type { width: 90px; }
+  .topbar-stream-name { width: 110px; }
 }
 
-// Compact — AI chat open (inputs shrink further)
+// Compact — AI chat open or narrow viewport
 @container topbar (max-width: 850px) {
-  .topbar-name-input   { min-width: 90px; }
-  .topbar-folder-field { width: 85px; }
-  .topbar-stream-type  { width: 90px; }
-  .topbar-stream-name  { width: 95px; }
+  .topbar-name-input  { min-width: 90px; }
+  .topbar-stream-type { width: 90px; }
+  .topbar-stream-name { width: 95px; }
 }
 
-// Minimum — AI chat + small viewport
+// Minimum — very narrow
 @container topbar (max-width: 680px) {
-  .topbar-name-input   { min-width: 70px; }
-  .topbar-folder-field { width: 70px; }
-  .topbar-stream-type  { width: 75px; }
-  .topbar-stream-name  { width: 80px; }
+  .topbar-name-input  { min-width: 70px; }
+  .topbar-stream-type { width: 75px; }
+  .topbar-stream-name { width: 80px; }
 }
 // ───────────────────────────────────────────────────────────────────────────
 </style>

@@ -19,8 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-select
       :model-value="modelValue"
       :options="folderOptions"
-      class="alert-v3-select"
-      :style="{ width }"
+      class="alert-v3-select folder-select"
       dense
       borderless
       behavior="menu"
@@ -74,10 +73,6 @@ export default defineComponent({
       type: String,
       default: "alerts",
     },
-    width: {
-      type: String,
-      default: "140px",
-    },
     disable: {
       type: Boolean,
       default: false,
@@ -114,3 +109,21 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+.folder-select {
+  width: 110px;
+}
+
+@media (max-width: 1500px) {
+  .folder-select { width: 90px; }
+}
+
+@media (max-width: 1100px) {
+  .folder-select { width: 75px; }
+}
+
+@media (max-width: 950px) {
+  .folder-select { width: 65px; }
+}
+</style>
