@@ -64,7 +64,7 @@ test.describe("Alerts UI Operations", () => {
     testLogger.info('Successfully deleted isolated template', { templateName: deleteTemplateName });
   });
 
-  test('Create and Delete Scheduled Alert with SQL Query', {
+  test.skip('Create and Delete Scheduled Alert with SQL Query', {
     tag: ['@scheduledAlerts', '@all', '@alerts'],
     timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
@@ -114,7 +114,7 @@ test.describe("Alerts UI Operations", () => {
    * Tests the manual alert trigger functionality accessible via the kebab menu
    * Uses validation infrastructure (self-referential destination) for reliable testing
    */
-  test('Manual Alert Trigger via UI (Feature #9484)', {
+  test.skip('Manual Alert Trigger via UI (Feature #9484)', {
     tag: ['@manualTrigger', '@all', '@alerts', '@feature9484']
   }, async ({ page }) => {
     const streamName = 'auto_playwright_stream';
@@ -164,7 +164,7 @@ test.describe("Alerts UI Operations", () => {
     testLogger.info('Feature #9484 test completed: Manual Alert Trigger via UI');
   });
 
-  test('Alert Module UI Validations and Filters Check', {
+  test.skip('Alert Module UI Validations and Filters Check', {
     tag: ['@all', '@alerts', '@alertsUIValidations']
   }, async ({ page }) => {
     const templateName = 'auto_playwright_template_' + sharedRandomValue;

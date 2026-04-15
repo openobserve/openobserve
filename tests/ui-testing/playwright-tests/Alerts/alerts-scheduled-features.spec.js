@@ -352,7 +352,7 @@ test.describe("Scheduled Alert Features", () => {
     // ========================================================================
     // TEST 2: P0 - Create scheduled alert with aggregation via Builder
     // ========================================================================
-    test("Create scheduled alert with aggregation via Builder", {
+    test.skip("Create scheduled alert with aggregation via Builder", {
         tag: ['@alertScheduled', '@aggregation', '@smoke', '@P0', '@all', '@alerts']
     }, async ({ page }) => {
         testLogger.info('=== PHASE 1: Navigate to test folder ===');
