@@ -211,7 +211,7 @@ export default defineComponent({
         name: "actions",
         field: "actions",
         label: t("aiToolset.actions"),
-        align: "left",
+        align: "center",
         sortable: false,
         classes: "actions-column",
       },

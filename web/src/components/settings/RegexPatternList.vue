@@ -285,7 +285,8 @@
           name: "actions",
           field: "actions",
           label: t("regex_patterns.actions"),
-          align: "left",
+          align: "center",
+          sortable: false,
           classes: "actions-column",
         }
       ]);
