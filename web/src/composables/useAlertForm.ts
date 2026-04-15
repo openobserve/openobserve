@@ -412,6 +412,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const step4Ref = ref(null);
   const lastValidStep = ref(1);
 
+  // Topbar field refs + error states for stream type / stream name
+  const streamTypeRef = ref<any>(null);
+  const streamNameRef = ref<any>(null);
+  const alertNameError = ref(false);
+  const streamTypeError = ref(false);
+  const streamNameError = ref(false);
+
   // ── V3 Tab State (for standard alerts) ──────────────────────────────────
 
   const activeTab = ref("condition");
@@ -1048,6 +1055,80 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         errorField.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     });
+  };
+
+  // Focus a topbar q-select/q-input by its Vue component ref
+  const focusTopbarField = (fieldRef: any) => {
+    nextTick(() => {
+      const el = fieldRef?.value?.$el as HTMLElement | null;
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        const input = el.querySelector("input") as HTMLElement | null;
+        input?.focus();
+      }
+    });
+  };
+
+  // Sequential top-to-bottom validation with auto-focus for V3 layout
+  const validateAndFocus = async (): Promise<boolean> => {
+    // 1. Alert name
+    if (!formData.value.name?.trim()) {
+      alertNameError.value = true;
+      q.notify({ type: "negative", message: "Alert name is required.", timeout: 2000 });
+      focusTopbarField(step1Ref);
+      return false;
+    }
+    alertNameError.value = false;
+
+    // 2. Stream Type
+    if (!formData.value.stream_type) {
+      streamTypeError.value = true;
+      q.notify({ type: "negative", message: "Stream type is required.", timeout: 2000 });
+      focusTopbarField(streamTypeRef);
+      return false;
+    }
+    streamTypeError.value = false;
+
+    // 3. Stream Name
+    if (!formData.value.stream_name) {
+      streamNameError.value = true;
+      q.notify({ type: "negative", message: "Stream name is required.", timeout: 2000 });
+      focusTopbarField(streamNameRef);
+      return false;
+    }
+    streamNameError.value = false;
+
+    // 4. Query + Conditions (QueryConfig validates SQL/PromQL content + custom conditions)
+    if (step2Ref.value && (step2Ref.value as any).validate) {
+      activeTab.value = "condition";
+      await nextTick();
+      const isValid = await (step2Ref.value as any).validate();
+      if (!isValid) {
+        // QueryConfig.validate() focuses its own editor/fields on failure
+        return false;
+      }
+    }
+
+    // 5. Alert Settings (trigger conditions, destinations)
+    if (step4Ref.value && (step4Ref.value as any).validate) {
+      const result = await (step4Ref.value as any).validate();
+      const isValid = typeof result === "boolean" ? result : result?.valid;
+      const message = typeof result === "object" ? result?.message : null;
+      const shouldFocusDestination = typeof result === "object" ? result?.focusDestination : false;
+      if (!isValid) {
+        activeTab.value = "condition";
+        await nextTick();
+        if (message) q.notify({ type: "negative", message, timeout: 2000 });
+        if (shouldFocusDestination && (step4Ref.value as any).focusDestination) {
+          (step4Ref.value as any).focusDestination();
+        } else {
+          focusOnFirstError();
+        }
+        return false;
+      }
+    }
+
+    return true;
   };
 
   // Validate all tabs for V3 layout save
@@ -1752,15 +1833,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // FINAL VALIDATION CHECKPOINT
-    // For V3 layout, validate all tabs
+    // For V3 layout, validate sequentially with auto-focus
     if (!isAnomalyMode.value) {
-      const { valid, firstErrorTab } = await validateAllTabs();
-      if (!valid) {
-        if (firstErrorTab) {
-          activeTab.value = firstErrorTab;
-        }
-        return false;
-      }
+      const valid = await validateAndFocus();
+      if (!valid) return false;
     } else {
       // Anomaly wizard validation
       if (step1Ref.value && (step1Ref.value as any).validate) {
@@ -1772,45 +1848,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
             message: "Please complete Alert Setup step correctly.",
             timeout: 2000,
           });
-          return false;
-        }
-      }
-    }
-
-    // Validate Step 2 (conditions) for standard alerts
-    if (!isAnomalyMode.value) {
-      if (step2Ref.value && (step2Ref.value as any).validate) {
-        const validationResult = (step2Ref.value as any).validate();
-        const isValid =
-          validationResult instanceof Promise
-            ? await validationResult
-            : validationResult;
-        if (!isValid) {
-          activeTab.value = "condition";
-          q.notify({
-            type: "negative",
-            message: "Please complete Query Configuration correctly.",
-            timeout: 2000,
-          });
-          return false;
-        }
-      }
-
-      // Validate Step 4 (alert settings)
-      if (step4Ref.value && (step4Ref.value as any).validate) {
-        const validationResult = (step4Ref.value as any).validate();
-        const result =
-          validationResult instanceof Promise
-            ? await validationResult
-            : validationResult;
-        const isValid = typeof result === "boolean" ? result : result.valid;
-        if (!isValid) {
-          activeTab.value = "condition";
-          q.notify({
-            type: "negative",
-            message: "Please complete Alert Settings correctly.",
-            timeout: 2000,
-          });
+          focusOnFirstError();
           return false;
         }
       }
@@ -2684,6 +2722,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     step3Ref,
     step4Ref,
     lastValidStep,
+    streamTypeRef,
+    streamNameRef,
+    alertNameError,
+    streamTypeError,
+    streamNameError,
     currentStepCaption,
     isLastStep,
     goToStep2,
@@ -2724,6 +2767,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     validateConditionsAgainstUDS,
     validateStep,
     validateAllTabs,
+    validateAndFocus,
     updateGroup,
     removeConditionGroup,
     transformFEToBE,

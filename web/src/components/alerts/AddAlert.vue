@@ -42,13 +42,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <template v-else>
                 <q-input
+                  ref="step1Ref"
                   v-model="formData.name"
                   data-test="add-alert-name-input"
                   dense
                   borderless
+                  no-error-icon
                   :placeholder="'Alert name'"
                   class="alert-v3-field topbar-name-input tw:text-sm"
+                  :class="alertNameError ? 'field-error' : ''"
                   hide-bottom-space
+                  @update:model-value="alertNameError = false"
                 />
               </template>
 
@@ -103,11 +107,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
             <label class="alert-v3-inline-label tw:opacity-80 tw:font-semibold">{{ t("alerts.streamType") }} <span class="tw:text-red-500">*</span></label>
             <q-select
+              ref="streamTypeRef"
               data-test="add-alert-stream-type-select-dropdown"
               v-model="formData.stream_type"
               :options="streamTypes"
               :popup-content-style="{ textTransform: 'lowercase' }"
               class="no-case alert-v3-field topbar-stream-type"
+              :class="streamTypeError ? 'field-error' : ''"
               dense
               borderless
               use-input
@@ -118,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :readonly="beingUpdated || anomalyEditMode"
               :disable="beingUpdated || anomalyEditMode"
               @filter="(val, update) => update(() => {})"
-              @update:model-value="updateStreams()"
+              @update:model-value="streamTypeError = false; updateStreams()"
               behavior="menu"
             />
           </div>
@@ -127,12 +133,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
             <label class="alert-v3-inline-label tw:opacity-80 tw:font-semibold">{{ t("alerts.stream_name") }} <span class="tw:text-red-500">*</span></label>
             <q-select
+              ref="streamNameRef"
               data-test="add-alert-stream-name-select-dropdown"
               v-model="formData.stream_name"
               :options="filteredStreams"
               :loading="isFetchingStreams"
               color="input-border"
               class="no-case alert-v3-field topbar-stream-name"
+              :class="streamNameError ? 'field-error' : ''"
               dense
               borderless
               use-input
@@ -143,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :readonly="beingUpdated || anomalyEditMode"
               :disable="beingUpdated || anomalyEditMode || !formData.stream_type"
               @filter="filterStreams"
-              @update:model-value="updateStreamFields"
+              @update:model-value="streamNameError = false; updateStreamFields($event)"
               behavior="menu"
             />
             <q-tooltip v-if="!formData.stream_type">Select a stream type first</q-tooltip>
@@ -710,6 +718,20 @@ export default defineComponent({
   :deep(.q-field__control) {
     border-color: rgba(255, 255, 255, 0.2) !important;
     background: rgba(255, 255, 255, 0.05) !important;
+  }
+}
+
+// Error highlight for topbar fields — combined selector beats .body--dark .alert-v3-field specificity
+.alert-v3-field.field-error {
+  :deep(.q-field__control) {
+    border-color: #ef5350 !important;
+    background: rgba(239, 83, 80, 0.05) !important;
+  }
+}
+.body--dark .alert-v3-field.field-error {
+  :deep(.q-field__control) {
+    border-color: #ef5350 !important;
+    background: rgba(239, 83, 80, 0.08) !important;
   }
 }
 
