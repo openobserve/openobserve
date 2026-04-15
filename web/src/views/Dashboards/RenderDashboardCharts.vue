@@ -1176,7 +1176,6 @@ export default defineComponent({
         gridStackInstance = null;
       }
       // Remove console helpers
-      delete (window as any).oo_downloadAllPanelsCSV;
       delete (window as any).oo_logAllPanelsJSON;
       panelDownloadRegistry.clear();
     });
@@ -1534,29 +1533,22 @@ export default defineComponent({
     onMounted(() => {
       initializePanelTimes();
 
-      // Console helpers available from any dashboard:
-      //   window.oo_downloadAllPanelsCSV()  → downloads a CSV file per panel
-      //   window.oo_logAllPanelsJSON()      → prints each panel's raw data to the console
-      const runForAll = (format: "csv" | "json") => {
+      // Console helper — prints each panel's raw data to the console.
+      // Usage:  window.oo_logAllPanelsJSON()
+      (window as any).oo_logAllPanelsJSON = () => {
         const total = panelDownloadRegistry.size;
         if (total === 0) {
           console.warn("[oo] No panels found on the current tab.");
           return;
         }
-        if (format === "csv") {
-          console.log(`[oo] Downloading CSV for ${total} panel(s)…`);
-        }
-        panelDownloadRegistry.forEach((entry, id) => {
+        panelDownloadRegistry.forEach((fn, id) => {
           try {
-            entry[format]();
+            fn();
           } catch (e) {
             console.warn(`[oo] Error on panel ${id}`, e);
           }
         });
       };
-
-      (window as any).oo_downloadAllPanelsCSV = () => runForAll("csv");
-      (window as any).oo_logAllPanelsJSON = () => runForAll("json");
     });
 
     // Re-initialize panel times when panels change or when global time changes
