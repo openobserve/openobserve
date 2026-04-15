@@ -127,7 +127,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     title="Error Span"
                     :data-test="`trace-tree-span-error-icon-${span.spanId}`"
                   />
-                  <SpanKindBadge v-if="span.spanKind" :kind="span.spanKind" />
+                  <SpanKindBadge
+                    v-if="span.spanKind"
+                    :kind="span.spanKind"
+                    :color="span.style?.color"
+                  />
                   <span
                     class="text-subtitle2 text-bold q-mr-sm"
                     :class="{

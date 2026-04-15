@@ -17,7 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
   <span
     v-if="abbrev"
     class="span-kind-badge"
-    :class="`span-kind-badge--${kindClass}`"
+    :class="!color ? `span-kind-badge--${kindClass}` : ''"
+    :style="
+      color
+        ? {
+            background: `color-mix(in srgb, ${color} 20%, transparent)`,
+            color: color,
+          }
+        : {}
+    "
     :data-test="`trace-tree-span-kind-badge-${kindClass}`"
   >
     {{ abbrev }}
@@ -31,6 +39,13 @@ import { computed } from "vue";
 const props = defineProps<{
   /** Human-readable span kind label, e.g. "Client", "Server", "Internal" */
   kind: string;
+  /**
+   * Optional hex color matching the waterfall bar for this span.
+   * When provided it overrides the CSS-variable-based per-kind classes so the
+   * badge background (light tint) and text always match the bar color,
+   * including dynamic / unknown span kind values.
+   */
+  color?: string;
 }>();
 
 const kindClass = computed(() => props.kind.toLowerCase());
@@ -49,7 +64,8 @@ const abbrev = computed(() => {
     case "Internal":
       return "I";
     default:
-      return "";
+      // Dynamic / unknown kinds: use first letter so the badge still appears
+      return props.kind ? props.kind.charAt(0).toUpperCase() : "";
   }
 });
 </script>
