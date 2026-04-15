@@ -174,19 +174,19 @@ async function globalSetup() {
       testLogger.info('[alpha1] On callback URL — waiting for SPA token processing...');
       try {
         // Wait for the SPA to process the token and redirect away from /cb
+        // AKS runners are slow — give 90s for JS token processing before giving up
         await page.waitForURL(
           url => !url.toString().includes('/cb'),
-          { timeout: 30000 }
+          { timeout: 90000 }
         );
         testLogger.info(`[alpha1] Callback processed, now at: ${page.url()}`);
       } catch (e) {
-        // If the SPA didn't auto-redirect, wait for network to settle then navigate
-        testLogger.warn('[alpha1] Callback did not auto-redirect, waiting for network idle...');
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        if (page.url().includes('/cb')) {
-          testLogger.info('[alpha1] Still on callback, navigating to /web/...');
-          await page.goto(`${baseUrl}/web/`, { waitUntil: 'domcontentloaded' });
-        }
+        // SPA did not redirect — navigating away at this point will lose the session.
+        // Try reloading the callback URL so the SPA gets another chance to process it.
+        testLogger.warn('[alpha1] Callback did not auto-redirect after 90s, reloading /web/ to retry...');
+        await page.goto(`${baseUrl}/web/`, { waitUntil: 'domcontentloaded' });
+        // If the reload sends us back to Dex, the session is truly lost — let the
+        // outer Dex check below catch it. If it lands on /web/, we're good.
       }
     }
 
