@@ -32,12 +32,14 @@ pub enum ReportMediaType {
     #[default]
     Pdf,
     Png,
+    Csv,
 }
 
 impl From<i16> for ReportMediaType {
     fn from(v: i16) -> Self {
         match v {
             1 => ReportMediaType::Png,
+            2 => ReportMediaType::Csv,
             _ => ReportMediaType::Pdf,
         }
     }
@@ -48,6 +50,7 @@ impl From<ReportMediaType> for i16 {
         match t {
             ReportMediaType::Pdf => 0,
             ReportMediaType::Png => 1,
+            ReportMediaType::Csv => 2,
         }
     }
 }
