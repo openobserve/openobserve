@@ -316,7 +316,20 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
 // ---------------------------------------------------------------------------
 
 fn toolset_to_response(t: OrgToolset) -> ToolsetResponse {
-    let data = t.data.as_deref().and_then(|s| serde_json::from_str(s).ok());
+    let data = t
+        .data
+        .as_deref()
+        .and_then(|s| match serde_json::from_str(s) {
+            Ok(v) => Some(v),
+            Err(e) => {
+                log::warn!(
+                    "toolset '{}' (id={}) has unreadable data: {e}",
+                    t.name,
+                    t.id
+                );
+                None
+            }
+        });
     ToolsetResponse {
         id: t.id,
         org: t.org,

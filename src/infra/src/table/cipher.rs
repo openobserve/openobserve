@@ -147,7 +147,7 @@ impl TryFrom<String> for EntryKind {
 pub struct ListFilter {
     pub org: Option<String>,
     pub kind: Option<EntryKind>,
-    /// Exact match on the `name` column.
+    /// Case-insensitive substring match on the `name` column (`LIKE '%val%'`).
     pub name: Option<String>,
     /// When `false`, rows with `is_system = true` are excluded from results.
     /// The public API always sets this to `false` so system DEKs are hidden.
@@ -373,7 +373,7 @@ pub async fn get_or_create_dek(org: &str) -> Result<Vec<u8>, errors::Error> {
     // No DEK yet — generate a new 512-bit key (AES-256-SIV requires 64 bytes).
     let dek = random_bytes(64);
 
-    add(CipherEntry {
+    match add(CipherEntry {
         org: org.to_string(),
         name: DEFAULT_DEK_NAME.to_string(),
         kind: EntryKind::CipherKey,
@@ -383,9 +383,26 @@ pub async fn get_or_create_dek(org: &str) -> Result<Vec<u8>, errors::Error> {
         created_at: now_micros(),
     })
     .await
-    .map_err(|e| errors::Error::Message(format!("failed to persist DEK for org {org}: {e}")))?;
-
-    Ok(dek)
+    {
+        Ok(_) => Ok(dek),
+        // Another concurrent caller won the race and already inserted the DEK.
+        // Retrieve the winner's key rather than returning an error.
+        Err(errors::Error::DbError(errors::DbError::UniqueViolation)) => {
+            get_data(org, EntryKind::CipherKey, DEFAULT_DEK_NAME)
+                .await?
+                .ok_or_else(|| {
+                    errors::Error::Message(format!("DEK for org {org} missing after race"))
+                })
+                .and_then(|b64| {
+                    BASE64_STANDARD.decode(b64).map_err(|e| {
+                        errors::Error::Message(format!("failed to decode DEK for org {org}: {e}"))
+                    })
+                })
+        }
+        Err(e) => Err(errors::Error::Message(format!(
+            "failed to persist DEK for org {org}: {e}"
+        ))),
+    }
 }
 
 /// Returns the per-org DEK, using an in-memory cache with a 5-minute TTL to
