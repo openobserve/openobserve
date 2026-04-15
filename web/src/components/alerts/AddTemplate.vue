@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:before>
         <div class="card-container tw:h-full tw:flex tw:flex-col">
-          <div class="q-pa-md tw:flex-1 tw:overflow-auto">
+          <div class="q-pa-md tw:overflow-auto">
             <div class="col-12 q-pb-sm q-pt-sm o2-input">
             <q-input
               data-test="add-template-name-input"

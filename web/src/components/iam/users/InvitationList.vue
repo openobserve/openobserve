@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-[calc(100vh-128px)]">
+      <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
         <q-table
           ref="qTable"
           :rows="invitations"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :pagination="pagination"
           style="width: 100%"
           :style="invitations.length > 0
-              ? 'width: 100%; height: calc(100vh - 128px)'
+              ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 92px);'
               : 'width: 100%'"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
         >
