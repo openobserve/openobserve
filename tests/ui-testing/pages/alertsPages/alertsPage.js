@@ -2181,6 +2181,15 @@ export class AlertsPage {
     }
 
     /**
+     * Get count of nested q-select components within the template override select
+     * Used to detect duplicate/nested rendering issues (Bug #10110)
+     */
+    async getNestedQSelectCount() {
+        const templateSelect = this.getTemplateOverrideSelect();
+        return await templateSelect.locator('.q-select').count();
+    }
+
+    /**
      * Get the operator select dropdown
      */
     getOperatorSelect() {

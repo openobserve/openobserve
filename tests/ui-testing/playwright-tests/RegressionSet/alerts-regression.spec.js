@@ -602,7 +602,7 @@ test.describe("Alerts Regression Bugs", () => {
     testLogger.info('Template field classes', { classes: templateFieldClasses });
 
     // Verify no nested q-select components (templateSelect IS the q-select, so children count should be 0)
-    const nestedQSelectCount = await templateSelect.locator('.q-select').count();
+    const nestedQSelectCount = await pm.alertsPage.getNestedQSelectCount();
     expect(nestedQSelectCount, 'Bug #10110: Should have no nested q-select components (templateSelect is already the q-select)').toBe(0);
     testLogger.info('✓ No nested/duplicate q-select components detected');
 
