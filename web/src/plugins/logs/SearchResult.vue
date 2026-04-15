@@ -180,7 +180,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
           <!-- Wrap Content Button -->
           <q-btn
-            v-if="searchObj.meta.logsVisualizeToggle === 'logs' || searchObj.meta.logsVisualizeToggle === 'patterns'"
+            v-if="
+              searchObj.meta.logsVisualizeToggle === 'logs' ||
+              searchObj.meta.logsVisualizeToggle === 'patterns'
+            "
             data-test="logs-search-result-wrap-table-content-btn"
             icon="wrap_text"
             flat
@@ -340,25 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click:data-row="openLogDetails"
           @expand-row="expandLog"
           @send-to-ai-chat="sendToAiChat"
-        >
-          <template #expanded-row="{ row, index }">
-            <json-preview
-              :value="row"
-              show-copy-button
-              class="tw:py-[0.375rem]"
-              mode="expanded"
-              :index="index"
-              :highlight-query="searchObj.data.highlightQuery"
-              :streamName="searchObj.data.stream.selectedStream[0]"
-              @copy="copyLogToClipboard"
-              @add-field-to-table="addFieldToTable"
-              @add-search-term="addSearchTerm"
-              @view-trace="() => redirectToTraces(row)"
-              @show-correlation="() => openLogDetailsWithCorrelation(row)"
-              @send-to-ai-chat="sendToAiChat"
-            />
-          </template>
-        </tenstack-table>
+        />
       </template>
 
       <!-- Patterns View -->
@@ -1339,7 +1324,7 @@ export default defineComponent({
         name: "searchJobInspector",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          trace_id: traceId
+          trace_id: traceId,
         },
       });
     };
