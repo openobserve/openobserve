@@ -350,9 +350,9 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have exactly 12 children routes when enterprise is enabled", () => {
+    it("should have exactly 13 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(12); // 4 base + 8 enterprise (query_management, cipherKeys, pipelineDestinations, nodes, domainManagement, regexPatterns, correlationSettings, license)
+      expect(routes[0].children).toHaveLength(13); // 4 base + 9 enterprise (query_management, cipherKeys, aiToolsets, pipelineDestinations, nodes, domainManagement, regexPatterns, correlationSettings, license)
     });
   });
 
@@ -420,9 +420,9 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 13 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 14 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(13); // 4 base + 8 enterprise + 1 cloud
+      expect(routes[0].children).toHaveLength(14); // 4 base + 9 enterprise + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
