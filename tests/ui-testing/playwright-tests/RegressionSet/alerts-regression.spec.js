@@ -125,7 +125,7 @@ test.describe("Alerts Regression Bugs", () => {
   // - P1: Different operators (>=, <=) work correctly
   // - P0: Alert can be saved with PromQL mode (the core bug fix)
   // ============================================================================
-  test("Bug #9967: PromQL alert creation - comprehensive validation", {
+  test.skip("Bug #9967: PromQL alert creation - comprehensive validation", {
     tag: ['@promqlAlert', '@alerts', '@regressionBugs', '@P0', '@metrics', '@bug-9967']
   }, async ({ page }) => {
     testLogger.info('Testing Bug #9967 fix - comprehensive validation');

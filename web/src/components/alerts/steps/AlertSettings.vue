@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dense
                           v-model="localDestinations"
                           :val="option.opt"
-                          @update:model-value="emitDestinationsUpdate"
+                          @update:model-value="destinationError = false; emitDestinationsUpdate()"
                         />
                       </q-item-section>
                       <q-item-section>
@@ -309,7 +309,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="localDestinations"
                 :options="filteredDestinations"
                 data-test="alert-destinations-select"
-                class="no-case q-py-none destinations-select-field alert-v3-select"
+                class="no-case q-py-none destinations-select-field alert-v3-select destination-select-field"
+                :class="destinationError ? 'destination-select-error' : ''"
                 borderless
                 dense
                 multiple
@@ -318,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :input-debounce="400"
                 hide-bottom-space
                 @filter="filterDestinations"
-                @update:model-value="emitDestinationsUpdate"
+                @update:model-value="destinationError = false; emitDestinationsUpdate()"
                 style="width: 180px; max-width: 300px"
               >
                 <template v-slot:selected>
@@ -339,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dense
                           v-model="localDestinations"
                           :val="option.opt"
-                          @update:model-value="emitDestinationsUpdate"
+                          @update:model-value="destinationError = false; emitDestinationsUpdate()"
                         />
                       </q-item-section>
                       <q-item-section>
@@ -421,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, type PropType } from "vue";
+import { defineComponent, ref, computed, watch, nextTick, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -489,6 +490,7 @@ export default defineComponent({
     );
     const localDestinations = ref(props.destinations);
     const destinationsTouched = ref(false);
+    const destinationError = ref(false);
 
     // Timezone management
     const browserTimezone = ref("");
@@ -783,7 +785,8 @@ export default defineComponent({
         // Check destinations (required for both real-time and scheduled)
         if (!localDestinations.value || localDestinations.value.length === 0) {
           destinationsTouched.value = true;
-          return { valid: false, message: null }; // null means show inline error only
+          destinationError.value = true;
+          return { valid: false, message: "At least one destination is required.", focusDestination: true };
         }
 
         return { valid: true };
@@ -888,10 +891,24 @@ export default defineComponent({
       // Check destinations (required for both real-time and scheduled)
       if (!localDestinations.value || localDestinations.value.length === 0) {
         destinationsTouched.value = true;
-        return { valid: false, message: null }; // null means show inline error only
+        destinationError.value = true;
+        return { valid: false, message: "At least one destination is required.", focusDestination: true };
       }
 
       return { valid: true };
+    };
+
+    const focusDestination = () => {
+      nextTick(() => {
+        const el = (destinationsFieldRef.value as any)?.$el as HTMLElement;
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => {
+            const input = el.querySelector('input') as HTMLElement;
+            input?.focus();
+          }, 400);
+        }
+      });
     };
 
     return {
@@ -901,6 +918,7 @@ export default defineComponent({
       localIsAggregationEnabled,
       localDestinations,
       destinationsTouched,
+      destinationError,
       aggFunctions,
       triggerOperators,
       filteredNumericColumns,
@@ -930,6 +948,7 @@ export default defineComponent({
       thresholdFieldRef,
       silenceFieldRef,
       destinationsFieldRef,
+      focusDestination,
       emitPromqlConditionUpdate,
     };
   },
@@ -1060,6 +1079,33 @@ export default defineComponent({
         width: 20% !important;
       }
     }
+  }
+}
+
+// Destination select — always has a subtle border (like stream type fields)
+.destination-select-field {
+  :deep(.q-field__control) {
+    border: 1px solid rgba(0, 0, 0, 0.2) !important;
+    border-radius: 4px !important;
+    background: rgba(0, 0, 0, 0.03) !important;
+  }
+}
+.body--dark .destination-select-field {
+  :deep(.q-field__control) {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+  }
+}
+.destination-select-field.destination-select-error {
+  :deep(.q-field__control) {
+    border-color: #ef5350 !important;
+    background: rgba(239, 83, 80, 0.05) !important;
+  }
+}
+.body--dark .destination-select-field.destination-select-error {
+  :deep(.q-field__control) {
+    border-color: #ef5350 !important;
+    background: rgba(239, 83, 80, 0.08) !important;
   }
 }
 

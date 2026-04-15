@@ -107,8 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :placeholder="t('alerts.placeholders.selectColumn')"
                       @filter="filterLogMeasureColumns"
                       class="alert-v3-select"
+                      :class="columnSelectError ? 'column-select-error' : ''"
                       style="min-width: 140px; max-width: 200px;"
-                      @update:model-value="onLogMeasureColumnChange"
+                      @update:model-value="columnSelectError = false; onLogMeasureColumnChange($event)"
                     />
                   </template>
 
@@ -309,8 +310,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :readonly="inputData.aggregation.having.column === 'value' && filteredNumericColumns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         :disable="inputData.aggregation.having.column === 'value' && filteredNumericColumns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         @filter="filterNumericColumns"
-                        @update:model-value="emitAggregationUpdate"
+                        @update:model-value="columnSelectError = false; emitAggregationUpdate()"
                         class="alert-v3-select"
+                        :class="columnSelectError ? 'column-select-error' : ''"
                         style="min-width: 140px; max-width: 200px;"
                       />
                       <q-tooltip v-if="inputData.aggregation.having.column === 'value' && filteredNumericColumns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" anchor="bottom middle" self="top middle" :delay="300">
@@ -1032,6 +1034,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, type PropType, defineAsyncComponent, nextTick, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useQuasar } from "quasar";
 import { b64EncodeUnicode, getUUID, convertMinutesToCron, getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval, describeCron, getImageURL } from "@/utils/zincutils";
 import hljs from "highlight.js/lib/core";
 import sql from "highlight.js/lib/languages/sql";
@@ -1133,8 +1136,10 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
+    const q = useQuasar();
 
     const localTab = ref(props.tab);
+    const columnSelectError = ref(false);
     const viewSqlEditor = ref(false);
     const customConditionsForm = ref(null);
     const showMultiWindowDialog = ref(false);
@@ -2226,15 +2231,51 @@ export default defineComponent({
     const validate = async () => {
       // Custom mode: Check if conditions have empty columns or values
       if (localTab.value === 'custom') {
+        // Aggregation column required when a measure function is selected
+        if (selectedFunction.value !== 'total_events') {
+          const col = isEventBased.value
+            ? logMeasureColumn.value
+            : props.inputData?.aggregation?.having?.column;
+          if (!col || col.trim() === '') {
+            columnSelectError.value = true;
+            q.notify({ type: 'negative', message: 'Column is required when using an aggregate function.', timeout: 2000 });
+            return false;
+          }
+        }
+        columnSelectError.value = false;
         return await validateCustomMode();
       }
 
-      // SQL mode: Check for empty query and backend validation errors
+      // SQL mode
       if (localTab.value === 'sql') {
-        return validateSqlMode();
+        const sqlQuery = props.sqlQuery;
+        if (!sqlQuery || sqlQuery.trim() === '') {
+          q.notify({ type: 'negative', message: 'SQL query cannot be empty.', timeout: 2000 });
+          await nextTick();
+          inlineQueryEditorRef.value?.focus?.();
+          return false;
+        }
+        if (props.sqlQueryErrorMsg && props.sqlQueryErrorMsg.trim() !== '') {
+          q.notify({ type: 'negative', message: 'Please fix the SQL error before saving.', timeout: 2000 });
+          await nextTick();
+          inlineQueryEditorRef.value?.focus?.();
+          return false;
+        }
+        return true;
       }
 
-      // PromQL mode: No validation required
+      // PromQL mode
+      if (localTab.value === 'promql') {
+        const promqlQuery = localPromqlQuery.value;
+        if (!promqlQuery || promqlQuery.trim() === '') {
+          q.notify({ type: 'negative', message: 'PromQL query cannot be empty.', timeout: 2000 });
+          await nextTick();
+          inlineQueryEditorRef.value?.focus?.();
+          return false;
+        }
+        return true;
+      }
+
       return true;
     };
 
@@ -2365,6 +2406,7 @@ export default defineComponent({
       onCronExpressionChange,
       onCronTimezoneChange,
       logMeasureColumn,
+      columnSelectError,
       filteredLogMeasureColumns,
       filterLogMeasureColumns,
       logGroupBy,
@@ -2819,5 +2861,14 @@ export default defineComponent({
 .sql-promql-label {
   min-width: 160px;
   width: 160px;
+}
+
+// Column select error state (aggregation measure column)
+.alert-v3-select.column-select-error {
+  :deep(.q-field__control) {
+    border: 1px solid #ef5350 !important;
+    border-radius: 4px !important;
+    background: rgba(239, 83, 80, 0.05) !important;
+  }
 }
 </style>
