@@ -163,11 +163,30 @@ describe("traces/constants", () => {
       expect(output).toBe("service='api' and span_kind='3' and duration > 100");
     });
 
+    it("should replace all labels in an IN clause with their numeric keys (regex fallback)", () => {
+      expect(
+        parseSpanKindWhereClause("span_kind IN ('Server', 'Client')"),
+      ).toBe("span_kind IN ('2', '3')");
+    });
+
+    it("should handle mixed case labels in an IN clause (regex fallback)", () => {
+      expect(
+        parseSpanKindWhereClause("span_kind IN ('SERVER', 'internal')"),
+      ).toBe("span_kind IN ('2', '1')");
+    });
+
+    it("should leave unknown labels in an IN clause unchanged (regex fallback)", () => {
+      expect(
+        parseSpanKindWhereClause("span_kind IN ('Unknown', 'Server')"),
+      ).toBe("span_kind IN ('Unknown', '2')");
+    });
+
     describe("with SQL parser", () => {
       let parser: any;
 
       beforeAll(async () => {
-        const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
+        const mod =
+          await import("@openobserve/node-sql-parser/build/datafusionsql");
         parser = new mod.default.Parser();
       });
 
