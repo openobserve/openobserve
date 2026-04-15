@@ -2820,7 +2820,8 @@
       "status": "Status",
       "type": "Typ",
       "multiStepAgent": "Mehrstufiger Agent"
-    }
+    },
+    "noLogsAvailableForService": "Für diesen Dienst sind keine Protokolle verfügbar"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

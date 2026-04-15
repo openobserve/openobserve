@@ -842,7 +842,7 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     let invite = org_invites::get_by_token_user(invite_token, user_email)
         .await
         .map_err(|e| {
-            log::info!("error getting token {invite_token} for email {user_email} : {e}");
+            log::info!("error getting invite token for email {user_email} : {e}");
             anyhow::anyhow!("Provided Token is not valid for this email id")
         })?;
 
@@ -928,7 +928,7 @@ pub async fn decline_invitation(
     let invite = org_invites::get_by_token_user(token, user_email)
         .await
         .map_err(|e| {
-            log::info!("error getting token {token} for email {user_email} : {e}");
+            log::info!("error getting invite token for email {user_email} : {e}");
             anyhow::anyhow!("Provided Token is not valid for this email id")
         })?;
 

@@ -2833,7 +2833,8 @@
       "status": "Status",
       "type": "Typ",
       "multiStepAgent": "Agent met meerdere stappen"
-    }
+    },
+    "noLogsAvailableForService": "Geen logboeken beschikbaar voor deze service"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

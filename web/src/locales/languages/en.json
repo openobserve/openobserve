@@ -2988,6 +2988,7 @@
     "showErrorOnly": "Show Error Only",
     "loadingStream": "Loading Stream...",
     "noTracesFound": "Result not found.",
+    "noLogsAvailableForService": "No Logs available for this service",
     "configureFullTextSearch": "to configure a full text search field to the stream.",
     "collapseFields": "Collapse Fields",
     "openFields": "Open Fields",

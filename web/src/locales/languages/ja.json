@@ -2841,7 +2841,8 @@
       "status": "ステータス",
       "type": "タイプ",
       "multiStepAgent": "マルチステップエージェント"
-    }
+    },
+    "noLogsAvailableForService": "このサービスで利用できるログはありません"
   },
   "actions": {
     "testAction": "アクションをテスト",

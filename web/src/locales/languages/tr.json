@@ -2833,7 +2833,8 @@
       "status": "Durum",
       "type": "Tür",
       "multiStepAgent": "Çok adımlı Ajan"
-    }
+    },
+    "noLogsAvailableForService": "Bu hizmet için günlük yok"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
