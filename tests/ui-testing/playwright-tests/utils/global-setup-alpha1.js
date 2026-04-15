@@ -104,12 +104,20 @@ async function globalSetup() {
       testLogger.info('[alpha1] click() blocked, submitting via Enter key');
       await page.keyboard.press('Enter');
     });
+    // AKS env routes through /config/redirect (OAuth callback) before reaching /web/
+    // Increase timeout to 30s to handle slower AKS runners
     await Promise.race([
-      page.waitForURL(/web\/|dex\/approval|dex\/auth.*error/, { timeout: 15000 }),
+      page.waitForURL(/web\/|config\/redirect|dex\/approval|dex\/auth.*error/, { timeout: 30000 }),
       page.locator('.flash-error, .alert, [class*="error"]').first()
-        .waitFor({ state: 'visible', timeout: 15000 })
+        .waitFor({ state: 'visible', timeout: 30000 })
         .then(() => { throw new Error('Dex login error: invalid credentials or server error'); }),
     ]);
+
+    // If landed on OAuth callback URL, wait for SPA to process and redirect to /web/
+    if (page.url().includes('config/redirect')) {
+      testLogger.info('[alpha1] On OAuth callback URL, waiting for SPA redirect to /web/...');
+      await page.waitForURL(/web\//, { timeout: 30000 });
+    }
 
     // Check if login failed (Dex error page)
     if (/dex\/.*error/.test(page.url())) {
