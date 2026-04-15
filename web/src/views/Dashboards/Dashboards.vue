@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-table"
             :style="
               !filterQuery.length && dashboards.length > 0
-                ? 'height: calc(100vh - 124px)'
+                ? 'height: calc(100vh  - var(--navbar-height) - 77px)'
                 : ''
             "
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"

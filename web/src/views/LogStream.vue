@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :filter="filterQuery"
             :filter-method="filterData"
             :style="logStream?.length
-                  ? 'width: 100%; height: calc(100vh - 126px)' 
+                  ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)' 
                   : 'width: 100%'"
             :rows-per-page-options="perPageOptions"
             @request="onRequest"

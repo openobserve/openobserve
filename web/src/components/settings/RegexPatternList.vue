@@ -46,7 +46,7 @@
           :pagination="pagination"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
+            ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 87px); overflow-y: auto;'
             : 'width: 100%'"
         >
         <template #no-data>

@@ -95,6 +95,7 @@ export default createStore({
     allRoleLimitsByOrgIdByRole: {},
     modulesToDisplay: {},
     isAiChatEnabled: false,
+    isWebinarBannerVisible: false,
     currentChatTimestamp: null,
     chatUpdated: false,
     // Default theme colors (Default Blue theme)
@@ -269,6 +270,9 @@ export default createStore({
     },
     setIsAiChatEnabled(state, payload) {
       state.isAiChatEnabled = payload;
+    },
+    setIsWebinarBannerVisible(state, payload) {
+      state.isWebinarBannerVisible = payload;
     },
     setCurrentChatTimestamp(state, payload) {
       state.currentChatTimestamp = payload;
@@ -469,6 +473,9 @@ export default createStore({
     },
     setIsAiChatEnabled(context, payload) {
       context.commit("setIsAiChatEnabled", payload);
+    },
+    setIsWebinarBannerVisible(context, payload) {
+      context.commit("setIsWebinarBannerVisible", payload);
     },
     setCurrentChatTimestamp(context, payload) {
       context.commit("setCurrentChatTimestamp", payload);
