@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="model.name"
                 label="Model Name *"
                 placeholder="e.g. GPT-4o"
-                class="showLabelOnTop"
+                class="showLabelOnTop tw:mb-1"
                 stack-label
                 dense
                 borderless
@@ -62,28 +62,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="nameTouched = true"
                 data-test="model-pricing-name-input"
               />
+              <div class="tw:text-xs text-grey-7 tw:-mt-4 tw:mb-2 tw:leading-tight">The name of the model. You can track price changes of models by using the same name and match pattern.</div>
             </div>
-            <div class="tw:flex-1 tw:flex tw:items-end tw:gap-1">
-              <q-input
-                v-model="model.match_pattern"
-                label="Match Pattern (Regex) *"
-                placeholder="e.g. gpt-4.*"
-                class="showLabelOnTop tw:flex-1"
-                stack-label
-                dense
-                borderless
-                :error="patternTouched && !!regexError"
-                :error-message="regexError"
-                @blur="patternTouched = true"
-                @update:model-value="patternTouched = true"
-                data-test="model-pricing-pattern-input"
-              />
+            <div class="tw:flex-1 tw:flex tw:items-start tw:gap-1">
+              <div class="tw:flex-1">
+                <q-input
+                  v-model="model.match_pattern"
+                  label="Match Pattern (Regex) *"
+                  placeholder="e.g. gpt-4.*"
+                  class="showLabelOnTop tw:mb-1"
+                  stack-label
+                  dense
+                  borderless
+                  :error="patternTouched && !!regexError"
+                  :error-message="regexError"
+                  @blur="patternTouched = true"
+                  @update:model-value="patternTouched = true"
+                  data-test="model-pricing-pattern-input"
+                />
+                <div class="tw:text-xs text-grey-7 tw:-mt-4 tw:mb-2 tw:leading-tight">Regular expression to match ingested generations to this model definition.</div>
+              </div>
               <q-btn
                 icon="lightbulb_outline"
                 padding="xs"
                 flat unelevated round dense size="sm"
-                class="pattern-examples-btn"
-                style="margin-bottom: 24px;"
+                class="pattern-examples-btn tw:mt-7"
                 @click="showExamples = true"
               >
                 <q-tooltip anchor="top right" self="bottom right" :offset="[0, 4]">
@@ -294,6 +297,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </div>
+
+                  <!-- Price Preview Table -->
+                  <div v-if="Object.keys(tier.prices).length" class="tw:mt-5 tw:border tw:rounded" style="background: rgba(0,0,0,0.015); border-color: var(--o2-border-color);">
+                     <div class="tw:px-4 tw:py-2 tw:text-xs text-grey-8 tw:font-semibold tw:border-b" style="border-color: var(--o2-border-color);">Price Preview</div>
+                     <table class="tw:w-full tw:text-xs" style="border-collapse: collapse;">
+                        <thead>
+                           <tr class="tw:text-left text-grey-7 tw:border-b" style="border-color: var(--o2-border-color);">
+                             <th class="tw:px-4 tw:py-2 tw:font-medium">Usage Type</th>
+                             <th class="tw:px-4 tw:py-2 tw:font-medium">per unit</th>
+                             <th class="tw:px-4 tw:py-2 tw:font-medium">per 1K</th>
+                             <th class="tw:px-4 tw:py-2 tw:font-medium">per 1M</th>
+                           </tr>
+                        </thead>
+                        <tbody>
+                           <tr v-for="entry in priceEntries(tier)" :key="entry.stableId" class="tw:border-b last:tw:border-none" style="border-color: var(--o2-border-color);">
+                              <td class="tw:px-4 tw:py-2 text-grey-9 tw:font-medium">{{ entry.key }}</td>
+                              <td class="tw:px-4 tw:py-2 text-grey-9">${{ formatPreviewCost(entry.value, 1) }}</td>
+                              <td class="tw:px-4 tw:py-2 text-grey-9">${{ formatPreviewCost(entry.value, 1000) }}</td>
+                              <td class="tw:px-4 tw:py-2 text-grey-9">${{ formatPreviewCost(entry.value, 1000000) }}</td>
+                           </tr>
+                        </tbody>
+                     </table>
+                  </div>
                 </div>
 
               </div>
@@ -347,6 +373,7 @@ const route = useRoute();
 const q = useQuasar();
 
 const saving = ref(false);
+const existingModels = ref<any[]>([]);
 const nameTouched = ref(false);
 const patternTouched = ref(false);
 const addState = ref<Array<{ key: string; value: number }>>([{ key: "", value: 0 }]);
@@ -490,6 +517,11 @@ function renamePriceByIndex(tier: any, index: number, newKey: string) {
   if (index < 0 || index >= entries.length) return;
   const [oldKey, val] = entries[index];
   if (newKey === oldKey) return;
+  const keyError = validateUsageKey(newKey);
+  if (keyError) {
+    q.notify({ type: "warning", message: keyError, position: "bottom", timeout: 3000 });
+    return;
+  }
   // Rebuild the object preserving insertion order with the new key at the same position
   const rebuilt: Record<string, number> = {};
   for (let i = 0; i < entries.length; i++) {
@@ -540,10 +572,31 @@ function fromPerMillion(perMillion: number): number {
   return perMillion > 0 ? perMillion / 1_000_000 : 0;
 }
 
+function formatPreviewCost(costPerUnit: number, multiplier: number) {
+  if (!costPerUnit) return "0";
+  const c = costPerUnit * multiplier;
+  if (c === 0) return "0";
+  if (c < 0.00001) return c.toExponential(2);
+  let str = c.toFixed(8);
+  str = str.replace(/0+$/, '').replace(/\.$/, '');
+  return str;
+}
+
+function validateUsageKey(key: string): string | null {
+  if (/^\d+$/.test(key)) return "Usage key cannot be a pure integer";
+  if (/\s/.test(key)) return "Usage key must not contain spaces";
+  return null;
+}
+
 function addPrice(tier: any, idx: number | string) {
   const i = Number(idx);
   const key = (addState.value[i]?.key || "").trim();
   if (!key) return;
+  const keyError = validateUsageKey(key);
+  if (keyError) {
+    q.notify({ type: "warning", message: keyError, position: "bottom", timeout: 3000 });
+    return;
+  }
   tier.prices = { ...tier.prices, [key]: fromPerMillion(addState.value[i].value || 0) };
   addState.value[i] = { key: "", value: 0 };
 }
@@ -604,6 +657,21 @@ async function save() {
     m.tiers[0].condition = null;
   }
 
+  // Warn if another enabled org entry has the same pattern and higher priority
+  // (same valid_from context — it will shadow this entry at runtime).
+  const patternConflicts = existingModels.value.filter((other: any) => {
+    if (other.id && other.id === m.id) return false; // skip self (edit mode)
+    if (other.match_pattern !== m.match_pattern) return false;
+    const otherVf = other.valid_from ?? 0;
+    const thisVf = m.valid_from ?? 0;
+    if (otherVf !== thisVf) return false; // different time windows — not a conflict
+    // Check if 'other' would win over 'this'
+    const otherSo = other.sort_order ?? 0;
+    const thisSo = m.sort_order ?? 0;
+    if (otherSo !== thisSo) return otherSo < thisSo;
+    return other.name.localeCompare(m.name) < 0;
+  });
+
   saving.value = true;
   try {
     if (m.id) {
@@ -611,7 +679,18 @@ async function save() {
     } else {
       await modelPricingService.create(orgIdentifier.value, m);
     }
-    q.notify({ type: "positive", message: "Model pricing saved", position: "bottom", timeout: 3000 });
+    if (patternConflicts.length > 0) {
+      const winner = patternConflicts[0].name;
+      q.notify({
+        type: "warning",
+        message: `Saved, but this entry is shadowed by "${winner}" which has the same pattern and higher priority. It will never be used for cost calculation unless the other entry is deleted or disabled.`,
+        position: "bottom",
+        timeout: 8000,
+        actions: [{ label: "Dismiss", color: "white" }],
+      });
+    } else {
+      q.notify({ type: "positive", message: "Model pricing saved", position: "bottom", timeout: 3000 });
+    }
     goBack();
   } catch (e: any) {
     notifyError("Failed to save", e);
@@ -623,6 +702,14 @@ async function save() {
 onBeforeMount(async () => {
   const id = route.query.id as string | undefined;
   const isDuplicate = route.query.duplicate === "true";
+
+  // Load all existing org models for duplicate-pattern detection on save
+  try {
+    const listRes = await modelPricingService.list(orgIdentifier.value);
+    existingModels.value = (listRes.data || []).filter(
+      (m: any) => (m.source === 'org' || !m.source) && m.org_id === orgIdentifier.value && m.enabled !== false
+    );
+  } catch { /* non-critical */ }
   if (id) {
     try {
       const res = await modelPricingService.get(orgIdentifier.value, id);
@@ -670,7 +757,6 @@ onBeforeMount(async () => {
 .form-card {
   border: 1px solid var(--o2-border-color);
   border-radius: 10px;
-  overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
   .body--dark & {
@@ -687,6 +773,7 @@ onBeforeMount(async () => {
   padding: 10px 16px;
   background: rgba(0, 0, 0, 0.025);
   border-bottom: 1px solid var(--o2-border-color);
+  border-radius: 10px 10px 0 0;
 
   .body--dark & {
     background: rgba(255, 255, 255, 0.04);

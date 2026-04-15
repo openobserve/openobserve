@@ -36,36 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
 
-        <!-- Provider dropdown filter -->
-          <q-select
-            v-model="selectedProvider"
-            :options="providerOptions"
-            placeholder="Provider"
-            dense
-            borderless
-            clearable
-            options-dense
-            use-input
-            hide-selected
-            menu-anchor="bottom left"
-            fill-input
-            class="no-border"
-            data-test="built-in-model-pricing-provider-filter"
-          >
-            <template #option="scope">
-              <q-item v-bind="scope.itemProps" dense>
-                <q-item-section avatar style="min-width: 20px;">
-                  <span
-                    class="provider-dot"
-                    :style="`background: ${providerColor(scope.opt)}`"
-                  />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label>{{ scope.opt }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
          </div>
 
         <!-- Refresh -->
@@ -129,14 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
           </template>
 
-          <!-- Provider — colored dot + name, no icon -->
-          <template #body-cell-provider="props">
-            <q-td :props="props">
-              <span class="provider-badge" :style="`color: ${providerBadgeBg(props.row.provider)}; border-color: ${providerBadgeBg(props.row.provider)};`">
-                {{ props.row.provider || 'Unknown' }}
-              </span>
-            </q-td>
-          </template>
 
           <!-- Pattern -->
           <template #body-cell-pattern="props">
@@ -169,11 +131,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="tier-prices">
                     <span
-                      v-for="(price, key) in tier.prices"
+                      v-for="[key, price] in sortedPriceEntries(tier.prices)"
                       :key="key"
                       class="price-chip"
                     >
-                      {{ fmtKey(key as string) }}: ${{ fmtPrice(price as number) }}
+                      {{ fmtKey(key) }}: ${{ fmtPrice(price) }}
                     </span>
                   </div>
                 </div>
@@ -224,16 +186,6 @@ interface BuiltInModel {
   selected?: boolean;
 }
 
-const PROVIDER_CONFIG: Record<string, { bg: string; text: string }> = {
-  OpenAI:    { bg: "#10a37f", text: "#ffffff" },
-  Anthropic: { bg: "#c47b45", text: "#ffffff" },
-  Google:    { bg: "#4285f4", text: "#ffffff" },
-};
-const DEFAULT_PROVIDER = { bg: "#78909c", text: "#ffffff" };
-
-function getProvider(name: string | undefined) {
-  return PROVIDER_CONFIG[name || ""] || DEFAULT_PROVIDER;
-}
 
 export default defineComponent({
   name: "BuiltInModelPricingTab",
@@ -246,20 +198,12 @@ export default defineComponent({
     const loading = ref(false);
     const error = ref("");
     const searchQuery = ref("");
-    const selectedProvider = ref<string | null>(null);
-
     const columns = [
       { name: "select",   label: "",         field: "selected",      align: "center" as const, style: "width: 40px" },
       { name: "name",     label: "Model",    field: "name",          align: "left"   as const, sortable: true },
-      { name: "provider", label: "Provider", field: "provider",      align: "left"   as const, sortable: true, style: "width: 120px" },
       { name: "pattern",  label: "Pattern",  field: "match_pattern", align: "left"   as const, style: "max-width: 200px" },
       { name: "pricing",  label: "Pricing",  field: "tiers",         align: "left"   as const },
     ];
-
-    // Plain string options — no emit-value/map-options needed
-    const providerOptions = computed(() => {
-      return [...new Set(models.value.map(m => m.provider || "Unknown"))].sort();
-    });
 
     const filteredModels = computed(() => {
       let result = models.value;
@@ -270,17 +214,26 @@ export default defineComponent({
           (m.description || "").toLowerCase().includes(sq)
         );
       }
-      if (selectedProvider.value) {
-        result = result.filter(m => (m.provider || "Unknown") === selectedProvider.value);
-      }
       return result;
     });
 
     const selectedCount = computed(() => models.value.filter(m => m.selected).length);
 
-    function providerColor(name: string | undefined)    { return getProvider(name).bg; }
-    function providerBadgeBg(name: string | undefined)  { return getProvider(name).bg; }
-    function providerBadgeText(name: string | undefined){ return getProvider(name).text; }
+
+    // Deterministic key order: input before output, then alphabetical
+    const PRICE_KEY_ORDER: Record<string, number> = {
+      input_tokens: 0,
+      output_tokens: 1,
+    };
+
+    function sortedPriceEntries(prices: Record<string, number>): [string, number][] {
+      return Object.entries(prices).sort(([a], [b]) => {
+        const oa = PRICE_KEY_ORDER[a] ?? 99;
+        const ob = PRICE_KEY_ORDER[b] ?? 99;
+        if (oa !== ob) return oa - ob;
+        return a.localeCompare(b);
+      });
+    }
 
     function fmtKey(key: string): string {
       return key.replace(/_tokens$/, '').replace(/_/g, '-');
@@ -356,10 +309,9 @@ export default defineComponent({
     onMounted(() => fetchModels());
 
     return {
-      models, loading, error, searchQuery, selectedProvider,
-      columns, providerOptions, filteredModels, selectedCount,
-      providerColor, providerBadgeBg, providerBadgeText,
-      fmtKey, fmtPrice, fetchModels, refreshModels, importSelectedModels,
+      models, loading, error, searchQuery,
+      columns, filteredModels, selectedCount,
+      sortedPriceEntries, fmtKey, fmtPrice, fetchModels, refreshModels, importSelectedModels,
     };
   },
 });
@@ -381,54 +333,35 @@ export default defineComponent({
   min-height: 0;
 }
 
-/* Provider dot used in dropdown options and selected display */
-.provider-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-/* Provider badge — border only, matching IncidentList style */
-.provider-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  border: 1px solid currentColor;
-}
 
 /* Tier pricing rows */
 .tier-row {
-  padding: 2px 0;
+  padding: 1px 0;
   & + .tier-row {
     border-top: 1px dashed #e0e0e0;
-    margin-top: 3px;
-    padding-top: 3px;
+    margin-top: 2px;
+    padding-top: 2px;
   }
 }
 .tier-name {
   font-size: 11px;
   font-weight: 600;
   color: #555;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
 }
 .tier-conditional .tier-name {
   color: #888;
 }
 .tier-prices {
   display: flex;
-  gap: 4px;
+  gap: 3px;
   flex-wrap: wrap;
+  align-items: center;
 }
 .price-chip {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 1px 6px;
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
@@ -442,6 +375,5 @@ body.body--dark {
     color: #bbb;
     border-color: #555;
   }
-  .provider-badge    { opacity: 0.85; }
 }
 </style>

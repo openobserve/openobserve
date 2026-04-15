@@ -341,6 +341,16 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
     return false;
   }
 
+  if (/\s/.test(jsonObj.name)) {
+    modelPricingErrorsToDisplay.value.push([
+      {
+        field: "model_pricing_name",
+        message: `Model pricing - ${index}: name must not contain spaces`,
+      },
+    ]);
+    return false;
+  }
+
   if (
     !jsonObj.match_pattern ||
     !jsonObj.match_pattern.trim() ||
@@ -371,6 +381,30 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
       `Model pricing - ${index}: tiers must be a non-empty array`,
     ]);
     return false;
+  }
+
+  // Validate usage keys in tiers
+  for (const tier of jsonObj.tiers) {
+    for (const key of Object.keys(tier.prices || {})) {
+      if (/^\d+$/.test(key)) {
+        modelPricingErrorsToDisplay.value.push([
+          {
+            field: "model_pricing_name",
+            message: `Model pricing - ${index}: usage key "${key}" cannot be a pure integer`,
+          },
+        ]);
+        return false;
+      }
+      if (/\s/.test(key)) {
+        modelPricingErrorsToDisplay.value.push([
+          {
+            field: "model_pricing_name",
+            message: `Model pricing - ${index}: usage key "${key}" must not contain spaces`,
+          },
+        ]);
+        return false;
+      }
+    }
   }
 
   return true;
