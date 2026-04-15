@@ -62,7 +62,7 @@
       </q-input>
     </div>
 
-    <div data-test="add-toggle-ingestion" class="span-id-field-name o2-input">
+    <div v-if="config.isCloud !== 'true'" data-test="add-toggle-ingestion" class="span-id-field-name o2-input">
       <q-toggle
         data-test="add-toggle-ingestion-btn"
         v-model="toggleIngestionLogs"
@@ -128,6 +128,7 @@ import organizations from "@/services/organizations";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
+import config from "@/aws-exports";
 
 const { t } = useI18n();
 
