@@ -1,5 +1,5 @@
 <template>
-  <div data-test="iam-page" class="q-pa-none tw:overflow-hidden">
+  <q-page data-test="iam-page" class="q-pa-none tw:overflow-hidden">
     <q-splitter
       v-model="splitterModel"
       unit="px"
@@ -40,7 +40,7 @@
         </div>
       </template>
     </q-splitter>
-  </div>
+  </q-page>
 </template>
 
 <script setup lang="ts">
