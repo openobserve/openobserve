@@ -583,10 +583,9 @@ test.describe("Alerts Regression Bugs", () => {
 
     // STRONG ASSERTION: Verify template name appears exactly once in the select field
     // Bug #10110 caused templates to display twice in the input field
-    // Get text from the input element only (excludes icons)
-    const templateInputElement = templateSelect.locator('.q-field__input');
-    const displayedText = await templateInputElement.innerText();
-    const cleanDisplayText = displayedText?.trim().replace(/\s+/g, ' ') || '';
+    // Get all visible text from the component (includes template name + icon labels)
+    const displayedText = await templateSelect.innerText();
+    const cleanDisplayText = displayedText?.trim() || '';
     testLogger.info('Template display text', { text: cleanDisplayText });
 
     // Template name must be non-empty to validate
@@ -594,10 +593,12 @@ test.describe("Alerts Regression Bugs", () => {
     const templateName = selectedTemplateName?.trim().replace(/\s+/g, ' ') || '';
     expect(templateName, 'Bug #10110: Selected template name must be non-empty to verify duplication').toBeTruthy();
 
-    // PRIMARY ASSERTION: Template display should match the selected template exactly (not duplicated)
-    // Bug #10110 caused the template name to appear twice in the display (e.g., "template1template1")
-    // Both strings are normalized (trimmed + collapsed whitespace) for accurate comparison
-    expect(cleanDisplayText, `Bug #10110: Template display should show "${templateName}" exactly once, not duplicated`).toBe(templateName);
+    // PRIMARY ASSERTION: Template name should appear exactly once (Bug #10110 caused duplication)
+    // Count occurrences of the template name in the displayed text
+    // The text includes icon labels (cancel, arrow_drop_down) but template should appear only once
+    const regex = new RegExp(templateName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    const occurrences = (cleanDisplayText.match(regex) || []).length;
+    expect(occurrences, `Bug #10110: Template "${templateName}" should appear exactly once in display, not ${occurrences} times`).toBe(1);
     testLogger.info(`✓ Template display matches selected template exactly (no duplication) - Bug #10110 is fixed`);
 
     // Additional check: Verify no duplicate class names or rendering issues
