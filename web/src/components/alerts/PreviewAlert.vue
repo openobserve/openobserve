@@ -1223,8 +1223,9 @@ const resizeChart = async () => {
   // No need to do anything else - ResizeObserver handles it automatically
 };
 
-// Expose refreshDataOnce instead of refreshData to prevent duplicate calls from parent
-defineExpose({ refreshData: refreshDataOnce, resizeChart, evaluationStatus });
+// Expose the real refreshData for explicit parent calls (bypasses the 200ms debounce).
+// The watcher internally still uses refreshDataOnce to prevent duplicate calls on rapid prop changes.
+defineExpose({ refreshData, resizeChart, evaluationStatus });
 </script>
 
 <style scoped>
