@@ -60,6 +60,9 @@ use {
         config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
         settings::{get_logo, get_logo_dark, get_logo_text},
     },
+    o2_enterprise::enterprise::license::{
+        block_feature_for_report_failure, last_reported_timestamp,
+    },
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
     },
@@ -78,6 +81,39 @@ use crate::{
         },
     },
 };
+
+/// Macro to conditionally select a value based on the "enterprise" feature flag.
+///
+/// # Usage
+/// ```rust
+/// let value = enterprise_value!(default_expr, enterprise_expr);
+/// ```
+///
+/// If the "enterprise" feature is enabled, returns `enterprise_expr`.
+/// Otherwise, returns `default_expr`.
+macro_rules! enterprise_value {
+    ($default:expr, $enterprise:expr) => {{
+        #[cfg(feature = "enterprise")]
+        {
+            $enterprise
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            $default
+        }
+    }};
+
+    ($default:expr, $enterprise:expr, $block_feat:expr) => {{
+        #[cfg(feature = "enterprise")]
+        {
+            if $block_feat { $default } else { $enterprise }
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            $default
+        }
+    }};
+}
 
 #[derive(Serialize, serde::Deserialize, ToSchema)]
 pub struct HealthzResponse {
@@ -165,6 +201,8 @@ struct ConfigResponse<'a> {
     fqn_priority_dimensions: Vec<String>,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
+    #[cfg(feature = "enterprise")]
+    last_usage_report_ts: i64,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -256,29 +294,17 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let dex_cfg = get_dex_config();
     #[cfg(feature = "enterprise")]
     let openfga_cfg = get_openfga_config();
-    #[cfg(feature = "enterprise")]
-    let sso_enabled = dex_cfg.dex_enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let sso_enabled = false;
-    #[cfg(feature = "enterprise")]
-    let native_login_enabled = dex_cfg.native_login_enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let native_login_enabled = true;
 
     #[cfg(feature = "enterprise")]
-    let rbac_enabled = openfga_cfg.enabled;
+    let block_features = block_feature_for_report_failure().await;
     #[cfg(not(feature = "enterprise"))]
-    let rbac_enabled = false;
+    let block_features = false;
 
-    #[cfg(feature = "enterprise")]
-    let actions_enabled = o2cfg.actions.enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let actions_enabled = false;
-
-    #[cfg(feature = "enterprise")]
-    let super_cluster_enabled = o2cfg.super_cluster.enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let super_cluster_enabled = false;
+    let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
+    let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
+    let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled, block_features);
+    let actions_enabled = enterprise_value!(false, o2cfg.actions.enabled);
+    let super_cluster_enabled = enterprise_value!(false, o2cfg.super_cluster.enabled);
 
     #[cfg(feature = "enterprise")]
     let custom_logo_text = match get_logo_text().await {
@@ -351,6 +377,9 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let license_server_url = o2cfg.common.license_server_url.to_string();
     #[cfg(feature = "enterprise")]
     let ingestion_quota_used = o2_enterprise::enterprise::license::ingestion_used() * 100.0;
+
+    #[cfg(feature = "enterprise")]
+    let last_usage_report_ts = last_reported_timestamp().await;
 
     #[cfg(feature = "enterprise")]
     let usage_enabled = true;
@@ -454,6 +483,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         fqn_priority_dimensions: vec![],
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
+        #[cfg(feature = "enterprise")]
+        last_usage_report_ts,
     }))
 }
 
@@ -847,6 +878,12 @@ pub async fn redirect(req: actix_web::HttpRequest) -> Result<HttpResponse, Error
 #[get("/dex_login")]
 pub async fn dex_login() -> Result<HttpResponse, Error> {
     use o2_dex::meta::auth::PreLoginData;
+
+    if block_feature_for_report_failure().await {
+        return Ok(crate::common::meta::http::HttpResponse::internal_error(
+            "feature blocked due to usage reporting failure",
+        ));
+    }
 
     let login_data: PreLoginData = get_dex_login();
     let state = login_data.state;
