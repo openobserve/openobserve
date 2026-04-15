@@ -2825,7 +2825,8 @@
       "status": "Status",
       "type": "Tipo",
       "multiStepAgent": "Agente in più fasi"
-    }
+    },
+    "noLogsAvailableForService": "Nessun registro disponibile per questo servizio"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",

@@ -86,6 +86,7 @@ import metrics from "./metrics.json";
 import { deepCopy, formatTimeWithSuffix } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import useParser from "@/composables/useParser";
 
 const RenderDashboardCharts = defineAsyncComponent(
@@ -224,14 +225,21 @@ const getBaseFilters = () => {
   });
 
   // Add user-provided filters from query editor, parsing any human-readable
-  // duration values (e.g. '1.50ms') back to raw microseconds for SQL.
+  // duration values (e.g. '1.50ms') back to raw microseconds for SQL,
+  // and span_kind labels (e.g. 'Server') back to numeric OTEL keys (e.g. '2').
   if (props.filter?.trim().length) {
     const parsed = parseDurationWhereClause(
       props.filter.trim(),
       sqlParser.value,
       searchObj.data.stream.selectedStream.value,
     );
-    baseFilters.push(typeof parsed === "string" ? parsed : props.filter.trim());
+    baseFilters.push(
+      parseSpanKindWhereClause(
+        typeof parsed === "string" ? parsed : props.filter.trim(),
+        sqlParser.value,
+        searchObj.data.stream.selectedStream.value,
+      ),
+    );
   }
 
   return baseFilters;
@@ -261,16 +269,21 @@ const loadDashboard = async () => {
       if (panel.title === "Errors") {
         const errorFilters = ["span_status = 'ERROR'"];
         if (props.filter?.trim().length) {
-          // Parse human-readable duration values back to raw µs for SQL
+          // Parse human-readable duration values back to raw µs for SQL,
+          // and span_kind labels back to numeric OTEL keys.
           const parsedFilter = parseDurationWhereClause(
             props.filter.trim(),
             sqlParser.value,
             searchObj.data.stream.selectedStream.value,
           );
           errorFilters.push(
-            typeof parsedFilter === "string"
-              ? parsedFilter
-              : props.filter.trim(),
+            parseSpanKindWhereClause(
+              typeof parsedFilter === "string"
+                ? parsedFilter
+                : props.filter.trim(),
+              sqlParser.value,
+              searchObj.data.stream.selectedStream.value,
+            ),
           );
         }
 

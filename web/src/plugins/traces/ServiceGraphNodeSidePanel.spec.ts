@@ -19,6 +19,11 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 import store from "@/test/unit/helpers/store";
 
+// Stable spy references — must be declared before vi.mock() factories reference them.
+// vi.mock is hoisted so these plain vi.fn() declarations are fine here.
+const notifyMock = vi.fn();
+const routerPushMock = vi.fn();
+
 // vi.mock calls are hoisted — must come before component import
 vi.mock("@/services/search", () => ({
   default: {
@@ -47,12 +52,29 @@ vi.mock("vue-i18n", () => ({
   })),
 }));
 
+vi.mock("vue-router", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    useRouter: () => ({
+      push: routerPushMock,
+      replace: vi.fn(),
+      currentRoute: { value: { path: "/", query: {} } },
+    }),
+    useRoute: () => ({
+      path: "/",
+      query: {},
+      params: {},
+    }),
+  };
+});
+
 vi.mock("quasar", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
     ...actual,
     useQuasar: () => ({
-      notify: vi.fn(),
+      notify: notifyMock,
       dialog: vi.fn(),
     }),
   };
@@ -114,6 +136,8 @@ function mountPanel(
         TelemetryCorrelationDashboard: {
           template: '<div data-test="stub-telemetry" />',
         },
+        // Render dropdown content inline so data-test items are always queryable
+        QBtnDropdown: { template: "<div><slot /><slot name='default' /></div>" },
       },
     },
     props: {
@@ -516,6 +540,134 @@ describe("ServiceGraphNodeSidePanel", () => {
 
       expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(
         initialCallCount,
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // "View Related Logs" navigation
+  // -------------------------------------------------------------------------
+
+  describe("viewRelatedLogs — no logs stream found", () => {
+    beforeEach(() => {
+      wrapper = mountPanel({ streamFilter: "default" });
+    });
+
+    it("should show a warning notification when correlate returns an empty logs array", async () => {
+      // Default mock already returns logs: [] — no override needed
+      const viewRelatedLogsBtn = wrapper.find(
+        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
+      );
+      expect(viewRelatedLogsBtn.exists()).toBe(true);
+      await viewRelatedLogsBtn.trigger("click");
+      await flushPromises();
+
+      expect(notifyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "warning",
+          message: "traces.noLogsAvailableForService",
+        }),
+      );
+    });
+
+    it("should NOT navigate to /logs when no logs stream is found", async () => {
+      const viewRelatedLogsBtn = wrapper.find(
+        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
+      );
+      expect(viewRelatedLogsBtn.exists()).toBe(true);
+      await viewRelatedLogsBtn.trigger("click");
+      await flushPromises();
+
+      expect(routerPushMock).not.toHaveBeenCalled();
+    });
+
+    it("should show a warning notification when correlate throws an error", async () => {
+      vi.mocked(correlateStreams).mockRejectedValueOnce(
+        new Error("Network failure"),
+      );
+
+      const viewRelatedLogsBtn = wrapper.find(
+        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
+      );
+      expect(viewRelatedLogsBtn.exists()).toBe(true);
+      await viewRelatedLogsBtn.trigger("click");
+      await flushPromises();
+
+      expect(notifyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "warning",
+          message: "traces.noLogsAvailableForService",
+        }),
+      );
+    });
+
+    it("should NOT navigate to /logs when correlate throws an error", async () => {
+      vi.mocked(correlateStreams).mockRejectedValueOnce(
+        new Error("Network failure"),
+      );
+
+      const viewRelatedLogsBtn = wrapper.find(
+        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
+      );
+      expect(viewRelatedLogsBtn.exists()).toBe(true);
+      await viewRelatedLogsBtn.trigger("click");
+      await flushPromises();
+
+      expect(routerPushMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("viewRelatedLogs — valid logs stream found", () => {
+    beforeEach(() => {
+      vi.mocked(correlateStreams).mockResolvedValue({
+        data: {
+          service_name: "frontend",
+          matched_dimensions: {},
+          additional_dimensions: {},
+          related_streams: {
+            logs: [
+              {
+                stream_name: "k8s-logs",
+                filters: { service_name: "frontend" },
+              },
+            ],
+            metrics: [],
+            traces: [],
+          },
+        },
+      } as any);
+      wrapper = mountPanel({ streamFilter: "default" });
+    });
+
+    it("should navigate to /logs when a valid log stream is found", async () => {
+      const viewRelatedLogsBtn = wrapper.find(
+        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
+      );
+      expect(viewRelatedLogsBtn.exists()).toBe(true);
+      await viewRelatedLogsBtn.trigger("click");
+      await flushPromises();
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/logs",
+          query: expect.objectContaining({
+            stream_type: "logs",
+            stream_value: "k8s-logs",
+          }),
+        }),
+      );
+    });
+
+    it("should NOT show a warning notification when a valid log stream is found", async () => {
+      const viewRelatedLogsBtn = wrapper.find(
+        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
+      );
+      expect(viewRelatedLogsBtn.exists()).toBe(true);
+      await viewRelatedLogsBtn.trigger("click");
+      await flushPromises();
+
+      expect(notifyMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: "warning" }),
       );
     });
   });
