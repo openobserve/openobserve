@@ -426,10 +426,37 @@ pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy:
             AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&cfg.smtp.smtp_host)
                 .port(cfg.smtp.smtp_port);
 
-        let option = &cfg.smtp.smtp_encryption;
-        transport_builder = if option == "starttls" {
+        // Resolve effective TLS mode:
+        // 1. If ZO_SMTP_ENCRYPTION is unset/auto, derive from port (465=ssltls, 587=starttls).
+        // 2. If explicitly set, validate it against the port convention. If mismatched, log a
+        //    warning and fall back to the port-derived value so the connection still works.
+        let port_derived = match cfg.smtp.smtp_port {
+            465 => "ssltls",
+            587 | 2587 => "starttls",
+            _ => "",
+        };
+        let effective_encryption = match cfg.smtp.smtp_encryption.as_str() {
+            "" | "auto" => port_derived,
+            explicit => {
+                let mismatch = matches!(
+                    (explicit, cfg.smtp.smtp_port),
+                    ("ssltls", 587) | ("ssltls", 2587) | ("starttls", 465)
+                );
+                if mismatch {
+                    log::warn!(
+                        "[SMTP] ZO_SMTP_ENCRYPTION={explicit} conflicts with port {}; \
+                         falling back to port-derived value '{port_derived}'",
+                        cfg.smtp.smtp_port
+                    );
+                    port_derived
+                } else {
+                    explicit
+                }
+            }
+        };
+        transport_builder = if effective_encryption == "starttls" {
             transport_builder.tls(Tls::Required(tls_parameters))
-        } else if option == "ssltls" {
+        } else if effective_encryption == "ssltls" {
             transport_builder.tls(Tls::Wrapper(tls_parameters))
         } else {
             transport_builder
