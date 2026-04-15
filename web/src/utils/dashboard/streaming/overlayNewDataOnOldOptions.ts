@@ -145,24 +145,46 @@ export function overlayNewDataOnOldOptions(
 
     // If new data uses [timestamp, value] format (time-series)
     if (newTimeSlots.size > 0 && Array.isArray(oldSeries.data)) {
+      // Build old data lookup by timestamp for O(1) access
+      const oldDataByTime = new Map<number, any>();
+      for (const oldPoint of oldSeries.data) {
+        if (Array.isArray(oldPoint) && oldPoint.length >= 2) {
+          const oldT = toNumericTime(oldPoint[0]);
+          if (!isNaN(oldT) && oldT >= newMinTime && oldT <= newMaxTime) {
+            oldDataByTime.set(oldT, oldPoint);
+          }
+        }
+      }
+
+      // Replace null-valued new entries with old real entries.
+      // fillMissingValues creates null placeholders for the full query range,
+      // which makes the overlay think those time slots are "covered" by new data.
+      // By replacing nulls with old values, the chart stays continuous during
+      // streaming instead of showing a gap between old and new data.
+      for (let i = 0; i < newSeries.data.length; i++) {
+        const point = newSeries.data[i];
+        if (Array.isArray(point) && point.length >= 2) {
+          const value = point[1];
+          if (value == null || value === "") {
+            const t = toNumericTime(point[0]);
+            const oldPoint = oldDataByTime.get(t);
+            if (oldPoint && oldPoint[1] != null && oldPoint[1] !== "") {
+              newSeries.data[i] = oldPoint;
+            }
+          }
+        }
+      }
+
       // Append old data points for time slots NOT covered by new data,
       // but ONLY if they fall within the new query's time range.
       // This prevents old data from a different time range (e.g. 1-week)
       // leaking into the new chart (e.g. 1-day) when the user changes
       // the time picker.
-      for (const oldPoint of oldSeries.data) {
-        if (Array.isArray(oldPoint) && oldPoint.length >= 2) {
-          const oldT = toNumericTime(oldPoint[0]);
-          if (
-            !isNaN(oldT) &&
-            !newTimeSlots.has(oldT) &&
-            oldT >= newMinTime &&
-            oldT <= newMaxTime
-          ) {
-            newSeries.data.push(oldPoint);
-          }
+      oldDataByTime.forEach((oldPoint, oldT) => {
+        if (!newTimeSlots.has(oldT)) {
+          newSeries.data.push(oldPoint);
         }
-      }
+      });
 
       // Sort by timestamp to maintain chronological order
       newSeries.data.sort((a: any, b: any) => {
@@ -293,14 +315,17 @@ export function overlayNewDataOnOldOptions(
           : 0;
 
       if (newFraction > 0 && newFraction < 1) {
-        const overlayWidth = newFraction * plotWidth;
-        const overlayLeft = plotLeft + plotWidth - overlayWidth;
+        // oldFraction is the stale portion (left side) that hasn't been
+        // refreshed yet. Overlay covers from plotLeft to the boundary
+        // where new data begins.
+        const oldFraction = 1 - newFraction;
+        const overlayWidth = oldFraction * plotWidth;
 
         if (overlayWidth > 1) {
           merged.graphic = [
             {
               type: "rect",
-              left: overlayLeft,
+              left: plotLeft,
               top: plotTop,
               shape: {
                 width: overlayWidth,

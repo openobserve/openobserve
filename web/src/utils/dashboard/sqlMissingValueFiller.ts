@@ -235,8 +235,26 @@ export const fillMissingValues = (
     resultMetaData?.[resultMetaData.length - 1]?.time_offset?.start_time,
   );
 
+  // Build a lookup map from old cached filledData to use as fallback when the
+  // current processedData doesn't cover a time slot. During streaming, previously
+  // rendered real data is preserved instead of being replaced by null entries.
+  // This works in tandem with overlayNewDataOnOldOptions at the chart level.
+  let oldFilledDataMap: Map<string, any> | null = null;
+
   if (cacheKey) {
     const cacheEntry = missingValueCache.get(cacheKey);
+
+    // Build old data map BEFORE the cache entry might be deleted below
+    if (cacheEntry?.filledData?.length) {
+      oldFilledDataMap = new Map();
+      for (const entry of cacheEntry.filledData) {
+        const mapKey = hasBreakdown
+          ? `${getDataValue(entry, timeKey)}-${getDataValue(entry, uniqueKey)}`
+          : `${getDataValue(entry, timeKey)}`;
+        oldFilledDataMap.set(mapKey, entry);
+      }
+    }
+
     if (
       cacheEntry &&
       cacheEntry.anchorTimes.length > 0 &&
@@ -335,25 +353,37 @@ export const fillMissingValues = (
   if (anchorTimes.length > 0) {
     if (!hasBreakdown) {
       anchorTimes.forEach((t) => {
-        const anchorEntry: any = { [timeKey]: t };
-        keys.forEach((key) => {
-          if (key !== timeKey) anchorEntry[key] = noValueConfigOption;
-        });
-        filledData.push(anchorEntry);
+        const lookupKey = `${t}`;
+        const oldEntry = oldFilledDataMap?.get(lookupKey);
+        if (oldEntry) {
+          filledData.push(oldEntry);
+        } else {
+          const anchorEntry: any = { [timeKey]: t };
+          keys.forEach((key) => {
+            if (key !== timeKey) anchorEntry[key] = noValueConfigOption;
+          });
+          filledData.push(anchorEntry);
+        }
       });
     } else {
       anchorTimes.forEach((t) => {
         uniqueXAxisValues.forEach((uniqueValue: any) => {
-          const anchorEntry: any = {
-            [timeKey]: t,
-            [uniqueKey]: uniqueValue,
-          };
-          keys.forEach((key) => {
-            if (key !== timeKey && key !== uniqueKey) {
-              anchorEntry[key] = noValueConfigOption;
-            }
-          });
-          filledData.push(anchorEntry);
+          const lookupKey = `${t}-${uniqueValue}`;
+          const oldEntry = oldFilledDataMap?.get(lookupKey);
+          if (oldEntry) {
+            filledData.push(oldEntry);
+          } else {
+            const anchorEntry: any = {
+              [timeKey]: t,
+              [uniqueKey]: uniqueValue,
+            };
+            keys.forEach((key) => {
+              if (key !== timeKey && key !== uniqueKey) {
+                anchorEntry[key] = noValueConfigOption;
+              }
+            });
+            filledData.push(anchorEntry);
+          }
         });
       });
     }
@@ -372,11 +402,17 @@ export const fillMissingValues = (
       if (currentData) {
         filledData.push(currentData);
       } else {
-        const nullEntry: any = { [timeKey]: currentFormattedTime };
-        keys.forEach((key) => {
-          if (key !== timeKey) nullEntry[key] = noValueConfigOption;
-        });
-        filledData.push(nullEntry);
+        // Use old cached data if available, otherwise create null entry
+        const oldEntry = oldFilledDataMap?.get(key);
+        if (oldEntry) {
+          filledData.push(oldEntry);
+        } else {
+          const nullEntry: any = { [timeKey]: currentFormattedTime };
+          keys.forEach((key) => {
+            if (key !== timeKey) nullEntry[key] = noValueConfigOption;
+          });
+          filledData.push(nullEntry);
+        }
       }
     } else {
       uniqueXAxisValues.forEach((uniqueValue: any) => {
@@ -385,16 +421,22 @@ export const fillMissingValues = (
         if (currentData) {
           filledData.push(currentData);
         } else {
-          const nullEntry: any = {
-            [timeKey]: currentFormattedTime,
-            [uniqueKey]: uniqueValue,
-          };
-          keys.forEach((key) => {
-            if (key !== timeKey && key !== uniqueKey) {
-              nullEntry[key] = noValueConfigOption;
-            }
-          });
-          filledData.push(nullEntry);
+          // Use old cached data if available, otherwise create null entry
+          const oldEntry = oldFilledDataMap?.get(key);
+          if (oldEntry) {
+            filledData.push(oldEntry);
+          } else {
+            const nullEntry: any = {
+              [timeKey]: currentFormattedTime,
+              [uniqueKey]: uniqueValue,
+            };
+            keys.forEach((key) => {
+              if (key !== timeKey && key !== uniqueKey) {
+                nullEntry[key] = noValueConfigOption;
+              }
+            });
+            filledData.push(nullEntry);
+          }
         }
       });
     }
