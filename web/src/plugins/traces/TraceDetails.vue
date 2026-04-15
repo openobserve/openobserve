@@ -33,7 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <header
           class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)]"
         >
-          <div class="tw:flex tw:items-center tw:space-x-4">
+          <div
+            class="tw:flex tw:items-center tw:space-x-4 tw:w-[calc(100%-17rem)]!"
+          >
             <!-- Back button -->
             <q-btn
               v-if="mode === 'standalone' && showBackButton"
@@ -52,19 +54,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</q-tooltip>
             </q-btn>
 
-            <div class="tw:flex">
+            <div class="tw:flex tw:min-w-0 tw:w-full">
               <!-- Operation Name -->
               <div
                 data-test="trace-details-operation-name"
-                class="tw:text-base tw:font-semibold tw:leading-tight tw:text-[var(--o2-text-primary)]"
+                class="tw:text-base tw:font-semibold tw:leading-tight tw:text-[var(--o2-text-primary)] tw:truncate tw:min-w-0 tw:max-w-[calc(100%-32rem)]!"
                 :title="traceTree[0]?.operationName"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
+                <q-tooltip>{{ traceTree[0]?.operationName }}</q-tooltip>
               </div>
 
               <!-- Service, Timestamp, and Trace ID -->
               <div
-                class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)]"
+                class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:w-[32rem]"
               >
                 <span class="tw:pl-[1rem]">{{
                   formatTimestamp(traceStartTime)
@@ -115,7 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tw:flex tw:items-center tw:space-x-3">
+          <div
+            class="tw:flex tw:justify-end tw:items-center tw:space-x-3 tw:w-[17rem]!"
+          >
             <!-- Apply filters button (standalone mode, right side) -->
             <q-btn
               v-if="mode === 'standalone' && areFiltersAdded"
@@ -139,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-icon name="hub" size="14px" />
               <span data-test="span-count-text"
-                >{{ effectiveSpanList.length }}
+                >{{ formatLargeNumber(effectiveSpanList.length) }}
                 {{ t("traces.spansLabel") }}</span
               >
             </div>
@@ -153,7 +158,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="14px"
                 :color="errorSpansCount > 0 ? 'negative' : undefined"
               />
-              <span>{{ errorSpansCount }} {{ t("traces.errorsLabel") }}</span>
+              <span
+                >{{ formatLargeNumber(errorSpansCount) }}
+                {{ t("traces.errorsLabel") }}</span
+              >
             </div>
 
             <!-- Expand button (embedded mode) -->
@@ -768,7 +776,7 @@ import {
   outlinedPlayCircle,
 } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
@@ -1197,7 +1205,7 @@ export default defineComponent({
         { label: "Waterfall", value: "waterfall" },
         { label: "Flame Graph", value: "flame-graph" },
         // { label: "Spans", value: "spans" },
-        { label: "Service Map", value: "map" },
+        { label: "Trace Graph", value: "map" },
       ];
       // Conditionally add DAG tab for LLM traces
       if (hasLLMSpans.value) {
@@ -2736,6 +2744,7 @@ export default defineComponent({
       traceEvaluationsViewRef,
       fetchEvalPipeline,
       fetchEvalData,
+      formatLargeNumber,
     };
   },
 });
