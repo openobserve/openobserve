@@ -621,6 +621,7 @@ describe("IdentityAccessManagement.vue Component", () => {
         vi.spyOn(config, "isEnterprise", "get").mockReturnValue("true");
         vi.spyOn(config, "isCloud", "get").mockReturnValue("true");
         store.state.zoConfig.rbac_enabled = false;
+        store.state.zoConfig.service_account_enabled = false;
 
         const newWrapper = mount(IdentityAccessManagement, {
           global: {
