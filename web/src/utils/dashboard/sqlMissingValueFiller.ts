@@ -18,6 +18,7 @@ import { dateBin } from "@/utils/dashboard/datetimeStartPoint";
 import { format } from "date-fns";
 import { isTimeSeries } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
+import { detectChunkingDirection } from "./chunkingDirection";
 
 /**
  * Fills in missing time-series data points between the start and end time
@@ -111,17 +112,13 @@ export const fillMissingValues = (
   );
 
   // Detect chunking direction from first resultMetaData entry.
-  // LTR: first chunk's start_time matches user's start → data arrives left-to-right.
-  // RTL: first chunk's end_time matches user's end → data arrives right-to-left.
-  const firstChunkStart = resultMetaData?.[0]?.time_offset?.start_time ?? 0;
-  const firstChunkEnd = resultMetaData?.[0]?.time_offset?.end_time ?? 0;
-  const userStartMicros = parseInt(metaDataStartTime);
-  const userEndMicros = parseInt(metaDataEndTime);
   const isLeftToRight =
-    firstChunkStart && firstChunkEnd && userStartMicros && userEndMicros
-      ? Math.abs(firstChunkStart - userStartMicros) <=
-        Math.abs(firstChunkEnd - userEndMicros)
-      : false;
+    detectChunkingDirection(
+      resultMetaData?.[0]?.time_offset?.start_time ?? 0,
+      resultMetaData?.[0]?.time_offset?.end_time ?? 0,
+      parseInt(metaDataStartTime),
+      parseInt(metaDataEndTime),
+    ) ?? false;
 
   let binnedFillStart: Date;
   let endTimeForFill: string;

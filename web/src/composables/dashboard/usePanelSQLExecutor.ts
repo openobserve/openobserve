@@ -17,6 +17,10 @@ import { markRaw, toRaw, nextTick } from "vue";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
 import logsUtils from "@/composables/useLogs/logsUtils";
+import {
+  detectChunkingDirection,
+  shouldPrependChunk,
+} from "@/utils/dashboard/chunkingDirection";
 
 const adjustTimestampByTimeRangeGap = (
   timestamp: number,
@@ -411,30 +415,18 @@ export const usePanelSQLExecutor = (ctx: {
                       ...(response?.content ?? {}),
                       ...(response?.content?.results ?? {}),
                     };
-                    const firstChunkStart =
-                      metaContent?.time_offset?.start_time ?? 0;
-                    const firstChunkEnd =
-                      metaContent?.time_offset?.end_time ?? 0;
-                    const userStart =
+                    const direction = detectChunkingDirection(
+                      metaContent?.time_offset?.start_time ?? 0,
+                      metaContent?.time_offset?.end_time ?? 0,
                       state.metadata?.queries?.[queryIndex]?.startTime ??
-                      state.metadata?.queries?.[0]?.startTime ??
-                      0;
-                    const userEnd =
+                        state.metadata?.queries?.[0]?.startTime ??
+                        0,
                       state.metadata?.queries?.[queryIndex]?.endTime ??
-                      state.metadata?.queries?.[0]?.endTime ??
-                      0;
-
-                    if (
-                      firstChunkStart &&
-                      firstChunkEnd &&
-                      userStart &&
-                      userEnd
-                    ) {
-                      chunkingLeftToRight.set(
-                        queryIndex,
-                        Math.abs(firstChunkStart - userStart) <=
-                          Math.abs(firstChunkEnd - userEnd),
-                      );
+                        state.metadata?.queries?.[0]?.endTime ??
+                        0,
+                    );
+                    if (direction !== null) {
+                      chunkingLeftToRight.set(queryIndex, direction);
                     }
                   }
 
@@ -487,8 +479,7 @@ export const usePanelSQLExecutor = (ctx: {
                         ]?.order_by?.toLowerCase() === "asc";
                       const isLTR =
                         chunkingLeftToRight.get(queryIndex) ?? false;
-                      // RTL+asc→prepend, RTL+desc→append, LTR+asc→append, LTR+desc→prepend
-                      const shouldPrepend = isLTR !== orderAsc;
+                      const shouldPrepend = shouldPrependChunk(isLTR, orderAsc);
 
                       if (shouldPrepend) {
                         state.data[queryIndex] = markRaw([
