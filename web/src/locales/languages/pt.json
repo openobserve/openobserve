@@ -2221,7 +2221,8 @@
     },
     "updateAnomalyDetection": "Atualize a detecção de anomalias:",
     "anomalyCreated": "Configuração de detecção de anomalias criada. O treinamento começará em breve.",
-    "editJson": "Editar alerta JSON"
+    "editJson": "Editar alerta JSON",
+    "additional_settings": "Configurações adicionais"
   },
   "alert_templates": {
     "header": "Modelos",

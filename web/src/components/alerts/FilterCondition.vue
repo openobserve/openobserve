@@ -1,9 +1,9 @@
 <template>
-    <div class=" tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap ">
+    <div class="condition-row tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap">
       <!-- V2: Fixed-width left column for alignment -->
       <!-- All conditions have the same width for the operator/label section -->
-      <div class="tw:flex tw:items-center tw:justify-center tw:mt-2 tw:min-w-[60px]">
-        <!-- First condition in root group: show "if" centered -->
+      <div class="tw:flex tw:items-center tw:justify-center tw:mt-1 tw:min-w-[60px]">
+        <!-- First condition in root group -->
         <template v-if="index === 0 && depth === 0">
           <span class="tw:text-sm">if</span>
         </template>
@@ -18,7 +18,7 @@
           <span class="tw:text-sm tw:font-medium tw:min-w-[30px] tw:lowercase">
             {{ computedLabel }}
           </span>
-          <!-- Toggle AND/OR button after label -->
+          <!-- Toggle AND/OR button -->
           <q-btn
             data-test="alert-conditions-toggle-operator-btn"
             flat
@@ -37,7 +37,7 @@
       </div>
         <div
           data-test="alert-conditions-select-column"
-          class="q-ml-none tw:mb-2"
+          class="q-ml-none"
         >
           <q-select
             v-model="condition.column"
@@ -48,18 +48,17 @@
             dense
             use-input
             hide-selected
+            class="alert-v3-select"
             fill-input
+            lazy-rules
             hide-bottom-space
+            no-error-icon
             :input-debounce="400"
             :placeholder="t('alerts.column')"
-            class="tw:mb-2"
             @filter="filterColumns"
             behavior="menu"
-            :rules="[
-              (val: any) => !!val || 'Field is required!',
-              validateColumnField
-            ]"
-            :class="inputWidth ? inputWidth : ''"
+            :rules="[(val: any) => !!val || 'Field is required!']"
+            :class="[inputWidth ? inputWidth : '']"
             @update:model-value="emits('input:update', 'conditions', condition)"
             :new-value-mode="props.allowCustomColumns ? 'add-unique' : undefined"
           >
@@ -79,9 +78,12 @@
             stack-label
             borderless
             dense
+            lazy-rules
             hide-bottom-space
+            no-error-icon
+            class="alert-v3-select"
             :rules="[(val: any) => !!val || 'Field is required!']"
-            :class="inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[70px]' : computedInputWidth)"
+            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[70px]' : computedInputWidth)]"
             @update:model-value="emits('input:update', 'conditions', condition)"
           >
           <q-tooltip v-if="condition.operator && store.state.isAiChatEnabled">
@@ -101,9 +103,11 @@
             stack-label
             borderless
             dense
+            lazy-rules
             hide-bottom-space
+            no-error-icon
             :rules="[(val: any) => !!val || 'Field is required!']"
-            :class="inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[110px]' : computedValueWidth)"
+            :class="['alert-v3-input', inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[110px]' : computedValueWidth)]"
             @update:model-value="emits('input:update', 'conditions', condition)"
           >
           <q-tooltip v-if="condition.value && store.state.isAiChatEnabled">
@@ -246,32 +250,19 @@ const filterColumns = (val: string, update: Function) => {
   });
 };
 
-// Validation rule for column field - checks if field exists in dropdown (only for alerts)
-const validateColumnField = (val: any) => {
-  // Skip validation if field is empty (required validation handles this)
-  if (!val || val === '') return true;
-
-  // Skip validation for pipelines module (they can use custom fields)
-  if (props.module === 'pipelines') return true;
-
-  // For alerts module: check if the selected field exists in the available streamFields
-  const fieldExists = props.streamFields.some((field: any) => field.value === val);
-
-  if (!fieldExists) {
-    return 'Field doesn\'t exist.';
-  }
-
-  return true;
-};
   </script>
 
-  <style scoped>
+  <style scoped lang="scss">
 .operator-toggle-btn {
   color: var(--o2-primary-btn-bg) !important;
 }
 
 .operator-toggle-btn:hover {
   background-color: rgba(var(--o2-primary-btn-bg-rgb), 0.1) !important;
+}
+
+.condition-row:has(.q-field--error) {
+  padding-bottom: 20px;
 }
 </style>
   
