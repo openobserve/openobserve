@@ -996,7 +996,10 @@ mod tests {
 
     #[test]
     fn test_sanitize_filename_allowed_special_chars() {
-        assert_eq!(sanitize_filename("my-report_v1 final"), "my-report_v1 final");
+        assert_eq!(
+            sanitize_filename("my-report_v1 final"),
+            "my-report_v1 final"
+        );
     }
 
     #[test]
@@ -1108,10 +1111,7 @@ mod tests {
     #[test]
     fn test_report_error_display_username_password_not_set() {
         let err = ReportError::ReportUsernamePasswordNotSet;
-        assert_eq!(
-            err.to_string(),
-            "Report username and password ENVs not set"
-        );
+        assert_eq!(err.to_string(), "Report username and password ENVs not set");
     }
 
     #[test]
