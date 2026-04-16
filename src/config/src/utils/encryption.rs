@@ -18,8 +18,6 @@ use base64::{Engine, prelude::BASE64_STANDARD};
 use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;
 
-// https://developers.google.com/tink/wire-format#tink_output_prefix
-const TINK_PREFIX_LENGTH: usize = 5;
 /// AES-256-SIV requires two concatenated 256-bit keys — 64 bytes total.
 const AES_256_SIV_KEY_LEN: usize = 64;
 
@@ -59,11 +57,6 @@ pub enum EncryptError {
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Algorithm {
-    /// Tink uses its own way to encode the encrypted value
-    /// so it has a dedicated algorithm type
-    TInkDaead256Siv {
-        key_id: u32,
-    },
     /// General AES 256-bit SIV algorithm
     Aes256Siv,
     None,
@@ -73,7 +66,6 @@ impl std::fmt::Display for Algorithm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Aes256Siv => write!(f, "aes-256-siv"),
-            Self::TInkDaead256Siv { .. } => write!(f, "tink-daead-256-siv"),
             Self::None => write!(f, "none"),
         }
     }
@@ -94,8 +86,6 @@ impl TryFrom<String> for Algorithm {
 
 impl Algorithm {
     pub fn encrypt(&self, key: &[u8], plaintext: &str) -> Result<String, EncryptError> {
-        let bytes = plaintext.as_bytes();
-
         // SIV mode: nonce need to be empty for the SIV itself to serve as the IV
         let nonce = [] as [&[u8]; 0];
 
@@ -104,30 +94,10 @@ impl Algorithm {
                 let mut cipher = Aes256Siv::new_from_slice(key).map_err(|e| {
                     EncryptError::AlgorithmError(format!("AES256 creation failed : {e}"))
                 })?;
-                let t = cipher.encrypt(nonce, bytes).map_err(|e| {
+                let t = cipher.encrypt(nonce, plaintext.as_bytes()).map_err(|e| {
                     EncryptError::EncryptionError(format!("Encryption failed : {e}"))
                 })?;
-                let output = BASE64_STANDARD.encode(&t);
-                Ok(output)
-            }
-            Self::TInkDaead256Siv { key_id } => {
-                let mut cipher = Aes256Siv::new_from_slice(key).map_err(|e| {
-                    EncryptError::AlgorithmError(format!("AES256 creation failed : {e}"))
-                })?;
-                let t = cipher.encrypt(nonce, bytes).map_err(|e| {
-                    EncryptError::EncryptionError(format!("Encryption failed : {e}"))
-                })?;
-                // When encoding, tink prepends a special prefix to the encrypted value,
-                // used when decrypting. Hence we also need to do that
-                // prefix starts with 1 byte version = 1 (fixed)
-                let mut temp = vec![0x01];
-                // then 4 bytes key id used for encryption, as big-endian byte order
-                temp.extend_from_slice(&key_id.to_be_bytes());
-                // and finally the encrypted value
-                temp.extend(t);
-                // all encoded as base64 string
-                let output = BASE64_STANDARD.encode(&temp);
-                Ok(output)
+                Ok(BASE64_STANDARD.encode(&t))
             }
             Self::None => Ok(BASE64_STANDARD.encode(plaintext.as_bytes())),
         }
@@ -141,7 +111,6 @@ impl Algorithm {
         // SIV mode: nonce need to be empty for the SIV itself to serve as the IV
         let nonce = [] as [&[u8]; 0];
 
-        // we do not support any having associated data in aes
         match self {
             Self::Aes256Siv => {
                 let mut cipher = Aes256Siv::new_from_slice(key).map_err(|e| {
@@ -150,37 +119,6 @@ impl Algorithm {
                 let t = cipher.decrypt(nonce, &decoded).map_err(|e| {
                     EncryptError::DecryptionError(format!("Decryption failed : {e}"))
                 })?;
-                Ok(String::from_utf8_lossy(&t).to_string())
-            }
-            Self::TInkDaead256Siv { key_id } => {
-                let mut cipher = Aes256Siv::new_from_slice(key).map_err(|e| {
-                    EncryptError::AlgorithmError(format!("AES256 creation failed {e}"))
-                })?;
-
-                if decoded.len() < TINK_PREFIX_LENGTH {
-                    return Err(EncryptError::DecryptionError(
-                        "Invalid encrypted string format, missing tink prefix".into(),
-                    ));
-                }
-                // we need to do a reverse checking of the Tink prefix and validate
-                // check that version = 1 (fixed)
-                if decoded[0] != 1 {
-                    return Err(EncryptError::DecryptionError(
-                        "Invalid encrypted string format, invalid version in prefix".into(),
-                    ));
-                }
-                // check that key id used for encryption matches the one used for decryption
-                if u32::from_be_bytes(decoded[1..=4].try_into().unwrap()) != *key_id {
-                    return Err(EncryptError::DecryptionError(
-                        "Invalid encrypted string format, key id mismatch in prefix".into(),
-                    ));
-                }
-                // decrypt  the actual value that is after the prefix
-                let t = cipher
-                    .decrypt(nonce, &decoded[TINK_PREFIX_LENGTH..])
-                    .map_err(|e| {
-                        EncryptError::DecryptionError(format!("Decryption failed : {e}"))
-                    })?;
                 Ok(String::from_utf8_lossy(&t).to_string())
             }
             Self::None => Ok(String::from_utf8_lossy(&decoded).to_string()),
@@ -195,10 +133,6 @@ mod tests {
     fn key() -> Vec<u8> {
         vec![0u8; 64]
     }
-
-    // -----------------------------------------------------------------------
-    // decode_encryption_key
-    // -----------------------------------------------------------------------
 
     #[test]
     fn test_valid_key() {
@@ -232,14 +166,6 @@ mod tests {
     #[test]
     fn test_display_aes() {
         assert_eq!(Algorithm::Aes256Siv.to_string(), "aes-256-siv");
-    }
-
-    #[test]
-    fn test_display_tink() {
-        assert_eq!(
-            Algorithm::TInkDaead256Siv { key_id: 1 }.to_string(),
-            "tink-daead-256-siv"
-        );
     }
 
     #[test]
@@ -281,45 +207,6 @@ mod tests {
     #[test]
     fn test_aes_bad_base64() {
         assert!(Algorithm::Aes256Siv.decrypt(&key(), "!!!").is_err());
-    }
-
-    #[test]
-    fn test_tink_encrypt_decrypt() {
-        let algo = Algorithm::TInkDaead256Siv { key_id: 99 };
-        let enc = algo.encrypt(&key(), "data").unwrap();
-        assert_eq!(algo.decrypt(&key(), &enc).unwrap(), "data");
-    }
-
-    #[test]
-    fn test_tink_prefix() {
-        let algo = Algorithm::TInkDaead256Siv { key_id: 123 };
-        let enc = algo.encrypt(&key(), "x").unwrap();
-        let dec = BASE64_STANDARD.decode(&enc).unwrap();
-        assert_eq!(dec[0], 1);
-        assert_eq!(u32::from_be_bytes([dec[1], dec[2], dec[3], dec[4]]), 123);
-    }
-
-    #[test]
-    fn test_tink_short() {
-        let algo = Algorithm::TInkDaead256Siv { key_id: 1 };
-        let short = BASE64_STANDARD.encode([1, 2]);
-        assert!(algo.decrypt(&key(), &short).is_err());
-    }
-
-    #[test]
-    fn test_tink_bad_version() {
-        let algo = Algorithm::TInkDaead256Siv { key_id: 1 };
-        let mut bad = vec![99, 0, 0, 0, 1];
-        bad.extend(vec![0; 20]);
-        assert!(algo.decrypt(&key(), &BASE64_STANDARD.encode(&bad)).is_err());
-    }
-
-    #[test]
-    fn test_tink_key_mismatch() {
-        let a1 = Algorithm::TInkDaead256Siv { key_id: 1 };
-        let a2 = Algorithm::TInkDaead256Siv { key_id: 2 };
-        let enc = a1.encrypt(&key(), "x").unwrap();
-        assert!(a2.decrypt(&key(), &enc).is_err());
     }
 
     #[test]
