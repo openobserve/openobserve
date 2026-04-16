@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div
             class="tw:font-semibold flex items-center"
-            style="width: 190px; min-height: 36px; padding-top: 4px"
+            style="width: 178px; min-height: 36px;"
           >
             Filters
           </div>
@@ -111,10 +111,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               no-caps
               dense
-              icon="add"
               label="Add filter"
-              color="primary"
+              class="o2-secondary-button q-mt-sm"
               size="sm"
+              style="width: 110px;"
               @click="addFilter"
             />
           </div>
@@ -629,7 +629,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   class="o2-secondary-button"
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  label="load data"
+                  label="Load data"
                   size="sm"
                   data-test="anomaly-sensitivity-load-btn"
                   @click="loadPreview"
@@ -1333,7 +1333,11 @@ export default defineComponent({
 }
 
 .sensitivity-range-slider {
-  height: 180px;
+  // Chart is 180px. With containLabel:true and top/bottom 3% margins (~5px
+  // each), the y-axis label at top takes ~15px and the x-axis time labels at
+  // bottom take ~25px, leaving the data area at ~top:20px, height:130px.
+  margin-top: 15px;
+  height: 145px !important;
 
   --slider-accent: color-mix(
     in srgb,
