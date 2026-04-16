@@ -2081,12 +2081,10 @@ export default defineComponent({
 
     watch(viewSqlEditor, (newValue, oldValue) => {
       // Emit state change whenever it changes
-      console.log("[QueryConfig] SQL Editor state changed:", oldValue, "->", newValue);
       emit("editor-state-changed", newValue);
 
       // When dialog closes (goes from true to false), emit event to refresh preview
       if (oldValue === true && newValue === false) {
-        console.log("[QueryConfig] SQL Editor Dialog closed, emitting editor-closed event");
         emit("editor-closed");
       }
     });

@@ -743,7 +743,6 @@ const buildMultiWindowQuery = (sql: string, periodInMicroseconds: number) => {
 
   // Guard: If multiTimeRange is null, undefined, or empty, return empty array
   if (!props.multiTimeRange || props.multiTimeRange.length === 0) {
-    console.log('[QueryEditorDialog] No multi-time ranges defined, returning empty array');
     return queryToSend;
   }
 
@@ -785,28 +784,22 @@ const buildMultiWindowQuery = (sql: string, periodInMicroseconds: number) => {
 
 // Query execution
 const triggerQuery = async (fn = false) => {
-  console.log('[QueryEditorDialog] triggerQuery called with fn:', fn);
   try {
-    console.log('[QueryEditorDialog] Step 1: Building query payload...');
     const queryReq = buildQueryPayload({
       sqlMode: true,
       streamName: props.streamName,
     });
     queryReq.query.sql = localSqlQuery.value;
     queryReq.query.size = 10;
-    console.log('[QueryEditorDialog] Step 2: Query payload prepared:', queryReq);
 
-    console.log('[QueryEditorDialog] Step 3: Calculating time range...');
     const periodInMicroseconds = props.period * 60 * 1000000;
     const endTime = new Date().getTime() * 1000; // ← Use 1000 to get microseconds
     const startTime = endTime - periodInMicroseconds;
-    console.log('[QueryEditorDialog] Time range:', { startTime, endTime, periodInMicroseconds });
 
     queryReq.query.query_fn = fn ? b64EncodeUnicode(vrlFunctionContent.value) : null;
     queryReq.query.sql_mode = true;
     queryReq.query.per_query_response = true;
 
-    console.log('[QueryEditorDialog] Step 4: Building query to send...');
     let queryToSend = [
       {
         start_time: startTime,
@@ -814,22 +807,11 @@ const triggerQuery = async (fn = false) => {
         sql: queryReq.query.sql,
       }
     ];
-    console.log('[QueryEditorDialog] Initial queryToSend:', queryToSend);
 
-    console.log('[QueryEditorDialog] Step 5: Calling buildMultiWindowQuery...');
     const multiWindowQueries = buildMultiWindowQuery(queryReq.query.sql, periodInMicroseconds);
-    console.log('[QueryEditorDialog] Multi-window queries:', multiWindowQueries);
 
     queryToSend.push(...multiWindowQueries);
     queryReq.query.sql = queryToSend;
-    console.log('[QueryEditorDialog] Final queryToSend with multi-window:', queryToSend);
-
-    console.log('[QueryEditorDialog] Step 6: About to call searchService.search with:', {
-      org_identifier: store.state.selectedOrganization.identifier,
-      page_type: props.streamType,
-      queryToSend: queryToSend,
-      validate: true,
-    });
 
     const res = await searchService.search({
       org_identifier: store.state.selectedOrganization.identifier,
@@ -837,8 +819,6 @@ const triggerQuery = async (fn = false) => {
       page_type: props.streamType,
       validate: true,
     });
-
-    console.log('[QueryEditorDialog] Step 7: Search API response received:', res);
 
     if (res.data.hits.length > 0) {
       if (fn) {
@@ -864,7 +844,6 @@ const triggerQuery = async (fn = false) => {
 };
 
 const runSqlQuery = async () => {
-  console.log('[QueryEditorDialog] runSqlQuery called with query:', localSqlQuery.value);
   runPromqlError.value = "";
   localSqlQueryErrorMsg.value = "";
   suppressPropError.value = true;
@@ -872,16 +851,13 @@ const runSqlQuery = async () => {
 
   // Validate SQL query before running (checks for SELECT * and reserved words)
   const parserResult = getParser(localSqlQuery.value);
-  console.log('[QueryEditorDialog] Parser result:', parserResult);
 
   if (!parserResult) {
     // Parser validation failed - don't run the query
     // Error message is already set by getParser via sqlQueryErrorMsg
-    console.log('[QueryEditorDialog] Parser validation failed:', localSqlQueryErrorMsg.value);
     return;
   }
 
-  console.log('[QueryEditorDialog] Parser validation passed, triggering query...');
   tempRunQuery.value = true;
   expandSqlOutput.value = true;
   try {
@@ -1073,7 +1049,6 @@ const handleQueryUpdate = (newQuery: string) => {
 };
 
 const handleLanguageChange = (newLanguage: 'sql' | 'promql') => {
-  console.log('[QueryEditorDialog] Language changed to:', newLanguage);
   localTab.value = newLanguage;
 
   // Explicitly sync the editor with the correct query after language change
@@ -1081,14 +1056,12 @@ const handleLanguageChange = (newLanguage: 'sql' | 'promql') => {
   setTimeout(() => {
     if (queryEditorRef.value && queryEditorRef.value.setValue) {
       const currentQuery = newLanguage === 'sql' ? localSqlQuery.value : localPromqlQuery.value;
-      console.log('[QueryEditorDialog] Syncing editor with query for', newLanguage, ':', currentQuery);
       queryEditorRef.value.setValue(currentQuery);
     }
   }, 50); // Small delay to ensure editor has switched language
 };
 
 const handleRunQuery = (language: 'sql' | 'promql') => {
-  console.log('[QueryEditorDialog] Run query for language:', language);
   if (language === 'sql') {
     runSqlQuery();
   } else {
@@ -1096,8 +1069,7 @@ const handleRunQuery = (language: 'sql' | 'promql') => {
   }
 };
 
-const handleAskAI = async (naturalLanguage: string, language: 'sql' | 'promql') => {
-  console.log('[QueryEditorDialog] Ask AI for language:', language, 'input:', naturalLanguage);
+const handleAskAI = async (_naturalLanguage: string, _language: string) => {
   // The unified component handles AI generation internally
   // This event is just for parent components that may need to react
 };
