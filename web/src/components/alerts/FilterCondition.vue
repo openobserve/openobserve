@@ -1,5 +1,5 @@
 <template>
-    <div class=" tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap ">
+    <div class="condition-row tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap">
       <!-- V2: Fixed-width left column for alignment -->
       <!-- All conditions have the same width for the operator/label section -->
       <div class="tw:flex tw:items-center tw:justify-center tw:mt-1 tw:min-w-[60px]">
@@ -18,9 +18,8 @@
           <span class="tw:text-sm tw:font-medium tw:min-w-[30px] tw:lowercase">
             {{ computedLabel }}
           </span>
-          <!-- Toggle AND/OR button (hidden for alerts — AND-only) -->
+          <!-- Toggle AND/OR button -->
           <q-btn
-            v-if="props.module !== 'alerts'"
             data-test="alert-conditions-toggle-operator-btn"
             flat
             dense
@@ -51,15 +50,14 @@
             hide-selected
             class="alert-v3-select"
             fill-input
+            lazy-rules
             hide-bottom-space
+            no-error-icon
             :input-debounce="400"
             :placeholder="t('alerts.column')"
             @filter="filterColumns"
             behavior="menu"
-            :rules="[
-              (val: any) => !!val || 'Field is required!',
-              validateColumnField
-            ]"
+            :rules="[(val: any) => !!val || 'Field is required!']"
             :class="[inputWidth ? inputWidth : '']"
             @update:model-value="emits('input:update', 'conditions', condition)"
             :new-value-mode="props.allowCustomColumns ? 'add-unique' : undefined"
@@ -80,7 +78,9 @@
             stack-label
             borderless
             dense
+            lazy-rules
             hide-bottom-space
+            no-error-icon
             class="alert-v3-select"
             :rules="[(val: any) => !!val || 'Field is required!']"
             :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[70px]' : computedInputWidth)]"
@@ -103,7 +103,9 @@
             stack-label
             borderless
             dense
+            lazy-rules
             hide-bottom-space
+            no-error-icon
             :rules="[(val: any) => !!val || 'Field is required!']"
             :class="['alert-v3-input', inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[110px]' : computedValueWidth)]"
             @update:model-value="emits('input:update', 'conditions', condition)"
@@ -248,23 +250,6 @@ const filterColumns = (val: string, update: Function) => {
   });
 };
 
-// Validation rule for column field - checks if field exists in dropdown (only for alerts)
-const validateColumnField = (val: any) => {
-  // Skip validation if field is empty (required validation handles this)
-  if (!val || val === '') return true;
-
-  // Skip validation for pipelines module (they can use custom fields)
-  if (props.module === 'pipelines') return true;
-
-  // For alerts module: check if the selected field exists in the available streamFields
-  const fieldExists = props.streamFields.some((field: any) => field.value === val);
-
-  if (!fieldExists) {
-    return 'Field doesn\'t exist.';
-  }
-
-  return true;
-};
   </script>
 
   <style scoped lang="scss">
@@ -276,5 +261,8 @@ const validateColumnField = (val: any) => {
   background-color: rgba(var(--o2-primary-btn-bg-rgb), 0.1) !important;
 }
 
+.condition-row:has(.q-field--error) {
+  padding-bottom: 20px;
+}
 </style>
   
