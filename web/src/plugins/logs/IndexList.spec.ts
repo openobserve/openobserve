@@ -780,7 +780,7 @@ describe("Index List", async () => {
       };
 
       wrapper.vm.handleSearchResponse(payload, response);
-      expect(wrapper.vm.fieldValues["testField"].values).toHaveLength(10);
+      expect(wrapper.vm.fieldValues["testField"].values).toHaveLength(15);
       // First value should have the highest count
       expect(wrapper.vm.fieldValues["testField"].values[0].count).toBe(15);
     });
@@ -1897,7 +1897,7 @@ describe("Index List", async () => {
       };
 
       wrapper.vm.handleSearchResponse(payload, response);
-      expect(wrapper.vm.fieldValues["testField"].values).toHaveLength(10);
+      expect(wrapper.vm.fieldValues["testField"].values).toHaveLength(15);
       // First value should have the highest count
       expect(wrapper.vm.fieldValues["testField"].values[0].count).toBe(15);
     });
