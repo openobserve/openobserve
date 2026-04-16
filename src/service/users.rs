@@ -411,9 +411,7 @@ pub async fn update_user(
                     } else if update_mode.is_self_update() && local_user.role < new_user.role {
                         message = "Self role cannot be upgraded";
                     } else {
-                        if local_user.role.ne(&new_user.role) {
-                            is_org_updated = true;
-                        }
+                        is_org_updated |= local_user.role.ne(&new_user.role);
                         #[cfg(feature = "enterprise")]
                         if new_org_role.custom_role.is_some() {
                             custom_roles_need_change = true;
