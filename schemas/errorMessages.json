@@ -24,28 +24,28 @@
     },
     "line": {
       "y:minItems": { "dashboard": "Add at least one field for the Y-Axis", "logs": "Unable to extract value field from the query." },
-      "x:minItems": { "dashboard": "Add one fields for the X-Axis", "logs": "Unable to extract grouping field from the query." },
-      "x:maxItems": { "dashboard": "Add one fields for the X-Axis", "logs": "Unable to extract grouping field from the query." }
+      "x:minItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." },
+      "x:maxItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." }
     },
     "area": {
       "y:minItems": { "dashboard": "Add at least one field for the Y-Axis", "logs": "Unable to extract value field from the query." },
-      "x:minItems": { "dashboard": "Add one fields for the X-Axis", "logs": "Unable to extract grouping field from the query." },
-      "x:maxItems": { "dashboard": "Add one fields for the X-Axis", "logs": "Unable to extract grouping field from the query." }
+      "x:minItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." },
+      "x:maxItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." }
     },
     "bar": {
       "y:minItems": { "dashboard": "Add at least one field for the Y-Axis", "logs": "Unable to extract value field from the query." },
-      "x:minItems": { "dashboard": "Add one fields for the X-Axis", "logs": "Unable to extract grouping field from the query." },
-      "x:maxItems": { "dashboard": "Add one fields for the X-Axis", "logs": "Unable to extract grouping field from the query." }
+      "x:minItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." },
+      "x:maxItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." }
     },
     "scatter": {
       "y:minItems": { "dashboard": "Add at least one field for the Y-Axis", "logs": "Unable to extract value field from the query." },
-      "x:minItems": { "dashboard": "Add one fields for the X-Axis", "logs": "Unable to extract grouping field from the query." },
-      "x:maxItems": { "dashboard": "Add one fields for the X-Axis", "logs": "Unable to extract grouping field from the query." }
+      "x:minItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." },
+      "x:maxItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." }
     },
     "h-bar": {
       "y:minItems": { "dashboard": "Add at least one field for the X-Axis", "logs": "Unable to extract value field from the query." },
-      "x:minItems": { "dashboard": "Add one fields for the Y-Axis", "logs": "Unable to extract grouping field from the query." },
-      "x:maxItems": { "dashboard": "Add one fields for the Y-Axis", "logs": "Unable to extract grouping field from the query." }
+      "x:minItems": { "dashboard": "Add one field for the Y-Axis", "logs": "Unable to extract grouping field from the query." },
+      "x:maxItems": { "dashboard": "Add one field for the Y-Axis", "logs": "Unable to extract grouping field from the query." }
     },
     "table": {
       "table:minFields": { "dashboard": "Add at least one field on First Column or Other Columns", "logs": "Unable to extract fields from the query." }

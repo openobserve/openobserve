@@ -45,7 +45,11 @@ pub fn validate(json: &Value) -> Vec<super::ValidationError> {
         .iter_errors(json)
         .map(|e| {
             let path = e.instance_path.to_string();
-            let keyword = format!("{:?}", e.kind);
+            // Extract the terminal JSON Schema keyword from the schema path
+            // (e.g. ".../minItems" -> "minItems"). This is stable across crate versions,
+            // unlike format!("{:?}", e.kind) which relies on internal Debug repr.
+            let schema_path_str = e.schema_path.to_string();
+            let keyword = schema_path_str.split('/').next_back().unwrap_or("").to_string();
             let message = map_error_message(&path, &keyword, &e.to_string(), json);
             super::ValidationError {
                 path,
@@ -63,17 +67,17 @@ fn map_error_message(path: &str, keyword: &str, raw_message: &str, dashboard: &V
         // Try chart-type specific messages
         let field = path.split('/').next_back().unwrap_or("");
 
-        // Map jsonschema error kinds to our key format
-        let error_key = if keyword.contains("MinItems") {
+        // Map JSON Schema keywords (lowercase) to our error key format.
+        // keyword is the last segment of schema_path, e.g. "minItems", "required", "enum".
+        let error_key = if keyword == "minItems" {
             format!("{}:minItems", field)
-        } else if keyword.contains("MaxItems") {
+        } else if keyword == "maxItems" {
             format!("{}:maxItems", field)
-        } else if keyword.contains("Required") {
-            // For required errors, the missing property is often in the raw message
+        } else if keyword == "required" {
             format!("{}:required", field)
-        } else if keyword.contains("Enum") {
+        } else if keyword == "enum" {
             format!("{}:enum", field)
-        } else if keyword.contains("MinLength") {
+        } else if keyword == "minLength" {
             format!("{}:minLength", field)
         } else {
             String::new()
@@ -90,20 +94,20 @@ fn map_error_message(path: &str, keyword: &str, raw_message: &str, dashboard: &V
         }
 
         // Panel structure errors
-        if keyword.contains("Enum") && path.ends_with("/type") {
+        if keyword == "enum" && path.ends_with("/type") {
             return format!("Panel {}: Chart type is not supported.", info.id);
         }
     }
 
     // Dashboard-level errors
     if (path.is_empty() || path == "/")
-        && keyword.contains("Required")
+        && keyword == "required"
         && raw_message.contains("title")
     {
         return "Dashboard title is required".to_string();
     }
 
-    if keyword.contains("MinItems") && path.ends_with("/tabs") {
+    if keyword == "minItems" && path.ends_with("/tabs") {
         return "Dashboard must have at least one tab".to_string();
     }
 
