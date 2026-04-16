@@ -1065,7 +1065,7 @@ export default defineComponent({
     });
 
     /** Maximum number of spans fetched per trace. Truncation warning is shown when this limit is hit. */
-    const MAX_SPANS_PER_TRACE = 2500;
+    const MAX_SPANS_PER_TRACE = 10;
 
     const serviceColorIndex = ref(0);
     const colors = ref(getAllSpanColors());
@@ -1827,6 +1827,17 @@ export default defineComponent({
             searchObj.data.traceDetails.totalSpanCount = totalFromCount;
             searchObj.data.traceDetails.spansTruncated =
               traceSpans.length >= limit;
+            if (searchObj.data.traceDetails.spansTruncated) {
+              $q.notify({
+                type: "warning",
+                message: t("traces.spansTruncatedWarning", {
+                  count: traceSpans.length,
+                  total: totalFromCount,
+                }),
+                timeout: 0,
+                actions: [{ icon: "close", color: "black", round: false }],
+              });
+            }
             searchObj.data.traceDetails.spanList = [...rumSpans, ...traceSpans];
             updateServiceColors();
             buildTracesTree();
