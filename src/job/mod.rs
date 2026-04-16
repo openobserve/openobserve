@@ -671,11 +671,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "service_streams_cleanup",
-        config::get_config().service_streams.cleanup_interval_mins * 60, // convert minutes to seconds
+        get_o2_config().service_streams.cleanup_interval_mins * 60, // convert minutes to seconds
         {
             use config::metrics;
 
-            let stale_age_us = config::get_config().service_streams.stale_threshold_hours as i64 * 3600 * 1_000_000; // convert hours to microseconds
+            let stale_age_us =  get_o2_config().service_streams.stale_threshold_hours as i64 * 3600 * 1_000_000; // convert hours to microseconds
 
             // Leader election: smallest UUID ingester runs cleanup
             let is_leader = match infra::cluster::get_cached_online_ingester_nodes().await {
