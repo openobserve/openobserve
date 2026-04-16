@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="step-anomaly-config"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="step-content card-container tw:px-3 tw:py-4">
+    <div class="step-content tw:px-3 tw:py-4">
       <q-form ref="formRef" @submit.prevent>
         <!-- Query Mode Tabs -->
         <div class="tw:mb-4">
