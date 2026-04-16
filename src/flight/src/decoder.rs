@@ -230,6 +230,7 @@ mod tests {
             file_list_took: 25,
             aggs_cache_ratio: 90,
             peak_memory_usage: 1024000,
+            partial_err: String::new(),
         };
         let custom_message = CustomMessage::ScanStats(scan_stats);
         let metadata = serde_json::to_string(&custom_message).unwrap();
@@ -264,6 +265,7 @@ mod tests {
             file_list_took: 25,
             aggs_cache_ratio: 90,
             peak_memory_usage: 1024000,
+            partial_err: String::new(),
         };
         let custom_message = CustomMessage::ScanStats(scan_stats);
 
