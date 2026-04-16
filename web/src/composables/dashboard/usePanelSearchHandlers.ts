@@ -36,13 +36,18 @@ export const usePanelSearchHandlers = ({
   loadData: () => void;
   removeTraceId: (traceId: string) => void;
 }) => {
+  // Track chunking direction per query index.
+  // LTR: first chunk starts at user's start → data arrives left-to-right.
+  // RTL: first chunk ends at user's end → data arrives right-to-left.
+  const chunkingLeftToRight: Map<number, boolean> = new Map();
+
   // Microtask-based hit batching: buffers search_response_hits per query
   // and flushes in a single state.data mutation via queueMicrotask.
   // When the worker sends batched events in one postMessage, multiple hits
   // are dispatched in the same macrotask, and queueMicrotask coalesces them.
   const hitsBuffer: Map<
     number,
-    { hits: any[][]; streamingAggs: boolean; orderAsc: boolean }
+    { hits: any[][]; streamingAggs: boolean; orderAsc: boolean; isLTR: boolean }
   > = new Map();
   let flushScheduled = false;
 
@@ -74,14 +79,17 @@ export const usePanelSearchHandlers = ({
           }
         }
 
-        if (buffer.orderAsc) {
-          // asc: prepend all new hits at once
+        // Determine prepend vs append based on chunking direction AND order_by.
+        // RTL + asc → prepend, RTL + desc → append
+        // LTR + asc → append, LTR + desc → prepend
+        const shouldPrepend = buffer.isLTR !== buffer.orderAsc;
+
+        if (shouldPrepend) {
           state.data[queryIndex] = markRaw([
             ...allNewHits,
             ...toRaw(state.data[queryIndex] ?? []),
           ]);
         } else {
-          // desc (default): append all new hits at once
           state.data[queryIndex] = markRaw([
             ...toRaw(state.data[queryIndex] ?? []),
             ...allNewHits,
@@ -95,6 +103,7 @@ export const usePanelSearchHandlers = ({
 
   function clearHitsBuffer() {
     hitsBuffer.clear();
+    chunkingLeftToRight.clear();
     flushScheduled = false;
   }
 
@@ -110,41 +119,74 @@ export const usePanelSearchHandlers = ({
     // is streaming aggs
     const streaming_aggs = searchRes?.content?.streaming_aggs ?? false;
 
+    const queryIndex = payload?.meta?.currentQueryIndex;
+
     // Initialize data array if not exists
-    if (!state.data[payload?.meta?.currentQueryIndex]) {
-      state.data[payload?.meta?.currentQueryIndex] = [];
+    if (!state.data[queryIndex]) {
+      state.data[queryIndex] = [];
     }
+
+    // Detect chunking direction on first chunk for this query
+    if (
+      !state.resultMetaData[queryIndex] ||
+      state.resultMetaData[queryIndex].length === 0
+    ) {
+      // time_offset may be at content.results.time_offset (search_response)
+      // or at content.time_offset (search_response_metadata format)
+      const firstChunkStart =
+        searchRes?.content?.results?.time_offset?.start_time ??
+        searchRes?.content?.time_offset?.start_time ??
+        0;
+      const firstChunkEnd =
+        searchRes?.content?.results?.time_offset?.end_time ??
+        searchRes?.content?.time_offset?.end_time ??
+        0;
+      const userStart =
+        state.metadata?.queries?.[queryIndex]?.startTime ??
+        state.metadata?.queries?.[0]?.startTime ??
+        0;
+      const userEnd =
+        state.metadata?.queries?.[queryIndex]?.endTime ??
+        state.metadata?.queries?.[0]?.endTime ??
+        0;
+
+      if (firstChunkStart && firstChunkEnd && userStart && userEnd) {
+        chunkingLeftToRight.set(
+          queryIndex,
+          Math.abs(firstChunkStart - userStart) <=
+            Math.abs(firstChunkEnd - userEnd),
+        );
+      }
+    }
+
+    const isLTR = chunkingLeftToRight.get(queryIndex) ?? false;
+    const orderAsc =
+      searchRes?.content?.results?.order_by?.toLowerCase() === "asc";
+    // Prepend vs append: RTL+asc→prepend, RTL+desc→append, LTR+asc→append, LTR+desc→prepend
+    const shouldPrepend = isLTR !== orderAsc;
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
-      state.data[payload?.meta?.currentQueryIndex] = markRaw([
+      state.data[queryIndex] = markRaw([
         ...(searchRes?.content?.results?.hits ?? {}),
       ]);
-    }
-    // if order by is desc, append new partition response at end
-    else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
-      // else append new partition response at start
-      state.data[payload?.meta?.currentQueryIndex] = markRaw([
+    } else if (shouldPrepend) {
+      state.data[queryIndex] = markRaw([
         ...(searchRes?.content?.results?.hits ?? {}),
-        ...toRaw(state.data[payload?.meta?.currentQueryIndex] ?? []),
+        ...toRaw(state.data[queryIndex] ?? []),
       ]);
     } else {
-      state.data[payload?.meta?.currentQueryIndex] = markRaw([
-        ...toRaw(state.data[payload?.meta?.currentQueryIndex] ?? []),
+      state.data[queryIndex] = markRaw([
+        ...toRaw(state.data[queryIndex] ?? []),
         ...(searchRes?.content?.results?.hits ?? {}),
       ]);
     }
 
     // Push metadata for each partition
-    state.resultMetaData[payload?.meta?.currentQueryIndex].push(
-      searchRes?.content?.results ?? {},
-    );
+    state.resultMetaData[queryIndex].push(searchRes?.content?.results ?? {});
 
     // If we have data and loading is complete, set isPartialData to false
-    if (
-      state.data[payload?.meta?.currentQueryIndex]?.length > 0 &&
-      !state.loading
-    ) {
+    if (state.data[queryIndex]?.length > 0 && !state.loading) {
       state.isPartialData = false;
     }
   };
@@ -156,6 +198,32 @@ export const usePanelSearchHandlers = ({
     // Initialize metadata array if not exists
     if (!state.resultMetaData[currentQueryIndex]) {
       state.resultMetaData[currentQueryIndex] = [];
+    }
+
+    // Detect chunking direction from the first metadata entry for this query
+    if (state.resultMetaData[currentQueryIndex].length === 0) {
+      const metaContent = {
+        ...(searchRes?.content ?? {}),
+        ...(searchRes?.content?.results ?? {}),
+      };
+      const firstChunkStart = metaContent?.time_offset?.start_time ?? 0;
+      const firstChunkEnd = metaContent?.time_offset?.end_time ?? 0;
+      const userStart =
+        state.metadata?.queries?.[currentQueryIndex]?.startTime ??
+        state.metadata?.queries?.[0]?.startTime ??
+        0;
+      const userEnd =
+        state.metadata?.queries?.[currentQueryIndex]?.endTime ??
+        state.metadata?.queries?.[0]?.endTime ??
+        0;
+
+      if (firstChunkStart && firstChunkEnd && userStart && userEnd) {
+        chunkingLeftToRight.set(
+          currentQueryIndex,
+          Math.abs(firstChunkStart - userStart) <=
+            Math.abs(firstChunkEnd - userEnd),
+        );
+      }
     }
 
     // Push metadata for each partition
@@ -199,17 +267,20 @@ export const usePanelSearchHandlers = ({
     }
 
     // Buffer hits for batched state.data mutation
+    const isLTR = chunkingLeftToRight.get(queryIndex) ?? false;
     if (!hitsBuffer.has(queryIndex)) {
       hitsBuffer.set(queryIndex, {
         hits: [],
         streamingAggs: streaming_aggs,
         orderAsc,
+        isLTR,
       });
     }
     const buffer = hitsBuffer.get(queryIndex)!;
     buffer.hits.push(hits);
     buffer.streamingAggs = streaming_aggs;
     buffer.orderAsc = orderAsc;
+    buffer.isLTR = isLTR;
 
     scheduleFlush();
   };

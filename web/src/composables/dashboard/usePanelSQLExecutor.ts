@@ -349,6 +349,8 @@ export const usePanelSQLExecutor = (ctx: {
             // Use HTTP2/streaming for multi-query (time-shift) queries
             // Track the current query index being processed
             let currentQueryIndexInStream: number | null = null;
+            // Track chunking direction per query index
+            const chunkingLeftToRight: Map<number, boolean> = new Map();
 
             const payload: any = {
               queryReq: {
@@ -403,6 +405,39 @@ export const usePanelSQLExecutor = (ctx: {
                     state.resultMetaData[queryIndex] = [];
                   }
 
+                  // Detect chunking direction from first metadata entry
+                  if (state.resultMetaData[queryIndex].length === 0) {
+                    const metaContent = {
+                      ...(response?.content ?? {}),
+                      ...(response?.content?.results ?? {}),
+                    };
+                    const firstChunkStart =
+                      metaContent?.time_offset?.start_time ?? 0;
+                    const firstChunkEnd =
+                      metaContent?.time_offset?.end_time ?? 0;
+                    const userStart =
+                      state.metadata?.queries?.[queryIndex]?.startTime ??
+                      state.metadata?.queries?.[0]?.startTime ??
+                      0;
+                    const userEnd =
+                      state.metadata?.queries?.[queryIndex]?.endTime ??
+                      state.metadata?.queries?.[0]?.endTime ??
+                      0;
+
+                    if (
+                      firstChunkStart &&
+                      firstChunkEnd &&
+                      userStart &&
+                      userEnd
+                    ) {
+                      chunkingLeftToRight.set(
+                        queryIndex,
+                        Math.abs(firstChunkStart - userStart) <=
+                          Math.abs(firstChunkEnd - userEnd),
+                      );
+                    }
+                  }
+
                   // Push metadata for each partition
                   state.resultMetaData[queryIndex].push({
                     ...(response?.content ?? {}),
@@ -444,21 +479,23 @@ export const usePanelSQLExecutor = (ctx: {
                     if (streaming_aggs) {
                       state.data[queryIndex] = markRaw([...hits]);
                     }
-                    // Otherwise, append/prepend based on order_by (multiple partitions)
+                    // Otherwise, append/prepend based on chunking direction and order_by
                     else {
-                      const orderBy =
+                      const orderAsc =
                         state.resultMetaData[
                           queryIndex
-                        ]?.order_by?.toLowerCase();
+                        ]?.order_by?.toLowerCase() === "asc";
+                      const isLTR =
+                        chunkingLeftToRight.get(queryIndex) ?? false;
+                      // RTL+asc→prepend, RTL+desc→append, LTR+asc→append, LTR+desc→prepend
+                      const shouldPrepend = isLTR !== orderAsc;
 
-                      if (orderBy === "asc") {
-                        // For ascending order, prepend new data at start
+                      if (shouldPrepend) {
                         state.data[queryIndex] = markRaw([
                           ...hits,
                           ...toRaw(state.data[queryIndex] ?? []),
                         ]);
                       } else {
-                        // For descending order, append new data at end
                         state.data[queryIndex] = markRaw([
                           ...toRaw(state.data[queryIndex] ?? []),
                           ...hits,

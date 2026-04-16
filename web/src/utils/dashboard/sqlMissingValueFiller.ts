@@ -102,22 +102,52 @@ export const fillMissingValues = (
 
   const intervalMillis = interval * 1000;
 
-  // Use metadata endTime for the fill range end (user's selected end time).
+  // Use metadata endTime for the user's selected end time.
   const metaDataEndTime = metadata?.queries[0]?.endTime?.toString() ?? 0;
   const endTime = new Date(parseInt(metaDataEndTime) / 1000);
-  const endTimeForFill = format(
+  const formattedUserEnd = format(
     toZonedTime(endTime, "UTC"),
     "yyyy-MM-dd'T'HH:mm:ss",
   );
 
-  // Use resultMetaData's last entry's time_offset.start_time as the fill start.
-  // Chunks arrive right-to-left (latest first), so the last entry has the earliest start.
-  const resultMetaStartTime =
-    resultMetaData?.[resultMetaData.length - 1]?.time_offset?.start_time ?? 0;
-  const fillStartTime = resultMetaStartTime
-    ? new Date(resultMetaStartTime / 1000)
-    : binnedDate;
-  const binnedFillStart = dateBin(interval, fillStartTime, origin);
+  // Detect chunking direction from first resultMetaData entry.
+  // LTR: first chunk's start_time matches user's start → data arrives left-to-right.
+  // RTL: first chunk's end_time matches user's end → data arrives right-to-left.
+  const firstChunkStart = resultMetaData?.[0]?.time_offset?.start_time ?? 0;
+  const firstChunkEnd = resultMetaData?.[0]?.time_offset?.end_time ?? 0;
+  const userStartMicros = parseInt(metaDataStartTime);
+  const userEndMicros = parseInt(metaDataEndTime);
+  const isLeftToRight =
+    firstChunkStart && firstChunkEnd && userStartMicros && userEndMicros
+      ? Math.abs(firstChunkStart - userStartMicros) <=
+        Math.abs(firstChunkEnd - userEndMicros)
+      : false;
+
+  let binnedFillStart: Date;
+  let endTimeForFill: string;
+
+  if (isLeftToRight) {
+    // LTR: fill from user's start to latest chunk's end
+    binnedFillStart = binnedDate;
+    const lastChunkEndTime =
+      resultMetaData?.[resultMetaData.length - 1]?.time_offset?.end_time ?? 0;
+    const fillEndTime = lastChunkEndTime
+      ? new Date(lastChunkEndTime / 1000)
+      : endTime;
+    endTimeForFill = format(
+      toZonedTime(fillEndTime, "UTC"),
+      "yyyy-MM-dd'T'HH:mm:ss",
+    );
+  } else {
+    // RTL: fill from earliest chunk's start to user's end (existing behavior)
+    const resultMetaStartTime =
+      resultMetaData?.[resultMetaData.length - 1]?.time_offset?.start_time ?? 0;
+    const fillStartTime = resultMetaStartTime
+      ? new Date(resultMetaStartTime / 1000)
+      : binnedDate;
+    binnedFillStart = dateBin(interval, fillStartTime, origin);
+    endTimeForFill = formattedUserEnd;
+  }
 
   // Build map from processedData for O(1) lookup
   const hasBreakdown =
@@ -143,10 +173,10 @@ export const fillMissingValues = (
   }
   const uniqueTimeSlotCount = uniqueTimeSlots.size;
 
-  // Always insert a null anchor at the user's selected start time when the fill
+  // RTL: insert a null anchor at the user's selected start time when the fill
   // loop doesn't yet cover it. This pins the ECharts x-axis left edge to the
   // user's query range from the very first chunk.
-  if (binnedFillStart > binnedDate) {
+  if (!isLeftToRight && binnedFillStart > binnedDate) {
     const anchorFormattedTime = format(
       toZonedTime(binnedDate, "UTC"),
       "yyyy-MM-dd'T'HH:mm:ss",
@@ -247,6 +277,64 @@ export const fillMissingValues = (
       toZonedTime(currentTime, "UTC"),
       "yyyy-MM-dd'T'HH:mm:ss",
     );
+  }
+
+  // LTR: insert a null anchor at the user's selected end time when the fill
+  // loop doesn't yet cover it. This pins the ECharts x-axis right edge to the
+  // user's query range from the very first chunk.
+  if (isLeftToRight) {
+    const binnedUserEnd = dateBin(interval, endTime, origin);
+    const formattedBinnedUserEnd = format(
+      toZonedTime(binnedUserEnd, "UTC"),
+      "yyyy-MM-dd'T'HH:mm:ss",
+    );
+
+    if (endTimeForFill < formattedBinnedUserEnd) {
+      const anchorTimes: string[] = [];
+
+      // Insert a phantom point one interval before the user's selected end
+      // time when data is sparse (< 3 unique time slots). This gives ECharts a
+      // known consecutive gap at the right edge so it sizes bars correctly.
+      if (uniqueTimeSlotCount < 3) {
+        const nearAnchorTime = new Date(
+          binnedUserEnd.getTime() - interval * 1000,
+        );
+        const formattedNearAnchor = format(
+          toZonedTime(nearAnchorTime, "UTC"),
+          "yyyy-MM-dd'T'HH:mm:ss",
+        );
+        if (formattedNearAnchor > endTimeForFill) {
+          anchorTimes.push(formattedNearAnchor);
+        }
+      }
+
+      anchorTimes.push(formattedBinnedUserEnd);
+
+      if (!hasBreakdown) {
+        anchorTimes.forEach((t) => {
+          const anchorEntry: any = { [timeKey]: t };
+          keys.forEach((key) => {
+            if (key !== timeKey) anchorEntry[key] = noValueConfigOption;
+          });
+          filledData.push(anchorEntry);
+        });
+      } else {
+        anchorTimes.forEach((t) => {
+          uniqueXAxisValues.forEach((uniqueValue: any) => {
+            const anchorEntry: any = {
+              [timeKey]: t,
+              [uniqueKey]: uniqueValue,
+            };
+            keys.forEach((key) => {
+              if (key !== timeKey && key !== uniqueKey) {
+                anchorEntry[key] = noValueConfigOption;
+              }
+            });
+            filledData.push(anchorEntry);
+          });
+        });
+      }
+    }
   }
 
   return filledData;
