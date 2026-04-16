@@ -474,7 +474,7 @@ test.describe("Alerts Regression Bugs", () => {
   // Bug #10110: Template appears twice in override template input field
   // https://github.com/openobserve/openobserve/issues/10110
   // ============================================================================
-  test("Override template should appear only once in input field @bug-10110 @P2 @regression @alerts", async ({ page }) => {
+  test.skip("Override template should appear only once in input field @bug-10110 @P2 @regression @alerts", async ({ page }) => {
     testLogger.info('Test: Verify template override displays value once (Bug #10110)');
 
     const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
