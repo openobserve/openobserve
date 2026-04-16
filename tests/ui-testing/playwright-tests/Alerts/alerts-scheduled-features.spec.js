@@ -289,7 +289,7 @@ test.describe("Scheduled Alert Features", () => {
     // TEST 1: P0 - Alert details dialog: open, history, actions, edit
     // (Combined: dialog visibility + refresh/copy/edit actions)
     // ========================================================================
-    test.skip("Alert details dialog opens with history and action buttons work", {
+    test("Alert details dialog opens with history and action buttons work", {
         tag: ['@alertScheduled', '@alertHistory', '@smoke', '@P0', '@all', '@alerts']
     }, async ({ page }) => {
         testLogger.info('=== PHASE 1: Navigate to folder with API-created alert ===');
@@ -352,7 +352,7 @@ test.describe("Scheduled Alert Features", () => {
     // ========================================================================
     // TEST 2: P0 - Create scheduled alert with aggregation via Builder
     // ========================================================================
-    test.skip("Create scheduled alert with aggregation via Builder", {
+    test("Create scheduled alert with aggregation via Builder", {
         tag: ['@alertScheduled', '@aggregation', '@smoke', '@P0', '@all', '@alerts']
     }, async ({ page }) => {
         testLogger.info('=== PHASE 1: Navigate to test folder ===');
@@ -379,7 +379,7 @@ test.describe("Scheduled Alert Features", () => {
     // ========================================================================
     // TEST 3: P1 - Create scheduled alert with PromQL query
     // ========================================================================
-    test.skip("Create scheduled alert with PromQL query", {
+    test("Create scheduled alert with PromQL query", {
         tag: ['@alertScheduled', '@promql', '@functional', '@P1', '@all', '@alerts']
     }, async ({ page }) => {
         testLogger.info('=== PHASE 1: Navigate to folder ===');
@@ -409,7 +409,7 @@ test.describe("Scheduled Alert Features", () => {
     // ========================================================================
     // TEST 4: P1 - SQL mode preview renders chart
     // ========================================================================
-    test.skip("SQL mode preview renders chart", {
+    test("SQL mode preview renders chart", {
         tag: ['@alertScheduled', '@preview', '@functional', '@P1', '@all', '@alerts']
     }, async ({ page }) => {
         testLogger.info('=== PHASE 1: Start alert wizard with SQL mode ===');
@@ -477,7 +477,7 @@ test.describe("Scheduled Alert Features", () => {
     // ========================================================================
     // TEST 5: P2 - "Would Trigger" indicator displays for scheduled alerts
     // ========================================================================
-    test.skip("Would Trigger indicator displays for scheduled alerts", {
+    test("Would Trigger indicator displays for scheduled alerts", {
         tag: ['@alertScheduled', '@preview', '@edgeCase', '@P2', '@all', '@alerts']
     }, async ({ page }) => {
         testLogger.info('=== PHASE 1: Open existing scheduled alert for editing ===');
@@ -516,7 +516,7 @@ test.describe("Scheduled Alert Features", () => {
     // ========================================================================
     // TEST 6: P2 - Aggregation toggle off clears configuration
     // ========================================================================
-    test.skip("Aggregation toggle off clears group-by fields", {
+    test("Aggregation toggle off clears group-by fields", {
         tag: ['@alertScheduled', '@aggregation', '@edgeCase', '@P2', '@all', '@alerts']
     }, async ({ page }) => {
         testLogger.info('=== PHASE 1: Open alert wizard and navigate to Step 2 ===');

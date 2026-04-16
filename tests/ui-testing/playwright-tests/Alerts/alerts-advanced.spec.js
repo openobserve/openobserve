@@ -40,7 +40,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
     // ==================== ADVANCED CONDITIONS TESTS ====================
 
-    test.skip("Create alert with multiple AND conditions", {
+    test("Create alert with multiple AND conditions", {
         tag: ['@alertsAdvanced', '@all', '@alerts', '@multiCondition']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
@@ -76,7 +76,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         testLogger.info('Multi-condition alert created and verified successfully', { alertName });
     });
 
-    test.skip("Verify condition operator toggle (AND to OR)", {
+    test("Verify condition operator toggle (AND to OR)", {
         tag: ['@alertsAdvanced', '@all', '@alerts', '@conditionOperator']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
@@ -112,7 +112,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
     // ==================== BULK OPERATIONS TESTS ====================
 
-    test.skip("Bulk pause and unpause multiple alerts", {
+    test("Bulk pause and unpause multiple alerts", {
         tag: ['@alertsAdvanced', '@all', '@alerts', '@bulkOperations']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
@@ -165,7 +165,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
 
     // ==================== DEDUPLICATION TESTS ====================
 
-    test.skip("Create scheduled alert with deduplication configuration", {
+    test("Create scheduled alert with deduplication configuration", {
         tag: ['@alertsAdvanced', '@all', '@alerts', '@deduplication']
     }, async ({ page }) => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
@@ -230,7 +230,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
      * 4. Ingests more data (same fingerprint, within time window)
      * 5. Verifies NO NEW notification - dedup suppressed the duplicate
      */
-    test.skip("Deduplication validation - verify duplicate alerts are suppressed", {
+    test("Deduplication validation - verify duplicate alerts are suppressed", {
         tag: ['@alertsAdvanced', '@alerts', '@deduplication', '@dedupValidation', '@enterprise', '@skip']
     }, async ({ page }) => {
         test.slow(); // Mark as slow test due to scheduled alert evaluation cycles

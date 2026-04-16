@@ -125,7 +125,7 @@ test.describe("Alerts Regression Bugs", () => {
   // - P1: Different operators (>=, <=) work correctly
   // - P0: Alert can be saved with PromQL mode (the core bug fix)
   // ============================================================================
-  test.skip("Bug #9967: PromQL alert creation - comprehensive validation", {
+  test("Bug #9967: PromQL alert creation - comprehensive validation", {
     tag: ['@promqlAlert', '@alerts', '@regressionBugs', '@P0', '@metrics', '@bug-9967']
   }, async ({ page }) => {
     testLogger.info('Testing Bug #9967 fix - comprehensive validation');
@@ -256,7 +256,7 @@ test.describe("Alerts Regression Bugs", () => {
   // ============================================================================
   // SKIPPED: Timing out in current test environment (page.goto timeouts)
   // TODO: Re-enable when environment is stable
-  test.skip("Group By field should show autocomplete suggestions @bug-10899 @P1 @regression @alerts", async ({ page }) => {
+  test("Group By field should show autocomplete suggestions @bug-10899 @P1 @regression @alerts", async ({ page }) => {
     test.setTimeout(300000); // 5 minutes timeout
     testLogger.info('Test: Verify Group By field autocomplete (Bug #10899)');
 
@@ -334,7 +334,7 @@ test.describe("Alerts Regression Bugs", () => {
   // Bug #10872: Multi-window alert VRL processing not working correctly
   // https://github.com/openobserve/openobserve/issues/10872
   // ============================================================================
-  test.skip("VRL Apply button should process multi-window result array correctly @bug-10872 @P2 @regression @alerts", async ({ page }, testInfo) => {
+  test("VRL Apply button should process multi-window result array correctly @bug-10872 @P2 @regression @alerts", async ({ page }, testInfo) => {
     test.setTimeout(300000); // 5 minutes timeout
     testLogger.info('Test: VRL processing for multi-window alerts (Bug #10872)');
 
@@ -428,7 +428,7 @@ test.describe("Alerts Regression Bugs", () => {
   // ============================================================================
   // SKIPPED: Timing out in current test environment (page.goto timeouts)
   // TODO: Re-enable when environment is stable
-  test.skip("Alert firing count should increment when alert fires @bug-10472 @P2 @regression @alerts", async ({ page }, testInfo) => {
+  test("Alert firing count should increment when alert fires @bug-10472 @P2 @regression @alerts", async ({ page }, testInfo) => {
     test.setTimeout(240000); // 4 minutes timeout
     testLogger.info('Test: Verify alert firing count increment (Bug #10472)');
 
@@ -474,7 +474,7 @@ test.describe("Alerts Regression Bugs", () => {
   // Bug #10110: Template appears twice in override template input field
   // https://github.com/openobserve/openobserve/issues/10110
   // ============================================================================
-  test.skip("Override template should appear only once in input field @bug-10110 @P2 @regression @alerts", async ({ page }) => {
+  test("Override template should appear only once in input field @bug-10110 @P2 @regression @alerts", async ({ page }) => {
     testLogger.info('Test: Verify template override displays value once (Bug #10110)');
 
     const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
