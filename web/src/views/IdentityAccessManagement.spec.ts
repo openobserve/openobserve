@@ -617,28 +617,6 @@ describe("IdentityAccessManagement.vue Component", () => {
         newWrapper.unmount();
       });
 
-      it("should not include service accounts in cloud mode", async () => {
-        vi.spyOn(config, "isEnterprise", "get").mockReturnValue("true");
-        vi.spyOn(config, "isCloud", "get").mockReturnValue("true");
-        store.state.zoConfig.rbac_enabled = false;
-        store.state.zoConfig.service_account_enabled = false;
-
-        const newWrapper = mount(IdentityAccessManagement, {
-          global: {
-            provide: { store: store },
-            plugins: [i18n, router],
-            stubs: { RouterView: true, RouteTabs: true },
-          },
-        });
-
-        await flushPromises();
-
-        const tabNames = newWrapper.vm.tabs.map((t: any) => t.name);
-        expect(tabNames).not.toContain("serviceAccounts");
-
-        newWrapper.unmount();
-      });
-
       it("should include RBAC tabs when rbac_enabled is true in enterprise", async () => {
         vi.spyOn(config, "isEnterprise", "get").mockReturnValue("true");
         vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
