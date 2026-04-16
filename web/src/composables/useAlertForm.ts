@@ -1151,6 +1151,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // Reset tab errors
     tabErrors.value = {
       condition: false,
+      rules: false,
       compare: false,
       dedup: false,
       advanced: false,
@@ -2036,7 +2037,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // ── Data Initialization (replaces created() hook) ───────────────────────
 
   const initializeFormData = async () => {
-    formData.value.ingest = ref(false);
     formData.value = { ...defaultAlertValue(), ...cloneDeep(props.modelValue) };
 
     const route = router.currentRoute.value;
