@@ -25,53 +25,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[48px]">
 
           <!-- Back + Title -->
-          <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-            <div
-              data-test="add-alert-back-btn"
-              class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer tw:opacity-60 hover:tw:opacity-100 tw:transition-opacity"
-              style="border: 1.5px solid; border-radius: 50%; width: 18px; height: 18px;"
-              title="Go Back"
-              @click="router.back()"
-            >
-              <q-icon name="arrow_back_ios_new" size="10px" class="tw:font-semibold" />
-            </div>
-            <template v-if="!isAnomalyMode">
-              <span v-if="beingUpdated" class="tw:text-sm tw:font-semibold tw:max-w-[160px] tw:truncate tw:inline-block">
-                {{ formData.name }}
-                <q-tooltip v-if="formData.name?.length > 20" class="tw:text-sm">{{ formData.name }}</q-tooltip>
-              </span>
-              <template v-else>
-                <q-input
-                  ref="step1Ref"
-                  v-model="formData.name"
-                  data-test="add-alert-name-input"
-                  dense
-                  borderless
-                  no-error-icon
-                  :placeholder="'Alert name'"
-                  class="alert-v3-field topbar-name-input tw:text-sm"
-                  :class="alertNameError ? 'field-error' : ''"
-                  hide-bottom-space
-                  @update:model-value="alertNameError = false"
-                />
-              </template>
+          <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0 tw:min-w-0">
 
-            </template>
-            <template v-else>
-              <template v-if="!anomalyEditMode">
-                <q-input
-                  v-model="anomalyConfig.name"
-                  dense
-                  borderless
-                  placeholder="Anomaly name"
-                  class="alert-v3-field topbar-name-input tw:text-sm"
-                  hide-bottom-space
-                />
+            <!-- Back button — matches dashboard style -->
+            <q-btn
+              no-caps
+              padding="xs"
+              outline
+              icon="arrow_back_ios_new"
+              data-test="add-alert-back-btn"
+              size="sm"
+              class="el-border"
+              @click="goBackToAlertsList"
+            />
+
+            <!-- EDIT MODE: dashboard-style breadcrumb (folder → chevron → name) -->
+            <template v-if="beingUpdated || anomalyEditMode">
+              <span
+                class="q-table__title folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
+                @click="goBackToAlertsList"
+              >{{ activeFolderName }}</span>
+              <q-icon name="chevron_right" class="q-table__title tw:text-gray-400 tw:mt-0.5 tw:shrink-0" />
+              <template v-if="!isAnomalyMode">
+                <span class="q-table__title tw:truncate tw:max-w-[200px]">
+                  {{ formData.name }}
+                  <q-tooltip v-if="formData.name?.length > 24" class="tw:text-sm">{{ formData.name }}</q-tooltip>
+                </span>
               </template>
-              <template v-if="anomalyEditMode">
-                <span class="tw:text-sm tw:font-semibold tw:max-w-[160px] tw:truncate tw:inline-block">
+              <template v-else>
+                <span class="q-table__title tw:truncate tw:max-w-[200px]">
                   {{ anomalyConfig.name }}
-                  <q-tooltip v-if="anomalyConfig.name?.length > 20" class="tw:text-sm">{{ anomalyConfig.name }}</q-tooltip>
+                  <q-tooltip v-if="anomalyConfig.name?.length > 24" class="tw:text-sm">{{ anomalyConfig.name }}</q-tooltip>
                 </span>
                 <q-badge v-if="anomalyConfig.status" :color="anomalyStatusColor" :label="anomalyConfig.status" class="text-caption" />
                 <span
@@ -84,17 +68,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn v-if="anomalyConfig.status === 'failed'" flat no-caps dense size="xs" color="negative" icon="replay" label="Retry" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" />
               </template>
             </template>
-          </div>
 
-          <!-- Folder (next to alert name) -->
-          <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-            <label class="alert-v3-inline-label">Folder</label>
-            <InlineSelectFolderDropdown
-              :model-value="activeFolderId"
-              type="alerts"
-              :disable="beingUpdated || anomalyEditMode"
-              @update:model-value="updateActiveFolderId({ value: $event })"
-            />
+            <!-- CREATE MODE: name input + folder dropdown (original add layout) -->
+            <template v-else>
+              <q-input
+                v-if="!isAnomalyMode"
+                ref="step1Ref"
+                v-model="formData.name"
+                data-test="add-alert-name-input"
+                dense
+                borderless
+                no-error-icon
+                :placeholder="'Alert name'"
+                class="alert-v3-field topbar-name-input tw:text-sm"
+                :class="alertNameError ? 'field-error' : ''"
+                hide-bottom-space
+                @update:model-value="alertNameError = false"
+              />
+              <q-input
+                v-else
+                v-model="anomalyConfig.name"
+                dense
+                borderless
+                placeholder="Anomaly name"
+                class="alert-v3-field topbar-name-input tw:text-sm"
+                hide-bottom-space
+              />
+              <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0 tw:ml-2">
+                <label class="alert-v3-inline-label">Folder</label>
+                <q-select
+                  :model-value="activeFolderId"
+                  :options="alertFolderOptions"
+                  emit-value
+                  map-options
+                  dense
+                  borderless
+                  hide-bottom-space
+                  class="alert-v3-field topbar-folder-select"
+                  @update:model-value="updateActiveFolderId({ value: $event })"
+                />
+              </div>
+            </template>
+
           </div>
 
           <!-- Push everything to the right -->
@@ -595,9 +610,34 @@ export default defineComponent({
       document.removeEventListener('mouseup', onFloatingDragEnd);
     });
 
+    const activeFolderName = computed(() => {
+      const folders = alertForm.store.state.organizationData.foldersByType?.alerts ?? [];
+      const found = folders.find((f: any) => f.folderId === alertForm.activeFolderId.value);
+      return found?.name ?? "default";
+    });
+
+    const alertFolderOptions = computed(() =>
+      (alertForm.store.state.organizationData.foldersByType?.alerts ?? []).map((f: any) => ({
+        label: f.name,
+        value: f.folderId,
+      }))
+    );
+
+    const goBackToAlertsList = () => {
+      return alertForm.router.push({
+        path: "/alerts",
+        query: {
+          folder: alertForm.activeFolderId.value ?? "default",
+        },
+      });
+    };
+
     return {
       ...alertForm,
       isAnomalyDetectionEnabled,
+      activeFolderName,
+      alertFolderOptions,
+      goBackToAlertsList,
       floatingPreview,
       floatingPreviewRef,
       activeEvaluationStatus,
@@ -1214,6 +1254,31 @@ body.body--dark .query-mode-tabs {
 .alert-v3-topbar {
   container-type: inline-size;
   container-name: topbar;
+}
+
+
+// Folder name — exact same as ViewDashboard.vue
+.folder-name {
+  color: var(--o2-menu-color) !important;
+}
+
+.folder-name:hover {
+  border-radius: 0.325rem;
+  background-color: var(--o2-tab-bg) !important;
+}
+
+// Folder breadcrumb select — matches q-table__title sizing/weight
+.topbar-folder-select {
+  min-width: 60px;
+  max-width: 140px;
+
+  :deep(.q-field__control) { padding: 0; }
+
+  :deep(.q-field__native) {
+    font-size: 1.25rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
 }
 
 // Base (widest) — full widths
