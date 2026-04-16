@@ -215,9 +215,7 @@ function setTabs() {
   const serviceAccountEnabled = store.state.zoConfig.service_account_enabled ?? true;
 
   if (isEnterprise) {
-    //for cloud version we dont want service accounts and for enterprise version we need service accounts
-    //so it will be available for entrerprise version
-    if (config.isCloud == "false" && serviceAccountEnabled) {
+    if (serviceAccountEnabled) {
       cloud.push("serviceAccounts");
     }
 

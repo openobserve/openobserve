@@ -50,6 +50,7 @@ const store = createStore({
     savedViewDialog: false,
     regionInfo: [],
     zoConfig: {
+      service_account_enabled: true,
       sql_mode: false,
       sql_reserved_keywords: [
         "all",
