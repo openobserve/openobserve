@@ -2837,7 +2837,8 @@
       "type": "タイプ",
       "multiStepAgent": "マルチステップエージェント"
     },
-    "noLogsAvailableForService": "このサービスで利用できるログはありません"
+    "noLogsAvailableForService": "このサービスで利用できるログはありません",
+    "spansTruncatedWarning": "{total} スパンのうち {count} を表示中 — トレースが不完全である可能性があります。時間範囲を狭めるか、管理者に連絡してスパン制限を増やしてください。"
   },
   "actions": {
     "testAction": "アクションをテスト",

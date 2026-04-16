@@ -2816,7 +2816,8 @@
       "type": "Typ",
       "multiStepAgent": "Mehrstufiger Agent"
     },
-    "noLogsAvailableForService": "Für diesen Dienst sind keine Protokolle verfügbar"
+    "noLogsAvailableForService": "Für diesen Dienst sind keine Protokolle verfügbar",
+    "spansTruncatedWarning": "Es werden {Anzahl} der {total} Spannweiten angezeigt — die Spur ist möglicherweise unvollständig. Grenzen Sie den Zeitraum ein oder wenden Sie sich an Ihren Administrator, um das Zeitlimit zu erhöhen."
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

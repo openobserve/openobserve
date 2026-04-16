@@ -2827,7 +2827,8 @@
       "type": "Tür",
       "multiStepAgent": "Çok adımlı Ajan"
     },
-    "noLogsAvailableForService": "Bu hizmet için günlük yok"
+    "noLogsAvailableForService": "Bu hizmet için günlük yok",
+    "spansTruncatedWarning": "{total} açıklığın {count} gösterilmesi — izleme eksik olabilir. Zaman aralığını daraltın veya süre sınırını artırmak için yöneticinizle iletişime geçin."
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

@@ -2825,7 +2825,8 @@
       "type": "Tipo",
       "multiStepAgent": "Agente in più fasi"
     },
-    "noLogsAvailableForService": "Nessun registro disponibile per questo servizio"
+    "noLogsAvailableForService": "Nessun registro disponibile per questo servizio",
+    "spansTruncatedWarning": "Mostra {count} di {total} intervalli: la traccia potrebbe essere incompleta. Restringi l'intervallo di tempo o contatta l'amministratore per aumentare il limite di intervallo."
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",

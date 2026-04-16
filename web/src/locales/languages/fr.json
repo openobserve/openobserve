@@ -2816,7 +2816,8 @@
       "type": "Tapez",
       "multiStepAgent": "Agent en plusieurs étapes"
     },
-    "noLogsAvailableForService": "Aucun journal disponible pour ce service"
+    "noLogsAvailableForService": "Aucun journal disponible pour ce service",
+    "spansTruncatedWarning": "Affichage de {count} de {total} spans — la trace est peut-être incomplète. Réduisez la plage de temps ou contactez votre administrateur pour augmenter la limite de durée."
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",

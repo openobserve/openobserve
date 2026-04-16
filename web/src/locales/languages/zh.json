@@ -2820,7 +2820,8 @@
       "type": "类型",
       "multiStepAgent": "多步代理"
     },
-    "noLogsAvailableForService": "此服务没有可用的日志"
+    "noLogsAvailableForService": "此服务没有可用的日志",
+    "spansTruncatedWarning": "显示 {总} 跨度的 {count} — 跟踪可能不完整。缩小时间范围或联系管理员以增加跨度限制。"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
