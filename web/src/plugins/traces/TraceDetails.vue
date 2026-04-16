@@ -145,13 +145,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="hub" size="14px" />
               <span data-test="span-count-text">
                 <template v-if="searchObj.data.traceDetails.spansTruncated">
-                  <span class="tw:text-orange-500">{{ formatLargeNumber(effectiveSpanList.length) }}</span><span class="tw:text-[var(--o2-text-primary)]">/{{ formatLargeNumber(searchObj.data.traceDetails.totalSpanCount) }}</span>
+                  <span class="tw:text-orange-500">{{
+                    formatLargeNumber(effectiveSpanList.length)
+                  }}</span
+                  ><span class="tw:text-[var(--o2-text-primary)]"
+                    >/{{
+                      formatLargeNumber(
+                        searchObj.data.traceDetails.totalSpanCount,
+                      )
+                    }}</span
+                  >
                 </template>
-                <template v-else>{{ formatLargeNumber(effectiveSpanList.length) }}</template>
+                <template v-else>{{
+                  formatLargeNumber(effectiveSpanList.length)
+                }}</template>
                 {{ t("traces.spansLabel") }}
               </span>
-              <q-tooltip v-if="searchObj.data.traceDetails.spansTruncated" anchor="bottom middle" self="top middle">
-                {{ t("traces.spansTruncatedWarning", { count: effectiveSpanList.length, total: searchObj.data.traceDetails.totalSpanCount }) }}
+              <q-tooltip
+                v-if="searchObj.data.traceDetails.spansTruncated"
+                anchor="bottom middle"
+                self="top middle"
+              >
+                {{
+                  t("traces.spansTruncatedWarning", {
+                    count: effectiveSpanList.length,
+                    total: searchObj.data.traceDetails.totalSpanCount,
+                  })
+                }}
               </q-tooltip>
             </div>
 
@@ -1048,7 +1068,7 @@ export default defineComponent({
     });
 
     /** Maximum number of spans fetched per trace. Truncation warning is shown when this limit is hit. */
-    const MAX_SPANS_PER_TRACE = 2500;
+    const MAX_SPANS_PER_TRACE = 10;
 
     const serviceColorIndex = ref(0);
     const colors = ref(getAllSpanColors());
@@ -1810,6 +1830,17 @@ export default defineComponent({
             searchObj.data.traceDetails.totalSpanCount = totalFromCount;
             searchObj.data.traceDetails.spansTruncated =
               traceSpans.length >= limit;
+            if (searchObj.data.traceDetails.spansTruncated) {
+              $q.notify({
+                type: "warning",
+                message: t("traces.spansTruncatedWarning", {
+                  count: traceSpans.length,
+                  total: totalFromCount,
+                }),
+                timeout: 0,
+                actions: [{ icon: "close", color: "black", round: false }],
+              });
+            }
             searchObj.data.traceDetails.spanList = [...rumSpans, ...traceSpans];
             updateServiceColors();
             buildTracesTree();
@@ -1983,7 +2014,9 @@ export default defineComponent({
       }
 
       if (!traceTree.value.length) {
-        console.warn("buildTracesTree: no root spans found — trace may have missing or malformed span IDs");
+        console.warn(
+          "buildTracesTree: no root spans found — trace may have missing or malformed span IDs",
+        );
         showTraceDetailsError();
         return;
       }

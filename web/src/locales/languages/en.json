@@ -2996,7 +2996,7 @@
     "tracesFound": "Traces Found",
     "spansTitle": "SPANS",
     "spansFound": "Spans Found",
-    "spansTruncatedWarning": "Showing {count} of {total} spans — trace may be incomplete. Narrow the time range or contact your administrator to increase the span limit.",
+    "spansTruncatedWarning": "Showing {count} of {total} spans, trace may be incomplete. Contact your administrator to increase the span limit.",
     "errorTraces": "Error Traces",
     "errorSpans": "Error Spans",
     "error": "ERROR",
