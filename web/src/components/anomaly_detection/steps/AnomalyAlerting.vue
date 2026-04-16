@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="step-anomaly-alerting"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="step-content card-container tw:px-3 tw:py-4">
+    <div class="step-content tw:px-3 tw:py-4">
       <!-- Enable Notifications toggle -->
       <div class="flex items-start alert-settings-row">
         <div
@@ -51,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-toggle
             v-model="config.alert_enabled"
             :label="config.alert_enabled ? 'Enabled' : 'Disabled'"
-            color="primary"
             size="xs"
             class="o2-toggle-button-xs"
             :class="
@@ -92,8 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               use-input
               input-debounce="300"
               :max-values="undefined"
-              class="destination-select"
-              style="min-width: 300px; max-width: 420px; background: none"
+              class="alert-v3-select destination-select"
+              style="min-width: 300px; max-width: 420px"
               data-test="anomaly-destination"
               @filter="filterDestinations"
             >
@@ -310,14 +309,29 @@ export default defineComponent({
 }
 
 .destination-select {
+  // override the compact 28px from alert-v3-select — chips need flexible height
+  min-height: auto !important;
+  height: auto !important;
+  :deep(.q-field__inner) {
+    min-height: auto !important;
+    max-height: none !important;
+    height: auto !important;
+  }
   :deep(.q-field__control) {
-    height: 36px;
-    min-height: 36px;
+    min-height: 1.75rem !important;
+    max-height: none !important;
+    height: auto !important;
     flex-wrap: nowrap;
   }
   :deep(.q-field__control-container) {
     flex-wrap: nowrap;
     overflow: hidden;
+  }
+  :deep(.q-field__marginal) {
+    height: auto !important;
+  }
+  :deep(.q-field__append) {
+    height: auto !important;
   }
 }
 </style>

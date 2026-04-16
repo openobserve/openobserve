@@ -546,6 +546,7 @@ export default defineComponent({
           : "36px";
         document.documentElement.style.setProperty("--navbar-height", navbarHeight);
       },
+      { immediate: true },
     );
 
     onMounted(async () => {

@@ -11,6 +11,7 @@ gxhash = ["dep:gxhash"]
 vortex = ["dep:vortex"]
 
 [dependencies]
+aes-siv.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
 arc-swap.workspace = true
