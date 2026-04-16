@@ -60,10 +60,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 borderless
                 use-input
+                fill-input
+                hide-selected
                 input-debounce="200"
                 :placeholder="filter.field ? '' : 'Field'"
-                class="alert-v3-select"
-                style="width: 160px"
+                class="alert-v3-select filter-field-select"
+                style="width: 200px"
                 :loading="loadingFields"
                 @filter="filterFieldOptions"
               >
@@ -94,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 borderless
                 placeholder="Value"
                 class="alert-v3-input"
-                style="flex: 1"
+                style=" max-width: 160px"
               />
               <q-btn
                 flat
@@ -1260,6 +1262,17 @@ export default defineComponent({
 .alert-settings-row {
   margin-bottom: 16px !important;
   padding-bottom: 0 !important;
+}
+
+.filter-field-select {
+  :deep(.q-field__native span) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  :deep(.q-field__input) {
+    text-overflow: ellipsis;
+  }
 }
 
 .paired-row {
