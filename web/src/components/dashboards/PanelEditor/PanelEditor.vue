@@ -977,7 +977,7 @@ const searchType = computed(() => {
     case "logs":
       return "ui";
     case "build":
-      return "ui";
+      return "dashboards";
     default:
       return "dashboards";
   }
