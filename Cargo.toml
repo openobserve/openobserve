@@ -298,7 +298,7 @@ hyper-util = { version = "0.1", features = [
 anyhow = "1.0"
 arc-swap = "1.8"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
-async-nats = "0.46"
+async-nats = "0.47"
 async-stream = "0.3"
 async-trait = "0.1"
 async-recursion = "1.0"
