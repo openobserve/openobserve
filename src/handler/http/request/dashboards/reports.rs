@@ -33,10 +33,7 @@ use crate::{
     handler::http::{
         extractors::Headers,
         models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
-        request::{
-            BulkDeleteRequest, BulkDeleteResponse,
-            dashboards::get_folder,
-        },
+        request::{BulkDeleteRequest, BulkDeleteResponse, dashboards::get_folder},
     },
     service::{
         dashboards::reports::{self, ReportError},
@@ -582,9 +579,7 @@ pub async fn list_reports_v2(
     // Re-map the query key from "folder" to "folder_id" if needed by the service.
     let folder = query.get("folder").map(|s| s.to_owned());
     let dashboard = query.get("dashboard_id").map(|s| s.to_owned());
-    let destination_less = query
-        .get("cache")
-        .and_then(|s| s.parse::<bool>().ok());
+    let destination_less = query.get("cache").and_then(|s| s.parse::<bool>().ok());
     let filters = ReportListFilters {
         folder,
         dashboard,
@@ -622,8 +617,7 @@ pub async fn list_reports_v2(
                     let scheduled_job = scheduled_jobs.remove(&d.report_id);
                     match ListReportsResponseBodyItem::try_from(d) {
                         Ok(mut item) => {
-                            item.last_triggered_at =
-                                scheduled_job.and_then(|t| t.start_time);
+                            item.last_triggered_at = scheduled_job.and_then(|t| t.start_time);
                             Some(item)
                         }
                         Err(e) => {

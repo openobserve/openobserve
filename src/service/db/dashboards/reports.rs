@@ -202,18 +202,12 @@ pub async fn update_by_id_without_updating_trigger<C: ConnectionTrait + Transact
     new_folder_snowflake_id: Option<&str>,
     report: Report,
 ) -> Result<String, anyhow::Error> {
-    let id =
-        table::reports::update_by_id(conn, report_id, new_folder_snowflake_id, report.clone())
-            .await?;
+    let id = table::reports::update_by_id(conn, report_id, new_folder_snowflake_id, report.clone())
+        .await?;
 
     #[cfg(feature = "enterprise")]
-    super_cluster::emit_update_event(
-        &report.org_id.clone(),
-        "",
-        new_folder_snowflake_id,
-        report,
-    )
-    .await?;
+    super_cluster::emit_update_event(&report.org_id.clone(), "", new_folder_snowflake_id, report)
+        .await?;
     Ok(id)
 }
 
