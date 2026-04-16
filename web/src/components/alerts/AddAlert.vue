@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- EDIT MODE: dashboard-style breadcrumb (folder → chevron → name) -->
             <template v-if="beingUpdated || anomalyEditMode">
               <span
-                class="q-table__title folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
+                class="q-table__title alert-folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
                 @click="goBackToAlertsList"
               >{{ activeFolderName }}</span>
               <q-icon name="chevron_right" class="q-table__title tw:text-gray-400 tw:mt-0.5 tw:shrink-0" />
@@ -1258,11 +1258,11 @@ body.body--dark .query-mode-tabs {
 
 
 // Folder name — exact same as ViewDashboard.vue
-.folder-name {
+.alert-folder-name {
   color: var(--o2-menu-color) !important;
 }
 
-.folder-name:hover {
+.alert-folder-name:hover {
   border-radius: 0.325rem;
   background-color: var(--o2-tab-bg) !important;
 }
