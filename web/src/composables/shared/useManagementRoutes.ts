@@ -95,6 +95,18 @@ const useManagementRoutes = () => {
           },
         },
         {
+          path: "ai_toolsets",
+          name: "aiToolsets",
+          component: () => import("@/components/settings/AiToolsets.vue"),
+          meta: {
+            keepAlive: true,
+            title: "AI Toolsets",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
           meta:{

@@ -433,6 +433,7 @@ import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import UsageReportBanner from "@/enterprise/components/billings/UsageReportBanner.vue";
 import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vue";
+import WebinarBanner from "@/components/WebinarBanner.vue";
 import { useRouter } from "vue-router";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import store from "@/test/unit/helpers/store";
@@ -932,6 +933,7 @@ export default defineComponent({
     DatabaseDeprecationBanner,
     UsageReportBanner,
     HomeViewSkeleton,
+    WebinarBanner,
   },
 });
 </script>
