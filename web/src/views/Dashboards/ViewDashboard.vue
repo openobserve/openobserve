@@ -22,10 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="fullscreenDiv"
       :class="{
         fullscreen: isFullscreen,
-        'tw:h-[calc(100vh- var(--navbar-height) - 77px)]': !store.state.printMode,
         'print-mode-container': store.state.printMode,
       }"
-      class="tw:mx-[0.625rem] q-pt-xs"
+      :style="!store.state.printMode && !isFullscreen ? { height: 'calc(100vh - var(--navbar-height))' } : {}"
+      class="tw:mx-[0.625rem] tw:flex tw:flex-col tw:overflow-hidden q-pt-xs"
     >
       <div
         :class="`${
@@ -248,6 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <RenderDashboardCharts
+        class="tw:flex-1 tw:min-h-0"
         :key="currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey"
         v-if="selectedDate"
         ref="renderDashboardChartsRef"
@@ -1891,7 +1892,7 @@ export default defineComponent({
 
 .stickyHeader {
   position: sticky;
-  top: 40px;
+  top: 0;
   z-index: 1001;
 }
 .stickyHeader.fullscreenHeader {
