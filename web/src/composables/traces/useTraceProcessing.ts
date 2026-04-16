@@ -448,7 +448,7 @@ function getStatusIcon(status?: SpanStatus): string {
   }
 }
 
-function getKindIcon(kind?: SpanKind): string {
+export function getKindIcon(kind?: SpanKind): string {
   switch (kind) {
     case SpanKind.CLIENT:
       return "call_made";

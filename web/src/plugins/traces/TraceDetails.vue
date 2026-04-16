@@ -126,9 +126,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="trace-details-spans-count"
                 class="tw:flex tw:items-center tw:ml-[0rem] tw:space-x-1 tw:px-[0.625rem] tw:py-[0.1rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
               >
-                Showing 10 out of
                 <span data-test="span-count-text">
                   <template v-if="searchObj.data.traceDetails.spansTruncated">
+                    <span
+                      v-if="
+                        searchObj.data.traceDetails.totalSpanCount >
+                        traceSpanLimit
+                      "
+                      >Showing {{ traceSpanLimit }} out of
+                    </span>
                     <span class="tw:pl-[0.25rem]">{{
                       formatLargeNumber(
                         searchObj.data.traceDetails.totalSpanCount,
@@ -1065,7 +1071,9 @@ export default defineComponent({
     });
 
     /** Maximum number of spans fetched per trace. Truncation warning is shown when this limit is hit. */
-    const MAX_SPANS_PER_TRACE = 10;
+    const MAX_SPANS_PER_TRACE = 2500;
+
+    const traceSpanLimit = ref(MAX_SPANS_PER_TRACE);
 
     const serviceColorIndex = ref(0);
     const colors = ref(getAllSpanColors());
@@ -1822,6 +1830,7 @@ export default defineComponent({
             const rumSpans = formatRumEventsAsSpans(rumEvents);
             const limit =
               store.state.zoConfig.max_spans_per_trace ?? MAX_SPANS_PER_TRACE;
+            traceSpanLimit.value = limit;
             const totalFromCount: number =
               countRes.data?.hits?.[0]?.total ?? traceSpans.length;
             searchObj.data.traceDetails.totalSpanCount = totalFromCount;
@@ -2830,6 +2839,7 @@ export default defineComponent({
       fetchEvalPipeline,
       fetchEvalData,
       formatLargeNumber,
+      traceSpanLimit,
     };
   },
 });

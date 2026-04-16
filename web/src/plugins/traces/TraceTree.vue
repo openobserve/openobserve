@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="span.operationName"
           >
             <div
-              class="flex no-wrap full-width relative-position operation-name-container tw:cursor-pointer"
+              class="flex no-wrap full-width relative-position operation-name-container tw:cursor-pointer tw:items-center"
               :class="[
                 store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
                 isLLMTrace(span) ? '' : 'q-pt-sm',
@@ -103,63 +103,122 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ></div>
 
               <div
-                class="ellipsis q-pl-xs cursor-pointer span-name-section"
-                :data-test="`trace-tree-span-select-btn-${span.spanId}`"
+                class="tw:flex tw:justify-between"
+                :class="
+                  span.hasChildSpans ? 'tw:w-full' : 'tw:w-[calc(100%-0.6rem)]!'
+                "
               >
                 <div
-                  class="ellipsis flex items-center span-name-section-content"
+                  class="ellipsis q-pl-xs cursor-pointer span-name-section tw:flex tw:items-center"
+                  :data-test="`trace-tree-span-select-btn-${span.spanId}`"
                 >
-                  <img
-                    :src="spanServiceIconUrlMap.get(`${span.serviceName}/${span.style?.color ?? ''}`)"
-                    class="q-mr-xs tw:shrink-0 tw:w-[1.125rem] tw:h-[1.125rem] tw:inline-block"
-                    aria-hidden="true"
-                    alt=""
-                    :data-test="`trace-tree-span-service-icon-${span.spanId}`"
-                  />
-                  <q-icon
-                    v-if="span.spanStatus === 'ERROR'"
-                    name="error"
-                    class="text-red-6 q-mr-xs"
-                    title="Error Span"
-                    :data-test="`trace-tree-span-error-icon-${span.spanId}`"
-                  />
-                  <span
-                    class="text-subtitle2 text-bold q-mr-sm"
-                    :class="{
-                      highlighted: isHighlighted(span.spanId),
-                      'tw:text-gray-900':
-                        store.state.theme === 'dark' &&
-                        isHighlighted(span.spanId),
-                      'current-match': currentSelectedValue === span.spanId, // Current match class
-                    }"
-                    :data-test="`trace-tree-span-service-name-${span.spanId}`"
+                  <div
+                    class="ellipsis flex items-center span-name-section-content"
                   >
-                    {{ span.serviceName }}
-                  </span>
-                  <span
-                    class="text-body2"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-grey-5'
-                        : 'text-blue-grey-9'
-                    "
-                    :data-test="`trace-tree-span-operation-name-${span.spanId}`"
-                    >{{ span.operationName }}</span
+                    <img
+                      :src="
+                        spanServiceIconUrlMap.get(
+                          `${span.serviceName}/${span.style?.color ?? ''}`,
+                        )
+                      "
+                      class="q-mr-xs tw:shrink-0 tw:w-[1.125rem] tw:h-[1.125rem] tw:inline-block"
+                      aria-hidden="true"
+                      alt=""
+                      :data-test="`trace-tree-span-service-icon-${span.spanId}`"
+                    />
+                    <q-icon
+                      v-if="span.spanStatus === 'ERROR'"
+                      name="error"
+                      class="text-red-6 q-mr-xs"
+                      title="Error Span"
+                      :data-test="`trace-tree-span-error-icon-${span.spanId}`"
+                    />
+                    <q-icon
+                      v-if="span.spanKind"
+                      :name="getKindIcon(span.spanKind.toUpperCase())"
+                      size="0.875rem"
+                      class="text-grey-6 q-mr-xs"
+                      :title="span.spanKind"
+                      :data-test="`trace-tree-span-kind-icon-${span.spanId}`"
+                    />
+                    <img
+                      v-if="spanTechIconUrlMap.get(getSpanTech(span))"
+                      :src="spanTechIconUrlMap.get(getSpanTech(span))"
+                      :title="getSpanTech(span)"
+                      class="q-mr-xs tw:shrink-0 tw:w-[0.875rem] tw:h-[0.875rem] tw:inline-block tw:opacity-60"
+                      aria-hidden="true"
+                      alt=""
+                      :data-test="`trace-tree-span-tech-icon-${span.spanId}`"
+                    />
+                    <span
+                      class="text-subtitle2 text-bold q-mr-sm"
+                      :class="{
+                        highlighted: isHighlighted(span.spanId),
+                        'tw:text-gray-900':
+                          store.state.theme === 'dark' &&
+                          isHighlighted(span.spanId),
+                        'current-match': currentSelectedValue === span.spanId, // Current match class
+                      }"
+                      :data-test="`trace-tree-span-service-name-${span.spanId}`"
+                    >
+                      {{ span.serviceName }}
+                    </span>
+                    <span
+                      class="text-body2"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'text-grey-5'
+                          : 'text-blue-grey-9'
+                      "
+                      :data-test="`trace-tree-span-operation-name-${span.spanId}`"
+                      >{{ span.operationName }}</span
+                    >
+                  </div>
+                  <!-- LLM Metrics -->
+                  <div
+                    v-if="isLLMTrace(span)"
+                    class="flex items-center text-caption text-red-6"
+                    style="margin-top: -4px; margin-bottom: 2px; line-height: 1"
                   >
+                    <span v-if="span.llm_usage?.total > 0" class="q-mr-sm">
+                      <q-icon name="functions" size="10px" />
+                      {{ formatTokens(span.llm_usage.total) }}
+                    </span>
+                    <span v-if="span.llm_cost?.total > 0">
+                      <q-icon name="attach_money" size="10px" />
+                      {{ formatCost(span.llm_cost.total) }}
+                    </span>
+                  </div>
                 </div>
-                <!-- LLM Metrics -->
-                <div
-                  v-if="isLLMTrace(span)"
-                  class="flex items-center text-caption text-red-6"
-                  style="margin-top: -4px; margin-bottom: 2px; line-height: 1"
-                >
-                  <span v-if="span.llm_usage?.total > 0" class="q-mr-sm">
-                    <q-icon name="functions" size="10px" />
-                    {{ formatTokens(span.llm_usage.total) }}
+
+                <div class="tw:flex tw:items-center tw:sticky tw:right-0">
+                  <span
+                    v-if="getHttpStatusVars(span)"
+                    class="tw:text-[0.625rem] tw:font-bold tw:leading-none tw:py-[0.4rem] tw:px-1 tw:mr-[0.25rem] tw:rounded tw:whitespace-nowrap"
+                    :style="{
+                      backgroundColor: getHttpStatusVars(span).bg,
+                      color: getHttpStatusVars(span).text,
+                    }"
+                    :title="`HTTP ${getHttpStatus(span)}`"
+                    :data-test="`trace-tree-span-http-status-${span.spanId}`"
+                  >
+                    {{ getHttpStatus(span) }}
                   </span>
-                  <span v-if="span.llm_cost?.total > 0">
-                    <q-icon name="attach_money" size="10px" />
-                    {{ formatCost(span.llm_cost.total) }}
+                  <span
+                    v-if="getEventCount(span) > 0 && false"
+                    class="flex items-center"
+                    :style="{
+                      fontSize: '0.625rem',
+                      lineHeight: 1,
+                      gap: '0.125rem',
+                      color: 'var(--o2-text-secondary)',
+                      whiteSpace: 'nowrap',
+                    }"
+                    :title="`${getEventCount(span)} span event${getEventCount(span) > 1 ? 's' : ''}`"
+                    :data-test="`trace-tree-span-event-count-${span.spanId}`"
+                  >
+                    <q-icon name="event_note" size="0.625rem" />
+                    {{ getEventCount(span) }}
                   </span>
                 </div>
               </div>
@@ -173,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 width: '100%',
               }"
               :data-test="`trace-tree-span-background-${span.spanId}`"
-            ></div>
+            />
           </div>
         </div>
         <div
@@ -261,7 +320,11 @@ import SpanBlock from "./SpanBlock.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
-import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
+import {
+  getServiceIconDataUrl,
+  getSpanTechIconDataUrl,
+} from "@/utils/traces/convertTraceData";
+import { getKindIcon } from "@/composables/traces/useTraceProcessing";
 
 export default defineComponent({
   name: "TraceTree",
@@ -598,6 +661,68 @@ export default defineComponent({
       return cache;
     });
 
+    const getHttpStatus = (span: any): number | null => {
+      const spanData = props.spanMap[span.spanId] || {};
+      const code = spanData["http_status_code"] ?? null;
+      return code !== null ? Number(code) : null;
+    };
+
+    const getHttpStatusVars = (
+      span: any,
+    ): { text: string; bg: string } | null => {
+      const code = getHttpStatus(span);
+      if (code === null || code < 200) return null;
+      if (code < 300)
+        return {
+          text: "var(--o2-status-success-text)",
+          bg: "var(--o2-status-success-bg)",
+        };
+      if (code < 400)
+        return {
+          text: "var(--o2-status-info-text)",
+          bg: "var(--o2-status-info-bg)",
+        };
+      if (code < 500)
+        return {
+          text: "var(--o2-status-warning-text)",
+          bg: "var(--o2-status-warning-bg)",
+        };
+      return {
+        text: "var(--o2-status-error-text)",
+        bg: "var(--o2-status-error-bg)",
+      };
+    };
+
+    const getEventCount = (span: any): number => {
+      return props.spanMap[span.spanId]?.events?.length ?? 0;
+    };
+
+    const getSpanTech = (span: any): string | null => {
+      const attrs = span || {};
+      return (
+        attrs["db_system"] ||
+        attrs["messaging_system"] ||
+        attrs["rpc_system"] ||
+        (span.spanKind?.toUpperCase() === "CLIENT" && attrs["http_url"]
+          ? "http"
+          : null) ||
+        null
+      );
+    };
+
+    const spanTechIconUrlMap = computed(() => {
+      const isDark = store.state.theme === "dark";
+      const map = new Map<string, string>();
+      for (const span of props.spans as any[]) {
+        const tech = getSpanTech(span);
+        if (tech && !map.has(tech)) {
+          const url = getSpanTechIconDataUrl(tech, isDark);
+          if (url) map.set(tech, url);
+        }
+      }
+      return map;
+    });
+
     return {
       toggleSpanCollapse,
       getImageURL,
@@ -626,6 +751,12 @@ export default defineComponent({
       formatCost,
       isLLMTrace,
       spanServiceIconUrlMap,
+      spanTechIconUrlMap,
+      getSpanTech,
+      getKindIcon,
+      getHttpStatus,
+      getHttpStatusVars,
+      getEventCount,
     };
   },
   components: { SpanBlock },
