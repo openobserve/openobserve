@@ -339,10 +339,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
           @update:columnSizes="handleColumnSizesUpdate"
           @update:columnOrder="handleColumnOrderUpdate"
+          @copy="copyLogToClipboard"
+          @add-field-to-table="addFieldToTable"
+          @add-search-term="addSearchTerm"
           @close-column="closeColumn"
           @click:data-row="openLogDetails"
           @expand-row="expandLog"
           @send-to-ai-chat="sendToAiChat"
+          @view-trace="redirectToTraces"
+          @show-correlation="openLogDetailsWithCorrelation"
         />
       </template>
 
