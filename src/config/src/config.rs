@@ -577,7 +577,6 @@ pub struct Config {
     pub chrome: Chrome,
     pub tokio_console: TokioConsole,
     pub pipeline: Pipeline,
-    pub service_streams: ServiceStreams,
     pub health_check: HealthCheck,
     pub enrichment_table: EnrichmentTable,
 }
