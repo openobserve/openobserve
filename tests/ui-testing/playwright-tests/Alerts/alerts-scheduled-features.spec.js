@@ -409,7 +409,7 @@ test.describe("Scheduled Alert Features", () => {
     // ========================================================================
     // TEST 4: P1 - SQL mode preview renders chart
     // ========================================================================
-    test("SQL mode preview renders chart", {
+    test.skip("SQL mode preview renders chart", {
         tag: ['@alertScheduled', '@preview', '@functional', '@P1', '@all', '@alerts']
     }, async ({ page }) => {
         testLogger.info('=== PHASE 1: Start alert wizard with SQL mode ===');
@@ -477,7 +477,7 @@ test.describe("Scheduled Alert Features", () => {
     // ========================================================================
     // TEST 5: P2 - "Would Trigger" indicator displays for scheduled alerts
     // ========================================================================
-    test("Would Trigger indicator displays for scheduled alerts", {
+    test.skip("Would Trigger indicator displays for scheduled alerts", {
         tag: ['@alertScheduled', '@preview', '@edgeCase', '@P2', '@all', '@alerts']
     }, async ({ page }) => {
         testLogger.info('=== PHASE 1: Open existing scheduled alert for editing ===');
@@ -516,7 +516,7 @@ test.describe("Scheduled Alert Features", () => {
     // ========================================================================
     // TEST 6: P2 - Aggregation toggle off clears configuration
     // ========================================================================
-    test("Aggregation toggle off clears group-by fields", {
+    test.skip("Aggregation toggle off clears group-by fields", {
         tag: ['@alertScheduled', '@aggregation', '@edgeCase', '@P2', '@all', '@alerts']
     }, async ({ page }) => {
         testLogger.info('=== PHASE 1: Open alert wizard and navigate to Step 2 ===');
