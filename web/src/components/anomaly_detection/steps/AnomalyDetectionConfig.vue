@@ -642,7 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Chart + Vertical Slider row -->
               <div class="tw:flex tw:gap-3">
                 <!-- Time series chart -->
-                <div class="sensitivity-chart-wrapper tw:flex-1">
+                <div ref="chartWrapperRef" class="sensitivity-chart-wrapper tw:flex-1">
                   <div
                     v-if="!previewActive"
                     class="sensitivity-empty-state"
@@ -675,6 +675,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="height: 180px; width: 100%"
                     data-test="anomaly-sensitivity-chart"
                   />
+                  <!-- Threshold lines: positions come from actual slider thumb
+                       DOM measurements so they align pixel-perfectly. -->
+                  <template v-if="previewActive && lineTopMax >= 0">
+                    <div
+                      class="threshold-line threshold-line--max"
+                      :style="{ top: lineTopMax + 'px', left: lineLeft + 'px' }"
+                      :title="'Max threshold: ' + thresholdRange.max"
+                    />
+                    <div
+                      class="threshold-line threshold-line--min"
+                      :style="{ top: lineTopMin + 'px', left: lineLeft + 'px' }"
+                      :title="'Min threshold: ' + thresholdRange.min"
+                    />
+                  </template>
                 </div>
 
                 <!-- Vertical dual-handle range slider -->
@@ -682,6 +696,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="sensitivity-slider-col tw:flex tw:flex-col tw:items-center"
                 >
                   <q-range
+                    ref="sliderRef"
                     v-model="thresholdRange"
                     :min="0"
                     :max="100"
@@ -707,9 +722,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch, type PropType } from "vue";
+import { computed, defineComponent, nextTick, ref, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import * as echarts from "echarts/core";
 import streamService from "@/services/stream";
 import {
   ANOMALY_FILTER_OPERATORS,
@@ -1142,6 +1158,8 @@ export default defineComponent({
       };
       previewKey.value++;
       previewActive.value = true;
+      // Measure after the slider has rendered in its new state
+      nextTick(updateLinePositions);
     };
 
     // Auto-refresh when Look Back Window, Detection Resolution, filters, or
@@ -1191,6 +1209,53 @@ export default defineComponent({
       },
     );
 
+    // ── Threshold line positions ────────────────────────────────────────────
+    // Measured from the actual Quasar thumb DOM elements so lines align
+    // exactly with the slider handles regardless of CSS internals.
+    const sliderRef = ref<any>(null);
+    const chartWrapperRef = ref<HTMLElement | null>(null);
+    const lineTopMax = ref(-1); // -1 = hidden until measured
+    const lineTopMin = ref(-1);
+    const lineLeft = ref(0); // px from chart wrapper left = y-axis line position
+
+    const updateLinePositions = () => {
+      const sliderEl = sliderRef.value?.$el as HTMLElement | undefined;
+      const chartEl = chartWrapperRef.value;
+      if (!sliderEl || !chartEl) return;
+
+      const thumbs = Array.from(
+        sliderEl.querySelectorAll(".q-slider__thumb"),
+      ) as HTMLElement[];
+      if (thumbs.length < 2) return;
+
+      const chartTop = chartEl.getBoundingClientRect().top;
+      // Sort top-to-bottom so [0]=max (top handle), [1]=min (bottom handle)
+      thumbs.sort(
+        (a, b) =>
+          a.getBoundingClientRect().top - b.getBoundingClientRect().top,
+      );
+
+      const r0 = thumbs[0].getBoundingClientRect();
+      const r1 = thumbs[1].getBoundingClientRect();
+      lineTopMax.value = r0.top + r0.height / 2 - chartTop;
+      lineTopMin.value = r1.top + r1.height / 2 - chartTop;
+
+      // Find where the y-axis line is (left boundary of the data area) so the
+      // threshold lines don't overlap the y-axis labels.
+      try {
+        const echartsEl = chartEl.querySelector("[_echarts_instance_]") as HTMLElement | null;
+        if (echartsEl) {
+          const instance = echarts.getInstanceByDom(echartsEl) as any;
+          const rect = instance?.getModel()?.getComponent("grid")?.coordinateSystem?.getRect();
+          if (rect?.x > 0) lineLeft.value = rect.x;
+        }
+      } catch {
+        // fallback: leave lineLeft at 0
+      }
+    };
+
+    // Re-measure whenever the slider values change
+    watch(thresholdRange, () => nextTick(updateLinePositions), { deep: true });
 
     return {
       t,
@@ -1220,6 +1285,12 @@ export default defineComponent({
       previewPanelSchema,
       previewTimeObj,
       loadPreview,
+      sliderRef,
+      chartWrapperRef,
+      lineTopMax,
+      lineTopMin,
+      lineLeft,
+      updateLinePositions,
     };
   },
 });
@@ -1315,6 +1386,35 @@ export default defineComponent({
   position: relative;
 }
 
+.threshold-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 2;
+
+  &::after {
+    content: "";
+    position: absolute;
+    right: -5px;
+    top: -5px;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 6px solid var(--q-primary);
+  }
+
+  &--max {
+    border-top: 1.5px dashed var(--q-primary);
+    opacity: 0.85;
+  }
+
+  &--min {
+    border-top: 1.5px dashed var(--q-primary);
+    opacity: 0.5;
+  }
+}
+
 
 .sensitivity-empty-state {
   width: 100%;
@@ -1336,7 +1436,7 @@ export default defineComponent({
   // Chart is 180px. With containLabel:true and top/bottom 3% margins (~5px
   // each), the y-axis label at top takes ~15px and the x-axis time labels at
   // bottom take ~25px, leaving the data area at ~top:20px, height:130px.
-  margin-top: 15px;
+  margin-top: 14px;
   height: 145px !important;
 
   --slider-accent: color-mix(
