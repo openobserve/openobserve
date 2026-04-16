@@ -414,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div><!-- /Service Configuration card -->
 
       <!-- Section 3: Workload Detection -->
-      <div v-if="availableGroups.length > 0" class="tw:mb-3 tw:rounded-lg tw:overflow-hidden"
+      <div v-if="workloadDetectedGroups.length > 0" class="tw:mb-3 tw:rounded-lg tw:overflow-hidden"
         style="border: 1px solid var(--o2-border-color)"
       >
         <!-- Section header -->
@@ -1161,11 +1161,38 @@ const activeEnvironment = ref<string>("");
 /** Map of group_id first segment -> environment key (shared from serviceStreamEnvs util) */
 
 
-/** Environments from the identity config, sorted alphabetically by label */
+/** Environments from the identity config, filtered to only show those with actual detected data */
 const detectedEnvironments = computed(() => {
   const sets = currentIdentityConfig.value?.sets;
-  if (!sets?.length) return [{ key: "all", label: "All" }];
-  return sets
+  if (!sets?.length) return [];
+
+  // Filter sets to only show those with actual detected workload data
+  const filteredSets = sets.filter(set => {
+    // Check if this environment has workload groups with detected fields
+    // Use the workloadDetectedGroups logic which filters availableGroups by cardinality > 0
+    const workloadGroups = workloadDetectedGroups.value;
+
+    // Map environment names to the types of workload groups they should contain
+    const environmentPatterns: Record<string, RegExp[]> = {
+      'kubernetes': [/^k8s/i, /kubernetes/i],
+      'k8s': [/^k8s/i, /kubernetes/i],
+      'aws': [/^aws/i],
+      'azure': [/^azure/i],
+      'gcp': [/^gcp/i]
+    };
+
+    const patterns = environmentPatterns[set.id.toLowerCase()] || [];
+
+    // If no patterns defined, include the set (could be custom environment)
+    if (patterns.length === 0) return true;
+
+    // Check if any workload groups match this environment's patterns
+    return workloadGroups.some(group =>
+      patterns.some(pattern => pattern.test(group.group_id) || pattern.test(group.display))
+    );
+  });
+
+  return filteredSets
     .map(set => ({ key: set.id, label: set.label }))
     .sort((a, b) => a.label.localeCompare(b.label));
 });
@@ -1204,6 +1231,17 @@ watch(detectedEnvironments, (envs) => {
   }
 }, { immediate: true });
 
+/** Ensure activeEnvironment is never invalid */
+watch(activeEnvironment, (env) => {
+  // Prevent "all" or empty values that cause save issues
+  if (!env || env === "all") {
+    const validEnvironments = detectedEnvironments.value;
+    if (validEnvironments.length > 0) {
+      activeEnvironment.value = validEnvironments[0].key;
+    }
+  }
+}, { immediate: true });
+
 /** Reset suggestion + add state when switching tabs */
 watch(activeEnvironment, () => {
   suggestionDismissed.value = false;
@@ -1229,6 +1267,16 @@ const activeEnvCoverage = computed(() => {
     .filter((v): v is number => v !== null);
   if (!coverages.length) return null;
   return Math.round(coverages.reduce((a, b) => a + b, 0) / coverages.length);
+});
+
+/** Available groups filtered to only include ones with actual detected workload data */
+const workloadDetectedGroups = computed(() => {
+  return availableGroups.value.filter(group => {
+    const dim = dimensionAnalytics.value[group.group_id];
+    // Only include groups that have dimension analytics with meaningful cardinality
+    // This excludes empty groups like AWS/Azure/Kubernetes with 0 detected fields
+    return dim && dim.cardinality > 0;
+  });
 });
 
 
@@ -2188,7 +2236,7 @@ const trackedAliasOptions = computed(() => {
 
 /**
  * Resolved list of tracked aliases with display labels.
- * IDs with no matching label in either source are dropped with a warning.
+ * All tracked alias IDs are included - if no label is found, uses a formatted version of the ID.
  */
 const resolvedTrackedAliases = computed(() => {
   const allOptions = [
@@ -2196,13 +2244,17 @@ const resolvedTrackedAliases = computed(() => {
     ...DEFAULT_TRACKED_OPTIONS,
   ];
   const labelMap = new Map(allOptions.map(o => [o.value, o.label]));
-  return [...trackedAliasIds.value].flatMap(id => {
-    const label = labelMap.get(id);
+
+  return [...trackedAliasIds.value].map(id => {
+    let label = labelMap.get(id);
     if (!label) {
-      console.warn(`[ServiceIdentitySetup] tracked alias id "${id}" has no matching alias definition — skipping`);
-      return [];
+      // Fallback: convert ID to readable label (e.g., "k8s-cluster" → "K8s Cluster")
+      label = id.split('-').map(part =>
+        part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+      ).join(' ');
+      console.warn(`[ServiceIdentitySetup] No label found for tracked alias "${id}", using fallback: "${label}"`);
     }
-    return [{ id, label }];
+    return { id, label };
   }).sort((a, b) => a.label.localeCompare(b.label));
 });
 
@@ -2727,13 +2779,14 @@ async function saveConfig() {
   try {
     // Build sets array: include only sets that have at least 1 non-empty distinguish_by field.
     // Preserve API-provided labels from loaded config, fall back to ID itself for new sets.
+    // Filter out invalid IDs like "all" that can cause duplication issues.
     const sets: IdentitySet[] = Object.entries(setDistinguishBy.value)
+      .filter(([id, fields]) => id !== "all" && id !== "" && fields.filter(Boolean).length > 0)
       .map(([id, fields]) => ({
         id,
         label: setLabels.value[id] ?? id,
         distinguish_by: fields.filter(Boolean),
-      }))
-      .filter((s) => s.distinguish_by.length > 0);
+      }));
 
     if (sets.length === 0) {
       $q.notify({

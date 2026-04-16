@@ -22,15 +22,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="step-content card-container tw:px-3 tw:py-4">
       <q-form ref="formRef" @submit.prevent>
         <!-- Query Mode Tabs -->
-        <div class="tw:mb-4 tw:flex tw:items-center tw:justify-between">
-          <div class="flex items-center app-tabs-container tw:h-[36px] tw:w-fit">
-            <AppTabs
-              data-test="anomaly-query-tabs"
-              :tabs="queryTabOptions"
-              class="tabs-selection-container"
-              :active-tab="config.query_mode === 'custom_sql' ? 'custom_sql' : 'filters'"
-              @update:active-tab="config.query_mode = $event"
-            />
+        <div class="tw:mb-4">
+          <div class="query-mode-tabs" data-test="anomaly-query-tabs">
+            <button
+              v-for="tab in queryTabOptions"
+              :key="tab.value"
+              type="button"
+              class="query-mode-tab"
+              :class="{ active: (config.query_mode === 'custom_sql' ? 'custom_sql' : 'filters') === tab.value }"
+              @click="config.query_mode = tab.value"
+            >
+              {{ tab.label }}
+            </button>
           </div>
         </div>
 
@@ -59,7 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 use-input
                 input-debounce="200"
                 :placeholder="filter.field ? '' : 'Field'"
-                style="width: 160px; background: none"
+                class="alert-v3-select"
+                style="width: 160px"
                 :loading="loadingFields"
                 @filter="filterFieldOptions"
               >
@@ -80,7 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="filterOperators"
                 dense
                 borderless
-                style="width: 110px; background: none"
+                class="alert-v3-select"
+                style="width: 110px"
               />
               <q-input
                 v-if="operatorNeedsValue(filter.operator)"
@@ -88,7 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 borderless
                 placeholder="Value"
-                style="flex: 1; background: none"
+                class="alert-v3-input"
+                style="flex: 1"
               />
               <q-btn
                 flat
@@ -196,8 +202,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               hide-bottom-space
               :rules="[(v) => !!v || 'Detection function is required']"
               data-test="anomaly-detection-function"
-              class="detection-fn-select"
-              style="width: 110px; background: none"
+              class="alert-v3-select"
+              style="width: 110px"
               @update:model-value="onDetectionFunctionChange"
             />
             <q-select
@@ -216,8 +222,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rules="[(v) => !!v || 'Field is required']"
               hide-bottom-space
               data-test="anomaly-detection-function-field"
-              class="detection-fn-select"
-              style="width: 180px; background: none"
+              class="alert-v3-select"
+              style="width: 180px"
               @filter="filterDetectionFieldOptions"
             >
               <template #no-option>
@@ -263,18 +269,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </div>
           <div>
-            <div class="flex items-center" style="width: fit-content">
-              <div style="width: 87px; margin-left: 0 !important">
-                <q-input
-                  v-model.number="config.histogram_interval_value"
-                  type="number"
-                  dense
-                  borderless
-                  min="1"
-                  style="background: none"
-                  data-test="anomaly-histogram-interval-value"
-                />
-              </div>
+            <div class="tw:flex tw:items-center tw:gap-0">
+              <q-input
+                v-model.number="config.histogram_interval_value"
+                type="number"
+                dense
+                borderless
+                min="1"
+                class="alert-v3-input"
+                style="width: 87px"
+                data-test="anomaly-histogram-interval-value"
+              />
               <q-select
                 v-model="config.histogram_interval_unit"
                 :options="intervalUnits"
@@ -284,7 +289,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 map-options
                 dense
                 borderless
-                style="min-width: 100px; background: none"
+                class="alert-v3-select"
+                style="min-width: 100px"
                 data-test="anomaly-histogram-interval-unit"
               />
             </div>
@@ -329,18 +335,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </div>
           <div>
-            <div class="flex items-center" style="width: fit-content">
-              <div style="width: 87px; margin-left: 0 !important">
-                <q-input
-                  v-model.number="config.schedule_interval_value"
-                  type="number"
-                  dense
-                  borderless
-                  min="1"
-                  style="background: none"
-                  data-test="anomaly-schedule-interval-value"
-                />
-              </div>
+            <div class="tw:flex tw:items-center tw:gap-0">
+              <q-input
+                v-model.number="config.schedule_interval_value"
+                type="number"
+                dense
+                borderless
+                min="1"
+                class="alert-v3-input"
+                style="width: 87px"
+                data-test="anomaly-schedule-interval-value"
+              />
               <q-select
                 v-model="config.schedule_interval_unit"
                 :options="intervalUnits"
@@ -350,7 +355,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 map-options
                 dense
                 borderless
-                style="min-width: 100px; background: none"
+                class="alert-v3-select"
+                style="min-width: 100px"
                 data-test="anomaly-schedule-interval-unit"
               />
             </div>
@@ -395,18 +401,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </div>
           <div>
-            <div class="flex items-center" style="width: fit-content">
-              <div style="width: 87px; margin-left: 0 !important">
-                <q-input
-                  v-model.number="config.detection_window_value"
-                  type="number"
-                  dense
-                  borderless
-                  min="1"
-                  style="background: none"
-                  data-test="anomaly-detection-window-value"
-                />
-              </div>
+            <div class="tw:flex tw:items-center tw:gap-0">
+              <q-input
+                v-model.number="config.detection_window_value"
+                type="number"
+                dense
+                borderless
+                min="1"
+                class="alert-v3-input"
+                style="width: 87px"
+                data-test="anomaly-detection-window-value"
+              />
               <q-select
                 v-model="config.detection_window_unit"
                 :options="intervalUnits"
@@ -416,7 +421,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 map-options
                 dense
                 borderless
-                style="min-width: 100px; background: none"
+                class="alert-v3-select"
+                style="min-width: 100px"
                 data-test="anomaly-detection-window-unit"
               />
             </div>
@@ -473,10 +479,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :min="1"
               :rules="[(v) => v >= 1 || 'Minimum 1 day']"
               data-test="anomaly-training-window"
+              class="alert-v3-input"
               style="width: 87px"
             />
             <span
-              class="text-caption tw:mt-1"
+              class="static-text text-caption"
               :class="
                 store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
               "
@@ -529,7 +536,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               borderless
               data-test="anomaly-retrain-interval"
-              style="max-width: 200px; background: none"
+              class="alert-v3-select"
+              style="max-width: 200px"
             />
           </div>
         </div>
@@ -684,13 +692,12 @@ import {
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import QueryEditor from "@/components/QueryEditor.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
 
-  components: { QueryEditor, AppTabs, PanelSchemaRenderer },
+  components: { QueryEditor, PanelSchemaRenderer },
 
   props: {
     config: {
@@ -1223,25 +1230,6 @@ export default defineComponent({
   padding-bottom: 0 !important;
 }
 
-// Detection function dropdowns — prevent text wrapping and cursor overflow
-.detection-fn-select {
-  :deep(.q-field__control) {
-    height: 36px;
-    min-height: 36px;
-  }
-  :deep(.q-field__native),
-  :deep(.q-field__input) {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    padding-top: 0;
-    padding-bottom: 0;
-    line-height: 36px;
-  }
-  :deep(.q-field__marginal) {
-    height: 36px;
-  }
-}
 
 // Monaco SQL editor wrapper
 .custom-sql-editor-wrapper {

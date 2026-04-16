@@ -41,7 +41,6 @@ struct ServiceDiscoveryResult {
 struct FilteredSemanticResult {
     group_values: HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
-    matched_set_id: Option<String>, // Which identity set matched best
 }
 
 /// Combined correlation result from both Service Discovery and semantic extraction
@@ -79,48 +78,38 @@ async fn extract_filtered_semantic_dimensions(
     let semantic_groups =
         crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
 
-    // Try each identity set, pick best coverage (same as Service Discovery logic)
-    let best_set = match identity_config.resolve_best_set(labels) {
-        Some(set) => set,
-        None => {
-            log::debug!(
-                "[incidents] No identity set matches labels for org {}, semantic extraction skipped",
-                org_id
-            );
-            return None;
-        }
-    };
+    // Collect all distinguish_by group IDs from ALL identity sets (flattened)
+    // Don't require a specific set to "match" - extract whatever we can
+    let mut all_distinguish_by: Vec<String> = Vec::new();
+    for set in &identity_config.sets {
+        all_distinguish_by.extend(set.distinguish_by.iter().cloned());
+    }
+    // Remove duplicates and sort for deterministic processing
+    all_distinguish_by.sort();
+    all_distinguish_by.dedup();
 
-    log::debug!(
-        "[incidents] Using identity set '{}' for semantic extraction, distinguish_by: {:?}",
-        best_set.id,
-        best_set.distinguish_by
-    );
+    if all_distinguish_by.is_empty() {
+        log::warn!(
+            "[incidents] No distinguish_by fields found in any identity sets for org {}",
+            org_id
+        );
+        return None;
+    }
 
-    // Extract only dimensions from distinguish_by fields of the best set
+    // Extract dimensions by resolving field names through semantic groups
     let mut group_values = HashMap::new();
-    for group_id in &best_set.distinguish_by {
+    for group_id in &all_distinguish_by {
         if let Some(alias_group) = semantic_groups.iter().find(|g| g.id == *group_id) {
-            // Find first matching field from this semantic group
+            // Find first matching field from this semantic group's aliases
             for field_name in &alias_group.fields {
                 if let Some(value) = labels.get(field_name)
                     && !value.is_empty()
                 {
+                    // Store using the group ID (canonical name), not the original field name
                     group_values.insert(group_id.clone(), value.clone());
-                    log::debug!(
-                        "[incidents] Mapped field '{}' → '{}' = '{}'",
-                        field_name,
-                        group_id,
-                        value
-                    );
                     break; // Take first match from this group
                 }
             }
-        } else {
-            log::debug!(
-                "[incidents] Semantic group '{}' not found, skipping",
-                group_id
-            );
         }
     }
 
@@ -132,16 +121,12 @@ async fn extract_filtered_semantic_dimensions(
         return None;
     }
 
-    log::debug!(
-        "[incidents] Filtered semantic extraction for org {} extracted dimensions: {:?}",
-        org_id,
-        group_values
-    );
+    // Use Secondary key type for semantic extraction (lower priority than Service Discovery)
+    let key_type = KeyType::Secondary;
 
     Some(FilteredSemanticResult {
         group_values,
-        key_type: KeyType::Secondary, // Lower priority than Service Discovery
-        matched_set_id: Some(best_set.id.clone()),
+        key_type,
     })
 }
 
@@ -211,17 +196,13 @@ fn merge_correlation_results(
         // Semantic extraction success - medium priority
         (None, Some(sem)) => {
             log::debug!(
-                "[incidents] Using filtered semantic extraction result: set='{}', dimensions={:?}",
-                sem.matched_set_id.as_deref().unwrap_or("unknown"),
+                "[incidents] Using filtered semantic extraction result: dimensions={:?}",
                 sem.group_values
             );
             (
                 sem.group_values.clone(),
                 sem.key_type,
-                format!(
-                    "semantic_extraction:{}",
-                    sem.matched_set_id.as_deref().unwrap_or("unknown")
-                ),
+                "semantic_extraction".to_string(),
             )
         }
         // Both failed - fallback to AlertId isolation
@@ -586,9 +567,8 @@ pub async fn correlate_alert_to_incident(
 
     if let Some(sem_result) = &parallel_result.semantic_extraction {
         log::debug!(
-            "[incidents] Semantic extraction for alert '{}': matched_set={:?}, dimensions={:?}",
+            "[incidents] Semantic extraction for alert '{}': dimensions={:?}",
             alert.name,
-            sem_result.matched_set_id,
             sem_result.group_values
         );
     }
