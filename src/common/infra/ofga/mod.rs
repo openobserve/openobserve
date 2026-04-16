@@ -70,6 +70,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_service_streams_migration = false;
     let mut need_eval_templates_migration = false;
     let mut need_ai_toolsets_migration = false;
+    let mut need_model_pricing_migration = false;
 
     let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
@@ -303,6 +304,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 if existing_model_version < v0_0_29 {
                     log::info!("[OFGA:Local] ai_toolsets permissions migration needed");
                     need_ai_toolsets_migration = true;
+                    log::info!("[OFGA:Local] model_pricing permissions migration needed");
+                    need_model_pricing_migration = true;
                 }
             }
 
@@ -419,6 +422,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     if need_ai_toolsets_migration {
                         get_ownership_all_org_tuple(org_name, "ai_toolsets", &mut tuples);
+                    }
+                    if need_model_pricing_migration {
+                        get_ownership_all_org_tuple(org_name, "model_pricing", &mut tuples);
                     }
                 }
                 if need_alert_folders_migration {
