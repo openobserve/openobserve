@@ -973,11 +973,11 @@ const searchType = computed(() => {
     case "dashboard":
       return "dashboards";
     case "metrics":
-      return "dashboards";
+      return "ui";
     case "logs":
       return "ui";
     case "build":
-      return "dashboards";
+      return "UI";
     default:
       return "dashboards";
   }
