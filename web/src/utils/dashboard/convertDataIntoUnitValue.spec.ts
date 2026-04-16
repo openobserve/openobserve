@@ -1164,7 +1164,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(panelData, errors, true, [{ name: "value" }], "dashboard", mockStore, checkTimestampAlias);
-      expect(errors).toContain("Add one fields for the X-Axis");
+      expect(errors).toContain("Add one field for the X-Axis");
     });
 
     it("should validate metric chart requirements", () => {
@@ -1520,7 +1520,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(panelData, errors, true, [{ name: "value" }], "dashboard", mockStore, checkTimestampAlias);
-      expect(errors).toContain("Add one fields for the X-Axis");
+      expect(errors).toContain("Add one field for the X-Axis");
     });
 
     it("should handle line chart with missing fields", () => {
@@ -2018,7 +2018,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
-      expect(errors).toContain("Add one fields for the X-Axis");
+      expect(errors).toContain("Add one field for the X-Axis");
     });
 
     it("should handle pie chart with multiple x fields", () => {
