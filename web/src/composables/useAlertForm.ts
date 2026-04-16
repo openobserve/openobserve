@@ -166,7 +166,7 @@ export const defaultAnomalyConfig = () => ({
   detection_window_unit: "h" as "m" | "h",
   training_window_days: 14,
   retrain_interval_days: 7,
-  threshold: 97,
+  threshold: 100,
   alert_enabled: true,
   alert_destination_ids: [] as string[],
   folder_id: "default",
