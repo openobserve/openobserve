@@ -461,7 +461,6 @@ pub async fn run_datafusion(
                 &mut visit.partial_err,
                 &sql,
             );
-            visit.scan_stats.partial_err.clone_from(&visit.partial_err);
             (data, visit.scan_stats, visit.partial_err)
         })
         .map_err(|e| e.into())

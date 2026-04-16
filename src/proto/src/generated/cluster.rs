@@ -35,7 +35,7 @@ pub struct Job {
     pub partition: i32,
 }
 #[derive(serde::Serialize)]
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ScanStats {
     #[prost(int64, tag = "1")]
     pub files: i64,
@@ -68,8 +68,6 @@ pub struct ScanStats {
     /// unit: bytes
     #[prost(int64, tag = "12")]
     pub peak_memory_usage: i64,
-    #[prost(string, tag = "13")]
-    pub partial_err: ::prost::alloc::string::String,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]

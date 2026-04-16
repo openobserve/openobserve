@@ -829,7 +829,7 @@ pub struct CancelQueryResponse {
     pub is_success: bool,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Copy, Default, Serialize, Deserialize, ToSchema)]
 pub struct ScanStats {
     pub files: i64,
     pub records: i64,
@@ -843,7 +843,6 @@ pub struct ScanStats {
     pub file_list_took: i64,
     pub aggs_cache_ratio: i64,
     pub peak_memory_usage: i64,
-    pub partial_err: String,
 }
 
 impl ScanStats {
@@ -870,14 +869,6 @@ impl ScanStats {
             std::cmp::min(self.aggs_cache_ratio, other.aggs_cache_ratio)
         };
         self.peak_memory_usage = std::cmp::max(self.peak_memory_usage, other.peak_memory_usage);
-        if !other.partial_err.is_empty() {
-            if self.partial_err.is_empty() {
-                self.partial_err.clone_from(&other.partial_err);
-            } else {
-                self.partial_err.push_str(" \n ");
-                self.partial_err.push_str(&other.partial_err);
-            }
-        }
     }
 
     pub fn format_to_mb(&mut self) {
@@ -924,7 +915,6 @@ impl From<&ScanStats> for cluster_rpc::ScanStats {
             file_list_took: req.file_list_took,
             aggs_cache_ratio: req.aggs_cache_ratio,
             peak_memory_usage: req.peak_memory_usage,
-            partial_err: req.partial_err.clone(),
         }
     }
 }
@@ -944,7 +934,6 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
             file_list_took: req.file_list_took,
             aggs_cache_ratio: req.aggs_cache_ratio,
             peak_memory_usage: req.peak_memory_usage,
-            partial_err: req.partial_err.clone(),
         }
     }
 }
@@ -2315,7 +2304,6 @@ mod tests {
             file_list_took: 30,
             aggs_cache_ratio: 80,
             peak_memory_usage: 1024000,
-            partial_err: String::new(),
         };
 
         let stats2 = ScanStats {
@@ -2331,7 +2319,6 @@ mod tests {
             file_list_took: 40,
             aggs_cache_ratio: 90,
             peak_memory_usage: 2048000,
-            partial_err: String::new(),
         };
 
         stats1.add(&stats2);
@@ -2510,7 +2497,6 @@ mod tests {
             file_list_took: 30,
             aggs_cache_ratio: 80,
             peak_memory_usage: 1024000,
-            partial_err: String::new(),
         };
 
         // Test conversion to cluster_rpc::ScanStats
