@@ -16,8 +16,35 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
+  build_frontend:
+    name: build_frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.branch }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build frontend code
+        run: cd web && npm ci && npm run build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: web/dist
+          retention-days: 1
+
   build_pr_image_amd64:
     name: build_pr_image_amd64
+    needs: [build_frontend]
     permissions:
       id-token: write
       contents: read
@@ -44,27 +71,47 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Rust cache
+        id: rust-cache
+        uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          prefix-key: amd64
+          shared-key: "openobserve-${{ runner.arch }}"
 
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
 
-      - uses: actions/setup-node@v5
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
         with:
-          node-version: 22
+          name: frontend-dist
+          path: web/dist
 
-      - name: Build frontend code
-        run: cd web && npm ci && npm run build
+      - name: Validate cache setup
+        run: |
+          echo "Rust cache hit: ${{ steps.rust-cache.outputs.cache-hit }}"
+          if [ ! -d "web/dist" ]; then
+            echo "ERROR: web/dist not found"
+            exit 1
+          fi
+          echo "web/dist exists"
+          if [ -d "target" ]; then
+            echo "target/ exists"
+            libconfig_count=$(find target -name "libconfig-*.rlib" 2>/dev/null | wc -l)
+            libinfra_count=$(find target -name "libinfra-*.rlib" 2>/dev/null | wc -l)
+            echo "libconfig rlibs: $libconfig_count, libinfra rlibs: $libinfra_count"
+            if [ "${{ steps.rust-cache.outputs.cache-hit }}" == "true" ] && [ "$libconfig_count" -eq 0 ]; then
+              echo "WARNING: cache hit claimed but no cached artifacts found"
+            fi
+          fi
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
 
       - name: Build and run binary
         run: |
+          echo "Building openobserve for x86_64..."
           cargo build --features mimalloc --profile release-profiling --target x86_64-unknown-linux-gnu
           mkdir -p bin
           mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
@@ -112,6 +159,7 @@ jobs:
 
   build_pr_image_arm64:
     name: build_pr_image_arm64
+    needs: [build_frontend]
     permissions:
       id-token: write
       contents: read
@@ -138,27 +186,47 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Rust cache
+        id: rust-cache
+        uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          prefix-key: arm64
+          shared-key: "openobserve-${{ runner.arch }}"
 
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
 
-      - uses: actions/setup-node@v5
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
         with:
-          node-version: 22
+          name: frontend-dist
+          path: web/dist
 
-      - name: Build frontend code
-        run: cd web && npm ci && npm run build
+      - name: Validate cache setup
+        run: |
+          echo "Rust cache hit: ${{ steps.rust-cache.outputs.cache-hit }}"
+          if [ ! -d "web/dist" ]; then
+            echo "ERROR: web/dist not found"
+            exit 1
+          fi
+          echo "web/dist exists"
+          if [ -d "target" ]; then
+            echo "target/ exists"
+            libconfig_count=$(find target -name "libconfig-*.rlib" 2>/dev/null | wc -l)
+            libinfra_count=$(find target -name "libinfra-*.rlib" 2>/dev/null | wc -l)
+            echo "libconfig rlibs: $libconfig_count, libinfra rlibs: $libinfra_count"
+            if [ "${{ steps.rust-cache.outputs.cache-hit }}" == "true" ] && [ "$libconfig_count" -eq 0 ]; then
+              echo "WARNING: cache hit claimed but no cached artifacts found"
+            fi
+          fi
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
 
       - name: Build and run binary
         run: |
+          echo "Building openobserve for aarch64..."
           cargo build --features mimalloc --profile release-profiling --target aarch64-unknown-linux-gnu
           mkdir -p bin
           mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
@@ -219,7 +287,6 @@ jobs:
           repository: ${{ github.repository }}
           ref: ${{ inputs.branch }}
           fetch-depth: 0
-          fetch-tags: true
       - name: Set GIT_TAG env
         run: |
           echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
