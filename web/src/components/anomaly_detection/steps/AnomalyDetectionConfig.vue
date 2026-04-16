@@ -674,10 +674,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchType="dashboards"
                     style="height: 180px; width: 100%"
                     data-test="anomaly-sensitivity-chart"
+                    @series-data-update="onSeriesDataUpdate"
                   />
                   <!-- Threshold lines: positions come from actual slider thumb
                        DOM measurements so they align pixel-perfectly. -->
-                  <template v-if="previewActive && lineTopMax >= 0">
+                  <template v-if="previewActive && previewHasData && lineTopMax >= 0">
                     <div
                       class="threshold-line threshold-line--max"
                       :style="{ top: lineTopMax + 'px', left: lineLeft + 'px' }"
@@ -1158,6 +1159,7 @@ export default defineComponent({
       };
       previewKey.value++;
       previewActive.value = true;
+      previewHasData.value = false; // reset until new data arrives
       // Measure after the slider has rendered in its new state
       nextTick(updateLinePositions);
     };
@@ -1217,6 +1219,14 @@ export default defineComponent({
     const lineTopMax = ref(-1); // -1 = hidden until measured
     const lineTopMin = ref(-1);
     const lineLeft = ref(0); // px from chart wrapper left = y-axis line position
+    const previewHasData = ref(false);
+
+    const onSeriesDataUpdate = (data: any) => {
+      const series = data?.options?.series ?? data?.series ?? [];
+      previewHasData.value = series.some(
+        (s: any) => Array.isArray(s.data) && s.data.length > 0,
+      );
+    };
 
     const updateLinePositions = () => {
       const sliderEl = sliderRef.value?.$el as HTMLElement | undefined;
@@ -1290,6 +1300,8 @@ export default defineComponent({
       lineTopMax,
       lineTopMin,
       lineLeft,
+      previewHasData,
+      onSeriesDataUpdate,
       updateLinePositions,
     };
   },
