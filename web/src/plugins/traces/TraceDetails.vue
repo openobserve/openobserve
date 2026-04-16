@@ -54,7 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</q-tooltip>
             </q-btn>
 
-            <div class="tw:flex tw:min-w-0 tw:w-full">
+            <div
+              class="tw:flex tw:min-w-0 tw:w-full tw:gap-[0.625rem]! tw:items-center"
+            >
               <!-- Operation Name -->
               <div
                 data-test="trace-details-operation-name"
@@ -67,13 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Service, Timestamp, and Trace ID -->
               <div
-                class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:w-[32rem]"
+                class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:max-w-[32rem]"
               >
-                <span class="tw:pl-[1rem]">{{
-                  formatTimestamp(traceStartTime)
-                }}</span>
-                <span>•</span>
-                <span>
+                <span>{{ formatTimestamp(traceStartTime) }}</span>
+                <div
+                  class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
+                />
+                <span class="tw:mr-[0.25rem]">
                   {{ t("traces.traceId") }}:
                   <span
                     v-if="mode === 'embedded'"
@@ -115,11 +117,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="handleExpandToFullView"
                 />
               </div>
+
+              <div
+                class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
+              />
+              <!-- Span Count Badge -->
+              <div
+                data-test="trace-details-spans-count"
+                class="tw:flex tw:items-center tw:ml-[0rem] tw:space-x-1 tw:px-[0.625rem] tw:py-[0.1rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
+              >
+                Showing 10 out of
+                <span data-test="span-count-text">
+                  <template v-if="searchObj.data.traceDetails.spansTruncated">
+                    <span class="tw:pl-[0.25rem]">{{
+                      formatLargeNumber(
+                        searchObj.data.traceDetails.totalSpanCount,
+                      )
+                    }}</span>
+                  </template>
+                  <template v-else>{{
+                    formatLargeNumber(effectiveSpanList.length)
+                  }}</template>
+                  {{ t("traces.spansLabel") }}
+                </span>
+                <q-tooltip
+                  v-if="searchObj.data.traceDetails.spansTruncated"
+                  anchor="bottom middle"
+                  self="top middle"
+                >
+                  {{
+                    t("traces.spansTruncatedWarning", {
+                      count: effectiveSpanList.length,
+                      total: searchObj.data.traceDetails.totalSpanCount,
+                    })
+                  }}
+                </q-tooltip>
+              </div>
+
+              <div
+                class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
+              />
+
+              <!-- Error Count Badge -->
+              <div
+                data-test="trace-details-error-spans-count"
+                class="tw:flex tw:items-center tw:space-x-1 tw:px-[0.625rem] tw:py-[0.1rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)] tw:bg-[var(--o2-error-tag-bg)] tw:mr-[0.85rem]"
+              >
+                <span
+                  >{{ formatLargeNumber(errorSpansCount) }}
+                  {{ t("traces.errorsLabel") }}</span
+                >
+              </div>
             </div>
           </div>
 
           <div
-            class="tw:flex tw:justify-end tw:items-center tw:space-x-3 tw:w-[17rem]!"
+            class="tw:flex tw:justify-end tw:items-center tw:space-x-3 tw:w-[25rem]!"
           >
             <!-- Apply filters button (standalone mode, right side) -->
             <q-btn
@@ -136,59 +189,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <q-tooltip>{{ t("traces.reviewAndApplyFilters") }}</q-tooltip>
             </q-btn>
-
-            <!-- Span Count Badge -->
-            <div
-              data-test="trace-details-spans-count"
-              class="tw:flex tw:items-center tw:space-x-1 tw:px-3 tw:py-1 tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:bg-[var(--o2-card-bg)]!"
-            >
-              <q-icon name="hub" size="14px" />
-              <span data-test="span-count-text">
-                <template v-if="searchObj.data.traceDetails.spansTruncated">
-                  <span class="tw:text-orange-500">{{
-                    formatLargeNumber(effectiveSpanList.length)
-                  }}</span
-                  ><span class="tw:text-[var(--o2-text-primary)]"
-                    >/{{
-                      formatLargeNumber(
-                        searchObj.data.traceDetails.totalSpanCount,
-                      )
-                    }}</span
-                  >
-                </template>
-                <template v-else>{{
-                  formatLargeNumber(effectiveSpanList.length)
-                }}</template>
-                {{ t("traces.spansLabel") }}
-              </span>
-              <q-tooltip
-                v-if="searchObj.data.traceDetails.spansTruncated"
-                anchor="bottom middle"
-                self="top middle"
-              >
-                {{
-                  t("traces.spansTruncatedWarning", {
-                    count: effectiveSpanList.length,
-                    total: searchObj.data.traceDetails.totalSpanCount,
-                  })
-                }}
-              </q-tooltip>
-            </div>
-
-            <!-- Error Count Badge -->
-            <div
-              class="tw:flex tw:items-center tw:space-x-1 tw:mr-[0.325rem] tw:px-3 tw:py-1 tw:bg-white tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:bg-[var(--o2-card-bg)]!"
-            >
-              <q-icon
-                name="error_outline"
-                size="14px"
-                :color="errorSpansCount > 0 ? 'negative' : undefined"
-              />
-              <span
-                >{{ formatLargeNumber(errorSpansCount) }}
-                {{ t("traces.errorsLabel") }}</span
-              >
-            </div>
 
             <!-- Expand button (embedded mode) -->
             <q-btn
