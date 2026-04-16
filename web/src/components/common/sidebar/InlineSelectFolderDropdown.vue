@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
     >
       <AddFolder
+      style="width: 30vw;"
         :type="type"
         :edit-mode="false"
         @update:modelValue="onFolderAdded"

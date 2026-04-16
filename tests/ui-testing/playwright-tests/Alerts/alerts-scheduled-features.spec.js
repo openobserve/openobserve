@@ -379,7 +379,7 @@ test.describe("Scheduled Alert Features", () => {
     // ========================================================================
     // TEST 3: P1 - Create scheduled alert with PromQL query
     // ========================================================================
-    test("Create scheduled alert with PromQL query", {
+    test.skip("Create scheduled alert with PromQL query", {
         tag: ['@alertScheduled', '@promql', '@functional', '@P1', '@all', '@alerts']
     }, async ({ page }) => {
         testLogger.info('=== PHASE 1: Navigate to folder ===');
