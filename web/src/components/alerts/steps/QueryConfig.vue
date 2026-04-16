@@ -720,7 +720,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="o2-toggle-button-xs"
                     :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
                   >
-                    <q-tooltip class="tw:text-[12px]" :delay="300">show VRL editor</q-tooltip>
+                    <q-tooltip class="tw:text-[12px]" :delay="300">Show VRL editor</q-tooltip>
                   </q-toggle>
                 </div>
                 <div style="position: relative; flex: 1; min-height: 0;">
@@ -766,7 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       clearable
                       class="mini-select alert-v3-select"
                       style="width: 130px;"
-                      placeholder="saved functions"
+                      placeholder="Saved functions"
                       @update:model-value="(fn) => fn && (vrlFunctionContent = fn.function || fn.body || '')"
                     >
                       <template #no-option>
@@ -780,7 +780,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="o2-toggle-button-xs"
                       :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
                     >
-                      <q-tooltip class="tw:text-[12px]" :delay="300">hide VRL editor</q-tooltip>
+                      <q-tooltip class="tw:text-[12px]" :delay="300">Hide VRL editor</q-tooltip>
                     </q-toggle>
                   </div>
                 </div>
@@ -819,11 +819,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
                 <q-icon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
-                <span>write a query to get started</span>
+                <span>Write a query to get started</span>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--idle'">
                 <q-icon name="check_circle_outline" size="12px" style="flex-shrink:0;opacity:0.7;" />
-                <span>use open full editor to run and validate</span>
+                <span>Use open full editor to run and validate</span>
               </template>
             </div>
             <q-tooltip

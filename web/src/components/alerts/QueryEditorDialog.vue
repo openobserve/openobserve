@@ -179,19 +179,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
                         <q-spinner size="10px" style="flex-shrink:0;" />
-                        <span>fetching results...</span>
+                        <span>Fetching results...</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--hint'">
                         <q-icon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
-                        <span>write a query to get started</span>
+                        <span>Write a query to get started</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--idle'">
                         <q-icon name="play_arrow" size="12px" style="flex-shrink:0;opacity:0.7;" />
-                        <span>press Run Query to see results</span>
+                        <span>Press Run Query to see results</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--empty'">
                         <q-icon name="search_off" size="12px" style="flex-shrink:0;" />
-                        <span>query ran successfully — no matching events</span>
+                        <span>Query ran successfully — no matching events</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--success'">
                         <q-icon name="check_circle" size="12px" style="flex-shrink:0;" />
@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Running indicator -->
                   <div v-if="runFnQueryLoading" class="tw:flex tw:items-center tw:gap-1">
                     <span class="running-dot" />
-                    <span class="tw:text-[10px] tw:font-semibold tw:text-emerald-400">running</span>
+                    <span class="tw:text-[10px] tw:font-semibold tw:text-emerald-400">Running</span>
                   </div>
                 </div>
 
