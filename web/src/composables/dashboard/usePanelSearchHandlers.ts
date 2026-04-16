@@ -277,6 +277,13 @@ export const usePanelSearchHandlers = ({
   // Connection lifecycle handlers
 
   const handleSearchClose = (payload: any, response: any) => {
+    // Flush any pending buffered hits BEFORE clearing, so the final chunk's
+    // data is written to state.data. Without this, when the worker dispatches
+    // the last `search_response_hits` and the `end` event in the same
+    // postMessage batch, the synchronous clearHitsBuffer() here runs before
+    // the microtask-scheduled flushHitsBuffer(), discarding the last hits and
+    // causing the chart to go blank.
+    flushHitsBuffer();
     clearHitsBuffer();
     removeTraceId(payload?.traceId);
 
