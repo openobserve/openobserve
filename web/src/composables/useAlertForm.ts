@@ -109,7 +109,7 @@ export const defaultAlertValue: any = () => {
       promql: "",
       type: "custom",
       aggregation: {
-        group_by: [""],
+        group_by: [],
         function: "avg",
         having: {
           column: "",
