@@ -110,13 +110,23 @@ export const fillMissingValues = (
     "yyyy-MM-dd'T'HH:mm:ss",
   );
 
-  // Use resultMetaData's last entry's time_offset.start_time as the fill start.
-  // Chunks arrive right-to-left (latest first), so the last entry has the earliest start.
-  const resultMetaStartTime =
-    resultMetaData?.[resultMetaData.length - 1]?.time_offset?.start_time ?? 0;
-  const fillStartTime = resultMetaStartTime
-    ? new Date(resultMetaStartTime / 1000)
-    : binnedDate;
+  // Use the minimum time_offset.start_time across all received metadata entries.
+  // This is robust regardless of chunk arrival order:
+  //   - Dashboards search_type: chunks arrive latest-first, so the last entry has
+  //     the earliest start — min converges correctly as chunks accumulate.
+  //   - UI search_type (metrics page): chunks arrive earliest-first, so the FIRST
+  //     entry already has the earliest start — min stays stable throughout streaming.
+  // Using the last entry's start_time alone was wrong for UI search_type, where the
+  // last chunk has the LATEST start_time, causing binnedFillStart to jump near
+  // endTime and the fill loop to produce almost no data (chart goes blank).
+  const resultMetaStartTime = resultMetaData
+    ?.map((meta: any) => meta?.time_offset?.start_time ?? 0)
+    .filter((t: number) => t > 0)
+    .reduce((min: number, t: number) => Math.min(min, t), Infinity);
+  const fillStartTime =
+    resultMetaStartTime && isFinite(resultMetaStartTime)
+      ? new Date(resultMetaStartTime / 1000)
+      : binnedDate;
   const binnedFillStart = dateBin(interval, fillStartTime, origin);
 
   // Build map from processedData for O(1) lookup
