@@ -19,8 +19,6 @@
 //! Encryption (write) and decryption (read) are handled transparently using the
 //! org's per-org DEK via [`cipher::get_dek`].
 
-use aes_siv::{KeyInit, siv::Aes256Siv};
-use base64::{Engine, prelude::BASE64_STANDARD};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set,
     SqlErr,
@@ -66,24 +64,15 @@ pub struct OrgToolset {
 // ---------------------------------------------------------------------------
 
 fn encrypt_data(dek: &[u8], plaintext: &str) -> Result<String, errors::Error> {
-    let mut cipher = Aes256Siv::new_from_slice(dek)
-        .map_err(|e| errors::Error::Message(format!("failed to initialise DEK cipher: {e}")))?;
-    cipher
-        .encrypt([&[]], plaintext.as_bytes())
-        .map(|v| BASE64_STANDARD.encode(v))
-        .map_err(|e| errors::Error::Message(format!("DEK encrypt error: {e}")))
+    config::utils::encryption::Algorithm::Aes256Siv
+        .encrypt(dek, plaintext)
+        .map_err(|e| errors::Error::Message(e.to_string()))
 }
 
 fn decrypt_data(dek: &[u8], ciphertext_b64: &str) -> Result<String, errors::Error> {
-    let mut cipher = Aes256Siv::new_from_slice(dek)
-        .map_err(|e| errors::Error::Message(format!("failed to initialise DEK cipher: {e}")))?;
-    let bytes = BASE64_STANDARD.decode(ciphertext_b64).map_err(|e| {
-        errors::Error::Message(format!("failed to base64-decode toolset data: {e}"))
-    })?;
-    cipher
-        .decrypt([&[]], &bytes)
-        .map(|v| String::from_utf8_lossy(&v).into_owned())
-        .map_err(|e| errors::Error::Message(format!("DEK decrypt error: {e}")))
+    config::utils::encryption::Algorithm::Aes256Siv
+        .decrypt(dek, ciphertext_b64)
+        .map_err(|e| errors::Error::Message(e.to_string()))
 }
 
 // ---------------------------------------------------------------------------
