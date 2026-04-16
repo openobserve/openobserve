@@ -621,29 +621,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </div>
                 <q-btn
-                  flat
-                  dense
                   no-caps
-                  size="sm"
-                  icon="refresh"
+                  dense
                   :disable="
                     !config.stream_name ||
                     (config.query_mode === 'custom_sql' && !config.custom_sql)
                   "
-                  class="text-caption"
+                  class="o2-secondary-button"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  label="load data"
+                  size="sm"
                   data-test="anomaly-sensitivity-load-btn"
                   @click="loadPreview"
                 >
-                  <q-tooltip v-if="!config.stream_name"
-                    >Select a stream first</q-tooltip
-                  >
-                  <q-tooltip
-                    v-else-if="
-                      config.query_mode === 'custom_sql' && !config.custom_sql
-                    "
-                    >Enter a SQL query first</q-tooltip
-                  >
-                  <span v-else class="q-ml-xs">Load Data</span>
+                  <q-tooltip v-if="!config.stream_name">select a stream first</q-tooltip>
+                  <q-tooltip v-else-if="config.query_mode === 'custom_sql' && !config.custom_sql">enter a SQL query first</q-tooltip>
                 </q-btn>
               </div>
 

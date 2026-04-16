@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="step-anomaly-alerting"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="step-content card-container tw:px-3 tw:py-4">
+    <div class="step-content tw:px-3 tw:py-4">
       <!-- Enable Notifications toggle -->
       <div class="flex items-start alert-settings-row">
         <div
