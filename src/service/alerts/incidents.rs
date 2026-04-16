@@ -679,10 +679,11 @@ async fn query_service_discovery_key(
             .await
             {
                 Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
-                    .unwrap_or_else(|_| ServiceIdentityConfig::default_config()),
-                _ => ServiceIdentityConfig::default_config(),
+                    .unwrap_or_else(|_| ServiceIdentityConfig::new_default()),
+                _ => ServiceIdentityConfig::new_default(),
             }
         };
+
         let semantic_groups =
             o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
 

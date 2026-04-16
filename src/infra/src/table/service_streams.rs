@@ -458,6 +458,29 @@ pub async fn list_by_name(
     Ok(records.into_iter().map(model_to_record).collect())
 }
 
+/// List services with optional service name filter.
+/// This avoids loading all records when only service name filtering is needed.
+pub async fn list_filtered_by_service(
+    org_id: &str,
+    service_name: Option<&str>,
+) -> Result<Vec<ServiceRecord>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let query = match service_name {
+        Some(name) => Entity::find()
+            .filter(Column::OrgId.eq(org_id))
+            .filter(Column::ServiceName.eq(name)),
+        None => Entity::find().filter(Column::OrgId.eq(org_id)),
+    };
+
+    let records = query
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(records.into_iter().map(model_to_record).collect())
+}
+
 /// Delete all service records for a specific identity set within an organization.
 /// Called when a set is removed from the config to clean up stale data.
 pub async fn delete_by_set_id(org_id: &str, set_id: &str) -> Result<(), errors::Error> {

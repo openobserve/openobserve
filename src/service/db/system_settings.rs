@@ -456,12 +456,15 @@ pub async fn get_service_identity_config(
         correlation::{IdentitySet, ServiceIdentityConfig},
         system_settings::SettingScope,
     };
+
+    // Intentionally kept here since there's no way to satisfy non-enterprise path
+    // TODO: move the entire module to enterprise so that there's no access restrictions
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
     let mut config = match db::get(&SettingScope::Org, Some(org_id), None, "service_identity").await
     {
         Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
-            .unwrap_or_else(|_| ServiceIdentityConfig::default_config()),
-        _ => ServiceIdentityConfig::default_config(),
+            .unwrap_or_else(|_| ServiceIdentityConfig::new_default()),
+        _ => ServiceIdentityConfig::new_default(),
     };
 
     // If tracked_alias_ids is empty (old stored config or default), populate from env default
@@ -651,7 +654,7 @@ mod tests {
         // (This condition check still applies in the new logic)
         use config::meta::correlation::{IdentitySet, ServiceIdentityConfig};
 
-        let mut config = ServiceIdentityConfig::default_config();
+        let mut config = ServiceIdentityConfig::new_default();
         config.tracked_alias_ids = vec!["service".to_string(), "environment".to_string()];
         config.sets = vec![IdentitySet {
             id: "existing".to_string(),
@@ -674,26 +677,29 @@ mod tests {
     }
 
     #[test]
-    fn test_service_identity_config_no_auto_config_when_tracked_alias_ids_empty() {
-        // Test that auto-config doesn't run when tracked_alias_ids is empty
-        // (This condition check still applies in the new logic)
+    fn test_service_identity_config_default_from_env_has_defaults() {
+        // Test that default_from_env creates default sets and tracked_alias_ids from env/fallback
         use config::meta::correlation::ServiceIdentityConfig;
 
-        let config = ServiceIdentityConfig::default_config();
-        // sets is empty (default), tracked_alias_ids is also empty (default)
+        let config = ServiceIdentityConfig::new_default();
 
-        let original_sets_len = config.sets.len();
+        // Should have default identity sets (AWS, Azure, Kubernetes)
+        assert_eq!(config.sets.len(), 3);
+        assert_eq!(config.sets[0].id, "aws");
+        assert_eq!(config.sets[1].id, "azure");
+        assert_eq!(config.sets[2].id, "kubernetes");
 
-        // Test the condition that prevents auto-config (still relevant)
-        let should_auto_config = config.sets.is_empty() && !config.tracked_alias_ids.is_empty();
-        assert!(
-            !should_auto_config,
-            "Auto-config should not run when tracked_alias_ids is empty"
-        );
+        // Should have tracked_alias_ids from env or fallback defaults
+        assert!(!config.tracked_alias_ids.is_empty());
 
-        // Verify sets are unchanged
-        assert_eq!(config.sets.len(), original_sets_len);
-        assert!(config.sets.is_empty());
+        // But sets should contain the 3 hardcoded identity sets (AWS, Azure, Kubernetes)
+        assert_eq!(config.sets.len(), 3);
+
+        // Verify the hardcoded sets are present
+        let set_ids: Vec<&str> = config.sets.iter().map(|s| s.id.as_str()).collect();
+        assert!(set_ids.contains(&"aws"));
+        assert!(set_ids.contains(&"azure"));
+        assert!(set_ids.contains(&"kubernetes"));
     }
 
     #[test]
