@@ -48,7 +48,8 @@ use crate::{
         flight::{
             stream::FlightEncoderStreamBuilder,
             visitor::{
-                get_cluster_metrics, get_peak_memory, get_peak_memory_from_ctx, get_scan_stats,
+                get_cluster_metrics, get_partial_err, get_peak_memory, get_peak_memory_from_ctx,
+                get_scan_stats,
             },
         },
     },
@@ -208,6 +209,7 @@ impl FlightService for FlightServiceImpl {
         let scan_stats_ref = get_scan_stats(&physical_plan);
         let metrics_ref = get_cluster_metrics(&physical_plan);
         let peak_memory_ref = get_peak_memory(&physical_plan);
+        let partial_err_ref = get_partial_err(&physical_plan);
 
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
             // clear session data
@@ -229,6 +231,10 @@ impl FlightService for FlightServiceImpl {
             .with_custom_message(PreCustomMessage::MetricsRef(metrics_ref))
             .with_custom_message(PreCustomMessage::PeakMemoryRef(Some(peak_memory)))
             .with_custom_message(PreCustomMessage::PeakMemoryRef(peak_memory_ref))
+            .with_custom_message(PreCustomMessage::PartialErrRefEarly(
+                partial_err_ref.clone(),
+            ))
+            .with_custom_message(PreCustomMessage::PartialErrRef(partial_err_ref))
             .build(stream, span);
 
         let stream = async_stream::stream! {
