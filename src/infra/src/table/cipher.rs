@@ -18,7 +18,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use aes_siv::{KeyInit, siv::Aes256Siv};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use config::{
     RwHashMap,
@@ -51,12 +50,34 @@ static DEK_CACHE: LazyLock<RwHashMap<String, (Vec<u8>, Instant)>> = LazyLock::ne
 const DEK_CACHE_TTL: Duration = Duration::from_secs(300);
 
 /// Master Key Encryption Key (KEK). Set once at server startup via
-/// [`init_master_key`]. Defaults to [`Algorithm::None`] (no encryption) when
-/// not initialised — this is the case in non-enterprise builds.
-static MASTER_KEY: OnceLock<Algorithm> = OnceLock::new();
+/// [`init_master_key`]. Defaults to no encryption when not initialised —
+/// this is the case in non-enterprise builds.
+static MASTER_KEY: OnceLock<MasterKey> = OnceLock::new();
 
-fn get_master_key() -> &'static Algorithm {
-    MASTER_KEY.get_or_init(|| Algorithm::None)
+struct MasterKey {
+    algo: config::utils::encryption::Algorithm,
+    key: Vec<u8>,
+}
+
+impl MasterKey {
+    fn encrypt(&self, plaintext: &str) -> Result<String, errors::Error> {
+        self.algo
+            .encrypt(&self.key, plaintext)
+            .map_err(|e| errors::Error::Message(e.to_string()))
+    }
+
+    fn decrypt(&self, encrypted: &str) -> Result<String, errors::Error> {
+        self.algo
+            .decrypt(&self.key, encrypted)
+            .map_err(|e| errors::Error::Message(e.to_string()))
+    }
+}
+
+fn get_master_key() -> &'static MasterKey {
+    MASTER_KEY.get_or_init(|| MasterKey {
+        algo: config::utils::encryption::Algorithm::None,
+        key: vec![],
+    })
 }
 
 /// Initialise the master KEK from a base64-encoded key string.
@@ -70,55 +91,11 @@ fn get_master_key() -> &'static Algorithm {
 pub fn init_master_key(key_b64: &str) -> Result<(), errors::Error> {
     let key = config::utils::encryption::decode_encryption_key(key_b64)
         .map_err(errors::Error::Message)?;
-    let _ = MASTER_KEY.set(Algorithm::Aes256Siv(key));
+    let _ = MASTER_KEY.set(MasterKey {
+        algo: config::utils::encryption::Algorithm::Aes256Siv,
+        key,
+    });
     Ok(())
-}
-
-enum Algorithm {
-    Aes256Siv(Vec<u8>),
-    None,
-}
-
-impl Algorithm {
-    fn encrypt(&self, plaintext: &str) -> Result<String, errors::Error> {
-        match self {
-            Self::Aes256Siv(k) => {
-                let mut c = Aes256Siv::new_from_slice(k).unwrap();
-                c.encrypt([&[]], plaintext.as_bytes())
-                    .map_err(|e| {
-                        errors::Error::Message(format!(
-                            "error encrypting data for cipher table {e}"
-                        ))
-                    })
-                    .map(|v| BASE64_STANDARD.encode(&v))
-            }
-            Self::None => Ok(plaintext.to_owned()),
-        }
-    }
-    fn decrypt(&self, encrypted: &str) -> Result<String, errors::Error> {
-        match self {
-            Self::Aes256Siv(k) => {
-                let mut c = Aes256Siv::new_from_slice(k).unwrap();
-                let v = match BASE64_STANDARD.decode(encrypted) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::warn!("error in decoding encrypted key {e}");
-                        return Err(errors::Error::Message(
-                            "failed to decode encrypted key".into(),
-                        ));
-                    }
-                };
-                c.decrypt([&[]], &v)
-                    .map_err(|e| {
-                        errors::Error::Message(format!(
-                            "error decrypting data for cipher table {e}"
-                        ))
-                    })
-                    .map(|v| String::from_utf8_lossy(&v).into_owned())
-            }
-            Self::None => Ok(encrypted.to_owned()),
-        }
-    }
 }
 
 impl std::fmt::Display for EntryKind {
@@ -466,67 +443,6 @@ mod tests {
         assert!(EntryKind::try_from("unknown".to_string()).is_err());
         assert!(EntryKind::try_from("".to_string()).is_err());
         assert!(EntryKind::try_from("CipherKey".to_string()).is_err()); // case-sensitive
-    }
-
-    // -----------------------------------------------------------------------
-    // Algorithm::None passthrough
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_algorithm_none_encrypt_is_passthrough() {
-        let alg = Algorithm::None;
-        let plaintext = "sensitive data";
-        let result = alg.encrypt(plaintext).unwrap();
-        assert_eq!(result, plaintext);
-    }
-
-    #[test]
-    fn test_algorithm_none_decrypt_is_passthrough() {
-        let alg = Algorithm::None;
-        let ciphertext = "some_base64_looking_string";
-        let result = alg.decrypt(ciphertext).unwrap();
-        assert_eq!(result, ciphertext);
-    }
-
-    // -----------------------------------------------------------------------
-    // Algorithm::Aes256Siv encrypt/decrypt roundtrip
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_algorithm_aes256siv_roundtrip() {
-        // 64-byte key for AES-256-SIV
-        let key = config::utils::rand::random_bytes(64);
-        let alg = Algorithm::Aes256Siv(key);
-        let plaintext = r#"{"url":"https://example.com","token":"secret"}"#;
-
-        let encrypted = alg.encrypt(plaintext).unwrap();
-        // Encrypted should be base64 and different from plaintext
-        assert_ne!(encrypted, plaintext);
-        assert!(BASE64_STANDARD.decode(&encrypted).is_ok());
-
-        let decrypted = alg.decrypt(&encrypted).unwrap();
-        assert_eq!(decrypted, plaintext);
-    }
-
-    #[test]
-    fn test_algorithm_aes256siv_tampered_ciphertext_fails() {
-        let key = config::utils::rand::random_bytes(64);
-        let alg = Algorithm::Aes256Siv(key);
-        let encrypted = alg.encrypt("hello").unwrap();
-
-        // Flip a byte in the ciphertext
-        let mut raw = BASE64_STANDARD.decode(&encrypted).unwrap();
-        raw[0] ^= 0xFF;
-        let tampered = BASE64_STANDARD.encode(raw);
-
-        assert!(alg.decrypt(&tampered).is_err());
-    }
-
-    #[test]
-    fn test_algorithm_aes256siv_invalid_base64_fails() {
-        let key = config::utils::rand::random_bytes(64);
-        let alg = Algorithm::Aes256Siv(key);
-        assert!(alg.decrypt("not-valid-base64!!!").is_err());
     }
 
     // -----------------------------------------------------------------------
