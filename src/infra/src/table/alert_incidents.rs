@@ -67,6 +67,8 @@ pub async fn create(
         alert_count: Set(0), // Will be incremented by add_alert_to_incident
         title: Set(title),
         assigned_to: Set(None),
+        external_refs: Set(None),
+        last_status_source: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     };

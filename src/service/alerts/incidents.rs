@@ -35,6 +35,10 @@ struct ServiceDiscoveryResult {
     group_values: HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
     service_name: String,
+    /// All matched service_streams row IDs, best-match first.
+    /// First element → 'responsible' service; remaining → 'impacted'.
+    /// Empty only when enterprise feature is off or no service matched.
+    matched_service_stream_ids: Vec<String>,
 }
 
 /// Result from filtered semantic extraction using distinguish_by groups
@@ -51,6 +55,9 @@ struct ParallelCorrelationResult {
     final_group_values: HashMap<String, String>,
     final_key_type: config::meta::alerts::incidents::KeyType,
     correlation_reason: String,
+    /// Propagated from ServiceDiscoveryResult when SD wins; empty otherwise.
+    /// First element → 'responsible'; remaining → 'impacted'.
+    matched_service_stream_ids: Vec<String>,
 }
 
 /// Extract semantic dimensions using configured distinguish_by groups only
@@ -174,12 +181,20 @@ async fn correlate_parallel(
     let (final_group_values, final_key_type, correlation_reason) =
         merge_correlation_results(&sd_result, &semantic_result);
 
+    // Carry matched IDs only when Service Discovery wins (highest priority).
+    // Semantic extraction has no service_streams rows to link.
+    let matched_service_stream_ids = sd_result
+        .as_ref()
+        .map(|sd| sd.matched_service_stream_ids.clone())
+        .unwrap_or_default();
+
     ParallelCorrelationResult {
         service_discovery: sd_result,
         semantic_extraction: semantic_result,
         final_group_values,
         final_key_type,
         correlation_reason,
+        matched_service_stream_ids,
     }
 }
 
@@ -559,6 +574,7 @@ pub async fn correlate_alert_to_incident(
     let group_values = parallel_result.final_group_values;
     let mut key_type = parallel_result.final_key_type;
     let correlation_reason = parallel_result.correlation_reason;
+    let matched_service_stream_ids = parallel_result.matched_service_stream_ids;
 
     // Extract service name using both results
     let service_name = extract_service_name_parallel(&labels, &parallel_result.service_discovery);
@@ -601,6 +617,7 @@ pub async fn correlate_alert_to_incident(
         triggered_at,
         &correlation_reason,
         &service_name,
+        matched_service_stream_ids,
     )
     .await?;
 
@@ -728,6 +745,7 @@ async fn query_service_discovery_key(
                     group_values: response.matched_dimensions.clone(),
                     key_type: config::meta::alerts::incidents::KeyType::Primary,
                     service_name: response.service_name,
+                    matched_service_stream_ids: response.matched_service_stream_ids,
                 })
             }
             Ok(None) => {
@@ -816,6 +834,7 @@ async fn create_new_incident(
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
+    matched_service_stream_ids: Vec<String>,
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
     let severity = o2_enterprise::enterprise::alerts::incidents::determine_severity(None);
 
@@ -831,6 +850,21 @@ async fn create_new_incident(
         Some(title.clone()),
     )
     .await?;
+
+    // Link the matched service(s) to this incident in the join table.
+    // First ID → 'responsible'; remaining → 'impacted'. No-op if empty (no service matched).
+    if let Err(e) = infra::table::alert_incident_services::link_services(
+        &incident.id,
+        &matched_service_stream_ids,
+        "system",
+    )
+    .await
+    {
+        log::error!(
+            "[Incidents] Failed to link services for incident {}: {e}",
+            incident.id
+        );
+    }
 
     // Initialize event timeline for new incident
     if let Err(e) = infra::table::incident_events::init(org_id, &incident.id).await {
@@ -985,6 +1019,7 @@ async fn find_or_create_incident(
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
+    matched_service_stream_ids: Vec<String>,
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
     use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
 
@@ -1017,6 +1052,20 @@ async fn find_or_create_incident(
             {
                 log::error!(
                     "[Incidents] Failed to record alert event for incident {}: {e}",
+                    incident.id
+                );
+            }
+
+            // Add any newly-matched services as 'impacted' on the existing incident.
+            if let Err(e) = infra::table::alert_incident_services::add_impacted_if_new(
+                &incident.id,
+                &matched_service_stream_ids,
+                "system",
+            )
+            .await
+            {
+                log::warn!(
+                    "[Incidents] Failed to add impacted services for incident {}: {e}",
                     incident.id
                 );
             }
@@ -1155,6 +1204,21 @@ async fn find_or_create_incident(
                 log::error!("[SUPER_CLUSTER] Failed to publish incident add_alert: {e}");
             }
 
+            // Add any newly-matched services as 'impacted' on the existing incident.
+            // INSERT OR IGNORE — safe to call concurrently, never touches the hot incident row.
+            if let Err(e) = infra::table::alert_incident_services::add_impacted_if_new(
+                &existing.id,
+                &matched_service_stream_ids,
+                "system",
+            )
+            .await
+            {
+                log::warn!(
+                    "[Incidents] Failed to add impacted services for incident {}: {e}",
+                    existing.id
+                );
+            }
+
             spawn_topology_enrichment(
                 org_id,
                 &existing.id,
@@ -1232,6 +1296,7 @@ async fn find_or_create_incident(
         triggered_at,
         correlation_reason,
         service_name,
+        matched_service_stream_ids,
     )
     .await
 }

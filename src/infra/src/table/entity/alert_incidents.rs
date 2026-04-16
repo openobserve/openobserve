@@ -30,6 +30,14 @@ pub struct Model {
     pub title: Option<String>,
     pub assigned_to: Option<String>,
 
+    /// Opaque external system references stored by Workflow action steps.
+    /// Example: PD incident key, Slack thread timestamp, Jira ticket URL.
+    /// JSON merge-patched via PATCH /incidents/{id}/metadata.
+    pub external_refs: Option<Json>,
+    /// Last system that changed incident status (e.g. "o2", "pagerduty").
+    /// Used by sync loop prevention (WP-7) to avoid infinite status echoes.
+    pub last_status_source: Option<String>,
+
     pub created_at: i64,
     pub updated_at: i64,
 }

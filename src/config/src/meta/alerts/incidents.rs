@@ -1252,3 +1252,95 @@ mod tests {
         assert_eq!(rel, DimensionRelationship::Equal);
     }
 }
+
+// ── WP-1: Service routing types ──────────────────────────────────────────────
+
+/// A single notification target for a service.
+/// `kind` identifies the integration type; `target_ref` is the opaque external identifier.
+/// New kinds can be added at runtime without DB schema changes — they are stored and
+/// skipped at dispatch time with a log warning.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+pub struct NotificationTarget {
+    pub kind: NotificationKind,
+    /// The external identifier meaningful to that integration:
+    ///   slack     → Slack channel ID (e.g. "C012AB3CD")
+    ///   pagerduty → PagerDuty service ID (e.g. "P1234AB")
+    ///   opsgenie  → OpsGenie team UUID
+    ///   msteams   → MS Teams webhook URL
+    ///   email     → email address
+    ///   webhook   → HTTP callback URL
+    ///   jira      → Jira project key
+    ///   victorops → routing key
+    #[serde(rename = "ref")]
+    pub target_ref: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum NotificationKind {
+    Slack,
+    Pagerduty,
+    Opsgenie,
+    Msteams,
+    Email,
+    Webhook,
+    Jira,
+    Victorops,
+    /// Forward-compatibility: unknown kinds are preserved as stored and skipped at dispatch.
+    #[serde(other)]
+    Unknown,
+}
+
+/// Role of a service linked to an incident.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum IncidentServiceRole {
+    /// Drives routing: on-call schedule, escalation policy, notifications.
+    /// At most one per incident at any time.
+    Responsible,
+    /// Affected service not responsible for routing.
+    Impacted,
+}
+
+impl IncidentServiceRole {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Responsible => "responsible",
+            Self::Impacted => "impacted",
+        }
+    }
+}
+
+/// Who linked a service to an incident.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum IncidentServiceSource {
+    /// Linked automatically during alert correlation.
+    System,
+    /// Added or changed manually via the API.
+    User,
+}
+
+impl IncidentServiceSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::System => "system",
+            Self::User => "user",
+        }
+    }
+}
+
+/// A service linked to an incident, as returned by the API.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct IncidentService {
+    pub service_stream_id: String,
+    /// Resolved from service_streams at query time
+    pub service_name: String,
+    pub role: IncidentServiceRole,
+    pub added_by: IncidentServiceSource,
+    pub created_at: i64,
+    /// Routing config for this service (empty when no config exists yet)
+    pub notification_targets: Vec<NotificationTarget>,
+    pub owner_emails: Vec<String>,
+    pub oncall_schedule_id: Option<String>,
+}

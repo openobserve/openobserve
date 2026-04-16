@@ -23,6 +23,7 @@ use crate::{
 };
 
 pub mod action_scripts;
+pub mod alert_incident_services;
 pub mod alert_incidents;
 pub mod alerts;
 pub mod backfill_jobs;
@@ -47,6 +48,7 @@ pub mod re_pattern_stream_map;
 pub mod reports;
 pub mod search_job;
 pub mod search_queue;
+pub mod service_routing_config;
 pub mod service_streams;
 pub mod sessions;
 pub mod short_urls;

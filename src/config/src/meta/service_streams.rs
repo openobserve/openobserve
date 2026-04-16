@@ -132,6 +132,14 @@ pub struct CorrelationResponse {
     /// `None` if the feature is not enabled or the set was not determined.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub matched_set_id: Option<String>,
+    /// IDs of the service_streams rows that were matched during correlation.
+    ///
+    /// Collected from the matched slice before the stream-union loop so they
+    /// correspond exactly to the rows whose streams are present in `related_streams`.
+    /// Used downstream to stamp `alert_incidents.service_stream_id` so incidents
+    /// can be linked back to the service record without a FK constraint.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub matched_service_stream_ids: Vec<String>,
 }
 
 impl CorrelationResponse {
@@ -180,6 +188,7 @@ impl CorrelationResponse {
             related_streams,
             all_streams: Vec::new(),
             matched_set_id: None,
+            matched_service_stream_ids: Vec::new(),
         };
         response.build_all_streams();
         response
