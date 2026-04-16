@@ -413,9 +413,9 @@ pub async fn update_user(
                     } else {
                         is_org_updated |= local_user.role.ne(&new_user.role);
                         #[cfg(feature = "enterprise")]
-                        if new_org_role.custom_role.is_some() {
+                        if let Some(cr) = new_org_role.custom_role {
                             custom_roles_need_change = true;
-                            custom_roles.extend(new_org_role.custom_role.unwrap());
+                            custom_roles.extend(cr);
                             is_org_updated = true;
                         }
                     }
