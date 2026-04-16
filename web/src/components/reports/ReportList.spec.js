@@ -87,6 +87,10 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
+vi.mock("@/utils/commons", () => ({
+  getFoldersListByType: vi.fn(() => Promise.resolve()),
+}));
+
 // Mock segment analytics
 vi.mock("@/services/segment_analytics", () => ({
   default: {
