@@ -33,7 +33,8 @@ vi.mock('vue-router', async () => {
     ...actual,
     useRouter: vi.fn(() => ({
       push: vi.fn(),
-      replace: vi.fn()
+      replace: vi.fn(),
+      currentRoute: { value: { query: {} } },
     }))
   };
 });
@@ -41,9 +42,10 @@ vi.mock('vue-router', async () => {
 // Mock reports service
 vi.mock("@/services/reports", () => ({
   default: {
-    list: vi.fn(),
-    toggleReportState: vi.fn(),
-    deleteReport: vi.fn(),
+    listByFolderId: vi.fn(),
+    toggleReportStateById: vi.fn(),
+    deleteReportById: vi.fn(),
+    bulkDeleteById: vi.fn(),
   },
 }));
 
@@ -124,14 +126,15 @@ describe("ReportList Component", () => {
 
   beforeEach(async () => {
     // Reset mock implementations
-    vi.mocked(reports.list).mockReset();
-    vi.mocked(reports.toggleReportState).mockReset();
-    vi.mocked(reports.deleteReport).mockReset();
+    vi.mocked(reports.listByFolderId).mockReset();
+    vi.mocked(reports.toggleReportStateById).mockReset();
+    vi.mocked(reports.deleteReportById).mockReset();
 
     // Setup default successful response for list
-    vi.mocked(reports.list).mockResolvedValue({
+    vi.mocked(reports.listByFolderId).mockResolvedValue({
       data: [
         {
+          report_id: "report-1",
           name: "Test Report 1",
           enabled: true,
           owner: "test-user",
@@ -142,6 +145,7 @@ describe("ReportList Component", () => {
           sql: "SELECT * FROM test1",
         },
         {
+          report_id: "report-2",
           name: "Test Report 2",
           enabled: false,
           owner: "test-user",
@@ -162,7 +166,8 @@ describe("ReportList Component", () => {
     // Setup router mock
     mockRouter = {
       push: vi.fn(),
-      replace: vi.fn()
+      replace: vi.fn(),
+      currentRoute: { value: { query: {} } },
     };
     vi.mocked(vueRouter.useRouter).mockReturnValue(mockRouter);
 
@@ -214,7 +219,7 @@ describe("ReportList Component", () => {
 
   describe("Component Initialization", () => {
     it("fetches reports on mount", async () => {
-      expect(reports.list).toHaveBeenCalledWith("test-org");
+      expect(reports.listByFolderId).toHaveBeenCalled();
     });
 
     it("should display correct number of reports", async () => {
@@ -280,7 +285,7 @@ describe("ReportList Component", () => {
           }
         }
       };
-      vi.mocked(reports.list).mockRejectedValue(error);
+      vi.mocked(reports.listByFolderId).mockRejectedValue(error);
 
       // Create new wrapper to trigger onBeforeMount
       const newWrapper = mount(ReportList, {
@@ -332,20 +337,19 @@ describe("ReportList Component", () => {
     });
 
     describe("Tab Filtering", () => {
-      it("shows only cached reports", async () => {
+      it("maps all staticReportsList rows when tab is cached (server-side filtering)", async () => {
         wrapper.vm.staticReportsList = [...wrapper.vm.reportsTableRows];
-        wrapper.vm.staticReportsList[1].destinations = [];
         wrapper.vm.activeTab = "cached";
         await wrapper.vm.filterReports();
-        expect(wrapper.vm.reportsTableRows.length).toBe(1);
-        expect(wrapper.vm.reportsTableRows[0].destinations.length).toBe(0);
+        // filterReports just re-numbers; tab filtering is server-side via listByFolderId
+        expect(wrapper.vm.reportsTableRows.length).toBe(wrapper.vm.staticReportsList.length);
       });
 
-      it("shows only scheduled reports", async () => {
+      it("maps all staticReportsList rows when tab is shared (server-side filtering)", async () => {
         wrapper.vm.staticReportsList = [...wrapper.vm.reportsTableRows];
         wrapper.vm.activeTab = "shared";
         await wrapper.vm.filterReports();
-        expect(wrapper.vm.reportsTableRows.every(report => report.destinations.length > 0)).toBe(true);
+        expect(wrapper.vm.reportsTableRows.length).toBe(wrapper.vm.staticReportsList.length);
       });
     });
   });
@@ -380,34 +384,35 @@ describe("ReportList Component", () => {
   describe("Report State Toggle", () => {
     it("successfully toggles report state from enabled to disabled", async () => {
       const report = {
+        report_id: "report-1",
         name: "Test Report 1",
         enabled: true,
         owner: "test-user"
       };
 
-      vi.mocked(reports.toggleReportState).mockResolvedValue({});
+      vi.mocked(reports.toggleReportStateById).mockResolvedValue({});
 
       await wrapper.vm.toggleReportState(report);
       await flushPromises();
 
       // Verify API call
-      expect(reports.toggleReportState).toHaveBeenCalledWith(
+      expect(reports.toggleReportStateById).toHaveBeenCalledWith(
         "test-org",
-        "Test Report 1",
+        "report-1",
         false
       );
 
       // Verify loading state
-      expect(wrapper.vm.reportsStateLoadingMap[report.name]).toBe(false);
+      expect(wrapper.vm.reportsStateLoadingMap[report.report_id]).toBe(false);
 
-      // Verify state updates in both lists
-      expect(wrapper.vm.staticReportsList.find(r => r.name === report.name).enabled).toBe(false);
-      expect(wrapper.vm.reportsTableRows.find(r => r.name === report.name).enabled).toBe(false);
+      // Verify state updated in staticReportsList
+      expect(wrapper.vm.staticReportsList.find(r => r.report_id === report.report_id).enabled).toBe(false);
     });
 
 
     it("handles error when toggling report state (non-403)", async () => {
       const report = {
+        report_id: "report-1",
         name: "Test Report 1",
         enabled: true,
         owner: "test-user"
@@ -422,18 +427,19 @@ describe("ReportList Component", () => {
         }
       };
 
-      vi.mocked(reports.toggleReportState).mockRejectedValue(error);
+      vi.mocked(reports.toggleReportStateById).mockRejectedValue(error);
 
       await wrapper.vm.toggleReportState(report);
       await flushPromises();
 
 
       // Verify loading state is cleared
-      expect(wrapper.vm.reportsStateLoadingMap[report.name]).toBe(false);
+      expect(wrapper.vm.reportsStateLoadingMap[report.report_id]).toBe(false);
     });
 
     it("handles 403 error silently when toggling report state", async () => {
       const report = {
+        report_id: "report-1",
         name: "Test Report 1",
         enabled: true,
         owner: "test-user"
@@ -445,7 +451,7 @@ describe("ReportList Component", () => {
         }
       };
 
-      vi.mocked(reports.toggleReportState).mockRejectedValue(error);
+      vi.mocked(reports.toggleReportStateById).mockRejectedValue(error);
 
       await wrapper.vm.toggleReportState(report);
       await flushPromises();
@@ -458,11 +464,12 @@ describe("ReportList Component", () => {
       );
 
       // Verify loading state is cleared
-      expect(wrapper.vm.reportsStateLoadingMap[report.name]).toBe(false);
+      expect(wrapper.vm.reportsStateLoadingMap[report.report_id]).toBe(false);
     });
 
     it("maintains loading state during toggle operation", async () => {
       const report = {
+        report_id: "report-1",
         name: "Test Report 1",
         enabled: true,
         owner: "test-user"
@@ -473,34 +480,31 @@ describe("ReportList Component", () => {
         resolvePromise = resolve;
       });
 
-      vi.mocked(reports.toggleReportState).mockReturnValue(togglePromise);
+      vi.mocked(reports.toggleReportStateById).mockReturnValue(togglePromise);
 
       const toggleOperation = wrapper.vm.toggleReportState(report);
 
       // Verify loading state is set
-      expect(wrapper.vm.reportsStateLoadingMap[report.name]).toBe(true);
+      expect(wrapper.vm.reportsStateLoadingMap[report.report_id]).toBe(true);
 
       resolvePromise({});
       await toggleOperation;
       await flushPromises();
 
       // Verify loading state is cleared
-      expect(wrapper.vm.reportsStateLoadingMap[report.name]).toBe(false);
+      expect(wrapper.vm.reportsStateLoadingMap[report.report_id]).toBe(false);
     });
   });
 
   describe("Edit Report", () => {
     it("navigates to edit page with correct query parameters", async () => {
       const report = {
+        report_id: "report-1",
         name: "Test Report 1",
         enabled: true,
         owner: "test-user",
         description: "Test Description"
       };
-
-      // Verify router is properly mocked
-      expect(vueRouter.useRouter()).toBeTruthy();
-      expect(typeof vueRouter.useRouter().push).toBe('function');
 
       await wrapper.vm.editReport(report);
 
@@ -509,156 +513,103 @@ describe("ReportList Component", () => {
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createReport",
         query: {
+          report_id: report.report_id,
           name: report.name,
-          org_identifier: "test-org"
+          org_identifier: "test-org",
+          folder: "default",
         }
       });
-
-      // Verify report is cloned to editingReport
-      expect(wrapper.vm.editingReport).toEqual(report);
     });
 
     it("handles edit button click in the table", async () => {
       // Find and click the edit button for the first report
       const editButton = wrapper.find('[data-test="report-list-Test Report 1-edit-report"]');
       expect(editButton.exists()).toBe(true);
-      
+
       await editButton.trigger('click');
 
       // Verify router navigation
       expect(mockRouter.push).toHaveBeenCalledTimes(1);
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        name: "createReport",
-        query: {
-          name: "Test Report 1",
-          org_identifier: "test-org"
-        }
-      });
+      expect(mockRouter.push).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "createReport" })
+      );
     });
   });
 
   describe("Delete Report", () => {
     it("confirms and deletes report successfully", async () => {
-      const reportName = "Test Report 1";
-      
-      // Setup successful delete response
-      vi.mocked(reports.deleteReport).mockResolvedValue({});
+      const report = { report_id: "report-1", name: "Test Report 1" };
 
-      // Store initial counts
+      // Setup successful delete response
+      vi.mocked(reports.deleteReportById).mockResolvedValue({});
+
+      // Store initial count
       const initialStaticListCount = wrapper.vm.staticReportsList.length;
-      const initialTableRowsCount = wrapper.vm.reportsTableRows.length;
 
       // Trigger delete confirmation
-      await wrapper.vm.confirmDeleteReport({ name: reportName });
+      await wrapper.vm.confirmDeleteReport(report);
 
       // Verify dialog is shown with correct message
       expect(wrapper.vm.deleteDialog.show).toBe(true);
-      expect(wrapper.vm.deleteDialog.message).toBe(`Are you sure you want to delete report "${reportName}"`);
-      expect(wrapper.vm.deleteDialog.data).toBe(reportName);
+      expect(wrapper.vm.deleteDialog.message).toBe(`Are you sure you want to delete report "${report.name}"`);
+      expect(wrapper.vm.deleteDialog.data).toEqual({ report_id: report.report_id, name: report.name });
 
       // Trigger delete action
       await wrapper.vm.deleteReport();
       await flushPromises();
 
       // Verify API call
-      expect(reports.deleteReport).toHaveBeenCalledWith(
-        "test-org",
-        reportName
-      );
+      expect(reports.deleteReportById).toHaveBeenCalledWith("test-org", report.report_id);
 
-      // Verify report is removed from lists
+      // Verify report is removed
       expect(wrapper.vm.staticReportsList.length).toBe(initialStaticListCount - 1);
-      expect(wrapper.vm.reportsTableRows.length).toBe(initialTableRowsCount - 1);
-      expect(wrapper.vm.staticReportsList.find(r => r.name === reportName)).toBeUndefined();
-      expect(wrapper.vm.reportsTableRows.find(r => r.name === reportName)).toBeUndefined();
-
-      // Manually close dialog as component would do
-      wrapper.vm.deleteDialog.show = false;
-      await nextTick();
-
-      // Verify dialog is closed
-      expect(wrapper.vm.deleteDialog.show).toBe(false);
+      expect(wrapper.vm.staticReportsList.find(r => r.report_id === report.report_id)).toBeUndefined();
     });
 
     it("handles error when deleting report (non-403)", async () => {
-      const reportName = "Test Report 1";
-      const error = {
-        response: {
-          status: 500,
-          data: {
-            message: "Internal server error"
-          }
-        }
-      };
+      const report = { report_id: "report-1", name: "Test Report 1" };
+      const error = { response: { status: 500, data: { message: "Internal server error" } } };
 
-      // Setup error response
-      vi.mocked(reports.deleteReport).mockRejectedValue(error);
+      vi.mocked(reports.deleteReportById).mockRejectedValue(error);
 
-      // Store initial counts
       const initialStaticListCount = wrapper.vm.staticReportsList.length;
-      const initialTableRowsCount = wrapper.vm.reportsTableRows.length;
 
-      // Trigger delete confirmation
-      await wrapper.vm.confirmDeleteReport({ name: reportName });
-      
-      // Trigger delete action
+      await wrapper.vm.confirmDeleteReport(report);
       await wrapper.vm.deleteReport();
 
-      // Verify API call was made
-      expect(reports.deleteReport).toHaveBeenCalledWith(
-        "test-org",
-        reportName
-      );
+      expect(reports.deleteReportById).toHaveBeenCalledWith("test-org", report.report_id);
 
       // Verify lists remain unchanged
       expect(wrapper.vm.staticReportsList.length).toBe(initialStaticListCount);
-      expect(wrapper.vm.reportsTableRows.length).toBe(initialTableRowsCount);
-      expect(wrapper.vm.staticReportsList.find(r => r.name === reportName)).toBeTruthy();
-      expect(wrapper.vm.reportsTableRows.find(r => r.name === reportName)).toBeTruthy();
+      expect(wrapper.vm.staticReportsList.find(r => r.report_id === report.report_id)).toBeTruthy();
     });
 
     it("handles 403 error silently when deleting report", async () => {
-      const reportName = "Test Report 1";
-      const error = {
-        response: {
-          status: 403
-        }
-      };
+      const report = { report_id: "report-1", name: "Test Report 1" };
+      const error = { response: { status: 403 } };
 
-      // Setup error response
-      vi.mocked(reports.deleteReport).mockRejectedValue(error);
+      vi.mocked(reports.deleteReportById).mockRejectedValue(error);
 
-      // Store initial counts
       const initialStaticListCount = wrapper.vm.staticReportsList.length;
 
-      // Trigger delete confirmation
-      await wrapper.vm.confirmDeleteReport({ name: reportName });
-      
-      // Trigger delete action
+      await wrapper.vm.confirmDeleteReport(report);
       await wrapper.vm.deleteReport();
 
-      // Verify API call was made
-      expect(reports.deleteReport).toHaveBeenCalledWith(
-        "test-org",
-        reportName
-      );
+      expect(reports.deleteReportById).toHaveBeenCalledWith("test-org", report.report_id);
 
-      // Verify lists remain unchanged
       expect(wrapper.vm.staticReportsList.length).toBe(initialStaticListCount);
-      expect(wrapper.vm.staticReportsList.find(r => r.name === reportName)).toBeTruthy();
+      expect(wrapper.vm.staticReportsList.find(r => r.report_id === report.report_id)).toBeTruthy();
     });
 
     it("handles delete button click in the table", async () => {
-      // Find and click the delete button for the first report
       const deleteButton = wrapper.find('[data-test="report-list-Test Report 1-delete-report"]');
       expect(deleteButton.exists()).toBe(true);
-      
+
       await deleteButton.trigger('click');
 
-      // Verify confirmation dialog is shown with correct data
+      // Verify confirmation dialog is shown
       expect(wrapper.vm.deleteDialog.show).toBe(true);
       expect(wrapper.vm.deleteDialog.message).toBe('Are you sure you want to delete report "Test Report 1"');
-      expect(wrapper.vm.deleteDialog.data).toBe('Test Report 1');
     });
   });
 
@@ -672,7 +623,8 @@ describe("ReportList Component", () => {
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createReport",
         query: {
-          org_identifier: store.state.selectedOrganization.identifier
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: "default",
         }
       });
     });

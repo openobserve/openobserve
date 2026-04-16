@@ -984,3 +984,145 @@ fn sanitize_filename(filename: &str) -> String {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_filename_alphanumeric() {
+        assert_eq!(sanitize_filename("report123"), "report123");
+    }
+
+    #[test]
+    fn test_sanitize_filename_allowed_special_chars() {
+        assert_eq!(sanitize_filename("my-report_v1 final"), "my-report_v1 final");
+    }
+
+    #[test]
+    fn test_sanitize_filename_replaces_slashes() {
+        assert_eq!(sanitize_filename("folder/report"), "folder_report");
+    }
+
+    #[test]
+    fn test_sanitize_filename_replaces_dots() {
+        assert_eq!(sanitize_filename("report.pdf"), "report_pdf");
+    }
+
+    #[test]
+    fn test_sanitize_filename_replaces_special_chars() {
+        assert_eq!(sanitize_filename("report@2024!"), "report_2024_");
+    }
+
+    #[test]
+    fn test_sanitize_filename_empty_string() {
+        assert_eq!(sanitize_filename(""), "");
+    }
+
+    #[test]
+    fn test_sanitize_filename_all_special() {
+        assert_eq!(sanitize_filename("@#$%^&*"), "_______");
+    }
+
+    #[test]
+    fn test_report_error_display_smtp_not_enabled() {
+        let err = ReportError::SmtpNotEnabled;
+        assert_eq!(err.to_string(), "SMTP configuration not enabled");
+    }
+
+    #[test]
+    fn test_report_error_display_chrome_not_enabled() {
+        let err = ReportError::ChromeNotEnabled;
+        assert_eq!(err.to_string(), "Chrome not enabled");
+    }
+
+    #[test]
+    fn test_report_error_display_name_is_empty() {
+        let err = ReportError::NameIsEmpty;
+        assert_eq!(err.to_string(), "Report name is required");
+    }
+
+    #[test]
+    fn test_report_error_display_name_contains_forward_slash() {
+        let err = ReportError::NameContainsForwardSlash;
+        assert_eq!(err.to_string(), "Report name cannot contain '/'");
+    }
+
+    #[test]
+    fn test_report_error_display_report_not_found() {
+        let err = ReportError::ReportNotFound;
+        assert_eq!(err.to_string(), "Report not found");
+    }
+
+    #[test]
+    fn test_report_error_display_no_dashboards() {
+        let err = ReportError::NoDashboards;
+        assert_eq!(err.to_string(), "Atleast one dashboard is required");
+    }
+
+    #[test]
+    fn test_report_error_display_no_destinations() {
+        let err = ReportError::NoDestinations;
+        assert_eq!(err.to_string(), "Atleast one destination is required");
+    }
+
+    #[test]
+    fn test_report_error_display_folder_not_found() {
+        let err = ReportError::FolderNotFound;
+        assert_eq!(err.to_string(), "Folder not found");
+    }
+
+    #[test]
+    fn test_report_error_display_create_default_folder_error() {
+        let err = ReportError::CreateDefaultFolderError;
+        assert_eq!(err.to_string(), "Error creating default reports folder");
+    }
+
+    #[test]
+    fn test_report_error_display_name_already_used() {
+        let err = ReportError::CreateReportNameAlreadyUsed;
+        assert_eq!(err.to_string(), "Report already exists");
+    }
+
+    #[test]
+    fn test_report_error_display_no_dashboard_tabs() {
+        let err = ReportError::NoDashboardTabs;
+        assert_eq!(err.to_string(), "Atleast one tab is required");
+    }
+
+    #[test]
+    fn test_report_error_display_inline_attachment_not_supported() {
+        let err = ReportError::InlineAttachmentTypeNotSupportedForPdf;
+        assert_eq!(
+            err.to_string(),
+            "Inline attachment type is only supported for PNG reports, not PDF"
+        );
+    }
+
+    #[test]
+    fn test_report_error_display_dashboard_tab_not_found() {
+        let err = ReportError::DashboardTabNotFound;
+        assert_eq!(err.to_string(), "Some dashboards/tabs not found");
+    }
+
+    #[test]
+    fn test_report_error_display_username_password_not_set() {
+        let err = ReportError::ReportUsernamePasswordNotSet;
+        assert_eq!(
+            err.to_string(),
+            "Report username and password ENVs not set"
+        );
+    }
+
+    #[test]
+    fn test_report_error_display_name_contains_unsupported_chars() {
+        let err = ReportError::NameContainsOpenFgaUnsupportedCharacters;
+        assert!(err.to_string().contains("Report name cannot contain"));
+    }
+
+    #[test]
+    fn test_report_error_db_error() {
+        let err = ReportError::DbError(anyhow::anyhow!("connection refused"));
+        assert!(err.to_string().contains("connection refused"));
+    }
+}
