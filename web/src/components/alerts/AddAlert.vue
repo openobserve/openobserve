@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goBackToAlertsList"
             />
 
-            <!-- EDIT MODE: dashboard-style breadcrumb (folder → chevron → name) -->
+            <!-- EDIT MODE: (folder → chevron → name) -->
             <template v-if="beingUpdated || anomalyEditMode">
               <span
                 class="q-table__title alert-folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
@@ -96,15 +96,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0 tw:ml-2">
                 <label class="alert-v3-inline-label">Folder</label>
-                <q-select
+                <InlineSelectFolderDropdown
                   :model-value="activeFolderId"
-                  :options="alertFolderOptions"
-                  emit-value
-                  map-options
-                  dense
-                  borderless
-                  hide-bottom-space
-                  class="alert-v3-field topbar-folder-select"
+                  type="alerts"
+                  class="topbar-folder-select"
                   @update:model-value="updateActiveFolderId({ value: $event })"
                 />
               </div>
@@ -112,7 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           </div>
 
-          <!-- Push everything to the right -->
           <div class="tw:flex-1" />
 
           <!-- Stream Type -->
@@ -178,11 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <q-select
               v-model="formData.is_real_time"
-              :options="[
-                { label: t('alerts.scheduled'), value: 'false' },
-                { label: t('alerts.realTime'), value: 'true' },
-                ...(isAnomalyDetectionEnabled ? [{ label: t('alerts.anomalyDetection'), value: 'anomaly' }] : []),
-              ]"
+              :options="alertTypeOptions"
               emit-value
               map-options
               dense
@@ -207,13 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Tab Headers -->
         <div class="tw:flex tw:border-b tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'">
           <div
-            v-for="tab in (isAnomalyMode ? [
-              { key: 'anomaly-config', label: t('alerts.anomalyDetectionConfig'), required: true },
-              { key: 'anomaly-alerting', label: t('alerts.alerting') || 'Alerting', required: anomalyConfig.alert_enabled },
-            ] : [
-              { key: 'condition', label: 'Alert Rules', required: true },
-              { key: 'advanced', label: t('alerts.steps.advanced') },
-            ]).filter(t => t.show !== false)"
+            v-for="tab in alertTabs"
             :key="tab.key"
             class="tw:px-4 tw:py-2.5 tw:cursor-pointer tw:text-sm tw:font-medium tw:relative tw:select-none tw:transition-colors"
             :class="activeTab === tab.key
@@ -476,21 +460,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, computed, watch, onBeforeUnmount } from "vue";
+import { defineComponent, computed, watch } from "vue";
 
 import JsonEditor from "../common/JsonEditor.vue";
-import HorizontalStepper from "./HorizontalStepper.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
 import AlertSettings from "./steps/AlertSettings.vue";
 import CompareWithPast from "./steps/CompareWithPast.vue";
 import Deduplication from "./steps/Deduplication.vue";
 import Advanced from "./steps/Advanced.vue";
-import AlertWizardRightColumn from "./AlertWizardRightColumn.vue";
-import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import InlineSelectFolderDropdown from "../common/sidebar/InlineSelectFolderDropdown.vue";
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
-import DateTimePicker from "@/components/DateTimePicker.vue";
 import AnomalyDetectionConfig from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.vue";
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
@@ -525,17 +505,13 @@ export default defineComponent({
   ],
   components: {
     JsonEditor,
-    HorizontalStepper,
     QueryConfig,
     AlertSettings,
     CompareWithPast,
     Deduplication,
     Advanced,
-    AlertWizardRightColumn,
     PreviewAlert,
     AlertSummary,
-    SelectFolderDropDown,
-    DateTimePicker,
     AnomalyDetectionConfig,
     AnomalyAlerting,
     AnomalySummary,
@@ -569,45 +545,28 @@ export default defineComponent({
       }
     );
 
-    // ── Floating preview widget ──
-    const floatingPreview = ref(false);
-    const floatingPreviewRef = ref<any>(null);
+    const activeEvaluationStatus = computed(() =>
+      alertForm.previewAlertRef.value?.evaluationStatus || null
+    );
+    const alertTypeOptions = computed(() => [
+      { label: alertForm.t("alerts.scheduled"), value: "false" },
+      { label: alertForm.t("alerts.realTime"), value: "true" },
+      ...(isAnomalyDetectionEnabled.value
+        ? [{ label: alertForm.t("alerts.anomalyDetection"), value: "anomaly" }]
+        : []),
+    ]);
 
-    // Use floating preview's status when it's active, otherwise use inline
-    const activeEvaluationStatus = computed(() => {
-      if (floatingPreview.value && floatingPreviewRef.value?.evaluationStatus) {
-        return floatingPreviewRef.value.evaluationStatus;
-      }
-      return alertForm.previewAlertRef.value?.evaluationStatus || null;
-    });
-    const floatingWidgetRef = ref<HTMLElement | null>(null);
-    const floatingPos = reactive({
-      x: typeof window !== 'undefined' ? window.innerWidth - 470 : 600,
-      y: 100,
-    });
-    const floatingWidgetStyle = computed(() => ({
-      left: `${floatingPos.x}px`,
-      top: `${floatingPos.y}px`,
-    }));
-
-    let dragOffset = { x: 0, y: 0 };
-    const onFloatingDragStart = (e: MouseEvent) => {
-      dragOffset.x = e.clientX - floatingPos.x;
-      dragOffset.y = e.clientY - floatingPos.y;
-      document.addEventListener('mousemove', onFloatingDragMove);
-      document.addEventListener('mouseup', onFloatingDragEnd);
-    };
-    const onFloatingDragMove = (e: MouseEvent) => {
-      floatingPos.x = Math.max(0, Math.min(e.clientX - dragOffset.x, window.innerWidth - 420));
-      floatingPos.y = Math.max(0, Math.min(e.clientY - dragOffset.y, window.innerHeight - 240));
-    };
-    const onFloatingDragEnd = () => {
-      document.removeEventListener('mousemove', onFloatingDragMove);
-      document.removeEventListener('mouseup', onFloatingDragEnd);
-    };
-    onBeforeUnmount(() => {
-      document.removeEventListener('mousemove', onFloatingDragMove);
-      document.removeEventListener('mouseup', onFloatingDragEnd);
+    const alertTabs = computed(() => {
+      const tabs = alertForm.isAnomalyMode.value
+        ? [
+            { key: "anomaly-config", label: alertForm.t("alerts.anomalyDetectionConfig"), required: true },
+            { key: "anomaly-alerting", label: alertForm.t("alerts.alerting") || "Alerting", required: alertForm.anomalyConfig.value.alert_enabled },
+          ]
+        : [
+            { key: "condition", label: "Alert Rules", required: true },
+            { key: "advanced", label: alertForm.t("alerts.steps.advanced") },
+          ];
+      return tabs.filter((tab: any) => (tab as any).show !== false);
     });
 
     const activeFolderName = computed(() => {
@@ -615,13 +574,6 @@ export default defineComponent({
       const found = folders.find((f: any) => f.folderId === alertForm.activeFolderId.value);
       return found?.name ?? "default";
     });
-
-    const alertFolderOptions = computed(() =>
-      (alertForm.store.state.organizationData.foldersByType?.alerts ?? []).map((f: any) => ({
-        label: f.name,
-        value: f.folderId,
-      }))
-    );
 
     const goBackToAlertsList = () => {
       return alertForm.router.push({
@@ -635,15 +587,11 @@ export default defineComponent({
     return {
       ...alertForm,
       isAnomalyDetectionEnabled,
+      alertTypeOptions,
+      alertTabs,
       activeFolderName,
-      alertFolderOptions,
       goBackToAlertsList,
-      floatingPreview,
-      floatingPreviewRef,
       activeEvaluationStatus,
-      floatingWidgetRef,
-      floatingWidgetStyle,
-      onFloatingDragStart,
     };
   },
 
@@ -660,28 +608,6 @@ export default defineComponent({
 .body--dark .active-tab {
   color: #fff;
   border-bottom-color: var(--q-primary);
-}
-
-#editor {
-  width: 100%;
-  min-height: 5rem;
-  resize: both;
-}
-
-
-// V3 Top Bar Styles
-.alert-v3-field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  height: 52px; // label(20px) + gap(4px) + control(28px)
-  justify-content: flex-end;
-}
-
-.alert-v3-label {
-  font-size: 14px;
-  font-weight: 700;
-  white-space: nowrap;
 }
 
 .alert-v3-inline-label {
@@ -756,90 +682,6 @@ export default defineComponent({
   }
 }
 
-.alert-v3-toggle {
-  height: 28px !important;
-  overflow: visible;
-
-  :deep(.q-btn) {
-    height: 28px !important;
-    min-height: 28px !important;
-    font-size: 12px;
-    padding: 0 12px !important;
-    font-weight: 500;
-    line-height: 28px;
-    border-radius: 4px !important;
-  }
-}
-
-
-.alert-v3-folder {
-  height: 28px !important;
-  display: flex;
-  align-items: center;
-
-  // The root div of SelectFolderDropDown
-  :deep(> div) {
-    display: flex;
-    align-items: center;
-    height: 28px;
-    width: 100%;
-  }
-  :deep(.showLabelOnTop) {
-    width: 100% !important;
-    margin-right: 0 !important;
-    padding-top: 0 !important;
-  }
-  :deep(.q-field__label) {
-    display: none !important;
-  }
-  :deep(.q-field) {
-    height: 28px !important;
-    min-height: 28px !important;
-    padding-top: 0 !important;
-  }
-  :deep(.q-field__inner) {
-    padding-top: 0 !important;
-  }
-  :deep(.q-field__control) {
-    height: 28px !important;
-    min-height: 28px !important;
-    border-radius: 4px;
-    padding-top: 0 !important;
-  }
-  :deep(.q-field__control-container) {
-    padding-top: 0 !important;
-    height: 28px !important;
-  }
-  :deep(.q-field__native),
-  :deep(.q-field__input) {
-    padding: 0 4px !important;
-    font-size: 13px;
-    min-height: 28px !important;
-    height: 28px !important;
-    line-height: 28px !important;
-  }
-  :deep(.q-field__marginal) {
-    height: 28px !important;
-    min-height: 28px !important;
-  }
-  :deep(.q-field__append) {
-    height: 28px !important;
-    align-items: center;
-  }
-  :deep(.add-folder-btn) {
-    display: none !important;
-  }
-}
-
-.alert-v3-add-folder-btn {
-  height: 28px !important;
-  min-height: 28px !important;
-  width: 28px !important;
-  min-width: 28px !important;
-  padding: 0 !important;
-  flex-shrink: 0;
-}
-
 .alert-condition {
   .__column,
   .__value {
@@ -861,53 +703,6 @@ export default defineComponent({
   }
 }
 
-.floating-preview-widget {
-  position: fixed;
-  z-index: 9999;
-  width: 420px;
-  height: 240px;
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
-
-  &--light {
-    background: #ffffff;
-    border: 1px solid #e0e0e0;
-  }
-  &--dark {
-    background: #1e1e1e;
-    border: 1px solid #424242;
-  }
-
-  &__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 32px;
-    padding: 0 4px 0 10px;
-    cursor: grab;
-    user-select: none;
-    flex-shrink: 0;
-    &:active { cursor: grabbing; }
-
-    &--light {
-      background: #f5f5f5;
-      border-bottom: 1px solid #e0e0e0;
-    }
-    &--dark {
-      background: #2a2a2a;
-      border-bottom: 1px solid #424242;
-    }
-  }
-
-  &__body {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-  }
-}
 </style>
 <style lang="scss">
 // ── Global compact 28px sizing for alert inputs/selects ────────────────────
