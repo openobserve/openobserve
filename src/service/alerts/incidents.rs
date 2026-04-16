@@ -342,22 +342,56 @@ async fn send_incident_notifications(
 
     let org_id = alert.org_id.as_str();
 
-    // Load incident to get severity, title and service_name.
-    let (severity, title, service_name) =
+    // Load incident to get severity and title.
+    let (severity, title) =
         match infra::table::alert_incidents::get(org_id, incident_id).await {
             Ok(Some(model)) => {
-                let gv: std::collections::HashMap<String, String> =
-                    serde_json::from_value(model.group_values).unwrap_or_default();
-                let svc = gv
-                    .get("service_name")
-                    .or_else(|| gv.get("service"))
-                    .cloned()
-                    .unwrap_or_default();
                 let title_str = model.title.unwrap_or_default();
-                (model.severity, title_str, svc)
+                (model.severity, title_str)
             }
-            _ => ("P3".to_string(), String::new(), String::new()),
+            _ => ("P3".to_string(), String::new()),
         };
+
+    // Resolve service name from the join table ('responsible' row), falling back
+    // to group_values extraction for incidents created before WP-1 shipped.
+    let service_name = {
+        let from_join = infra::table::alert_incident_services::get_by_incident(incident_id)
+            .await
+            .ok()
+            .and_then(|links| {
+                links
+                    .into_iter()
+                    .find(|l| l.role == "responsible")
+                    .map(|l| l.service_stream_id)
+            });
+
+        match from_join {
+            Some(ssid) => {
+                infra::table::service_streams::list_by_id(org_id, &ssid)
+                    .await
+                    .ok()
+                    .and_then(|mut recs| recs.pop())
+                    .map(|r| r.service_name)
+                    .unwrap_or_default()
+            }
+            None => {
+                // Pre-WP-1 fallback: extract from group_values
+                infra::table::alert_incidents::get(org_id, incident_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|model| {
+                        let gv: std::collections::HashMap<String, String> =
+                            serde_json::from_value(model.group_values).unwrap_or_default();
+                        gv.get("service_name")
+                            .or_else(|| gv.get("service"))
+                            .cloned()
+                            .unwrap_or_default()
+                    })
+                    .unwrap_or_default()
+            }
+        }
+    };
 
     let cfg = config::get_config();
     let incident_url = format!(
@@ -1001,6 +1035,20 @@ async fn create_new_incident(
                 }
             });
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        let org_id_ev = org_id.to_string();
+        let incident_id_ev = incident.id.clone();
+        tokio::spawn(async move {
+            o2_enterprise::enterprise::alerts::incidents::publish_incident_event(
+                &org_id_ev,
+                "incident.created",
+                &incident_id_ev,
+            )
+            .await;
+        });
     }
 
     Ok(IncidentCorrelationOutcome::NewIncidentCreated {
@@ -2003,6 +2051,27 @@ pub async fn update_status(
         log::error!("[SUPER_CLUSTER] Failed to publish incident update_status: {e}");
     }
 
+    // Publish lifecycle event (fire-and-forget)
+    #[cfg(feature = "enterprise")]
+    {
+        let event_name = match status {
+            "acknowledged" => Some("incident.acknowledged"),
+            "resolved"     => Some("incident.resolved"),
+            "open"         => Some("incident.reopened"),
+            _ => None,
+        };
+        if let Some(ev) = event_name {
+            let org_id_ev = org_id.to_string();
+            let incident_id_ev = incident_id.to_string();
+            tokio::spawn(async move {
+                o2_enterprise::enterprise::alerts::incidents::publish_incident_event(
+                    &org_id_ev, ev, &incident_id_ev,
+                )
+                .await;
+            });
+        }
+    }
+
     model_to_incident(updated).await
 }
 
@@ -2071,6 +2140,21 @@ pub async fn update_severity(
             log::error!("[Incidents] Failed to record severity event: {e}");
         }
         send_incident_severity_notification(org_id, incident_id).await;
+
+        // Publish lifecycle event (fire-and-forget)
+        #[cfg(feature = "enterprise")]
+        {
+            let org_id_ev = org_id.to_string();
+            let incident_id_ev = incident_id.to_string();
+            tokio::spawn(async move {
+                o2_enterprise::enterprise::alerts::incidents::publish_incident_event(
+                    &org_id_ev,
+                    "incident.severity_changed",
+                    &incident_id_ev,
+                )
+                .await;
+            });
+        }
     }
 
     model_to_incident(updated).await

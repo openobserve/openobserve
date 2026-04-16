@@ -1344,3 +1344,59 @@ pub struct IncidentService {
     pub owner_emails: Vec<String>,
     pub oncall_schedule_id: Option<String>,
 }
+
+/// Joined view returned by GET /services and GET /services/{id}.
+/// Combines service_streams identity with service_routing_config operational data.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ServiceWithRouting {
+    // ── From service_streams ──────────────────────────────────────────────────
+    pub id: String,
+    pub org_id: String,
+    pub service_name: String,
+    pub set_id: String,
+    pub disambiguation: serde_json::Value,
+    pub all_dimensions: serde_json::Value,
+    pub logs_streams: serde_json::Value,
+    pub traces_streams: serde_json::Value,
+    pub metrics_streams: serde_json::Value,
+    pub last_seen: i64,
+
+    // ── From service_routing_config (all optional — may not exist yet) ────────
+    pub routing_config_id: Option<String>,
+    pub owner_emails: Vec<String>,
+    pub oncall_schedule_id: Option<String>,
+    pub escalation_policy_id: Option<String>,
+    /// Extensible list of notification targets. Empty when no routing config exists.
+    pub notification_targets: Vec<NotificationTarget>,
+
+    // ── Computed ──────────────────────────────────────────────────────────────
+    /// Count of open incidents where this service appears as 'responsible' or 'impacted'.
+    pub open_incident_count: i64,
+    /// Resolved on-call info — null until WP-3 ships.
+    pub resolved_oncall: Option<serde_json::Value>,
+}
+
+/// Request body for PUT /services/{id}/routing
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PutRoutingConfigRequest {
+    #[serde(default)]
+    pub owner_emails: Vec<String>,
+    pub oncall_schedule_id: Option<String>,
+    pub escalation_policy_id: Option<String>,
+    #[serde(default)]
+    pub notification_targets: Vec<NotificationTarget>,
+}
+
+/// Request body for PATCH /incidents/{id}/services/{service_stream_id}/role
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PatchServiceRoleRequest {
+    pub role: IncidentServiceRole,
+}
+
+/// Request body for PATCH /incidents/{id}/metadata
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PatchIncidentMetadataRequest {
+    /// JSON merge-patch applied to external_refs.
+    /// Keys set to null are removed; new keys are added; existing keys are overwritten.
+    pub external_refs: serde_json::Value,
+}

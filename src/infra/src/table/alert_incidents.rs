@@ -500,6 +500,53 @@ pub async fn update_incident_metadata(
     Ok(())
 }
 
+/// Apply a JSON merge-patch to `external_refs` on an incident.
+///
+/// - New keys are added.
+/// - Existing keys are overwritten.
+/// - Keys whose value is `serde_json::Value::Null` are removed.
+///
+/// The merge is applied at the application layer (read-modify-write) so it
+/// works identically on SQLite and Postgres.
+pub async fn update_external_refs(
+    org_id: &str,
+    id: &str,
+    patch: serde_json::Value,
+) -> Result<alert_incidents::Model, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let now = chrono::Utc::now().timestamp_micros();
+
+    let incident = get(org_id, id)
+        .await?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
+
+    // Merge patch into existing external_refs (or start from empty object)
+    let mut existing: serde_json::Map<String, serde_json::Value> = incident
+        .external_refs
+        .as_ref()
+        .and_then(|v| v.as_object().cloned())
+        .unwrap_or_default();
+
+    if let serde_json::Value::Object(patch_map) = patch {
+        for (k, v) in patch_map {
+            if v.is_null() {
+                existing.remove(&k);
+            } else {
+                existing.insert(k, v);
+            }
+        }
+    }
+
+    let mut active: alert_incidents::ActiveModel = incident.into();
+    active.external_refs = Set(Some(serde_json::Value::Object(existing)));
+    active.updated_at = Set(now);
+
+    active
+        .update(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 /// Find open incidents with optional filters (general-purpose function)
 ///
 /// A flexible function for finding open incidents with various filters.

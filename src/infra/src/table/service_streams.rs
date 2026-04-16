@@ -458,6 +458,23 @@ pub async fn list_by_name(
     Ok(records.into_iter().map(model_to_record).collect())
 }
 
+/// Get a single service record by its KSUID, scoped to an org.
+pub async fn list_by_id(
+    org_id: &str,
+    id: &str,
+) -> Result<Vec<ServiceRecord>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let records = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.eq(id))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(records.into_iter().map(model_to_record).collect())
+}
+
 /// Delete all service records for a specific identity set within an organization.
 /// Called when a set is removed from the config to clean up stale data.
 pub async fn delete_by_set_id(org_id: &str, set_id: &str) -> Result<(), errors::Error> {

@@ -723,6 +723,14 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
+        // Incident service linking + metadata (WP-1)
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/services/{service_stream_id}/role", patch(services::patch_incident_service_role))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/metadata", patch(services::patch_incident_metadata))
+
+        // Services routing config (WP-1)
+        .route("/v2/{org_id}/services", get(services::list_services))
+        .route("/v2/{org_id}/services/{service_stream_id}", get(services::get_service))
+        .route("/v2/{org_id}/services/{service_stream_id}/routing", put(services::put_service_routing).delete(services::delete_service_routing))
 
         // Alert templates
         .route("/{org_id}/alerts/templates", get(alerts::templates::list_templates).post(alerts::templates::save_template))
