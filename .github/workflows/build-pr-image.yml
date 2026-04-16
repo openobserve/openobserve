@@ -21,6 +21,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      packages: write
     runs-on: ubicloud-standard-8
     steps:
       - name: Remove unused tools
@@ -81,6 +82,13 @@ jobs:
         with:
           registry-type: public
 
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -96,6 +104,7 @@ jobs:
           context: .
           tags: |
             public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
+            ghcr.io/openobserve/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
           push: true
           cache-from: type=gha,scope=amd64
           cache-to: type=gha,mode=max,scope=amd64
@@ -106,6 +115,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      packages: write
     runs-on: "ubicloud-standard-16-arm"
     steps:
       - name: Remove unused tools
@@ -166,6 +176,13 @@ jobs:
         with:
           registry-type: public
 
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -181,6 +198,7 @@ jobs:
           context: .
           tags: |
             public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
+            ghcr.io/openobserve/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
           push: true
           cache-from: type=gha,scope=arm64
           cache-to: type=gha,mode=max,scope=arm64
@@ -193,6 +211,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      packages: write
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -218,6 +237,13 @@ jobs:
         with:
           registry-type: public
 
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: int128/docker-manifest-create-action@v2
         with:
           tags: |
@@ -225,6 +251,14 @@ jobs:
           sources: |
             public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
             public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
+
+      - uses: int128/docker-manifest-create-action@v2
+        with:
+          tags: |
+            ghcr.io/openobserve/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}
+          sources: |
+            ghcr.io/openobserve/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
+            ghcr.io/openobserve/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
 
   build_pr_image_summary:
     runs-on: ubuntu-latest
