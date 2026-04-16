@@ -642,7 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Chart + Vertical Slider row -->
               <div class="tw:flex tw:gap-3">
                 <!-- Time series chart -->
-                <div ref="chartWrapperRef" class="sensitivity-chart-wrapper tw:flex-1">
+                <div class="sensitivity-chart-wrapper tw:flex-1">
                   <div
                     v-if="!previewActive"
                     class="sensitivity-empty-state"
@@ -676,20 +676,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="anomaly-sensitivity-chart"
                     @series-data-update="onSeriesDataUpdate"
                   />
-                  <!-- Threshold lines: positions come from actual slider thumb
-                       DOM measurements so they align pixel-perfectly. -->
-                  <template v-if="previewActive && previewHasData && lineTopMax >= 0">
-                    <div
-                      class="threshold-line threshold-line--max"
-                      :style="{ top: lineTopMax + 'px', left: lineLeft + 'px' }"
-                      :title="'Max threshold: ' + thresholdRange.max"
-                    />
-                    <div
-                      class="threshold-line threshold-line--min"
-                      :style="{ top: lineTopMin + 'px', left: lineLeft + 'px' }"
-                      :title="'Min threshold: ' + thresholdRange.min"
-                    />
-                  </template>
                 </div>
 
                 <!-- Vertical dual-handle range slider -->
@@ -726,7 +712,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, nextTick, ref, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import * as echarts from "echarts/core";
 import streamService from "@/services/stream";
 import {
   ANOMALY_FILTER_OPERATORS,
@@ -1107,6 +1092,10 @@ export default defineComponent({
           custom_chart_options: {
             tooltip: { appendToBody: true, confine: false },
           },
+          mark_line: [
+            { name: "max threshold", type: "yAxis", value: String(thresholdRange.value.max) },
+            { name: "min threshold", type: "yAxis", value: String(thresholdRange.value.min) },
+          ],
         },
         queryType: "sql",
         queries: [
@@ -1160,8 +1149,7 @@ export default defineComponent({
       previewKey.value++;
       previewActive.value = true;
       previewHasData.value = false; // reset until new data arrives
-      // Measure after the slider has rendered in its new state
-      nextTick(updateLinePositions);
+      seriesDataMax.value = null;
     };
 
     // Auto-refresh when Look Back Window, Detection Resolution, filters, or
@@ -1192,7 +1180,7 @@ export default defineComponent({
     // ── Sensitivity slider ──────────────────────────────────────────────────
     const thresholdRange = ref<{ min: number; max: number }>({
       min: props.config.threshold_min ?? 0,
-      max: props.config.threshold ?? 97,
+      max: props.config.threshold ?? 100,
     });
 
     const onThresholdRangeChange = (val: { min: number; max: number }) => {
@@ -1206,66 +1194,57 @@ export default defineComponent({
       ([max, min]) => {
         thresholdRange.value = {
           min: (min as number) ?? 0,
-          max: (max as number) ?? 97,
+          max: (max as number) ?? 100,
         };
       },
     );
 
-    // ── Threshold line positions ────────────────────────────────────────────
-    // Measured from the actual Quasar thumb DOM elements so lines align
-    // exactly with the slider handles regardless of CSS internals.
-    const sliderRef = ref<any>(null);
-    const chartWrapperRef = ref<HTMLElement | null>(null);
-    const lineTopMax = ref(-1); // -1 = hidden until measured
-    const lineTopMin = ref(-1);
-    const lineLeft = ref(0); // px from chart wrapper left = y-axis line position
     const previewHasData = ref(false);
+    const seriesDataMax = ref<number | null>(null);
 
     const onSeriesDataUpdate = (data: any) => {
       const series = data?.options?.series ?? data?.series ?? [];
       previewHasData.value = series.some(
         (s: any) => Array.isArray(s.data) && s.data.length > 0,
       );
-    };
 
-    const updateLinePositions = () => {
-      const sliderEl = sliderRef.value?.$el as HTMLElement | undefined;
-      const chartEl = chartWrapperRef.value;
-      if (!sliderEl || !chartEl) return;
-
-      const thumbs = Array.from(
-        sliderEl.querySelectorAll(".q-slider__thumb"),
-      ) as HTMLElement[];
-      if (thumbs.length < 2) return;
-
-      const chartTop = chartEl.getBoundingClientRect().top;
-      // Sort top-to-bottom so [0]=max (top handle), [1]=min (bottom handle)
-      thumbs.sort(
-        (a, b) =>
-          a.getBoundingClientRect().top - b.getBoundingClientRect().top,
-      );
-
-      const r0 = thumbs[0].getBoundingClientRect();
-      const r1 = thumbs[1].getBoundingClientRect();
-      lineTopMax.value = r0.top + r0.height / 2 - chartTop;
-      lineTopMin.value = r1.top + r1.height / 2 - chartTop;
-
-      // Find where the y-axis line is (left boundary of the data area) so the
-      // threshold lines don't overlap the y-axis labels.
-      try {
-        const echartsEl = chartEl.querySelector("[_echarts_instance_]") as HTMLElement | null;
-        if (echartsEl) {
-          const instance = echarts.getInstanceByDom(echartsEl) as any;
-          const rect = instance?.getModel()?.getComponent("grid")?.coordinateSystem?.getRect();
-          if (rect?.x > 0) lineLeft.value = rect.x;
+      // Find the max y value across all series so we can convert the 0-100
+      // slider percentages into actual y-axis values for the mark lines.
+      let max = -Infinity;
+      for (const s of series) {
+        if (!Array.isArray(s.data)) continue;
+        for (const point of s.data) {
+          // Points can be [x, y], plain number, or { value: [x, y] / y }
+          let raw: any = point;
+          if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) raw = raw.value;
+          const v: any = Array.isArray(raw) ? raw[1] : raw;
+          if (typeof v === "number" && isFinite(v) && v > max) max = v;
         }
-      } catch {
-        // fallback: leave lineLeft at 0
+      }
+      if (isFinite(max) && max !== seriesDataMax.value) {
+        seriesDataMax.value = max;
       }
     };
 
-    // Re-measure whenever the slider values change
-    watch(thresholdRange, () => nextTick(updateLinePositions), { deep: true });
+    const updateMarkLines = (maxPct: number, minPct: number) => {
+      if (!previewPanelSchema.value) return;
+      const yMax = seriesDataMax.value;
+      // If data is loaded, map 0-100% → actual y values; otherwise fall back to raw %
+      const toValue = (pct: number) => yMax !== null ? (pct / 100) * yMax : pct;
+      previewPanelSchema.value.config.mark_line = [
+        { name: "", type: "yAxis", value: String(toValue(maxPct)) },
+        { name: "", type: "yAxis", value: String(toValue(minPct)) },
+      ];
+    };
+
+    // Keep mark_line in sync with slider — update the schema config in-place
+    // so PanelSchemaRenderer re-renders the lines without a full chart reload.
+    watch(thresholdRange, ({ max, min }) => updateMarkLines(max, min), { deep: true });
+
+    // Re-apply mark lines once data max is known after chart loads.
+    watch(seriesDataMax, () => {
+      updateMarkLines(thresholdRange.value.max, thresholdRange.value.min);
+    });
 
     return {
       t,
@@ -1295,14 +1274,8 @@ export default defineComponent({
       previewPanelSchema,
       previewTimeObj,
       loadPreview,
-      sliderRef,
-      chartWrapperRef,
-      lineTopMax,
-      lineTopMin,
-      lineLeft,
       previewHasData,
       onSeriesDataUpdate,
-      updateLinePositions,
     };
   },
 });
@@ -1396,35 +1369,6 @@ export default defineComponent({
 .sensitivity-chart-wrapper {
   min-height: 180px;
   position: relative;
-}
-
-.threshold-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 0;
-  pointer-events: none;
-  z-index: 2;
-
-  &::after {
-    content: "";
-    position: absolute;
-    right: -5px;
-    top: -5px;
-    border-top: 4px solid transparent;
-    border-bottom: 4px solid transparent;
-    border-left: 6px solid var(--q-primary);
-  }
-
-  &--max {
-    border-top: 1.5px dashed var(--q-primary);
-    opacity: 0.85;
-  }
-
-  &--min {
-    border-top: 1.5px dashed var(--q-primary);
-    opacity: 0.5;
-  }
 }
 
 
