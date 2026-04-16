@@ -14,6 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { toRaw, markRaw } from "vue";
+import {
+  detectChunkingDirection,
+  shouldPrependChunk,
+} from "@/utils/dashboard/chunkingDirection";
 
 /**
  * Composable that encapsulates all streaming search response event handlers
@@ -79,10 +83,7 @@ export const usePanelSearchHandlers = ({
           }
         }
 
-        // Determine prepend vs append based on chunking direction AND order_by.
-        // RTL + asc → prepend, RTL + desc → append
-        // LTR + asc → append, LTR + desc → prepend
-        const shouldPrepend = buffer.isLTR !== buffer.orderAsc;
+        const shouldPrepend = shouldPrependChunk(buffer.isLTR, buffer.orderAsc);
 
         if (shouldPrepend) {
           state.data[queryIndex] = markRaw([
@@ -133,37 +134,29 @@ export const usePanelSearchHandlers = ({
     ) {
       // time_offset may be at content.results.time_offset (search_response)
       // or at content.time_offset (search_response_metadata format)
-      const firstChunkStart =
+      const direction = detectChunkingDirection(
         searchRes?.content?.results?.time_offset?.start_time ??
-        searchRes?.content?.time_offset?.start_time ??
-        0;
-      const firstChunkEnd =
+          searchRes?.content?.time_offset?.start_time ??
+          0,
         searchRes?.content?.results?.time_offset?.end_time ??
-        searchRes?.content?.time_offset?.end_time ??
-        0;
-      const userStart =
+          searchRes?.content?.time_offset?.end_time ??
+          0,
         state.metadata?.queries?.[queryIndex]?.startTime ??
-        state.metadata?.queries?.[0]?.startTime ??
-        0;
-      const userEnd =
+          state.metadata?.queries?.[0]?.startTime ??
+          0,
         state.metadata?.queries?.[queryIndex]?.endTime ??
-        state.metadata?.queries?.[0]?.endTime ??
-        0;
-
-      if (firstChunkStart && firstChunkEnd && userStart && userEnd) {
-        chunkingLeftToRight.set(
-          queryIndex,
-          Math.abs(firstChunkStart - userStart) <=
-            Math.abs(firstChunkEnd - userEnd),
-        );
+          state.metadata?.queries?.[0]?.endTime ??
+          0,
+      );
+      if (direction !== null) {
+        chunkingLeftToRight.set(queryIndex, direction);
       }
     }
 
     const isLTR = chunkingLeftToRight.get(queryIndex) ?? false;
     const orderAsc =
       searchRes?.content?.results?.order_by?.toLowerCase() === "asc";
-    // Prepend vs append: RTL+asc→prepend, RTL+desc→append, LTR+asc→append, LTR+desc→prepend
-    const shouldPrepend = isLTR !== orderAsc;
+    const shouldPrepend = shouldPrependChunk(isLTR, orderAsc);
 
     // if streaming aggs, replace the state data
     if (streaming_aggs) {
@@ -206,23 +199,18 @@ export const usePanelSearchHandlers = ({
         ...(searchRes?.content ?? {}),
         ...(searchRes?.content?.results ?? {}),
       };
-      const firstChunkStart = metaContent?.time_offset?.start_time ?? 0;
-      const firstChunkEnd = metaContent?.time_offset?.end_time ?? 0;
-      const userStart =
+      const direction = detectChunkingDirection(
+        metaContent?.time_offset?.start_time ?? 0,
+        metaContent?.time_offset?.end_time ?? 0,
         state.metadata?.queries?.[currentQueryIndex]?.startTime ??
-        state.metadata?.queries?.[0]?.startTime ??
-        0;
-      const userEnd =
+          state.metadata?.queries?.[0]?.startTime ??
+          0,
         state.metadata?.queries?.[currentQueryIndex]?.endTime ??
-        state.metadata?.queries?.[0]?.endTime ??
-        0;
-
-      if (firstChunkStart && firstChunkEnd && userStart && userEnd) {
-        chunkingLeftToRight.set(
-          currentQueryIndex,
-          Math.abs(firstChunkStart - userStart) <=
-            Math.abs(firstChunkEnd - userEnd),
-        );
+          state.metadata?.queries?.[0]?.endTime ??
+          0,
+      );
+      if (direction !== null) {
+        chunkingLeftToRight.set(currentQueryIndex, direction);
       }
     }
 

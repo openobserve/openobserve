@@ -16,14 +16,29 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fillMissingValues } from "./sqlMissingValueFiller";
 
-// Mock date-fns-tz: toZonedTime passes through the date unchanged
+// Mock date-fns-tz: toZonedTime shifts the date so its local representation
+// equals the requested timezone. For "UTC", local getHours() = UTC hours.
+// This makes the tests timezone-independent.
 vi.mock("date-fns-tz", () => ({
-  toZonedTime: vi.fn((date: Date) => date),
+  toZonedTime: vi.fn((date: Date, tz: string) => {
+    const d = new Date(date);
+    if (tz === "UTC") {
+      return new Date(d.getTime() + d.getTimezoneOffset() * 60000);
+    }
+    return d;
+  }),
 }));
 
-// Mock date-fns: format always returns a constant formatted time
+// Mock date-fns: format returns an ISO-like string using the date's local time.
+// Combined with the toZonedTime mock above, this produces UTC-formatted strings
+// (matching production behavior). A constant mock causes an infinite loop in
+// the fill loop because currentFormattedTime never advances past endTimeForFill.
 vi.mock("date-fns", () => ({
-  format: vi.fn(() => "2024-01-15T10:00:00"),
+  format: vi.fn((date: Date) => {
+    const d = new Date(date);
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }),
 }));
 
 // Mock datetimeStartPoint: dateBin returns startTime (the second arg)
@@ -43,12 +58,11 @@ vi.mock("@/utils/dashboard/aliasUtils", () => ({
   getDataValue: vi.fn((obj: any, key: any) => obj?.[key]),
 }));
 
-// TS = 1705323600000000 microseconds → ms = 1705323600000
-// startTime = endTime = new Date(1705323600000)
-// dateBin mock returns startTime, so currentTime === endTime → loop runs exactly once
-// interval = 60 seconds, intervalMillis = 60000 ms → after first iteration currentTime > endTime
-const TS_MICROS = 1705323600000000;
-const TS_MS = 1705323600000; // TS_MICROS / 1000
+// Use Date.UTC to guarantee timezone-independent epoch for 2024-01-15T10:00:00 UTC.
+// startTime = endTime = this date → dateBin mock returns startTime → loop runs exactly once
+// interval = 60 seconds → after first iteration currentTime > endTime
+const TS_MS = Date.UTC(2024, 0, 15, 10, 0, 0); // 2024-01-15T10:00:00 UTC in ms
+const TS_MICROS = TS_MS * 1000; // same in microseconds
 
 const makeMetadata = (overrides?: any) => ({
   queries: [
