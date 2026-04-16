@@ -64,13 +64,13 @@ pub struct OrgToolset {
 // ---------------------------------------------------------------------------
 
 fn encrypt_data(dek: &[u8], plaintext: &str) -> Result<String, errors::Error> {
-    config::utils::encrypt::Algorithm::Aes256Siv
+    config::utils::encryption::Algorithm::Aes256Siv
         .encrypt(dek, plaintext)
         .map_err(|e| errors::Error::Message(e.to_string()))
 }
 
 fn decrypt_data(dek: &[u8], ciphertext_b64: &str) -> Result<String, errors::Error> {
-    config::utils::encrypt::Algorithm::Aes256Siv
+    config::utils::encryption::Algorithm::Aes256Siv
         .decrypt(dek, ciphertext_b64)
         .map_err(|e| errors::Error::Message(e.to_string()))
 }

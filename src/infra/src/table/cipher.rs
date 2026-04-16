@@ -55,7 +55,7 @@ const DEK_CACHE_TTL: Duration = Duration::from_secs(300);
 static MASTER_KEY: OnceLock<MasterKey> = OnceLock::new();
 
 struct MasterKey {
-    algo: config::utils::encrypt::Algorithm,
+    algo: config::utils::encryption::Algorithm,
     key: Vec<u8>,
 }
 
@@ -75,7 +75,7 @@ impl MasterKey {
 
 fn get_master_key() -> &'static MasterKey {
     MASTER_KEY.get_or_init(|| MasterKey {
-        algo: config::utils::encrypt::Algorithm::None,
+        algo: config::utils::encryption::Algorithm::None,
         key: vec![],
     })
 }
@@ -92,7 +92,7 @@ pub fn init_master_key(key_b64: &str) -> Result<(), errors::Error> {
     let key = config::utils::encryption::decode_encryption_key(key_b64)
         .map_err(errors::Error::Message)?;
     let _ = MASTER_KEY.set(MasterKey {
-        algo: config::utils::encrypt::Algorithm::Aes256Siv,
+        algo: config::utils::encryption::Algorithm::Aes256Siv,
         key,
     });
     Ok(())
