@@ -69,7 +69,7 @@ const getDefaultDashboardPanelData: any = () => ({
   data: {
     version: 2,
     id: "",
-    type: "bar",
+    type: "line",
     title: "",
     description: "",
     config: {
@@ -290,7 +290,19 @@ const cleanAggregationQuery = (query: string): string => {
       /\bSELECT\s+/i,
       "SELECT histogram(_timestamp) AS zo_sql_key, ",
     );
-    cleaned = cleaned.replace(/\bGROUP\s+BY\s+/i, "GROUP BY zo_sql_key, ");
+    if (/\bGROUP\s+BY\s+/i.test(cleaned)) {
+      // Existing GROUP BY — prepend zo_sql_key to it
+      cleaned = cleaned.replace(/\bGROUP\s+BY\s+/i, "GROUP BY zo_sql_key, ");
+    } else {
+      // No GROUP BY at all — append one before ORDER BY / LIMIT or at end
+      if (/\bORDER\s+BY\b/i.test(cleaned)) {
+        cleaned = cleaned.replace(/\bORDER\s+BY\b/i, "GROUP BY zo_sql_key ORDER BY");
+      } else if (/\bLIMIT\b/i.test(cleaned)) {
+        cleaned = cleaned.replace(/\bLIMIT\b/i, "GROUP BY zo_sql_key LIMIT");
+      } else {
+        cleaned += " GROUP BY zo_sql_key";
+      }
+    }
   }
   // Move zo_sql_num field to sit right after zo_sql_key in the SELECT list.
   // Pattern: remove ", <expr> AS zo_sql_num" from wherever it is, then
@@ -336,12 +348,12 @@ const determineChartType = (extractedFields: {
     return "line";
   }
 
-  // If we have group by without time series, could be bar chart
+  // If we have group by without time series, use line chart
   if (
     extractedFields.group_by.length > 0 &&
     extractedFields.group_by.length <= 2
   ) {
-    return "bar";
+    return "line";
   }
 
   // Otherwise use table for best compatibility
@@ -482,12 +494,18 @@ const fetchQuerySchema = async () => {
           label: "Time",
         },
       ];
+      const aggFunction = props.formData.query_condition?.aggregation?.function || "";
+      const aggColumn = props.formData.query_condition?.aggregation?.having?.column || "";
+      const yLabel = aggColumn
+        ? aggFunction ? `${aggFunction}(${aggColumn})` : aggColumn
+        : "zo_sql_num";
+
       dashboardPanelData.data.queries[0].fields.y = [
         {
           alias: "zo_sql_num",
           column: "zo_sql_num",
           color: "#5960b2",
-          label: "zo_sql_num",
+          label: yLabel,
         },
       ];
       dashboardPanelData.data.queries[0].fields.z = [];
@@ -657,24 +675,86 @@ const handleChartDataUpdate = (resultMetaData: any) => {
           firstQueryMetadata[firstQueryMetadata.length - 1];
 
         // Determine result count based on query mode
-        // SQL mode and custom with aggregations: use 'total' field (count of aggregated groups)
-        if (
-          props.selectedTab === "sql" ||
-          (props.selectedTab === "custom" && props.isAggregationEnabled)
-        ) {
-          // Sum up total from all partitions instead of just taking the last one
-          // This handles streaming responses where data comes in multiple partitions
-          if (
-            firstQueryMetadata.some(
-              (partition: any) => partition?.total !== undefined,
-            )
-          ) {
-            resultCount = firstQueryMetadata.reduce(
-              (sum: number, partition: any) => {
-                return sum + (partition?.total || 0);
-              },
-              0,
-            );
+        // Custom builder with aggregation: re-aggregate per group across time buckets
+        // before applying the having condition — histogram adds time-bucket rows that
+        // would otherwise inflate the count.
+        // SQL mode uses simple row count (trigger = "did SQL return >= N rows?")
+        if (props.selectedTab === "custom" && props.isAggregationEnabled) {
+          const havingValue = props.formData.query_condition?.aggregation?.having?.value;
+          const havingOperator = props.formData.query_condition?.aggregation?.having?.operator || ">=";
+          const aggFunction = props.formData.query_condition?.aggregation?.function || "avg";
+          const groupByFields: string[] = (props.formData.query_condition?.aggregation?.group_by || [])
+            .filter((f: string) => f && f.trim() !== "");
+          const numHaving = havingValue != null && havingValue !== "" ? Number(havingValue) : null;
+
+          const passesHaving = (val: number): boolean => {
+            if (numHaving === null) return true;
+            switch (havingOperator) {
+              case ">=": return val >= numHaving;
+              case ">":  return val > numHaving;
+              case "<=": return val <= numHaving;
+              case "<":  return val < numHaving;
+              case "=":
+              case "==": return val === numHaving;
+              case "!=": return val !== numHaving;
+              default:   return val >= numHaving;
+            }
+          };
+
+          // Collect all hits across partitions
+          const allHits: any[] = [];
+          for (const partition of firstQueryMetadata) {
+            if (Array.isArray(partition?.hits)) {
+              allHits.push(...partition.hits);
+            }
+          }
+
+          if (allHits.length > 0 && groupByFields.length > 0) {
+            // Group hits by the user's group_by field combination (strip time bucket dimension)
+            const groupMap = new Map<string, number[]>();
+            for (const hit of allHits) {
+              const key = groupByFields.map((f: string) => String(hit[f] ?? "")).join("\x00");
+              if (!groupMap.has(key)) groupMap.set(key, []);
+              groupMap.get(key)!.push(Number(hit.zo_sql_num ?? hit.alert_agg_value ?? 0));
+            }
+
+            // Re-apply the aggregation function across time buckets per group, then check having
+            for (const values of groupMap.values()) {
+              let aggVal: number;
+              switch (aggFunction) {
+                case "min":    aggVal = Math.min(...values); break;
+                case "max":    aggVal = Math.max(...values); break;
+                case "sum":
+                case "count":  aggVal = values.reduce((a, b) => a + b, 0); break;
+                case "avg":
+                default:       aggVal = values.reduce((a, b) => a + b, 0) / values.length; break;
+              }
+              if (passesHaving(aggVal)) resultCount++;
+            }
+          } else if (allHits.length > 0) {
+            // No group_by: single group — aggregate all values and check once
+            const values = allHits.map((h: any) => Number(h.zo_sql_num ?? h.alert_agg_value ?? 0));
+            let aggVal: number;
+            switch (aggFunction) {
+              case "min":    aggVal = Math.min(...values); break;
+              case "max":    aggVal = Math.max(...values); break;
+              case "sum":
+              case "count":  aggVal = values.reduce((a, b) => a + b, 0); break;
+              case "avg":
+              default:       aggVal = values.reduce((a, b) => a + b, 0) / values.length; break;
+            }
+            if (passesHaving(aggVal)) resultCount = 1;
+          }
+
+          // Fallback: if no hits available, use total row count
+          if (resultCount === 0 && allHits.length === 0 && firstQueryMetadata.some((p: any) => p?.total !== undefined)) {
+            resultCount = firstQueryMetadata.reduce((sum: number, p: any) => sum + (p?.total || 0), 0);
+          }
+        }
+        // SQL mode: trigger = "SQL returned >= N rows", so count total rows returned
+        else if (props.selectedTab === "sql") {
+          if (firstQueryMetadata.some((p: any) => p?.total !== undefined)) {
+            resultCount = firstQueryMetadata.reduce((sum: number, p: any) => sum + (p?.total || 0), 0);
           } else if (Array.isArray(latestPartition?.hits)) {
             resultCount = latestPartition.hits.length;
           }
@@ -757,61 +837,42 @@ const handleChartDataUpdate = (resultMetaData: any) => {
   }
 };
 
-// Handle series data update event (for PromQL and other series-based data)
+// Handle series data update event (PromQL only — aggregation evaluation uses handleChartDataUpdate)
 const handleSeriesDataUpdate = (seriesData: any) => {
-  // Only process for PromQL mode
-  if (props.selectedTab !== "promql") {
-    return;
-  }
+  if (!props.formData.trigger_condition) return;
 
-  // Safety check: ensure trigger_condition exists
-  if (!props.formData.trigger_condition) {
-    console.warn("[PreviewAlert] No trigger_condition found in series update");
-    return;
-  }
+  // Aggregation mode is evaluated from partition hits in handleChartDataUpdate
+  if (props.selectedTab === "custom" && props.isAggregationEnabled) return;
+
+  // --- PromQL mode ---
+  if (props.selectedTab !== "promql") return;
 
   try {
-    // seriesData should contain the chart series information
-    // For PromQL, count the number of series (time series count)
     let resultCount = 0;
-
     if (Array.isArray(seriesData)) {
       resultCount = seriesData.length;
     } else if (seriesData && typeof seriesData === "object") {
-      // Check if there's a nested array
       if (Array.isArray(seriesData.series)) {
         resultCount = seriesData.series.length;
       } else if (Array.isArray(seriesData.data)) {
         resultCount = seriesData.data.length;
-      } else if (
-        seriesData.options &&
-        Array.isArray(seriesData.options.series)
-      ) {
-        // ECharts series are in options.series
-        // Filter to only count actual data series with meaningful data
-        // Exclude helper/placeholder series (unnamed series with only 1 data point)
+      } else if (seriesData.options && Array.isArray(seriesData.options.series)) {
         const dataSeries = seriesData.options.series.filter((s: any) => {
           const hasData = s.data && Array.isArray(s.data);
           const hasMultiplePoints = hasData && s.data.length > 1;
           const hasName = s.name !== undefined && s.name !== null;
-
-          // Count series that either have a name OR have multiple data points
-          // This filters out placeholder series (no name, 1 point)
           return (hasName || hasMultiplePoints) && hasData;
         });
         resultCount = dataSeries.length;
       } else if (seriesData.options?.dataset?.source) {
-        // Dataset-based series
         const source = seriesData.options.dataset.source;
         if (Array.isArray(source) && source.length > 1) {
-          resultCount = source.length - 1; // Subtract header row
+          resultCount = source.length - 1;
         }
       }
     }
 
-    if (resultCount > 0) {
-      evaluateAndSetStatus(resultCount);
-    }
+    if (resultCount > 0) evaluateAndSetStatus(resultCount);
   } catch (error) {
     console.error("[PreviewAlert] Error processing series data:", error);
   }
@@ -876,8 +937,8 @@ const evaluateAndSetStatus = (resultCount: number) => {
     dashboardPanelData.data.queries[0]?.fields?.x?.length > 0;
 
   let resultLabel = "result";
-  if (chartType === "bar" && hasGroupBy) {
-    resultLabel = resultCount !== 1 ? "groups" : "group";
+  if (props.isAggregationEnabled && hasGroupBy) {
+    resultLabel = resultCount !== 1 ? "matching groups" : "matching group";
   } else if (chartType === "line") {
     resultLabel = resultCount !== 1 ? "data points" : "data point";
   } else if (chartType === "table") {
@@ -969,6 +1030,13 @@ const refreshData = () => {
     dashboardPanelData.data.queryType = "promql";
     dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
 
+    // Add threshold mark line from promql_condition
+    const promqlThreshold = props.formData.query_condition?.promql_condition?.value;
+    dashboardPanelData.data.config.mark_line =
+      promqlThreshold !== undefined && promqlThreshold !== null && promqlThreshold !== ""
+        ? [{ name: "Threshold", type: "yAxis", value: String(promqlThreshold) }]
+        : [];
+
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
     const newTimeObj = { ...dashboardPanelData.meta.dateTime };
@@ -1015,7 +1083,8 @@ const refreshData = () => {
     dashboardPanelData.data.queries[0].fields.stream_type =
       props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
-    dashboardPanelData.data.type = "bar"; // Bar chart for histogram
+    dashboardPanelData.data.type = "line"; // Line chart for histogram
+    dashboardPanelData.data.config.mark_line = [];
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
@@ -1088,6 +1157,7 @@ watch(
     props.formData.trigger_condition?.period,
     props.formData.trigger_condition?.threshold,
     props.formData.trigger_condition?.operator,
+    props.formData.query_condition?.promql_condition?.value,
     props.selectedTab,
     props.isUsingBackendSql,
   ],
@@ -1100,6 +1170,7 @@ watch(
     // Skip the first watch trigger on mount since onMounted will handle it
     if (isInitialLoad) {
       isInitialLoad = false;
+      lastRefreshTime = Date.now(); // stamp so 200ms debounce blocks rapid follow-up
       return;
     }
 
@@ -1152,8 +1223,9 @@ const resizeChart = async () => {
   // No need to do anything else - ResizeObserver handles it automatically
 };
 
-// Expose refreshDataOnce instead of refreshData to prevent duplicate calls from parent
-defineExpose({ refreshData: refreshDataOnce, resizeChart, evaluationStatus });
+// Expose the real refreshData for explicit parent calls (bypasses the 200ms debounce).
+// The watcher internally still uses refreshDataOnce to prevent duplicate calls on rapid prop changes.
+defineExpose({ refreshData, resizeChart, evaluationStatus });
 </script>
 
 <style scoped>
