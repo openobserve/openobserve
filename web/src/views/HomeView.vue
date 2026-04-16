@@ -18,7 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!no_data_ingest && !isLoadingSummary" class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container" :class="store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 40px)]' : 'tw:h-full'" style="display: flex; flex-direction: column; ">
         <!-- Banners section -->
         <div class="banners-wrapper">
-          <TrialPeriod></TrialPeriod>
+          <div>
+            <WebinarBanner variant="home" />
+            <TrialPeriod></TrialPeriod>
+         </div>
           <LicensePeriod v-if="!showUsageReportBanner" @update-license="goToLicensePage"></LicensePeriod>
           <UsageReportBanner></UsageReportBanner>
           <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
