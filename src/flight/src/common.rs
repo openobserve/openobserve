@@ -117,7 +117,7 @@ pub struct MetricsInfo {
 }
 
 impl PreCustomMessage {
-    pub fn is_scan_stats(&self) -> bool {
+    pub fn is_early_emit(&self) -> bool {
         matches!(
             self,
             PreCustomMessage::ScanStats(_)
@@ -220,29 +220,29 @@ mod tests {
     }
 
     #[test]
-    fn test_pre_custom_message_is_scan_stats() {
+    fn test_pre_custom_message_is_early_emit() {
         let scan_stats = create_test_scan_stats();
 
         // Test ScanStats variant
         let pre_msg = PreCustomMessage::ScanStats(scan_stats);
-        assert!(pre_msg.is_scan_stats());
+        assert!(pre_msg.is_early_emit());
 
         // Test ScanStatsRef variant with Some
         let stats_ref = Arc::new(Mutex::new(scan_stats));
         let pre_msg = PreCustomMessage::ScanStatsRef(Some(stats_ref));
-        assert!(pre_msg.is_scan_stats());
+        assert!(pre_msg.is_early_emit());
 
         // Test ScanStatsRef variant with None
         let pre_msg = PreCustomMessage::ScanStatsRef(None);
-        assert!(pre_msg.is_scan_stats());
+        assert!(pre_msg.is_early_emit());
 
         // Test Metrics variant (should be false)
         let pre_msg = PreCustomMessage::Metrics(None);
-        assert!(!pre_msg.is_scan_stats());
+        assert!(!pre_msg.is_early_emit());
 
         // Test MetricsRef variant (should be false)
         let pre_msg = PreCustomMessage::MetricsRef(vec![]);
-        assert!(!pre_msg.is_scan_stats());
+        assert!(!pre_msg.is_early_emit());
     }
 
     #[test]
