@@ -86,12 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </div>
 
-          <!-- Push everything to the right -->
-          <div class="tw:flex-1" />
-
-          <!-- Folder -->
+          <!-- Folder (next to alert name) -->
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-            <label class="alert-v3-inline-label tw:opacity-80 tw:font-semibold">Folder</label>
+            <label class="alert-v3-inline-label">Folder</label>
             <InlineSelectFolderDropdown
               :model-value="activeFolderId"
               type="alerts"
@@ -100,12 +97,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <!-- Separator after Folder -->
-          <div class="tw:w-px tw:h-5 tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600/50' : 'tw:bg-gray-300'" />
+          <!-- Push everything to the right -->
+          <div class="tw:flex-1" />
 
           <!-- Stream Type -->
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-            <label class="alert-v3-inline-label tw:opacity-80 tw:font-semibold">{{ t("alerts.streamType") }} <span class="tw:text-red-500">*</span></label>
+            <label class="alert-v3-inline-label">{{ t("alerts.streamType") }} <span class="tw:text-red-500">*</span></label>
             <q-select
               ref="streamTypeRef"
               data-test="add-alert-stream-type-select-dropdown"
@@ -131,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Stream Name -->
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-            <label class="alert-v3-inline-label tw:opacity-80 tw:font-semibold">{{ t("alerts.stream_name") }} <span class="tw:text-red-500">*</span></label>
+            <label class="alert-v3-inline-label">{{ t("alerts.stream_name") }} <span class="tw:text-red-500">*</span></label>
             <q-select
               ref="streamNameRef"
               data-test="add-alert-stream-name-select-dropdown"
@@ -164,27 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
             <label class="alert-v3-inline-label">{{ t("alerts.alertType") || 'Alert Type' }}</label>
 
-            <!-- Tabs: default -->
-            <div v-if="!store.state.isAiChatEnabled" class="alert-type-tabs">
-              <button
-                v-for="tab in [
-                  { key: 'false', label: t('alerts.scheduled') },
-                  { key: 'true', label: t('alerts.realTime') },
-                  ...(isAnomalyDetectionEnabled ? [{ key: 'anomaly', label: t('alerts.anomalyDetection') }] : []),
-                ]"
-                :key="tab.key"
-                class="alert-type-tab"
-                :class="{ active: formData.is_real_time === tab.key }"
-                :disabled="beingUpdated || anomalyEditMode"
-                @click="formData.is_real_time = tab.key"
-              >
-                {{ tab.label }}
-              </button>
-            </div>
-
-            <!-- Dropdown: when AI chat is open -->
             <q-select
-              v-else
               v-model="formData.is_real_time"
               :options="[
                 { label: t('alerts.scheduled'), value: 'false' },
@@ -671,7 +648,11 @@ export default defineComponent({
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
-  opacity: 0.8;
+  color: rgba(0, 0, 0, 0.72);
+}
+
+.body--dark .alert-v3-inline-label {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .alert-v3-field {
@@ -750,57 +731,6 @@ export default defineComponent({
   }
 }
 
-.alert-type-tabs {
-  display: flex;
-  gap: 2px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 6px;
-  padding: 3px;
-
-  .alert-type-tab {
-    padding: 4px 12px;
-    border-radius: 4px;
-    border: none;
-    background: transparent;
-    color: rgba(0, 0, 0, 0.4);
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    line-height: 1.4;
-
-    &:hover {
-      color: rgba(0, 0, 0, 0.7);
-    }
-
-    &.active {
-      background: #ffffff;
-      color: #202124;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-    }
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-  }
-}
-
-.body--dark .alert-type-tabs {
-  background: rgba(255, 255, 255, 0.05);
-
-  .alert-type-tab {
-    color: rgba(255, 255, 255, 0.45);
-
-    &:hover { color: rgba(255, 255, 255, 0.75); }
-
-    &.active {
-      background: #374151;
-      color: #e4e7eb;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-    }
-  }
-}
 
 .alert-v3-folder {
   height: 28px !important;
