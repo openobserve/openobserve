@@ -317,13 +317,6 @@
     } else {
       groups.value.logicalOperator = groups.value.logicalOperator === 'AND' ? 'OR' : 'AND';
     }
-    // Update all child conditions to match the group's operator
-    const newOp = groups.value.logicalOperator;
-    groups.value.conditions.forEach((item: any) => {
-      if (item.filterType !== 'group') {
-        item.logicalOperator = newOp;
-      }
-    });
     emit('add-group', groups.value); // optional, sync with parent
     emit('input:update', 'conditions', groups.value);
   };

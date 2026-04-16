@@ -87,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <q-input
                 v-else
+                ref="anomalyNameRef"
                 v-model="anomalyConfig.name"
                 dense
                 borderless

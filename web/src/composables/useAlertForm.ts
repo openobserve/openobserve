@@ -415,6 +415,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // Topbar field refs + error states for stream type / stream name
   const streamTypeRef = ref<any>(null);
   const streamNameRef = ref<any>(null);
+  const anomalyNameRef = ref<any>(null);
   const alertNameError = ref(false);
   const streamTypeError = ref(false);
   const streamNameError = ref(false);
@@ -1849,19 +1850,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       const valid = await validateAndFocus();
       if (!valid) return false;
     } else {
-      // Anomaly wizard validation
-      if (step1Ref.value && (step1Ref.value as any).validate) {
-        const isValid = await (step1Ref.value as any).validate();
-        if (!isValid) {
-          wizardStep.value = 1;
-          q.notify({
-            type: "negative",
-            message: "Please complete Alert Setup step correctly.",
-            timeout: 2000,
-          });
-          focusOnFirstError();
-          return false;
-        }
+      // Anomaly wizard validation — validate name from topbar ref
+      if (!anomalyConfig.value.name?.trim()) {
+        q.notify({
+          type: "negative",
+          message: "Anomaly detection name is required.",
+          timeout: 2000,
+        });
+        focusTopbarField(anomalyNameRef);
+        return false;
       }
     }
 
@@ -2735,6 +2732,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     lastValidStep,
     streamTypeRef,
     streamNameRef,
+    anomalyNameRef,
     alertNameError,
     streamTypeError,
     streamNameError,
