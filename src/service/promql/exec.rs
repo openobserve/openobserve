@@ -149,7 +149,7 @@ impl PromqlContext {
         Ok((
             sorted_value,
             final_result_type,
-            *self.scan_stats.read().await,
+            self.scan_stats.read().await.clone(),
         ))
     }
 
@@ -217,7 +217,11 @@ impl PromqlContext {
 
         // empty result quick return
         if instant_vectors.is_empty() {
-            return Ok((Value::None, result_type, *self.scan_stats.read().await));
+            return Ok((
+                Value::None,
+                result_type,
+                self.scan_stats.read().await.clone(),
+            ));
         }
 
         // merge data
@@ -243,6 +247,6 @@ impl PromqlContext {
         // sort data
         let mut value = Value::Matrix(merged_data);
         value.sort();
-        Ok((value, result_type, *self.scan_stats.read().await))
+        Ok((value, result_type, self.scan_stats.read().await.clone()))
     }
 }

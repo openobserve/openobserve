@@ -121,10 +121,10 @@ impl PreCustomMessage {
 
     pub fn get_custom_message(&self) -> Option<CustomMessage> {
         match self {
-            PreCustomMessage::ScanStats(stats) => Some(CustomMessage::ScanStats(*stats)),
+            PreCustomMessage::ScanStats(stats) => Some(CustomMessage::ScanStats(stats.clone())),
             PreCustomMessage::ScanStatsRef(stats_ref) => stats_ref
                 .as_ref()
-                .map(|stats| CustomMessage::ScanStats(*stats.lock())),
+                .map(|stats| CustomMessage::ScanStats(stats.lock().clone())),
             PreCustomMessage::Metrics(metrics_ref) => metrics_ref
                 .as_ref()
                 .map(|metrics_info| CustomMessage::Metrics(collect_metrics(metrics_info))),

@@ -190,7 +190,7 @@ impl Drop for FlightDecoderStream {
         } else {
             "follower".to_string()
         };
-        let scan_stats = self.scan_stats;
+        let scan_stats = self.scan_stats.clone();
 
         log::info!(
             "{}",
