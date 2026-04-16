@@ -49,7 +49,11 @@ pub fn validate(json: &Value) -> Vec<super::ValidationError> {
             // (e.g. ".../minItems" -> "minItems"). This is stable across crate versions,
             // unlike format!("{:?}", e.kind) which relies on internal Debug repr.
             let schema_path_str = e.schema_path.to_string();
-            let keyword = schema_path_str.split('/').next_back().unwrap_or("").to_string();
+            let keyword = schema_path_str
+                .split('/')
+                .next_back()
+                .unwrap_or("")
+                .to_string();
             let message = map_error_message(&path, &keyword, &e.to_string(), json);
             super::ValidationError {
                 path,
@@ -100,10 +104,7 @@ fn map_error_message(path: &str, keyword: &str, raw_message: &str, dashboard: &V
     }
 
     // Dashboard-level errors
-    if (path.is_empty() || path == "/")
-        && keyword == "required"
-        && raw_message.contains("title")
-    {
+    if (path.is_empty() || path == "/") && keyword == "required" && raw_message.contains("title") {
         return "Dashboard title is required".to_string();
     }
 
