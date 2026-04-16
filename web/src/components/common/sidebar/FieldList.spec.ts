@@ -44,9 +44,13 @@ const fieldValuesMocks = vi.hoisted(() => ({
 vi.mock("@/composables/useFieldValuesStream", async () => {
   const { ref } = await import("vue");
   const fieldValuesRef = ref<Record<string, any>>({});
+  const fieldValuesFinalizedValuesRef = ref<Record<string, any[]>>({});
+  const fieldValuesCurrentSizeRef = ref<Record<string, number>>({});
 
   fieldValuesMocks._reset = () => {
     fieldValuesRef.value = {};
+    fieldValuesFinalizedValuesRef.value = {};
+    fieldValuesCurrentSizeRef.value = {};
   };
 
   fieldValuesMocks._setFieldState = (fieldName, patch) => {
@@ -70,6 +74,8 @@ vi.mock("@/composables/useFieldValuesStream", async () => {
   return {
     default: () => ({
       fieldValues: fieldValuesRef,
+      fieldValuesFinalizedValues: fieldValuesFinalizedValuesRef,
+      fieldValuesCurrentSize: fieldValuesCurrentSizeRef,
       fetchFieldValues: fieldValuesMocks.fetchFieldValues,
       cancelFieldStream: fieldValuesMocks.cancelFieldStream,
       resetFieldValues,
