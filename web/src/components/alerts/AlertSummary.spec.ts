@@ -77,7 +77,7 @@ describe("AlertSummary", () => {
       },
     });
 
-    const placeholder = wrapper.find(".summary-placeholder");
+    const placeholder = wrapper.find(".summary-empty-state");
     expect(placeholder.exists()).toBe(true);
   });
 

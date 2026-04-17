@@ -2221,7 +2221,8 @@
     },
     "updateAnomalyDetection": "更新异常检测：",
     "anomalyCreated": "异常检测配置已创建。培训将很快开始。",
-    "editJson": "编辑警报 JSON"
+    "editJson": "编辑警报 JSON",
+    "additional_settings": "其他设置"
   },
   "alert_templates": {
     "header": "模板",

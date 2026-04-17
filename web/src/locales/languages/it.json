@@ -2219,7 +2219,8 @@
     "anomalyCreated": "Configurazione di rilevamento delle anomalie creata. La formazione inizierà a breve.",
     "editJson": "Modifica avviso JSON",
     "importedFromPattern": "Avviso precompilato dal modello di registro",
-    "importedFromAnomalyPattern": "Avviso precompilato da un modello di registro anomalo: rivedi le impostazioni di urgenza"
+    "importedFromAnomalyPattern": "Avviso precompilato da un modello di registro anomalo: rivedi le impostazioni di urgenza",
+    "additional_settings": "Impostazioni aggiuntive"
   },
   "alert_templates": {
     "header": "Modelli",

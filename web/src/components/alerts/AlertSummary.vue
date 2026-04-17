@@ -18,7 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="alert-summary">
     <div class="summary-content" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
       <p v-if="summaryText" class="summary-text" v-html="DOMPurify.sanitize(summaryText)" @click="handleSummaryClick"></p>
-      <p v-else class="summary-placeholder">{{ t('alerts.summary.configureAlert') }}</p>
+      <div v-else class="summary-empty-state">
+        <q-icon name="article" size="36px" class="summary-empty-icon" />
+        <span class="summary-empty-text">{{ t('alerts.summary.configureAlert') || 'Configure your alert to see a summary' }}</span>
+      </div>
     </div>
 
     <!-- Scroll to bottom button -->
@@ -146,6 +149,8 @@ onMounted(async () => {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .summary-text {
@@ -220,10 +225,26 @@ onMounted(async () => {
   }
 }
 
-.summary-placeholder {
-  margin: 0;
-  font-style: italic;
-  opacity: 0.6;
+.summary-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 120px;
+  gap: 8px;
+  padding: 1rem;
+}
+
+.summary-empty-icon {
+  opacity: 0.2;
+}
+
+.summary-empty-text {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: center;
+  opacity: 0.5;
 }
 
 // Scroll to bottom button styling

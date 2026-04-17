@@ -256,7 +256,7 @@ test.describe("Alerts Regression Bugs", () => {
   // ============================================================================
   // SKIPPED: Timing out in current test environment (page.goto timeouts)
   // TODO: Re-enable when environment is stable
-  test.skip("Group By field should show autocomplete suggestions @bug-10899 @P1 @regression @alerts", async ({ page }) => {
+  test("Group By field should show autocomplete suggestions @bug-10899 @P1 @regression @alerts", async ({ page }) => {
     test.setTimeout(300000); // 5 minutes timeout
     testLogger.info('Test: Verify Group By field autocomplete (Bug #10899)');
 
@@ -334,7 +334,7 @@ test.describe("Alerts Regression Bugs", () => {
   // Bug #10872: Multi-window alert VRL processing not working correctly
   // https://github.com/openobserve/openobserve/issues/10872
   // ============================================================================
-  test.skip("VRL Apply button should process multi-window result array correctly @bug-10872 @P2 @regression @alerts", async ({ page }, testInfo) => {
+  test("VRL Apply button should process multi-window result array correctly @bug-10872 @P2 @regression @alerts", async ({ page }, testInfo) => {
     test.setTimeout(300000); // 5 minutes timeout
     testLogger.info('Test: VRL processing for multi-window alerts (Bug #10872)');
 
@@ -428,7 +428,7 @@ test.describe("Alerts Regression Bugs", () => {
   // ============================================================================
   // SKIPPED: Timing out in current test environment (page.goto timeouts)
   // TODO: Re-enable when environment is stable
-  test.skip("Alert firing count should increment when alert fires @bug-10472 @P2 @regression @alerts", async ({ page }, testInfo) => {
+  test("Alert firing count should increment when alert fires @bug-10472 @P2 @regression @alerts", async ({ page }, testInfo) => {
     test.setTimeout(240000); // 4 minutes timeout
     testLogger.info('Test: Verify alert firing count increment (Bug #10472)');
 

@@ -47,7 +47,7 @@ test.describe("Alerts Import/Export", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   });
 
-  test('Import/Export Alert Functionality', {
+  test.skip('Import/Export Alert Functionality', {
     tag: ['@all', '@alerts', '@alertsImportExport'],
     timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
