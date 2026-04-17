@@ -170,7 +170,7 @@ export const fillMissingValues = (
   }
   const uniqueTimeSlotCount = uniqueTimeSlots.size;
 
-  // RTL: insert a null anchor at the user's selected start time when the fill
+  // RTL: insert an empty-string anchor at the user's selected start time when the fill
   // loop doesn't yet cover it. This pins the ECharts x-axis left edge to the
   // user's query range from the very first chunk.
   if (!isLeftToRight && binnedFillStart > binnedDate) {
@@ -278,7 +278,7 @@ export const fillMissingValues = (
     );
   }
 
-  // LTR: insert a null anchor at the user's selected end time when the fill
+  // LTR: insert an empty-string anchor at the user's selected end time when the fill
   // loop doesn't yet cover it. This pins the ECharts x-axis right edge to the
   // user's query range from the very first chunk.
   if (isLeftToRight) {
