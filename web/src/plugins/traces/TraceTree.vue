@@ -16,52 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div v-bind="$attrs" :style="isSidebarOpen && { width: leftWidth + 'px' }">
-    <!-- Virtualizer outer: establishes the full scrollable height -->
+    <!-- Virtualizer outer: sets the full scrollable height -->
     <div
       :style="{ position: 'relative', height: totalSize + 'px', width: '100%' }"
     >
-      <!-- SVG connector overlay — positions derived from span data, no DOM queries -->
-      <svg
-        v-if="connectorLines.length > 0"
-        :style="{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          pointerEvents: 'none',
-          zIndex: 1,
-          overflow: 'visible',
-        }"
-      >
-        <template v-for="(connector, idx) in connectorLines" :key="idx">
-          <line
-            :x1="connector.x1"
-            :y1="connector.y1"
-            :x2="connector.x1"
-            :y2="connector.y2"
-            stroke="var(--o2-border-color)"
-            stroke-width="1.5"
-            opacity="0.6"
-          />
-          <line
-            v-for="(child, ci) in connector.children"
-            :key="ci"
-            :x1="connector.x1"
-            :y1="child.y"
-            :x2="child.x"
-            :y2="child.y"
-            stroke="var(--o2-border-color)"
-            stroke-width="1.5"
-            opacity="0.6"
-          />
-        </template>
-      </svg>
-
       <div
         v-for="virtualRow in virtualRows"
         :key="virtualRow.key"
-        class="span-row-item"
         :style="{
           position: 'absolute',
           top: 0,
@@ -71,6 +32,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           height: (spanDimensions?.height ?? 30) + 'px',
         }"
       >
+        <!-- CSS tree connector lines (no DOM queries needed — derived from span.depth) -->
+        <template v-if="(spans as any[])[virtualRow.index]?.depth > 0">
+          <!-- Vertical segment at the parent badge column -->
+          <template
+            v-for="depth in (spans as any[])[virtualRow.index]?.depth"
+            :key="virtualRow.key + depth"
+          >
+            <div
+              v-if="
+                depth === 1 ||
+                hasNextSiblingAtAncestorDepth(depth - 1, virtualRow.index)
+              "
+              data-test="vertical-segment"
+              :data-left="
+                parseInt((spans as any[])[virtualRow.index].style.left)
+              "
+              :data-depth="depth"
+              :style="{
+                position: 'absolute',
+                left:
+                  parseInt((spans as any[])[virtualRow.index].style.left) -
+                  (spanDimensions?.gap ?? 15) * (depth - 1) +
+                  'px',
+                top: '0',
+                height: hasNextSiblingAtSameDepth(virtualRow.index)
+                  ? spanDimensions.height + 'px'
+                  : (spans as any[])[virtualRow.index]?.depth + 1 - depth ===
+                      (spans as any[])[virtualRow.index]?.depth
+                    ? spanDimensions.height / 2 + 'px'
+                    : spanDimensions.height + 'px',
+                borderLeft: '1.5px solid var(--o2-border-color)',
+                pointerEvents: 'none',
+                zIndex: 1,
+              }"
+            />
+          </template>
+          <!-- Horizontal stub from parent column to this badge -->
+          <div
+            data-test="horizontal-segment"
+            :style="{
+              position: 'absolute',
+              left:
+                parseInt((spans as any[])[virtualRow.index].style.left) + 'px',
+              top: '50%',
+              width: (spans as any[])[virtualRow.index].hasChildSpans
+                ? (spanDimensions?.gap ?? 15) / 2 + 'px'
+                : (spanDimensions?.gap ?? 15) + 5 + 'px',
+              borderTop: '1.5px solid var(--o2-border-color)',
+              pointerEvents: 'none',
+              zIndex: 1,
+            }"
+          />
+        </template>
+
+        <!-- Span row -->
         <div
           :style="{
             position: 'relative',
@@ -92,9 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 margin: `0 0 0 ${
                   (spans as any[])[virtualRow.index].hasChildSpans
                     ? (spans as any[])[virtualRow.index].style.left
-                    : parseInt(
-                          (spans as any[])[virtualRow.index].style.left,
-                        ) +
+                    : parseInt((spans as any[])[virtualRow.index].style.left) +
                       spanDimensions.collapseWidth +
                       'px'
                 }`,
@@ -136,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
-                  class="span-count-box cursor-pointer tw:border-[var(--o2-border-color)]!"
+                  class="span-count-box cursor-pointer tw:border-[var(--o2-border-color)]! tw:relative"
                   :style="{
                     color: (spans as any[])[virtualRow.index].style.color,
                   }"
@@ -149,6 +163,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="`Click to ${collapseMapping[(spans as any[])[virtualRow.index].spanId] ? 'expand' : 'collapse'}`"
                 >
                   {{ getChildCount((spans as any[])[virtualRow.index]) }}
+                  <div
+                    data-test="vertical-segment"
+                    :style="{
+                      position: 'absolute',
+                      left: '0.5rem',
+                      bottom: '-6px',
+                      height: '5px',
+                      borderLeft: '1.5px solid var(--o2-border-color)',
+                      pointerEvents: 'none',
+                      zIndex: 1,
+                    }"
+                  />
                 </div>
 
                 <div
@@ -196,6 +222,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         title="Error Span"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
+                      <span
+                        class="text-subtitle2 text-bold q-mr-sm"
+                        :class="{
+                          highlighted: isHighlighted(
+                            (spans as any[])[virtualRow.index].spanId,
+                          ),
+                          'tw:text-gray-900':
+                            store.state.theme === 'dark' &&
+                            isHighlighted(
+                              (spans as any[])[virtualRow.index].spanId,
+                            ),
+                          'current-match':
+                            currentSelectedValue ===
+                            (spans as any[])[virtualRow.index].spanId,
+                        }"
+                        :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"
+                      >
+                        {{ (spans as any[])[virtualRow.index].serviceName }}
+                      </span>
                       <q-icon
                         v-if="(spans as any[])[virtualRow.index].spanKind"
                         :name="
@@ -221,33 +266,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             getSpanTech((spans as any[])[virtualRow.index]),
                           )
                         "
-                        :title="
-                          getSpanTech((spans as any[])[virtualRow.index])
-                        "
+                        :title="getSpanTech((spans as any[])[virtualRow.index])"
                         class="q-mr-xs tw:shrink-0 tw:w-[0.875rem] tw:h-[0.875rem] tw:inline-block tw:opacity-60"
                         aria-hidden="true"
                         alt=""
                         :data-test="`trace-tree-span-tech-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
-                      <span
-                        class="text-subtitle2 text-bold q-mr-sm"
-                        :class="{
-                          highlighted: isHighlighted(
-                            (spans as any[])[virtualRow.index].spanId,
-                          ),
-                          'tw:text-gray-900':
-                            store.state.theme === 'dark' &&
-                            isHighlighted(
-                              (spans as any[])[virtualRow.index].spanId,
-                            ),
-                          'current-match':
-                            currentSelectedValue ===
-                            (spans as any[])[virtualRow.index].spanId,
-                        }"
-                        :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"
-                      >
-                        {{ (spans as any[])[virtualRow.index].serviceName }}
-                      </span>
                       <span
                         class="text-body2"
                         :class="
@@ -265,7 +289,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-if="isLLMTrace((spans as any[])[virtualRow.index])"
                       class="flex items-center text-caption text-red-6"
-                      style="margin-top: -4px; margin-bottom: 2px; line-height: 1"
+                      style="
+                        margin-top: -4px;
+                        margin-bottom: 2px;
+                        line-height: 1;
+                      "
                     >
                       <span
                         v-if="
@@ -313,9 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="`HTTP ${getHttpStatus((spans as any[])[virtualRow.index])}`"
                       :data-test="`trace-tree-span-http-status-${(spans as any[])[virtualRow.index].spanId}`"
                     >
-                      {{
-                        getHttpStatus((spans as any[])[virtualRow.index])
-                      }}
+                      {{ getHttpStatus((spans as any[])[virtualRow.index]) }}
                     </span>
                     <span
                       v-if="
@@ -385,17 +411,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  nextTick,
-  ref,
-  watch,
-  computed,
-} from "vue";
+import { defineComponent, nextTick, ref, watch, computed } from "vue";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
 import SpanBlock from "./SpanBlock.vue";
 import { useI18n } from "vue-i18n";
+
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
 import {
   getServiceIconDataUrl,
@@ -456,8 +477,8 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    // DOM Element reference to the parent scroll container
     scrollContainer: {
+      // DOM Element ref from parent — no runtime type check needed
       default: null,
     },
   },
@@ -470,6 +491,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { buildQueryDetails, navigateToLogs } = useTraces();
     const store = useStore();
+
     const { t } = useI18n();
 
     // ── Virtualizer ──────────────────────────────────────────────────────────
@@ -485,11 +507,41 @@ export default defineComponent({
     const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
     const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
 
+    // ── CSS connector helper ─────────────────────────────────────────────────
+    // Returns true if there is a sibling at the same depth after this index,
+    // meaning the vertical connector line must continue past the row midpoint.
+    const hasNextSiblingAtSameDepth = (index: number): boolean => {
+      const currentDepth = (props.spans as any[])[index]?.depth ?? 0;
+      for (let i = index + 1; i < (props.spans as any[]).length; i++) {
+        const nextDepth = (props.spans as any[])[i]?.depth ?? 0;
+        if (nextDepth < currentDepth) return false;
+        if (nextDepth === currentDepth) return true;
+      }
+      return false;
+    };
+
+    // Returns true if the ancestor `depthOffset` levels above `index` has a
+    // next sibling at its own depth (depthOffset=0 checks the node itself).
+    const hasNextSiblingAtAncestorDepth = (
+      depthOffset: number,
+      index: number,
+    ): boolean => {
+      if (depthOffset === 0) return hasNextSiblingAtSameDepth(index);
+      const spans = props.spans as any[];
+      const ancestorTreeDepth = (spans[index]?.depth ?? 0) - depthOffset;
+      if (ancestorTreeDepth < 0) return false;
+      for (let i = index - 1; i >= 0; i--) {
+        if ((spans[i]?.depth ?? 0) === ancestorTreeDepth) {
+          return hasNextSiblingAtSameDepth(i);
+        }
+      }
+      return false;
+    };
+
     // ── Actions ──────────────────────────────────────────────────────────────
     function toggleSpanCollapse(spanId: number | string) {
       emit("toggleCollapse", spanId);
     }
-
     const selectSpan = (spanId: string) => {
       emit("selectSpan", spanId);
     };
@@ -507,7 +559,6 @@ export default defineComponent({
     // ── Search ───────────────────────────────────────────────────────────────
     const searchResults = ref<any[]>([]);
     const currentIndex = ref<number | null>(null);
-
     const currentSelectedValue = computed(() => {
       if (
         currentIndex.value === -1 ||
@@ -542,8 +593,6 @@ export default defineComponent({
         .filter((index: any) => index !== -1);
     };
 
-    // Scroll to the current match using the virtualizer instead of querySelector.
-    // This works even when the target row is outside the rendered viewport.
     const scrollToMatch = () => {
       if (searchResults.value.length === 0 || currentIndex.value === null)
         return;
@@ -610,55 +659,6 @@ export default defineComponent({
     });
     watch(searchResults, (newValue) => {
       emit("search-result", newValue.length);
-    });
-
-    // ── SVG Connectors (math-based, no DOM queries) ──────────────────────────
-    const connectorLines = computed(() => {
-      const spans = props.spans as any[];
-      const rowH = props.spanDimensions?.height ?? 30;
-      const gap = props.spanDimensions?.gap ?? 15;
-      const colW = props.spanDimensions?.collapseWidth ?? 14;
-      const pad = 6;
-
-      type ConnectorGroup = {
-        x1: number;
-        y1: number;
-        y2: number;
-        children: { x: number; y: number }[];
-      };
-      const groups = new Map<string, ConnectorGroup>();
-      const spanIndexById = new Map<string, number>();
-
-      for (let i = 0; i < spans.length; i++) {
-        spanIndexById.set(spans[i].spanId ?? spans[i].span_id, i);
-      }
-
-      for (let i = 0; i < spans.length; i++) {
-        const span = spans[i];
-        const parentId = span.parentSpanId ?? span.parent_span_id;
-        if (!parentId) continue;
-        const parentIdx = spanIndexById.get(parentId);
-        if (parentIdx === undefined) continue;
-        const parent = spans[parentIdx];
-
-        const parentX = pad + gap * (parent.depth ?? 0) + colW / 2;
-        const parentY = parentIdx * rowH + rowH / 2;
-        const childY = i * rowH + rowH / 2;
-        const childDepth = span.depth ?? 0;
-        const childX = span.hasChildSpans
-          ? pad + gap * childDepth
-          : pad + gap * childDepth + colW;
-
-        let group = groups.get(parentId);
-        if (!group) {
-          group = { x1: parentX, y1: parentY, y2: childY, children: [] };
-          groups.set(parentId, group);
-        }
-        group.y2 = childY;
-        group.children.push({ x: childX, y: childY });
-      }
-
-      return Array.from(groups.values());
     });
 
     // ── Icon maps ────────────────────────────────────────────────────────────
@@ -770,9 +770,11 @@ export default defineComponent({
       getHttpStatus,
       getHttpStatusVars,
       getEventCount,
+      // virtualizer
       virtualRows,
       totalSize,
-      connectorLines,
+      hasNextSiblingAtSameDepth,
+      hasNextSiblingAtAncestorDepth,
     };
   },
   components: { SpanBlock },
@@ -834,17 +836,13 @@ export default defineComponent({
 .operation-name-container {
   height: 1.875rem;
   overflow: visible;
-
-  .view-logs-container {
-    visibility: hidden;
-  }
 }
 
 .span-row {
   position: relative;
   min-height: 1.875rem;
 
-  // Hover highlight via CSS only — no JS spanHoveredIndex needed
+  // Hover highlight via CSS — no JS required
   &:hover::before {
     content: "";
     position: absolute;
@@ -862,7 +860,7 @@ export default defineComponent({
   }
 
   &:hover .view-logs-container {
-    visibility: visible !important;
+    visibility: visible;
   }
 
   &.span-row-selected {
