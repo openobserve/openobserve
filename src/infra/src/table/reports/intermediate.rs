@@ -272,3 +272,283 @@ pub fn convert_str_to_meta_report_timerange(
     let timerange: MetaReportTimeRange = timerange.into();
     Ok(timerange)
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::dashboards::reports::{
+        ReportDashboardVariable as MetaReportDashboardVariable,
+        ReportDestination as MetaReportDestination, ReportFrequency as MetaReportFrequency,
+        ReportFrequencyType as MetaReportFrequencyType, ReportTimerange as MetaReportTimeRange,
+        ReportTimerangeType as MetaReportTimeRangeType,
+    };
+
+    use super::*;
+
+    // ── ReportFrequencyType conversions ──────────────────────────────────────
+
+    #[test]
+    fn frequency_type_once_roundtrip() {
+        let meta = MetaReportFrequencyType::Once;
+        let db: ReportFrequencyType = meta.into();
+        assert!(matches!(db, ReportFrequencyType::Once));
+    }
+
+    #[test]
+    fn frequency_type_hours_roundtrip() {
+        let meta = MetaReportFrequencyType::Hours;
+        let db: ReportFrequencyType = meta.into();
+        assert!(matches!(db, ReportFrequencyType::Hours));
+    }
+
+    #[test]
+    fn frequency_type_days_roundtrip() {
+        let meta = MetaReportFrequencyType::Days;
+        let db: ReportFrequencyType = meta.into();
+        assert!(matches!(db, ReportFrequencyType::Days));
+    }
+
+    #[test]
+    fn frequency_type_weeks_roundtrip() {
+        let meta = MetaReportFrequencyType::Weeks;
+        let db: ReportFrequencyType = meta.into();
+        assert!(matches!(db, ReportFrequencyType::Weeks));
+    }
+
+    #[test]
+    fn frequency_type_months_roundtrip() {
+        let meta = MetaReportFrequencyType::Months;
+        let db: ReportFrequencyType = meta.into();
+        assert!(matches!(db, ReportFrequencyType::Months));
+    }
+
+    #[test]
+    fn frequency_type_cron_roundtrip() {
+        let meta = MetaReportFrequencyType::Cron;
+        let db: ReportFrequencyType = meta.into();
+        assert!(matches!(db, ReportFrequencyType::Cron));
+    }
+
+    // ── ReportFrequency → MetaReportFrequency ────────────────────────────────
+
+    #[test]
+    fn frequency_once_to_meta() {
+        let db = ReportFrequency {
+            interval: 0,
+            cron: String::new(),
+            frequency_type: ReportFrequencyType::Once,
+            align_time: false,
+        };
+        let meta: MetaReportFrequency = db.into();
+        assert_eq!(meta.frequency_type, MetaReportFrequencyType::Once);
+        assert_eq!(meta.interval, 0);
+    }
+
+    #[test]
+    fn frequency_hours_to_meta() {
+        let db = ReportFrequency {
+            interval: 2,
+            cron: String::new(),
+            frequency_type: ReportFrequencyType::Hours,
+            align_time: false,
+        };
+        let meta: MetaReportFrequency = db.into();
+        assert_eq!(meta.frequency_type, MetaReportFrequencyType::Hours);
+        assert_eq!(meta.interval, 2);
+    }
+
+    #[test]
+    fn frequency_days_to_meta() {
+        let db = ReportFrequency {
+            interval: 3,
+            cron: String::new(),
+            frequency_type: ReportFrequencyType::Days,
+            align_time: false,
+        };
+        let meta: MetaReportFrequency = db.into();
+        assert_eq!(meta.frequency_type, MetaReportFrequencyType::Days);
+        assert_eq!(meta.interval, 3);
+    }
+
+    #[test]
+    fn frequency_weeks_to_meta() {
+        let db = ReportFrequency {
+            interval: 1,
+            cron: String::new(),
+            frequency_type: ReportFrequencyType::Weeks,
+            align_time: true,
+        };
+        let meta: MetaReportFrequency = db.into();
+        assert_eq!(meta.frequency_type, MetaReportFrequencyType::Weeks);
+        assert_eq!(meta.interval, 1);
+        assert!(meta.align_time);
+    }
+
+    #[test]
+    fn frequency_months_to_meta() {
+        let db = ReportFrequency {
+            interval: 6,
+            cron: String::new(),
+            frequency_type: ReportFrequencyType::Months,
+            align_time: false,
+        };
+        let meta: MetaReportFrequency = db.into();
+        assert_eq!(meta.frequency_type, MetaReportFrequencyType::Months);
+        assert_eq!(meta.interval, 6);
+    }
+
+    #[test]
+    fn frequency_cron_to_meta() {
+        let db = ReportFrequency {
+            interval: 0,
+            cron: "0 9 * * 1".to_string(),
+            frequency_type: ReportFrequencyType::Cron,
+            align_time: false,
+        };
+        let meta: MetaReportFrequency = db.into();
+        assert_eq!(meta.frequency_type, MetaReportFrequencyType::Cron);
+        assert_eq!(meta.cron, "0 9 * * 1");
+    }
+
+    // ── MetaReportFrequency → ReportFrequency (TryFrom) ──────────────────────
+
+    #[test]
+    fn meta_frequency_to_db_ok() {
+        let meta = MetaReportFrequency {
+            frequency_type: MetaReportFrequencyType::Hours,
+            interval: 4,
+            cron: String::new(),
+            align_time: false,
+        };
+        let db: ReportFrequency = meta.try_into().unwrap();
+        assert_eq!(db.interval, 4);
+        assert!(matches!(db.frequency_type, ReportFrequencyType::Hours));
+    }
+
+    // ── ReportDestination conversions ────────────────────────────────────────
+
+    #[test]
+    fn destination_email_db_to_meta() {
+        let db = ReportDestination::Email("user@example.com".to_string());
+        let meta: MetaReportDestination = db.into();
+        assert!(matches!(meta, MetaReportDestination::Email(e) if e == "user@example.com"));
+    }
+
+    #[test]
+    fn destination_email_meta_to_db() {
+        let meta = MetaReportDestination::Email("user@example.com".to_string());
+        let db: ReportDestination = meta.into();
+        assert!(matches!(db, ReportDestination::Email(e) if e == "user@example.com"));
+    }
+
+    #[test]
+    fn destinations_vec_roundtrip() {
+        let meta_vec = vec![MetaReportDestination::Email("a@b.com".to_string())];
+        let db: ReportDestinations = meta_vec.into();
+        let back: Vec<MetaReportDestination> = db.into();
+        assert!(matches!(&back[0], MetaReportDestination::Email(e) if e == "a@b.com"));
+    }
+
+    // ── ReportTimerange conversions ──────────────────────────────────────────
+
+    #[test]
+    fn timerange_relative_db_to_meta() {
+        let db = ReportTimerange::Relative {
+            period: "15m".to_string(),
+        };
+        let meta: MetaReportTimeRange = db.into();
+        assert_eq!(meta.range_type, MetaReportTimeRangeType::Relative);
+        assert_eq!(meta.period, "15m");
+    }
+
+    #[test]
+    fn timerange_absolute_db_to_meta() {
+        let db = ReportTimerange::Absolute {
+            from: 1000,
+            to: 2000,
+        };
+        let meta: MetaReportTimeRange = db.into();
+        assert_eq!(meta.range_type, MetaReportTimeRangeType::Absolute);
+        assert_eq!(meta.from, 1000);
+        assert_eq!(meta.to, 2000);
+    }
+
+    #[test]
+    fn timerange_relative_meta_to_db() {
+        let meta = MetaReportTimeRange {
+            range_type: MetaReportTimeRangeType::Relative,
+            period: "1h".to_string(),
+            from: 0,
+            to: 0,
+        };
+        let db: ReportTimerange = meta.into();
+        assert!(
+            matches!(db, ReportTimerange::Relative { period } if period == "1h")
+        );
+    }
+
+    #[test]
+    fn timerange_absolute_meta_to_db() {
+        let meta = MetaReportTimeRange {
+            range_type: MetaReportTimeRangeType::Absolute,
+            period: String::new(),
+            from: 100,
+            to: 200,
+        };
+        let db: ReportTimerange = meta.into();
+        assert!(matches!(db, ReportTimerange::Absolute { from, to } if from == 100 && to == 200));
+    }
+
+    #[test]
+    fn convert_str_to_meta_report_timerange_relative() {
+        let json = serde_json::json!({"relative": {"period": "30m"}});
+        let result = convert_str_to_meta_report_timerange(json).unwrap();
+        assert_eq!(result.range_type, MetaReportTimeRangeType::Relative);
+        assert_eq!(result.period, "30m");
+    }
+
+    #[test]
+    fn convert_str_to_meta_report_timerange_absolute() {
+        let json = serde_json::json!({"absolute": {"from": 500, "to": 1000}});
+        let result = convert_str_to_meta_report_timerange(json).unwrap();
+        assert_eq!(result.range_type, MetaReportTimeRangeType::Absolute);
+        assert_eq!(result.from, 500);
+        assert_eq!(result.to, 1000);
+    }
+
+    // ── ReportDashboardVariable conversions ──────────────────────────────────
+
+    #[test]
+    fn dashboard_variable_db_to_meta() {
+        let db = ReportDashboardVariable {
+            key: "env".to_string(),
+            value: "prod".to_string(),
+            id: Some("v1".to_string()),
+        };
+        let meta: MetaReportDashboardVariable = db.into();
+        assert_eq!(meta.key, "env");
+        assert_eq!(meta.value, "prod");
+        assert_eq!(meta.id, Some("v1".to_string()));
+    }
+
+    #[test]
+    fn dashboard_variable_meta_to_db() {
+        let meta = MetaReportDashboardVariable {
+            key: "region".to_string(),
+            value: "us-east".to_string(),
+            id: None,
+        };
+        let db: ReportDashboardVariable = meta.into();
+        assert_eq!(db.key, "region");
+        assert_eq!(db.id, None);
+    }
+
+    // ── TabNames conversions ─────────────────────────────────────────────────
+
+    #[test]
+    fn tab_names_from_vec() {
+        let tabs = vec!["tab1".to_string(), "tab2".to_string()];
+        let names: TabNames = tabs.clone().into();
+        let back: Vec<String> = names.into();
+        assert_eq!(back, tabs);
+    }
+}

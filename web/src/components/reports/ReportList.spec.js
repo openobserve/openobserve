@@ -21,7 +21,6 @@ import { nextTick, ref } from 'vue';
 import ReportList from "./ReportList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import router from "@/test/unit/helpers/router";
 import reports from "@/services/reports";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import * as vueRouter from 'vue-router';
@@ -257,23 +256,33 @@ describe("ReportList Component", () => {
     });
 
     it("should show loading state during initialization", async () => {
+      // Keep listByFolderId pending so isLoadingReports stays true while we check it
+      let resolveList;
+      vi.mocked(reports.listByFolderId).mockReturnValueOnce(
+        new Promise((resolve) => { resolveList = resolve; })
+      );
+
       const newWrapper = mount(ReportList, {
         global: {
           plugins: [[Quasar, { platform }], [i18n]],
           provide: { store, platform, router: mockRouter },
           mocks: {
             $router: mockRouter,
-            $q: { 
-              platform, 
-              notify: notifyMock, 
-              dialog: dialogMock 
+            $q: {
+              platform,
+              notify: notifyMock,
+              dialog: dialogMock
             },
             router: mockRouter
           }
         }
       });
 
+      // Advance past the getFoldersListByType microtask so loadReports is called
+      await nextTick();
+
       expect(newWrapper.vm.isLoadingReports).toBe(true);
+      resolveList({ data: [] });
       await flushPromises();
       expect(newWrapper.vm.isLoadingReports).toBe(false);
       newWrapper.unmount();
