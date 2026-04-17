@@ -146,7 +146,7 @@ impl FlightEncoderStream {
         let custom_messages = std::mem::take(&mut self.custom_messages);
         let mut remainder_messages = Vec::new();
         for message in custom_messages.into_iter() {
-            if message.is_scan_stats() {
+            if message.is_early_emit() {
                 let message = message.get_custom_message();
                 if let Some(message) = message {
                     let flight_data = self.encoder.encode_custom(&message)?;
