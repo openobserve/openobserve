@@ -23,6 +23,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let filter = ListFilter {
         org: None,
         kind: Some(cipher::EntryKind::CipherKey),
+        name: None,
+        is_system: false,
     };
 
     let data_list = cipher::list_filtered(filter, None).await?;

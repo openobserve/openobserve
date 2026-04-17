@@ -57,6 +57,13 @@ const useFieldValuesStream = () => {
     >
   > = ref({});
 
+  // Finalized values from previous "load more" pages (immutable during streaming)
+  const fieldValuesFinalizedValues: Ref<Record<string, FieldValueEntry[]>> =
+    ref({});
+
+  // Cumulative size requested per field (grows on "load more")
+  const fieldValuesCurrentSize: Ref<Record<string, number>> = ref({});
+
   // Active trace IDs per field (supports multiple concurrent streams per field)
   const traceIdMapper: Ref<Record<string, string[]>> = ref({});
 
@@ -100,6 +107,7 @@ const useFieldValuesStream = () => {
       errMsg: "",
     };
     streamFieldValues.value[fieldName] = {};
+    delete fieldValuesFinalizedValues.value[fieldName];
   };
 
   /** Kick off a streaming values fetch for the given payload. */
@@ -128,7 +136,6 @@ const useFieldValuesStream = () => {
   const handleResponse = (payload: any, response: any) => {
     const fieldName = payload?.queryReq?.fields[0];
     const streamName = payload?.queryReq?.stream_name;
-    const isAppend = (payload?.queryReq?.from ?? 0) > 0;
     const pageSize = store.state.zoConfig?.query_values_default_num || 10;
 
     if (!fieldName) return;
@@ -173,15 +180,9 @@ const useFieldValuesStream = () => {
           );
         }
 
-        // Append in paginated (load-more) mode; replace on fresh load.
-        if (isAppend) {
-          streamFieldValues.value[fieldName][streamName].values = [
-            ...(streamFieldValues.value[fieldName][streamName].values || []),
-            ...chunkValues,
-          ];
-        } else {
-          streamFieldValues.value[fieldName][streamName].values = chunkValues;
-        }
+        // The backend returns the full cumulative result set (from rank 0 to
+        // from+size), so always replace per-stream values rather than appending.
+        streamFieldValues.value[fieldName][streamName].values = chunkValues;
 
         // Aggregate values across all streams and sort by count descending.
         const aggregated: Record<string, number> = {};
@@ -197,17 +198,27 @@ const useFieldValuesStream = () => {
           .map(([key, count]) => ({ key, count }))
           .sort((a, b) => b.count - a.count);
 
-        streamFieldValues.value[fieldName][streamName].hasMore =
-          chunkValues.length >= pageSize;
+        // Merge with finalized values from previous pages.
+        const finalized = fieldValuesFinalizedValues.value[fieldName] || [];
+        const currentSize =
+          fieldValuesCurrentSize.value[fieldName] || pageSize;
 
-        fieldValues.value[fieldName].values = isAppend
-          ? aggregatedArray
-          : aggregatedArray.slice(0, pageSize);
-        fieldValues.value[fieldName].hasMore = isAppend
-          ? Object.values(streamFieldValues.value[fieldName]).some(
-              (s) => s.hasMore,
-            )
-          : aggregatedArray.length >= pageSize;
+        if (finalized.length > 0) {
+          const finalizedKeys = new Set(finalized.map((v) => v.key));
+          const merged = [...finalized];
+          for (const item of aggregatedArray) {
+            if (!finalizedKeys.has(item.key)) {
+              merged.push(item);
+            }
+          }
+          merged.sort((a, b) => b.count - a.count);
+          fieldValues.value[fieldName].values = merged;
+        } else {
+          fieldValues.value[fieldName].values = aggregatedArray;
+        }
+
+        fieldValues.value[fieldName].hasMore =
+          aggregatedArray.length >= currentSize;
       }
 
       fieldValues.value[fieldName].isLoading = false;
@@ -247,6 +258,8 @@ const useFieldValuesStream = () => {
 
   return {
     fieldValues,
+    fieldValuesFinalizedValues,
+    fieldValuesCurrentSize,
     fetchFieldValues,
     cancelFieldStream,
     resetFieldValues,

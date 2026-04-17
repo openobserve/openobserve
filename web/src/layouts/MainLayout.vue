@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[store.state.printMode === true ? 'printMode' : '']"
   >
     <q-header>
+      <!-- Webinar announcement bar: shown above toolbar for cloud users -->
+      <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
+
       <!-- Header component containing logo, navigation, and user controls -->
       <Header
         :store="store"
@@ -92,7 +95,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="col-auto"
         v-show="store.state.isAiChatEnabled && isLoading"
-        style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: 44px; padding-right: 0.625rem;"
+        style="
+          width: 25%;
+          max-width: 100%;
+          min-width: 75px;
+          z-index: 10;
+          padding-top: 44px;
+          padding-right: 0.625rem;
+        "
         :class="
           store.state.theme == 'dark'
             ? 'dark-mode-chat-container'
@@ -109,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-dialog v-model="showGetStarted" maximized
-full-height>
+    <q-dialog v-model="showGetStarted"
+maximized full-height>
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </q-dialog>
     <PredefinedThemes />
@@ -203,6 +213,7 @@ import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
+import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 
 let mainLayoutMixin: any = null;
@@ -218,6 +229,7 @@ export default defineComponent({
   components: {
     "menu-link": MenuLink,
     Header,
+    WebinarBanner,
     "keep-alive": KeepAlive,
     "q-page": QPage,
     "q-page-container": QPageContainer,
@@ -309,7 +321,8 @@ export default defineComponent({
 
     const { getStreams, resetStreams } = useStreams();
     const { closeSocket } = useSearchWebSocket();
-    const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
+    const { isOpen: isPredefinedThemesOpen, toggleThemes } =
+      usePredefinedThemes();
     const { prefetchRoute } = useRoutePrefetch();
 
     const isMonacoEditorLoaded = ref(false);
@@ -381,70 +394,69 @@ export default defineComponent({
     let user = store.state.userInfo;
 
     var linksList = ref([
-        {
-          title: t("menu.home"),
-          icon: outlinedHome,
-          link: "/",
-          exact: true,
-          name: "home",
-        },
-        {
-          title: t("menu.search"),
-          icon: outlinedSearch,
-          link: "/logs",
-          name: "logs",
-        },
-        {
-          title: t("menu.metrics"),
-          icon: outlinedBarChart,
-          link: "/metrics",
-          name: "metrics",
-        },
-        {
-          title: t("menu.traces"),
-          icon: outlinedAccountTree,
-          link: "/traces",
-          name: "traces",
-        },
-        {
-          title: t("menu.rum"),
-          icon: outlinedDevices,
-          link: "/rum",
-          name: "rum",
-        },
-        {
-          title: t("menu.dashboard"),
-          icon: outlinedDashboard,
-          link: "/dashboards",
-          name: "dashboards",
-        },
-        {
-          title: t("menu.index"),
-          icon: outlinedWindow,
-          link: "/streams",
-          name: "streams",
-        },
-        {
-          title: t("menu.alerts"),
-          icon: outlinedReportProblem,
-          link: "/alerts",
-          name: "alertList",
-        },
-        {
-          title: t("menu.ingestion"),
-          icon: outlinedFilterAlt,
-          link: "/ingestion",
-          name: "ingestion",
-        },
-        {
-          title: t("menu.iam"),
-          icon: outlinedManageAccounts,
-          link: "/iam",
-          display: store.state?.currentuser?.role == "admin" ? true : false,
-          name: "iam",
-        },
-      ]);
-
+      {
+        title: t("menu.home"),
+        icon: outlinedHome,
+        link: "/",
+        exact: true,
+        name: "home",
+      },
+      {
+        title: t("menu.search"),
+        icon: outlinedSearch,
+        link: "/logs",
+        name: "logs",
+      },
+      {
+        title: t("menu.metrics"),
+        icon: outlinedBarChart,
+        link: "/metrics",
+        name: "metrics",
+      },
+      {
+        title: t("menu.traces"),
+        icon: outlinedAccountTree,
+        link: "/traces",
+        name: "traces",
+      },
+      {
+        title: t("menu.rum"),
+        icon: outlinedDevices,
+        link: "/rum",
+        name: "rum",
+      },
+      {
+        title: t("menu.dashboard"),
+        icon: outlinedDashboard,
+        link: "/dashboards",
+        name: "dashboards",
+      },
+      {
+        title: t("menu.index"),
+        icon: outlinedWindow,
+        link: "/streams",
+        name: "streams",
+      },
+      {
+        title: t("menu.alerts"),
+        icon: outlinedReportProblem,
+        link: "/alerts",
+        name: "alertList",
+      },
+      {
+        title: t("menu.ingestion"),
+        icon: outlinedFilterAlt,
+        link: "/ingestion",
+        name: "ingestion",
+      },
+      {
+        title: t("menu.iam"),
+        icon: outlinedManageAccounts,
+        link: "/iam",
+        display: store.state?.currentuser?.role == "admin" ? true : false,
+        name: "iam",
+      },
+    ]);
 
     const langList = [
       {
@@ -525,6 +537,17 @@ export default defineComponent({
         console.error("Error in onBeforeMount:", error);
       }
     });
+
+    watch(
+      () => store.state.isWebinarBannerVisible,
+      (visible) => {
+        const navbarHeight = visible
+          ? "calc(36px + 27px)"
+          : "36px";
+        document.documentElement.style.setProperty("--navbar-height", navbarHeight);
+      },
+      { immediate: true },
+    );
 
     onMounted(async () => {
       filterMenus();
@@ -916,23 +939,36 @@ export default defineComponent({
         //set settings in store
         //scrape interval will be in number
         store.dispatch("setOrganizationSettings", {
-          scrape_interval: orgSettings?.data?.data?.scrape_interval ?? defaultSettings.scrape_interval,
+          scrape_interval:
+            orgSettings?.data?.data?.scrape_interval ??
+            defaultSettings.scrape_interval,
           span_id_field_name:
-            orgSettings?.data?.data?.span_id_field_name ?? defaultSettings.span_id_field_name,
+            orgSettings?.data?.data?.span_id_field_name ??
+            defaultSettings.span_id_field_name,
           trace_id_field_name:
-            orgSettings?.data?.data?.trace_id_field_name ?? defaultSettings.trace_id_field_name,
+            orgSettings?.data?.data?.trace_id_field_name ??
+            defaultSettings.trace_id_field_name,
           toggle_ingestion_logs:
-            orgSettings?.data?.data?.toggle_ingestion_logs ?? defaultSettings.toggle_ingestion_logs,
+            orgSettings?.data?.data?.toggle_ingestion_logs ??
+            defaultSettings.toggle_ingestion_logs,
           enable_websocket_search:
-            orgSettings?.data?.data?.enable_websocket_search ?? defaultSettings.enable_websocket_search,
+            orgSettings?.data?.data?.enable_websocket_search ??
+            defaultSettings.enable_websocket_search,
           enable_streaming_search:
-            orgSettings?.data?.data?.enable_streaming_search ?? defaultSettings.enable_streaming_search,
+            orgSettings?.data?.data?.enable_streaming_search ??
+            defaultSettings.enable_streaming_search,
           streaming_aggregation_enabled:
-            orgSettings?.data?.data?.streaming_aggregation_enabled ?? defaultSettings.streaming_aggregation_enabled,
-          free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? defaultSettings.free_trial_expiry,
-          light_mode_theme_color: orgSettings?.data?.data?.light_mode_theme_color,
+            orgSettings?.data?.data?.streaming_aggregation_enabled ??
+            defaultSettings.streaming_aggregation_enabled,
+          free_trial_expiry:
+            orgSettings?.data?.data?.free_trial_expiry ??
+            defaultSettings.free_trial_expiry,
+          light_mode_theme_color:
+            orgSettings?.data?.data?.light_mode_theme_color,
           dark_mode_theme_color: orgSettings?.data?.data?.dark_mode_theme_color,
-          claim_parser_function: orgSettings?.data?.data?.claim_parser_function ?? defaultSettings.claim_parser_function,
+          claim_parser_function:
+            orgSettings?.data?.data?.claim_parser_function ??
+            defaultSettings.claim_parser_function,
           cross_links: orgSettings?.data?.data?.cross_links ?? [],
         });
 
@@ -958,7 +994,9 @@ export default defineComponent({
       } catch (error: any) {
         // Handle permission errors gracefully (403 = Forbidden)
         if (error?.response?.status === 403) {
-          console.warn("Organization settings access denied (403). Using default settings.");
+          console.warn(
+            "Organization settings access denied (403). Using default settings.",
+          );
           // Set default settings when access is denied
           store.dispatch("setOrganizationSettings", defaultSettings);
         } else {
@@ -1354,7 +1392,7 @@ export default defineComponent({
         width: 1.3rem;
       }
 
-      .q-item__label{
+      .q-item__label {
         padding-bottom: 4px;
       }
 
@@ -1374,7 +1412,6 @@ export default defineComponent({
           body.body--dark & {
             color: #ffffff !important;
           }
-
         }
         color: var(--o2-menu-color);
 
@@ -1395,8 +1432,6 @@ export default defineComponent({
             color: #ffffff !important;
           }
         }
-
-        
       }
 
       &__label {
@@ -1610,22 +1645,32 @@ body.ai-chat-open {
 }
 
 .ai-btn-active {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.35) 0%, rgba(236, 72, 153, 0.35) 100%) !important;
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.35) 0%,
+    rgba(236, 72, 153, 0.35) 100%
+  ) !important;
 
   .header-icon {
     opacity: 1 !important;
   }
 }
 .ai-btn-active:hover {
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
 }
 .ai-hover-btn {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.30) 0%, rgba(236, 72, 153, 0.40) 100%) !important;
-  transition: background 0.3s ease, box-shadow 0.3s ease;
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.3) 0%,
+    rgba(236, 72, 153, 0.4) 100%
+  ) !important;
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .ai-hover-btn:hover {
-  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
 }
 

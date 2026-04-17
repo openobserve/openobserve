@@ -290,9 +290,11 @@ export default defineComponent({
       pagination.value.page = 1;
     });
 
-    // Per-field pagination state
-    const currentFrom: Ref<Record<string, number>> = ref({});
+    // Per-field pagination state: cumulative size (grows on "load more")
+    const currentSizePerField: Ref<Record<string, number>> = ref({});
     const currentKeyword: Ref<Record<string, string>> = ref({});
+    // Pinned time range per field so "load more" pages cover the same window.
+    const fieldValuesTimeRange: Ref<Record<string, { start_time: number; end_time: number }>> = ref({});
 
     const defaultValuesCount = computed(
       () => store.state.zoConfig?.query_values_default_num || 10,
@@ -336,6 +338,8 @@ export default defineComponent({
 
     const {
       fieldValues,
+      fieldValuesFinalizedValues,
+      fieldValuesCurrentSize,
       fetchFieldValues,
       cancelFieldStream,
       resetFieldValues,
@@ -379,15 +383,16 @@ export default defineComponent({
       }
 
       cancelFieldStream(name);
-      currentFrom.value[name] = 0;
+      currentSizePerField.value[name] = defaultValuesCount.value;
       currentKeyword.value[name] = "";
+      fieldValuesTimeRange.value[name] = { start_time: props.timeStamp.startTime, end_time: props.timeStamp.endTime };
       resetFieldValues(name, true);
 
       const resolvedStream = stream_name || props.streamName;
+      fieldValuesCurrentSize.value[name] = defaultValuesCount.value;
       fetchFieldValues({
         fields: [name],
         size: defaultValuesCount.value,
-        from: 0,
         no_count: false,
         start_time: props.timeStamp.startTime,
         end_time: props.timeStamp.endTime,
@@ -402,8 +407,9 @@ export default defineComponent({
     const closeField = (fieldName: string) => {
       cancelFieldStream(fieldName);
       expandedRows.value[fieldName] = false;
-      currentFrom.value[fieldName] = 0;
+      currentSizePerField.value[fieldName] = 0;
       currentKeyword.value[fieldName] = "";
+      delete fieldValuesTimeRange.value[fieldName];
       resetFieldValues(fieldName);
     };
 
@@ -415,16 +421,18 @@ export default defineComponent({
       );
       const resolvedStream = row?.stream_name || props.streamName;
       currentKeyword.value[fieldName] = term;
-      currentFrom.value[fieldName] = 0;
+      currentSizePerField.value[fieldName] = defaultValuesCount.value;
+      fieldValuesCurrentSize.value[fieldName] = defaultValuesCount.value;
+      delete fieldValuesFinalizedValues.value[fieldName];
       cancelFieldStream(fieldName);
       resetFieldValues(fieldName, true);
+      const pinnedTime = fieldValuesTimeRange.value[fieldName];
       fetchFieldValues({
         fields: [fieldName],
         size: defaultValuesCount.value,
-        from: 0,
         no_count: false,
-        start_time: props.timeStamp.startTime,
-        end_time: props.timeStamp.endTime,
+        start_time: pinnedTime?.start_time ?? props.timeStamp.startTime,
+        end_time: pinnedTime?.end_time ?? props.timeStamp.endTime,
         stream_name: resolvedStream,
         stream_type: props.streamType,
         sql: buildSql(resolvedStream, props.query || undefined),
@@ -439,15 +447,24 @@ export default defineComponent({
         (f: any) => f.name === fieldName,
       );
       const resolvedStream = row?.stream_name || props.streamName;
-      currentFrom.value[fieldName] =
-        (currentFrom.value[fieldName] ?? 0) + defaultValuesCount.value;
+      const newSize =
+        (currentSizePerField.value[fieldName] ?? defaultValuesCount.value) +
+        defaultValuesCount.value;
+      currentSizePerField.value[fieldName] = newSize;
+      fieldValuesCurrentSize.value[fieldName] = newSize;
+
+      // Snapshot current values as finalized (they won't change during streaming).
+      fieldValuesFinalizedValues.value[fieldName] = [
+        ...(fieldValues.value[fieldName]?.values || []),
+      ];
+
+      const pinnedTime = fieldValuesTimeRange.value[fieldName];
       fetchFieldValues({
         fields: [fieldName],
-        size: defaultValuesCount.value,
-        from: currentFrom.value[fieldName],
+        size: newSize,
         no_count: false,
-        start_time: props.timeStamp.startTime,
-        end_time: props.timeStamp.endTime,
+        start_time: pinnedTime?.start_time ?? props.timeStamp.startTime,
+        end_time: pinnedTime?.end_time ?? props.timeStamp.endTime,
         stream_name: resolvedStream,
         stream_type: props.streamType,
         sql: buildSql(resolvedStream, props.query || undefined),

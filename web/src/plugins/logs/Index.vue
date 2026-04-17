@@ -3211,9 +3211,9 @@ export default defineComponent({
 
 <style lang="scss">
 .logPage {
-  height: calc(100vh - $navbarHeight);
-  min-height: calc(100vh - $navbarHeight) !important;
-  max-height: calc(100vh - $navbarHeight) !important;
+  height: calc(100vh - var(--navbar-height));
+  min-height: calc(100vh - var(--navbar-height)) !important;
+  max-height: calc(100vh - var(--navbar-height)) !important;
   overflow: hidden !important;
 
   .index-menu .field_list .field_overlay .field_label,
