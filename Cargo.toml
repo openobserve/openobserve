@@ -45,11 +45,11 @@ strip = true
 
 [profile.release-ci]
 inherits = "release"
-opt-level = 1
-codegen-units = 16
+opt-level = 2
+codegen-units = 4
 debug = false
 strip = true
-lto = false
+lto = "thin"
 incremental = false
 
 [profile.release-prod]
