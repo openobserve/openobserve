@@ -405,8 +405,6 @@ import serviceStreamsService from "@/services/service_streams";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
-const router = useRouter();
-
 const emit = defineEmits<{
   (e: "navigate-to-configuration"): void;
 }>();
