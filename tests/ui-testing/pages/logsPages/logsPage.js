@@ -1128,6 +1128,9 @@ export class LogsPage {
         await this.page.waitForTimeout(200);
         // Click the q-item directly - it has @click="handleQuickMode" handler
         await this.page.locator(this.quickModeToggle).click();
+        // Close the utilities menu - it stays open after toggle click
+        // (no v-close-popup on the quick mode item)
+        await this.page.keyboard.press('Escape');
     }
 
     // Click on the Quick Mode text label (not the toggle switch) - for testing #10821
@@ -3381,12 +3384,10 @@ export class LogsPage {
             const isSwitchedOff = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--falsy')).catch(() => false);
             if (isSwitchedOff) {
                 await toggleInner.click();
-            } else {
-                await this.page.keyboard.press('Escape');
             }
-        } else {
-            await this.page.keyboard.press('Escape');
         }
+        // Always close the utilities menu
+        await this.page.keyboard.press('Escape');
     }
 
     async clickTimestampField() {

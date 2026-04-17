@@ -448,6 +448,16 @@ where
                     .map_or("templates", |model| model.key),
                 path_columns[0]
             )
+        } else if path_columns.len() > 2
+            && path_columns[1].eq("ai")
+            && path_columns[2].eq("toolsets")
+        {
+            let key = "ai_toolsets";
+            format!(
+                "{}:{}",
+                OFGA_MODELS.get(key).map_or(key, |model| model.key),
+                path_columns[0]
+            )
         } else if url_len == 3 {
             // Handle /v2 alert and report apis
             if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("alerts") {
@@ -969,25 +979,6 @@ where
             )
         };
 
-        // Check if the ws request is using internal grpc token
-        if method.eq("GET")
-            && path.contains("/ws")
-            && let Some(auth_header) = parts.headers.get("Authorization")
-            && auth_header
-                .to_str()
-                .unwrap()
-                .eq(&cfg.grpc.internal_grpc_token)
-        {
-            return Ok(AuthExtractor {
-                auth: auth_header.to_str().unwrap().to_string(),
-                method,
-                o2_type: format!("stream:{org_id}"),
-                org_id,
-                bypass_check: true,
-                parent_id: folder,
-            });
-        }
-
         let auth_str = extract_auth_str_from_headers(&parts.headers).await;
 
         // Log auth metadata without exposing sensitive tokens
@@ -1004,11 +995,11 @@ where
         };
 
         log::debug!(
-            "AuthExtractor: path='{}', auth_str_empty={}, auth_type='{}', auth_str_len={}",
+            "AuthExtractor: path='{}', auth_str_empty={}, auth_type='{}', auth_str_len={}, object_type='{object_type}'",
             local_path,
             auth_str.is_empty(),
             auth_type,
-            auth_str.len()
+            auth_str.len(),
         );
 
         // if let Some(auth_header) = parts.headers.get("Authorization") {
@@ -1048,7 +1039,6 @@ where
             || path.contains("clusters")
             || path.contains("query_manager")
             || path.contains("/short")
-            || path.contains("/ws")
             || path.contains("/_values_stream")
             // bulk enable of pipelines and alerts
             || path.contains("/bulk/enable")

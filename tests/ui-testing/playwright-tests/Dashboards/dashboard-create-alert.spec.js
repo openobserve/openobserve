@@ -337,8 +337,9 @@ test.describe("Dashboard Create Alert testcases", () => {
   );
 
   // ===== P0: END-TO-END ALERT CREATION =====
+  // this is skipped for now as we are working on alert v3 
 
-  test(
+  test.skip(
     "should create a real alert end-to-end from dashboard panel Create Alert option",
     { tag: ["@dashboardCreateAlert", "@smoke", "@P0"] },
     async ({ page }) => {

@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           context="role"
         />
         <GroupServiceAccounts
-          v-if="config.isCloud == 'false'"
+          v-if="store.state.zoConfig.service_account_enabled"
           data-test="edit-role-users-section"
           v-show="activeTab === 'serviceAccounts'"
           :groupUsers="roleUsers"
@@ -411,7 +411,7 @@ const tabs = [
   },
 ];
 
-if (config.isCloud == "false") {
+if (store.state.zoConfig.service_account_enabled) {
   tabs.push({
     value: "serviceAccounts",
     label: "Service Accounts",

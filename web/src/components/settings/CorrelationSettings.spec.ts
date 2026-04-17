@@ -168,16 +168,16 @@ describe("CorrelationSettings", () => {
     it("should show DiscoveredServices when activeTab=services", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(wrapper.find('[data-test="discovered-services"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="service-identity-setup"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="discovered-services"]').isVisible()).toBe(true);
+      expect(wrapper.find('[data-test="service-identity-setup"]').isVisible()).toBe(false);
     });
 
     it("should show ServiceIdentitySetup when activeTab=discovery", async () => {
       wrapper = mountComponent();
       wrapper.vm.activeTab = "discovery";
       await wrapper.vm.$nextTick();
-      expect(wrapper.find('[data-test="service-identity-setup"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="discovered-services"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="service-identity-setup"]').isVisible()).toBe(true);
+      expect(wrapper.find('[data-test="discovered-services"]').isVisible()).toBe(false);
     });
 
     it("should show OrganizationDeduplicationSettings when activeTab=alert-correlation", async () => {

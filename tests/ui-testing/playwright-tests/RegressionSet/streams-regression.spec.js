@@ -44,11 +44,10 @@ test.describe("Streams Regression Bugs", () => {
     await pm.streamsPage.exploreStream();
 
     // Wait for navigation to stream explorer
-    await page.waitForTimeout(2000);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Navigated to logs page after stream explorer click');
 
-    // Verify expand button exists after stream explorer navigation
+    // Verify expand button exists after stream explorer navigation (this will wait for element)
     await pm.logsPage.expectQueryEditorFullScreenBtnVisible();
     testLogger.info('Query expand button found after stream explorer navigation');
 
@@ -106,31 +105,27 @@ test.describe("Streams Regression Bugs", () => {
       testLogger.info(`Data ingested to ${longStreamNames[i]}`, { response });
     });
 
-    await page.waitForTimeout(3000);
+    // Wait for ingestion to complete
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${orgId}`);
 
-    // Select the first long-named stream
+    // Select the first long-named stream (selectStream includes waits)
     await pm.logsPage.selectStream(longStreamNames[0]);
-    await page.waitForTimeout(2000);
 
     // Enable all fields and apply query
     await pm.logsPage.clickQuickModeToggle();
     await pm.logsPage.clickAllFieldsButton();
-    await page.waitForTimeout(1000);
 
     // Add remaining long-named streams
     testLogger.info('Adding additional long-named streams to trigger ellipsis');
     for (let i = 1; i < longStreamNames.length; i++) {
       await pm.logsPage.fillStreamFilter(longStreamNames[i]);
-      await page.waitForTimeout(2000);
       await pm.logsPage.toggleStreamSelection(longStreamNames[i]);
-      await page.waitForTimeout(3000);
+      // Wait for stream to be selected
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
     }
-
-    // Wait for UI to stabilize
-    await page.waitForTimeout(2000);
 
     testLogger.info('Multiple long-named streams selected, checking UI behavior');
 
@@ -161,9 +156,9 @@ test.describe("Streams Regression Bugs", () => {
       // SECONDARY ASSERTION: Try to find and verify tooltip on hover (using POM)
       testLogger.info('Hovering over stream display to check for tooltip');
       await pm.logsPage.hoverStreamDisplay();
-      await page.waitForTimeout(1500);
 
       // Look for tooltip containing any of the long stream names (using POM)
+      // isTooltipVisible already includes a timeout
       const tooltipVisible = await pm.logsPage.isTooltipVisible(3000);
 
       if (tooltipVisible) {
@@ -242,6 +237,119 @@ test.describe("Streams Regression Bugs", () => {
     testLogger.info('✓ Stream schema/details panel accessible — FTS fields reachable');
 
     testLogger.info('✓ PASSED: FTS auto-add verified');
+  });
+
+  // ==========================================================================
+  // Bug #7671: FTS fields and quick mode fields should be visually indicated in stream settings
+  // https://github.com/openobserve/openobserve/issues/7671
+  // ==========================================================================
+  test("Full text search and quick mode fields should be visually indicated in stream settings @bug-7671 @P2 @regression @streams", async ({ page }) => {
+    testLogger.info('Test: Verify FTS and quick mode fields are visually indicated (Bug #7671)');
+
+    // Ingest test data first
+    await ingestTestData(page);
+    await page.waitForLoadState('domcontentloaded');
+
+    // Wait for stream to be indexed
+    await pm.logsPage.waitForStreamAvailable('e2e_automate', 90000, 3000);
+
+    // Navigate to streams page
+    const orgId = getOrgIdentifier() || 'default';
+    await pm.streamsPage.navigateToStreamsPage(process.env.ZO_BASE_URL, orgId);
+
+    // Search for and open stream details
+    await pm.streamsPage.searchStream('e2e_automate');
+    await pm.streamsPage.expectExactStreamCellVisible('e2e_automate');
+
+    // Click on the stream to open schema/settings view
+    await pm.streamsPage.clickStream('e2e_automate');
+    // Wait for stream details/schema to be visible
+    await pm.streamsPage.expectStreamDetailsVisible();
+    testLogger.info('✓ Opened stream schema/settings');
+    testLogger.info('✓ Stream details visible');
+
+    // PART 1: Verify Full Text Search fields are visually indicated
+    testLogger.info('PART 1: Checking Full Text Search field indicators');
+
+    // Search for a specific field that might have FTS enabled
+    // First, let's search for any field to get to the schema table
+    await pm.streamsPage.searchForField('kubernetes_host');
+
+    // PRIMARY ASSERTION SETUP: Index type select must be visible to validate FTS feature
+    await pm.streamsPage.expectIndexTypeSelectVisible(5000);
+    testLogger.info('✓ Index type select visible in stream settings');
+
+    // Click on the index type select to see available options
+    await pm.streamsPage.indexTypeSelect.click();
+    // Wait for dropdown options to appear
+    const fullTextSearchOption = pm.streamsPage.getFullTextSearchOption();
+    await expect(fullTextSearchOption.first()).toBeVisible({ timeout: 3000 }).catch(() => {});
+
+    // PRIMARY ASSERTION 1: Verify "Full text search" option exists
+    const ftsOptionExists = await fullTextSearchOption.count() > 0;
+
+    expect(ftsOptionExists, 'Bug #7671 Point #1: Full text search option should be visible in stream settings').toBe(true);
+    testLogger.info('✓ Full text search option exists in index type dropdown');
+
+    // Close the dropdown
+    await page.keyboard.press('Escape');
+
+    // PART 2: Verify Quick Mode fields from env variables show icon
+    testLogger.info('PART 2: Checking Quick Mode field indicators from environment variables');
+
+    // Clear any existing field search
+    const fieldSearchInput = pm.streamsPage.fieldSearchInput;
+    if (await fieldSearchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await fieldSearchInput.clear();
+    }
+
+    // Check for quick mode icon on fields
+    // The quick mode icon appears next to field names that are in default_quick_mode_fields env variable
+    const quickModeIconCount = await pm.streamsPage.getQuickModeIconsCount();
+
+    testLogger.info(`Found ${quickModeIconCount} quick mode icons in stream settings`);
+
+    // PRIMARY ASSERTION 2: Verify quick mode icon rendering mechanism
+    // Bug #7671 Point #2: Quick mode fields from env should show icons
+    // NOTE: Actual icon visibility depends on env config (default_quick_mode_fields)
+    // If icons aren't found, skip test to surface missing env config in CI (don't pass with partial validation)
+    if (quickModeIconCount === 0) {
+      testLogger.warn('⚠️  No quick mode icons found - Bug #7671 Point #2 cannot be validated');
+      testLogger.warn('⚠️  Test requires default_quick_mode_fields env variable to be configured');
+      testLogger.info('Skipping test - FTS validation alone is insufficient for Bug #7671');
+      test.skip(true, 'Quick mode icons require default_quick_mode_fields env variable - cannot validate Bug #7671 Point #2');
+    }
+
+    testLogger.info(`✓ Quick mode field indicators visible: ${quickModeIconCount} icon(s) found`);
+
+    // STRONG ASSERTION: Verify the icon is actually an image element with valid src
+    const firstIcon = pm.streamsPage.quickModeIcons.first();
+    await expect(firstIcon, 'Bug #7671 Point #2: Quick mode icon must be visible').toBeVisible({ timeout: 3000 });
+
+    const iconSrc = await firstIcon.getAttribute('src');
+    const hasValidImageSrc = iconSrc && iconSrc.length > 0 && (iconSrc.endsWith('.png') || iconSrc.endsWith('.svg') || iconSrc.endsWith('.jpg') || iconSrc.endsWith('.webp'));
+
+    expect(hasValidImageSrc, `Bug #7671 Point #2: Quick mode icon must have valid image src (got: ${iconSrc})`).toBeTruthy();
+    testLogger.info(`✓ Quick mode icon visible with valid image src: ${iconSrc}`);
+
+    // Verify tooltip on hover
+    await firstIcon.hover();
+
+    // isTooltipVisible includes timeout wait
+    const tooltipVisible = await pm.streamsPage.isTooltipVisible(2000);
+
+    if (tooltipVisible) {
+      const tooltipText = await pm.streamsPage.quickModeTooltip.textContent();
+      testLogger.info(`✓ Quick mode tooltip visible: "${tooltipText}"`);
+    } else {
+      testLogger.info('Quick mode tooltip may require different hover interaction');
+    }
+
+    // ADDITIONAL VERIFICATION: Check that fields table is properly rendered
+    await pm.streamsPage.expectSchemaTableVisible(5000);
+    testLogger.info('✓ Schema table properly rendered in stream settings');
+
+    testLogger.info('✓ PASSED: Bug #7671 field indicators test completed (FTS + Quick Mode validated)');
   });
 
   test.afterEach(async () => {

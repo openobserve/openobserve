@@ -17,7 +17,7 @@
             <div class="q-mt-sm text-body2">
               {{ t('about.installation_id') }}: <strong>{{ licenseData.installation_id || 'N/A' }}</strong>
             </div>
-            <div class="q-mt-md text-body2" v-html="t('about.contact_admin_license')"></div>
+            <div class="q-mt-md text-body2" v-html="DOMPurify.sanitize(t('about.contact_admin_license'))"></div>
             <q-btn
               data-test="no-license-get-license-btn"
               color="primary"
@@ -206,7 +206,7 @@
                           size="18px"
                           class="tw:flex-shrink-0"
                         />
-                        <span v-html="t('about.license_allows_ingestion', { limit: !licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? licenseData?.license?.limits?.Ingestion?.value : '50' })"></span>
+                        <span v-html="DOMPurify.sanitize(t('about.license_allows_ingestion', { limit: !licenseData?.expired && licenseData?.license?.limits?.Ingestion?.value ? licenseData?.license?.limits?.Ingestion?.value : '50' }))"></span>
                       </div>
 
                       <!-- Line 2: Exceeded Status -->
@@ -231,18 +231,18 @@
                         />
                         <span>
                           <span v-if="licenseData?.ingestion_exceeded && licenseData?.ingestion_exceeded > 0">
-                            <span v-html="t('about.limit_exceeded_days', {
+                            <span v-html="DOMPurify.sanitize(t('about.limit_exceeded_days', {
                               colorClass: licenseData?.ingestion_exceeded > 30 ? 'text-negative' : 'text-warning',
                               days: licenseData?.ingestion_exceeded,
                               plural: licenseData?.ingestion_exceeded > 1 ? 's' : ''
-                            })"></span><span v-if="licenseData?.ingestion_exceeded > limitBreachAllowedCount" class="warning-message" v-html="t('about.limit_exceeded_warning', {
+                            }))"></span><span v-if="licenseData?.ingestion_exceeded > limitBreachAllowedCount" class="warning-message" v-html="DOMPurify.sanitize(t('about.limit_exceeded_warning', {
                               max: limitBreachAllowedCount,
                               maxPlural: limitBreachAllowedCount > 1 ? 's' : ''
-                            })"></span><span v-else class="info-message" v-html="t('about.limit_exceeded_info', {
+                            }))"></span><span v-else class="info-message" v-html="DOMPurify.sanitize(t('about.limit_exceeded_info', {
                               remaining: limitBreachAllowedCount - licenseData?.ingestion_exceeded,
                               plural: (limitBreachAllowedCount - licenseData?.ingestion_exceeded) > 1 ? 's' : '',
                               max: limitBreachAllowedCount
-                            })"></span>.
+                            }))"></span>.
                           </span>
                           <span v-else>
                             {{ t('about.no_limit_exceedances', { max: limitBreachAllowedCount }) }}
@@ -327,6 +327,7 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
+import DOMPurify from 'dompurify';
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
@@ -803,6 +804,7 @@ export default defineComponent({
       ingestionLimitGB,
       generateUsageDashboard,
       limitBreachAllowedCount,
+      DOMPurify,
     };
   },
 });

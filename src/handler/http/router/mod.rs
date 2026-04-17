@@ -93,9 +93,67 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-sampled"),
             X_O2_ASSISTANT_SESSION_ID,
         ])
-        .allow_origin(AllowOrigin::mirror_request())
+        // Restrict CORS to the configured web_url origin, plus any extra origins in
+        // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
+        // allows any origin to make credentialed requests — effectively disabling same-origin
+        // protection.  Only reflect the Origin header back if it matches one of our allowed origins.
+        // We extract only the scheme+host+port from each URL (ignoring any path) because the Origin
+        // header per RFC 6454 never carries a path component.  This prevents prefix-match bypasses
+        // like https://app.example.com.evil.com when the allowed URL is https://app.example.com.
+        .allow_origin(AllowOrigin::predicate(|origin, _parts| {
+            let cfg = config::get_config();
+            let web_url = cfg.common.web_url.trim_end_matches('/');
+            if is_origin_allowed(origin.as_bytes(), web_url) {
+                return true;
+            }
+            // Also check any extra origins in ZO_CORS_ALLOWED_ORIGINS.
+            let extra = cfg.common.cors_allowed_origins.trim();
+            if !extra.is_empty() {
+                for url in extra.split(',') {
+                    let url = url.trim().trim_end_matches('/');
+                    if is_origin_allowed(origin.as_bytes(), url) {
+                        return true;
+                    }
+                }
+            }
+            false
+        }))
         .allow_credentials(true)
         .max_age(Duration::from_secs(3600))
+}
+
+/// Returns `true` if `request_origin` should be permitted for CORS.
+///
+/// Rules:
+/// - If `web_url` is empty (dev / unconfigured), allow all origins and log a warning.
+/// - Extract the `scheme://host[:port]` portion of `web_url`, ignoring any path component, because
+///   the `Origin` header per RFC 6454 never carries a path.
+/// - Perform a byte-exact comparison — no prefix-match that could be bypassed by `https://app.example.com.evil.com`
+///   when `web_url=https://app.example.com`.
+/// - If `web_url` is malformed (no `://`), deny the request.
+pub(crate) fn is_origin_allowed(request_origin: &[u8], web_url: &str) -> bool {
+    if web_url.is_empty() {
+        // In dev/test when web_url is empty, fall back to permissive behaviour.
+        // Log a warning so misconfigured production deployments are visible.
+        log::warn!(
+            "ZO_WEB_URL is not configured — CORS is unrestricted. \
+             Set ZO_WEB_URL to your frontend origin in production."
+        );
+        return true;
+    }
+    // Extract the origin (scheme://host[:port]) from web_url so that a
+    // web_url with a path (e.g. https://app.example.com/o2) still matches
+    // the bare Origin header (https://app.example.com).
+    let allowed_origin = match web_url.find("://") {
+        Some(scheme_end) => {
+            let after_scheme = &web_url[scheme_end + 3..];
+            let host_end = after_scheme.find('/').unwrap_or(after_scheme.len());
+            &web_url[..scheme_end + 3 + host_end]
+        }
+        // Malformed web_url — deny rather than fall back to prefix match.
+        None => return false,
+    };
+    request_origin == allowed_origin.as_bytes()
 }
 
 /// Authentication middleware for API routes
@@ -807,6 +865,8 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
             .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
             .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
+            .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
+            .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
 
             // Evaluation Templates
             .route("/{org_id}/eval_templates", get(eval_templates::list).post(eval_templates::create))
@@ -1102,5 +1162,89 @@ mod tests {
                 .and_then(Value::as_array)
                 .is_some_and(|keywords| !keywords.is_empty())
         );
+    }
+
+    // ── is_origin_allowed unit tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_cors_exact_match_allowed() {
+        assert!(is_origin_allowed(
+            b"https://app.example.com",
+            "https://app.example.com"
+        ));
+    }
+
+    #[test]
+    fn test_cors_exact_match_with_port() {
+        assert!(is_origin_allowed(
+            b"https://app.example.com:8080",
+            "https://app.example.com:8080"
+        ));
+    }
+
+    #[test]
+    fn test_cors_web_url_with_path_stripped() {
+        // web_url has a path component — origin must still match scheme+host only.
+        assert!(is_origin_allowed(
+            b"https://app.example.com",
+            "https://app.example.com/o2"
+        ));
+    }
+
+    #[test]
+    fn test_cors_web_url_trailing_slash_stripped() {
+        // Caller trims trailing slashes on web_url before calling us.
+        assert!(is_origin_allowed(
+            b"https://app.example.com",
+            "https://app.example.com"
+        ));
+    }
+
+    #[test]
+    fn test_cors_prefix_bypass_denied() {
+        // https://app.example.com.evil.com must NOT match https://app.example.com
+        assert!(!is_origin_allowed(
+            b"https://app.example.com.evil.com",
+            "https://app.example.com"
+        ));
+    }
+
+    #[test]
+    fn test_cors_subdomain_denied() {
+        assert!(!is_origin_allowed(
+            b"https://sub.app.example.com",
+            "https://app.example.com"
+        ));
+    }
+
+    #[test]
+    fn test_cors_different_scheme_denied() {
+        assert!(!is_origin_allowed(
+            b"http://app.example.com",
+            "https://app.example.com"
+        ));
+    }
+
+    #[test]
+    fn test_cors_different_port_denied() {
+        assert!(!is_origin_allowed(
+            b"https://app.example.com:9000",
+            "https://app.example.com:8080"
+        ));
+    }
+
+    #[test]
+    fn test_cors_malformed_web_url_denied() {
+        // web_url without "://" is malformed — should deny
+        assert!(!is_origin_allowed(
+            b"https://app.example.com",
+            "app.example.com"
+        ));
+    }
+
+    #[test]
+    fn test_cors_empty_web_url_allows_all() {
+        // Empty web_url is permissive (dev mode)
+        assert!(is_origin_allowed(b"https://any.origin.com", ""));
     }
 }

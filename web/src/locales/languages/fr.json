@@ -2221,7 +2221,8 @@
     },
     "updateAnomalyDetection": "Mettre à jour la détection des anomalies :",
     "anomalyCreated": "Configuration de détection des anomalies créée. La formation débutera prochainement.",
-    "editJson": "Modifier le JSON d'alerte"
+    "editJson": "Modifier le JSON d'alerte",
+    "additional_settings": "Réglages supplémentaires"
   },
   "alert_templates": {
     "header": "Modèles",
@@ -2518,7 +2519,8 @@
     "maxSeriesPerQueryTooltip": "Lorsqu'une requête ProMQL telle que « count (metric) by (label) » renvoie trop de séries, elle peut geler l'interface utilisateur. Cette limite empêche cela. Définissez la valeur par défaut du système sur null ou spécifiez une valeur comprise entre 1 000 et 1 000 000.",
     "maxSeriesPerQueryValidation": "La valeur doit être comprise entre 1 000 et 1 000 000, ou laisser vide par défaut",
     "systemDefault": "défaut du système",
-    "usageStreamEnabledLabel": "Activer le flux d'utilisation"
+    "usageStreamEnabledLabel": "Activer le flux d'utilisation",
+    "aiToolsets": "Ensembles d'outils d'IA"
   },
   "iam": {
     "users": "Les utilisateurs",
@@ -2815,7 +2817,8 @@
       "status": "État",
       "type": "Tapez",
       "multiStepAgent": "Agent en plusieurs étapes"
-    }
+    },
+    "noLogsAvailableForService": "Aucun journal disponible pour ce service"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -3347,5 +3350,61 @@
     "typeScore": "Score numérique (par exemple, 0,0 à 1,0)",
     "typeBoolean": "Binaire/Pass-Fail (booléen)",
     "typeCustom": "Texte catégoriel/personnalisé"
+  },
+  "aiToolset": {
+    "header": "Ensembles d'outils d'IA",
+    "add": "Nouveau jeu d'outils d'IA",
+    "search": "Rechercher des ensembles d'outils d'IA",
+    "update": "Mettre à jour AI Toolset",
+    "name": "Nom",
+    "nameRequired": "Le nom est obligatoire",
+    "nameInvalid": "Seuls les lettres, les chiffres, les traits d'union et les traits de soulignement sont autorisés",
+    "nameTooLong": "Le nom ne doit pas dépasser 256 caractères",
+    "kind": "Tapez",
+    "kindRequired": "Le type est obligatoire",
+    "description": "Descriptif",
+    "actions": "Actions",
+    "deleteTitle": "Supprimer AI Toolset",
+    "deleteMessage": "Êtes-vous sûr de vouloir supprimer « {name} » ?",
+    "loadFailed": "Impossible de charger AI Toolsets. Veuillez réessayer.",
+    "createFailed": "Impossible de créer AI Toolset. Réessayez, s'il vous plaît.",
+    "updateFailed": "Impossible de mettre à jour AI Toolset. Veuillez réessayer.",
+    "deleteFailed": "Impossible de supprimer AI Toolset.",
+    "createdSuccessfully": "AI Toolset créé avec succès",
+    "updatedSuccessfully": "AI Toolset mis à jour avec succès",
+    "deletedSuccessfully": "AI Toolset supprimé avec succès",
+    "mcpConfig": "Configuration du serveur MCP",
+    "mcpUrl": "URL du terminal",
+    "mcpUrlRequired": "L'URL du point de terminaison est requise",
+    "timeoutSeconds": "Délai d'attente (secondes)",
+    "headers": "En-têtes HTTP",
+    "headerKey": "Nom de l'en-tête",
+    "headerValue": "Valeur d'en-tête",
+    "addHeader": "Ajouter un en-tête",
+    "cliConfig": "Configuration de l'outil CLI",
+    "presets": "Remplissage rapide",
+    "cliCommand": "Commande",
+    "cliCommandRequired": "La commande est requise",
+    "allowedSubcommands": "Sous-commandes autorisées",
+    "subcommandsHint": "Liste séparée par des virgules, par exemple get, describe, logs — laissez vide pour tout autoriser",
+    "maxOutputBytes": "Sortie maximale (octets)",
+    "requiresConfirmation": "Exiger une confirmation avant l'exécution",
+    "envVars": "Variables d'environnement",
+    "envKey": "Nom de la variable",
+    "envValue": "Valeur",
+    "addEnvVar": "Ajouter une variable",
+    "credentialFiles": "Fichiers d'identification",
+    "credEnvVar": "Nom de la barre d'environnement",
+    "credContent": "Contenu du fichier",
+    "credContentHint": "Contenu du fichier brut (par exemple kubeconfig YAML)",
+    "addCredFile": "Ajouter un fichier d'identification",
+    "skillConfig": "Configuration des compétences",
+    "skillContent": "Définition de la compétence (Markdown)",
+    "skillContentPlaceholder": "# Titre de la compétence\n\nDécrivez le rôle de la compétence et donnez des exemples...",
+    "skillContentRequired": "Le contenu des compétences est requis",
+    "genericConfig": "Configuration",
+    "genericData": "Configuration JSON",
+    "genericDataPlaceholder": "{}",
+    "invalidJson": "Doit être un JSON valide"
   }
 }

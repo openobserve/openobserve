@@ -2221,7 +2221,8 @@
     },
     "updateAnomalyDetection": "Atualize a detecção de anomalias:",
     "anomalyCreated": "Configuração de detecção de anomalias criada. O treinamento começará em breve.",
-    "editJson": "Editar alerta JSON"
+    "editJson": "Editar alerta JSON",
+    "additional_settings": "Configurações adicionais"
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2518,7 +2519,8 @@
     "maxSeriesPerQueryTooltip": "Quando uma consulta ProMQL como 'count (metric) by (label) 'retorna muitas séries, ela pode congelar a interface do usuário. Esse limite evita isso. Defina como null para o padrão do sistema ou especifique um valor entre 1.000 e 1.000.000.",
     "maxSeriesPerQueryValidation": "O valor deve estar entre 1.000 e 1.000.000 ou deixar em branco por padrão",
     "systemDefault": "padrão do sistema",
-    "usageStreamEnabledLabel": "Ativar fluxo de uso"
+    "usageStreamEnabledLabel": "Ativar fluxo de uso",
+    "aiToolsets": "Conjuntos de ferramentas de IA"
   },
   "iam": {
     "users": "Usuários",
@@ -2815,7 +2817,8 @@
       "status": "Status",
       "type": "Tipo",
       "multiStepAgent": "Agente de várias etapas"
-    }
+    },
+    "noLogsAvailableForService": "Não há registros disponíveis para este serviço"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -3347,5 +3350,61 @@
     "typeScore": "Pontuação numérica (por exemplo, 0,0 - 1,0)",
     "typeBoolean": "Binário//Falha de aprovação (booleano)",
     "typeCustom": "Texto categórico/personalizado"
+  },
+  "aiToolset": {
+    "header": "Conjuntos de ferramentas de IA",
+    "add": "Novo conjunto de ferramentas de IA",
+    "search": "Pesquisar conjuntos de ferramentas de IA",
+    "update": "Atualizar o conjunto de ferramentas de IA",
+    "name": "Nome",
+    "nameRequired": "O nome é obrigatório",
+    "nameInvalid": "Somente letras, números, hífens e sublinhados são permitidos",
+    "nameTooLong": "O nome não deve exceder 256 caracteres",
+    "kind": "Tipo",
+    "kindRequired": "O tipo é obrigatório",
+    "description": "Descrição",
+    "actions": "Ações",
+    "deleteTitle": "Excluir conjunto de ferramentas de IA",
+    "deleteMessage": "Tem certeza de que deseja excluir “{name}”?",
+    "loadFailed": "Falha ao carregar os conjuntos de ferramentas de IA. Por favor, tente novamente.",
+    "createFailed": "Falha ao criar o AI Toolset. Por favor, tente novamente.",
+    "updateFailed": "Falha ao atualizar o AI Toolset. Por favor, tente novamente.",
+    "deleteFailed": "Falha ao excluir o AI Toolset.",
+    "createdSuccessfully": "Conjunto de ferramentas de IA criado com sucesso",
+    "updatedSuccessfully": "Conjunto de ferramentas de IA atualizado com sucesso",
+    "deletedSuccessfully": "Conjunto de ferramentas de IA excluído com sucesso",
+    "mcpConfig": "Configuração do servidor MCP",
+    "mcpUrl": "URL do endpoint",
+    "mcpUrlRequired": "O URL do endpoint é obrigatório",
+    "timeoutSeconds": "Tempo limite (segundos)",
+    "headers": "Cabeçalhos HTTP",
+    "headerKey": "Nome do cabeçalho",
+    "headerValue": "Valor do cabeçalho",
+    "addHeader": "Adicionar cabeçalho",
+    "cliConfig": "Configuração da ferramenta CLI",
+    "presets": "Preenchimento rápido",
+    "cliCommand": "Comando",
+    "cliCommandRequired": "O comando é obrigatório",
+    "allowedSubcommands": "Subcomandos permitidos",
+    "subcommandsHint": "Lista separada por vírgulas, por exemplo, get, describe, logs — deixe em branco para permitir todos",
+    "maxOutputBytes": "Saída máxima (bytes)",
+    "requiresConfirmation": "Exigir confirmação antes da execução",
+    "envVars": "Variáveis de ambiente",
+    "envKey": "Nome da variável",
+    "envValue": "Valor",
+    "addEnvVar": "Adicionar variável",
+    "credentialFiles": "Arquivos de credenciais",
+    "credEnvVar": "Nome da variável de ambiente",
+    "credContent": "Conteúdo do arquivo",
+    "credContentHint": "Conteúdo bruto do arquivo (por exemplo, kubeconfig YAML)",
+    "addCredFile": "Adicionar arquivo de credencial",
+    "skillConfig": "Configuração de habilidades",
+    "skillContent": "Definição de habilidade (Markdown)",
+    "skillContentPlaceholder": "# Título da habilidade\n\nDescreva o que a habilidade faz e forneça exemplos...",
+    "skillContentRequired": "O conteúdo da habilidade é obrigatório",
+    "genericConfig": "Configuração",
+    "genericData": "Configuração JSON",
+    "genericDataPlaceholder": "{}",
+    "invalidJson": "Deve ser um JSON válido"
   }
 }

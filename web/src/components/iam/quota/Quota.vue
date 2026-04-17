@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
     style="min-height: inherit"
   >
-    <div :style="{ height: '100%', marginTop: 0 }" class="app-table-container">
+    <div :style="{ marginTop: 0 }" class="app-table-container" style="height: calc(100vh - var(--navbar-height) - 15px)">
       <div class="card-container tw:mb-[0.625rem]">
         <div class="q-px-md q-py-sm">
           <div
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter="searchQuery"
         :filter-method="filteredData"
         v-if="activeTab == 'api-limits' && activeType == 'table' && !isApiLimitsLoading"
-        style="height: calc(100vh - 220px);"
+        style="height: calc(100vh - var(--navbar-height) - 192px);"
         dense
       >
         <template v-slot:header="props">

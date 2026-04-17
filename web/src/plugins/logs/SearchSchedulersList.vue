@@ -40,7 +40,7 @@
       </div>
 
    <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-      <div class=" tw:h-[calc(100vh-128px)] card-container">
+      <div class=" tw:h-[calc(100vh - var(--navbar-height) - 95px)] card-container">
           <q-table
             data-test="search-scheduler-table"
             ref="qTableSchedule"
@@ -51,7 +51,7 @@
             row-key="trace_id"
             :rows-per-page-options="[]"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-            :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh - 128px); overflow-y: auto;' : 'height: 0px'"
+            :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh  - var(--navbar-height) - 95px); overflow-y: auto;' : 'height: 0px'"
             :sort-method="sortMethod"
           >
             <template v-slot:body="props">
