@@ -52,36 +52,8 @@ env:
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
-  build_frontend:
-    name: build_frontend
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clone the current repo
-        uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Build frontend code
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
-          VITE_COVERAGE: "true"
-          COVERAGE: "true"
-        run: cd web && npm ci && npm run build
-
-      - name: Upload frontend dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-frontend-dist
-          path: web/dist
-          retention-days: 1
-
   build_binary:
     name: build_binary
-    needs: [build_frontend]
     runs-on:
       labels: ubicloud-standard-30
     env:
@@ -131,11 +103,18 @@ jobs:
         run: |
           bash ./.github/protoc.sh
 
-      - name: Download frontend dist
-        uses: actions/download-artifact@v4
+      - uses: actions/setup-node@v5
         with:
-          name: playwright-frontend-dist
-          path: web/dist
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build frontend code
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+          VITE_COVERAGE: "true"
+          COVERAGE: "true"
+        run: cd web && npm ci && npm run build
 
       - name: Build binary
         run: cargo build --locked --profile release-ci --target x86_64-unknown-linux-gnu
