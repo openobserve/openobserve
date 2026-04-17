@@ -351,7 +351,20 @@ async function fetchCloudConfig(page) {
     });
 
     if (orgsResponse && orgsResponse.data && orgsResponse.data.length > 0) {
-      const org = orgsResponse.data.find(o => o.identifier !== '_meta') || orgsResponse.data[0];
+      // Use ORGNAME from env/yml to find the correct org, fall back to first non-_meta
+      const envOrgId = process.env.ORGNAME;
+      let org;
+      if (envOrgId && envOrgId !== 'default') {
+        org = orgsResponse.data.find(o => o.identifier === envOrgId);
+        if (org) {
+          testLogger.info(`[alpha1] Matched org from ORGNAME env: ${org.name} (${org.identifier})`);
+        } else {
+          testLogger.warn(`[alpha1] ORGNAME "${envOrgId}" not found in user orgs, falling back to first`);
+        }
+      }
+      if (!org) {
+        org = orgsResponse.data.find(o => o.identifier !== '_meta') || orgsResponse.data[0];
+      }
       const orgIdentifier = org.identifier;
       testLogger.info(`[alpha1] User org: ${org.name} (${orgIdentifier})`);
 
