@@ -4,17 +4,19 @@ on:
   push:
     branches:
       - "main"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths-ignore:
+      - "**.md"
+      - "web/**"
+      - "tests/ui-testing/**"
+      - "tests/playwright-tests/**"
   pull_request:
     branches:
       - "*"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths-ignore:
+      - "**.md"
+      - "web/**"
+      - "tests/ui-testing/**"
+      - "tests/playwright-tests/**"
   merge_group:
 
 concurrency:
@@ -61,7 +63,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          prefix-key: api-testing
+          shared-key: "openobserve-debug-${{ runner.arch }}"
 
       - name: Install Protoc
         run: |

@@ -4,17 +4,15 @@ on:
   push:
     branches:
       - "main"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths-ignore:
+      - "**.md"
+      - "tests/api-testing/**"
   pull_request:
     branches:
       - "*"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths-ignore:
+      - "**.md"
+      - "tests/api-testing/**"
   merge_group:
 
 concurrency:
@@ -54,8 +52,36 @@ env:
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
+  build_frontend:
+    name: build_frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build frontend code
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+          VITE_COVERAGE: "true"
+          COVERAGE: "true"
+        run: cd web && npm ci && npm run build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-frontend-dist
+          path: web/dist
+          retention-days: 1
+
   build_binary:
     name: build_binary
+    needs: [build_frontend]
     runs-on:
       labels: ubicloud-standard-30
 
@@ -77,25 +103,21 @@ jobs:
         with:
           toolchain: nightly-2025-11-11
           targets: x86_64-unknown-linux-gnu
+
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          prefix-key: playwright
+          shared-key: "openobserve-release-${{ runner.arch }}"
 
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
 
-      - uses: actions/setup-node@v5
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
         with:
-          node-version: 22
-
-      - name: Build frontend code
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
-          VITE_COVERAGE: "true"
-          COVERAGE: "true"
-        run: cd web && npm ci && npm run build
+          name: playwright-frontend-dist
+          path: web/dist
 
       - name: Build and run binary
         run: cargo build --release --target x86_64-unknown-linux-gnu
