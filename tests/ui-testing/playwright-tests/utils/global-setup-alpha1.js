@@ -34,19 +34,40 @@ async function globalSetup() {
     throw new Error('ALPHA1_USER_EMAIL and ALPHA1_USER_PASSWORD must be set');
   }
 
+  // Check if shared auth state exists (downloaded from cleanup job artifact)
+  // If valid, skip the entire Dex login flow — just verify and ingest
+  if (fs.existsSync(AUTH_FILE) && fs.existsSync(CLOUD_CONFIG_FILE)) {
+    testLogger.info('[alpha1] Found shared auth state from cleanup job — skipping Dex login');
+    try {
+      const valid = await verifySharedAuth(baseUrl);
+      if (valid) {
+        testLogger.info('[alpha1] Shared auth state is valid');
+        // Still need to do ingestion for shard-specific streams
+        const specFiles = process.argv.filter(arg => /\.spec\.(js|ts)$/.test(arg));
+        const isCleanupOnly = specFiles.length === 1 && /cleanup\.spec\.(js|ts)$/.test(specFiles[0]);
+        if (!isCleanupOnly && process.env.SKIP_INGESTION !== 'true') {
+          await performGlobalIngestionWithFetch();
+        }
+        testLogger.info('[alpha1] Global setup completed successfully (shared auth)');
+        return;
+      }
+      testLogger.warn('[alpha1] Shared auth state invalid — falling back to Dex login');
+    } catch (e) {
+      testLogger.warn(`[alpha1] Shared auth verification failed: ${e.message} — falling back to Dex login`);
+    }
+  }
+
+  // Fallback: perform Dex login with retries
   const maxAttempts = 3;
   let lastError;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    // Stagger delay: spread out 13 parallel Dex logins to reduce contention
-    // First attempt: random 0-15s; retries: 5-15s backoff
     const staggerMs = attempt === 1
       ? Math.floor(Math.random() * 15000)
       : 5000 + Math.floor(Math.random() * 10000);
     testLogger.info(`[alpha1] Login attempt ${attempt}/${maxAttempts} (stagger: ${staggerMs}ms)`);
     await new Promise(r => setTimeout(r, staggerMs));
 
-    // Fresh browser per attempt to avoid stale state from failed login
     const browser = await chromium.launch();
     const context = await browser.newContext({
       viewport: { width: 1500, height: 1024 },
@@ -60,17 +81,13 @@ async function globalSetup() {
     });
 
     try {
-      // Perform Dex login
       await performDexLogin(page, baseUrl, userEmail, userPassword);
 
-      // Save authentication state for tests to reuse
       await context.storageState({ path: AUTH_FILE });
       testLogger.info(`[alpha1] Auth state saved to ${AUTH_FILE}`);
 
-      // Fetch org identifier and passcode
       await fetchCloudConfig(page);
 
-      // Perform global data ingestion
       const specFiles = process.argv.filter(arg => /\.spec\.(js|ts)$/.test(arg));
       const isCleanupOnly = specFiles.length === 1 && /cleanup\.spec\.(js|ts)$/.test(specFiles[0]);
       if (isCleanupOnly || process.env.SKIP_INGESTION === 'true') {
@@ -80,12 +97,11 @@ async function globalSetup() {
       }
 
       testLogger.info('[alpha1] Global setup completed successfully');
-      return; // Success — exit retry loop
+      return;
 
     } catch (error) {
       lastError = error;
 
-      // Screenshot on failure for debugging
       const debugDir = path.join(__dirname, '..', '..', 'test-results');
       if (!fs.existsSync(debugDir)) {
         fs.mkdirSync(debugDir, { recursive: true });
@@ -95,12 +111,9 @@ async function globalSetup() {
 
       if (attempt < maxAttempts) {
         testLogger.warn(`[alpha1] Attempt ${attempt} failed: ${error.message}. Retrying...`);
-        testLogger.warn(`[alpha1] Screenshot saved: ${screenshotPath}`);
       } else {
         testLogger.error(`[alpha1] All ${maxAttempts} login attempts failed.`);
         testLogger.error(`[alpha1] Final error: ${error.message}`);
-        testLogger.error(`[alpha1] Screenshot: ${screenshotPath}`);
-        // Clean up stale auth file so it's not reused
         if (fs.existsSync(AUTH_FILE)) {
           fs.unlinkSync(AUTH_FILE);
         }
@@ -452,6 +465,115 @@ async function performGlobalIngestion(page) {
   if (Date.now() - startTime >= maxWaitMs) {
     testLogger.warn(`[alpha1] Streams not fully indexed after ${maxWaitMs}ms — tests may fail on stream selection`);
   }
+}
+
+/**
+ * Verify that shared auth state (from cleanup job artifact) is still valid.
+ * Opens a browser with the storageState and checks if the session works.
+ */
+async function verifySharedAuth(baseUrl) {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({
+    storageState: AUTH_FILE,
+    viewport: { width: 1500, height: 1024 },
+  });
+  const page = await context.newPage();
+
+  try {
+    await page.goto(`${baseUrl}/web/`, { timeout: 60000, waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+    // If we ended up on Dex or login page, the session is invalid
+    const url = page.url();
+    if (url.includes('dex') || url.endsWith('/web/login')) {
+      testLogger.warn(`[alpha1] Shared auth redirected to login: ${url}`);
+      return false;
+    }
+
+    // Verify the main menu is visible
+    const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
+    await menuItem.waitFor({ state: 'visible', timeout: 15000 });
+    testLogger.info('[alpha1] Shared auth verified — menu visible');
+    return true;
+  } catch (e) {
+    testLogger.warn(`[alpha1] Shared auth verification error: ${e.message}`);
+    return false;
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+}
+
+/**
+ * Perform data ingestion using Node.js fetch (no browser needed).
+ * Used when shared auth state is available — avoids opening a browser page.
+ */
+async function performGlobalIngestionWithFetch() {
+  let headers;
+  let orgId;
+  let baseUrl;
+
+  try {
+    const cloudConfig = JSON.parse(fs.readFileSync(CLOUD_CONFIG_FILE, 'utf-8'));
+    orgId = cloudConfig.orgIdentifier;
+    const basicAuth = Buffer.from(`${cloudConfig.userEmail}:${cloudConfig.passcode}`).toString('base64');
+    headers = {
+      'Authorization': `Basic ${basicAuth}`,
+      'Content-Type': 'application/json',
+    };
+    baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
+  } catch (e) {
+    testLogger.warn('[alpha1] Cannot read cloud-config.json for ingestion — skipping', { error: e.message });
+    return;
+  }
+
+  const streams = [
+    { name: 'e2e_automate', data: logsdata },
+    { name: 'auto_playwright_stream', data: [{ level: 'info', job: 'test', log: 'test message for openobserve' }] },
+  ];
+
+  for (const stream of streams) {
+    try {
+      const r = await fetch(`${baseUrl}/api/${orgId}/${stream.name}/_json`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(stream.data),
+      });
+      if (r.ok) {
+        testLogger.info(`[alpha1] Ingested test data into '${stream.name}'`, { status: r.status });
+      } else {
+        const text = await r.text();
+        testLogger.warn(`[alpha1] Ingestion into '${stream.name}' returned ${r.status}`, { body: text.substring(0, 200) });
+      }
+    } catch (e) {
+      testLogger.warn(`[alpha1] Failed to ingest into '${stream.name}'`, { error: e.message });
+    }
+  }
+
+  // Wait for streams to be indexed
+  testLogger.info('[alpha1] Waiting for streams to be indexed...');
+  const maxWaitMs = 90000;
+  const pollIntervalMs = 3000;
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      const r = await fetch(`${baseUrl}/api/${orgId}/streams?type=logs&page_num=0&page_size=1000`, { headers });
+      if (r.ok) {
+        const data = await r.json();
+        const names = (data.list || []).map(s => s.name);
+        if (names.includes('e2e_automate') && names.includes('auto_playwright_stream')) {
+          testLogger.info(`[alpha1] Both streams indexed after ${Date.now() - startTime}ms`);
+          return;
+        }
+      }
+    } catch (e) {
+      testLogger.debug(`[alpha1] Error checking streams: ${e.message}`);
+    }
+    await new Promise(r => setTimeout(r, pollIntervalMs));
+  }
+
+  testLogger.warn(`[alpha1] Streams not fully indexed after ${maxWaitMs}ms — tests may fail on stream selection`);
 }
 
 module.exports = globalSetup;
