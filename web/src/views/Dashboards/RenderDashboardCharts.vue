@@ -326,7 +326,7 @@ import {
   resolvePanelTimeValue,
 } from "@/utils/dashboard/panelTimeUtils";
 import "gridstack/dist/gridstack.min.css";
-import { panelDownloadRegistry } from "@/utils/panelDownloadRegistry";
+import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -1177,7 +1177,9 @@ export default defineComponent({
       }
       // Remove console helpers
       delete (window as any).oo_logAllPanelsJSON;
+      delete (window as any).oo_getAllPanelsCsv;
       panelDownloadRegistry.clear();
+      panelCsvRegistry.clear();
     });
 
     /**
@@ -1548,6 +1550,22 @@ export default defineComponent({
             console.warn(`[oo] Error on panel ${id}`, e);
           }
         });
+      };
+
+      // Report-server helper — returns { [panelId]: { title, csv } } as a plain
+      // JS object so the report server can capture it via page.evaluate().
+      // Usage:  window.oo_getAllPanelsCsv()
+      (window as any).oo_getAllPanelsCsv = (): Record<string, { title: string; csv: string }> => {
+        const result: Record<string, { title: string; csv: string }> = {};
+        panelCsvRegistry.forEach((fn, id) => {
+          try {
+            const data = fn();
+            if (data) result[id] = data;
+          } catch (e) {
+            console.warn(`[oo] Error getting CSV for panel ${id}`, e);
+          }
+        });
+        return result;
       };
     });
 

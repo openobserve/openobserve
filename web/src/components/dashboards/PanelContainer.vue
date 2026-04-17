@@ -421,7 +421,7 @@ import {
   onBeforeUnmount,
   onMounted,
 } from "vue";
-import { panelDownloadRegistry } from "@/utils/panelDownloadRegistry";
+import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -896,12 +896,16 @@ export default defineComponent({
     };
 
     // Register in the module-level download registry so that
-    // window.oo_logAllPanelsJSON() can print panel data from the console.
+    // window.oo_logAllPanelsJSON() can print panel data from the console,
+    // and in panelCsvRegistry so window.oo_getAllPanelsCsv() can collect CSV data.
     onMounted(() => {
       const panelId = props.data?.id;
       if (panelId) {
         panelDownloadRegistry.set(panelId, () =>
           PanleSchemaRendererRef.value?.logDataAsJSON(props.data?.title),
+        );
+        panelCsvRegistry.set(panelId, () =>
+          PanleSchemaRendererRef.value?.getPanelCsvData(props.data?.title) ?? null,
         );
       }
     });
@@ -912,6 +916,7 @@ export default defineComponent({
       const panelId = props.data?.id;
       if (panelId) {
         panelDownloadRegistry.delete(panelId);
+        panelCsvRegistry.delete(panelId);
       }
 
       // Clear any pending timeouts or intervals
