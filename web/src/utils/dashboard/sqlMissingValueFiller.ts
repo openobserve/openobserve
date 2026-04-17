@@ -200,13 +200,13 @@ export const fillMissingValues = (
       }
     }
 
-    // Anchor/phantom entries use null (not noValueConfigOption) so ECharts
-    // renders them as gaps rather than plotted points at the configured value.
+    // Anchor/phantom entries use empty string (not noValueConfigOption) so
+    // ECharts renders them as gaps rather than plotted points at the configured value.
     if (!hasBreakdown) {
       anchorTimes.forEach((t) => {
         const anchorEntry: any = { [timeKey]: t };
         keys.forEach((key) => {
-          if (key !== timeKey) anchorEntry[key] = null;
+          if (key !== timeKey) anchorEntry[key] = "";
         });
         filledData.push(anchorEntry);
       });
@@ -219,7 +219,7 @@ export const fillMissingValues = (
           };
           keys.forEach((key) => {
             if (key !== timeKey && key !== uniqueKey) {
-              anchorEntry[key] = null;
+              anchorEntry[key] = "";
             }
           });
           filledData.push(anchorEntry);
@@ -309,13 +309,13 @@ export const fillMissingValues = (
 
       anchorTimes.push(formattedBinnedUserEnd);
 
-      // Anchor/phantom entries use null (not noValueConfigOption) so ECharts
-      // renders them as gaps rather than plotted points at the configured value.
+      // Anchor/phantom entries use empty string (not noValueConfigOption) so
+      // ECharts renders them as gaps rather than plotted points at the configured value.
       if (!hasBreakdown) {
         anchorTimes.forEach((t) => {
           const anchorEntry: any = { [timeKey]: t };
           keys.forEach((key) => {
-            if (key !== timeKey) anchorEntry[key] = null;
+            if (key !== timeKey) anchorEntry[key] = "";
           });
           filledData.push(anchorEntry);
         });
@@ -328,7 +328,7 @@ export const fillMissingValues = (
             };
             keys.forEach((key) => {
               if (key !== timeKey && key !== uniqueKey) {
-                anchorEntry[key] = null;
+                anchorEntry[key] = "";
               }
             });
             filledData.push(anchorEntry);
