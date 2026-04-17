@@ -57,7 +57,6 @@ jobs:
     runs-on:
       labels: ubicloud-standard-30
     env:
-      CARGO_INCREMENTAL: "0"
       SCCACHE_GHA_ENABLED: "true"
       SCCACHE_IDLE_TIMEOUT: "0"
       RUSTC_WRAPPER: "sccache"
