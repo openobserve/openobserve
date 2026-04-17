@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px)">
+  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px); ">
 
     <!-- Full-page Import View -->
     <ImportModelPricing
@@ -168,6 +168,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-tr
           :props="props"
         >
+          <q-tooltip
+            v-if="getShadowedBy(props.row)"
+            :delay="400"
+            anchor="top middle"
+            self="bottom middle"
+            class="bg-grey-9 text-caption"
+            style="white-space: normal; max-width: 300px;"
+          >
+            Shadowed by "{{ getShadowedBy(props.row)?.name }}"
+            <div class="tw:mt-1 tw:opacity-75">Higher priority match. This model won't be used for cost calculation.</div>
+          </q-tooltip>
           <q-td v-for="col in columns" :key="col.name" :props="props" :style="col.style">
             <template v-if="col.name === 'select'">
               <q-checkbox
@@ -200,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Custom model</q-tooltip>
                 </q-icon>
-                <div class="o2-table-cell-content tw:font-semibold">
+                <div class="o2-table-cell-content">
                   {{ props.row.name }}
                 </div>
                 <q-tooltip
@@ -218,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:items-center tw:gap-1">
                 <code
                   class="text-caption pattern-code o2-table-cell-content"
-                  :class="{'tw:opacity-40': !!getShadowedBy(props.row)}"
+                  :class="{'tw:opacity-60 tw:line-through': !!getShadowedBy(props.row)}"
                 >
                   {{ props.row.match_pattern }}
                 </code>
@@ -227,15 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="warning_amber"
                   size="14px"
                   color="warning"
-                  class="tw:cursor-pointer"
-                >
-                  <q-tooltip :delay="300" class="bg-grey-9 text-caption" style="white-space: normal; max-width: 300px;">
-                    Shadowed by "{{ getShadowedBy(props.row)?.name }}"
-                    <div class="tw:mt-1 tw:opacity-75">
-                      Higher priority match. This model won't be used for cost calculation.
-                    </div>
-                  </q-tooltip>
-                </q-icon>
+                />
               </div>
             </template>
             <template v-else-if="col.name === 'pricing'">
@@ -305,6 +308,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     round
                     flat
+                    :icon="outlinedDelete"
+                    title="Delete"
+                    @click.stop="confirmDelete(props.row)"
+                    data-test="model-pricing-delete-btn"
+                  />
+                  <q-btn
+                    padding="sm"
+                    unelevated
+                    size="sm"
+                    round
+                    flat
                     icon="content_copy"
                     title="Duplicate"
                     @click.stop="duplicateModel(props.row)"
@@ -337,9 +351,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #bottom="scope">
-        <div class="bottom-btn">
-          <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
-            {{ resultTotal }} models
+        <div class="bottom-btn tw:h-[48px]">
+          <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px]">
+            {{ resultTotal }} Models
           </div>
           <q-btn
             v-if="selectedCount > 0"
@@ -377,10 +391,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Pricing detail side panel -->
   <q-dialog v-model="showPricingDialog" position="right" maximized>
-    <div :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'" class="pricing-dialog-panel " style="width: 30vw;">
+    <div :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'" class="pricing-dialog-panel">
       <div class="add-stream-header row items-center no-wrap q-px-md">
-        <div class="col">
-          <div style="font-size: 18px">{{ pricingDialogRow?.name }}</div>
+        <div class="col tw:flex tw:items-center tw:gap-2 tw:min-w-0">
+          <!-- Source icon -->
+          <span v-if="getSource(pricingDialogRow) === 'built_in'" class="tw:shrink-0 tw:cursor-default tw:inline-flex">
+            <img :src="ooLogo" class="tw:w-[18px] tw:h-[18px]" alt="OpenObserve" />
+            <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Built-in model provided by OpenObserve</q-tooltip>
+          </span>
+          <q-icon
+            v-else-if="pricingDialogRow && (getSource(pricingDialogRow) === 'meta_org' || (getSource(pricingDialogRow) === 'org' && pricingDialogRow.org_id !== orgIdentifier))"
+            name="corporate_fare"
+            size="18px"
+            class="tw:shrink-0 tw:text-grey-6 tw:cursor-default"
+          >
+            <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from meta org</q-tooltip>
+          </q-icon>
+          <q-icon
+            v-else
+            name="person"
+            size="18px"
+            class="tw:shrink-0 tw:text-grey-6 tw:cursor-default"
+          >
+            <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Custom model</q-tooltip>
+          </q-icon>
+          <div style="font-size: 18px" class="tw:truncate">
+            {{ pricingDialogRow?.name }}
+            <q-tooltip
+              v-if="pricingDialogRow?.name && pricingDialogRow.name.length > 20"
+              :delay="300"
+              anchor="bottom middle"
+              self="top middle"
+              style="max-width: none; white-space: normal; word-break: break-all;"
+            >{{ pricingDialogRow.name }}</q-tooltip>
+          </div>
         </div>
         <div class="col-auto">
           <q-btn v-close-popup round flat icon="cancel" />
@@ -388,16 +432,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <q-separator />
       <div class="q-pa-md pricing-dialog-body">
-        <div v-if="pricingDialogRow" class="tw:flex tw:flex-wrap tw:gap-2">
-          <span
-            v-for="(price, key) in getDefaultTier(pricingDialogRow)?.prices"
-            :key="key"
-            class="dimension-badge"
-            :class="getPriceKeyColorClass(key as string)"
-            style="font-size: 13px; padding: 4px 10px;"
-          >
-            <span class="tw:font-medium">{{ formatPriceKey(key as string) }}</span>=<span>{{ formatPerMillion(price as number) }}</span>
-          </span>
+        <div v-if="pricingDialogRow">
+          <!-- Pattern section -->
+          <div class="tw:mb-4">
+            <div class="pricing-section-label">Pattern</div>
+            <code class="text-caption pattern-code pattern-code-panel">{{ pricingDialogRow.match_pattern }}</code>
+          </div>
+          <q-separator class="tw:mb-4" />
+
+          <!-- Pricing per 1M tokens section -->
+          <div>
+            <div class="pricing-section-label tw:mt-2">Pricing per 1M tokens</div>
+            <div class="tw:flex tw:flex-wrap tw:gap-2">
+              <span
+                v-for="(price, key) in getDefaultTier(pricingDialogRow)?.prices"
+                :key="key"
+                class="dimension-badge"
+                :class="getPriceKeyColorClass(key as string)"
+                style="font-size: 13px; padding: 4px 10px;"
+              >
+                <span class="tw:font-medium">{{ formatPriceKey(key as string) }}</span>=<span>{{ formatPerMillion(price as number) }}</span>
+              </span>
+              <span v-if="!getDefaultTier(pricingDialogRow)?.prices || Object.keys(getDefaultTier(pricingDialogRow)?.prices || {}).length === 0" class="text-grey-5">—</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -497,7 +555,7 @@ const columns = computed(() => {
     { name: "name", label: "Model", field: "name", align: "left", sortable: true, style: "width: 280px; min-width: 280px; max-width: 280px;" },
     { name: "match_pattern", label: "Pattern", field: "match_pattern", align: "left", style: "width: 280px; min-width: 280px; max-width: 280px; overflow: hidden;" },
     { name: "pricing", label: "Pricing (per 1M tokens)", field: "pricing", align: "left", style: "min-width: 200px;" },
-    { name: "actions", label: "Actions", field: "actions", align: "center", style: "width: 120px; min-width: 120px; max-width: 120px;" },
+    { name: "actions", label: "Actions", field: "actions", align: "center", style: "width: 120px; min-width: 120px; max-width: 120px;", classes: "actions-column", headerClasses: "actions-column" },
   );
   return cols;
 });
@@ -796,7 +854,8 @@ async function toggleEnabled(model: any, enabled: boolean) {
     const updated = { ...clean, enabled };
     await modelPricingService.update(orgIdentifier.value, model.id, updated);
     await fetchModels(); // refetch to reflect server state
-    q.notify({ type: "positive", message: `Model "${model.name}" ${enabled ? "enabled" : "disabled"}`, position: "bottom", timeout: 3000 });
+    const displayName = model.name.length > 30 ? model.name.slice(0, 30) + "…" : model.name;
+    q.notify({ type: "positive", message: `Model "${displayName}" ${enabled ? "enabled" : "disabled"}`, position: "bottom", timeout: 3000 });
   } catch (e: any) {
     notifyError("Failed to update", e);
   }
@@ -986,6 +1045,27 @@ body.body--dark .pattern-code {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.pricing-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #555;
+
+  .body--dark & {
+    color: #aaa;
+  }
+}
+
+.pattern-code-panel {
+  display: block;
+  font-size: 13px;
+  padding: 6px 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
 /* ── Dimension badges (pricing) ─────────────────────── */
 .dimension-badge {
   display: inline-flex;
@@ -1012,22 +1092,10 @@ body.body--dark .badge-more {
   color: #d1d5db;
 }
 
-.badge-blue   { border-color: #1d4ed8; }
-.badge-green  { border-color: #065f46; }
-.badge-cyan   { border-color: #0e7490; }
-.badge-purple { border-color: #7c3aed; }
-.badge-pink   { border-color: #9f1239; }
-.badge-orange { border-color: #c2410c; }
-.badge-gray   { border-color: #4b5563; }
-.badge-amber  { border-color: #d97706; }
-.badge-violet { border-color: #7c3aed; }
-.badge-rose   { border-color: #e11d48; }
-.badge-teal   { border-color: #0f766e; }
-.badge-indigo { border-color: #4f46e5; }
 
 /* ── Pricing detail side panel ────────────────────── */
 .pricing-dialog-panel {
-  width: 30vw;
+  width: 30vw !important;
   min-width: 320px;
   max-width: 100vw;
   height: 100vh;
@@ -1057,18 +1125,9 @@ body.body--dark .badge-more {
 }
 
 body.body--dark {
-  .dimension-badge { color: #ffffff; }
-  .badge-blue   { border-color: #93c5fd; }
-  .badge-green  { border-color: #6ee7b7; }
-  .badge-cyan   { border-color: #67e8f9; }
-  .badge-purple { border-color: #c4b5fd; }
-  .badge-pink   { border-color: #f9a8d4; }
-  .badge-orange { border-color: #fdba74; }
-  .badge-gray   { border-color: #d1d5db; }
-  .badge-amber  { border-color: #fbbf24; }
-  .badge-violet { border-color: #c4b5fd; }
-  .badge-rose   { border-color: #fda4af; }
-  .badge-teal   { border-color: #5eead4; }
-  .badge-indigo { border-color: #a5b4fc; }
+  .dimension-badge {
+    color: #ffffff;
+    border-color: #4b5563;
+  }
 }
 </style>

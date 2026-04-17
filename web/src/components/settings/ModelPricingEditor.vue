@@ -18,10 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="q-pa-none tw:flex tw:flex-col" style="min-height: 0; height: 100%; overflow: hidden;">
 
     <!-- Header -->
-    <div class="tw:flex tw:items-center tw:px-5 tw:h-[68px] tw:border-b-[1px] tw:gap-3 tw:flex-shrink-0">
+    <div class="tw:flex tw:items-center tw:px-3 tw:h-[68px] tw:border-b-[1px] tw:gap-3 tw:flex-shrink-0">
       <div
         data-test="model-pricing-editor-back-btn"
-        class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+        class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius"
         title="Go Back"
         @click="goBack"
       >
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Form Body -->
-    <div class="tw:px-6 tw:py-6" style="flex: 1; min-height: 0; height: calc(100vh - 170px);  overflow-y: auto;">
+    <div class="tw:px-3 tw:py-3" style="flex: 1; min-height: 0; height: calc(100vh - 170px);  overflow-y: auto;">
       <div style="max-width: 760px;" class="tw:flex tw:flex-col tw:gap-6">
 
         <!-- ── Model Details Card ── -->
