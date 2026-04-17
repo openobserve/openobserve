@@ -66,10 +66,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           </q-btn>
           <!-- Use JsonFieldRenderer if column is marked as JSON -->
-          <JsonFieldRenderer
+          <span
             v-if="props.col.showFieldAsJson"
-            :value="props.value"
-          />
+            style="display: inline-block"
+          >
+            <JsonFieldRenderer :value="props.value" />
+          </span>
           <!-- Otherwise show normal value -->
           <!-- Note: props.value is already the format()-applied value (Quasar applies col.format internally).
                Calling props.col.format again here would double-convert timestamps (wrong timezone offset). -->
