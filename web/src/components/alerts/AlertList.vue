@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     ? 'warning'
                                     : props.row.status === 'disabled'
                                       ? 'grey'
-                                      : 'info'
+                                      : 'positive'
                             "
                             :label="props.row.status"
                             style="text-transform: capitalize; cursor: default"
