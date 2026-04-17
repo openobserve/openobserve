@@ -69,6 +69,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_logs_pattern_insights_migration = false;
     let mut need_service_streams_migration = false;
     let mut need_eval_templates_migration = false;
+    let mut need_ai_toolsets_migration = false;
     let mut need_report_folders_migration = false;
 
     let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
@@ -297,11 +298,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     log::info!("[OFGA:Local] service_streams permissions migration needed");
                     need_service_streams_migration = true;
                 }
-                if meta_version > v0_0_27 && existing_model_version < v0_0_28 {
+                if existing_model_version < v0_0_28 {
                     log::info!("[OFGA:Local] eval_templates permissions migration needed");
                     need_eval_templates_migration = true;
                 }
-                if meta_version > v0_0_29 && existing_model_version < v0_0_30 {
+                if existing_model_version < v0_0_29 {
+                    log::info!("[OFGA:Local] ai_toolsets permissions migration needed");
+                    need_ai_toolsets_migration = true;
+                }
+                if existing_model_version < v0_0_30 {
                     log::info!("[OFGA:Local] report folders migration needed");
                     need_report_folders_migration = true;
                 }
@@ -426,6 +431,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     if need_eval_templates_migration {
                         get_ownership_all_org_tuple(org_name, "eval_templates", &mut tuples);
+                    }
+                    if need_ai_toolsets_migration {
+                        get_ownership_all_org_tuple(org_name, "ai_toolsets", &mut tuples);
                     }
                 }
                 if need_alert_folders_migration {

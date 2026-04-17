@@ -14,22 +14,22 @@ export class ServiceGraphPage {
     // ===== MAIN COMPONENT (ServiceGraph.vue) =====
     this.dateTimePicker = '[data-test="service-graph-date-time-picker"]';
     this.refreshButton = '[data-test="service-graph-refresh-btn"]';
-    this.viewTabs = '[data-test="service-graph-view-tabs"]';
     this.chartContainer = '[data-test="service-graph-chart"]';
 
-    // ===== VIEW TAB SELECTORS (AppTabs renders div.o2-tab, NOT role="tab") =====
-    this.graphViewTab = '[data-test="tab-graph"]';
-    this.treeViewTab = '[data-test="tab-tree"]';
-    this.activeViewTab = '.o2-tab.active';
+    // ===== VIEW TOGGLE BUTTONS (SearchBar.vue — q-btn with .selected class) =====
+    this.graphViewTab = '[data-test="service-graph-graph-view-btn"]';
+    this.treeViewTab = '[data-test="service-graph-tree-view-btn"]';
 
     // ===== SEARCH =====
-    this.searchInput = 'input[placeholder="Search services..."]';
+    this.searchInput = 'input[placeholder="Search Services"]';
 
     // ===== NODE DETAIL PANEL (ServiceGraphNodeSidePanel.vue) =====
     this.sidePanel = '[data-test="service-graph-side-panel"]';
     this.sidePanelHeader = '[data-test="service-graph-side-panel-header"]';
     this.sidePanelServiceName = '[data-test="service-graph-side-panel-service-name"]';
-    this.sidePanelShowTelemetryBtn = '[data-test="service-graph-side-panel-show-telemetry-btn"]';
+    this.sidePanelViewRelatedBtn = '[data-test="service-graph-node-panel-view-related-btn"]';
+    this.sidePanelViewRelatedLogsBtn = '[data-test="service-graph-node-panel-view-related-logs-btn"]';
+    this.sidePanelViewRelatedTracesBtn = '[data-test="service-graph-node-panel-view-related-traces-btn"]';
     this.sidePanelCloseBtn = '[data-test="service-graph-side-panel-close-btn"]';
 
     // RED charts section (Rate/Errors/Duration dashboards)
@@ -99,22 +99,27 @@ export class ServiceGraphPage {
 
   async switchToGraphView() {
     await this.page.locator(this.graphViewTab).click();
-    // Wait for the graph tab to become active
-    await this.page.locator(this.graphViewTab + '.active')
-      .waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+    // Wait for the graph button to become selected
+    await expect(this.page.locator(this.graphViewTab)).toHaveClass(/selected/, { timeout: 5000 });
   }
 
   async switchToTreeView() {
     await this.page.locator(this.treeViewTab).click();
-    // Wait for the tree tab to become active
-    await this.page.locator(this.treeViewTab + '.active')
-      .waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+    // Wait for the tree button to become selected
+    await expect(this.page.locator(this.treeViewTab)).toHaveClass(/selected/, { timeout: 5000 });
   }
 
   async getActiveViewTab() {
-    // Scope to the view tabs container to avoid matching other AppTabs on the page
-    const activeTab = this.page.locator(this.viewTabs).locator(this.activeViewTab);
-    return await activeTab.textContent();
+    // Check which view toggle button has the .selected class
+    const treeSelected = await this.page.locator(this.treeViewTab)
+      .evaluate(el => el.classList.contains('selected')).catch(() => false);
+    if (treeSelected) return 'Tree View';
+
+    const graphSelected = await this.page.locator(this.graphViewTab)
+      .evaluate(el => el.classList.contains('selected')).catch(() => false);
+    if (graphSelected) return 'Graph View';
+
+    return 'Unknown';
   }
 
   async typeInSearchBox(text) {
@@ -337,30 +342,54 @@ export class ServiceGraphPage {
   // ===== TELEMETRY CORRELATION =====
 
   /**
-   * Click "Show Telemetry" and wait for the async API call to finish.
-   * The button has a :loading state while fetchCorrelatedStreams() runs.
-   * Returns true if the correlation dialog opened, false if an error notification appeared.
+   * Click the Metrics tab in the side panel and wait for correlation data to load.
+   * Returns true if metrics dashboard rendered, false if error/empty state shown.
    */
-  async clickShowTelemetryAndWait() {
-    const btn = this.page.locator(this.sidePanelShowTelemetryBtn);
-    await btn.click();
+  async clickMetricsTabAndWait() {
+    const metricsTab = this.page.locator('[data-test="service-graph-node-panel-tab-metrics"]');
+    await metricsTab.click();
 
-    // Wait for the loading spinner to appear and then disappear (API call in progress)
-    // The button has :loading="correlationLoading" — Quasar adds .q-btn--loading class
-    await btn.locator('.q-spinner').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    await btn.locator('.q-spinner').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+    // Wait for loading spinner to appear and disappear
+    const metricsPanel = this.page.locator('[data-test="service-graph-side-panel-metrics"]');
+    await metricsPanel.locator('.q-spinner').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await metricsPanel.locator('.q-spinner').waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
 
-    // After loading completes, either the dialog opens or a notification toast appears
-    const dialogVisible = await this.page.locator(this.correlationDashboardCard)
-      .waitFor({ state: 'visible', timeout: 3000 })
+    // Check if the metrics dashboard rendered
+    const dashboardVisible = await this.page.locator('[data-test="service-graph-side-panel-metrics-dashboard"]')
+      .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false);
 
-    return dialogVisible;
+    return dashboardVisible;
   }
 
-  async clickShowTelemetry() {
-    await this.page.locator(this.sidePanelShowTelemetryBtn).click();
+  async expectMetricsDashboardVisible() {
+    await expect(this.page.locator('[data-test="service-graph-side-panel-metrics-dashboard"]')).toBeVisible({ timeout: 5000 });
+  }
+
+  async isMetricsErrorVisible() {
+    return await this.page.locator('[data-test="service-graph-side-panel-metrics-error"]')
+      .isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  async isMetricsEmptyVisible() {
+    return await this.page.locator('[data-test="service-graph-side-panel-metrics-empty"]')
+      .isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  async getSearchInputValue() {
+    return await this.page.locator(this.searchInput).inputValue();
+  }
+
+  /**
+   * Click "View Related" dropdown and select an option (Logs or Traces).
+   * @param {'logs'|'traces'} type - Which related telemetry to view
+   */
+  async clickViewRelated(type = 'traces') {
+    await this.page.locator(this.sidePanelViewRelatedBtn).click();
+    await this.page.waitForTimeout(300);
+    const selector = type === 'logs' ? this.sidePanelViewRelatedLogsBtn : this.sidePanelViewRelatedTracesBtn;
+    await this.page.locator(selector).click();
   }
 
   async expectCorrelationDialogVisible() {

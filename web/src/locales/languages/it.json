@@ -2219,7 +2219,8 @@
     "anomalyCreated": "Configurazione di rilevamento delle anomalie creata. La formazione inizierà a breve.",
     "editJson": "Modifica avviso JSON",
     "importedFromPattern": "Avviso precompilato dal modello di registro",
-    "importedFromAnomalyPattern": "Avviso precompilato da un modello di registro anomalo: rivedi le impostazioni di urgenza"
+    "importedFromAnomalyPattern": "Avviso precompilato da un modello di registro anomalo: rivedi le impostazioni di urgenza",
+    "additional_settings": "Impostazioni aggiuntive"
   },
   "alert_templates": {
     "header": "Modelli",
@@ -2527,7 +2528,8 @@
     "maxSeriesPerQueryTooltip": "Quando una query ProMQL come «count (metric) by (label)» restituisce troppe serie, può bloccare l'interfaccia utente. Questo limite lo impedisce. Imposta su null per l'impostazione predefinita del sistema o specifica un valore compreso tra 1.000 e 1.000.000.",
     "maxSeriesPerQueryValidation": "Il valore deve essere compreso tra 1.000 e 1.000.000 o lasciare vuoto per impostazione predefinita",
     "systemDefault": "impostazione predefinita del sistema",
-    "usageStreamEnabledLabel": "Abilita flusso di utilizzo"
+    "usageStreamEnabledLabel": "Abilita flusso di utilizzo",
+    "aiToolsets": "Set di strumenti AI"
   },
   "iam": {
     "users": "Utenti",
@@ -2824,7 +2826,8 @@
       "status": "Status",
       "type": "Tipo",
       "multiStepAgent": "Agente in più fasi"
-    }
+    },
+    "noLogsAvailableForService": "Nessun registro disponibile per questo servizio"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -3356,5 +3359,61 @@
     "typeScore": "Punteggio numerico (ad es. 0,0 - 1,0)",
     "typeBoolean": "Binario/Pass-Fail (booleano)",
     "typeCustom": "Testo categoriale/personalizzato"
+  },
+  "aiToolset": {
+    "header": "Set di strumenti AI",
+    "add": "Nuovo set di strumenti AI",
+    "search": "Cerca set di strumenti AI",
+    "update": "Aggiorna il set di strumenti AI",
+    "name": "Nome",
+    "nameRequired": "Il nome è obbligatorio",
+    "nameInvalid": "Sono consentiti solo lettere, numeri, trattini e trattini bassi",
+    "nameTooLong": "Il nome non deve superare i 256 caratteri",
+    "kind": "Tipo",
+    "kindRequired": "Il tipo è obbligatorio",
+    "description": "Descrizione",
+    "actions": "Azioni",
+    "deleteTitle": "Elimina set di strumenti AI",
+    "deleteMessage": "Sei sicuro di voler eliminare «{name}»?",
+    "loadFailed": "Impossibile caricare i set di strumenti AI. Riprova.",
+    "createFailed": "Creazione del set di strumenti AI non riuscita. Per favore riprova.",
+    "updateFailed": "Aggiornamento del set di strumenti AI non riuscito. Riprova.",
+    "deleteFailed": "Impossibile eliminare AI Toolset.",
+    "createdSuccessfully": "Set di strumenti AI creato con successo",
+    "updatedSuccessfully": "AI Toolset aggiornato con successo",
+    "deletedSuccessfully": "AI Toolset eliminato con successo",
+    "mcpConfig": "Configurazione del server MCP",
+    "mcpUrl": "URL dell'endpoint",
+    "mcpUrlRequired": "L'URL dell'endpoint è obbligatorio",
+    "timeoutSeconds": "Timeout (secondi)",
+    "headers": "Intestazioni HTTP",
+    "headerKey": "Nome dell'intestazione",
+    "headerValue": "Valore dell'intestazione",
+    "addHeader": "Aggiungi intestazione",
+    "cliConfig": "Configurazione dello strumento CLI",
+    "presets": "Riempimento rapido",
+    "cliCommand": "Comando",
+    "cliCommandRequired": "Il comando è obbligatorio",
+    "allowedSubcommands": "Sottocomandi consentiti",
+    "subcommandsHint": "Elenco separato da virgole, ad esempio get, describe, logs: lascia vuoto per consentire tutto",
+    "maxOutputBytes": "Uscita massima (byte)",
+    "requiresConfirmation": "Richiedi conferma prima dell'esecuzione",
+    "envVars": "Variabili d'ambiente",
+    "envKey": "Nome della variabile",
+    "envValue": "Valore",
+    "addEnvVar": "Aggiungi variabile",
+    "credentialFiles": "File delle credenziali",
+    "credEnvVar": "Nome della variabile Env",
+    "credContent": "Contenuto del file",
+    "credContentHint": "Contenuto del file non elaborato (ad esempio kubeconfig YAML)",
+    "addCredFile": "Aggiungi file di credenziali",
+    "skillConfig": "Configurazione delle abilità",
+    "skillContent": "Definizione delle abilità (Markdown)",
+    "skillContentPlaceholder": "# Titolo abilità\n\nDescrivi cosa fa l'abilità e fornisci esempi...",
+    "skillContentRequired": "È richiesto il contenuto delle competenze",
+    "genericConfig": "Configurazione",
+    "genericData": "Configurazione JSON",
+    "genericDataPlaceholder": "{}",
+    "invalidJson": "Deve essere un JSON valido"
   }
 }

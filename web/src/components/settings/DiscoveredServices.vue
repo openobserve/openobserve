@@ -165,12 +165,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full tw:h-full">
         <div class="tw:h-[calc(100vh-340px)]">
           <q-table
-            :pagination="{ rowsPerPage: 0 }"
+            :pagination="{ rowsPerPage: 0, sortBy: sortBy, descending: sortDescending }"
             :rows="refreshing ? [] : paginatedGroups"
             :columns="columns"
             :loading="refreshing"
             row-key="service_name"
             hide-pagination
+            @request="onTableRequest"
             style="width: 100%"
             :style="filteredGroups.length > 0
               ? 'width: 100%; height: calc(100vh - 340px)'
@@ -493,6 +494,10 @@ const pagination = ref({
   rowsPerPage: 20,
 });
 
+// Sort state management - default to sort by last seen (most recent first)
+const sortBy = ref<string>('last_seen');
+const sortDescending = ref<boolean>(true);
+
 const perPageOptions: any = [
   { label: "20", value: 20 },
   { label: "50", value: 50 },
@@ -504,6 +509,20 @@ const perPageOptions: any = [
 const changePagination = (val: { label: string; value: number }) => {
   pagination.value.rowsPerPage = val.value;
   pagination.value.page = 1;
+};
+
+const onTableRequest = (props: any) => {
+  const { page, rowsPerPage, sortBy: newSortBy, descending } = props.pagination;
+
+  // Update sort state if sort changed
+  if (newSortBy && newSortBy !== sortBy.value) {
+    sortBy.value = newSortBy;
+    sortDescending.value = descending;
+    pagination.value.page = 1; // Reset to first page when sorting changes
+  } else if (newSortBy && newSortBy === sortBy.value) {
+    // Toggle sort direction if same column clicked
+    sortDescending.value = descending;
+  }
 };
 
 const columns = computed(() => [
@@ -524,7 +543,7 @@ const columns = computed(() => [
   {
     name: "last_seen",
     label: t("settings.correlation.lastSeen"),
-    field: "last_seen",
+    field: "lastSeen",
     align: "right" as const,
     sortable: true,
     style: "width: 120px",
@@ -615,6 +634,33 @@ const filteredGroups = computed((): ServiceGroup[] => {
         inst.metrics_streams.some(stream => stream.toLowerCase().includes(query))
       )
     );
+  }
+
+  // Apply sorting
+  if (sortBy.value) {
+    groups = [...groups].sort((a, b) => {
+      let aVal: any, bVal: any;
+
+      if (sortBy.value === 'last_seen') {
+        // Use lastSeen timestamps for sorting
+        aVal = a.lastSeen || 0;
+        bVal = b.lastSeen || 0;
+      } else {
+        // Use the field specified in sortBy
+        aVal = (a as any)[sortBy.value];
+        bVal = (b as any)[sortBy.value];
+      }
+
+      // Handle string comparison
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        const result = aVal.localeCompare(bVal);
+        return sortDescending.value ? -result : result;
+      }
+
+      // Handle numeric comparison
+      const diff = aVal - bVal;
+      return sortDescending.value ? -diff : diff;
+    });
   }
 
   return groups;
@@ -791,6 +837,7 @@ const formatRelativeTime = (microseconds: number): string => {
   const diffDays = Math.floor(diffHours / 24);
   return `${diffDays}d ago`;
 };
+
 
 const loadServices = async (isRefresh = false) => {
   if (isRefresh) {

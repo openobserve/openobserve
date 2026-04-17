@@ -928,7 +928,7 @@ async fn oo_validator_internal(
                 Some(value) => value,
                 None => return Err(AuthError::Unauthorized("Unauthorized Access".to_string())),
             };
-            log::info!("Auth ext token found: validating: {username} {password}");
+            log::info!("Auth ext token found: validating: {username}");
             validator(req_data, &username, &password, auth_info, path_prefix).await
         }
     } else {

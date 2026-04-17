@@ -21,6 +21,7 @@ pub mod eval_templates;
 pub mod folders;
 pub mod incident_events;
 pub mod kv_store;
+pub mod org_ai_toolsets;
 pub mod org_users;
 pub mod organizations;
 pub mod pipeline_last_errors;

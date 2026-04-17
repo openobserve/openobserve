@@ -19,8 +19,71 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-// Stub TenstackTable — renders loading/empty slots and one row of cell slots
-// so that cell-slot split tests can verify which component is rendered.
+// ─── Quasar mock — intercept copyToClipboard ────────────────────────────────
+// vi.mock is hoisted by Vitest, so the factory runs before any const declarations.
+// Use vi.hoisted() to create the spy in the hoisted scope so it's available
+// both inside the factory and in test assertions.
+//
+// cellActionsColumnRef drives the column passed to the cell-actions slot in the
+// TenstackTable stub.  The component uses `column.id` and `row[column.id]`
+// directly in its @copy handler (not event args), so each copy test must set
+// the right column.id + include the matching field in the hit before mounting.
+const { mockQCopyToClipboard, cellActionsColumnRef } = vi.hoisted(() => ({
+  mockQCopyToClipboard: vi.fn().mockResolvedValue(undefined),
+  cellActionsColumnRef: {
+    id: undefined as string | undefined,
+    columnDef: { meta: { disableCellAction: false } },
+  },
+}));
+vi.mock("quasar", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    copyToClipboard: mockQCopyToClipboard,
+    useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
+  };
+});
+
+// ─── Shared searchObj reference — lets tests read addToFilter after mutation ─
+const sharedSearchObj = {
+  data: {
+    stream: { selectedStreamFields: [] as string[], addToFilter: "" },
+    resultGrid: { columns: [] as any[] },
+  },
+};
+
+vi.mock("@/composables/useTraces", () => ({
+  default: () => ({
+    searchObj: sharedSearchObj,
+    updatedLocalLogFilterField: vi.fn(),
+  }),
+}));
+
+// ─── CellActions stub — emits copy/add-search-term with the field + value
+// that are passed down from the component via its @copy / @add-search-term
+// bindings on the real CellActions component.  The stub captures the props
+// and re-emits them verbatim so tests can trigger the component's handlers
+// with explicit field/value pairs via wrapper.vm.$emit on the stub.
+vi.mock("@/plugins/logs/data-table/CellActions.vue", () => ({
+  default: {
+    name: "CellActions",
+    props: [
+      "column",
+      "row",
+      "selectedStreamFields",
+      "hideSearchTermActions",
+      "hideAi",
+    ],
+    emits: ["copy", "add-search-term", "send-to-ai-chat"],
+    template: `<div data-test="stub-cell-actions" />`,
+  },
+}));
+
+// ─── TenstackTable stub — renders loading/empty/cell slots ──────────────────
+// Also renders cell-actions slot so CellActions can be exercised in tests.
+// setup() exposes cellActionsColumnRef so each test can control column.id — the
+// component's @copy handler uses column.id + row[column.id] from the slot scope,
+// not the event args emitted by CellActions.
 vi.mock("@/components/TenstackTable.vue", () => ({
   default: {
     name: "TenstackTable",
@@ -42,6 +105,9 @@ vi.mock("@/components/TenstackTable.vue", () => ({
       "selectedStreamFields",
     ],
     emits: ["click:data-row", "sort-change"],
+    setup() {
+      return { cellActionsColumn: cellActionsColumnRef };
+    },
     // Mirror the real slot behaviour used by TracesSearchResultList.
     // Also render cell slots for the first row so slot-split tests can assert on rendered output.
     template: `
@@ -51,22 +117,13 @@ vi.mock("@/components/TenstackTable.vue", () => ({
         <template v-if="rows && rows.length">
           <div data-test="stub-cell-span_status"><slot name="cell-span_status" :item="rows[0]" /></div>
           <div data-test="stub-cell-status"><slot name="cell-status" :item="rows[0]" /></div>
+          <div data-test="stub-cell-actions-wrapper">
+            <slot name="cell-actions" :row="rows[0]" :column="cellActionsColumn" :active="true" />
+          </div>
         </template>
       </div>
     `,
   },
-}));
-
-vi.mock("@/composables/useTraces", () => ({
-  default: () => ({
-    searchObj: {
-      data: {
-        stream: { selectedStreamFields: [], addToFilter: "" },
-        resultGrid: { columns: [] },
-      },
-    },
-    updatedLocalLogFilterField: vi.fn(),
-  }),
 }));
 
 vi.mock("./TraceTimestampCell.vue", () => ({
@@ -117,6 +174,12 @@ describe("TracesSearchResultList", () => {
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
+    // Reset shared searchObj state between tests
+    sharedSearchObj.data.stream.addToFilter = "";
+    sharedSearchObj.data.stream.selectedStreamFields = [];
+    sharedSearchObj.data.resultGrid.columns = [];
+    // Reset the column ref so copy tests don't bleed into each other
+    cellActionsColumnRef.id = undefined;
   });
 
   const mount_ = (
@@ -357,6 +420,126 @@ describe("TracesSearchResultList", () => {
       expect(
         spanStatusCell.findComponent({ name: "TraceStatusCell" }).exists(),
       ).toBe(false);
+    });
+  });
+
+  // ─── copyToClipboard — span_kind translation ──────────────────────────────
+  // The component's @copy handler is an inline expression:
+  //   @copy="copyToClipboard(column.id, row[column.id])"
+  // It uses column.id and row[column.id] from the slot scope — it does NOT
+  // forward the args emitted by CellActions.  Each test therefore:
+  //   1. Sets cellActionsColumnRef.id to the target field before mounting
+  //   2. Passes a hit that contains that field with the desired value
+  //   3. Emits "copy" with no args — the handler picks up field+value from scope
+  describe("copyToClipboard — span_kind translation", () => {
+    it("should copy the display label when field is span_kind and value maps to a known entry", async () => {
+      // value "2" maps to "Server" in SPAN_KIND_MAP
+      cellActionsColumnRef.id = "span_kind";
+      wrapper = mount_({
+        hits: [{ ...makeHit("t1"), span_kind: "2" }],
+        loading: false,
+      });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      await cellActions.vm.$emit("copy");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("Server");
+    });
+
+    it("should copy the raw value when field is span_kind and value is not in the map", async () => {
+      // value "99" has no mapping — raw string is copied unchanged
+      cellActionsColumnRef.id = "span_kind";
+      wrapper = mount_({
+        hits: [{ ...makeHit("t1"), span_kind: "99" }],
+        loading: false,
+      });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      await cellActions.vm.$emit("copy");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("99");
+    });
+
+    it("should copy the raw value without translation when field is not span_kind", async () => {
+      // non-span_kind field — no translation applied
+      cellActionsColumnRef.id = "some_other_field";
+      wrapper = mount_({
+        hits: [{ ...makeHit("t1"), some_other_field: "2" }],
+        loading: false,
+      });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      await cellActions.vm.$emit("copy");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("2");
+    });
+  });
+
+  // ─── addSearchTerm — span_kind translation in filter string ──────────────
+  // The component handler is invoked by CellActions via its @add-search-term event.
+  // We emit the event on the CellActions stub and assert the resulting
+  // searchObj.data.stream.addToFilter string.
+  describe("addSearchTerm — span_kind translation", () => {
+    const hit = makeHit("t1");
+
+    it("should include display label in filter when field is span_kind and value maps to a known entry", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      // value "2" maps to "Server"
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "span_kind",
+        "2",
+        "include",
+      );
+      expect(sharedSearchObj.data.stream.addToFilter).toContain(
+        "span_kind = 'Server'",
+      );
+    });
+
+    it("should include raw value in filter when field is span_kind and value is not in the map", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      // value "99" has no mapping — raw string used in filter
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "span_kind",
+        "99",
+        "include",
+      );
+      expect(sharedSearchObj.data.stream.addToFilter).toContain(
+        "span_kind = '99'",
+      );
+    });
+
+    it("should include raw value without translation when field is not span_kind", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      // non-span_kind field — no translation
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "service_name",
+        "my-svc",
+        "include",
+      );
+      expect(sharedSearchObj.data.stream.addToFilter).toContain(
+        "service_name = 'my-svc'",
+      );
+    });
+
+    it("should use != operator for exclude action", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "span_kind",
+        "2",
+        "exclude",
+      );
+      expect(sharedSearchObj.data.stream.addToFilter).toContain(
+        "span_kind != 'Server'",
+      );
     });
   });
 });

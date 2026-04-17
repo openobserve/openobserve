@@ -444,7 +444,7 @@ use crate::{common::meta, handler::http::request};
         (name = "Saved Views", description = "Collection of saved search views for easy retrieval"),
         (name = "Alerts", description = "Alerts retrieval & management operations"),
         (name = "Incidents", description = "Alert incident correlation & management operations"),
-        (name = "Agents", description = "AI agent chat and analysis operations (enterprise)"),
+        (name = "AI", description = "AI agent chat analysis and SRE agent operations (enterprise)"),
         (name = "Functions", description = "Functions retrieval & management operations"),
         (name = "Organizations", description = "Organizations retrieval & management operations"),
         (name = "Streams", description = "Stream retrieval & management operations"),

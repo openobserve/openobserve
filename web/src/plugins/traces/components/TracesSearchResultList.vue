@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :hide-search-term-actions="false"
               :hide-ai="true"
-              @copy="copyToClipboard"
+              @copy="copyToClipboard(column.id, row[column.id])"
               @add-search-term="addSearchTerm"
               @send-to-ai-chat="sendToAiChat"
             />
@@ -227,6 +227,7 @@ import {
 } from "../../../utils/zincutils";
 import { useStore } from "vuex";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 
 interface Props {
   hits: any[];
@@ -278,7 +279,12 @@ const emit = defineEmits<{
   "send-to-ai-chat": [value: string];
 }>();
 
-const copyToClipboard = (value: any) => qCopyToClipboard(String(value));
+const copyToClipboard = (field: string, value: any) =>
+  qCopyToClipboard(
+    field === "span_kind"
+      ? (SPAN_KIND_MAP[String(value)] ?? String(value))
+      : String(value),
+  );
 
 const addSearchTerm = (
   field: string,
@@ -290,7 +296,11 @@ const addSearchTerm = (
     const isOp = action === "include" ? "is" : "is not";
     searchObj.data.stream.addToFilter = `${field} ${isOp} null`;
   } else {
-    searchObj.data.stream.addToFilter = `${field} ${operator} '${String(fieldValue).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+    const displayValue =
+      field === "span_kind"
+        ? (SPAN_KIND_MAP[String(fieldValue)] ?? String(fieldValue))
+        : String(fieldValue);
+    searchObj.data.stream.addToFilter = `${field} ${operator} '${displayValue.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
   }
 };
 

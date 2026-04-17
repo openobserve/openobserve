@@ -81,6 +81,7 @@ pub enum CustomMessage {
     ScanStats(ScanStats),
     Metrics(Vec<Metrics>),
     PeakMemory(usize),
+    PartialErr(String),
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
@@ -103,6 +104,10 @@ pub enum PreCustomMessage {
     MetricsRef(Vec<Arc<Mutex<Vec<Metrics>>>>),
     // use for storing memory pool reference to extract peak later
     PeakMemoryRef(Option<Arc<AtomicUsize>>),
+    // sent before first batch (early signal for fast-failing nodes)
+    PartialErrRefEarly(Option<Arc<Mutex<String>>>),
+    // sent after all batches (final accumulated value)
+    PartialErrRef(Option<Arc<Mutex<String>>>),
 }
 
 pub struct MetricsInfo {
@@ -112,10 +117,12 @@ pub struct MetricsInfo {
 }
 
 impl PreCustomMessage {
-    pub fn is_scan_stats(&self) -> bool {
+    pub fn is_early_emit(&self) -> bool {
         matches!(
             self,
-            PreCustomMessage::ScanStats(_) | PreCustomMessage::ScanStatsRef(_)
+            PreCustomMessage::ScanStats(_)
+                | PreCustomMessage::ScanStatsRef(_)
+                | PreCustomMessage::PartialErrRefEarly(_)
         )
     }
 
@@ -135,6 +142,15 @@ impl PreCustomMessage {
             PreCustomMessage::PeakMemoryRef(peak_memory_ref) => peak_memory_ref
                 .as_ref()
                 .map(|peak| CustomMessage::PeakMemory(peak.load(Ordering::Relaxed))),
+            PreCustomMessage::PartialErrRefEarly(ref_opt)
+            | PreCustomMessage::PartialErrRef(ref_opt) => ref_opt.as_ref().and_then(|r| {
+                let err = r.lock().clone();
+                if err.is_empty() {
+                    None
+                } else {
+                    Some(CustomMessage::PartialErr(err))
+                }
+            }),
         }
     }
 }
@@ -204,29 +220,29 @@ mod tests {
     }
 
     #[test]
-    fn test_pre_custom_message_is_scan_stats() {
+    fn test_pre_custom_message_is_early_emit() {
         let scan_stats = create_test_scan_stats();
 
         // Test ScanStats variant
         let pre_msg = PreCustomMessage::ScanStats(scan_stats);
-        assert!(pre_msg.is_scan_stats());
+        assert!(pre_msg.is_early_emit());
 
         // Test ScanStatsRef variant with Some
         let stats_ref = Arc::new(Mutex::new(scan_stats));
         let pre_msg = PreCustomMessage::ScanStatsRef(Some(stats_ref));
-        assert!(pre_msg.is_scan_stats());
+        assert!(pre_msg.is_early_emit());
 
         // Test ScanStatsRef variant with None
         let pre_msg = PreCustomMessage::ScanStatsRef(None);
-        assert!(pre_msg.is_scan_stats());
+        assert!(pre_msg.is_early_emit());
 
         // Test Metrics variant (should be false)
         let pre_msg = PreCustomMessage::Metrics(None);
-        assert!(!pre_msg.is_scan_stats());
+        assert!(!pre_msg.is_early_emit());
 
         // Test MetricsRef variant (should be false)
         let pre_msg = PreCustomMessage::MetricsRef(vec![]);
-        assert!(!pre_msg.is_scan_stats());
+        assert!(!pre_msg.is_early_emit());
     }
 
     #[test]

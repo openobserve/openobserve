@@ -128,10 +128,14 @@ impl super::Db for PostgresDb {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let query = format!(
-            "SELECT value FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}' ORDER BY start_dt DESC;"
-        );
-        let value: String = match sqlx::query_scalar(&query).fetch_one(&pool).await {
+        let query = "SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC;";
+        let value: String = match sqlx::query_scalar(query)
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .fetch_one(&pool)
+            .await
+        {
             Ok(v) => v,
             Err(e) => {
                 if let sqlx::Error::RowNotFound = e {
@@ -236,9 +240,12 @@ impl super::Db for PostgresDb {
         } else {
             lock_id as i64
         };
-        let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
         DB_QUERY_NUMS.with_label_values(&["get_lock", ""]).inc();
-        if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
+        if let Err(e) = sqlx::query("SELECT pg_advisory_xact_lock($1)")
+            .bind(lock_id)
+            .execute(&mut *tx)
+            .await
+        {
             if let Err(e) = tx.rollback().await {
                 log::error!("[POSTGRES] rollback get_for_update error: {e}");
             }
@@ -415,56 +422,119 @@ impl super::Db for PostgresDb {
         }
 
         let (module, key1, key2) = super::parse_key(key);
-        // Escape ' (single quote) character with ''
-        let (key1, key2) = (key1.replace("'", "''"), key2.replace("'", "''"));
-        let sql = if with_prefix {
-            if key1.is_empty() {
-                format!(r#"DELETE FROM meta WHERE module = '{module}';"#)
-            } else if key2.is_empty() {
-                format!(r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}';"#)
-            } else {
-                format!(
-                    r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND (key2 = '{key2}' OR key2 LIKE '{key2}/%');"#
-                )
-            }
-        } else {
-            format!(
-                r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}';"#
-            )
-        };
-
-        let sql = if let Some(start_dt) = start_dt {
-            sql.replace(';', &format!(" AND start_dt = {start_dt};"))
-        } else {
-            sql
-        };
-
         let pool = CLIENT.clone();
         DB_QUERY_NUMS.with_label_values(&["delete", "meta"]).inc();
-        sqlx::query(&sql).execute(&pool).await?;
+
+        if with_prefix {
+            if key1.is_empty() {
+                // module = $1 [, start_dt = $2]
+                if let Some(dt) = start_dt {
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND start_dt = $2")
+                        .bind(&module)
+                        .bind(dt)
+                        .execute(&pool)
+                        .await?;
+                } else {
+                    sqlx::query("DELETE FROM meta WHERE module = $1")
+                        .bind(&module)
+                        .execute(&pool)
+                        .await?;
+                }
+            } else if key2.is_empty() {
+                // module = $1, key1 = $2 [, start_dt = $3]
+                if let Some(dt) = start_dt {
+                    sqlx::query(
+                        "DELETE FROM meta WHERE module = $1 AND key1 = $2 AND start_dt = $3",
+                    )
+                    .bind(&module)
+                    .bind(&key1)
+                    .bind(dt)
+                    .execute(&pool)
+                    .await?;
+                } else {
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2")
+                        .bind(&module)
+                        .bind(&key1)
+                        .execute(&pool)
+                        .await?;
+                }
+            } else {
+                // module = $1, key1 = $2, key2 = $3, key2/% = $4 [, start_dt = $5]
+                if let Some(dt) = start_dt {
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4) AND start_dt = $5")
+                        .bind(&module)
+                        .bind(&key1)
+                        .bind(&key2)
+                        .bind(format!("{}/%", key2))
+                        .bind(dt)
+                        .execute(&pool)
+                        .await?;
+                } else {
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4)")
+                        .bind(&module)
+                        .bind(&key1)
+                        .bind(&key2)
+                        .bind(format!("{}/%", key2))
+                        .execute(&pool)
+                        .await?;
+                }
+            }
+        } else {
+            // module = $1, key1 = $2, key2 = $3 [, start_dt = $4]
+            if let Some(dt) = start_dt {
+                sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4")
+                    .bind(&module)
+                    .bind(&key1)
+                    .bind(&key2)
+                    .bind(dt)
+                    .execute(&pool)
+                    .await?;
+            } else {
+                sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3")
+                    .bind(&module)
+                    .bind(&key1)
+                    .bind(&key2)
+                    .execute(&pool)
+                    .await?;
+            }
+        }
 
         Ok(())
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
+        let mut sql =
+            "SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1".to_string();
+        let mut params = Vec::new();
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            sql.push_str(" AND module = $1");
+            params.push(module);
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+            params.push(key1);
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            sql.push_str(&format!(
+                " AND (key2 = ${} OR key2 LIKE ${})",
+                params.len() + 1,
+                params.len() + 2
+            ));
+            let key2_prefix = format!("{}/%", key2);
+            params.push(key2);
+            params.push(key2_prefix);
         }
-        sql = format!("{sql} ORDER BY start_dt ASC");
+        sql.push_str(" ORDER BY start_dt ASC");
 
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        for p in params {
+            query = query.bind(p);
+        }
+        let ret = query.fetch_all(&pool).await?;
         Ok(ret
             .into_iter()
             .map(|r| {
@@ -478,22 +548,37 @@ impl super::Db for PostgresDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta ".to_string();
+        let mut sql =
+            "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta WHERE 1=1 ".to_string();
+        let mut params = Vec::new();
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            sql.push_str(" AND module = $1");
+            params.push(module);
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+            params.push(key1);
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            sql.push_str(&format!(
+                " AND (key2 = ${} OR key2 LIKE ${})",
+                params.len() + 1,
+                params.len() + 2
+            ));
+            let key2_prefix = format!("{}/%", key2);
+            params.push(key2);
+            params.push(key2_prefix);
         }
-        sql = format!("{sql} ORDER BY start_dt ASC");
+        sql.push_str(" ORDER BY start_dt ASC");
+
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        for p in params {
+            query = query.bind(p);
+        }
+        let ret = query.fetch_all(&pool).await?;
         Ok(ret
             .into_iter()
             .map(|r| format!("/{}/{}/{}", r.module, r.key1, r.key2))
@@ -521,25 +606,19 @@ impl super::Db for PostgresDb {
         }
 
         let (min_dt, max_dt) = start_dt.unwrap();
-        let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
-        if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
-        }
-        if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
-        }
-        if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
-        }
-        sql = format!("{sql} AND start_dt >= {min_dt} AND start_dt <= {max_dt}");
-        sql = format!("{sql} ORDER BY start_dt ASC");
+        let (sql, str_params) = build_list_by_start_dt_sql(prefix, min_dt, max_dt);
 
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        for p in str_params {
+            query = query.bind(p);
+        }
+        // min_dt and max_dt are i64 — bind them directly so PostgreSQL receives
+        // them as BIGINT rather than TEXT, avoiding "operator does not exist: bigint >= text".
+        query = query.bind(min_dt);
+        query = query.bind(max_dt);
+        let ret = query.fetch_all(&pool).await?;
         Ok(ret
             .into_iter()
             .map(|r| (r.start_dt, Bytes::from(r.value)))
@@ -548,19 +627,34 @@ impl super::Db for PostgresDb {
 
     async fn count(&self, prefix: &str) -> Result<i64> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();
+        let mut sql = "SELECT COUNT(*) AS num FROM meta WHERE 1=1".to_string();
+        let mut params = Vec::new();
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            sql.push_str(" AND module = $1");
+            params.push(module);
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+            params.push(key1);
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            sql.push_str(&format!(
+                " AND (key2 = ${} OR key2 LIKE ${})",
+                params.len() + 1,
+                params.len() + 2
+            ));
+            let key2_prefix = format!("{}/%", key2);
+            params.push(key2);
+            params.push(key2_prefix);
         }
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
+        let mut query = sqlx::query_scalar::<_, i64>(&sql);
+        for p in params {
+            query = query.bind(p);
+        }
+        let count: i64 = query.fetch_one(&pool).await?;
         Ok(count)
     }
 
@@ -776,6 +870,57 @@ pub async fn drop_column(table: &str, column: &str) -> Result<()> {
         sqlx::query(&alert_sql).execute(&pool).await?;
     }
     Ok(())
+}
+
+/// Builds the SQL string and string-typed bind parameters for `list_values_by_start_dt`.
+///
+/// Returns `(sql, str_params)` where `str_params` contains the string-typed positional
+/// parameters (module / key1 / key2). The caller must then bind `min_dt` and `max_dt`
+/// as `i64` **after** the string params so that PostgreSQL sees them as BIGINT, not TEXT.
+///
+/// Keeping this logic in a standalone function makes the SQL generation unit-testable
+/// without requiring a live database connection.
+pub(crate) fn build_list_by_start_dt_sql(
+    prefix: &str,
+    min_dt: i64,
+    max_dt: i64,
+) -> (String, Vec<String>) {
+    let (module, key1, key2) = super::parse_key(prefix);
+    let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1".to_string();
+    let mut params: Vec<String> = Vec::new();
+
+    if !module.is_empty() {
+        sql.push_str(" AND module = $1");
+        params.push(module);
+    }
+    if !key1.is_empty() {
+        sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+        params.push(key1);
+    }
+    if !key2.is_empty() {
+        sql.push_str(&format!(
+            " AND (key2 = ${} OR key2 LIKE ${})",
+            params.len() + 1,
+            params.len() + 2
+        ));
+        let key2_prefix = format!("{key2}/%");
+        params.push(key2);
+        params.push(key2_prefix);
+    }
+    // min_dt / max_dt are intentionally NOT pushed into params here.
+    // The caller binds them as i64 after the string-params loop so that the
+    // PostgreSQL driver receives them as BIGINT, not TEXT.
+    let n = params.len();
+    sql.push_str(&format!(
+        " AND start_dt >= ${} AND start_dt <= ${}",
+        n + 1,
+        n + 2
+    ));
+    // Suppress unused-variable warning: min_dt / max_dt are consumed by the caller.
+    let _ = (min_dt, max_dt);
+    sql.push_str(" ORDER BY start_dt ASC");
+
+    (sql, params)
 }
 
 #[cfg(test)]
@@ -1108,5 +1253,96 @@ mod tests {
         assert_eq!(module, "module");
         assert_eq!(k1, "key1");
         assert!(k2.starts_with("key2"));
+    }
+
+    // ── build_list_by_start_dt_sql unit tests ─────────────────────────────────
+    // These tests verify that the SQL and parameter vector produced by the helper
+    // are correct for every combination of module / key1 / key2 presence, and that
+    // min_dt / max_dt placeholder indices are always one past the last string param.
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_full_prefix() {
+        let (sql, params) = build_list_by_start_dt_sql("/module/key1/key2", 100, 200);
+        // 3 string params: module=$1, key1=$2, key2=$3 / key2-prefix=$4
+        assert_eq!(params.len(), 4);
+        assert_eq!(params[0], "module");
+        assert_eq!(params[1], "key1");
+        assert_eq!(params[2], "key2");
+        assert_eq!(params[3], "key2/%");
+        assert!(
+            sql.contains("AND module = $1"),
+            "module param missing: {sql}"
+        );
+        assert!(sql.contains("AND key1 = $2"), "key1 param missing: {sql}");
+        assert!(
+            sql.contains("AND (key2 = $3 OR key2 LIKE $4)"),
+            "key2 param missing: {sql}"
+        );
+        // min_dt=$5, max_dt=$6 (one past the 4 string params)
+        assert!(
+            sql.contains("AND start_dt >= $5 AND start_dt <= $6"),
+            "start_dt bounds wrong: {sql}"
+        );
+        assert!(
+            sql.ends_with("ORDER BY start_dt ASC"),
+            "missing ORDER BY: {sql}"
+        );
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_module_only() {
+        let (sql, params) = build_list_by_start_dt_sql("/module", 1, 999);
+        assert_eq!(params.len(), 1);
+        assert_eq!(params[0], "module");
+        assert!(sql.contains("AND module = $1"));
+        // min_dt=$2, max_dt=$3
+        assert!(
+            sql.contains("AND start_dt >= $2 AND start_dt <= $3"),
+            "start_dt bounds wrong: {sql}"
+        );
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_module_and_key1() {
+        let (sql, params) = build_list_by_start_dt_sql("/module/key1", 10, 20);
+        assert_eq!(params.len(), 2);
+        assert_eq!(params[0], "module");
+        assert_eq!(params[1], "key1");
+        assert!(sql.contains("AND module = $1"));
+        assert!(sql.contains("AND key1 = $2"));
+        // min_dt=$3, max_dt=$4
+        assert!(
+            sql.contains("AND start_dt >= $3 AND start_dt <= $4"),
+            "start_dt bounds wrong: {sql}"
+        );
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_empty_prefix() {
+        let (sql, params) = build_list_by_start_dt_sql("", 0, 9999);
+        // No string params — min_dt=$1, max_dt=$2
+        assert!(params.is_empty());
+        assert!(
+            sql.contains("AND start_dt >= $1 AND start_dt <= $2"),
+            "start_dt bounds wrong for empty prefix: {sql}"
+        );
+        assert!(sql.contains("WHERE 1=1"));
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_key2_prefix_pattern() {
+        let (sql, params) = build_list_by_start_dt_sql("/m/k1/k2", 0, 0);
+        // key2 LIKE pattern must end with /%
+        assert_eq!(params[3], "k2/%");
+        assert!(sql.contains("OR key2 LIKE $4"));
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_starts_with_base_select() {
+        let (sql, _) = build_list_by_start_dt_sql("/m/k1/k2", 1, 2);
+        assert!(
+            sql.starts_with("SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1"),
+            "unexpected SQL start: {sql}"
+        );
     }
 }

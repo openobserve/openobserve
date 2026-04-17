@@ -332,12 +332,12 @@ describe("CompareWithPast.vue", () => {
 
     it("should show correct tooltip for custom tab", async () => {
       await wrapper.setProps({ selectedTab: "custom" });
-      expect(wrapper.vm.comparisonDisabledTooltip).toContain("switch to SQL mode");
+      expect(wrapper.vm.comparisonDisabledTooltip).toContain("Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.");
     });
 
     it("should show correct tooltip for promql tab", async () => {
       await wrapper.setProps({ selectedTab: "promql" });
-      expect(wrapper.vm.comparisonDisabledTooltip).toContain("switch to SQL mode");
+      expect(wrapper.vm.comparisonDisabledTooltip).toContain("Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.");
     });
 
     it("should show empty tooltip for sql tab", async () => {

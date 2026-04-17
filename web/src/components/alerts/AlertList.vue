@@ -109,16 +109,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-tooltip>
             </div>
           </div>
-          <q-btn
-            v-if="false"
-            class="q-ml-sm o2-secondary-button tw:h-[36px]"
-            no-caps
-            flat
-            label="Alert Insights"
-            @click="goToAlertInsights"
-            data-test="alert-insights-btn"
-            icon="insights"
-          />
           <!-- Import button -->
           <q-btn
             :class="[
@@ -204,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: 100%"
                 :style="
                   filteredResults?.length
-                    ? 'width: 100%; height: calc(100vh - 124px)'
+                    ? 'width: 100%; height: calc(100vh  - var(--navbar-height) - 77px)'
                     : 'width: 100%'
                 "
                 class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
