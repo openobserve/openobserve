@@ -71,13 +71,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="props.value"
           />
           <!-- Otherwise show normal value -->
+          <!-- Note: props.value is already the format()-applied value (Quasar applies col.format internally).
+               Calling props.col.format again here would double-convert timestamps (wrong timezone offset). -->
           <template v-else>
               {{
                 props.value === "undefined" || props.value === null
                   ? ""
-                  : props.col.format
-                    ? props.col.format(props.value, props.row)
-                    : props.value
+                  : props.value
               }}
           </template>
         <!-- Copy button on right for non-numeric columns -->
