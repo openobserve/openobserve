@@ -865,13 +865,14 @@ async fn merge_files(
         let service_streams_config =
             &o2_enterprise::enterprise::common::config::get_config().service_streams;
 
-        // Skip self-reporting streams from _meta organization to avoid processing internal metrics
-        if service_streams_config.node_matches_processing_node(&LOCAL_NODE)
-            && service_streams_config.enabled
+        let valid_stream_type = stream_type == StreamType::Logs
+            || stream_type == StreamType::Metrics
+            || stream_type == StreamType::Traces;
+
+        if service_streams_config.enabled
+            && service_streams_config.node_matches_processing_node(&LOCAL_NODE)
             && org_id != config::META_ORG_ID
-            && (stream_type == StreamType::Logs
-                || stream_type == StreamType::Metrics
-                || stream_type == StreamType::Traces)
+            && valid_stream_type
         {
             // Get stream count for this type (cached, 5-min TTL — counts rarely change).
             let stream_count =
