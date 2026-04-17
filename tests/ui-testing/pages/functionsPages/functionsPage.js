@@ -115,9 +115,7 @@ class FunctionsPage {
     await this.page.keyboard.press('Backspace');
     await this.page.waitForTimeout(200);
 
-    // IMPORTANT: Use clipboard paste instead of keyboard.type() to avoid Monaco
-    // auto-close bracket interference. keyboard.type() types char-by-char, causing
-    // Monaco to auto-insert } after every {, corrupting multi-line code with nested blocks.
+    // Paste via clipboard to avoid Monaco auto-close bracket corruption
     const pasteShortcut = process.platform === 'darwin' ? 'Meta+V' : 'Control+V';
     await this.page.evaluate(async (text) => {
       await navigator.clipboard.writeText(text);
