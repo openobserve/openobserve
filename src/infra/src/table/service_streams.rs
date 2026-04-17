@@ -337,7 +337,7 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
             let active_model = ActiveModel {
                 id: Set(record.id),
                 org_id: Set(org_id.to_owned()),
-                service_name: Set(record.service_name),
+                service_name: Set(record.service_name.clone()),
                 set_id: Set(record.set_id),
                 disambiguation: Set(record.disambiguation),
                 all_dimensions: Set(record.all_dimensions),
