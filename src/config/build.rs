@@ -54,7 +54,9 @@ fn main() -> Result<()> {
     // of every workspace crate that depends on config).
     let build_date = match std::env::var("SOURCE_DATE_EPOCH") {
         Ok(epoch) => {
-            let secs: i64 = epoch.parse().expect("SOURCE_DATE_EPOCH must be a unix timestamp");
+            let secs: i64 = epoch
+                .parse()
+                .expect("SOURCE_DATE_EPOCH must be a unix timestamp");
             DateTime::from_timestamp(secs, 0)
                 .expect("invalid SOURCE_DATE_EPOCH timestamp")
                 .to_rfc3339_opts(SecondsFormat::Secs, true)
