@@ -616,7 +616,21 @@ export const usePanelSQLExecutor = (ctx: {
             state.data[currentQueryIndex] = markRaw(
               searchResponse.value.hits ?? [],
             );
-            state.resultMetaData[currentQueryIndex] = [searchResponse.value]; // Wrap in array
+            // In Logs→Visualize path, searchResponse is a single combined chunk
+            // (not streaming). Override time_offset with the user's actual
+            // selected range so fillMissingValues detects direction / builds
+            // fill bounds correctly. searchResponse.time_offset from Index.vue
+            // may carry a partition boundary (e.g. last page's range), which
+            // would make RTL detection fill only the last partition's slice.
+            state.resultMetaData[currentQueryIndex] = [
+              {
+                ...searchResponse.value,
+                time_offset: {
+                  start_time: Number(startISOTimestamp),
+                  end_time: Number(endISOTimestamp),
+                },
+              },
+            ];
 
             // Wait for annotations to complete
             if (annotationsPromise) {
