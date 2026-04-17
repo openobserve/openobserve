@@ -128,9 +128,19 @@ async function performDexLogin(page, baseUrl, userEmail, userPassword) {
 
   testLogger.info(`[alpha1] Current URL: ${page.url()}`);
 
+  // Check if already logged in (valid session from previous attempt or shared cookies)
+  // If the main menu is visible, skip the entire Dex flow
+  const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
+  const alreadyLoggedIn = await menuItem.isVisible().catch(() => false);
+  if (alreadyLoggedIn) {
+    testLogger.info('[alpha1] Already logged in — skipping Dex flow');
+    return;
+  }
+
   // Step 2: Click "Continue with Email" on the Dex page
+  // The page may be at /web/login (app login page with Dex button) or already on Dex
   const continueWithEmail = page.getByText('Continue with Email');
-  await continueWithEmail.waitFor({ state: 'visible', timeout: 15000 });
+  await continueWithEmail.waitFor({ state: 'visible', timeout: 20000 });
   testLogger.info('[alpha1] Clicking "Continue with Email"...');
   await continueWithEmail.click();
   await page.waitForLoadState('domcontentloaded');
@@ -243,8 +253,21 @@ async function performDexLogin(page, baseUrl, userEmail, userPassword) {
       );
       testLogger.info(`[alpha1] Callback processed, now at: ${page.url()}`);
     } catch (e) {
-      testLogger.warn('[alpha1] Callback did not auto-redirect after 90s, reloading /web/ to retry...');
-      await page.goto(`${baseUrl}/web/`, { waitUntil: 'domcontentloaded' });
+      // Reload the current page (preserves the hash fragment with the id_token)
+      // so the SPA gets another chance to process the token.
+      // page.goto('/web/') would lose the hash and the session.
+      testLogger.warn('[alpha1] Callback did not auto-redirect after 90s, reloading to retry...');
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      // Give SPA another 30s to process after reload
+      try {
+        await page.waitForURL(
+          url => !url.toString().includes('/cb'),
+          { timeout: 30000 }
+        );
+        testLogger.info(`[alpha1] Callback processed after reload, now at: ${page.url()}`);
+      } catch (e2) {
+        testLogger.warn('[alpha1] Callback still stuck after reload — session likely lost');
+      }
     }
   }
 
@@ -259,42 +282,40 @@ async function performDexLogin(page, baseUrl, userEmail, userPassword) {
     throw new Error(`Login failed — redirected back to Dex after token exchange: ${page.url()}`);
   }
 
-  const menuItem = page.locator('[data-test="menu-link-\\/-item"]');
-  await menuItem.waitFor({ state: 'visible', timeout: 15000 });
+  await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ state: 'visible', timeout: 15000 });
   testLogger.info('[alpha1] Login successful — main menu visible');
 }
 
 /**
  * Submit the Dex login form with multiple strategies.
- * Tries: 1) force-click submit button, 2) Enter key, 3) form.submit() via JS
+ * Tries: 1) Enter on password field, 2) force-click submit button, 3) form.submit() via JS
+ *
+ * Enter on password field is tried first because it's the most reliable —
+ * the cursor is already in the password field after fill(), and pressing Enter
+ * on a focused input submits the containing form.
  */
 async function submitDexLoginForm(page) {
-  const submitButton = page.locator('form').locator(
-    'button:has-text("Login"), button:has-text("Sign In"), button:has-text("Log In"), button[type="submit"]'
-  );
-
-  const submitVisible = await submitButton.first().isVisible().catch(() => false);
-
-  if (submitVisible) {
-    // Strategy 1: Force-click the submit button (timeout 10s, not 30s default)
-    try {
-      await submitButton.first().click({ force: true, timeout: 10000 });
-      testLogger.info('[alpha1] Form submitted via button click');
-      return;
-    } catch (e) {
-      testLogger.warn('[alpha1] Button click failed, trying Enter key...');
-    }
-  }
-
-  // Strategy 2: Submit via Enter key on the password field
+  // Strategy 1: Press Enter on the password field (cursor is there after fill)
+  // passwordField.press('Enter') focuses the element first, unlike page.keyboard.press
   try {
-    await page.keyboard.press('Enter');
-    testLogger.info('[alpha1] Form submitted via Enter key');
-    // Give a moment for the form submission to initiate
-    await page.waitForTimeout(1000);
+    const pwField = page.locator('input[name="password"], input[type="password"]').first();
+    await pwField.press('Enter');
+    testLogger.info('[alpha1] Form submitted via Enter on password field');
     return;
   } catch (e) {
-    testLogger.warn('[alpha1] Enter key failed, trying JS form.submit()...');
+    testLogger.warn('[alpha1] Enter on password field failed, trying button click...');
+  }
+
+  // Strategy 2: Force-click the submit button
+  try {
+    const submitButton = page.locator(
+      'button[type="submit"], form button:has-text("Login"), form button:has-text("Sign In"), form button:has-text("Log In")'
+    ).first();
+    await submitButton.click({ force: true, timeout: 5000 });
+    testLogger.info('[alpha1] Form submitted via button click');
+    return;
+  } catch (e) {
+    testLogger.warn('[alpha1] Button click failed, trying JS form.submit()...');
   }
 
   // Strategy 3: Submit via JavaScript
