@@ -81,7 +81,7 @@ pub async fn list(
         match model_pricing::list(META_ORG).await {
             Ok(meta_items) => {
                 for item in meta_items {
-                    if seen_names.insert(item.name.clone()) {
+                    if item.enabled && seen_names.insert(item.name.clone()) {
                         items.push(item);
                     }
                 }

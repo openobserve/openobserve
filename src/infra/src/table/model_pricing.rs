@@ -180,15 +180,6 @@ pub async fn list(org_id: &str) -> Result<Vec<ModelPricingDefinition>, Error> {
         .collect()
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    if let Some(model) = get_by_org_and_name(client, org_id, name).await? {
-        model.delete(client).await?;
-    }
-    Ok(())
-}
-
 /// Delete a model pricing definition by ID, scoped to org.
 /// Returns `Ok(true)` if a row was deleted, `Ok(false)` if not found.
 /// Built-in entries (`source = 'built_in'`) are never deleted — returns an error.
