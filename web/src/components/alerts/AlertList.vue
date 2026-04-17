@@ -2636,7 +2636,9 @@ export default defineComponent({
               store.state.selectedOrganization.identifier,
               alertId,
             );
-            return res.data;
+            const data = res.data;
+            if (data.hasOwnProperty("id")) delete data.id;
+            return data;
           }),
         );
         alertToBeExported.push(...alertsData);
