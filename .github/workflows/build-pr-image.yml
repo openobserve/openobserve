@@ -76,7 +76,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: "openobserve-${{ runner.arch }}"
+          shared-key: "openobserve-amd64"
 
       - name: Install Protoc
         run: |
@@ -191,7 +191,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: "openobserve-${{ runner.arch }}"
+          shared-key: "openobserve-arm64"
 
       - name: Install Protoc
         run: |
@@ -287,6 +287,7 @@ jobs:
           repository: ${{ github.repository }}
           ref: ${{ inputs.branch }}
           fetch-depth: 0
+          fetch-tags: true
       - name: Set GIT_TAG env
         run: |
           echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
