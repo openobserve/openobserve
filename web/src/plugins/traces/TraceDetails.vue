@@ -453,6 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @resize-start="startResize"
                 />
                 <div
+                  ref="traceScrollContainer"
                   class="relative-position trace-content-scroll"
                   :style="{
                     width: isSidebarOpen ? leftWidth + 'px' : '100%',
@@ -487,6 +488,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :spanDimensions="spanDimensions"
                         :spanMap="spanMap"
                         :leftWidth="leftWidth"
+                        :scrollContainer="traceScrollContainer"
                         ref="traceTreeRef"
                         class="tw:bg-[var(--o2-card-bg)]!"
                         :search-query="searchQuery"
@@ -955,6 +957,7 @@ export default defineComponent({
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
     const parentContainer = ref<HTMLElement | null>(null);
+    const traceScrollContainer = ref<HTMLElement | null>(null);
     let parentHeight = ref(0);
     let currentHeight = 0;
     const updateHeight = async () => {
@@ -1071,7 +1074,7 @@ export default defineComponent({
     });
 
     /** Maximum number of spans fetched per trace. Truncation warning is shown when this limit is hit. */
-    const MAX_SPANS_PER_TRACE = 2500;
+    const MAX_SPANS_PER_TRACE = 20000;
 
     const traceSpanLimit = ref(MAX_SPANS_PER_TRACE);
 
@@ -2782,6 +2785,7 @@ export default defineComponent({
       handleSearchResult,
       searchResults,
       parentContainer,
+      traceScrollContainer,
       parentHeight,
       updateHeight,
       getSpanKind,

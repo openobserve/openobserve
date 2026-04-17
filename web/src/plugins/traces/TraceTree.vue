@@ -15,292 +15,372 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    v-bind="$attrs"
-    ref="rootContainer"
-    :style="isSidebarOpen && { width: leftWidth + 'px' }"
-  >
-    <template v-for="(span, index) in spans as any[]" :key="span.spanId">
-      <div
-        :style="{
-          position: 'relative',
-          width: '100%',
-          flexWrap: 'nowrap',
-        }"
-        class="flex span-row"
-        :class="{
-          'span-row-highlight': spanHoveredIndex === index,
-          'span-row-selected': span.spanId === selectedSpanId,
-        }"
-        :data-test="`trace-tree-span-container-${span.spanId}`"
-        @mouseover="() => (spanHoveredIndex = index)"
-        @mouseout="() => (spanHoveredIndex = -1)"
-      >
-        <div :style="{ width: leftWidth + 'px' }" class="tw:pl-[0.375rem]">
-          <div
-            :style="{
-              height: '100%',
-              margin: `0 0 0 ${
-                span.hasChildSpans
-                  ? span.style.left
-                  : parseInt(span.style.left) +
-                    spanDimensions.collapseWidth +
-                    'px'
-              }`,
-            }"
-            class="flex flex-col items-start justify-start ellipsis"
-            :title="span.operationName"
-          >
-            <div
-              class="flex no-wrap full-width relative-position operation-name-container tw:cursor-pointer tw:items-center"
-              :class="[
-                store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
-                isLLMTrace(span) ? '' : 'q-pt-sm',
-              ]"
-              :data-test="`trace-tree-span-operation-name-container-${span.spanId}`"
-              @click="selectSpan(span.spanId)"
-            >
-              <div
-                class="absolute view-logs-container"
-                :class="spanHoveredIndex === index ? 'show' : ''"
-                :data-test="`trace-tree-span-view-logs-container-${span.spanId}`"
-              >
-                <q-btn
-                  class="q-mx-xs view-span-logs"
-                  :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-                  size="0.625rem"
-                  icon="search"
-                  dense
-                  no-caps
-                  :title="t('traces.viewLogs')"
-                  @click.stop="viewSpanLogs(span)"
-                  :data-test="`trace-tree-span-view-logs-btn-${span.spanId}`"
-                >
-                  <!-- <span class="text view-logs-btn-text">View Logs</span> -->
-                </q-btn>
-              </div>
-              <div
-                v-if="span.hasChildSpans"
-                class="span-count-box cursor-pointer tw:border-[var(--o2-border-color)]!"
-                :ref="(el) => setBadgeRef(span.spanId, el)"
-                :style="{
-                  color: span.style.color,
-                }"
-                @click.stop="toggleSpanCollapse(span.spanId)"
-                :data-test="`trace-tree-span-badge-collapse-btn-${span.spanId}`"
-                :title="`Click to ${collapseMapping[span.spanId] ? 'expand' : 'collapse'}`"
-              >
-                {{ getChildCount(span) }}
-              </div>
-
-              <div
-                v-else
-                class="span-leaf-dot"
-                :ref="(el) => setBadgeRef(span.spanId, el)"
-                :style="{
-                  backgroundColor: span.style.color,
-                }"
-              ></div>
-
-              <div
-                class="tw:flex tw:justify-between"
-                :class="
-                  span.hasChildSpans ? 'tw:w-full' : 'tw:w-[calc(100%-0.6rem)]!'
-                "
-              >
-                <div
-                  class="ellipsis q-pl-xs cursor-pointer span-name-section tw:flex tw:items-center"
-                  :data-test="`trace-tree-span-select-btn-${span.spanId}`"
-                >
-                  <div
-                    class="ellipsis flex items-center span-name-section-content"
-                  >
-                    <img
-                      :src="
-                        spanServiceIconUrlMap.get(
-                          `${span.serviceName}/${span.style?.color ?? ''}`,
-                        )
-                      "
-                      class="q-mr-xs tw:shrink-0 tw:w-[1.125rem] tw:h-[1.125rem] tw:inline-block"
-                      aria-hidden="true"
-                      alt=""
-                      :data-test="`trace-tree-span-service-icon-${span.spanId}`"
-                    />
-                    <q-icon
-                      v-if="span.spanStatus === 'ERROR'"
-                      name="error"
-                      class="text-red-6 q-mr-xs"
-                      title="Error Span"
-                      :data-test="`trace-tree-span-error-icon-${span.spanId}`"
-                    />
-                    <q-icon
-                      v-if="span.spanKind"
-                      :name="getKindIcon(span.spanKind.toUpperCase())"
-                      size="0.875rem"
-                      class="text-grey-6 q-mr-xs"
-                      :title="span.spanKind"
-                      :data-test="`trace-tree-span-kind-icon-${span.spanId}`"
-                    />
-                    <img
-                      v-if="spanTechIconUrlMap.get(getSpanTech(span))"
-                      :src="spanTechIconUrlMap.get(getSpanTech(span))"
-                      :title="getSpanTech(span)"
-                      class="q-mr-xs tw:shrink-0 tw:w-[0.875rem] tw:h-[0.875rem] tw:inline-block tw:opacity-60"
-                      aria-hidden="true"
-                      alt=""
-                      :data-test="`trace-tree-span-tech-icon-${span.spanId}`"
-                    />
-                    <span
-                      class="text-subtitle2 text-bold q-mr-sm"
-                      :class="{
-                        highlighted: isHighlighted(span.spanId),
-                        'tw:text-gray-900':
-                          store.state.theme === 'dark' &&
-                          isHighlighted(span.spanId),
-                        'current-match': currentSelectedValue === span.spanId, // Current match class
-                      }"
-                      :data-test="`trace-tree-span-service-name-${span.spanId}`"
-                    >
-                      {{ span.serviceName }}
-                    </span>
-                    <span
-                      class="text-body2"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-grey-5'
-                          : 'text-blue-grey-9'
-                      "
-                      :data-test="`trace-tree-span-operation-name-${span.spanId}`"
-                      >{{ span.operationName }}</span
-                    >
-                  </div>
-                  <!-- LLM Metrics -->
-                  <div
-                    v-if="isLLMTrace(span)"
-                    class="flex items-center text-caption text-red-6"
-                    style="margin-top: -4px; margin-bottom: 2px; line-height: 1"
-                  >
-                    <span v-if="span.llm_usage?.total > 0" class="q-mr-sm">
-                      <q-icon name="functions" size="10px" />
-                      {{ formatTokens(span.llm_usage.total) }}
-                    </span>
-                    <span v-if="span.llm_cost?.total > 0">
-                      <q-icon name="attach_money" size="10px" />
-                      {{ formatCost(span.llm_cost.total) }}
-                    </span>
-                  </div>
-                </div>
-
-                <div class="tw:flex tw:items-center tw:sticky tw:right-0">
-                  <span
-                    v-if="getHttpStatusVars(span)"
-                    class="tw:text-[0.625rem] tw:font-bold tw:leading-none tw:py-[0.4rem] tw:px-1 tw:mr-[0.25rem] tw:rounded tw:whitespace-nowrap"
-                    :style="{
-                      backgroundColor: getHttpStatusVars(span).bg,
-                      color: getHttpStatusVars(span).text,
-                    }"
-                    :title="`HTTP ${getHttpStatus(span)}`"
-                    :data-test="`trace-tree-span-http-status-${span.spanId}`"
-                  >
-                    {{ getHttpStatus(span) }}
-                  </span>
-                  <span
-                    v-if="getEventCount(span) > 0 && false"
-                    class="flex items-center"
-                    :style="{
-                      fontSize: '0.625rem',
-                      lineHeight: 1,
-                      gap: '0.125rem',
-                      color: 'var(--o2-text-secondary)',
-                      whiteSpace: 'nowrap',
-                    }"
-                    :title="`${getEventCount(span)} span event${getEventCount(span) > 1 ? 's' : ''}`"
-                    :data-test="`trace-tree-span-event-count-${span.spanId}`"
-                  >
-                    <q-icon name="event_note" size="0.625rem" />
-                    {{ getEventCount(span) }}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div
-              class="span-background-wrapper"
-              :style="{
-                backgroundColor: span.style.backgroundColor,
-                borderLeft: `0.1875rem solid ${span.style.color}`,
-                marginLeft: span.hasChildSpans ? '0.875rem' : '0',
-                width: '100%',
-              }"
-              :data-test="`trace-tree-span-background-${span.spanId}`"
-            />
-          </div>
-        </div>
-        <div
-          v-if="!isSidebarOpen"
-          :style="{ width: `calc(100% - ${leftWidth}px)` }"
-        >
-          <span-block
-            :span="span"
-            :depth="depth"
-            :baseTracePosition="baseTracePosition"
-            :styleObj="{
-              position: 'absolute',
-              top: span.style.top,
-              left: span.style.left,
-              height: '3.75rem',
-            }"
-            :spanDimensions="spanDimensions"
-            :isCollapsed="collapseMapping[span.spanId]"
-            :spanData="spanMap[span.spanId]"
-            :class="spanHoveredIndex === index ? 'span-block-highlight' : ''"
-            @toggle-collapse="toggleSpanCollapse"
-            @select-span="selectSpan"
-            @view-logs="viewSpanLogs(span)"
-          />
-        </div>
-      </div>
-    </template>
-
-    <!-- SVG overlay for connectors -->
-    <svg
-      v-if="Object.keys(connectorPaths).length > 0"
-      class="connector-overlay"
-      :style="{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'none',
-        zIndex: 1000,
-        overflow: 'visible',
-      }"
+  <div v-bind="$attrs" :style="isSidebarOpen && { width: leftWidth + 'px' }">
+    <!-- Virtualizer outer: establishes the full scrollable height -->
+    <div
+      :style="{ position: 'relative', height: totalSize + 'px', width: '100%' }"
     >
-      <template v-for="(connector, key) in connectorPaths" :key="key">
-        <!-- Vertical line -->
-        <line
-          :x1="connector.x1"
-          :y1="connector.y1"
-          :x2="connector.x1"
-          :y2="connector.y2"
-          :stroke="connector.color"
-          stroke-width="1.5"
-          opacity="0.6"
-        />
-        <!-- Horizontal lines to children -->
-        <template v-for="(child, idx) in connector.children" :key="idx">
+      <!-- SVG connector overlay — positions derived from span data, no DOM queries -->
+      <svg
+        v-if="connectorLines.length > 0"
+        :style="{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          pointerEvents: 'none',
+          zIndex: 1,
+          overflow: 'visible',
+        }"
+      >
+        <template v-for="(connector, idx) in connectorLines" :key="idx">
           <line
+            :x1="connector.x1"
+            :y1="connector.y1"
+            :x2="connector.x1"
+            :y2="connector.y2"
+            stroke="var(--o2-border-color)"
+            stroke-width="1.5"
+            opacity="0.6"
+          />
+          <line
+            v-for="(child, ci) in connector.children"
+            :key="ci"
             :x1="connector.x1"
             :y1="child.y"
             :x2="child.x"
             :y2="child.y"
-            :stroke="connector.color"
+            stroke="var(--o2-border-color)"
             stroke-width="1.5"
             opacity="0.6"
           />
         </template>
-      </template>
-    </svg>
+      </svg>
+
+      <div
+        v-for="virtualRow in virtualRows"
+        :key="virtualRow.key"
+        class="span-row-item"
+        :style="{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          transform: `translateY(${virtualRow.start}px)`,
+          height: (spanDimensions?.height ?? 30) + 'px',
+        }"
+      >
+        <div
+          :style="{
+            position: 'relative',
+            width: '100%',
+            flexWrap: 'nowrap',
+            height: '100%',
+          }"
+          class="flex span-row"
+          :class="{
+            'span-row-selected':
+              (spans as any[])[virtualRow.index].spanId === selectedSpanId,
+          }"
+          :data-test="`trace-tree-span-container-${(spans as any[])[virtualRow.index].spanId}`"
+        >
+          <div :style="{ width: leftWidth + 'px' }" class="tw:pl-[0.375rem]">
+            <div
+              :style="{
+                height: '100%',
+                margin: `0 0 0 ${
+                  (spans as any[])[virtualRow.index].hasChildSpans
+                    ? (spans as any[])[virtualRow.index].style.left
+                    : parseInt(
+                          (spans as any[])[virtualRow.index].style.left,
+                        ) +
+                      spanDimensions.collapseWidth +
+                      'px'
+                }`,
+              }"
+              class="flex flex-col items-start justify-start ellipsis"
+              :title="(spans as any[])[virtualRow.index].operationName"
+            >
+              <div
+                class="flex no-wrap full-width relative-position operation-name-container tw:cursor-pointer tw:items-center"
+                :class="[
+                  store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
+                  isLLMTrace((spans as any[])[virtualRow.index])
+                    ? ''
+                    : 'q-pt-sm',
+                ]"
+                :data-test="`trace-tree-span-operation-name-container-${(spans as any[])[virtualRow.index].spanId}`"
+                @click="selectSpan((spans as any[])[virtualRow.index].spanId)"
+              >
+                <div
+                  class="absolute view-logs-container"
+                  :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
+                >
+                  <q-btn
+                    class="q-mx-xs view-span-logs"
+                    :class="
+                      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'
+                    "
+                    size="0.625rem"
+                    icon="search"
+                    dense
+                    no-caps
+                    :title="t('traces.viewLogs')"
+                    @click.stop="
+                      viewSpanLogs((spans as any[])[virtualRow.index])
+                    "
+                    :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
+                  >
+                  </q-btn>
+                </div>
+                <div
+                  v-if="(spans as any[])[virtualRow.index].hasChildSpans"
+                  class="span-count-box cursor-pointer tw:border-[var(--o2-border-color)]!"
+                  :style="{
+                    color: (spans as any[])[virtualRow.index].style.color,
+                  }"
+                  @click.stop="
+                    toggleSpanCollapse(
+                      (spans as any[])[virtualRow.index].spanId,
+                    )
+                  "
+                  :data-test="`trace-tree-span-badge-collapse-btn-${(spans as any[])[virtualRow.index].spanId}`"
+                  :title="`Click to ${collapseMapping[(spans as any[])[virtualRow.index].spanId] ? 'expand' : 'collapse'}`"
+                >
+                  {{ getChildCount((spans as any[])[virtualRow.index]) }}
+                </div>
+
+                <div
+                  v-else
+                  class="span-leaf-dot"
+                  :style="{
+                    backgroundColor: (spans as any[])[virtualRow.index].style
+                      .color,
+                  }"
+                ></div>
+
+                <div
+                  class="tw:flex tw:justify-between"
+                  :class="
+                    (spans as any[])[virtualRow.index].hasChildSpans
+                      ? 'tw:w-full'
+                      : 'tw:w-[calc(100%-0.6rem)]!'
+                  "
+                >
+                  <div
+                    class="ellipsis q-pl-xs cursor-pointer span-name-section tw:flex tw:items-center"
+                    :data-test="`trace-tree-span-select-btn-${(spans as any[])[virtualRow.index].spanId}`"
+                  >
+                    <div
+                      class="ellipsis flex items-center span-name-section-content"
+                    >
+                      <img
+                        :src="
+                          spanServiceIconUrlMap.get(
+                            `${(spans as any[])[virtualRow.index].serviceName}/${(spans as any[])[virtualRow.index].style?.color ?? ''}`,
+                          )
+                        "
+                        class="q-mr-xs tw:shrink-0 tw:w-[1.125rem] tw:h-[1.125rem] tw:inline-block"
+                        aria-hidden="true"
+                        alt=""
+                        :data-test="`trace-tree-span-service-icon-${(spans as any[])[virtualRow.index].spanId}`"
+                      />
+                      <q-icon
+                        v-if="
+                          (spans as any[])[virtualRow.index].spanStatus ===
+                          'ERROR'
+                        "
+                        name="error"
+                        class="text-red-6 q-mr-xs"
+                        title="Error Span"
+                        :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
+                      />
+                      <q-icon
+                        v-if="(spans as any[])[virtualRow.index].spanKind"
+                        :name="
+                          getKindIcon(
+                            (spans as any[])[
+                              virtualRow.index
+                            ].spanKind.toUpperCase(),
+                          )
+                        "
+                        size="0.875rem"
+                        class="text-grey-6 q-mr-xs"
+                        :title="(spans as any[])[virtualRow.index].spanKind"
+                        :data-test="`trace-tree-span-kind-icon-${(spans as any[])[virtualRow.index].spanId}`"
+                      />
+                      <img
+                        v-if="
+                          spanTechIconUrlMap.get(
+                            getSpanTech((spans as any[])[virtualRow.index]),
+                          )
+                        "
+                        :src="
+                          spanTechIconUrlMap.get(
+                            getSpanTech((spans as any[])[virtualRow.index]),
+                          )
+                        "
+                        :title="
+                          getSpanTech((spans as any[])[virtualRow.index])
+                        "
+                        class="q-mr-xs tw:shrink-0 tw:w-[0.875rem] tw:h-[0.875rem] tw:inline-block tw:opacity-60"
+                        aria-hidden="true"
+                        alt=""
+                        :data-test="`trace-tree-span-tech-icon-${(spans as any[])[virtualRow.index].spanId}`"
+                      />
+                      <span
+                        class="text-subtitle2 text-bold q-mr-sm"
+                        :class="{
+                          highlighted: isHighlighted(
+                            (spans as any[])[virtualRow.index].spanId,
+                          ),
+                          'tw:text-gray-900':
+                            store.state.theme === 'dark' &&
+                            isHighlighted(
+                              (spans as any[])[virtualRow.index].spanId,
+                            ),
+                          'current-match':
+                            currentSelectedValue ===
+                            (spans as any[])[virtualRow.index].spanId,
+                        }"
+                        :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"
+                      >
+                        {{ (spans as any[])[virtualRow.index].serviceName }}
+                      </span>
+                      <span
+                        class="text-body2"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'text-grey-5'
+                            : 'text-blue-grey-9'
+                        "
+                        :data-test="`trace-tree-span-operation-name-${(spans as any[])[virtualRow.index].spanId}`"
+                        >{{
+                          (spans as any[])[virtualRow.index].operationName
+                        }}</span
+                      >
+                    </div>
+                    <!-- LLM Metrics -->
+                    <div
+                      v-if="isLLMTrace((spans as any[])[virtualRow.index])"
+                      class="flex items-center text-caption text-red-6"
+                      style="margin-top: -4px; margin-bottom: 2px; line-height: 1"
+                    >
+                      <span
+                        v-if="
+                          (spans as any[])[virtualRow.index].llm_usage?.total >
+                          0
+                        "
+                        class="q-mr-sm"
+                      >
+                        <q-icon name="functions" size="10px" />
+                        {{
+                          formatTokens(
+                            (spans as any[])[virtualRow.index].llm_usage.total,
+                          )
+                        }}
+                      </span>
+                      <span
+                        v-if="
+                          (spans as any[])[virtualRow.index].llm_cost?.total > 0
+                        "
+                      >
+                        <q-icon name="attach_money" size="10px" />
+                        {{
+                          formatCost(
+                            (spans as any[])[virtualRow.index].llm_cost.total,
+                          )
+                        }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="tw:flex tw:items-center tw:sticky tw:right-0">
+                    <span
+                      v-if="
+                        getHttpStatusVars((spans as any[])[virtualRow.index])
+                      "
+                      class="tw:text-[0.625rem] tw:font-bold tw:leading-none tw:py-[0.4rem] tw:px-1 tw:mr-[0.25rem] tw:rounded tw:whitespace-nowrap"
+                      :style="{
+                        backgroundColor: getHttpStatusVars(
+                          (spans as any[])[virtualRow.index],
+                        ).bg,
+                        color: getHttpStatusVars(
+                          (spans as any[])[virtualRow.index],
+                        ).text,
+                      }"
+                      :title="`HTTP ${getHttpStatus((spans as any[])[virtualRow.index])}`"
+                      :data-test="`trace-tree-span-http-status-${(spans as any[])[virtualRow.index].spanId}`"
+                    >
+                      {{
+                        getHttpStatus((spans as any[])[virtualRow.index])
+                      }}
+                    </span>
+                    <span
+                      v-if="
+                        getEventCount((spans as any[])[virtualRow.index]) > 0 &&
+                        false
+                      "
+                      class="flex items-center"
+                      :style="{
+                        fontSize: '0.625rem',
+                        lineHeight: 1,
+                        gap: '0.125rem',
+                        color: 'var(--o2-text-secondary)',
+                        whiteSpace: 'nowrap',
+                      }"
+                      :title="`${getEventCount((spans as any[])[virtualRow.index])} span event${getEventCount((spans as any[])[virtualRow.index]) > 1 ? 's' : ''}`"
+                      :data-test="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
+                    >
+                      <q-icon name="event_note" size="0.625rem" />
+                      {{ getEventCount((spans as any[])[virtualRow.index]) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div
+                class="span-background-wrapper"
+                :style="{
+                  backgroundColor: (spans as any[])[virtualRow.index].style
+                    .backgroundColor,
+                  borderLeft: `0.1875rem solid ${(spans as any[])[virtualRow.index].style.color}`,
+                  marginLeft: (spans as any[])[virtualRow.index].hasChildSpans
+                    ? '0.875rem'
+                    : '0',
+                  width: '100%',
+                }"
+                :data-test="`trace-tree-span-background-${(spans as any[])[virtualRow.index].spanId}`"
+              />
+            </div>
+          </div>
+          <div
+            v-if="!isSidebarOpen"
+            :style="{ width: `calc(100% - ${leftWidth}px)` }"
+          >
+            <span-block
+              :span="(spans as any[])[virtualRow.index]"
+              :depth="depth"
+              :baseTracePosition="baseTracePosition"
+              :styleObj="{
+                position: 'absolute',
+                top: (spans as any[])[virtualRow.index].style.top,
+                left: (spans as any[])[virtualRow.index].style.left,
+                height: '3.75rem',
+              }"
+              :spanDimensions="spanDimensions"
+              :isCollapsed="
+                collapseMapping[(spans as any[])[virtualRow.index].spanId]
+              "
+              :spanData="spanMap[(spans as any[])[virtualRow.index].spanId]"
+              @toggle-collapse="toggleSpanCollapse"
+              @select-span="selectSpan"
+              @view-logs="viewSpanLogs((spans as any[])[virtualRow.index])"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -311,20 +391,18 @@ import {
   ref,
   watch,
   computed,
-  onMounted,
 } from "vue";
-import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
 import SpanBlock from "./SpanBlock.vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
 import {
   getServiceIconDataUrl,
   getSpanTechIconDataUrl,
 } from "@/utils/traces/convertTraceData";
 import { getKindIcon } from "@/composables/traces/useTraceProcessing";
+import { useVirtualizer } from "@tanstack/vue-virtual";
 
 export default defineComponent({
   name: "TraceTree",
@@ -378,6 +456,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // DOM Element reference to the parent scroll container
+    scrollContainer: {
+      default: null,
+    },
   },
   emits: [
     "toggleCollapse",
@@ -386,33 +468,32 @@ export default defineComponent({
     "search-result",
   ],
   setup(props, { emit }) {
-    const { searchObj, buildQueryDetails, navigateToLogs } = useTraces();
+    const { buildQueryDetails, navigateToLogs } = useTraces();
     const store = useStore();
-
     const { t } = useI18n();
 
-    const spanHoveredIndex = ref(-1);
+    // ── Virtualizer ──────────────────────────────────────────────────────────
+    const rowVirtualizer = useVirtualizer(
+      computed(() => ({
+        count: (props.spans as any[]).length,
+        getScrollElement: () => props.scrollContainer,
+        estimateSize: () => props.spanDimensions?.height ?? 30,
+        overscan: 10,
+      })),
+    );
 
-    const router = useRouter();
+    const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
+    const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
 
-    const badgeRefs = ref<Record<string, HTMLElement>>({});
-    const connectorPaths = ref<Record<string, any>>({});
-    const rootContainer = ref<HTMLElement | null>(null);
-
-    const setBadgeRef = (spanId: string, el: any) => {
-      if (el) {
-        badgeRefs.value[spanId] = el;
-      }
-    };
-
+    // ── Actions ──────────────────────────────────────────────────────────────
     function toggleSpanCollapse(spanId: number | string) {
       emit("toggleCollapse", spanId);
     }
+
     const selectSpan = (spanId: string) => {
       emit("selectSpan", spanId);
     };
 
-    // Main function to view span logs
     const viewSpanLogs = (span: any) => {
       const queryDetails = buildQueryDetails(span);
       navigateToLogs(queryDetails);
@@ -423,95 +504,10 @@ export default defineComponent({
       return span.spans.length;
     };
 
-    const getDirectChildren = (span: any) => {
-      if (!span.spans || !Array.isArray(span.spans)) return [];
-      return span.spans;
-    };
-
-    const getChildrenHeight = (span: any): number => {
-      if (
-        !span.spans ||
-        !Array.isArray(span.spans) ||
-        !props.collapseMapping[span.spanId]
-      ) {
-        return 0;
-      }
-
-      const countVisibleChildren = (children: any[]): number => {
-        let count = 0;
-        children.forEach((child: any) => {
-          count++;
-          if (
-            child.spans &&
-            child.spans.length > 0 &&
-            props.collapseMapping[child.spanId]
-          ) {
-            count += countVisibleChildren(child.spans);
-          }
-        });
-        return count;
-      };
-
-      return countVisibleChildren(span.spans);
-    };
-
-    const calculateConnectors = () => {
-      if (!rootContainer.value) return;
-
-      const newConnectorPaths: Record<string, any> = {};
-      const containerRect = rootContainer.value.getBoundingClientRect();
-      if (props.spans && Array.isArray(props.spans)) {
-        props.spans.forEach((span: any) => {
-          if (span.hasChildSpans && props.collapseMapping[span.spanId]) {
-            const parentBadge = badgeRefs.value[span.spanId];
-            if (!parentBadge) return;
-
-            const parentRect = parentBadge.getBoundingClientRect();
-            const parentX =
-              parentRect.left - containerRect.left + parentRect.width / 2;
-            const parentY = parentRect.bottom - containerRect.top;
-
-            const children = getDirectChildren(span);
-            const childPositions: any[] = [];
-            let lastChildY = parentY;
-
-            children.forEach((child: any) => {
-              const childBadge = badgeRefs.value[child.spanId];
-              if (childBadge) {
-                const childRect = childBadge.getBoundingClientRect();
-                const childX = childRect.left - containerRect.left;
-                const childY =
-                  childRect.top - containerRect.top + childRect.height / 2;
-
-                childPositions.push({
-                  x: childX,
-                  y: childY,
-                  isLeaf: !child.hasChildSpans,
-                });
-
-                lastChildY = childY;
-              }
-            });
-
-            if (childPositions.length > 0) {
-              newConnectorPaths[span.spanId] = {
-                x1: parentX,
-                y1: parentY,
-                x2: parentX,
-                y2: lastChildY,
-                color: "#e6e6e6",
-                children: childPositions,
-              };
-            }
-          }
-        });
-      }
-
-      connectorPaths.value = newConnectorPaths;
-    };
-
+    // ── Search ───────────────────────────────────────────────────────────────
     const searchResults = ref<any[]>([]);
     const currentIndex = ref<number | null>(null);
+
     const currentSelectedValue = computed(() => {
       if (
         currentIndex.value === -1 ||
@@ -527,13 +523,11 @@ export default defineComponent({
       const query = searchQuery.toLowerCase().trim();
       if (!query) return [];
       return spanList
-        .map((span: any, index: any) => {
-          // Check if any span value matches the query
+        .map((span: any) => {
           const matches = Object.entries(span).some(([key, value]) => {
             if (typeof value === "string" || typeof value === "number") {
-              // Special handling for duration
               if (key === "duration") {
-                const formattedDuration = `${value}us`; // Format duration with "us"
+                const formattedDuration = `${value}us`;
                 return (
                   String(value).toLowerCase().includes(query) ||
                   formattedDuration.toLowerCase().includes(query)
@@ -541,19 +535,33 @@ export default defineComponent({
               }
               return String(value).toLowerCase().includes(query);
             }
-            return false; // Skip non-string/non-number values
+            return false;
           });
-          // Return the index if a match is found, otherwise return -1
           return matches ? span.span_id : -1;
         })
         .filter((index: any) => index !== -1);
     };
+
+    // Scroll to the current match using the virtualizer instead of querySelector.
+    // This works even when the target row is outside the rendered viewport.
+    const scrollToMatch = () => {
+      if (searchResults.value.length === 0 || currentIndex.value === null)
+        return;
+      const targetSpanId = searchResults.value[currentIndex.value];
+      const spanIndex = (props.spans as any[]).findIndex(
+        (s: any) => s.spanId === targetSpanId || s.span_id === targetSpanId,
+      );
+      if (spanIndex !== -1) {
+        rowVirtualizer.value.scrollToIndex(spanIndex, { align: "center" });
+      }
+    };
+
     const updateSearch = () => {
       if (props.searchQuery?.trim()) {
         searchResults.value = findMatches(props.spanList, props.searchQuery);
-        currentIndex.value = 0; // Reset to first match
+        currentIndex.value = 0;
         nextTick(() => {
-          scrollToMatch(); // Wait for DOM updates before scrolling
+          scrollToMatch();
         });
       } else {
         searchResults.value = [];
@@ -562,27 +570,12 @@ export default defineComponent({
     };
 
     const isHighlighted = (path: any) => {
-      // If the path is an array, join it and compare with resultPath joined
       if (Array.isArray(path)) {
         return searchResults.value.some(
           (resultPath: any) => resultPath.join(",") === path.join(","),
         );
       }
-
-      // If path is a single value (index), compare it directly
       return searchResults.value.includes(path);
-    };
-
-    const scrollToMatch = () => {
-      if (searchResults.value.length > 0) {
-        const matchElement = document.querySelector(`.current-match`);
-        if (matchElement) {
-          matchElement.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-        }
-      }
     };
 
     const nextMatch = () => {
@@ -592,7 +585,7 @@ export default defineComponent({
       ) {
         currentIndex.value++;
         nextTick(() => {
-          scrollToMatch(); // Wait for DOM updates before scrolling
+          scrollToMatch();
         });
       }
     };
@@ -601,14 +594,14 @@ export default defineComponent({
       if (currentIndex.value !== null && currentIndex.value > 0) {
         currentIndex.value--;
         nextTick(() => {
-          scrollToMatch(); // Wait for DOM updates before scrolling
+          scrollToMatch();
         });
       }
     };
 
     watch(
       () => props.searchQuery,
-      (newValue) => {
+      () => {
         updateSearch();
       },
     );
@@ -619,29 +612,56 @@ export default defineComponent({
       emit("search-result", newValue.length);
     });
 
-    // Watch for changes that require recalculating connectors
-    watch(
-      () => [props.spans, props.collapseMapping],
-      () => {
-        nextTick(() => {
-          // Use setTimeout to ensure all refs are set after DOM updates
-          setTimeout(() => {
-            calculateConnectors();
-          }, 0);
-        });
-      },
-      { deep: true },
-    );
+    // ── SVG Connectors (math-based, no DOM queries) ──────────────────────────
+    const connectorLines = computed(() => {
+      const spans = props.spans as any[];
+      const rowH = props.spanDimensions?.height ?? 30;
+      const gap = props.spanDimensions?.gap ?? 15;
+      const colW = props.spanDimensions?.collapseWidth ?? 14;
+      const pad = 6;
 
-    onMounted(() => {
-      nextTick(() => {
-        // Use setTimeout to ensure all refs are set after DOM updates
-        setTimeout(() => {
-          calculateConnectors();
-        }, 0);
-      });
+      type ConnectorGroup = {
+        x1: number;
+        y1: number;
+        y2: number;
+        children: { x: number; y: number }[];
+      };
+      const groups = new Map<string, ConnectorGroup>();
+      const spanIndexById = new Map<string, number>();
+
+      for (let i = 0; i < spans.length; i++) {
+        spanIndexById.set(spans[i].spanId ?? spans[i].span_id, i);
+      }
+
+      for (let i = 0; i < spans.length; i++) {
+        const span = spans[i];
+        const parentId = span.parentSpanId ?? span.parent_span_id;
+        if (!parentId) continue;
+        const parentIdx = spanIndexById.get(parentId);
+        if (parentIdx === undefined) continue;
+        const parent = spans[parentIdx];
+
+        const parentX = pad + gap * (parent.depth ?? 0) + colW / 2;
+        const parentY = parentIdx * rowH + rowH / 2;
+        const childY = i * rowH + rowH / 2;
+        const childDepth = span.depth ?? 0;
+        const childX = span.hasChildSpans
+          ? pad + gap * childDepth
+          : pad + gap * childDepth + colW;
+
+        let group = groups.get(parentId);
+        if (!group) {
+          group = { x1: parentX, y1: parentY, y2: childY, children: [] };
+          groups.set(parentId, group);
+        }
+        group.y2 = childY;
+        group.children.push({ x: childX, y: childY });
+      }
+
+      return Array.from(groups.values());
     });
 
+    // ── Icon maps ────────────────────────────────────────────────────────────
     const spanServiceIconUrlMap = computed(() => {
       const isDark = store.state.theme === "dark";
       const cache = new Map<string, string>();
@@ -661,6 +681,33 @@ export default defineComponent({
       return cache;
     });
 
+    const getSpanTech = (span: any): string | null => {
+      const attrs = span || {};
+      return (
+        attrs["db_system"] ||
+        attrs["messaging_system"] ||
+        attrs["rpc_system"] ||
+        (span.spanKind?.toUpperCase() === "CLIENT" && attrs["http_url"]
+          ? "http"
+          : null) ||
+        null
+      );
+    };
+
+    const spanTechIconUrlMap = computed(() => {
+      const isDark = store.state.theme === "dark";
+      const map = new Map<string, string>();
+      for (const span of props.spans as any[]) {
+        const tech = getSpanTech(span);
+        if (tech && !map.has(tech)) {
+          const url = getSpanTechIconDataUrl(tech, isDark);
+          if (url) map.set(tech, url);
+        }
+      }
+      return map;
+    });
+
+    // ── HTTP status helpers ──────────────────────────────────────────────────
     const getHttpStatus = (span: any): number | null => {
       const spanData = props.spanMap[span.spanId] || {};
       const code = spanData["http_status_code"] ?? null;
@@ -697,40 +744,12 @@ export default defineComponent({
       return props.spanMap[span.spanId]?.events?.length ?? 0;
     };
 
-    const getSpanTech = (span: any): string | null => {
-      const attrs = span || {};
-      return (
-        attrs["db_system"] ||
-        attrs["messaging_system"] ||
-        attrs["rpc_system"] ||
-        (span.spanKind?.toUpperCase() === "CLIENT" && attrs["http_url"]
-          ? "http"
-          : null) ||
-        null
-      );
-    };
-
-    const spanTechIconUrlMap = computed(() => {
-      const isDark = store.state.theme === "dark";
-      const map = new Map<string, string>();
-      for (const span of props.spans as any[]) {
-        const tech = getSpanTech(span);
-        if (tech && !map.has(tech)) {
-          const url = getSpanTechIconDataUrl(tech, isDark);
-          if (url) map.set(tech, url);
-        }
-      }
-      return map;
-    });
-
     return {
       toggleSpanCollapse,
-      getImageURL,
       selectSpan,
       store,
       viewSpanLogs,
       t,
-      spanHoveredIndex,
       searchResults,
       currentIndex,
       updateSearch,
@@ -741,12 +760,6 @@ export default defineComponent({
       scrollToMatch,
       findMatches,
       getChildCount,
-      getDirectChildren,
-      getChildrenHeight,
-      setBadgeRef,
-      connectorPaths,
-      calculateConnectors,
-      rootContainer,
       formatTokens,
       formatCost,
       isLLMTrace,
@@ -757,6 +770,9 @@ export default defineComponent({
       getHttpStatus,
       getHttpStatusVars,
       getEventCount,
+      virtualRows,
+      totalSize,
+      connectorLines,
     };
   },
   components: { SpanBlock },
@@ -767,9 +783,7 @@ export default defineComponent({
 .view-logs-container {
   top: 0.25rem;
   right: 0;
-}
-.spans-container {
-  position: relative;
+  visibility: hidden;
 }
 
 .span-count-box {
@@ -824,33 +838,31 @@ export default defineComponent({
   .view-logs-container {
     visibility: hidden;
   }
-  .view-logs-container {
-    &.show {
-      visibility: visible !important;
-    }
-  }
 }
 
 .span-row {
   position: relative;
   min-height: 1.875rem;
 
-  &.span-row-highlight {
-    &::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 0;
-      bottom: 0;
-      background-color: rgba(0, 123, 255, 0.2);
-      pointer-events: none;
-      z-index: 999;
-    }
+  // Hover highlight via CSS only — no JS spanHoveredIndex needed
+  &:hover::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: rgba(0, 123, 255, 0.2);
+    pointer-events: none;
+    z-index: 999;
+  }
 
-    .operation-name-container {
-      background-color: transparent !important;
-    }
+  &:hover .operation-name-container {
+    background-color: transparent !important;
+  }
+
+  &:hover .view-logs-container {
+    visibility: visible !important;
   }
 
   &.span-row-selected {
@@ -904,12 +916,5 @@ export default defineComponent({
   background-color: yellow;
   color: red;
   font-weight: bold;
-}
-
-.span-block-highlight {
-  .bg-dark,
-  .bg-white {
-    background-color: transparent !important;
-  }
 }
 </style>
