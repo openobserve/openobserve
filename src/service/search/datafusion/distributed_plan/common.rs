@@ -151,7 +151,7 @@ pub fn get_empty_stream(empty_stream: EmptyStream) -> SendableRecordBatchStream 
     if let Some(e) = e
         && e.code() != tonic::Code::Ok
     {
-        log::info!(
+        log::error!(
             "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
             start.elapsed().as_millis(),
         );
