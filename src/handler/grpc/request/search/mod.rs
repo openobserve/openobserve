@@ -21,7 +21,7 @@ use proto::cluster_rpc::{
     CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
     GetLicenseUsageRequest, GetLicenseUsageResponse, GetResultRequest, GetResultResponse,
     GetTableRequest, GetTableResponse, QueryStatusRequest, QueryStatusResponse,
-    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse, UsageResult,
+    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
     search_server::Search,
 };
 use tonic::{Request, Response, Status};
@@ -31,6 +31,7 @@ use {
     config::meta::search::ScanStats,
     config::metrics,
     o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup},
+    proto::cluster_rpc::UsageResult,
 };
 
 use crate::{handler::grpc::MetadataMap, service::search as SearchService};

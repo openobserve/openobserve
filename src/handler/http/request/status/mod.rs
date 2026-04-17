@@ -297,8 +297,6 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
 
     #[cfg(feature = "enterprise")]
     let block_features = block_feature_for_report_failure().await;
-    #[cfg(not(feature = "enterprise"))]
-    let block_features = false;
 
     let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
     let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
