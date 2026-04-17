@@ -83,6 +83,18 @@ async function globalSetup() {
     try {
       await performDexLogin(page, baseUrl, userEmail, userPassword);
 
+      // Navigate to the correct org before saving auth state
+      // Dex login lands on the user's default org (e.g. automation_dashboard)
+      // but tests need to run against the org specified by ORGNAME env var
+      const targetOrg = process.env.ORGNAME;
+      if (targetOrg && targetOrg !== 'default') {
+        const orgUrl = `${baseUrl}/web/?org_identifier=${targetOrg}`;
+        testLogger.info(`[alpha1] Switching to target org: ${targetOrg}`);
+        await page.goto(orgUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        testLogger.info(`[alpha1] Now on: ${page.url()}`);
+      }
+
       await context.storageState({ path: AUTH_FILE });
       testLogger.info(`[alpha1] Auth state saved to ${AUTH_FILE}`);
 
@@ -493,7 +505,12 @@ async function verifySharedAuth(baseUrl) {
   const page = await context.newPage();
 
   try {
-    await page.goto(`${baseUrl}/web/`, { timeout: 60000, waitUntil: 'domcontentloaded' });
+    // Navigate to the correct org — shared auth may have been saved on a different default org
+    const targetOrg = process.env.ORGNAME;
+    const verifyUrl = (targetOrg && targetOrg !== 'default')
+      ? `${baseUrl}/web/?org_identifier=${targetOrg}`
+      : `${baseUrl}/web/`;
+    await page.goto(verifyUrl, { timeout: 60000, waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     // If we ended up on Dex or login page, the session is invalid
