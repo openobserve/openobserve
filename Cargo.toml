@@ -298,12 +298,16 @@ hyper-util = { version = "0.1", features = [
 anyhow = "1.0"
 arc-swap = "1.8"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
-async-nats = "0.46"
+async-nats = "0.47"
 async-stream = "0.3"
 async-trait = "0.1"
 async-recursion = "1.0"
-aws-config = "1.5.17"
-aws-sdk-sns = "1.61.0"
+aws-config = "1.8"
+aws-sdk-sns = { version = "1.97", default-features = false, features = [
+    "behavior-version-latest",
+    "default-https-client",
+    "rt-tokio",
+] }
 base64 = "0.22"
 bitvec = "1.0"
 bytes = "1.11"
@@ -444,7 +448,11 @@ tokio-rustls = { version = "0.26", default-features = false, features = [
 ] }
 tokio-util = { version = "0.7", features = ["compat"] }
 tokio-stream = "0.1"
-tonic = { version = "0.14", features = ["gzip", "tls-webpki-roots", "tls-native-roots"] }
+tonic = { version = "0.14", features = [
+    "gzip",
+    "tls-webpki-roots",
+    "tls-native-roots",
+] }
 tonic-prost = "0.14"
 tracing = "0.1.44"
 tracing-appender = "0.2.4"

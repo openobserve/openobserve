@@ -866,7 +866,7 @@ async fn merge_files(
             &o2_enterprise::enterprise::common::config::get_config().service_streams;
 
         // Skip self-reporting streams from _meta organization to avoid processing internal metrics
-        if LOCAL_NODE.is_ingester()
+        if service_streams_config.node_matches_processing_node(&LOCAL_NODE)
             && service_streams_config.enabled
             && org_id != config::META_ORG_ID
             && (stream_type == StreamType::Logs
@@ -1136,7 +1136,9 @@ async fn queue_services_from_parquet(
     // Create bounded channel for backpressure - drops records if consumer can't keep up
     // ARROW-NATIVE: Channel now sends RecordBatch directly (no HashMap conversion!)
     let (tx, mut rx) = mpsc::channel::<arrow::record_batch::RecordBatch>(
-        o2_enterprise::enterprise::common::config::SS_CHANNEL_CAPACITY,
+        o2_enterprise::enterprise::common::config::get_config()
+            .service_streams
+            .channel_capacity,
     );
 
     // Clone data needed for producer task

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="traces-search-result-list tw:h-full tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)]"
+    class="traces-search-result-list tw:h-auto! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)]"
   >
     <!-- ════════════════════ Empty State ════════════════════ -->
     <div
@@ -32,77 +32,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       v-show="hasResults || loading"
       data-test="traces-table-wrapper"
-      class="column tw:h-full tw:flex-1 tw:min-h-0"
+      class="column tw:h-auto!"
     >
-      <!-- Section header: title + count badge + pagination -->
-      <div
-        v-if="showHeader"
-        data-test="traces-section-header"
-        class="row items-center q-px-sm q-py-xs tw:shrink-0 tw:min-h-[2.5rem] tw:border-t tw:border-[rgba(0,0,0,0.07)]"
-      >
-        <span
-          data-test="traces-section-title"
-          class="tw:text-[0.75rem] tw:font-bold tw:tracking-[0.0625rem]! tw:text-[var(--o2-text-1)]! tw:mr-[0.85rem]"
-        >
-          {{
-            props.searchMode === "spans"
-              ? t("traces.spansTitle")
-              : t("traces.tracesTitle")
-          }}
-        </span>
-        <q-badge
-          data-test="traces-count-badge"
-          rounded
-          :label="`${formatLargeNumber(props.total != null ? props.total : hits.length)} ${props.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}`"
-          class="text-caption tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.85rem]"
-        />
-        <q-badge
-          v-if="props.errorCount != null && props.errorCount > 0"
-          data-test="traces-error-count-badge"
-          rounded
-          :label="`${formatLargeNumber(props.errorCount)} ${props.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}`"
-          class="text-caption tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-field-type-boolean-bg)]! tw:mr-[0.85rem]"
-        />
-        <q-space />
-
-        <!-- Pagination -->
-        <template v-if="showPagination">
-          <q-select
-            :model-value="rowsPerPage"
-            :options="rowsPerPageOptions"
-            class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
-            size="sm"
-            dense
-            borderless
-            data-test="traces-search-result-records-per-page"
-            @update:model-value="emit('rows-per-page-change', $event)"
-          />
-          <q-pagination
-            :disable="loading"
-            :model-value="currentPage"
-            :max="totalPages"
-            :input="false"
-            direction-links
-            :boundary-numbers="false"
-            :max-pages="5"
-            :ellipses="false"
-            icon-first="skip_previous"
-            icon-last="skip_next"
-            icon-prev="fast_rewind"
-            icon-next="fast_forward"
-            class="float-right paginator-section tw:mt-0!"
-            data-test="traces-search-result-pagination"
-            @update:model-value="emit('page-change', $event)"
-          />
-        </template>
-      </div>
-
-      <!-- Table scroll area -->
+      <!-- Table scroll area: no overflow here — parent handles unified scroll -->
       <div
         data-test="traces-search-result-list"
-        class="tw:w-full tw:flex-1 tw:overflow-y-auto tw:overflow-x-auto tw:relative"
+        class="tw:w-full tw:h-auto! tw:overflow-x-auto tw:relative"
       >
         <TenstackTable
+          class="tw:h-auto!"
           :columns="searchObj.data.resultGrid.columns"
           :rows="hits"
           :loading="loading"
@@ -131,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :hide-search-term-actions="false"
               :hide-ai="true"
-              @copy="copyToClipboard"
+              @copy="copyToClipboard(column.id, row[column.id])"
               @add-search-term="addSearchTerm"
               @send-to-ai-chat="sendToAiChat"
             />
@@ -174,9 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template
-            #[`cell-${store.state.zoConfig.timestamp_column}`]="{ item }"
+            #[`cell-${store.state.zoConfig.timestamp_column}`]="{ cell }"
           >
-            <TraceTimestampCell :item="item" :search-mode="props.searchMode" />
+            <TraceTimestampCell :value="cell.getValue()" />
           </template>
 
           <template #cell-service_name="{ item }">
@@ -289,6 +227,7 @@ import {
 } from "../../../utils/zincutils";
 import { useStore } from "vuex";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 
 interface Props {
   hits: any[];
@@ -340,7 +279,12 @@ const emit = defineEmits<{
   "send-to-ai-chat": [value: string];
 }>();
 
-const copyToClipboard = (value: any) => qCopyToClipboard(String(value));
+const copyToClipboard = (field: string, value: any) =>
+  qCopyToClipboard(
+    field === "span_kind"
+      ? (SPAN_KIND_MAP[String(value)] ?? String(value))
+      : String(value),
+  );
 
 const addSearchTerm = (
   field: string,
@@ -352,7 +296,11 @@ const addSearchTerm = (
     const isOp = action === "include" ? "is" : "is not";
     searchObj.data.stream.addToFilter = `${field} ${isOp} null`;
   } else {
-    searchObj.data.stream.addToFilter = `${field} ${operator} '${String(fieldValue).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+    const displayValue =
+      field === "span_kind"
+        ? (SPAN_KIND_MAP[String(fieldValue)] ?? String(fieldValue))
+        : String(fieldValue);
+    searchObj.data.stream.addToFilter = `${field} ${operator} '${displayValue.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
   }
 };
 

@@ -165,7 +165,6 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Navigate to Step 2: Conditions
     await pm.alertsPage.clickContinueButton();
-    await page.waitForTimeout(500);
 
     // ✅ COVERAGE: P1 - PromQL tab visibility for metrics streams
     await pm.alertsPage.expectPromqlTabVisible();
@@ -182,7 +181,6 @@ test.describe("Alerts Regression Bugs", () => {
     // Navigate to Step 4 to verify promql_condition fields
     await pm.alertsPage.clickContinueButton(); // Step 3
     await pm.alertsPage.clickContinueButton(); // Step 4
-    await page.waitForTimeout(500);
 
     // ✅ COVERAGE: P1 - "Trigger if the value is" fields appear in Step 4
     await pm.alertsPage.expectPromqlConditionRowVisible();
@@ -239,7 +237,6 @@ test.describe("Alerts Regression Bugs", () => {
 
       // Verify alert appears in the list using page object
       await pm.alertsPage.searchAlert(alertName);
-      await page.waitForTimeout(2000);
       await pm.alertsPage.expectAlertRowVisible(alertName);
       testLogger.info(`✅ P0/P1: Alert with operator ${operator} saved successfully`);
     }
@@ -259,7 +256,7 @@ test.describe("Alerts Regression Bugs", () => {
   // ============================================================================
   // SKIPPED: Timing out in current test environment (page.goto timeouts)
   // TODO: Re-enable when environment is stable
-  test.skip("Group By field should show autocomplete suggestions @bug-10899 @P1 @regression @alerts", async ({ page }) => {
+  test("Group By field should show autocomplete suggestions @bug-10899 @P1 @regression @alerts", async ({ page }) => {
     test.setTimeout(300000); // 5 minutes timeout
     testLogger.info('Test: Verify Group By field autocomplete (Bug #10899)');
 
@@ -278,20 +275,21 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Navigate to Step 2: Conditions
     await pm.alertsPage.clickContinueButton();
-    await page.waitForTimeout(1000);
-    testLogger.info('✓ Navigated to Step 2');
 
     // Enable aggregation to show Group By section
     const aggregationToggle = pm.alertsPage.getAggregationToggle();
     await aggregationToggle.waitFor({ state: 'visible', timeout: 5000 });
+    testLogger.info('✓ Navigated to Step 2');
     await expect(aggregationToggle).toBeEnabled({ timeout: 3000 });
     await aggregationToggle.click();
-    await page.waitForTimeout(1000);
 
     // STRONG ASSERTION: Verify group-by section appeared
     const groupByLabel = pm.alertsPage.getGroupByLabel().first();
     await expect(groupByLabel).toBeVisible({ timeout: 5000 });
     testLogger.info('✓ Group By section visible');
+
+    // Get the query config section container (Step 2: Conditions) using POM
+    const queryConfigSection = pm.alertsPage.getStepQueryConfigSection();
 
     // Find the Group By input field using POM method with fallback selectors
     const groupByInput = await pm.alertsPage.findGroupByInputWithFallback(queryConfigSection);
@@ -302,16 +300,16 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Click to open dropdown/autocomplete
     await groupByInput.click();
-    await page.waitForTimeout(500);
     testLogger.info('✓ Clicked Group By input');
 
     // Type characters to trigger autocomplete
     await groupByInput.fill('k8s');
-    await page.waitForTimeout(1000);
     testLogger.info('✓ Typed "k8s" to trigger autocomplete');
 
     // STRONG ASSERTION: Check for autocomplete suggestions using POM
     const suggestions = pm.alertsPage.getAutocompleteSuggestions();
+    // Wait for autocomplete dropdown to appear after typing
+    await suggestions.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     const suggestionCount = await suggestions.count();
     testLogger.info(`Autocomplete suggestions found: ${suggestionCount}`);
 
@@ -327,7 +325,7 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Clean up
     await pm.alertsPage.clickBackButton();
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     testLogger.info('✓ PASSED: Group By autocomplete test completed');
   });
@@ -336,7 +334,7 @@ test.describe("Alerts Regression Bugs", () => {
   // Bug #10872: Multi-window alert VRL processing not working correctly
   // https://github.com/openobserve/openobserve/issues/10872
   // ============================================================================
-  test.skip("VRL Apply button should process multi-window result array correctly @bug-10872 @P2 @regression @alerts", async ({ page }, testInfo) => {
+  test("VRL Apply button should process multi-window result array correctly @bug-10872 @P2 @regression @alerts", async ({ page }, testInfo) => {
     test.setTimeout(300000); // 5 minutes timeout
     testLogger.info('Test: VRL processing for multi-window alerts (Bug #10872)');
 
@@ -352,7 +350,7 @@ test.describe("Alerts Regression Bugs", () => {
 
     // Navigate to create new alert
     await pm.alertsPage.clickCreateAlertButton();
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Check if multi-window/compare options are available
     const compareWithPastContainer = pm.alertsPage.getCompareWithPastContainer();
@@ -361,7 +359,7 @@ test.describe("Alerts Regression Bugs", () => {
     // Try to find and enable multi-window mode
     if (await compareWithPastContainer.first().isVisible({ timeout: 5000 }).catch(() => false)) {
       await compareWithPastContainer.first().click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
       testLogger.info('✓ Compare with Past container found');
     } else {
       testLogger.info('Compare with Past container not found - may need to navigate to condition step first');
@@ -371,7 +369,7 @@ test.describe("Alerts Regression Bugs", () => {
     const conditionTab = pm.alertsPage.getConditionTab();
     if (await conditionTab.first().isVisible({ timeout: 3000 }).catch(() => false)) {
       await conditionTab.first().click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
     }
 
     // Look for VRL editor or apply VRL button
@@ -401,7 +399,7 @@ test.describe("Alerts Regression Bugs", () => {
     // PRIMARY ASSERTION: Apply VRL button should be available
     await expect(applyVrlButton).toBeVisible({ timeout: 3000 });
     await applyVrlButton.click();
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('✓ Apply VRL button clicked');
 
     // STRONG ASSERTION: Check for error messages - the bug would cause an error here
@@ -430,7 +428,7 @@ test.describe("Alerts Regression Bugs", () => {
   // ============================================================================
   // SKIPPED: Timing out in current test environment (page.goto timeouts)
   // TODO: Re-enable when environment is stable
-  test.skip("Alert firing count should increment when alert fires @bug-10472 @P2 @regression @alerts", async ({ page }, testInfo) => {
+  test("Alert firing count should increment when alert fires @bug-10472 @P2 @regression @alerts", async ({ page }, testInfo) => {
     test.setTimeout(240000); // 4 minutes timeout
     testLogger.info('Test: Verify alert firing count increment (Bug #10472)');
 
@@ -470,6 +468,135 @@ test.describe("Alerts Regression Bugs", () => {
     }
 
     testLogger.info('✓ PASSED: Alert firing count test completed');
+  });
+
+  // ============================================================================
+  // Bug #10110: Template appears twice in override template input field
+  // https://github.com/openobserve/openobserve/issues/10110
+  // ============================================================================
+  test("Override template should appear only once in input field @bug-10110 @P2 @regression @alerts", async ({ page }) => {
+    testLogger.info('Test: Verify template override displays value once (Bug #10110)');
+
+    const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
+    await page.goto(alertsUrl);
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+    // Start creating a real-time alert to reach the Alert Settings step
+    await pm.alertsPage.clickAddAlertButton();
+
+    // ==================== STEP 1: ALERT SETUP ====================
+    const alertName = `auto_template_display_${randomValue}`;
+    // fillAlertName includes wait for input to be visible
+    await pm.alertsPage.fillAlertName(alertName);
+    testLogger.info('✓ Filled alert name', { alertName });
+
+    // Select logs stream type
+    await pm.alertsPage.selectStreamType('logs');
+
+    // Select stream (selectLogsStream includes wait for dropdown to be visible)
+    await pm.alertsPage.selectLogsStream(TEST_STREAM);
+    testLogger.info('✓ Selected stream', { stream: TEST_STREAM });
+
+    // Select real-time alert type
+    await pm.alertsPage.expectRealtimeRadioVisible();
+    await pm.alertsPage.selectRealtimeAlertType();
+    testLogger.info('✓ Selected real-time alert type');
+
+    // ==================== STEP 2: CONDITIONS ====================
+    await pm.alertsPage.clickContinueButton();
+    // Wait for Step 2 (Conditions) to load
+    await expect(pm.alertsPage.getAddConditionButton()).toBeVisible({ timeout: 5000 });
+    testLogger.info('✓ Navigated to Step 2: Conditions');
+
+    // Add a simple condition
+    const addCondBtn = pm.alertsPage.getAddConditionButton();
+    if (await addCondBtn.isVisible({ timeout: 3000 })) {
+      await addCondBtn.click();
+      // Wait for condition column select to appear
+      await expect(pm.alertsPage.getConditionColumnSelect()).toBeVisible({ timeout: 5000 });
+
+      // Select first available column
+      const columnSelect = pm.alertsPage.getConditionColumnSelect();
+      await columnSelect.click();
+      // Wait for dropdown menu to appear
+      await expect(pm.alertsPage.getFirstMenuItem()).toBeVisible({ timeout: 5000 });
+      await pm.alertsPage.getFirstMenuItem().click();
+
+      // Select operator
+      const operatorSelect = pm.alertsPage.getOperatorSelect();
+      await operatorSelect.click();
+      // Wait for operator dropdown menu to appear
+      await expect(pm.alertsPage.getFirstMenuItem()).toBeVisible({ timeout: 5000 });
+      // Select Contains operator from dropdown
+      await pm.alertsPage.getVisibleMenu().getByText('Contains', { exact: true }).click();
+
+      // Fill value
+      await pm.alertsPage.getConditionValueInputElement().fill('test');
+
+      testLogger.info('✓ Added condition');
+    }
+
+    // ==================== STEP 3: COMPARE (Skip) ====================
+    await pm.alertsPage.clickContinueButton();
+    // No need to wait - immediately clicking continue to skip this step
+
+    testLogger.info('✓ Navigated to Step 3: Compare (skipping)');
+
+    // ==================== STEP 4: ALERT SETTINGS ====================
+    await pm.alertsPage.clickContinueButton();
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    // Wait for template select to appear (confirms Step 4 loaded)
+    await pm.alertsPage.expectTemplateOverrideSelectVisible();
+    testLogger.info('✓ Navigated to Step 4: Alert Settings');
+
+    // Find the template override select field (it's in the alert settings step)
+    // Wait for template field to be visible as confirmation that we're on the right step
+    // NOTE: No data-test attribute exists on this component (AlertSettings.vue line 189)
+    // Using .template-select-field (application-defined class, stable) + .q-select (Quasar component)
+    // TODO: Product team should add data-test="alert-template-override-select" for test stability
+    const templateSelect = pm.alertsPage.getTemplateOverrideSelect();
+    testLogger.info('✓ Template override field visible');
+
+    // Click the template select to open dropdown
+    await templateSelect.click();
+    // Wait for dropdown menu to appear
+    await expect(pm.alertsPage.getFirstMenuItem()).toBeVisible({ timeout: 5000 });
+
+    // Find and select the first available template from dropdown
+    const firstTemplate = pm.alertsPage.getFirstMenuItem();
+    const selectedTemplateName = await firstTemplate.textContent();
+    testLogger.info('Selecting template', { templateName: selectedTemplateName?.trim() });
+
+    await firstTemplate.click();
+    // Wait for dropdown menu to close (indicates selection completed)
+    await expect(pm.alertsPage.getVisibleMenu()).not.toBeVisible({ timeout: 5000 });
+    testLogger.info('✓ Selected template from dropdown');
+
+    // STRONG ASSERTION: Verify template name appears exactly once in the select field
+    // Bug #10110 caused templates to display twice in the input field
+    // Get all visible text from the component (includes template name + icon labels)
+    const displayedText = await templateSelect.innerText();
+    const cleanDisplayText = displayedText?.trim() || '';
+    testLogger.info('Template display text', { text: cleanDisplayText });
+
+    // Template name must be non-empty to validate
+    // Normalize whitespace to handle extra spaces/newlines from .q-item
+    const templateName = selectedTemplateName?.trim().replace(/\s+/g, ' ') || '';
+    expect(templateName, 'Bug #10110: Selected template name must be non-empty to verify duplication').toBeTruthy();
+
+    // PRIMARY ASSERTION: Template name should appear exactly once (Bug #10110 caused duplication)
+    // Count occurrences of the template name in the displayed text
+    // The text includes icon labels (cancel, arrow_drop_down) but template should appear only once
+    const regex = new RegExp(templateName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    const occurrences = (cleanDisplayText.match(regex) || []).length;
+    expect(occurrences, `Bug #10110: Template "${templateName}" should appear exactly once in display, not ${occurrences} times`).toBe(1);
+    testLogger.info(`✓ Template display matches selected template exactly (no duplication) - Bug #10110 is fixed`);
+
+    // Clean up - go back without saving
+    await pm.alertsPage.clickBackButton();
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+
+    testLogger.info('✓ PASSED: Template override duplication test completed');
   });
 
   test.afterEach(async () => {
@@ -556,7 +683,8 @@ async function ingestMetricsData(page) {
     testLogger.warn('Metrics ingestion may have failed', { error: e.message });
   }
 
-  await page.waitForTimeout(3000); // Allow time for indexing
+  // Allow time for indexing by waiting for network activity to settle
+  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 }
 
 /**

@@ -905,7 +905,8 @@ pub async fn list_alerts(
     // Apply pagination to the combined list (regular alerts + anomaly configs).
     #[cfg(feature = "enterprise")]
     let list = if let Some((page_size, page_idx)) = page_size_and_idx {
-        let start = (page_idx * page_size) as usize;
+        // Use saturating_mul to prevent u64 overflow before casting to usize.
+        let start = page_idx.saturating_mul(page_size) as usize;
         list.into_iter()
             .skip(start)
             .take(page_size as usize)

@@ -18,7 +18,7 @@
           borderless
           emit-value
           map-options
-          class="tw:w-[auto] tw:flex-shrink-0 tw:bg-[var(--o2-primary-background)] tw:rounded"
+          class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
           @update:model-value="onStreamFilterChange"
           :disable="availableStreams.length === 0"
         >
@@ -34,7 +34,7 @@
           v-model="searchFilter"
           borderless
           dense
-          class="no-border tw:w-[14rem]! tw:h-[36px] tw:bg-[var(--o2-primary-background)] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
+          class="no-border tw:w-[14rem]! tw:h-[36px] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
           placeholder="Search Services"
           debounce="300"
           @update:model-value="applyFilters"
@@ -1734,5 +1734,10 @@ code {
 .graph-container svg path[style*="stroke-dasharray"] {
   animation: sg-edge-flow 0.5s linear infinite;
   animation-fill-mode: both;
+}
+
+.body--dark [data-test="service-graph-stream-selector"] .q-field,
+.body--dark [data-test="service-graph-search-input"] .q-field {
+  background: var(--o2-primary-background);
 }
 </style>

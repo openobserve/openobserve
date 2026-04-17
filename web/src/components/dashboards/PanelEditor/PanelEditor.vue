@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!resolvedConfig.hideChartPreview"
                     class="col tw:relative"
                   >
-                    <div :class="chartAreaClass">
+                    <div :class="chartAreaClass" :style="chartAreaStyle">
                       <PanelSchemaRenderer
                         v-if="chartData"
                         ref="panelSchemaRendererRef"
@@ -293,7 +293,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Query Editor -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
-                  class="row column tw:h-[calc(100vh-180px)]"
+                  class="row column"
+                  :style="{ height: 'calc(100vh - var(--navbar-height) - 144px)' }"
                 >
                   <DashboardQueryEditor />
                 </div>
@@ -302,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator vertical />
 
               <!-- Config Panel Sidebar -->
-              <div class="col-auto">
+              <div class="col-auto" :style="(pageType === 'logs' || pageType === 'build') ? { height: '100%' } : {}">
                 <PanelSidebar
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
@@ -597,7 +598,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Query Editor for custom chart -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
-                  class="row column tw:h-[calc(100vh-180px)]"
+                  class="row column"
+                  :style="{ height: 'calc(100vh - var(--navbar-height) - 144px)' }"
                 >
                   <DashboardQueryEditor />
                 </div>
@@ -823,15 +825,15 @@ const showCustomChartTypeSelector = ref(false);
 const contentHeight = computed(() => {
   switch (props.pageType) {
     case "dashboard":
-      return "calc(100vh - 110px)";
+      return "calc(100vh - var(--navbar-height) - 74px)";
     case "metrics":
-      return "calc(100vh - 106px)";
+      return "calc(100vh - var(--navbar-height) - 70px)";
     case "logs":
       return "calc(100% - 36px)";
     case "build":
-      return "calc(100vh - 60px)";
+      return "calc(100vh - var(--navbar-height) - 24px)";
     default:
-      return "calc(100vh - 110px)";
+      return "calc(100vh - var(--navbar-height) - 74px)";
   }
 });
 
@@ -840,7 +842,15 @@ const chartAreaClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return "tw:h-[calc(100%-36px)] tw:min-h-[140px]";
   }
-  return "tw:h-[calc(100vh-500px)] tw:min-h-[140px] tw:mt-[40px]";
+  return "tw:min-h-[140px] tw:mt-[40px]";
+});
+
+// Chart area style based on page type (uses CSS var for dynamic navbar height)
+const chartAreaStyle = computed(() => {
+  if (props.pageType === "logs" || props.pageType === "build") {
+    return {};
+  }
+  return { height: "calc(100vh - var(--navbar-height) - 464px)" };
 });
 
 // Main content area class - logs needs flat background without card styling
@@ -963,11 +973,11 @@ const searchType = computed(() => {
     case "dashboard":
       return "dashboards";
     case "metrics":
-      return "ui";
+      return "dashboards";
     case "logs":
       return "ui";
     case "build":
-      return "ui";
+      return "dashboards";
     default:
       return "dashboards";
   }

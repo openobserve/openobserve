@@ -26,35 +26,20 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use serde::Deserialize;
-
-/// Agent type for general chat/copilot requests (SQL help, observability questions, etc.)
 #[cfg(feature = "enterprise")]
-const DEFAULT_AGENT_TYPE: &str = "o2-ai";
-
-/// Agent type for incident-specific queries (triggered when incident_id is in context)
-#[cfg(feature = "enterprise")]
-const INCIDENT_AGENT_TYPE: &str = "sre";
-
-/// Determine agent type based on context.
-/// - If context contains incident_id, use SRE agent for incident investigation
-/// - Otherwise use default copilot agent
-#[cfg(feature = "enterprise")]
-fn get_agent_type(context: &serde_json::Value) -> &'static str {
-    if context
-        .as_object()
-        .is_some_and(|obj| obj.contains_key("incident_id"))
-    {
-        INCIDENT_AGENT_TYPE
-    } else {
-        DEFAULT_AGENT_TYPE
-    }
-}
-
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::ai::agent::meta::Role;
+use {
+    futures::StreamExt,
+    o2_enterprise::enterprise::{
+        ai::{
+            agent::meta::Role,
+            client::{
+                DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE, get_agent_client,
+            },
+        },
+        common::config::get_config as get_o2_config,
+    },
+};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -65,6 +50,21 @@ use crate::{
         router::X_O2_ASSISTANT_SESSION_ID,
     },
 };
+
+/// Determine agent type based on context.
+/// - If context contains incident_id, use SRE agent for incident investigation
+/// - Otherwise use default copilot agent
+#[cfg(feature = "enterprise")]
+fn get_agent_type(context: &serde_json::Value) -> &'static str {
+    if context
+        .as_object()
+        .is_some_and(|obj| obj.contains_key("incident_id"))
+    {
+        RCA_AGENT_TYPE
+    } else {
+        DEFAULT_AGENT_TYPE
+    }
+}
 
 /// Extract headers from the request that match the configured passthrough patterns.
 /// Supports exact matches and prefix wildcards (e.g., "x-forwarded-*").
@@ -112,11 +112,10 @@ fn extract_passthrough_headers(
     post,
     path = "/{org_id}/ai/chat",
     context_path = "/api",
-    tag = "Ai",
+    tag = "AI",
     operation_id = "Chat",
     summary = "Generate AI chat response",
-    description = "Generates an AI-powered response to user queries and requests. \
-                   This endpoint redirects to the o2-sre-agent service for processing.",
+    description = "Generates an AI-powered response to user queries and requests.",
     security(
         ("Authorization" = [])
     ),
@@ -171,8 +170,6 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
 
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::alerts::rca_agent::QueryRequest;
-
         let trace_id = auth_data.get_trace_id();
         let user_id = &auth_data.user_id;
         let org_id_str = org_id.as_str();
@@ -232,7 +229,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         // Auth header is passed directly to agent - no need to extract user_token
 
         // Get global agent client singleton
-        let client = match o2_enterprise::enterprise::alerts::rca_agent::get_agent_client() {
+        let client = match get_agent_client() {
             Some(c) => c,
             None => {
                 log::error!(
@@ -287,16 +284,16 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         // Convert images to agent format
         let images = prompt_body.images.map(|imgs| {
             imgs.into_iter()
-                .map(
-                    |img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
-                        data: img.data,
-                        mime_type: img.mime_type,
-                        filename: img.filename,
-                    },
-                )
+                .map(|img| ImageAttachment {
+                    data: img.data,
+                    mime_type: img.mime_type,
+                    filename: img.filename,
+                })
                 .collect()
         });
 
+        let (tool_mcps, tool_clis) =
+            o2_enterprise::enterprise::ai::toolsets::push::load_sre_tools(org_id_str).await;
         let query_req = QueryRequest {
             query: last_user_message,
             context,
@@ -311,6 +308,16 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                 Some(history)
             },
             images,
+            mcps: if tool_mcps.is_empty() {
+                None
+            } else {
+                Some(tool_mcps)
+            },
+            clis: if tool_clis.is_empty() {
+                None
+            } else {
+                Some(tool_clis)
+            },
         };
 
         // Query agent with headers
@@ -402,7 +409,7 @@ impl TraceInfo {
     post,
     path = "/{org_id}/ai/chat_stream",
     context_path = "/api",
-    tag = "Ai",
+    tag = "AI",
     operation_id = "ChatStream",
     summary = "Generate streaming AI chat response",
     description = "Generates an AI response with real-time streaming for improved user experience. \
@@ -579,11 +586,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 
     #[cfg(feature = "enterprise")]
     {
-        use futures::StreamExt;
-        use o2_enterprise::enterprise::alerts::rca_agent::{QueryRequest, get_agent_client};
-
         let org_id_str = org_id.clone();
-
         let mut code = StatusCode::OK.as_u16();
         let body_bytes_str = serde_json::to_string(&prompt_body).unwrap_or_default();
 
@@ -710,16 +713,16 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         // Convert images to agent format
         let images = prompt_body.images.map(|imgs| {
             imgs.into_iter()
-                .map(
-                    |img| o2_enterprise::enterprise::alerts::rca_agent::ImageAttachment {
-                        data: img.data,
-                        mime_type: img.mime_type,
-                        filename: img.filename,
-                    },
-                )
+                .map(|img| ImageAttachment {
+                    data: img.data,
+                    mime_type: img.mime_type,
+                    filename: img.filename,
+                })
                 .collect()
         });
 
+        let (tool_mcps, tool_clis) =
+            o2_enterprise::enterprise::ai::toolsets::push::load_sre_tools(&org_id_str).await;
         let query_req = QueryRequest {
             query: last_user_message,
             context,
@@ -734,6 +737,16 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 Some(history)
             },
             images,
+            mcps: if tool_mcps.is_empty() {
+                None
+            } else {
+                Some(tool_mcps)
+            },
+            clis: if tool_clis.is_empty() {
+                None
+            } else {
+                Some(tool_clis)
+            },
         };
 
         // Report successful start to audit
@@ -897,8 +910,6 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
 
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::alerts::rca_agent::get_agent_client;
-
         if !get_o2_config().ai.enabled {
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
@@ -953,7 +964,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
     post,
     path = "/{org_id}/ai/confirm/{session_id}",
     context_path = "/api",
-    tag = "Ai",
+    tag = "AI",
     operation_id = "ConfirmAction",
     summary = "Confirm or reject a destructive AI tool action",
     description = "Forwards user confirmation or rejection to the o2-sre-agent service \
@@ -994,8 +1005,6 @@ pub async fn confirm_action(
 
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::alerts::rca_agent::get_agent_client;
-
         let o2_cfg = get_o2_config();
         if !o2_cfg.ai.enabled {
             return MetaHttpResponse::bad_request("AI is not enabled");

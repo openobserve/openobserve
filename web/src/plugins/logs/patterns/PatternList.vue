@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Actions Column - No Header -->
-        <div class="tw:w-24 tw:flex-shrink-0 tw:px-2 tw:relative table-head">
+        <div class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:relative table-head">
         </div>
       </div>
 

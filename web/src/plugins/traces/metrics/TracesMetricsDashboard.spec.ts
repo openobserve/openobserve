@@ -198,20 +198,10 @@ describe("TracesMetricsDashboard", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render the dashboard header when show is true", () => {
-      const header = wrapper.find(".dashboard-header");
-      expect(header.exists()).toBe(true);
-    });
-
-    it("should not render the dashboard header when show is false", async () => {
+    it("should not render the charts-wrapper when show is false", async () => {
       await wrapper.setProps({ show: false });
-      const header = wrapper.find(".dashboard-header");
-      expect(header.exists()).toBe(false);
-    });
-
-    it("should render the insights button when show is true", () => {
-      const btn = wrapper.find('[data-test="insights-button"]');
-      expect(btn.exists()).toBe(true);
+      const charts = wrapper.find('[data-test="render-dashboard-charts"]');
+      expect(charts.exists()).toBe(false);
     });
 
     it("should render the dashboard charts component when show is true and histogram is visible", () => {
@@ -230,24 +220,6 @@ describe("TracesMetricsDashboard", () => {
         '[data-test="traces-analysis-dashboard"]',
       );
       expect(analysisDashboard.exists()).toBe(false);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Collapse behaviour
-  // -------------------------------------------------------------------------
-  describe("collapse behaviour", () => {
-    it("should toggle showHistogram to false when header is clicked", async () => {
-      const header = wrapper.find(".dashboard-header");
-      await header.trigger("click");
-      expect(mockSearchObj.meta.showHistogram).toBe(false);
-    });
-
-    it("should re-expand showHistogram to true when header is clicked again", async () => {
-      const header = wrapper.find(".dashboard-header");
-      await header.trigger("click");
-      await header.trigger("click");
-      expect(mockSearchObj.meta.showHistogram).toBe(true);
     });
   });
 
@@ -377,6 +349,73 @@ describe("TracesMetricsDashboard", () => {
       // WHERE clause placeholder should be replaced with empty string
       expect(query).not.toContain("[WHERE_CLAUSE]");
       expect(query).not.toMatch(/WHERE\b/);
+    });
+
+    it("should convert span_kind='Server' label to '2' in the Rate panel WHERE clause", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='Server'" });
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const query = getPanelQuery(wrapper, "Rate");
+      expect(query).toContain("span_kind='2'");
+      expect(query).not.toContain("span_kind='Server'");
+    });
+
+    it("should convert span_kind='Server' label to '2' in the Errors panel WHERE clause", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='Server'" });
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const query = getPanelQuery(wrapper, "Errors");
+      expect(query).toContain("span_kind='2'");
+      expect(query).not.toContain("span_kind='Server'");
+    });
+
+    it("should convert span_kind='Client' label to '3' in both Rate and Errors panels", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='Client'" });
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const rateQuery = getPanelQuery(wrapper, "Rate");
+      const errorsQuery = getPanelQuery(wrapper, "Errors");
+      expect(rateQuery).toContain("span_kind='3'");
+      expect(rateQuery).not.toContain("span_kind='Client'");
+      expect(errorsQuery).toContain("span_kind='3'");
+      expect(errorsQuery).not.toContain("span_kind='Client'");
+    });
+
+    it("should leave non-span_kind filter unchanged in the Errors panel WHERE clause", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "service_name = 'api'" });
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const query = getPanelQuery(wrapper, "Errors");
+      expect(query).toContain("service_name = 'api'");
+    });
+
+    it("should leave non-span_kind filter unchanged in the Duration panel WHERE clause", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "service_name = 'api'" });
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const query = getPanelQuery(wrapper, "Duration");
+      expect(query).toContain("service_name = 'api'");
+    });
+
+    it("should convert span_kind label case-insensitively in the Errors panel", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='CONSUMER'" });
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const query = getPanelQuery(wrapper, "Errors");
+      expect(query).toContain("span_kind='5'");
+      expect(query).not.toContain("span_kind='CONSUMER'");
     });
 
     it("should combine duration range filter and filter prop in Rate panel WHERE clause", async () => {
@@ -528,18 +567,19 @@ describe("TracesMetricsDashboard", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Insights button
+  // Insights button — driven via the exposed openUnifiedAnalysisDashboard API
+  // (the insights button DOM element was removed from the template; the
+  //  function is invoked by the parent via defineExpose)
   // -------------------------------------------------------------------------
   describe("insights button", () => {
-    it("should open the analysis dashboard when the insights button is clicked", async () => {
-      const btn = wrapper.find('[data-test="insights-button"]');
-      await btn.trigger("click");
+    it("should open the analysis dashboard when openUnifiedAnalysisDashboard is called", async () => {
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
       expect(wrapper.vm.showAnalysisDashboard).toBe(true);
     });
 
-    it("should render TracesAnalysisDashboard after insights button click", async () => {
-      const btn = wrapper.find('[data-test="insights-button"]');
-      await btn.trigger("click");
+    it("should render TracesAnalysisDashboard after openUnifiedAnalysisDashboard is called", async () => {
+      wrapper.vm.openUnifiedAnalysisDashboard();
       await flushPromises();
       const analysisDashboard = wrapper.find(
         '[data-test="traces-analysis-dashboard"]',
@@ -548,8 +588,8 @@ describe("TracesMetricsDashboard", () => {
     });
 
     it("should set defaultAnalysisTab to volume when no brush selection exists", async () => {
-      const btn = wrapper.find('[data-test="insights-button"]');
-      await btn.trigger("click");
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
       expect(wrapper.vm.defaultAnalysisTab).toBe("volume");
     });
   });
@@ -573,6 +613,10 @@ describe("TracesMetricsDashboard", () => {
     it("should expose rangeFiltersVersion as a ref", () => {
       // rangeFiltersVersion is a numeric ref — it must be a number
       expect(typeof wrapper.vm.rangeFiltersVersion).toBe("number");
+    });
+
+    it("should expose the openUnifiedAnalysisDashboard method", () => {
+      expect(typeof wrapper.vm.openUnifiedAnalysisDashboard).toBe("function");
     });
   });
 
@@ -631,6 +675,52 @@ describe("TracesMetricsDashboard", () => {
       wrapper = mountComponent({ filter: "   " });
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toEqual([]);
+    });
+
+    it("should convert span_kind='Server' label to numeric key '2' in the base filter", () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='Server'" });
+      const filters = wrapper.vm.getBaseFilters();
+      expect(filters).toContain("span_kind='2'");
+      expect(filters.join(" ")).not.toContain("span_kind='Server'");
+    });
+
+    it("should convert span_kind='Client' label to numeric key '3' in the base filter", () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='Client'" });
+      const filters = wrapper.vm.getBaseFilters();
+      expect(filters).toContain("span_kind='3'");
+      expect(filters.join(" ")).not.toContain("span_kind='Client'");
+    });
+
+    it("should convert span_kind label case-insensitively in the base filter", () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='SERVER'" });
+      const filters = wrapper.vm.getBaseFilters();
+      expect(filters).toContain("span_kind='2'");
+    });
+
+    it("should leave non-span_kind filters unchanged in the base filter", () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "service_name = 'api'" });
+      const filters = wrapper.vm.getBaseFilters();
+      expect(filters).toContain("service_name = 'api'");
+    });
+
+    it("should convert span_kind label when combined with a duration range filter", () => {
+      mockMetricsRangeFilters.set("panel-dur", {
+        panelTitle: "Duration",
+        start: 100,
+        end: 500,
+        timeStart: null,
+        timeEnd: null,
+      });
+      wrapper.unmount();
+      wrapper = mountComponent({ filter: "span_kind='Internal'" });
+      const filters = wrapper.vm.getBaseFilters();
+      expect(filters).toContain("duration >= 100 and duration <= 500");
+      expect(filters).toContain("span_kind='1'");
+      expect(filters.join(" ")).not.toContain("span_kind='Internal'");
     });
   });
 

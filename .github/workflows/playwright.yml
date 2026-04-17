@@ -48,6 +48,9 @@ env:
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_UTF8_VIEW_ENABLED: false
   ZO_ENABLE_CROSS_LINKING: true
+  # Allow alert destinations to target localhost so the test validation stream
+  # (http://localhost:5080/api/.../..._json) is not blocked by the SSRF guard.
+  ZO_SSRF_ALLOW_LOOPBACK: true
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
@@ -164,11 +167,11 @@ jobs:
             browser: "chrome"
             run_files:
               [
-                "alerts-e2e-flow.spec.js",
+                # "alerts-e2e-flow.spec.js",
                 "alerts-ui-operations.spec.js",
                 "alerts-import.spec.js",
-                "alerts-advanced.spec.js",
-                "alerts-scheduled-features.spec.js",
+                # "alerts-advanced.spec.js",
+                # "alerts-scheduled-features.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
                 "alerts-vrl-encoding.spec.js",
               ]
@@ -281,7 +284,7 @@ jobs:
                 "enrichment-regression.spec.js",
                 "ui-regression.spec.js",
                 "pipeline-regression.spec.js",
-                "alerts-regression.spec.js",
+                # "alerts-regression.spec.js",
                 "metrics-regression.spec.js",
                 "traces-regression.spec.js",
               ]

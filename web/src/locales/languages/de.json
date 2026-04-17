@@ -2221,7 +2221,8 @@
     },
     "updateAnomalyDetection": "Anomalieerkennung aktualisieren:",
     "anomalyCreated": "Konfiguration zur Erkennung von Anomalien wurde erstellt. Die Schulung beginnt in Kürze.",
-    "editJson": "Alert-JSON bearbeiten"
+    "editJson": "Alert-JSON bearbeiten",
+    "additional_settings": "Zusätzliche Einstellungen"
   },
   "alert_templates": {
     "header": "Vorlagen",
@@ -2518,7 +2519,8 @@
     "maxSeriesPerQueryTooltip": "Wenn eine PromQL-Abfrage wie 'count (metric) by (label) 'zu viele Serien zurückgibt, kann sie die Benutzeroberfläche einfrieren. Dieses Limit verhindert das. Legen Sie den Systemstandard auf Null fest, oder geben Sie einen Wert zwischen 1.000 und 1.000.000 an.",
     "maxSeriesPerQueryValidation": "Der Wert muss zwischen 1.000 und 1.000.000 liegen oder als Standardeinstellung leer lassen",
     "systemDefault": "Systemstandard",
-    "usageStreamEnabledLabel": "Nutzungsstream aktivieren"
+    "usageStreamEnabledLabel": "Nutzungsstream aktivieren",
+    "aiToolsets": "KI-Toolsets"
   },
   "iam": {
     "users": "Nutzer",
@@ -2777,6 +2779,7 @@
     "showTraces": "Spuren einblenden",
     "applyAndSearch": "Bewerben & Suchen",
     "addToTable": "Zur Tabelle hinzufügen",
+    "timestamp": "Zeitstempel",
     "evaluations": {
       "loading": "Bewertungsdaten werden geladen...",
       "noDataTitle": "Keine Bewertungsdaten",
@@ -2814,7 +2817,8 @@
       "status": "Status",
       "type": "Typ",
       "multiStepAgent": "Mehrstufiger Agent"
-    }
+    },
+    "noLogsAvailableForService": "Für diesen Dienst sind keine Protokolle verfügbar"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -3346,5 +3350,61 @@
     "typeScore": "Numerischer Wert (z. B. 0,0 — 1,0)",
     "typeBoolean": "Binär//Pass-Fail (Boolean)",
     "typeCustom": "Kategorisch//Benutzerdefinierter Text"
+  },
+  "aiToolset": {
+    "header": "KI-Toolsets",
+    "add": "Neues KI-Toolset",
+    "search": "Suchen Sie nach KI-Toolsets",
+    "update": "KI-Toolset aktualisieren",
+    "name": "Name",
+    "nameRequired": "Name ist erforderlich",
+    "nameInvalid": "Nur Buchstaben, Zahlen, Bindestriche und Unterstriche sind erlaubt",
+    "nameTooLong": "Der Name darf 256 Zeichen nicht überschreiten",
+    "kind": "Typ",
+    "kindRequired": "Typ ist erforderlich",
+    "description": "Beschreibung",
+    "actions": "Aktionen",
+    "deleteTitle": "AI Toolset löschen",
+    "deleteMessage": "Bist du sicher, dass du „{name}“ löschen möchtest?",
+    "loadFailed": "AI Toolsets konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "createFailed": "AI Toolset konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
+    "updateFailed": "AI Toolset konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut.",
+    "deleteFailed": "AI Toolset konnte nicht gelöscht werden.",
+    "createdSuccessfully": "AI Toolset wurde erfolgreich erstellt",
+    "updatedSuccessfully": "AI Toolset wurde erfolgreich aktualisiert",
+    "deletedSuccessfully": "AI Toolset wurde erfolgreich gelöscht",
+    "mcpConfig": "MCP-Serverkonfiguration",
+    "mcpUrl": "Endpunkt-URL",
+    "mcpUrlRequired": "Endpunkt-URL ist erforderlich",
+    "timeoutSeconds": "Timeout (Sekunden)",
+    "headers": "HTTP-Header",
+    "headerKey": "Name der Kopfzeile",
+    "headerValue": "Header-Wert",
+    "addHeader": "Header hinzufügen",
+    "cliConfig": "Konfiguration des CLI-Tools",
+    "presets": "Schnelles Befüllen",
+    "cliCommand": "Befehl",
+    "cliCommandRequired": "Befehl ist erforderlich",
+    "allowedSubcommands": "Erlaubte Unterbefehle",
+    "subcommandsHint": "Kommagetrennte Liste, z. B. get, describe, logs — leer lassen, um alle zuzulassen",
+    "maxOutputBytes": "Max. Ausgabe (Byte)",
+    "requiresConfirmation": "Vor der Ausführung eine Bestätigung erforderlich",
+    "envVars": "Umgebungsvariablen",
+    "envKey": "Variablenname",
+    "envValue": "Wert",
+    "addEnvVar": "Variable hinzufügen",
+    "credentialFiles": "Dateien mit Anmeldeinformationen",
+    "credEnvVar": "Name der Umgebungsvariable",
+    "credContent": "Inhalt der Datei",
+    "credContentHint": "Roher Dateiinhalt (z. B. kubeconfig YAML)",
+    "addCredFile": "Anmeldeinformationsdatei hinzufügen",
+    "skillConfig": "Konfiguration des Skills",
+    "skillContent": "Definition der Fähigkeit (Markdown)",
+    "skillContentPlaceholder": "# Titel der Fähigkeit\n\nBeschreiben Sie, was der Skill bewirkt, und geben Sie Beispiele an...",
+    "skillContentRequired": "Skillinhalte sind erforderlich",
+    "genericConfig": "Konfiguration",
+    "genericData": "JSON-Konfiguration",
+    "genericDataPlaceholder": "{}",
+    "invalidJson": "Muss ein gültiges JSON sein"
   }
 }

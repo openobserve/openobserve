@@ -116,9 +116,10 @@ test.describe("Stream multiselect testcases", () => {
     }
 
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await pm.logsPage.selectStream("e2e_automate"); 
+    await pm.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
-    await pm.logsPage.clickQuickModeToggle();
+    // Ensure quick mode is ON (idempotent) so the All Fields toggle is visible
+    await pm.logsPage.enableQuickModeIfDisabled();
     await pm.logsPage.clickAllFieldsButton();
   });
 
@@ -287,8 +288,9 @@ async function multistreamselect(page) {
     await pageManager.logsPage.toggleStreamSelection("e2e_stream1");
     await page.waitForTimeout(4000);
     
-    // Click All Fields and enable function editor using POM
-    await pageManager.logsPage.clickQuickModeToggle();
+    // Ensure quick mode is ON so the All Fields toggle is visible
+    // (quickMode default depends on whether localStorage has saved streams from prior navigation)
+    await pageManager.logsPage.enableQuickModeIfDisabled();
     await pageManager.logsPage.clickAllFieldsButton();
     await pageManager.logsPage.toggleQueryModeEditor();
     await pageManager.logsPage.clickMonacoEditor();

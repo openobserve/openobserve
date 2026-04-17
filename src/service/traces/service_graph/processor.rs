@@ -25,6 +25,13 @@ use config::meta::stream::StreamType;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
+#[cfg(feature = "enterprise")]
+#[derive(serde::Deserialize)]
+struct RecentIngestedTraceStream {
+    org_id: String,
+    stream_name: String,
+}
+
 /// Main entry point for service graph processing
 /// Called by compactor job
 #[cfg(feature = "enterprise")]
@@ -33,21 +40,54 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     let window_micros = get_o2_config().service_graph.query_time_range_minutes * 60 * 1_000_000;
     let start_time = now - window_micros;
 
-    log::debug!(
-        "[ServiceGraph] Processing traces from {} to {}",
-        start_time,
-        now
-    );
+    log::debug!("[ServiceGraph] Processing traces from {start_time} to {now}");
 
-    // Get all trace streams across all orgs
-    let streams = get_trace_streams().await?;
+    // Query usage stream to find which streams have recent ingestion activity
+    let sql = r#"SELECT org_id, stream_name
+        FROM "usage"
+        WHERE
+            event = 'Ingestion'
+            AND stream_type = 'traces'
+        GROUP BY org_id, stream_name"#
+        .to_string();
+
+    let usage_results = match crate::service::self_reporting::search::get_usage(
+        sql, start_time, now,
+    )
+    .await
+    {
+        Ok(v) => v
+            .into_iter()
+            .filter_map(
+                |v| match serde_json::from_value::<RecentIngestedTraceStream>(v) {
+                    Ok(usage) => Some(usage),
+                    Err(e) => {
+                        log::warn!("[ServiceGraph] Failed to deserialize usage row: {e}");
+                        None
+                    }
+                },
+            )
+            .collect::<Vec<_>>(),
+        Err(e) => {
+            log::error!(
+                "[ServiceGraph] Failed to get last ingestion from usage stream, skipping service graph: {e}"
+            );
+            return Ok(());
+        }
+    };
+
     log::info!(
-        "[ServiceGraph] Found {} trace streams to process",
-        streams.len()
+        "[ServiceGraph] Found {} active trace streams in usage data",
+        usage_results.len()
     );
 
-    for (org_id, stream_name) in streams {
+    for RecentIngestedTraceStream {
+        org_id,
+        stream_name,
+    } in usage_results
+    {
         log::info!("[ServiceGraph] Processing stream {org_id}/{stream_name}");
+
         if let Err(e) = process_stream(&org_id, &stream_name, start_time, now).await {
             log::error!("[ServiceGraph] Failed to process stream {org_id}/{stream_name}: {e}");
             continue; // Don't fail entire job if one stream fails
@@ -55,43 +95,6 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
-}
-
-/// Get list of all trace streams
-#[cfg(feature = "enterprise")]
-async fn get_trace_streams() -> Result<Vec<(String, String)>, anyhow::Error> {
-    let mut streams = Vec::new();
-
-    // Get all organizations
-    let orgs = crate::service::db::organization::list(None).await?;
-
-    for org in orgs {
-        // Skip internal orgs
-        if org.identifier.starts_with('_') {
-            continue;
-        }
-
-        // Get trace streams for this org (using identifier, not name)
-        let org_streams = crate::service::db::schema::list_streams_from_cache(
-            &org.identifier,
-            StreamType::Traces,
-        )
-        .await;
-
-        if org_streams.is_empty() {
-            log::debug!(
-                "[ServiceGraph] No trace streams found for org '{}' (identifier: {})",
-                org.name,
-                org.identifier
-            );
-        }
-
-        for stream_name in org_streams {
-            streams.push((org.identifier.clone(), stream_name));
-        }
-    }
-
-    Ok(streams)
 }
 
 /// Process a single trace stream
@@ -102,17 +105,6 @@ async fn process_stream(
     start_time: i64,
     end_time: i64,
 ) -> Result<(), anyhow::Error> {
-    // Skip if no new data was ingested since the last processing interval.
-    // Using doc_time_max against start_time avoids re-processing the same data
-    // on every tick when ingestion has stopped.
-    let stats = infra::cache::stats::get_stream_stats(org_id, stream_name, StreamType::Traces);
-    if stats.doc_time_max > 0 && stats.doc_time_max <= start_time {
-        log::info!(
-            "[ServiceGraph] Stream {org_id}/{stream_name} has no new data since last interval, skipping"
-        );
-        return Ok(());
-    }
-
     // Build SQL to aggregate service graph edges directly in DataFusion
     // Use CTE to compute client/server first, then aggregate
     log::info!(
@@ -217,4 +209,24 @@ async fn process_stream(
 #[cfg(not(feature = "enterprise"))]
 pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     Ok(())
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod test {
+
+    #[test]
+    fn test_usage_deser() {
+        let value = serde_json::json!({
+            "org_id": "random",
+            "stream_name": "random-stream"
+        });
+
+        let result = serde_json::from_value::<super::RecentIngestedTraceStream>(value);
+
+        assert!(
+            result.is_ok_and(|data| {
+                data.org_id == "random" && data.stream_name == "random-stream"
+            })
+        );
+    }
 }

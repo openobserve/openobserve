@@ -2221,7 +2221,8 @@
     },
     "updateAnomalyDetection": "更新异常检测：",
     "anomalyCreated": "异常检测配置已创建。培训将很快开始。",
-    "editJson": "编辑警报 JSON"
+    "editJson": "编辑警报 JSON",
+    "additional_settings": "其他设置"
   },
   "alert_templates": {
     "header": "模板",
@@ -2522,7 +2523,8 @@
     "maxSeriesPerQueryTooltip": "当像 “按（标签）计数（指标）” 这样的 PromQL 查询返回的序列过多时，它可能会冻结用户界面。这个限制可以防止这种情况。将系统默认值设置为空，或指定一个介于 1,000 和 1,000,000 之间的值。",
     "maxSeriesPerQueryValidation": "值必须介于 1,000 和 1,000,000 之间，或留空作为默认值",
     "systemDefault": "系统默认",
-    "usageStreamEnabledLabel": "启用使用流"
+    "usageStreamEnabledLabel": "启用使用流",
+    "aiToolsets": "AI 工具集"
   },
   "iam": {
     "users": "用户",
@@ -2781,6 +2783,7 @@
     "showTraces": "显示追踪",
     "applyAndSearch": "申请并搜索",
     "addToTable": "添加到表格",
+    "timestamp": "时间戳",
     "evaluations": {
       "loading": "正在加载评估数据...",
       "noDataTitle": "没有评估数据",
@@ -2818,7 +2821,8 @@
       "status": "状态",
       "type": "类型",
       "multiStepAgent": "多步代理"
-    }
+    },
+    "noLogsAvailableForService": "此服务没有可用的日志"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -3350,5 +3354,61 @@
     "typeScore": "数字分数（例如，0.0-1.0）",
     "typeBoolean": "二进制/合格失败（布尔值）",
     "typeCustom": "分类/自定义文本"
+  },
+  "aiToolset": {
+    "header": "AI 工具集",
+    "add": "新的 AI 工具集",
+    "search": "搜索 AI 工具集",
+    "update": "更新 AI 工具集",
+    "name": "姓名",
+    "nameRequired": "姓名为必填项",
+    "nameInvalid": "只允许使用字母、数字、连字符和下划线",
+    "nameTooLong": "名称不得超过 256 个字符",
+    "kind": "类型",
+    "kindRequired": "类型为必填项",
+    "description": "描述",
+    "actions": "行动",
+    "deleteTitle": "删除 AI 工具集",
+    "deleteMessage": "您确定要删除 “{name}” 吗？",
+    "loadFailed": "无法加载 AI 工具集。请再试一次。",
+    "createFailed": "无法创建 AI 工具集。请重试。",
+    "updateFailed": "无法更新 AI 工具集。请再试一次。",
+    "deleteFailed": "删除 AI 工具集失败。",
+    "createdSuccessfully": "AI 工具集已成功创建",
+    "updatedSuccessfully": "AI 工具集已成功更新",
+    "deletedSuccessfully": "AI 工具集已成功删除",
+    "mcpConfig": "MCP 服务器配置",
+    "mcpUrl": "端点 URL",
+    "mcpUrlRequired": "端点 URL 为必填项",
+    "timeoutSeconds": "超时（秒）",
+    "headers": "HTTP 标头",
+    "headerKey": "标题名称",
+    "headerValue": "标题值",
+    "addHeader": "添加标题",
+    "cliConfig": "CLI 工具配置",
+    "presets": "快速填充",
+    "cliCommand": "命令",
+    "cliCommandRequired": "命令是必需的",
+    "allowedSubcommands": "允许的子命令",
+    "subcommandsHint": "以逗号分隔的列表，例如 get、describe、logs — 留空则允许所有",
+    "maxOutputBytes": "最大输出（字节）",
+    "requiresConfirmation": "执行前需要确认",
+    "envVars": "环境变量",
+    "envKey": "变量名",
+    "envValue": "价值",
+    "addEnvVar": "添加变量",
+    "credentialFiles": "凭证文件",
+    "credEnvVar": "环境变量名称",
+    "credContent": "文件内容",
+    "credContentHint": "原始文件内容（例如 kubeconfig YAML）",
+    "addCredFile": "添加凭证文件",
+    "skillConfig": "技能配置",
+    "skillContent": "技能定义（Markdown）",
+    "skillContentPlaceholder": "# 技能标题\n\n描述该技能的作用并提供示例...",
+    "skillContentRequired": "技能内容为必填内容",
+    "genericConfig": "配置",
+    "genericData": "JSON 配置",
+    "genericDataPlaceholder": "{}",
+    "invalidJson": "必须是有效的 JSON"
   }
 }
