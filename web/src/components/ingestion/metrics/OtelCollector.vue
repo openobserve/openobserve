@@ -4,7 +4,7 @@
       <div class="text-subtitle1 text-bold q-pl-xs">OTLP HTTP</div>
       <ContentCopy :content="getOtelHttpConfig" />
     </div>
-    <div class="q-pa-sm">
+    <div class="q-pa-sm" v-if="config.isCloud == 'false'">
       <div class="text-subtitle1 text-bold q-mt-sm q-pl-xs">OTLP gRPC</div>
       <ContentCopy :content="getOtelGrpcConfig" />
     </div>
@@ -17,6 +17,7 @@ import type { Endpoint } from "@/ts/interfaces";
 import ContentCopy from "@/components/CopyContent.vue";
 import { useStore } from "vuex";
 import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
+import config from "@/aws-exports";
 
 const store = useStore();
 
