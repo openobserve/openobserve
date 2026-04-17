@@ -19,24 +19,51 @@ use chrono::{DateTime, SecondsFormat, Utc};
 
 fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
+    // Re-run when these env vars change (CI sets them for deterministic builds)
+    println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
+    println!("cargo:rerun-if-env-changed=GIT_VERSION_OVERRIDE");
+    println!("cargo:rerun-if-env-changed=GIT_HASH_OVERRIDE");
 
     // build information
-    let output = Command::new("git")
-        .args(["describe", "--tags", "--abbrev=0"])
-        .output()
-        .unwrap();
-    let git_tag = String::from_utf8(output.stdout).unwrap();
+    let git_tag = match std::env::var("GIT_VERSION_OVERRIDE") {
+        Ok(v) if !v.is_empty() => v,
+        _ => {
+            let output = Command::new("git")
+                .args(["describe", "--tags", "--abbrev=0"])
+                .output()
+                .unwrap();
+            String::from_utf8(output.stdout).unwrap().trim().to_string()
+        }
+    };
     println!("cargo:rustc-env=GIT_VERSION={git_tag}");
 
-    let output = Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .output()
-        .unwrap();
-    let git_commit = String::from_utf8(output.stdout).unwrap();
+    let git_commit = match std::env::var("GIT_HASH_OVERRIDE") {
+        Ok(v) if !v.is_empty() => v,
+        _ => {
+            let output = Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .output()
+                .unwrap();
+            String::from_utf8(output.stdout).unwrap().trim().to_string()
+        }
+    };
     println!("cargo:rustc-env=GIT_COMMIT_HASH={git_commit}");
 
-    let now: DateTime<Utc> = Utc::now();
-    let build_date = now.to_rfc3339_opts(SecondsFormat::Secs, true);
+    // Use SOURCE_DATE_EPOCH for reproducible builds (set in CI to keep output
+    // deterministic across runs on the same commit, avoiding unnecessary rebuilds
+    // of every workspace crate that depends on config).
+    let build_date = match std::env::var("SOURCE_DATE_EPOCH") {
+        Ok(epoch) => {
+            let secs: i64 = epoch.parse().expect("SOURCE_DATE_EPOCH must be a unix timestamp");
+            DateTime::from_timestamp(secs, 0)
+                .expect("invalid SOURCE_DATE_EPOCH timestamp")
+                .to_rfc3339_opts(SecondsFormat::Secs, true)
+        }
+        Err(_) => {
+            let now: DateTime<Utc> = Utc::now();
+            now.to_rfc3339_opts(SecondsFormat::Secs, true)
+        }
+    };
     println!("cargo:rustc-env=GIT_BUILD_DATE={build_date}");
 
     Ok(())

@@ -84,6 +84,14 @@ jobs:
     needs: [build_frontend]
     runs-on:
       labels: ubicloud-standard-30
+    env:
+      CARGO_INCREMENTAL: "0"
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
+      # Deterministic build: pass commit hash via env so config/build.rs
+      # output is identical across CI runs on the same commit — prevents
+      # full workspace rebuilds caused by changing git output / timestamps.
+      GIT_HASH_OVERRIDE: ${{ github.sha }}
 
     steps:
       - name: Remove unused tools
@@ -95,8 +103,9 @@ jobs:
 
       - name: Clone the current repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
+
+      - name: Set deterministic build date
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> $GITHUB_ENV
 
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
@@ -104,10 +113,18 @@ jobs:
           toolchain: nightly-2025-11-11
           targets: x86_64-unknown-linux-gnu
 
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.7
+
+      - name: Install mold linker
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y mold clang
+
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: "openobserve-release-${{ runner.arch }}"
+          shared-key: "openobserve-playwright-${{ runner.arch }}"
 
       - name: Install Protoc
         run: |
@@ -119,14 +136,17 @@ jobs:
           name: playwright-frontend-dist
           path: web/dist
 
-      - name: Build and run binary
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+      - name: Build binary
+        run: cargo build --locked --profile release-ci --target x86_64-unknown-linux-gnu
+        env:
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: "clang"
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: release-binary
-          path: target/x86_64-unknown-linux-gnu/release/openobserve
+          path: target/x86_64-unknown-linux-gnu/release-ci/openobserve
           retention-days: 1
 
   ui_integration_tests:
@@ -401,11 +421,21 @@ jobs:
       - name: Start OpenObserve
         run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
 
-      - name: Wait for start
-        run: sleep 60
-
-      - name: Ensure we are getting a reply from the server
-        run: curl http://localhost:5080/web/login
+      - name: Wait for server ready
+        run: |
+          echo "Waiting for OpenObserve to start..."
+          for i in $(seq 1 120); do
+            if curl -sf http://localhost:5080/web/login > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"
+              break
+            fi
+            if [ "$i" -eq 120 ]; then
+              echo "Server failed to start within 120s"
+              cat o2.log
+              exit 1
+            fi
+            sleep 1
+          done
 
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
@@ -413,6 +443,13 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ hashFiles('tests/ui-testing/package-lock.json') }}
 
       - name: Check if this is a rerun
         id: check_rerun
@@ -477,7 +514,11 @@ jobs:
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci
-          npx playwright install --with-deps chromium
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
+            npx playwright install --with-deps chromium
+          else
+            npx playwright install-deps chromium
+          fi
 
           # Check if this is a rerun
           IS_RERUN="${{ steps.check_rerun.outputs.is_rerun }}"
