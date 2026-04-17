@@ -75,6 +75,9 @@ jobs:
         if: steps.check_changes.outputs.has_changes == 'true'
         with:
           cache-on-failure: true
+      - name: Setup sccache
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: mozilla-actions/sccache-action@v0.0.7
 
       - name: Install Protoc
         if: steps.check_changes.outputs.has_changes == 'true'
@@ -91,10 +94,18 @@ jobs:
 
       - name: Check code formatting
         if: steps.check_changes.outputs.has_changes == 'true'
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          SCCACHE_IDLE_TIMEOUT: "0"
+          RUSTC_WRAPPER: "sccache"
         run: cargo fmt --all -- --check
 
       - name: Run clippy
         if: steps.check_changes.outputs.has_changes == 'true'
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          SCCACHE_IDLE_TIMEOUT: "0"
+          RUSTC_WRAPPER: "sccache"
         run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
 
       - name: Wait for PostgreSQL to be ready
@@ -112,6 +123,10 @@ jobs:
 
       - name: Run unit tests
         if: steps.check_changes.outputs.has_changes == 'true'
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          SCCACHE_IDLE_TIMEOUT: "0"
+          RUSTC_WRAPPER: "sccache"
         run: |
           # required for all dbs
           export ZO_INTERNAL_GRPC_TOKEN=fake
