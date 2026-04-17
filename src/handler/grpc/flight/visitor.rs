@@ -93,6 +93,36 @@ impl<'n> TreeNodeVisitor<'n> for MetricsVisitor {
     }
 }
 
+pub fn get_partial_err(plan: &Arc<dyn ExecutionPlan>) -> Option<Arc<Mutex<String>>> {
+    let mut visitor = PartialErrVisitor::new();
+    let _ = plan.visit(&mut visitor);
+    visitor.partial_err
+}
+
+struct PartialErrVisitor {
+    partial_err: Option<Arc<Mutex<String>>>,
+}
+
+impl PartialErrVisitor {
+    pub fn new() -> Self {
+        Self { partial_err: None }
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for PartialErrVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        if node.name() == "RemoteScanExec" {
+            let remote_scan_exec = node.as_any().downcast_ref::<RemoteScanExec>().unwrap();
+            self.partial_err = Some(remote_scan_exec.partial_err());
+            Ok(TreeNodeRecursion::Stop)
+        } else {
+            Ok(TreeNodeRecursion::Continue)
+        }
+    }
+}
+
 pub fn get_peak_memory(plan: &Arc<dyn ExecutionPlan>) -> Option<Arc<AtomicUsize>> {
     let mut visitor = PeakMemoryVisitor::new();
     let _ = plan.visit(&mut visitor);
