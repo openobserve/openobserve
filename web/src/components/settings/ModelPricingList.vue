@@ -180,24 +180,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else-if="col.name === 'name'">
               <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-0">
-                <img
-                  v-if="getSource(props.row) === 'built_in'"
-                  :src="ooLogo"
-                  class="tw:w-[16px] tw:h-[16px] tw:shrink-0"
-                  alt="OpenObserve"
-                />
+                <span v-if="getSource(props.row) === 'built_in'" class="tw:shrink-0 tw:cursor-default tw:inline-flex">
+                  <img :src="ooLogo" class="tw:w-[16px] tw:h-[16px]" alt="OpenObserve" />
+                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Built-in model provided by OpenObserve</q-tooltip>
+                </span>
                 <q-icon
                   v-else-if="getSource(props.row) === 'meta_org' || (getSource(props.row) === 'org' && props.row.org_id !== orgIdentifier)"
                   name="corporate_fare"
                   size="16px"
-                  class="tw:shrink-0 tw:text-grey-6"
-                />
+                  class="tw:shrink-0 tw:text-grey-6 tw:cursor-default"
+                >
+                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from meta org</q-tooltip>
+                </q-icon>
                 <q-icon
                   v-else
                   name="person"
                   size="16px"
-                  class="tw:shrink-0 tw:text-grey-6"
-                />
+                  class="tw:shrink-0 tw:text-grey-6 tw:cursor-default"
+                >
+                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Custom model</q-tooltip>
+                </q-icon>
                 <div class="o2-table-cell-content tw:font-semibold">
                   {{ props.row.name }}
                 </div>

@@ -48,12 +48,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="form-card-body tw:flex tw:flex-row tw:gap-4">
             <div class="tw:flex-1">
+              <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label">
+                Model Name *
+                <q-icon
+                  name="info"
+                  size="14px"
+                  class="q-ml-xs cursor-pointer"
+                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                >
+                  <q-tooltip anchor="center right" self="center left" max-width="300px">
+                    <span style="font-size: 13px">Name this rule. You can track price changes by using the same name and match pattern across multiple entries.</span>
+                  </q-tooltip>
+                </q-icon>
+              </div>
               <q-input
                 v-model="model.name"
-                label="Model Name *"
                 placeholder="e.g. GPT-4o"
-                class="showLabelOnTop tw:mb-1"
-                stack-label
+                class="showLabelOnTop"
                 dense
                 borderless
                 :error="nameTouched && !!nameError"
@@ -62,16 +73,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="nameTouched = true"
                 data-test="model-pricing-name-input"
               />
-              <div class="tw:text-xs text-grey-7 tw:-mt-4 tw:mb-2 tw:leading-tight">The name of the model. You can track price changes of models by using the same name and match pattern.</div>
             </div>
             <div class="tw:flex-1 tw:flex tw:items-start tw:gap-1">
               <div class="tw:flex-1">
+                <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label">
+                  Match Pattern (Regex) *
+                  <q-icon
+                    name="info"
+                    size="14px"
+                    class="q-ml-xs cursor-pointer"
+                    :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                  >
+                    <q-tooltip anchor="center right" self="center left" max-width="300px">
+                      <span style="font-size: 13px">Regular expression matched against ingested model names to apply this pricing rule.</span>
+                    </q-tooltip>
+                  </q-icon>
+                </div>
                 <q-input
                   v-model="model.match_pattern"
-                  label="Match Pattern (Regex) *"
                   placeholder="e.g. gpt-4.*"
-                  class="showLabelOnTop tw:mb-1"
-                  stack-label
+                  class="showLabelOnTop"
                   dense
                   borderless
                   :error="patternTouched && !!regexError"
@@ -80,7 +101,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="patternTouched = true"
                   data-test="model-pricing-pattern-input"
                 />
-                <div class="tw:text-xs text-grey-7 tw:-mt-4 tw:mb-2 tw:leading-tight">Regular expression to match ingested generations to this model definition.</div>
               </div>
               <q-btn
                 icon="lightbulb_outline"
@@ -305,7 +325,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <thead>
                            <tr class="tw:text-left text-grey-7 tw:border-b" style="border-color: var(--o2-border-color);">
                              <th class="tw:px-4 tw:py-2 tw:font-medium">Usage Type</th>
-                             <th class="tw:px-4 tw:py-2 tw:font-medium">per unit</th>
                              <th class="tw:px-4 tw:py-2 tw:font-medium">per 1K</th>
                              <th class="tw:px-4 tw:py-2 tw:font-medium">per 1M</th>
                            </tr>
@@ -313,7 +332,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <tbody>
                            <tr v-for="entry in priceEntries(tier)" :key="entry.stableId" class="tw:border-b last:tw:border-none" style="border-color: var(--o2-border-color);">
                               <td class="tw:px-4 tw:py-2 text-grey-9 tw:font-medium">{{ entry.key }}</td>
-                              <td class="tw:px-4 tw:py-2 text-grey-9">${{ formatPreviewCost(entry.value, 1) }}</td>
                               <td class="tw:px-4 tw:py-2 text-grey-9">${{ formatPreviewCost(entry.value, 1000) }}</td>
                               <td class="tw:px-4 tw:py-2 text-grey-9">${{ formatPreviewCost(entry.value, 1000000) }}</td>
                            </tr>
@@ -609,7 +627,7 @@ function goBack() {
 }
 
 function notifyWarn(message: string) {
-  q.notify({ type: "warning", message, position: "bottom", timeout: 4000 });
+  q.notify({ type: "negative", message, position: "bottom", timeout: 4000 });
 }
 
 /** Show error notification only for non-403 errors.
@@ -968,10 +986,9 @@ onBeforeMount(async () => {
   grid-template-columns: 1fr 160px auto;
   gap: 8px;
   padding: 6px 12px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   opacity: 0.45;
 }
 
@@ -1095,6 +1112,14 @@ onBeforeMount(async () => {
   .body--dark & {
     background: rgba(255, 255, 255, 0.08);
   }
+}
+
+/* ── Field label ────────────────────────────────────── */
+.field-label {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.75;
+  height: 20px;
 }
 
 /* ── showLabelOnTop input border override ───────────── */
