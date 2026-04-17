@@ -481,9 +481,7 @@ mod tests {
             to: 0,
         };
         let db: ReportTimerange = meta.into();
-        assert!(
-            matches!(db, ReportTimerange::Relative { period } if period == "1h")
-        );
+        assert!(matches!(db, ReportTimerange::Relative { period } if period == "1h"));
     }
 
     #[test]
