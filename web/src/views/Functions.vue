@@ -120,9 +120,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization.identifier,
                     },
                   }"
-                  label="Evaluation Templates"
+                  :label="isCompactSidebar ? undefined : t('pipeline.evalTemplates')"
+                  :icon="isCompactSidebar ? 'rule' : undefined"
                   content-class="tab_content"
-                />
+                >
+                  <q-tooltip
+                    v-if="isCompactSidebar"
+                    anchor="center right"
+                    self="center left"
+                    :offset="[8, 0]"
+                  >
+                    {{ t('pipeline.evalTemplates') }}
+                  </q-tooltip>
+                </q-route-tab>
               </q-tabs>
             </div>
           </div>
