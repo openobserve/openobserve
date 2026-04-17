@@ -59,20 +59,21 @@ export const convertPanelData = async (
     case "scatter":
     case "metric":
     case "gauge": {
+      // NOTE: on logs to visualize toggle, it shows below error because breakdown field is not required for all the charts
       // Skip conversion if no fields are selected in builder mode
       // (prevents echarts errors like "axis.getAxesOnZeroOf is not a function")
       // PromQL queries don't use builder fields, so skip this check for them
-      const query = panelSchema?.queries?.[0];
-      if (
-        panelSchema?.queryType !== "promql" &&
-        !query?.fields?.x?.length &&
-        !query?.fields?.y?.length &&
-        !query?.fields?.breakdown?.length
-      ) {
-        throw new Error(
-          "Please select required fields to render the chart",
-        );
-      }
+      // const query = panelSchema?.queries?.[0];
+      // if (
+      //   panelSchema?.queryType !== "promql" &&
+      //   !query?.fields?.x?.length &&
+      //   !query?.fields?.y?.length &&
+      //   !query?.fields?.breakdown?.length
+      // ) {
+      //   throw new Error(
+      //     "Please select required fields to render the chart",
+      //   );
+      // }
 
       if (
         // panelSchema?.fields?.stream_type == "metrics" &&

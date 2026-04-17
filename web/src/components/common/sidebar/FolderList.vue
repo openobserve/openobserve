@@ -241,8 +241,8 @@ export default defineComponent({
 
 
       onMounted(async () => {
-        if(Object.keys(store.state.organizationData.foldersByType).length == 0) {
-          await getFoldersListByType(store, "alerts");
+        if(!store.state.organizationData.foldersByType?.[props.type]) {
+          await getFoldersListByType(store, props.type);
         }
         if(router.currentRoute.value.query.folder) {
           activeFolderId.value = router.currentRoute.value.query.folder;
@@ -278,7 +278,7 @@ export default defineComponent({
       if (selectedFolderDelete.value) {
         try {
           //delete folder
-          await deleteFolderByIdByType(store, selectedFolderDelete.value, "alerts");
+          await deleteFolderByIdByType(store, selectedFolderDelete.value, props.type);
 
           //check activeFolderId to be deleted
           if (activeFolderId.value === selectedFolderDelete.value)
