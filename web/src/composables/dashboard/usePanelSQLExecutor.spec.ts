@@ -230,6 +230,66 @@ describe("usePanelSQLExecutor", () => {
       expect(state.data[0]).toEqual([{ id: 1 }, { id: 2 }]);
     });
 
+    // ─── searchResponse path: time_offset override ────────────────────────────
+    //
+    // Regression for the Logs→Visualize bug where searchResponse carries a
+    // partition-boundary time_offset (e.g. last page's tiny window near
+    // userEnd). The executor must override that time_offset with the caller's
+    // startISOTimestamp / endISOTimestamp so fillMissingValues detects the
+    // chunking direction from the user's ACTUAL range, not the partition slice.
+    it("overrides searchResponse time_offset with user's selected range", async () => {
+      const userStart = 1_000_000; // microseconds
+      const userEnd = 900_000_000; // microseconds (user-selected 15-min range)
+
+      // searchResponse has a WRONG time_offset (partition boundary near userEnd)
+      const { ctx, state } = makeCtx({
+        searchResponse: ref({
+          hits: [{ id: 1 }],
+          histogram_interval: 60,
+          time_offset: {
+            start_time: userEnd - 2_000_000, // 2s before userEnd (bad)
+            end_time: userEnd,
+          },
+        }),
+      });
+
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(userStart, userEnd, null);
+
+      // resultMetaData[0] should expose the user's FULL range, not the partition slice
+      const rmd = state.resultMetaData[0]?.[0];
+      expect(rmd).toBeDefined();
+      expect(rmd.time_offset.start_time).toBe(userStart);
+      expect(rmd.time_offset.end_time).toBe(userEnd);
+      // Other searchResponse fields (like histogram_interval) must be preserved
+      expect(rmd.histogram_interval).toBe(60);
+      // And hits must still be wired into state.data
+      expect(state.data[0]).toEqual([{ id: 1 }]);
+    });
+
+    it("keeps other searchResponse fields intact when overriding time_offset", async () => {
+      const { ctx, state } = makeCtx({
+        searchResponse: ref({
+          hits: [{ id: 42 }],
+          converted_histogram_query: "SELECT histogram(_timestamp) FROM default",
+          order_by: "asc",
+          some_other_field: "preserved",
+        }),
+      });
+
+      const { executeSQL } = usePanelSQLExecutor(ctx);
+      await executeSQL(100, 200, null);
+
+      const rmd = state.resultMetaData[0]?.[0];
+      expect(rmd.converted_histogram_query).toBe(
+        "SELECT histogram(_timestamp) FROM default",
+      );
+      expect(rmd.order_by).toBe("asc");
+      expect(rmd.some_other_field).toBe("preserved");
+      // And time_offset is overridden with the executor's arguments
+      expect(rmd.time_offset).toEqual({ start_time: 100, end_time: 200 });
+    });
+
     it("skips fetch and sets partial data flag when abort signal is aborted", async () => {
       const { ctx, fetchQueryDataWithHttpStream, state } = makeCtx();
       const abortController = new AbortController();
