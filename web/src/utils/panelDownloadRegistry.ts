@@ -22,3 +22,13 @@
  * DOM manipulation.
  */
 export const panelDownloadRegistry = new Map<string, () => void>();
+
+/**
+ * Registry for CSV data callbacks used by window.oo_getAllPanelsCsv().
+ *
+ * Each panel registers a function that returns { title, csv } (or null if no
+ * data is available). The report server calls window.oo_getAllPanelsCsv() via
+ * page.evaluate() and receives the combined result as a plain JS object.
+ */
+export type PanelCsvFn = () => { title: string; csv: string } | null;
+export const panelCsvRegistry = new Map<string, PanelCsvFn>();

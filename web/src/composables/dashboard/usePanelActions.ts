@@ -391,8 +391,79 @@ export function usePanelDownload({
     }
   };
 
+  /**
+   * Returns the CSV string for the panel's current data without triggering a
+   * file download. Used by the report server via window.oo_getAllPanelsCsv().
+   */
+  const getPanelCsvString = (): string | null => {
+    if (panelSchema.value.type === "table") {
+      return tableRendererRef?.value?.getTableCsvString() ?? null;
+    }
+
+    if (!data?.value || data?.value?.length === 0) return null;
+
+    if (panelSchema.value.queryType === "promql") {
+      const flattenedData: any[] = [];
+
+      filteredData?.value?.forEach((promData: any) => {
+        if (!promData?.result || !Array.isArray(promData.result)) return;
+
+        promData.result.forEach((series: any) => {
+          const metricLabels = series.metric || {};
+          series.values.forEach((point: any) => {
+            flattenedData.push({
+              timestamp: point[0],
+              value: point[1],
+              ...metricLabels,
+            });
+          });
+        });
+      });
+
+      if (flattenedData.length === 0) return null;
+
+      const allKeys = new Set<string>();
+      flattenedData.forEach((row) => Object.keys(row).forEach((k) => allKeys.add(k)));
+      const keys = Array.from(allKeys).sort((a, b) => {
+        if (a === "timestamp") return -1;
+        if (b === "timestamp") return 1;
+        if (a === "value") return -1;
+        if (b === "value") return 1;
+        return a.localeCompare(b);
+      });
+
+      return [
+        keys.join(","),
+        ...flattenedData.map((row) =>
+          keys.map((key) => wrapCsvValue(row[key] ?? "")).join(","),
+        ),
+      ].join("\r\n");
+    } else {
+      const flattenedData: any[] = [];
+
+      data?.value?.forEach((dataset: any) => {
+        if (!dataset || !Array.isArray(dataset) || dataset.length === 0) return;
+        dataset.forEach((row: any) => flattenedData.push({ ...row }));
+      });
+
+      if (flattenedData.length === 0) return null;
+
+      const allKeys = new Set<string>();
+      flattenedData.forEach((row) => Object.keys(row).forEach((k) => allKeys.add(k)));
+      const headers = Array.from(allKeys).sort();
+
+      return [
+        headers.join(","),
+        ...flattenedData.map((row) =>
+          headers.map((h) => wrapCsvValue(row[h] ?? "")).join(","),
+        ),
+      ].join("\r\n");
+    }
+  };
+
   return {
     downloadDataAsCSV,
     downloadDataAsJSON,
+    getPanelCsvString,
   };
 }
