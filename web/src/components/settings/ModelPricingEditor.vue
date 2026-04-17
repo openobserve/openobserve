@@ -716,7 +716,6 @@ async function save() {
         message: `Saved, but this entry is shadowed by "${winner}" which has the same pattern and higher priority. It will never be used for cost calculation unless the other entry is deleted or disabled.`,
         position: "bottom",
         timeout: 8000,
-        actions: [{ label: "Dismiss", color: "white" }],
       });
     } else {
       q.notify({ type: "positive", message: "Model pricing saved", position: "bottom", timeout: 3000 });
