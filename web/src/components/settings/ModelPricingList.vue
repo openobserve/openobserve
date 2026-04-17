@@ -35,10 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!showImportModelPricingPage">
 
     <!-- List View Header -->
-    <div
-      class="tw:flex tw:flex-wrap tw:justify-between tw:items-center tw:px-4 tw:py-2 tw:gap-2 tw:border-b-[1px]"
-    >
-      <div class="q-table__title tw:font-[600] tw:flex tw:items-center tw:gap-2" data-test="model-pricing-list-title">
+    <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]">
+      <div class="q-table__title tw:font-[600]" data-test="model-pricing-list-title">
         LLM Model Pricing
         <q-btn icon="info_outline" flat round dense size="sm" color="grey-6" class="tw:mb-0.5">
           <q-tooltip class="bg-grey-9">
@@ -48,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
       </div>
       <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-        <div class="app-tabs-container tw:h-[36px] q-mr-sm">
+        <div class="app-tabs-container tw:h-[36px]">
           <app-tabs
             class="tabs-selection-container"
             :tabs="tabOptions"
@@ -71,8 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-secondary-button tw:h-[36px]"
           no-caps
           flat
-          icon="refresh"
-          label="Refresh Built-in"
+          label="Refresh"
           :loading="refreshing"
           @click="refreshBuiltIn"
           data-test="model-pricing-refresh-btn"
@@ -81,17 +78,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-secondary-button tw:h-[36px]"
           no-caps
           flat
-          label="Bulk Import"
-          @click="openImport"
-          data-test="model-pricing-import-btn"
+          label="Test"
+          @click="showTestMatchDialog = true"
+          data-test="model-pricing-test-match-btn"
         />
         <q-btn
           class="o2-secondary-button tw:h-[36px]"
           no-caps
           flat
-          label="Test Match"
-          @click="showTestMatchDialog = true"
-          data-test="model-pricing-test-match-btn"
+          label="Import"
+          @click="openImport"
+          data-test="model-pricing-import-btn"
         />
         <q-btn
           class="o2-primary-button tw:h-[36px]"
@@ -110,13 +107,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="model-pricing-list-table"
       :rows="filteredModels"
       :columns="columns"
-      :loading="loading"
       row-key="id"
       v-model:pagination="pagination"
       :sort-method="customSort"
       class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
       :style="filteredModels.length
-        ? 'width: 100%; height: calc(100vh - 160px)'
+        ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 87px); overflow-y: auto;'
         : 'width: 100%'"
     >
       <template v-slot:header="props">
@@ -144,7 +140,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #no-data>
+        <div v-if="loading" class="full-width column flex-center q-mt-xs" style="font-size: 1.5rem">
+          <q-spinner-hourglass size="50px" color="primary" style="margin-top: 20vh" />
+        </div>
         <div
+          v-else
           class="full-width column flex-center"
           style="height: calc(100vh - 220px); gap: 8px;"
         >
@@ -165,30 +165,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:body="props">
-        <!-- Section separator -->
-        <q-tr
-          v-if="props.row.__sectionStart"
-          class="inherited-section-header"
-        >
-          <q-td :colspan="columns.length" class="section-header-cell">
-            <div class="tw:flex tw:items-center tw:gap-2">
-              <q-icon :name="sectionIcon(props.row.__sectionStart)" size="18px" color="grey-7" />
-              <span class="text-caption section-header-title">
-                {{ sectionLabel(props.row.__sectionStart) }}
-              </span>
-              <span class="text-caption section-header-subtitle">
-                &mdash; Read-only. Clone to create your own copy.
-              </span>
-            </div>
-          </q-td>
-        </q-tr>
-
         <q-tr
           :props="props"
-          :class="[
-            isReadOnly(props.row) ? 'inherited-row' : '',
-            !props.row.enabled ? 'tw:opacity-60' : ''
-          ]"
         >
           <q-td v-for="col in columns" :key="col.name" :props="props" :style="col.style">
             <template v-if="col.name === 'select'">
@@ -201,75 +179,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template v-else-if="col.name === 'name'">
-              <div class="o2-table-cell-content tw:font-semibold" :title="props.row.name">
-                {{ props.row.name }}
-              </div>
-            </template>
-            <template v-else-if="col.name === 'maintainer'">
-              <div class="o2-table-cell-content text-caption">
-                {{ getMaintainer(props.row) }}
+              <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-0">
+                <img
+                  v-if="getSource(props.row) === 'built_in'"
+                  :src="ooLogo"
+                  class="tw:w-[16px] tw:h-[16px] tw:shrink-0"
+                  alt="OpenObserve"
+                />
+                <q-icon
+                  v-else-if="getSource(props.row) === 'meta_org' || (getSource(props.row) === 'org' && props.row.org_id !== orgIdentifier)"
+                  name="corporate_fare"
+                  size="16px"
+                  class="tw:shrink-0 tw:text-grey-6"
+                />
+                <q-icon
+                  v-else
+                  name="person"
+                  size="16px"
+                  class="tw:shrink-0 tw:text-grey-6"
+                />
+                <div class="o2-table-cell-content tw:font-semibold">
+                  {{ props.row.name }}
+                </div>
+                <q-tooltip
+                  v-if="props.row.name.length > 30"
+                  anchor="top middle"
+                  self="bottom middle"
+                  :delay="500"
+                  style="max-width: none; white-space: normal; word-break: break-all;"
+                >
+                  {{ props.row.name }}
+                </q-tooltip>
               </div>
             </template>
             <template v-else-if="col.name === 'match_pattern'">
-              <div class="o2-table-cell-content tw:flex tw:items-center tw:gap-2 tw:flex-wrap" style="white-space: normal;">
-                <code 
-                  class="text-caption pattern-code" 
-                  :class="{'tw:line-through tw:opacity-60': getShadowedBy(props.row)}"
+              <div class="tw:flex tw:items-center tw:gap-1">
+                <code
+                  class="text-caption pattern-code o2-table-cell-content"
+                  :class="{'tw:opacity-40': !!getShadowedBy(props.row)}"
                 >
                   {{ props.row.match_pattern }}
                 </code>
-                <q-chip
+                <q-icon
                   v-if="getShadowedBy(props.row)"
-                  size="sm"
-                  dense
+                  name="warning_amber"
+                  size="14px"
                   color="warning"
-                  text-color="dark"
-                  icon="warning_amber"
-                  class="tw:m-0 tw:cursor-pointer"
+                  class="tw:cursor-pointer"
                 >
-                  Shadowed
-                  <q-tooltip class="bg-grey-9 text-caption">
-                    Shadowed by <b class="text-white">"{{ getShadowedBy(props.row) }}"</b>
-                    <div class="tw:mt-1 tw:opacity-75" style="max-width: 250px; white-space: normal;">
-                      Same pattern, higher priority. This model won't be used for cost calculation.
+                  <q-tooltip :delay="300" class="bg-grey-9 text-caption" style="white-space: normal; max-width: 300px;">
+                    Shadowed by "{{ getShadowedBy(props.row)?.name }}"
+                    <div class="tw:mt-1 tw:opacity-75">
+                      Higher priority match. This model won't be used for cost calculation.
                     </div>
                   </q-tooltip>
-                </q-chip>
+                </q-icon>
               </div>
             </template>
             <template v-else-if="col.name === 'pricing'">
-              <div class="o2-table-cell-content" style="white-space: normal;">
-                <div v-if="getDefaultTier(props.row) && Object.keys(getDefaultTier(props.row).prices || {}).length" class="pricing-chips">
+              <div class="tw:flex tw:flex-wrap tw:gap-1">
+                <template v-if="getDefaultTier(props.row) && Object.keys(getDefaultTier(props.row).prices || {}).length">
                   <span
                     v-for="(price, key) in getVisiblePrices(props.row)"
                     :key="key"
-                    class="price-chip"
+                    class="dimension-badge"
+                    :class="getPriceKeyColorClass(key as string)"
                   >
-                    <span class="price-chip-key">{{ formatPriceKey(key as string) }}</span>
-                    <span class="price-chip-val">{{ formatPerMillion(price as number) }}</span>
+                    <span class="tw:font-medium">{{ formatPriceKey(key as string) }}</span>=<span>{{ formatPerMillion(price as number) }}</span>
                   </span>
                   <span
                     v-if="getOverflowCount(props.row) > 0"
-                    class="price-chip price-chip--more"
+                    class="dimension-badge badge-more tw:cursor-pointer"
+                    @click.stop="openPricingDialog(props.row)"
                   >
-                    +{{ getOverflowCount(props.row) }}
-                    <q-tooltip anchor="top middle" self="bottom middle" class="pricing-tooltip-card">
-                      <div class="pricing-popover">
-                        <div class="pricing-popover-title">Token Pricing <span class="pricing-popover-sub">(per 1M)</span></div>
-                        <div class="pricing-popover-table">
-                          <div
-                            v-for="(price, key) in getDefaultTier(props.row).prices"
-                            :key="key"
-                            class="pricing-popover-row"
-                          >
-                            <span class="pricing-popover-key">{{ formatPriceKey(key as string) }}</span>
-                            <span class="pricing-popover-val">{{ formatPerMillion(price as number) }}</span>
-                          </div>
-                        </div>
+                    +{{ getOverflowCount(props.row) }} more
+                    <q-tooltip :delay="400" anchor="top middle" self="bottom middle" class="pricing-overflow-tooltip">
+                      <div class="pricing-overflow-tooltip-inner">
+                        <span
+                          v-for="(price, key) in getDefaultTier(props.row).prices"
+                          :key="key"
+                          class="dimension-badge"
+                          :class="getPriceKeyColorClass(key as string)"
+                        >
+                          <span class="tw:font-medium">{{ formatPriceKey(key as string) }}</span>=<span>{{ formatPerMillion(price as number) }}</span>
+                        </span>
                       </div>
                     </q-tooltip>
                   </span>
-                </div>
+                </template>
                 <span v-else class="text-grey-5">—</span>
               </div>
             </template>
@@ -281,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense
                     unelevated
                     size="sm"
-                    color="grey-7"
+                    :color="props.row.enabled ? 'negative' : 'positive'"
                     :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
                     round
                     flat
@@ -376,6 +373,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-table>
     </div> <!-- end v-if="!showImportModelPricingPage" -->
 
+  <!-- Pricing detail side panel -->
+  <q-dialog v-model="showPricingDialog" position="right" maximized>
+    <div :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'" class="pricing-dialog-panel " style="width: 30vw;">
+      <div class="add-stream-header row items-center no-wrap q-px-md">
+        <div class="col">
+          <div style="font-size: 18px">{{ pricingDialogRow?.name }}</div>
+        </div>
+        <div class="col-auto">
+          <q-btn v-close-popup round flat icon="cancel" />
+        </div>
+      </div>
+      <q-separator />
+      <div class="q-pa-md pricing-dialog-body">
+        <div v-if="pricingDialogRow" class="tw:flex tw:flex-wrap tw:gap-2">
+          <span
+            v-for="(price, key) in getDefaultTier(pricingDialogRow)?.prices"
+            :key="key"
+            class="dimension-badge"
+            :class="getPriceKeyColorClass(key as string)"
+            style="font-size: 13px; padding: 4px 10px;"
+          >
+            <span class="tw:font-medium">{{ formatPriceKey(key as string) }}</span>=<span>{{ formatPerMillion(price as number) }}</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </q-dialog>
+
   <confirm-dialog
     v-model="confirmDialogMeta.show"
     :title="confirmDialogMeta.title"
@@ -392,6 +417,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { outlinedDelete, outlinedPause, outlinedPlayArrow } from "@quasar/extras/material-icons-outlined";
+import { getImageURL } from "@/utils/zincutils";
 import modelPricingService from "@/services/model_pricing";
 import ImportModelPricing from "@/components/settings/ImportModelPricing.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -407,6 +433,15 @@ const qTableRef = ref<any>(null);
 const models = ref<any[]>([]);
 const loading = ref(true);
 const refreshing = ref(false);
+
+// Pricing detail side panel
+const showPricingDialog = ref(false);
+const pricingDialogRow = ref<any>(null);
+
+function openPricingDialog(row: any) {
+  pricingDialogRow.value = row;
+  showPricingDialog.value = true;
+}
 
 const confirmDialogMeta = ref({
   show: false,
@@ -426,9 +461,8 @@ const selectedTab = ref("all");
 
 const tabOptions = [
   { label: "All", value: "all" },
-  { label: "You", value: "org" },
-  { label: "Meta", value: "meta_org" },
-  { label: "Built-in", value: "built_in" },
+  { label: "Custom", value: "org" },
+  { label: "System", value: "inherited" },
 ];
 
 function onTabChange() {
@@ -455,14 +489,13 @@ const hasSelectableModels = computed(() =>
 const columns = computed(() => {
   const cols: any[] = [];
   if (hasSelectableModels.value) {
-    cols.push({ name: "select", label: "", field: "select", align: "center", style: "width: 40px" });
+    cols.push({ name: "select", label: "", field: "select", align: "center", style: "width: 40px; min-width: 40px; max-width: 40px;" });
   }
   cols.push(
-    { name: "name", label: "Model", field: "name", align: "left", sortable: true, style: "max-width: 300px;" },
-    { name: "maintainer", label: "Maintainer", field: "maintainer", align: "left", style: "width: 130px;" },
-    { name: "match_pattern", label: "Pattern", field: "match_pattern", align: "left", style: "max-width: 300px; overflow: hidden;" },
-    { name: "pricing", label: "Pricing (per 1M tokens)", field: "pricing", align: "left" },
-    { name: "actions", label: "Actions", field: "actions", align: "center", style: "width: 170px" },
+    { name: "name", label: "Model", field: "name", align: "left", sortable: true, style: "width: 280px; min-width: 280px; max-width: 280px;" },
+    { name: "match_pattern", label: "Pattern", field: "match_pattern", align: "left", style: "width: 280px; min-width: 280px; max-width: 280px; overflow: hidden;" },
+    { name: "pricing", label: "Pricing (per 1M tokens)", field: "pricing", align: "left", style: "min-width: 200px;" },
+    { name: "actions", label: "Actions", field: "actions", align: "center", style: "width: 120px; min-width: 120px; max-width: 120px;" },
   );
   return cols;
 });
@@ -530,13 +563,6 @@ function getSource(model: any): string {
   return model.source || 'org';
 }
 
-/** Display who maintains a model pricing entry. */
-function getMaintainer(model: any): string {
-  const source = getSource(model);
-  if (source === 'built_in') return 'OpenObserve';
-  if (source === 'meta_org') return 'Meta Org';
-  return 'You';
-}
 
 /** True when a model entry is read-only (built-in or from another org). */
 function isReadOnly(model: any): boolean {
@@ -568,13 +594,21 @@ const filteredModels = computed(() => {
     items = items.filter((m: any) => getSource(m) === 'org' && m.org_id === orgIdentifier.value);
     return items.map((m: any) => ({ ...m, __sectionStart: null }));
   }
-  if (tab === 'meta_org') {
-    items = items.filter((m: any) => getSource(m) === 'meta_org' || (getSource(m) === 'org' && m.org_id !== orgIdentifier.value));
-    return items.map((m: any) => ({ ...m, __sectionStart: null }));
-  }
-  if (tab === 'built_in') {
-    items = items.filter((m: any) => getSource(m) === 'built_in');
-    return items.map((m: any) => ({ ...m, __sectionStart: null }));
+  if (tab === 'inherited') {
+    const metaItems = items.filter((m: any) => getSource(m) === 'meta_org' || (getSource(m) === 'org' && m.org_id !== orgIdentifier.value));
+    const builtInItems = items.filter((m: any) => getSource(m) === 'built_in');
+    const sorted: any[] = [];
+    if (metaItems.length > 0) {
+      metaItems[0] = { ...metaItems[0], __sectionStart: 'meta_org' };
+      for (let i = 1; i < metaItems.length; i++) metaItems[i] = { ...metaItems[i], __sectionStart: null };
+      sorted.push(...metaItems);
+    }
+    if (builtInItems.length > 0) {
+      builtInItems[0] = { ...builtInItems[0], __sectionStart: 'built_in' };
+      for (let i = 1; i < builtInItems.length; i++) builtInItems[i] = { ...builtInItems[i], __sectionStart: null };
+      sorted.push(...builtInItems);
+    }
+    return sorted;
   }
 
   // "all" tab — group by source with section headers
@@ -665,10 +699,8 @@ function getOverflowCount(model: any): number {
   return Math.max(0, total - MAX_VISIBLE_PRICES);
 }
 
-/** Returns the name of the model that shadows this one, or null if not shadowed.
- *  A model is shadowed when another enabled model shares the same match_pattern
- *  and valid_from, but has higher priority (lower sort_order, or earlier name). */
-function getShadowedBy(model: any): string | null {
+/** Returns the model that shadows this one, or null if not shadowed. */
+function getShadowedBy(model: any): { name: string; match_pattern: string } | null {
   if (!model.enabled) return null;
   for (const other of models.value) {
     if (other.id === model.id) continue;
@@ -679,8 +711,8 @@ function getShadowedBy(model: any): string | null {
     if (otherVf !== thisVf) continue;
     const otherSo = other.sort_order ?? 0;
     const thisSo = model.sort_order ?? 0;
-    if (otherSo < thisSo) return other.name;
-    if (otherSo === thisSo && other.name.localeCompare(model.name) < 0) return other.name;
+    if (otherSo < thisSo) return { name: other.name, match_pattern: other.match_pattern };
+    if (otherSo === thisSo && other.name.localeCompare(model.name) < 0) return { name: other.name, match_pattern: other.match_pattern };
   }
   return null;
 }
@@ -688,6 +720,20 @@ function getShadowedBy(model: any): string | null {
 /** Shorten usage key for display: replace underscores with hyphens, drop trailing "_tokens". */
 function formatPriceKey(key: string): string {
   return key.replace(/_tokens$/, '').replace(/_/g, '-');
+}
+
+function getPriceKeyColorClass(key: string): string {
+  const k = key.toLowerCase();
+  if (k.includes('input')) return 'badge-blue';
+  if (k.includes('output')) return 'badge-green';
+  // Hash-based color for all other arbitrary keys
+  const palette = ['badge-cyan', 'badge-purple', 'badge-pink', 'badge-orange', 'badge-amber', 'badge-violet', 'badge-rose', 'badge-teal', 'badge-indigo'];
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = ((hash << 5) - hash) + key.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return palette[Math.abs(hash) % palette.length];
 }
 
 function formatPerMillion(pricePerToken: number | undefined | null): string {
@@ -699,6 +745,12 @@ function formatPerMillion(pricePerToken: number | undefined | null): string {
 
 const orgIdentifier = computed(
   () => store.state.selectedOrganization?.identifier || ""
+);
+
+const ooLogo = computed(() =>
+  store.state.theme === "dark"
+    ? getImageURL("openobserve_favicon_dark.ico")
+    : getImageURL("images/common/openobserve_favicon.png")
 );
 
 /** Show error notification only for non-403 errors.
@@ -900,16 +952,6 @@ onActivated(() => {
   display: block;
 }
 
-.inherited-row {
-  background: rgba(0, 0, 0, 0.02);
-  border-left: 3px solid rgba(0, 0, 0, 0.12);
-
-  .body--dark & {
-    background: rgba(255, 255, 255, 0.03);
-    border-left-color: rgba(255, 255, 255, 0.12);
-  }
-}
-
 .section-header-cell {
   padding: 10px 16px;
   background: rgba(0, 0, 0, 0.04);
@@ -942,117 +984,89 @@ body.body--dark .pattern-code {
   background: rgba(255, 255, 255, 0.05);
 }
 
-/* ── Pricing chips ─────────────────────────────────── */
-.pricing-chips {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.price-chip {
+/* ── Dimension badges (pricing) ─────────────────────── */
+.dimension-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  border-radius: 5px;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 6px;
   font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  color: #065f46;
-  background: #ecfdf5;
-  border: 1px solid rgba(52, 211, 153, 0.5);
-  line-height: 1.4;
-}
-
-.price-chip-key {
-  font-weight: 600;
-  opacity: 0.7;
-  font-size: 10px;
-}
-
-.price-chip-val {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-body.body--dark .price-chip {
-  color: #a7f3d0;
-  background: rgba(16, 185, 129, 0.08);
-  border-color: rgba(5, 150, 105, 0.4);
-}
-
-.price-chip--more {
-  color: var(--q-primary);
-  border-color: rgba(89, 96, 178, 0.3);
-  background: rgba(89, 96, 178, 0.06);
-  font-weight: 700;
-  font-size: 10px;
-  cursor: default;
-  padding: 2px 6px;
-}
-
-body.body--dark .price-chip--more {
-  color: #a5b4fc;
-  background: rgba(89, 96, 178, 0.12);
-  border-color: rgba(89, 96, 178, 0.25);
-}
-
-/* ── Pricing tooltip popover ─────────────────────────── */
-.pricing-tooltip-card {
-  background: #1e293b !important;
-  border-radius: 10px !important;
-  padding: 0 !important;
-  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3) !important;
-  min-width: 200px;
-}
-
-.pricing-popover {
-  padding: 10px 0;
-}
-
-.pricing-popover-title {
-  padding: 0 14px 8px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #e2e8f0;
-  letter-spacing: 0.02em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.pricing-popover-sub {
   font-weight: 400;
-  opacity: 0.45;
+  white-space: nowrap;
+  border: 1px solid #d1d5db;
+  color: inherit;
 }
 
-.pricing-popover-table {
-  padding-top: 4px;
+.badge-more {
+  background: #e5e7eb;
+  color: #6b7280;
+  font-weight: 500;
+  border: none;
 }
 
-.pricing-popover-row {
+body.body--dark .badge-more {
+  background: #4b5563;
+  color: #d1d5db;
+}
+
+.badge-blue   { border-color: #1d4ed8; }
+.badge-green  { border-color: #065f46; }
+.badge-cyan   { border-color: #0e7490; }
+.badge-purple { border-color: #7c3aed; }
+.badge-pink   { border-color: #9f1239; }
+.badge-orange { border-color: #c2410c; }
+.badge-gray   { border-color: #4b5563; }
+.badge-amber  { border-color: #d97706; }
+.badge-violet { border-color: #7c3aed; }
+.badge-rose   { border-color: #e11d48; }
+.badge-teal   { border-color: #0f766e; }
+.badge-indigo { border-color: #4f46e5; }
+
+/* ── Pricing detail side panel ────────────────────── */
+.pricing-dialog-panel {
+  width: 30vw;
+  min-width: 320px;
+  max-width: 100vw;
+  height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 5px 14px;
-  transition: background 0.1s;
+  flex-direction: column;
 
-  &:hover {
-    background: rgba(255, 255, 255, 0.04);
+  .add-stream-header {
+    min-height: 64px;
   }
 }
 
-.pricing-popover-key {
-  font-size: 12px;
-  font-weight: 500;
-  color: #94a3b8;
-  font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+.pricing-dialog-body {
+  flex: 1;
+  overflow-y: auto;
 }
 
-.pricing-popover-val {
-  font-size: 13px;
-  font-weight: 700;
-  color: #4ade80;
-  font-variant-numeric: tabular-nums;
-  margin-left: 20px;
+/* ── Pricing overflow tooltip ──────────────────────── */
+.pricing-overflow-tooltip {
+  padding: 10px 12px;
+  max-width: 440px;
+}
+
+.pricing-overflow-tooltip-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+body.body--dark {
+  .dimension-badge { color: #ffffff; }
+  .badge-blue   { border-color: #93c5fd; }
+  .badge-green  { border-color: #6ee7b7; }
+  .badge-cyan   { border-color: #67e8f9; }
+  .badge-purple { border-color: #c4b5fd; }
+  .badge-pink   { border-color: #f9a8d4; }
+  .badge-orange { border-color: #fdba74; }
+  .badge-gray   { border-color: #d1d5db; }
+  .badge-amber  { border-color: #fbbf24; }
+  .badge-violet { border-color: #c4b5fd; }
+  .badge-rose   { border-color: #fda4af; }
+  .badge-teal   { border-color: #5eead4; }
+  .badge-indigo { border-color: #a5b4fc; }
 }
 </style>
