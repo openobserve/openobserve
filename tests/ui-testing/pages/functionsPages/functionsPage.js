@@ -109,12 +109,21 @@ class FunctionsPage {
     await textarea.focus();
     await this.page.waitForTimeout(300);
 
-    // Clear existing content and type new code
+    // Clear existing content
     const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
     await this.page.keyboard.press(selectAll);
     await this.page.keyboard.press('Backspace');
     await this.page.waitForTimeout(200);
-    await this.page.keyboard.type(code);
+
+    // IMPORTANT: Use clipboard paste instead of keyboard.type() to avoid Monaco
+    // auto-close bracket interference. keyboard.type() types char-by-char, causing
+    // Monaco to auto-insert } after every {, corrupting multi-line code with nested blocks.
+    const pasteShortcut = process.platform === 'darwin' ? 'Meta+V' : 'Control+V';
+    await this.page.evaluate(async (text) => {
+      await navigator.clipboard.writeText(text);
+    }, code);
+    await this.page.keyboard.press(pasteShortcut);
+
     // Wait longer than the Monaco editor's 500ms debounce so formData syncs via v-model
     await this.page.waitForTimeout(1000);
   }
