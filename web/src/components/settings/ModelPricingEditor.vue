@@ -537,7 +537,7 @@ function renamePriceByIndex(tier: any, index: number, newKey: string) {
   if (newKey === oldKey) return;
   const keyError = validateUsageKey(newKey);
   if (keyError) {
-    q.notify({ type: "warning", message: keyError, position: "bottom", timeout: 3000 });
+    notifyWarn(keyError);
     return;
   }
   // Rebuild the object preserving insertion order with the new key at the same position
@@ -606,17 +606,18 @@ function validateUsageKey(key: string): string | null {
   return null;
 }
 
-function addPrice(tier: any, idx: number | string) {
+function addPrice(tier: any, idx: number | string): boolean {
   const i = Number(idx);
   const key = (addState.value[i]?.key || "").trim();
-  if (!key) return;
+  if (!key) return true;
   const keyError = validateUsageKey(key);
   if (keyError) {
-    q.notify({ type: "warning", message: keyError, position: "bottom", timeout: 3000 });
-    return;
+    notifyWarn(keyError);
+    return false;
   }
   tier.prices = { ...tier.prices, [key]: fromPerMillion(addState.value[i].value || 0) };
   addState.value[i] = { key: "", value: 0 };
+  return true;
 }
 
 function goBack() {
@@ -650,7 +651,18 @@ async function save() {
       return;
     }
     if (pending && pending.key.trim()) {
-      addPrice(m.tiers[i], i);
+      if (!addPrice(m.tiers[i], i)) return;
+    }
+  }
+
+  // Validate condition usage_key on non-default tiers — must not be a pure integer
+  for (let i = 1; i < m.tiers.length; i++) {
+    const c = m.tiers[i].condition;
+    if (!c) continue;
+    const key = (c.usage_key || "").trim();
+    if (key && /^\d+$/.test(key)) {
+      notifyWarn(`Tier "${m.tiers[i].name || `#${i + 1}`}": Usage key cannot be a plain number. Use a label like "input" or "output".`);
+      return;
     }
   }
 
