@@ -807,9 +807,10 @@ body.body--dark .query-mode-tabs {
 .static-text {
   display: inline-flex;
   align-items: center;
-  height: 1.75rem;
-  line-height: 1.75rem;
+  height: 2.3rem;
+  line-height: 1.3rem;
   font-size: 12px;
+  margin-top: 0.1rem;
 }
 // ───────────────────────────────────────────────────────────────────────────
 

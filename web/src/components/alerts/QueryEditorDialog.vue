@@ -318,8 +318,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="tw:flex tw:items-center tw:gap-2">
                     <div class="pane-accent-bar pane-accent-bar--primary" />
                     <span class="pane-title">Query Result</span>
+                    <span
+                      v-if="multiTimeRange && multiTimeRange.length > 0"
+                      class="multi-window-badge"
+                      :class="store.state.theme === 'dark' ? 'multi-window-badge--dark' : 'multi-window-badge--light'"
+                    >results across all time windows</span>
                   </div>
-                  <span class="tw:text-[10px] tw:opacity-50">{{ t('alerts.resultsIncludeAllWindows') }}</span>
                 </div>
 
                 <!-- Content -->
@@ -798,20 +802,28 @@ const triggerQuery = async (fn = false) => {
 
     queryReq.query.query_fn = fn ? b64EncodeUnicode(vrlFunctionContent.value) : null;
     queryReq.query.sql_mode = true;
-    queryReq.query.per_query_response = true;
-
-    let queryToSend = [
-      {
-        start_time: startTime,
-        end_time: endTime,
-        sql: queryReq.query.sql,
-      }
-    ];
 
     const multiWindowQueries = buildMultiWindowQuery(queryReq.query.sql, periodInMicroseconds);
 
-    queryToSend.push(...multiWindowQueries);
-    queryReq.query.sql = queryToSend;
+    if (multiWindowQueries.length > 0) {
+      // Multi-window: combine primary window + extra windows → _search_multi
+      queryReq.query.per_query_response = true;
+      const queryToSend = [
+        {
+          start_time: startTime,
+          end_time: endTime,
+          sql: queryReq.query.sql,
+        },
+        ...multiWindowQueries,
+      ];
+      queryReq.query.sql = queryToSend;
+    } else {
+      // No multi-window: use normal _search API
+      queryReq.query.start_time = startTime;
+      queryReq.query.end_time = endTime;
+    }
+
+    delete queryReq.aggs;
 
     const res = await searchService.search({
       org_identifier: store.state.selectedOrganization.identifier,
@@ -1397,6 +1409,25 @@ const getBtnLogo = computed(() => {
   background: rgba(52, 211, 153, 0.15);
   color: #10b981;
   letter-spacing: 0.02em;
+}
+
+.multi-window-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+
+  &--light {
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    color: #2563eb;
+  }
+  &--dark {
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #60a5fa;
+  }
 }
 
 .sql-vrl-badge {
