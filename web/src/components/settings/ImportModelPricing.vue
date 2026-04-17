@@ -341,16 +341,6 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
     return false;
   }
 
-  if (/\s/.test(jsonObj.name)) {
-    modelPricingErrorsToDisplay.value.push([
-      {
-        field: "model_pricing_name",
-        message: `Model pricing - ${index}: name must not contain spaces`,
-      },
-    ]);
-    return false;
-  }
-
   if (
     !jsonObj.match_pattern ||
     !jsonObj.match_pattern.trim() ||
@@ -480,7 +470,6 @@ function arrowBackFn() {
 .section-title {
   font-size: 16px;
   margin-bottom: 10px;
-  text-transform: uppercase;
 }
 
 .error-list {
