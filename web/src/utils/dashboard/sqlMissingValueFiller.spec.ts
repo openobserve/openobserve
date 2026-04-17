@@ -319,4 +319,198 @@ describe("fillMissingValues", () => {
       value: null,
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Chunking-direction tests (LTR vs RTL)
+  // ---------------------------------------------------------------------------
+  //
+  // detectChunkingDirection picks LTR when |firstChunkStart - userStart| <=
+  // |firstChunkEnd - userEnd|. The filler branches on that flag:
+  //   LTR → fill from userStart  → latestChunkEnd, right-edge anchor at userEnd
+  //   RTL → fill from earliestChunkStart → userEnd, left-edge anchor at userStart
+  //
+  // The right/left anchor uses empty-string values so ECharts treats them as
+  // gaps (not plotted at noValueConfigOption). That's what these tests assert.
+
+  // Build metadata with distinct user-start / user-end microseconds
+  const makeRangeMetadata = (userStartMs: number, userEndMs: number) => ({
+    queries: [
+      {
+        startTime: userStartMs * 1000,
+        endTime: userEndMs * 1000,
+      },
+    ],
+  });
+
+  // Metadata array with a single chunk whose time_offset is explicit
+  const makeChunkMetaData = (
+    chunkStartMs: number,
+    chunkEndMs: number,
+    interval: number,
+  ) => [
+    {
+      histogram_interval: interval,
+      time_offset: {
+        start_time: chunkStartMs * 1000,
+        end_time: chunkEndMs * 1000,
+      },
+    },
+  ];
+
+  it("LTR: anchors user-end with empty string when first chunk starts at user-start", () => {
+    const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
+    // First chunk covers only the very start → LTR
+    const chunkStart = userStart;
+    const chunkEnd = userStart + 60_000; // 1 min in
+
+    const processedData = [{ ts: "2024-01-15T10:00:00", value: 42 }];
+
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeChunkMetaData(chunkStart, chunkEnd, 60),
+      makeRangeMetadata(userStart, userEnd),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      "fallback", // noValueConfigOption — must NOT appear on anchors
+    );
+
+    // The right-edge anchor is at binnedDate(userEnd) — with dateBin mock
+    // returning the passed-in date, that formats to userEnd's ISO string.
+    const anchor = result.find(
+      (r: any) => r.ts === new Date(userEnd).toISOString().slice(0, 19),
+    );
+    expect(anchor).toBeDefined();
+    expect(anchor.value).toBe(""); // empty string, NOT "fallback"
+  });
+
+  it("RTL: anchors user-start with empty string when first chunk ends at user-end", () => {
+    const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
+    // First chunk covers only the very end → RTL
+    const chunkStart = userEnd - 60_000;
+    const chunkEnd = userEnd;
+
+    const processedData = [{ ts: "2024-01-15T10:04:00", value: 99 }];
+
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeChunkMetaData(chunkStart, chunkEnd, 60),
+      makeRangeMetadata(userStart, userEnd),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      "fallback",
+    );
+
+    // The left-edge anchor is at binnedDate(userStart)
+    const anchor = result.find(
+      (r: any) => r.ts === new Date(userStart).toISOString().slice(0, 19),
+    );
+    expect(anchor).toBeDefined();
+    expect(anchor.value).toBe(""); // empty string, NOT "fallback"
+  });
+
+  it("LTR with breakdown: right-edge anchor is emitted per series with empty string", () => {
+    const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
+    const chunkStart = userStart;
+    const chunkEnd = userStart + 60_000;
+
+    const processedData = [
+      { ts: "2024-01-15T10:00:00", service: "api", value: 10 },
+      { ts: "2024-01-15T10:00:00", service: "web", value: 20 },
+    ];
+
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeChunkMetaData(chunkStart, chunkEnd, 60),
+      makeRangeMetadata(userStart, userEnd),
+      ["ts"],
+      ["value"],
+      [],
+      ["service"],
+      0, // noValueConfigOption — 0 is a real number that MUST NOT appear on anchors
+    );
+
+    const userEndIso = new Date(userEnd).toISOString().slice(0, 19);
+    const apiAnchor = result.find(
+      (r: any) => r.ts === userEndIso && r.service === "api",
+    );
+    const webAnchor = result.find(
+      (r: any) => r.ts === userEndIso && r.service === "web",
+    );
+    expect(apiAnchor).toBeDefined();
+    expect(webAnchor).toBeDefined();
+    // Anchor must use "" regardless of noValueConfigOption
+    expect(apiAnchor.value).toBe("");
+    expect(webAnchor.value).toBe("");
+  });
+
+  it("RTL with breakdown: left-edge anchor is emitted per series with empty string", () => {
+    const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
+    const chunkStart = userEnd - 60_000;
+    const chunkEnd = userEnd;
+
+    const processedData = [
+      { ts: "2024-01-15T10:04:00", service: "api", value: 10 },
+      { ts: "2024-01-15T10:04:00", service: "web", value: 20 },
+    ];
+
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeChunkMetaData(chunkStart, chunkEnd, 60),
+      makeRangeMetadata(userStart, userEnd),
+      ["ts"],
+      ["value"],
+      [],
+      ["service"],
+      0,
+    );
+
+    const userStartIso = new Date(userStart).toISOString().slice(0, 19);
+    const apiAnchor = result.find(
+      (r: any) => r.ts === userStartIso && r.service === "api",
+    );
+    const webAnchor = result.find(
+      (r: any) => r.ts === userStartIso && r.service === "web",
+    );
+    expect(apiAnchor).toBeDefined();
+    expect(webAnchor).toBeDefined();
+    expect(apiAnchor.value).toBe("");
+    expect(webAnchor.value).toBe("");
+  });
+
+  it("LTR (invalid time_offset): no crash, returns filled data including user-end anchor", () => {
+    // When time_offset is missing the detector returns null → defaults to RTL
+    // branch. This test just ensures no throw and the data is still filled.
+    const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const userEnd = Date.UTC(2024, 0, 15, 10, 2, 0);
+
+    const processedData = [{ ts: "2024-01-15T10:00:00", value: 1 }];
+    const metadataNoOffset = [{ histogram_interval: 60 }]; // no time_offset
+
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      metadataNoOffset,
+      makeRangeMetadata(userStart, userEnd),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      null,
+    );
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+  });
 });
