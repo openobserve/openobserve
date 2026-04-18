@@ -494,11 +494,11 @@ pub async fn get_service_identity_config(
                 "[ServiceIdentityConfig] DB semantic groups for org {} have no is_workload_type=true entries (stale), patching from defaults",
                 org_id
             );
-            let default_workload: std::collections::HashMap<&str, bool> =
-                get_default_semantic_field_groups()
-                    .iter()
-                    .map(|g| (g.id.as_str(), g.is_workload_type))
-                    .collect();
+            let default_groups = get_default_semantic_field_groups();
+            let default_workload: std::collections::HashMap<&str, bool> = default_groups
+                .iter()
+                .map(|g| (g.id.as_str(), g.is_workload_type))
+                .collect();
             for group in &mut semantic_groups {
                 if let Some(&is_workload) = default_workload.get(group.id.as_str()) {
                     group.is_workload_type = is_workload;

@@ -190,40 +190,14 @@ pub async fn correlate_streams(
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
-        use config::meta::{correlation::ServiceIdentityConfig, system_settings::SettingScope};
-        let identity_config = match infra::table::system_settings::get(
-            &SettingScope::Org,
-            Some(&org_id),
-            None,
-            "service_identity",
-        )
-        .await
-        {
-            Ok(Some(s)) => {
-                log::debug!(
-                    "[correlation] Found service_identity setting in system_settings for org {}: {:?}",
-                    org_id,
-                    s.setting_value
-                );
-                serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
-                    .unwrap_or_else(|e| {
-                        log::debug!("[correlation] Failed to deserialize ServiceIdentityConfig for org {org_id}: {e}");
-                        ServiceIdentityConfig::new_default()
-                    })
-            }
-            Ok(None) => {
-                log::debug!(
-                    "[correlation] No service_identity setting found in system_settings for org {org_id}"
-                );
-                ServiceIdentityConfig::new_default()
-            }
-            Err(e) => {
-                log::debug!(
-                    "[correlation] Error loading service_identity setting for org {org_id}: {e}"
-                );
-                ServiceIdentityConfig::new_default()
-            }
-        };
+        let identity_config =
+            crate::service::db::system_settings::get_service_identity_config(&org_id).await;
+        log::debug!(
+            "[correlation] Loaded service_identity config for org {}: sets={}, tracked_alias_ids={:?}",
+            org_id,
+            identity_config.sets.len(),
+            identity_config.tracked_alias_ids
+        );
         let semantic_groups =
             o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
 
