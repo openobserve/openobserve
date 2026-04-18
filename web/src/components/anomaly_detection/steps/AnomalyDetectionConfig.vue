@@ -54,15 +54,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="idx"
               class="tw:flex tw:items-center tw:gap-2 tw:mb-2"
             >
-              <q-select
+              <O2Select
                 v-model="filter.field"
                 :options="filteredStreamFields"
-                dense
-                borderless
-                use-input
-                fill-input
-                hide-selected
-                input-debounce="200"
+                variant="borderless"
+                useInput
+                fillInput
+                hideSelected
+                :inputDebounce="200"
                 :placeholder="filter.field ? '' : 'Field'"
                 class="alert-v3-select filter-field-select"
                 style="width: 200px"
@@ -80,20 +79,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-item-section>
                   </q-item>
                 </template>
-              </q-select>
-              <q-select
+              </O2Select>
+              <O2Select
                 v-model="filter.operator"
                 :options="filterOperators"
-                dense
-                borderless
+                variant="borderless"
                 class="alert-v3-select"
                 style="width: 110px"
               />
-              <q-input
+              <O2Input
                 v-if="operatorNeedsValue(filter.operator)"
                 v-model="filter.value"
-                dense
-                borderless
+                variant="borderless"
                 placeholder="Value"
                 class="alert-v3-input"
                 style=" max-width: 160px"
@@ -195,33 +192,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-negative tw:ml-1">*</span>
             </div>
             <div class="tw:flex tw:items-center tw:gap-2">
-              <q-select
+              <O2Select
                 v-model="config.detection_function"
                 :options="detectionFunctions"
-                dense
-                borderless
-                hide-bottom-space
+                variant="borderless"
+                hideBottomSpace
                 :rules="[(v) => !!v || 'Detection function is required']"
                 data-test="anomaly-detection-function"
                 class="alert-v3-select"
                 style="width: 110px"
                 @update:model-value="onDetectionFunctionChange"
               />
-              <q-select
+              <O2Select
                 v-if="
                   config.detection_function &&
                   config.detection_function !== 'count'
                 "
                 v-model="config.detection_function_field"
                 :options="filteredDetectionFields"
-                dense
-                borderless
-                use-input
-                input-debounce="200"
+                variant="borderless"
+                useInput
+                :inputDebounce="200"
                 :placeholder="config.detection_function_field ? '' : 'Field'"
                 :loading="loadingFields"
                 :rules="[(v) => !!v || 'Field is required']"
-                hide-bottom-space
+                hideBottomSpace
                 data-test="anomaly-detection-function-field"
                 class="alert-v3-select"
                 style="width: 140px"
@@ -238,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-item-section>
                   </q-item>
                 </template>
-              </q-select>
+              </O2Select>
             </div>
           </div>
           <!-- Detection Resolution -->
@@ -263,25 +258,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
-                <q-input
+                <O2Input
                   v-model.number="config.histogram_interval_value"
                   type="number"
-                  dense
-                  borderless
+                  variant="borderless"
                   min="1"
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-histogram-interval-value"
                 />
-                <q-select
+                <O2Select
                   v-model="config.histogram_interval_unit"
                   :options="intervalUnits"
-                  option-label="label"
-                  option-value="value"
-                  emit-value
-                  map-options
-                  dense
-                  borderless
+                  optionLabel="label"
+                  optionValue="value"
+                  emitValue
+                  mapOptions
+                  variant="borderless"
                   class="alert-v3-select"
                   style="min-width: 100px"
                   data-test="anomaly-histogram-interval-unit"
@@ -329,25 +322,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div>
             <div class="tw:flex tw:items-center tw:gap-0">
-              <q-input
+              <O2Input
                 v-model.number="config.histogram_interval_value"
                 type="number"
-                dense
-                borderless
+                variant="borderless"
                 min="1"
                 class="alert-v3-input"
                 style="width: 87px"
                 data-test="anomaly-histogram-interval-value"
               />
-              <q-select
+              <O2Select
                 v-model="config.histogram_interval_unit"
                 :options="intervalUnits"
-                option-label="label"
-                option-value="value"
-                emit-value
-                map-options
-                dense
-                borderless
+                optionLabel="label"
+                optionValue="value"
+                emitValue
+                mapOptions
+                variant="borderless"
                 class="alert-v3-select"
                 style="min-width: 100px"
                 data-test="anomaly-histogram-interval-unit"
@@ -390,25 +381,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
-                <q-input
+                <O2Input
                   v-model.number="config.schedule_interval_value"
                   type="number"
-                  dense
-                  borderless
+                  variant="borderless"
                   min="1"
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-schedule-interval-value"
                 />
-                <q-select
+                <O2Select
                   v-model="config.schedule_interval_unit"
                   :options="intervalUnits"
-                  option-label="label"
-                  option-value="value"
-                  emit-value
-                  map-options
-                  dense
-                  borderless
+                  optionLabel="label"
+                  optionValue="value"
+                  emitValue
+                  mapOptions
+                  variant="borderless"
                   class="alert-v3-select"
                   style="min-width: 100px"
                   data-test="anomaly-schedule-interval-unit"
@@ -448,25 +437,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
-                <q-input
+                <O2Input
                   v-model.number="config.detection_window_value"
                   type="number"
-                  dense
-                  borderless
+                  variant="borderless"
                   min="1"
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-detection-window-value"
                 />
-                <q-select
+                <O2Select
                   v-model="config.detection_window_unit"
                   :options="intervalUnits"
-                  option-label="label"
-                  option-value="value"
-                  emit-value
-                  map-options
-                  dense
-                  borderless
+                  optionLabel="label"
+                  optionValue="value"
+                  emitValue
+                  mapOptions
+                  variant="borderless"
                   class="alert-v3-select"
                   style="min-width: 100px"
                   data-test="anomaly-detection-window-unit"
@@ -512,12 +499,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-icon>
             </div>
             <div class="tw:flex tw:flex-col">
-              <q-input
+              <O2Input
                 v-model.number="config.training_window_days"
                 type="number"
-                dense
-                borderless
-                hide-bottom-space
+                variant="borderless"
+                hideBottomSpace
                 :min="1"
                 :rules="[(v) => v >= 1 || 'Minimum 1 day']"
                 data-test="anomaly-training-window"
@@ -559,15 +545,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-tooltip>
               </q-icon>
             </div>
-            <q-select
+            <O2Select
               v-model="config.retrain_interval_days"
               :options="retrainIntervalOptions"
-              option-label="label"
-              option-value="value"
-              emit-value
-              map-options
-              dense
-              borderless
+              optionLabel="label"
+              optionValue="value"
+              emitValue
+              mapOptions
+              variant="borderless"
               data-test="anomaly-retrain-interval"
               class="alert-v3-select"
               style="max-width: 200px"
@@ -720,11 +705,12 @@ import {
 } from "@/utils/alerts/anomalyFilterOperators";
 import QueryEditor from "@/components/QueryEditor.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
+import { O2Input, O2Select } from "@/lib";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
 
-  components: { QueryEditor, PanelSchemaRenderer },
+  components: { QueryEditor, PanelSchemaRenderer, O2Input, O2Select },
 
   props: {
     config: {

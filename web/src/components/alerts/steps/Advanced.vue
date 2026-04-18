@@ -34,12 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
           </div>
           <div class="tw:flex tw:items-center tw:gap-2">
-            <q-select
+            <O2Select
               v-model="localTemplate"
               :options="filteredTemplates"
               class="no-case q-py-none inline-condition-select alert-v3-select"
-              borderless dense use-input clearable emit-value
-              :input-debounce="400" hide-bottom-space
+              variant="borderless" useInput clearable emitValue
+              :inputDebounce="400" hideBottomSpace
               @filter="filterTemplates"
               @update:model-value="emitTemplateUpdate"
               style="min-width: 240px; max-width: 300px"
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-slot:no-option>
                 <q-item><q-item-section class="text-grey">No templates available</q-item-section></q-item>
               </template>
-            </q-select>
+            </O2Select>
             <q-btn icon="refresh" padding="xs" unelevated size="sm" round flat title="Refresh latest Templates" @click="$emit('refresh:templates')" />
           </div>
         </div>
@@ -75,8 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:gap-2 tw:mb-2"
               :data-test="`alert-variables-${index + 1}`"
             >
-              <q-input data-test="alert-variables-key-input" v-model="variable.key" :placeholder="t('common.name')" dense borderless class="inline-condition-select alert-v3-input" style="min-width: 140px;" @update:model-value="emitUpdate" />
-              <q-input data-test="alert-variables-value-input" v-model="variable.value" :placeholder="t('common.value')" dense borderless class="inline-condition-select alert-v3-input" style="min-width: 200px;" @update:model-value="emitUpdate" />
+              <O2Input data-test="alert-variables-key-input" v-model="variable.key" :placeholder="t('common.name')" variant="borderless" class="inline-condition-select alert-v3-input" style="min-width: 140px;" @update:model-value="emitUpdate" />
+              <O2Input data-test="alert-variables-value-input" v-model="variable.value" :placeholder="t('common.value')" variant="borderless" class="inline-condition-select alert-v3-input" style="min-width: 200px;" @update:model-value="emitUpdate" />
               <q-btn data-test="alert-variables-delete-variable-btn" icon="delete_outline" padding="xs" unelevated size="sm" round flat @click="removeVariable(variable)" />
               <q-btn data-test="alert-variables-add-variable-btn" v-if="index === localVariables.length - 1" icon="add" padding="xs" unelevated size="sm" round flat @click="addVariable" />
             </div>
@@ -86,9 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Description -->
         <div>
           <div class="subsection-label tw:mb-2"><span>{{ t("alerts.description") }}</span></div>
-          <q-input
+          <O2Input
             v-model="localDescription"
-            dense borderless
+            variant="borderless"
             class="inline-condition-select"
             style="width: 100%; resize: none;"
             type="textarea"
@@ -119,10 +119,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <q-input
+          <O2Input
             data-test="add-alert-row-input-textarea"
             v-model="localRowTemplate"
-            dense borderless
+            variant="borderless"
             class="inline-condition-select"
             style="width: 100%; resize: none;"
             type="textarea"
@@ -142,6 +142,7 @@ import { defineComponent, ref, computed, watch, type PropType, type Ref } from "
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
+import { O2Input, O2Select } from "@/lib";
 
 export interface Variable {
   id: string;
@@ -151,6 +152,7 @@ export interface Variable {
 
 export default defineComponent({
   name: "Step6Advanced",
+  components: { O2Input, O2Select },
   props: {
     template: {
       type: String,

@@ -65,14 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="alert-condition-row">
                 <span class="condition-label">Alert if *</span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <q-select
+                  <O2Select
                     v-model="selectedFunction"
                     :options="logFunctionOptions"
-                    emit-value
-                    map-options
-                    dense
-                    borderless
-                    hide-bottom-space
+                    emitValue
+                    mapOptions
+                    hideBottomSpace
                     class="alert-v3-select"
                     style="min-width: 130px; max-width: 180px;"
                     @update:model-value="onLogFunctionChange"
@@ -90,20 +88,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </q-tooltip>
                       </q-item>
                     </template>
-                  </q-select>
+                  </O2Select>
                   <!-- "of [field]" shown for measure modes -->
                   <template v-if="selectedFunction !== 'total_events'">
                     <span class="condition-text">of</span>
-                    <q-select
+                    <O2Select
                       v-model="logMeasureColumn"
                       :options="filteredLogMeasureColumns"
-                      emit-value
-                      dense
-                      borderless
-                      use-input
-                      hide-selected
-                      fill-input
-                      hide-bottom-space
+                      emitValue
+                      useInput
+                      hideSelected
+                      fillInput
+                      hideBottomSpace
                       :placeholder="t('alerts.placeholders.selectColumn')"
                       @filter="filterLogMeasureColumns"
                       class="alert-v3-select"
@@ -115,23 +111,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- COUNT mode -->
                   <template v-if="selectedFunction === 'total_events'">
-                    <q-select
+                    <O2Select
                       v-model="triggerOperator"
                       :options="numericOperators"
-                      dense
-                      borderless
-                      hide-bottom-space
+                      hideBottomSpace
                       class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onTriggerOperatorChange"
                     />
-                    <q-input
+                    <O2Input
                       v-model="triggerThreshold"
                       type="number"
-                      dense
-                      borderless
-                      hide-bottom-space
-                      no-error-icon
+                      hideBottomSpace
+                      noErrorIcon
                       @blur="restoreDefaultThreshold"
                       class="alert-v3-input"
                       style="min-width: 60px; max-width: 80px;"
@@ -145,23 +137,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- MEASURE mode -->
                   <template v-else>
                     <span class="condition-text">is</span>
-                    <q-select
+                    <O2Select
                       v-model="conditionOperator"
                       :options="numericOperators"
-                      dense
-                      borderless
-                      hide-bottom-space
+                      hideBottomSpace
                       class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onConditionOperatorChange"
                     />
-                    <q-input
+                    <O2Input
                       v-model="conditionValue"
                       type="number"
-                      dense
-                      borderless
-                      hide-bottom-space
-                      no-error-icon
+                      hideBottomSpace
+                      noErrorIcon
                       :placeholder="t('alerts.placeholders.value')"
                       class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
@@ -186,19 +174,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="index"
                   >
                     <div class="tw:flex tw:items-center tw:gap-1">
-                      <q-select
+                      <O2Select
                         v-model="logGroupBy[index]"
                         :options="filteredFields"
                         class="alert-v3-select"
-                        borderless
-                        dense
-                        use-input
-                        emit-value
-                        hide-selected
+                        useInput
+                        emitValue
+                        hideSelected
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        fill-input
-                        :input-debounce="400"
-                        hide-bottom-space
+                        fillInput
+                        :inputDebounce="400"
+                        hideBottomSpace
                         @filter="(val: string, update: any) => filterFields(val, update)"
                         style="min-width: 120px; max-width: 180px;"
                         @update:model-value="onLogGroupByChange"
@@ -237,18 +223,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <q-select
+                  <O2Select
                     v-model="triggerOperator"
                     :options="numericOperators"
-                    dense borderless hide-bottom-space
+                    hideBottomSpace
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
                   />
-                  <q-input
+                  <O2Input
                     v-model="triggerThreshold"
                     type="number"
-                    dense borderless hide-bottom-space
+                    hideBottomSpace
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
@@ -265,14 +251,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="alert-condition-row">
                 <span class="condition-label">Alert if *</span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <q-select
+                  <O2Select
                     v-model="selectedFunction"
                     :options="logFunctionOptions"
-                    emit-value
-                    map-options
-                    dense
-                    borderless
-                    hide-bottom-space
+                    emitValue
+                    mapOptions
+                    hideBottomSpace
                     class="alert-v3-select"
                     style="min-width: 130px; max-width: 180px;"
                     @update:model-value="onMetricFunctionChange"
@@ -290,22 +274,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </q-tooltip>
                       </q-item>
                     </template>
-                  </q-select>
+                  </O2Select>
 
                   <!-- "of [field]" hidden for count mode -->
                   <template v-if="selectedFunction !== 'total_events'">
                     <span class="condition-text">of</span>
                     <div style="position: relative; display: inline-flex;">
-                      <q-select
+                      <O2Select
                         v-model="inputData.aggregation.having.column"
                         :options="filteredNumericColumns"
-                        emit-value
-                        dense
-                        borderless
-                        use-input
-                        hide-selected
-                        fill-input
-                        hide-bottom-space
+                        emitValue
+                        useInput
+                        hideSelected
+                        fillInput
+                        hideBottomSpace
                         :placeholder="t('alerts.placeholders.selectColumn')"
                         :readonly="inputData.aggregation.having.column === 'value' && filteredNumericColumns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         :disable="inputData.aggregation.having.column === 'value' && filteredNumericColumns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
@@ -324,23 +306,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Count mode for metrics -->
                   <template v-if="selectedFunction === 'total_events'">
-                    <q-select
+                    <O2Select
                       v-model="triggerOperator"
                       :options="numericOperators"
-                      dense
-                      borderless
-                      hide-bottom-space
+                      hideBottomSpace
                       class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onTriggerOperatorChange"
                     />
-                    <q-input
+                    <O2Input
                       v-model="triggerThreshold"
                       type="number"
-                      dense
-                      borderless
-                      hide-bottom-space
-                      no-error-icon
+                      hideBottomSpace
+                      noErrorIcon
                       class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
                       :rules="[(val: any) => !!val || 'Field is required!']"
@@ -351,23 +329,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Measure mode for metrics -->
                   <template v-else>
-                    <q-select
+                    <O2Select
                       v-model="conditionOperator"
                       :options="numericOperators"
-                      dense
-                      borderless
-                      hide-bottom-space
+                      hideBottomSpace
                       class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onConditionOperatorChange"
                     />
-                    <q-input
+                    <O2Input
                       v-model="conditionValue"
                       type="number"
-                      dense
-                      borderless
-                      hide-bottom-space
-                      no-error-icon
+                      hideBottomSpace
+                      noErrorIcon
                       :placeholder="t('alerts.placeholders.value')"
                       class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
@@ -392,19 +366,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="index"
                   >
                     <div class="tw:flex tw:items-center tw:gap-1">
-                      <q-select
+                      <O2Select
                         v-model="inputData.aggregation.group_by[index]"
                         :options="filteredFields"
                         class="alert-v3-select"
-                        borderless
-                        dense
-                        use-input
-                        emit-value
-                        hide-selected
+                        useInput
+                        emitValue
+                        hideSelected
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        fill-input
-                        :input-debounce="400"
-                        hide-bottom-space
+                        fillInput
+                        :inputDebounce="400"
+                        hideBottomSpace
                         @filter="(val: string, update: any) => filterFields(val, update)"
                         style="min-width: 120px; max-width: 180px;"
                         @update:model-value="emitAggregationUpdate"
@@ -443,18 +415,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <q-select
+                  <O2Select
                     v-model="triggerOperator"
                     :options="numericOperators"
-                    dense borderless hide-bottom-space
+                    hideBottomSpace
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
                   />
-                  <q-input
+                  <O2Input
                     v-model="triggerThreshold"
                     type="number"
-                    dense borderless hide-bottom-space
+                    hideBottomSpace
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
@@ -477,13 +449,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex tw:items-center tw:gap-2">
                   <!-- Minutes/hours mode: number input -->
                   <template v-if="frequencyMode !== 'cron'">
-                    <q-input
+                    <O2Input
                       v-model="checkEveryFrequency"
                       type="number"
-                      dense
-                      borderless
-                      hide-bottom-space
-                      no-error-icon
+                      hideBottomSpace
+                      noErrorIcon
                       class="alert-v3-input"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
@@ -494,11 +464,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <!-- Cron mode: expression input + timezone -->
                   <template v-else>
-                    <q-input
+                    <O2Input
                       v-model="cronExpression"
-                      dense
-                      borderless
-                      hide-bottom-space
+                      hideBottomSpace
                       class="alert-v3-input"
                       placeholder="0 */10 * * * *"
                       style="min-width: 100px; max-width: 100px;"
@@ -507,14 +475,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <!-- Unit dropdown: minutes / hours / cron -->
-                  <q-select
+                  <O2Select
                     :model-value="frequencyMode"
                     :options="frequencyUnitOptions"
-                    dense
-                    borderless
-                    hide-bottom-space
-                    emit-value
-                    map-options
+                    hideBottomSpace
+                    emitValue
+                    mapOptions
                     class="alert-v3-select frequency-unit-select"
                     style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
@@ -522,17 +488,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Timezone (only for cron, inline) -->
                   <template v-if="frequencyMode === 'cron'">
-                    <q-select
+                    <O2Select
                       v-model="cronTimezone"
                       :options="filteredTimezones"
-                      dense
-                      borderless
-                      hide-bottom-space
-                      use-input
-                      emit-value
-                      fill-input
-                      hide-selected
-                      :input-debounce="0"
+                      hideBottomSpace
+                      useInput
+                      emitValue
+                      fillInput
+                      hideSelected
+                      :inputDebounce="0"
                       class="alert-v3-select"
                       placeholder="timezone"
                       :display-value="cronTimezone || 'timezone'"
@@ -541,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="onCronTimezoneChange"
                     >
                     <q-tooltip v-if="cronTimezone" :delay="300" anchor="bottom middle" self="top middle">{{ cronTimezone }}</q-tooltip>
-                  </q-select>
+                  </O2Select>
                   </template>
 
                   <span class="condition-text">on these</span>
@@ -755,13 +719,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="inline-editor-title">VRL Editor</span>
                   </div>
                   <div class="tw:flex tw:items-center tw:gap-1">
-                    <q-select
+                    <O2Select
                       :model-value="null"
                       :options="functionsList"
-                      option-label="name"
-                      option-value="name"
-                      borderless dense use-input hide-selected fill-input
-                      input-debounce="0"
+                      optionLabel="name"
+                      optionValue="name"
+                      useInput
+                      hideSelected
+                      fillInput
+                      :inputDebounce="0"
                       behavior="menu"
                       clearable
                       class="mini-select alert-v3-select"
@@ -772,7 +738,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #no-option>
                         <q-item><q-item-section>No functions</q-item-section></q-item>
                       </template>
-                    </q-select>
+                    </O2Select>
                     <q-toggle
                       v-model="showVrl"
                       :icon="'img:' + getImageURL('images/common/function.svg')"
@@ -847,11 +813,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:flex-col tw:gap-1">
                 <div class="tw:flex tw:items-center tw:gap-2">
                   <template v-if="frequencyMode !== 'cron'">
-                    <q-input
+                    <O2Input
                       v-model="checkEveryFrequency"
                       type="number"
-                      dense borderless hide-bottom-space
-                      no-error-icon
+                      hideBottomSpace
+                      noErrorIcon
                       class="alert-v3-input"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
@@ -861,31 +827,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </template>
                   <template v-else>
-                    <q-input
+                    <O2Input
                       v-model="cronExpression"
-                      dense borderless hide-bottom-space
+                      hideBottomSpace
                       class="alert-v3-input"
                       placeholder="0 */10 * * * *"
                       style="min-width: 100px; max-width: 100px;"
                       @update:model-value="onCronExpressionChange"
                     />
                   </template>
-                  <q-select
+                  <O2Select
                     :model-value="frequencyMode"
                     :options="frequencyUnitOptions"
-                    dense borderless hide-bottom-space
-                    emit-value map-options
+                    hideBottomSpace
+                    emitValue
+                    mapOptions
                     class="alert-v3-select frequency-unit-select"
                     style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
                   />
                   <template v-if="frequencyMode === 'cron'">
-                    <q-select
+                    <O2Select
                       v-model="cronTimezone"
                       :options="filteredTimezones"
-                      dense borderless hide-bottom-space
-                      use-input emit-value fill-input hide-selected
-                      :input-debounce="0"
+                      hideBottomSpace
+                      useInput
+                      emitValue
+                      fillInput
+                      hideSelected
+                      :inputDebounce="0"
                       class="alert-v3-select"
                       placeholder="timezone"
                       :display-value="cronTimezone || 'timezone'"
@@ -894,7 +864,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="onCronTimezoneChange"
                     >
                       <q-tooltip v-if="cronTimezone" :delay="300" anchor="bottom middle" self="top middle">{{ cronTimezone }}</q-tooltip>
-                    </q-select>
+                    </O2Select>
                   </template>
                 </div>
                 <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:italic"
@@ -911,18 +881,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="localTab === 'sql'" class="alert-condition-row">
               <span class="condition-label sql-promql-label">Alert if No. of events *</span>
               <div class="tw:flex tw:items-center tw:gap-2">
-                <q-select
+                <O2Select
                   v-model="triggerOperator"
                   :options="numericOperators"
-                  dense borderless hide-bottom-space
+                  hideBottomSpace
                   class="alert-v3-select"
                   style="min-width: 70px; max-width: 120px;"
                   @update:model-value="onTriggerOperatorChange"
                 />
-                <q-input
+                <O2Input
                   v-model="triggerThreshold"
                   type="number"
-                  dense borderless hide-bottom-space
+                  hideBottomSpace
                   class="alert-v3-input"
                   style="min-width: 60px; max-width: 80px;"
                   min="1"
@@ -941,21 +911,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <q-select
+                  <O2Select
                     v-model="promqlCondition.operator"
                     :options="numericOperators"
-                    dense borderless hide-bottom-space
-                    no-error-icon
+                    hideBottomSpace
+                    noErrorIcon
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     :rules="[(val: any) => !!val || 'Field is required!']"
                     @update:model-value="emitPromqlConditionUpdate"
                   />
-                  <q-input
+                  <O2Input
                     v-model.number="promqlCondition.value"
                     type="number"
-                    dense borderless hide-bottom-space
-                    no-error-icon
+                    hideBottomSpace
+                    noErrorIcon
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 120px;"
                     debounce="300"
@@ -971,18 +941,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <q-select
+                  <O2Select
                     v-model="triggerOperator"
                     :options="numericOperators"
-                    dense borderless hide-bottom-space
+                    hideBottomSpace
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
                   />
-                  <q-input
+                  <O2Input
                     v-model="triggerThreshold"
                     type="number"
-                    dense borderless hide-bottom-space
+                    hideBottomSpace
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
@@ -1045,6 +1015,7 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
+import { O2Input, O2Select } from "@/lib";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue")
@@ -1061,6 +1032,8 @@ export default defineComponent({
     QueryEditorDialog,
     CustomConfirmDialog,
     UnifiedQueryEditor,
+    O2Input,
+    O2Select,
   },
   props: {
     tab: {

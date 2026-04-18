@@ -30,10 +30,9 @@
       </div>
       <!-- Normal input when not generating -->
       <div v-else class="tw:flex tw:items-center tw:gap-2">
-        <q-input
+        <O2Input
           v-model="aiInputText"
-          dense
-          borderless
+          variant="borderless"
           :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')"
           :class="aiInputFieldClass"
           :data-test="`${dataTestPrefix}-ai-input-field`"
@@ -42,7 +41,7 @@
           <template v-slot:prepend>
             <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
           </template>
-        </q-input>
+        </O2Input>
         <!-- Send Button -->
         <q-btn
           round
@@ -124,6 +123,7 @@
 import { ref, computed, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
+import { O2Input } from '@/lib';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { useChatHistory } from '@/composables/useChatHistory';

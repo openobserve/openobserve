@@ -48,11 +48,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: 87px; margin-left: 0 !important"
                 class="silence-notification-input"
               >
-                <q-input
+                <O2Input
                   v-model.number="formData.trigger_condition.silence"
                   type="number"
-                  dense
-                  borderless
+                  variant="borderless"
                   min="0"
                   class="alert-v3-input"
                   style="background: none"
@@ -93,18 +92,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="tw:flex tw:flex-col">
             <div class="tw:flex tw:items-center">
-              <q-select
+              <O2Select
                 v-model="localDestinations"
                 :options="filteredDestinations"
                 data-test="alert-destinations-select"
-                color="input-border"
-                bg-color="input-bg"
                 class="showLabelOnTop no-case destinations-select-field"
-                filled
-                dense
+                variant="filled"
                 multiple
-                use-input
-                input-debounce="0"
+                useInput
+                :inputDebounce="0"
                 @filter="filterDestinations"
                 style="width: 300px; max-width: 300px"
                 @update:model-value="emitDestinationsUpdate"
@@ -137,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-item-section class="text-grey">No destinations available</q-item-section>
                   </q-item>
                 </template>
-              </q-select>
+              </O2Select>
               <q-btn
                 icon="refresh"
                 class="iconHoverBtn q-ml-xs"
@@ -195,11 +191,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <div ref="periodFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
               <div style="width: 87px; margin-left: 0 !important" class="period-input-container">
-                <q-input
+                <O2Input
                   v-model.number="formData.trigger_condition.period"
                   type="number"
-                  dense
-                  borderless
+                  variant="borderless"
                   min="1"
                   class="alert-v3-input"
                   style="background: none"
@@ -248,11 +243,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 style="width: 87px; margin-left: 0 !important"
               >
-                <q-input
+                <O2Input
                   v-model.number="formData.trigger_condition.silence"
                   type="number"
-                  dense
-                  borderless
+                  variant="borderless"
                   min="0"
                   class="alert-v3-input"
                   debounce="300"
@@ -304,20 +298,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div>
             <div class="flex items-center">
-              <q-select
+              <O2Select
                 ref="destinationsFieldRef"
                 v-model="localDestinations"
                 :options="filteredDestinations"
                 data-test="alert-destinations-select"
                 class="no-case q-py-none destinations-select-field alert-v3-select destination-select-field"
                 :class="destinationError ? 'destination-select-error' : ''"
-                borderless
-                dense
+                variant="borderless"
                 multiple
-                use-input
-                fill-input
-                :input-debounce="400"
-                hide-bottom-space
+                useInput
+                fillInput
+                :inputDebounce="400"
+                hideBottomSpace
                 @filter="filterDestinations"
                 @update:model-value="destinationError = false; emitDestinationsUpdate()"
                 style="width: 180px; max-width: 300px"
@@ -354,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-item-section class="text-grey">No destinations available</q-item-section>
                   </q-item>
                 </template>
-              </q-select>
+              </O2Select>
               <q-btn
                 icon="refresh"
                 class=" q-ml-xs"
@@ -431,9 +424,11 @@ import {
   isAboveMinRefreshInterval,
   convertMinutesToCron,
 } from "@/utils/zincutils";
+import { O2Input, O2Select } from '@/lib';
 
 export default defineComponent({
   name: "Step3AlertConditions",
+  components: { O2Input, O2Select },
   props: {
     formData: {
       type: Object as PropType<any>,

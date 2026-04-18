@@ -77,19 +77,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="tw:flex tw:flex-col">
           <div class="tw:flex tw:items-center">
-            <q-select
+            <O2Select
               v-model="config.alert_destination_ids"
               :options="filteredDestinations"
-              option-label="name"
-              option-value="name"
-              emit-value
-              map-options
+              optionLabel="name"
+              optionValue="name"
+              emitValue
+              mapOptions
               multiple
-              use-chips
-              dense
-              borderless
-              use-input
-              input-debounce="300"
+              useChips
+              variant="borderless"
+              useInput
+              :inputDebounce="300"
               :max-values="undefined"
               class="alert-v3-select destination-select"
               style="min-width: 300px; max-width: 420px"
@@ -137,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </q-item>
               </template>
-            </q-select>
+            </O2Select>
             <q-btn
               icon="refresh"
               class="iconHoverBtn q-ml-xs"
@@ -195,9 +194,12 @@ import { computed, defineComponent, ref, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { O2Input, O2Select } from "@/lib";
 
 export default defineComponent({
   name: "AnomalyAlerting",
+
+  components: { O2Select },
 
   props: {
     config: {

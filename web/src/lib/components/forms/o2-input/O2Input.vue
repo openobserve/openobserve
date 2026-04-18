@@ -604,15 +604,15 @@ const handleClear = () => {
   // ─── Variant: borderless ──────────────────────────────────────────────────
   // Matches Quasar's `borderless` prop: no visible border at rest.
   &--borderless &__control {
-    border-color: transparent;
+    border-color: var(--o2-border);
     background: transparent;
   }
 
-  &--borderless&--focused &__control {
+  &--borderless.o2-input--focused &__control {
     border-color: var(--o2-input-border-focus);
   }
 
-  &--borderless&--error &__control {
+  &--borderless.o2-input--error &__control {
     border-color: var(--o2-input-border-error);
   }
 
@@ -622,12 +622,12 @@ const handleClear = () => {
     background: var(--o2-secondary-background);
   }
 
-  &--filled&--focused &__control {
+  &--filled.o2-input--focused &__control {
     background: var(--o2-secondary-background);
     border-color: var(--o2-input-border-focus);
   }
 
-  &--filled&--error &__control {
+  &--filled.o2-input--error &__control {
     border-color: var(--o2-input-border-error);
   }
 }

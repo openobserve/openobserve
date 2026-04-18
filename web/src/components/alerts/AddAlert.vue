@@ -71,29 +71,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- CREATE MODE: name input + folder dropdown (original add layout) -->
             <template v-else>
-              <q-input
+              <O2Input
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
                 v-model="formData.name"
                 data-test="add-alert-name-input"
-                dense
-                borderless
-                no-error-icon
+                variant="borderless"
+                noErrorIcon
                 :placeholder="'Alert name'"
                 class="alert-v3-field topbar-name-input tw:text-sm"
                 :class="alertNameError ? 'field-error' : ''"
-                hide-bottom-space
+                hideBottomSpace
                 @update:model-value="alertNameError = false"
               />
-              <q-input
+              <O2Input
                 v-else
                 ref="anomalyNameRef"
                 v-model="anomalyConfig.name"
-                dense
-                borderless
+                variant="borderless"
                 placeholder="Anomaly name"
                 class="alert-v3-field topbar-name-input tw:text-sm"
-                hide-bottom-space
+                hideBottomSpace
               />
               <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0 tw:ml-2">
                 <label class="alert-v3-inline-label">Folder</label>
@@ -113,21 +111,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Stream Type -->
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
             <label class="alert-v3-inline-label">{{ t("alerts.streamType") }} <span class="tw:text-red-500">*</span></label>
-            <q-select
+            <O2Select
               ref="streamTypeRef"
               data-test="add-alert-stream-type-select-dropdown"
               v-model="formData.stream_type"
               :options="streamTypes"
-              :popup-content-style="{ textTransform: 'lowercase' }"
+              :popupContentStyle="{ textTransform: 'lowercase' }"
               class="no-case alert-v3-field topbar-stream-type"
               :class="streamTypeError ? 'field-error' : ''"
-              dense
-              borderless
-              use-input
-              fill-input
-              hide-selected
-              hide-bottom-space
-              :input-debounce="200"
+              variant="borderless"
+              useInput
+              fillInput
+              hideSelected
+              hideBottomSpace
+              :inputDebounce="200"
               :readonly="beingUpdated || anomalyEditMode"
               :disable="beingUpdated || anomalyEditMode"
               @filter="(val, update) => update(() => {})"
@@ -139,22 +136,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Stream Name -->
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
             <label class="alert-v3-inline-label">{{ t("alerts.stream_name") }} <span class="tw:text-red-500">*</span></label>
-            <q-select
+            <O2Select
               ref="streamNameRef"
               data-test="add-alert-stream-name-select-dropdown"
               v-model="formData.stream_name"
               :options="filteredStreams"
               :loading="isFetchingStreams"
-              color="input-border"
               class="no-case alert-v3-field topbar-stream-name"
               :class="streamNameError ? 'field-error' : ''"
-              dense
-              borderless
-              use-input
-              hide-selected
-              hide-bottom-space
-              fill-input
-              :input-debounce="400"
+              variant="borderless"
+              useInput
+              hideSelected
+              hideBottomSpace
+              fillInput
+              :inputDebounce="400"
               :readonly="beingUpdated || anomalyEditMode"
               :disable="beingUpdated || anomalyEditMode || !formData.stream_type"
               @filter="filterStreams"
@@ -171,14 +166,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
             <label class="alert-v3-inline-label">{{ t("alerts.alertType") || 'Alert Type' }}</label>
 
-            <q-select
+            <O2Select
               v-model="formData.is_real_time"
               :options="alertTypeOptions"
-              emit-value
-              map-options
-              dense
-              borderless
-              hide-bottom-space
+              emitValue
+              mapOptions
+              variant="borderless"
+              hideBottomSpace
               :disable="beingUpdated || anomalyEditMode"
               class="alert-v3-field"
               style="min-width: 110px;"
@@ -463,6 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, computed, watch } from "vue";
 
+import { O2Input, O2Select } from "@/lib";
 import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
 import AlertSettings from "./steps/AlertSettings.vue";
@@ -505,6 +500,8 @@ export default defineComponent({
     "refresh:templates",
   ],
   components: {
+    O2Input,
+    O2Select,
     JsonEditor,
     QueryConfig,
     AlertSettings,

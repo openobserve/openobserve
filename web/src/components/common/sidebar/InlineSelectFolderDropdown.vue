@@ -16,16 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:flex tw:items-center tw:gap-1">
-    <q-select
+    <O2Select
       :model-value="modelValue"
       :options="folderOptions"
       class="alert-v3-select folder-select"
-      dense
-      borderless
+      variant="borderless"
       behavior="menu"
-      input-debounce="0"
-      emit-value
-      map-options
+      :inputDebounce="0"
+      emitValue
+      mapOptions
       :disable="disable"
       @update:model-value="$emit('update:modelValue', $event)"
     />
@@ -58,12 +57,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from "vue";
 import { useStore } from "vuex";
+import { O2Select } from "@/lib";
 import AddFolder from "./AddFolder.vue";
 import { getFoldersListByType } from "@/utils/commons";
 
 export default defineComponent({
   name: "InlineSelectFolderDropdown",
-  components: { AddFolder },
+  components: { AddFolder, O2Select },
   emits: ["update:modelValue"],
   props: {
     modelValue: {

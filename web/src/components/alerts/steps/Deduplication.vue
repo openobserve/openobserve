@@ -44,21 +44,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.deduplication.fingerprintFieldsHint") }}
         </div>
         <div class="tw:relative">
-          <q-select
+          <O2Select
             v-model="localDeduplication.fingerprint_fields"
             :options="filteredColumns"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop no-case fingerprint-select tw:max-w-[600px] tw:min-w-[300px]"
-            dense
-            borderless
+            variant="borderless"
             multiple
-            use-chips
-            use-input
-            input-debounce="300"
-            new-value-mode="add-unique"
-            emit-value
-            map-options
+            useChips
+            useInput
+            :inputDebounce="300"
+            newValueMode="add-unique"
+            emitValue
+            mapOptions
             @filter="filterColumns"
             @update:model-value="emitUpdate"
           >
@@ -68,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 fields)
               </div>
             </template>
-          </q-select>
+          </O2Select>
           <q-tooltip v-if="localDeduplication.fingerprint_fields?.length > 0" max-width="400px">
             {{ localDeduplication.fingerprint_fields.join(', ') }}
           </q-tooltip>
@@ -98,11 +95,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="tw:flex tw:items-center">
           <div class="tw:w-[210px] tw:ml-0">
-            <q-input
+            <O2Input
               v-model.number="localDeduplication.time_window_minutes"
               type="number"
-              dense
-              borderless
+              variant="borderless"
               min="1"
               class="alert-v3-input"
               :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
@@ -128,9 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { O2Input, O2Select } from "@/lib";
 
 export default defineComponent({
   name: "Step5Deduplication",
+  components: { O2Input, O2Select },
   props: {
     deduplication: {
       type: Object as PropType<any>,

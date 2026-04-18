@@ -16,3 +16,6 @@
 
 export { O2Input } from './components/forms/o2-input'
 export type { O2InputProps } from './components/forms/o2-input'
+
+export { O2Select } from './components/forms/o2-select'
+export type { O2SelectProps } from './components/forms/o2-select'
