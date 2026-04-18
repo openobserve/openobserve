@@ -683,28 +683,14 @@ mod tests {
 
     #[test]
     fn test_service_identity_config_default_from_env_has_defaults() {
-        // Test that default_from_env creates default sets and tracked_alias_ids from env/fallback
+        // new_default() returns an intentionally empty config — sets and tracked_alias_ids are
+        // populated dynamically at runtime by get_service_identity_config(), not hardcoded here.
         use config::meta::correlation::ServiceIdentityConfig;
 
         let config = ServiceIdentityConfig::new_default();
 
-        // Should have default identity sets (AWS, Azure, Kubernetes)
-        assert_eq!(config.sets.len(), 3);
-        assert_eq!(config.sets[0].id, "aws");
-        assert_eq!(config.sets[1].id, "azure");
-        assert_eq!(config.sets[2].id, "kubernetes");
-
-        // Should have tracked_alias_ids from env or fallback defaults
-        assert!(!config.tracked_alias_ids.is_empty());
-
-        // But sets should contain the 3 hardcoded identity sets (AWS, Azure, Kubernetes)
-        assert_eq!(config.sets.len(), 3);
-
-        // Verify the hardcoded sets are present
-        let set_ids: Vec<&str> = config.sets.iter().map(|s| s.id.as_str()).collect();
-        assert!(set_ids.contains(&"aws"));
-        assert!(set_ids.contains(&"azure"));
-        assert!(set_ids.contains(&"kubernetes"));
+        assert_eq!(config.sets.len(), 0);
+        assert_eq!(config.tracked_alias_ids.len(), 0);
     }
 
     #[test]
