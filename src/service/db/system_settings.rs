@@ -479,17 +479,22 @@ pub async fn get_service_identity_config(
             .collect();
     }
 
-    // Auto-config: if sets is empty but tracked_alias_ids is not empty, create category-based sets
+    // Auto-config: if sets is empty but tracked_alias_ids is not empty, create category-based sets.
+    // Only aliases with is_workload_type=true are used as distinguish_by fields — this prevents
+    // HTTP, Database, System, Observability, and Network aliases from being treated as workload
+    // identity discriminators.
     if config.sets.is_empty() && !config.tracked_alias_ids.is_empty() {
         // Group tracked alias IDs by their semantic categories
         let semantic_groups = get_semantic_field_groups(org_id).await;
         let mut category_groups = std::collections::HashMap::new();
 
-        // Map each tracked alias ID to its semantic group category
-        // Use String as HashMap key to ensure proper equality comparison
-        // (avoids potential issues with &str slices from different iterations)
+        // Only include aliases that are explicitly marked as workload-type dimensions.
+        // The group field on those aliases is used as the identity set id/label.
         for alias_id in &config.tracked_alias_ids {
-            if let Some(group) = semantic_groups.iter().find(|g| g.id == *alias_id) {
+            if let Some(group) = semantic_groups
+                .iter()
+                .find(|g| g.id == *alias_id && g.is_workload_type)
+            {
                 let category = group.group.as_deref().unwrap_or("Common").to_string();
                 category_groups
                     .entry(category)

@@ -61,6 +61,14 @@ pub struct FieldAlias {
     ///
     /// Note: Field names can overlap with other groups. First-defined group wins.
     pub fields: Vec<String>,
+
+    /// When true, this alias is a workload-type dimension used to build identity sets.
+    /// Aliases with this flag are grouped by their `group` field to form `IdentitySet`
+    /// entries with `distinguish_by` populated from those alias IDs.
+    /// Aliases without this flag (HTTP, Database, System, etc.) are never used as
+    /// identity set discriminators.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub is_workload_type: bool,
 }
 
 impl FieldAlias {
@@ -72,6 +80,7 @@ impl FieldAlias {
             display: display.into(),
             group: None,
             fields,
+            is_workload_type: false,
         }
     }
 
@@ -88,6 +97,7 @@ impl FieldAlias {
             display: display.into(),
             group: Some(group.into()),
             fields,
+            is_workload_type: false,
         }
     }
 
@@ -209,88 +219,22 @@ pub struct ServiceIdentityConfig {
     pub tracked_alias_ids: Vec<String>,
 }
 
-/// Returns the default tracked alias IDs from environment variable or fallback defaults.
-///
-/// Reads the `O2_SERVICE_STREAMS_TRACKED_ALIAS_IDS` environment variable and parses it
-/// as a comma-separated list of semantic group IDs to track per service record.
-///
-/// **Environment Variable**: `O2_SERVICE_STREAMS_TRACKED_ALIAS_IDS`
-/// - Format: Comma-separated list (e.g., "k8s-cluster,aws-ecs-cluster,environment")
-/// - Whitespace is trimmed from each entry
-/// - Empty entries are filtered out
-///
-/// **Fallback**: If the environment variable is not set, returns common defaults for
-/// Kubernetes, AWS, and Azure environments.
-///
-/// **Enterprise Note**: Enterprise deployments may set different values via environment
-/// variables or override this function entirely.
-///
-/// # Returns
-///
-/// A vector of semantic group ID strings that should be tracked for service correlation.
-fn default_tracked_alias_ids() -> Vec<String> {
-    std::env::var("O2_SERVICE_STREAMS_TRACKED_ALIAS_IDS")
-        .unwrap_or_else(|_| {
-            // Fallback to common defaults if env var not set
-            "k8s-cluster,k8s-namespace,k8s-deployment,aws-ecs-cluster,availability-zone,faas-name,azure-resource-group,azure-cloud-role".to_string()
-        })
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect()
-}
-
-/// Returns the default identity sets for common cloud and container platforms.
-///
-/// This provides OSS fallback identity sets for AWS, Azure, and Kubernetes environments.
-/// Each set defines how to distinguish services within that platform using semantic
-/// dimension groups (e.g., `aws-ecs-cluster`, `k8s-namespace`, etc.).
-///
-/// **Enterprise Note**: Enterprise deployments may override these defaults with
-/// richer configurations loaded from JSON files or other sources.
-///
-/// # Returns
-///
-/// A vector of 3 identity sets:
-/// - **AWS**: Distinguishes by ECS cluster, availability zone, and FaaS name
-/// - **Azure**: Distinguishes by resource group and cloud role
-/// - **Kubernetes**: Distinguishes by cluster, namespace, and deployment
-fn default_identity_sets() -> Vec<IdentitySet> {
-    vec![
-        IdentitySet {
-            id: "aws".to_string(),
-            label: "AWS".to_string(),
-            distinguish_by: vec![
-                "aws-ecs-cluster".to_string(),
-                "availability-zone".to_string(),
-                "faas-name".to_string(),
-            ],
-        },
-        IdentitySet {
-            id: "azure".to_string(),
-            label: "Azure".to_string(),
-            distinguish_by: vec![
-                "azure-resource-group".to_string(),
-                "azure-cloud-role".to_string(),
-            ],
-        },
-        IdentitySet {
-            id: "kubernetes".to_string(),
-            label: "Kubernetes".to_string(),
-            distinguish_by: vec![
-                "k8s-cluster".to_string(),
-                "k8s-namespace".to_string(),
-                "k8s-deployment".to_string(),
-            ],
-        },
-    ]
-}
-
 impl ServiceIdentityConfig {
+    /// Returns an empty config used as a bootstrap fallback.
+    ///
+    /// Identity sets and tracked alias IDs are not hardcoded here. Instead:
+    /// - `tracked_alias_ids` is sourced from `O2_SERVICE_STREAMS_TRACKED_ALIAS_IDS` (enterprise env
+    ///   config) and populated by `get_service_identity_config()` at load time.
+    /// - `sets` are derived dynamically from semantic field groups where `is_workload_type=true`,
+    ///   grouped by their `group` field, by the auto-configure path in
+    ///   `get_service_identity_config()`.
+    ///
+    /// If `tracked_alias_ids` resolves to empty (env var unset or explicitly `""`), service
+    /// streams processing treats the feature as disabled for that org.
     pub fn new_default() -> Self {
         Self {
-            sets: default_identity_sets(),
-            tracked_alias_ids: default_tracked_alias_ids(),
+            sets: vec![],
+            tracked_alias_ids: vec![],
         }
     }
 
