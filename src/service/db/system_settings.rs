@@ -484,8 +484,27 @@ pub async fn get_service_identity_config(
     // HTTP, Database, System, Observability, and Network aliases from being treated as workload
     // identity discriminators.
     if config.sets.is_empty() && !config.tracked_alias_ids.is_empty() {
-        // Group tracked alias IDs by their semantic categories
-        let semantic_groups = get_semantic_field_groups(org_id).await;
+        // Group tracked alias IDs by their semantic categories.
+        // If the DB-stored groups predate the is_workload_type field (all false/missing), patch
+        // them from the defaults file by ID so user-customised fields are preserved.
+        let mut semantic_groups = get_semantic_field_groups(org_id).await;
+        let has_workload_types = semantic_groups.iter().any(|g| g.is_workload_type);
+        if !has_workload_types {
+            log::debug!(
+                "[ServiceIdentityConfig] DB semantic groups for org {} have no is_workload_type=true entries (stale), patching from defaults",
+                org_id
+            );
+            let default_workload: std::collections::HashMap<&str, bool> =
+                get_default_semantic_field_groups()
+                    .iter()
+                    .map(|g| (g.id.as_str(), g.is_workload_type))
+                    .collect();
+            for group in &mut semantic_groups {
+                if let Some(&is_workload) = default_workload.get(group.id.as_str()) {
+                    group.is_workload_type = is_workload;
+                }
+            }
+        }
         let mut category_groups = std::collections::HashMap::new();
 
         // Only include aliases that are explicitly marked as workload-type dimensions.
