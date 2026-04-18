@@ -380,6 +380,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
+          <!-- Field Name Mapping -->
+          <div v-if="selectedService && Object.keys(selectedService.field_name_mapping ?? {}).length > 0" class="panel-block">
+            <div class="panel-block-label">{{ t('settings.correlation.fieldNameMapping') }}</div>
+            <div class="panel-mapping-grid">
+              <template
+                v-for="[raw, mapped] in Object.entries(selectedService.field_name_mapping ?? {}).sort(([a], [b]) => a.localeCompare(b))"
+                :key="raw"
+              >
+                <span class="mapping-key">{{ raw }}</span>
+                <q-icon name="arrow_forward" size="0.75rem" class="tw:text-gray-400 tw:justify-self-center" />
+                <span class="mapping-val">{{ mapped }}</span>
+              </template>
+            </div>
+          </div>
 
         </div>
       </q-card>
