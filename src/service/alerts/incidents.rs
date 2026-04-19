@@ -668,21 +668,9 @@ async fn query_service_discovery_key(
 ) -> Option<ServiceDiscoveryResult> {
     #[cfg(feature = "enterprise")]
     {
-        let identity_config = {
-            use config::meta::{correlation::ServiceIdentityConfig, system_settings::SettingScope};
-            match infra::table::system_settings::get(
-                &SettingScope::Org,
-                Some(org_id),
-                None,
-                "service_identity",
-            )
-            .await
-            {
-                Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
-                    .unwrap_or_else(|_| ServiceIdentityConfig::default_config()),
-                _ => ServiceIdentityConfig::default_config(),
-            }
-        };
+        let identity_config =
+            crate::service::db::system_settings::get_service_identity_config(org_id).await;
+
         let semantic_groups =
             o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
 
