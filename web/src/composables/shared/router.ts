@@ -84,6 +84,12 @@ import Login from "@/views/Login.vue";
 const useRoutes = () => {
   const parentRoutes: any = [
     {
+      // O2 Component Library playground — dev-only, no auth required
+      path: "/demo",
+      component: () => import("@/views/ComponentDemo.vue"),
+      meta: { title: "O2 Component Demo" },
+    },
+    {
       path: "/login",
       component: Login,
       meta: {
