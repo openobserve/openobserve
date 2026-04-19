@@ -333,6 +333,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
       >
+        <!-- DOM element counter — dev analysis badge -->
+        <span class="dom-counter tw:mr-auto">
+          <span class="dom-counter__label">DOM elements</span>
+          <span class="dom-counter__value">{{ domCount }}</span>
+        </span>
+
         <q-btn
           data-test="add-alert-cancel-btn"
           class="o2-secondary-button tw:h-[36px]"
@@ -455,7 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, watch } from "vue";
+import { defineComponent, computed, watch, ref, onMounted, onUnmounted, nextTick } from "vue";
 
 import { O2Input, O2Select } from "@/lib";
 import JsonEditor from "../common/JsonEditor.vue";
@@ -582,6 +588,25 @@ export default defineComponent({
       });
     };
 
+    // ── DOM element counter (dev analysis) ──────────────────────────────────
+    const domCount = ref(0);
+    let domObserver: MutationObserver | null = null;
+
+    const updateDomCount = () => {
+      domCount.value = document.querySelectorAll('*').length;
+    };
+
+    onMounted(() => {
+      nextTick(updateDomCount);
+      domObserver = new MutationObserver(updateDomCount);
+      domObserver.observe(document.body, { childList: true, subtree: true });
+    });
+
+    onUnmounted(() => {
+      domObserver?.disconnect();
+    });
+    // ────────────────────────────────────────────────────────────────────────
+
     return {
       ...alertForm,
       isAnomalyDetectionEnabled,
@@ -590,6 +615,7 @@ export default defineComponent({
       activeFolderName,
       goBackToAlertsList,
       activeEvaluationStatus,
+      domCount,
     };
   },
 
@@ -597,6 +623,28 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+// ── DOM counter badge ──────────────────────────────────────────────────────────
+.dom-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  opacity: 0.6;
+
+  &__label {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__value {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 0.75rem;
+  }
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 .active-tab {
   color: var(--q-primary);
   border-bottom: 2px solid var(--q-primary);
