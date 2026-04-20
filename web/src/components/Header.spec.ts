@@ -886,7 +886,7 @@ describe("Header Component", () => {
       expect(wrapper.props("user").email).toBe("john@test.com");
     });
 
-    it("should render user tooltip with auto width for long text", () => {
+    it("should apply header-user-tooltip class to profile button tooltip", () => {
       const tooltipWrapper = createWrapper({
         mountType: "mount",
         stubsOverrides: {
