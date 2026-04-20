@@ -164,6 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ getChildCount((spans as any[])[virtualRow.index]) }}
                   <div
+                    v-if="
+                      collapseMapping[(spans as any[])[virtualRow.index].spanId]
+                    "
                     data-test="vertical-segment"
                     :style="{
                       position: 'absolute',
