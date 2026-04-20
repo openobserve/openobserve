@@ -360,16 +360,14 @@ pub async fn create_config(
         .super_cluster
         .enabled
         && !config::get_config().common.local_mode
-    {
-        if let Err(e) =
+        && let Err(e) =
             o2_enterprise::enterprise::super_cluster::queue::anomaly_config_create(result.clone())
                 .await
-        {
-            log::warn!(
-                "[anomaly_detection {}] failed to broadcast ConfigCreate to super cluster: {e}",
-                result.anomaly_id
-            );
-        }
+    {
+        log::warn!(
+            "[anomaly_detection {}] failed to broadcast ConfigCreate to super cluster: {e}",
+            result.anomaly_id
+        );
     }
 
     let folder_name_owned = folder_name.to_string();
@@ -655,16 +653,14 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
         .super_cluster
         .enabled
         && !config::get_config().common.local_mode
-    {
-        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::anomaly_config_delete(
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::anomaly_config_delete(
             org_id, anomaly_id,
         )
         .await
-        {
-            log::warn!(
-                "[anomaly_detection {anomaly_id}] failed to broadcast ConfigDelete to super cluster: {e}"
-            );
-        }
+    {
+        log::warn!(
+            "[anomaly_detection {anomaly_id}] failed to broadcast ConfigDelete to super cluster: {e}"
+        );
     }
 
     // Remove the detection trigger from the shared scheduler.
