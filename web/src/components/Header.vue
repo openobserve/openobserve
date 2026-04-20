@@ -217,6 +217,9 @@ size="16px" class="q-mr-xs" />
         <div class="row items-center no-wrap tw:gap-2">
           <img :src="getBtnLogo" class="header-icon ai-icon" />
         </div>
+        <q-tooltip anchor="top middle" self="bottom middle">
+          Open AI Chat (⌘K / Ctrl+K)
+        </q-tooltip>
       </q-btn>
 
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->

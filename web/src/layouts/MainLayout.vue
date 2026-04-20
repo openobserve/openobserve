@@ -170,6 +170,7 @@ import {
   markRaw,
   nextTick,
   onBeforeMount,
+  onBeforeUnmount,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
@@ -571,6 +572,38 @@ export default defineComponent({
           setRumUser();
         }
       }
+    });
+
+    const isCtrlOrCmdKShortcut = (event: KeyboardEvent) =>
+      (event.ctrlKey || event.metaKey) &&
+      !event.altKey &&
+      !event.shiftKey &&
+      event.key.toLowerCase() === "k";
+
+    const isInsideQueryEditor = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      return Boolean(target.closest(".monaco-editor, .code-query-editor-container"));
+    };
+
+    const openAIChat = () => {
+      if (store.state.isAiChatEnabled) return;
+      store.dispatch("setIsAiChatEnabled", true);
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    const handleGlobalAIShortcut = (event: KeyboardEvent) => {
+      if (!store.state.zoConfig?.ai_enabled || !isCtrlOrCmdKShortcut(event)) return;
+      if (isInsideQueryEditor(event.target)) return;
+      event.preventDefault();
+      openAIChat();
+    };
+
+    onMounted(() => {
+      window.addEventListener("keydown", handleGlobalAIShortcut);
+    });
+
+    onBeforeUnmount(() => {
+      window.removeEventListener("keydown", handleGlobalAIShortcut);
     });
 
     const updateIncidentsMenu = () => {

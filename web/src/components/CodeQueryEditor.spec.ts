@@ -67,7 +67,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     registerCompletionItemProvider: vi.fn(() => ({ dispose: vi.fn() })),
   },
   KeyMod: { CtrlCmd: 1 },
-  KeyCode: { Enter: 13 },
+  KeyCode: { Enter: 13, KeyK: 41 },
 }));
 
 // Mock dynamic imports
@@ -144,6 +144,9 @@ describe("CodeQueryEditor", () => {
     store = createStore({
       state: {
         theme: "light",
+        zoConfig: {
+          ai_enabled: true,
+        },
       },
     });
     // Reset call histories on the stable editor instance so each test starts clean
@@ -556,6 +559,72 @@ describe("CodeQueryEditor", () => {
       expect(mockEditorObj.addCommand).toHaveBeenCalled();
       const firstCall = mockEditorObj.addCommand.mock.calls[0];
       expect(firstCall[2]).toBe("ctrlenter");
+    });
+  });
+
+  describe("Ctrl+K / Cmd+K keyboard shortcut", () => {
+    let shortcutWrapper: ReturnType<typeof mount> | null = null;
+    let getElementByIdSpy: ReturnType<typeof vi.spyOn>;
+
+    const mountAndSetup = async (props: any = {}) => {
+      const fakeEditorEl = document.createElement("div");
+      getElementByIdSpy = vi
+        .spyOn(document, "getElementById")
+        .mockReturnValue(fakeEditorEl);
+
+      shortcutWrapper = mount(CodeQueryEditor, {
+        props: {
+          editorId: "test-editor",
+          query: "SELECT * FROM logs",
+          showAiIcon: true,
+          ...props,
+        },
+        global: { plugins: [store] },
+      });
+      await vi.waitFor(
+        () => {
+          expect(mockEditorObj.addCommand).toHaveBeenCalled();
+        },
+        { timeout: 3000 },
+      );
+      return shortcutWrapper;
+    };
+
+    afterEach(() => {
+      getElementByIdSpy?.mockRestore();
+      shortcutWrapper?.unmount();
+      shortcutWrapper = null;
+    });
+
+    it("should register CtrlCmd+K keybinding when AI is enabled", async () => {
+      await mountAndSetup();
+      const keyBinding = 1 | 41;
+      const ctrlCmdKCall = mockEditorObj.addCommand.mock.calls.find(
+        ([binding]: [number]) => binding === keyBinding,
+      );
+      expect(ctrlCmdKCall).toBeTruthy();
+    });
+
+    it("should emit toggle-nlp-mode when CtrlCmd+K handler is invoked", async () => {
+      const wrapper = await mountAndSetup();
+      const keyBinding = 1 | 41;
+      const ctrlCmdKCall = mockEditorObj.addCommand.mock.calls.find(
+        ([binding]: [number]) => binding === keyBinding,
+      );
+      expect(ctrlCmdKCall).toBeTruthy();
+      const handler = ctrlCmdKCall[1];
+      handler();
+      expect(wrapper.emitted("toggle-nlp-mode")).toBeTruthy();
+    });
+
+    it("should not register CtrlCmd+K when AI is disabled", async () => {
+      store.state.zoConfig.ai_enabled = false;
+      await mountAndSetup();
+      const keyBinding = 1 | 41;
+      const ctrlCmdKCall = mockEditorObj.addCommand.mock.calls.find(
+        ([binding]: [number]) => binding === keyBinding,
+      );
+      expect(ctrlCmdKCall).toBeFalsy();
     });
   });
 });

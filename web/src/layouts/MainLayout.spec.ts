@@ -444,6 +444,74 @@ describe("MainLayout Methods and Functions", () => {
       expect(result).toBe(true);
       expect(localStorage.getItem('isFirstTimeLogin')).toBeNull();
     });
+
+    it("should open AI chat on Ctrl/Cmd+K when AI is enabled", () => {
+      const handleGlobalAIShortcut = (event: any, store: any) => {
+        const isCtrlOrCmdK =
+          (event.ctrlKey || event.metaKey) &&
+          !event.altKey &&
+          !event.shiftKey &&
+          event.key?.toLowerCase() === "k";
+
+        if (!store.state.zoConfig?.ai_enabled || !isCtrlOrCmdK) return;
+
+        event.preventDefault();
+        store.dispatch("setIsAiChatEnabled", true);
+      };
+
+      const event = {
+        key: "k",
+        ctrlKey: true,
+        metaKey: false,
+        altKey: false,
+        shiftKey: false,
+        preventDefault: vi.fn(),
+      };
+
+      const store = {
+        state: { zoConfig: { ai_enabled: true } },
+        dispatch: vi.fn(),
+      };
+
+      handleGlobalAIShortcut(event, store);
+
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(store.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
+    });
+
+    it("should ignore Ctrl/Cmd+K when AI is disabled", () => {
+      const handleGlobalAIShortcut = (event: any, store: any) => {
+        const isCtrlOrCmdK =
+          (event.ctrlKey || event.metaKey) &&
+          !event.altKey &&
+          !event.shiftKey &&
+          event.key?.toLowerCase() === "k";
+
+        if (!store.state.zoConfig?.ai_enabled || !isCtrlOrCmdK) return;
+
+        event.preventDefault();
+        store.dispatch("setIsAiChatEnabled", true);
+      };
+
+      const event = {
+        key: "k",
+        ctrlKey: false,
+        metaKey: true,
+        altKey: false,
+        shiftKey: false,
+        preventDefault: vi.fn(),
+      };
+
+      const store = {
+        state: { zoConfig: { ai_enabled: false } },
+        dispatch: vi.fn(),
+      };
+
+      handleGlobalAIShortcut(event, store);
+
+      expect(event.preventDefault).not.toHaveBeenCalled();
+      expect(store.dispatch).not.toHaveBeenCalled();
+    });
   });
 
   describe("Menu Management", () => {

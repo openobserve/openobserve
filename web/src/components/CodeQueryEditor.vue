@@ -37,10 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <img :src="aiIcon" alt="AI" class="ai-icon-img" />
       </q-icon>
       <q-tooltip>
-        {{
-          disableAiReason ||
-          t(nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel")
-        }}
+        {{ aiTooltipText }}
       </q-tooltip>
     </q-btn>
   </div>
@@ -704,6 +701,11 @@ export default defineComponent({
         },
         "ctrlenter",
       );
+      if (store.state.zoConfig?.ai_enabled && props.showAiIcon && !props.disableAi) {
+        editorObj.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, () => {
+          emit("toggle-nlp-mode");
+        });
+      }
       editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
 
@@ -718,6 +720,14 @@ export default defineComponent({
           },
           "ctrlenter",
         );
+        if (store.state.zoConfig?.ai_enabled && props.showAiIcon && !props.disableAi) {
+          editorObj.addCommand(
+            monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK,
+            () => {
+              emit("toggle-nlp-mode");
+            },
+          );
+        }
       });
 
       editorObj.onDidBlurEditorWidget(() => {
@@ -1078,6 +1088,12 @@ export default defineComponent({
         ? getImageURL("images/common/ai_icon_dark.svg")
         : getImageURL("images/common/ai_icon_gradient.svg");
     });
+    const aiTooltipText = computed(() => {
+      const label =
+        props.disableAiReason ||
+        t(props.nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel");
+      return `${label} (⌘K / Ctrl+K)`;
+    });
 
     // Toggle NLP mode
     const toggleNlpMode = () => {
@@ -1103,6 +1119,7 @@ export default defineComponent({
       streamingResponse,
       t,
       aiIcon,
+      aiTooltipText,
       toggleNlpMode,
     };
   },

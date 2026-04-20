@@ -103,6 +103,7 @@
                 </div>
               </q-menu>
             </q-btn>
+            <span class="chat-shortcut-hint">⌘K / Ctrl+K</span>
           </div>
 
           <div>
@@ -4826,6 +4827,13 @@ export default defineComponent({
         white-space: nowrap;
         max-width: 180px;
       }
+    }
+
+    .chat-shortcut-hint {
+      font-size: 12px;
+      color: var(--q-secondary-text);
+      opacity: 0.8;
+      white-space: nowrap;
     }
   }
 
