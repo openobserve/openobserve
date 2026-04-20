@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{ops::Range, sync::Arc};
+use std::{
+    ops::Range,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use arc_swap::ArcSwap;
 use async_trait::async_trait;
@@ -26,7 +29,6 @@ use object_store::{
     ObjectStoreExt as ObjStoreExt, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
     path::Path,
 };
-use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
 use crate::storage::{ObjectStoreExt, get_stream_from_file, remote::StorageConfig};
@@ -378,11 +380,11 @@ impl ObjectStoreExt for StorageClientFactory {
         self.get_client_by_name(account).delete(location).await
     }
 
-    fn delete_stream(
+    async fn delete_stream(
         &self,
         account: &str,
         locations: BoxStream<'static, Result<Path>>,
-    ) -> BoxStream<'static, Result<Path>> {
+    ) -> Result<Vec<Path>> {
         self.get_client_by_name(account)
             .delete_stream(locations)
             .try_collect::<Vec<Path>>()

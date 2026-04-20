@@ -184,12 +184,15 @@ impl ObjectStoreExt for CacheFS {
         })
     }
 
-    fn delete_stream(
+    async fn delete_stream(
         &self,
         _account: &str,
         _locations: BoxStream<'static, Result<Path>>,
     ) -> Result<Vec<Path>> {
-        Err(object_store::Error::NotImplemented {})
+        Err(Error::NotImplemented {
+            operation: "delete_stream".to_string(),
+            implementer: Self::name().to_string(),
+        })
     }
 
     fn list(

@@ -83,7 +83,7 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
     ) -> Result<Vec<Bytes>>;
     async fn head(&self, account: &str, location: &Path) -> Result<ObjectMeta>;
     async fn delete(&self, account: &str, location: &Path) -> Result<()>;
-    fn delete_stream(
+    async fn delete_stream(
         &self,
         account: &str,
         locations: BoxStream<'static, Result<Path>>,
@@ -249,9 +249,9 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
             let files = futures::stream::iter(files)
                 .map(|file| Ok(Path::from(file)))
                 .boxed();
-            match MULTI_ACCOUNTS.delete_stream(account, files).await {
+            match MULTI_ACCOUNTS.delete_stream(&account, files).await {
                 Ok(files) => {
-                    log::debug!("Deleted objects: {deleted:?}");
+                    log::debug!("Deleted objects: {files:?}");
                     if columns.len() > 2 && columns[0] == "files" {
                         metrics::STORAGE_WRITE_REQUESTS
                             .with_label_values(&[columns[1], columns[2], "remote"])

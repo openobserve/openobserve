@@ -13,13 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use hashbrown::HashMap;
 use infra::{
     coordinator::get_coordinator, db::Event, table::org_storage_providers::OrgStorageProvider,
 };
-use once_cell::sync::Lazy;
 use parquet::data_type::AsBytes;
 use tokio::sync::RwLock;
 
