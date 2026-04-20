@@ -24,9 +24,9 @@ use crate::{
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ProviderType {
-    AWS,
-    GCP,
-    AZURE,
+    AwsCredential,
+    GcpCredentials,
+    AzureCredentials,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -65,10 +65,10 @@ pub struct AzureCredentials {
 impl From<String> for ProviderType {
     fn from(value: String) -> Self {
         match value.as_str().to_ascii_lowercase().as_str() {
-            "aws" => Self::AWS,
-            "gcp" => Self::GCP,
-            "azure" => Self::AZURE,
-            _ => Self::AWS,
+            "aws_credentials" => Self::AwsCredential,
+            "gcp_credentials" => Self::GcpCredentials,
+            "azure_credentials" => Self::AzureCredentials,
+            _ => Self::AwsCredential,
         }
     }
 }
@@ -76,9 +76,9 @@ impl From<String> for ProviderType {
 impl std::fmt::Display for ProviderType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AWS => write!(f, "aws"),
-            Self::AZURE => write!(f, "azure"),
-            Self::GCP => write!(f, "gcp"),
+            Self::AwsCredential => write!(f, "aws_credentials"),
+            Self::AzureCredentials => write!(f, "azure_credentials"),
+            Self::GcpCredentials => write!(f, "gcp_credentials"),
         }
     }
 }

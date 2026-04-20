@@ -103,17 +103,17 @@ pub async fn get_provider_list() -> Result<Vec<(String, Box<dyn ObjectStore>)>, 
 
     for provider in list {
         match provider.provider_type {
-            ProviderType::AWS => {
+            ProviderType::AwsCredential => {
                 let creds: AwsCredentials = serde_json::from_str(&provider.data)?;
                 let store = get_aws(creds)?;
                 ret.push((provider.org_id, Box::new(store)))
             }
-            ProviderType::GCP => {
+            ProviderType::GcpCredentials => {
                 let creds: GcpCredentials = serde_json::from_str(&provider.data)?;
                 let store = get_gcp(creds)?;
                 ret.push((provider.org_id, Box::new(store)))
             }
-            ProviderType::AZURE => {
+            ProviderType::AzureCredentials => {
                 let creds: AzureCredentials = serde_json::from_str(&provider.data)?;
                 let store = get_azure(creds)?;
                 ret.push((provider.org_id, Box::new(store)))
@@ -142,18 +142,18 @@ pub async fn get_redacted_config(
 
     if let Some(config) = provider.as_mut() {
         match config.provider_type {
-            ProviderType::AWS => {
+            ProviderType::AwsCredential => {
                 let mut creds: AwsCredentials = serde_json::from_str(&config.data)?;
                 creds.access_key = redact(&creds.access_key);
                 creds.secret_key = redact(&creds.secret_key);
                 config.data = serde_json::to_string(&creds).unwrap();
             }
-            ProviderType::GCP => {
+            ProviderType::GcpCredentials => {
                 let mut creds: GcpCredentials = serde_json::from_str(&config.data)?;
                 creds.access_key = redact(&creds.access_key);
                 config.data = serde_json::to_string(&creds).unwrap();
             }
-            ProviderType::AZURE => {
+            ProviderType::AzureCredentials => {
                 let mut creds: AzureCredentials = serde_json::from_str(&config.data)?;
                 creds.access_key = redact(&creds.access_key);
                 creds.secret_key = redact(&creds.secret_key);
