@@ -125,7 +125,7 @@ export function useMetricsCorrelationDashboard() {
     // Quote field names that contain special characters (hyphens, dots, etc.)
     // Skip filters with SELECT_ALL_VALUE (wildcard - means match all values)
 
-    const whereConditions = Object.entries(stream.filters)
+    const whereConditions = Object.entries(stream.filters ?? {})
       .filter(([field, value]) => {
         const skip = value === SELECT_ALL_VALUE;
         // if (skip) {
@@ -300,10 +300,10 @@ ORDER BY x_axis_1`;
       );
       if (matchingStream) {
         // Use filters from API response (best case - backend computed correct field names)
-        filters = matchingStream.filters;
+        filters = matchingStream.filters ?? {};
       } else if (streams && streams.length > 0) {
         // Source stream not in response, use first available stream's filters
-        filters = streams[0].filters;
+        filters = streams[0].filters ?? {};
       } else {
         // No streams from API, fallback to matched dimensions
         filters = config.matchedDimensions || {};
@@ -312,7 +312,7 @@ ORDER BY x_axis_1`;
       // Use first correlated log stream from API response
       const primaryStream = streams[0];
       streamName = primaryStream.stream_name;
-      filters = primaryStream.filters;
+      filters = primaryStream.filters ?? {};
     } else {
       // No logs available
       return null;

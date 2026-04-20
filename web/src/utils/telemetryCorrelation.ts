@@ -18,6 +18,7 @@ import type {
   FieldAlias,
   CorrelationResponse,
   StreamInfo,
+  ServiceIdentityConfig,
 } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
@@ -94,6 +95,68 @@ export function extractSemanticDimensions(
   }
 
   return dimensions;
+}
+
+/**
+ * Filter dimensions to only include fields that are actually used for disambiguation
+ *
+ * This implements the same logic as the backend to determine which dimensions are relevant
+ * for service matching. This reduces the amount of data sent to the _correlate API and
+ * ensures we only send dimensions that the backend will actually use.
+ *
+ * Logic matches backend processor.rs:
+ * 1. Use distinguish_by fields from all identity sets (union), OR
+ * 2. Use tracked_alias_ids as fallback
+ * 3. Always include "service" dimension if present
+ *
+ * @param allDimensions - All extracted semantic dimensions
+ * @param identityConfig - Service identity configuration
+ * @returns Filtered dimensions containing only disambiguation fields
+ */
+export function filterDimensionsForCorrelation(
+  allDimensions: Record<string, string>,
+  identityConfig: ServiceIdentityConfig
+): Record<string, string> {
+  // Determine selected fields (same logic as backend)
+  let selectedFields: string[] = [];
+
+  if (identityConfig.sets && identityConfig.sets.length > 0) {
+    // Use distinguish_by fields from ALL identity sets (union of all sets)
+    const allDistinguishByFields = new Set<string>();
+    for (const set of identityConfig.sets) {
+      if (set.distinguish_by) {
+        set.distinguish_by.forEach(field => allDistinguishByFields.add(field));
+      }
+    }
+    selectedFields = Array.from(allDistinguishByFields);
+    console.log(`[filterDimensionsForCorrelation] Using distinguish_by from all identity sets:`, selectedFields);
+  } else if (identityConfig.tracked_alias_ids && identityConfig.tracked_alias_ids.length > 0) {
+    // Fallback to tracked_alias_ids
+    selectedFields = identityConfig.tracked_alias_ids;
+    console.log(`[filterDimensionsForCorrelation] Using tracked_alias_ids fallback:`, selectedFields);
+  } else {
+    console.log(`[filterDimensionsForCorrelation] No identity config available, using all dimensions`);
+    // No config available, return all dimensions
+    return allDimensions;
+  }
+
+  // Always include "service" field if present + selected fields
+  const fieldsToKeep = new Set([...selectedFields, "service"]);
+
+  // Filter dimensions to only include fields we need
+  const filtered = Object.fromEntries(
+    Object.entries(allDimensions).filter(([key]) => fieldsToKeep.has(key))
+  );
+
+  console.log(`[filterDimensionsForCorrelation] Filtered dimensions:`, {
+    fieldsToKeep: Array.from(fieldsToKeep),
+    originalCount: Object.keys(allDimensions).length,
+    filteredCount: Object.keys(filtered).length,
+    original: allDimensions,
+    filtered
+  });
+
+  return filtered;
 }
 
 /**
