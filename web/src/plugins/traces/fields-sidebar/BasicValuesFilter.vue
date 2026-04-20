@@ -13,14 +13,14 @@
         :title="row.name"
       >
         <div
-          class="field_label tw:ellipsis! tw:flex tw:items-center tw:w-full"
+          class="field_label tw:ellipsis! tw:flex tw:items-center tw:w-full tw:text-[var(--o2-text-4)]!"
           style="font-size: 14px"
           :title="row.label || row.name"
         >
           <span v-if="row.dataType" class="field-type-container">
             <q-icon
-              class="field-expand-icon"
-              :name="isExpanded ? 'expand_less' : 'expand_more'"
+              class="field-expand-icon tw:text-[var(--o2-text-1)]!"
+              :name="isExpanded ? 'expand_more' : 'chevron_right'"
               size="1rem"
             />
           </span>

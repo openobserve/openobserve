@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`logs-field-list-item-${field.name}`"
     >
       <div
-        class="ellipsis tw:flex tw:items-center tw:max-w-[calc(100%-1.5rem)]! tw:pl-[1.5rem] tw:text-[0.875rem]"
+        class="ellipsis tw:flex tw:items-center tw:max-w-[calc(100%-1.5rem)]! tw:pl-[1.5rem] tw:text-[0.875rem] tw:text-[var(--o2-text-4)]!"
         style="display: inline-block"
       >
         {{ field.label || field.name }}
