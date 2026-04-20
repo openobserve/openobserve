@@ -49,6 +49,8 @@ pub mod saved_view;
 pub mod scheduler;
 pub mod schema;
 pub mod search_job;
+#[cfg(feature = "enterprise")]
+pub mod service_graph;
 pub mod session;
 pub mod short_url;
 pub mod sourcemaps;

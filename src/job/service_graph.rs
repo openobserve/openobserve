@@ -35,29 +35,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
             "service_graph_processor",
             get_o2_config().service_graph.processing_interval_secs,
             {
-                // Leader election: only the alert_manager with the smallest UUID runs the job.
-                // This prevents duplicate writes when multiple alert_manager nodes are running.
-                let is_leader = match infra::cluster::get_cached_nodes(|node| {
-                    node.status == config::meta::cluster::NodeStatus::Online
-                        && node.is_alert_manager()
-                })
-                .await
-                {
-                    Some(mut nodes) if !nodes.is_empty() => {
-                        nodes.sort_by(|a, b| a.uuid.cmp(&b.uuid));
-                        nodes[0].uuid == LOCAL_NODE.uuid
-                    }
-                    // Cache empty or single-node — fall through and run.
-                    _ => true,
-                };
-
-                if !is_leader {
-                    log::debug!(
-                        "[SERVICE_GRAPH::JOB] Not leader alert_manager, skipping this interval"
-                    );
-                    continue;
-                }
-
                 log::debug!("[SERVICE_GRAPH::JOB] Running service graph processing");
                 if let Err(e) = crate::service::traces::service_graph::process_service_graph().await
                 {
