@@ -35,7 +35,9 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         log::error!("[SUPER_CLUSTER:anomaly_detection] failed to deserialize message: {e}");
         infra::errors::Error::Message(format!("[ANOMALY_DETECTION] Failed to deserialize: {e}"))
     })?;
-    log::debug!("[SUPER_CLUSTER:anomaly_detection] deserialized message ok, dispatching to process_msg");
+    log::debug!(
+        "[SUPER_CLUSTER:anomaly_detection] deserialized message ok, dispatching to process_msg"
+    );
     process_msg(msg).await
 }
 
@@ -69,17 +71,13 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                 existing.is_some()
             );
             if existing.is_some() {
-                config
-                    .into_active_model()
-                    .update(db)
-                    .await
-                    .map_err(|e| {
-                        log::error!(
-                            "[SUPER_CLUSTER:anomaly_detection] ConfigCreate update failed id={}: {e}",
-                            anomaly_id
-                        );
-                        infra::errors::Error::Message(e.to_string())
-                    })?;
+                config.into_active_model().update(db).await.map_err(|e| {
+                    log::error!(
+                        "[SUPER_CLUSTER:anomaly_detection] ConfigCreate update failed id={}: {e}",
+                        anomaly_id
+                    );
+                    infra::errors::Error::Message(e.to_string())
+                })?;
                 log::info!(
                     "[SUPER_CLUSTER:anomaly_detection] ConfigCreate updated existing row id={}",
                     anomaly_id
@@ -131,17 +129,13 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                 existing.is_some()
             );
             if existing.is_some() {
-                config
-                    .into_active_model()
-                    .update(db)
-                    .await
-                    .map_err(|e| {
-                        log::error!(
-                            "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate update failed id={}: {e}",
-                            anomaly_id
-                        );
-                        infra::errors::Error::Message(e.to_string())
-                    })?;
+                config.into_active_model().update(db).await.map_err(|e| {
+                    log::error!(
+                        "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate update failed id={}: {e}",
+                        anomaly_id
+                    );
+                    infra::errors::Error::Message(e.to_string())
+                })?;
                 log::info!(
                     "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate successfully wrote to DB id={}",
                     anomaly_id
