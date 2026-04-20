@@ -675,7 +675,7 @@ export default defineComponent({
             user.role?.toLowerCase() !== "root" &&
             (currentUserRole.value == "root" ||
               currentUserRole.value == "admin") &&
-              store.state.userInfo.email !== user.email
+              store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
 
           );
         }
