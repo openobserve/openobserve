@@ -720,14 +720,6 @@ export default defineComponent({
           },
           "ctrlenter",
         );
-        if (store.state.zoConfig?.ai_enabled && props.showAiIcon && !props.disableAi) {
-          editorObj.addCommand(
-            monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK,
-            () => {
-              emit("toggle-nlp-mode");
-            },
-          );
-        }
       });
 
       editorObj.onDidBlurEditorWidget(() => {
@@ -1092,7 +1084,9 @@ export default defineComponent({
       const label =
         props.disableAiReason ||
         t(props.nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel");
-      return `${label} (⌘K / Ctrl+K)`;
+      const showShortcutHint =
+        store.state.zoConfig?.ai_enabled && props.showAiIcon && !props.disableAi;
+      return showShortcutHint ? `${label} (⌘K / Ctrl+K)` : label;
     });
 
     // Toggle NLP mode

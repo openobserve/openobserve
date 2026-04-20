@@ -582,12 +582,13 @@ export default defineComponent({
 
     const isInsideQueryEditor = (target: EventTarget | null) => {
       if (!(target instanceof HTMLElement)) return false;
-      return Boolean(target.closest(".monaco-editor, .code-query-editor-container"));
+      return Boolean(target.closest(".monaco-editor, [data-test='query-editor']"));
     };
 
     const openAIChat = () => {
-      if (store.state.isAiChatEnabled) return;
-      store.dispatch("setIsAiChatEnabled", true);
+      if (!store.state.isAiChatEnabled) {
+        store.dispatch("setIsAiChatEnabled", true);
+      }
       window.dispatchEvent(new Event("resize"));
     };
 

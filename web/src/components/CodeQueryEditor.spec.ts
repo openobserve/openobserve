@@ -507,7 +507,7 @@ describe("CodeQueryEditor", () => {
     // without needing the component attached to document. This bypasses the
     // 100ms retry-loop setTimeout. Then use vi.waitFor to poll until the
     // async setupEditor chain (dynamic imports + loadMonaco) fully completes.
-    const mountAndSetup = async (props: any = {}) => {
+    const mountAndSetup = async (props: any = {}, customStore: any = store) => {
       const fakeEditorEl = document.createElement("div");
       getElementByIdSpy = vi
         .spyOn(document, "getElementById")
@@ -566,7 +566,7 @@ describe("CodeQueryEditor", () => {
     let shortcutWrapper: ReturnType<typeof mount> | null = null;
     let getElementByIdSpy: ReturnType<typeof vi.spyOn>;
 
-    const mountAndSetup = async (props: any = {}) => {
+    const mountAndSetup = async (props: any = {}, customStore: any = store) => {
       const fakeEditorEl = document.createElement("div");
       getElementByIdSpy = vi
         .spyOn(document, "getElementById")
@@ -579,7 +579,7 @@ describe("CodeQueryEditor", () => {
           showAiIcon: true,
           ...props,
         },
-        global: { plugins: [store] },
+        global: { plugins: [customStore] },
       });
       await vi.waitFor(
         () => {
@@ -618,8 +618,24 @@ describe("CodeQueryEditor", () => {
     });
 
     it("should not register CtrlCmd+K when AI is disabled", async () => {
-      store.state.zoConfig.ai_enabled = false;
-      await mountAndSetup();
+      const disabledStore = createStore({
+        state: {
+          theme: "light",
+          zoConfig: {
+            ai_enabled: false,
+          },
+        },
+      });
+      await mountAndSetup({}, disabledStore);
+      const keyBinding = 1 | 41;
+      const ctrlCmdKCall = mockEditorObj.addCommand.mock.calls.find(
+        ([binding]: [number]) => binding === keyBinding,
+      );
+      expect(ctrlCmdKCall).toBeFalsy();
+    });
+
+    it("should not register CtrlCmd+K when AI button is disabled", async () => {
+      await mountAndSetup({ disableAi: true });
       const keyBinding = 1 | 41;
       const ctrlCmdKCall = mockEditorObj.addCommand.mock.calls.find(
         ([binding]: [number]) => binding === keyBinding,
