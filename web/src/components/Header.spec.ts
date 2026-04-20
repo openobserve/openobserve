@@ -886,6 +886,28 @@ describe("Header Component", () => {
       expect(wrapper.props("user").email).toBe("john@test.com");
     });
 
+    it("should render user tooltip with auto width for long text", () => {
+      const tooltipWrapper = createWrapper({
+        mountType: "mount",
+        stubsOverrides: {
+          QToolbar: false,
+          QBtn: false,
+        },
+      });
+
+      const profileBtn = tooltipWrapper.find(
+        '[data-test="header-my-account-profile-icon"]',
+      );
+      const profileBtnHtml = profileBtn.html();
+
+      expect(profileBtnHtml).toContain("header-user-tooltip");
+      expect(profileBtnHtml).toContain("width: auto");
+      expect(profileBtnHtml).toContain("max-width: none");
+      expect(profileBtnHtml).toContain("white-space: nowrap");
+
+      tooltipWrapper.unmount();
+    });
+
     it("should display language selection menu", () => {
       expect(wrapper.props("langList")).toHaveLength(2);
       expect(wrapper.props("langList")[0].code).toBe("en-gb");

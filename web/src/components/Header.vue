@@ -461,7 +461,12 @@ dense :ripple="false" data-test="menu-link-help-item">
             :name="user.picture ? user.picture : 'person'"
             class="header-icon"
           ></q-icon>
-          <q-tooltip anchor="top middle" self="bottom middle">
+          <q-tooltip
+            anchor="top middle"
+            self="bottom middle"
+            class="header-user-tooltip"
+            style="width: auto; max-width: none; white-space: nowrap"
+          >
             {{
               user.given_name
                 ? user.given_name + " " + user.family_name
