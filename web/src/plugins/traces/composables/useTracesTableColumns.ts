@@ -181,7 +181,7 @@ export function useTracesTableColumns() {
         meta: { slot: true, sortable: true, class: "tw:capitalize!" },
         accessorFn: (row: any) =>
           timestampToTimezoneDate(
-            row[timestampCol] / 1000,
+            (row[timestampCol] ?? row["zo_sql_timestamp"]) / 1000,
             store.state.timezone,
             "yyyy-MM-dd HH:mm:ss.SSS",
           ),
