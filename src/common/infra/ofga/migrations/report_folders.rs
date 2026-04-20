@@ -15,9 +15,9 @@
 
 use std::collections::HashSet;
 
-use o2_openfga::{authorizer, config::get_config as get_ofga_config};
 #[cfg(not(feature = "cloud"))]
 use o2_openfga::meta::mapping::OFGA_MODELS;
+use o2_openfga::{authorizer, config::get_config as get_ofga_config};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 
 /// Migrate report-folder permissions in OpenFGA.
@@ -86,9 +86,8 @@ pub async fn migrate_report_folders<C: ConnectionTrait>(db: &C) -> Result<(), an
     log::info!("Processed {folder_len} report folders for ofga migrations");
 
     // ------------------------------------------------------------------
-    // 2. For every existing report, add a parent relation to its folder.
-    //    Reports are not enabled in cloud builds, so sections 2 and 3 are
-    //    skipped there.
+    // 2. For every existing report, add a parent relation to its folder. Reports are not enabled in
+    //    cloud builds, so sections 2 and 3 are skipped there.
     // ------------------------------------------------------------------
     #[cfg(not(feature = "cloud"))]
     {
@@ -150,21 +149,18 @@ pub async fn migrate_report_folders<C: ConnectionTrait>(db: &C) -> Result<(), an
             for role in roles.iter() {
                 let mut add_roles = vec![];
 
-                let report_perms = match authorizer::roles::get_role_permissions(
-                    org,
-                    role,
-                    reports_ofga_type,
-                )
-                .await
-                {
-                    Ok(perms) => perms,
-                    Err(e) => {
-                        log::error!(
-                            "Error getting openfga report permissions for role {role}: {e}"
-                        );
-                        continue;
-                    }
-                };
+                let report_perms =
+                    match authorizer::roles::get_role_permissions(org, role, reports_ofga_type)
+                        .await
+                    {
+                        Ok(perms) => perms,
+                        Err(e) => {
+                            log::error!(
+                                "Error getting openfga report permissions for role {role}: {e}"
+                            );
+                            continue;
+                        }
+                    };
 
                 for perm in report_perms.iter() {
                     // Object is of the form  "report:<entity>"
@@ -189,15 +185,8 @@ pub async fn migrate_report_folders<C: ConnectionTrait>(db: &C) -> Result<(), an
 
                 if !add_roles.is_empty() {
                     let count = add_roles.len();
-                    match authorizer::roles::update_role(
-                        org,
-                        role,
-                        add_roles,
-                        vec![],
-                        None,
-                        None,
-                    )
-                    .await
+                    match authorizer::roles::update_role(org, role, add_roles, vec![], None, None)
+                        .await
                     {
                         Ok(_) => {
                             log::debug!(
