@@ -823,7 +823,14 @@ const showCustomChartTypeSelector = ref(false);
 // ============================================================================
 
 // X-axis alias consistency warning for multi-SQL panels
+// Only applicable for chart types that render an x-axis
+const xAxisChartTypes = new Set([
+  "line", "area", "area-stacked", "stacked", "h-stacked",
+  "bar", "h-bar", "scatter",
+]);
 const hasInconsistentXAlias = computed(() => {
+  if (!xAxisChartTypes.has(dashboardPanelData.data.type)) return false;
+
   const activeQueries = dashboardPanelData.data.queries.filter(
     (_: any, idx: number) =>
       !dashboardPanelData.layout.hiddenQueries.includes(idx),
