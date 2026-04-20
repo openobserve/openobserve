@@ -104,19 +104,33 @@ test.describe("SQL Autocomplete — Logs", () => {
         await navigateToBase(page);
         pm = new PageManager(page);
 
-        // Navigate to logs page and select stream.
-        // selectStream internally navigates with waitUntil:'domcontentloaded' + 3s wait,
-        // which can be too short for CI to finish loading the stream-list API.
-        // The explicit networkidle wait below ensures updateStreamKeywords() has been
-        // called with the full stream list before any autocomplete test runs.
-        await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        // selectStream internally navigates to the logs page, waits 3 s, then
+        // selects the stream — this is the moment getStreamList() fires and the
+        // /api/{org}/streams response populates streamResults.list.
+        //
+        // Set up waitForResponse BEFORE selectStream so we capture that exact
+        // response and can await it. selectStream itself handles page.goto; we
+        // do NOT navigate separately (a prior goto would cause a second component
+        // mount inside selectStream, resetting streamKeywords to empty again).
+        const streamsApiDone = page.waitForResponse(
+            (resp) => {
+                const url = resp.url();
+                // /api/{org}/streams (list endpoint) but NOT /streams/{name}/... sub-paths
+                return /\/api\/[^/]+\/streams(\?|$)/.test(url) && resp.status() === 200;
+            },
+            { timeout: 35000 }
+        ).catch(() => {
+            testLogger.warn('streams API response not captured — streamKeywords may still load via cache');
+            return null;
+        });
 
         await pm.logsPage.selectStream(streamName);
-        // Wait for stream-list API response so streamKeywords is populated before
-        // we trigger suggestions (FROM context needs a non-empty streamKeywords).
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-        await page.waitForTimeout(500);
+
+        // Wait for the stream-list API response so streamResults.list is set.
+        // After this resolves, Vue's watcher fires (microtask) and sets streamKeywords.
+        await streamsApiDone;
+        // Buffer for Vue's async reactivity (watcher microtask + nextTick)
+        await page.waitForTimeout(800);
 
         testLogger.info('Logs SQL test setup completed');
     });
@@ -172,19 +186,34 @@ test.describe("SQL Autocomplete — Logs", () => {
         await enableSqlMode(page, pm);
         await page.waitForTimeout(500);
 
-        // Type "SELECT * FROM " to trigger stream context
-        await setAndTrigger(page, pm, 'SELECT * FROM ');
+        // Retry loop: streamKeywords may not be populated on the very first
+        // trigger if Vue's watch hasn't processed the stream-list API response
+        // yet. Each attempt re-opens the editor and triggers Ctrl+Space.
+        // Once the stream list propagates, the FROM context will activate.
+        let labels = [];
+        let hasStream = false;
+        const MAX_ATTEMPTS = 5;
 
-        const labels = await waitAndGetSuggestions(page, pm);
-        testLogger.info(`FROM context suggestions: ${labels.slice(0, 10).join(', ')}`);
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            await page.keyboard.press('Escape').catch(() => {});
+            if (attempt > 1) {
+                await page.waitForTimeout(1500); // extra wait between retries
+            }
+
+            await setAndTrigger(page, pm, 'SELECT * FROM ');
+            labels = await waitAndGetSuggestions(page, pm).catch(() => []);
+            hasStream = labels.some(l =>
+                l.toLowerCase().includes(streamName.toLowerCase()) ||
+                l.toLowerCase().includes('e2e')
+            );
+            testLogger.info(
+                `Attempt ${attempt}/${MAX_ATTEMPTS}: ${labels.length} suggestions ` +
+                `[${labels.slice(0, 5).join(', ')}], hasStream=${hasStream}`
+            );
+            if (hasStream) break;
+        }
 
         expect(labels.length).toBeGreaterThan(0);
-
-        // The current stream should appear in suggestions
-        const hasStream = labels.some(l =>
-            l.toLowerCase().includes(streamName.toLowerCase()) ||
-            l.toLowerCase().includes('e2e')
-        );
         expect(hasStream).toBe(true);
         testLogger.info(`Stream "${streamName}" found in FROM suggestions: ${hasStream}`);
 
@@ -258,13 +287,19 @@ test.describe("SQL Autocomplete — Logs", () => {
 
         expect(labels.length).toBeGreaterThan(0);
 
-        // After WHERE, stream names should NOT dominate the list.
-        // SQL keywords like "and", "or" SHOULD be present (base keywords restored).
-        const hasSqlKeywords = labels.some(l =>
-            ['and', 'or', 'like', 'in'].includes(l.toLowerCase())
+        // Fields have sortText "\x00", SQL keywords have sortText "\x02".
+        // With 10+ field suggestions above them, SQL keywords are scrolled out
+        // of Monaco's initial viewport — only the fields are visible at first.
+        // The correct assertion is that FIELD names appear (proving we are NOT
+        // in the FROM-context stream-only list, where streams would replace fields).
+        //
+        // Known fields of e2e_automate stream (ingested in global setup):
+        const knownFields = ['code', 'floatvalue', 'job'];
+        const hasFieldSuggestions = labels.some(l =>
+            knownFields.some(f => l.toLowerCase() === f.toLowerCase())
         );
-        expect(hasSqlKeywords).toBe(true);
-        testLogger.info('SQL keywords restored after FROM context: confirmed');
+        expect(hasFieldSuggestions).toBe(true);
+        testLogger.info('Field suggestions visible in WHERE context (not FROM-context stream list) — confirmed');
 
         testLogger.info('Field suggestions restored after FROM test PASSED');
     });

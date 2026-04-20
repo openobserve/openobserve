@@ -399,7 +399,15 @@ const useSqlSuggestions = () => {
     // Compute text up to cursor (same slice logic used by analyzeSqlWhereClause).
     const query = autoCompleteData.value.query;
     const endIdx = cursorIndex >= 0 ? cursorIndex + 1 : query.length;
-    const textUpToCursor = query.slice(0, endIdx);
+    let textUpToCursor = query.slice(0, endIdx);
+    // CodeQueryEditor.vue emits getValue().trim(), which strips trailing
+    // whitespace. When the cursor (tracked against Monaco's un-trimmed model)
+    // sits at or past the end of the trimmed query, the user likely just typed
+    // a space that was stripped. Re-append one space so that the FROM-context
+    // regex (which requires \s+ after FROM) can still fire correctly.
+    if (cursorIndex >= query.length && query.length > 0) {
+      textUpToCursor = textUpToCursor + " ";
+    }
 
     // FROM context: when the cursor is immediately after FROM (and optionally a
     // partial stream name), show stream suggestions instead of field/function

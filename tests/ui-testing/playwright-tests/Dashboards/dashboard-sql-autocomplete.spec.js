@@ -171,13 +171,19 @@ test.describe('Dashboard SQL Autocomplete', () => {
 
         expect(labels.length).toBeGreaterThan(0);
 
-        // SQL keywords like 'and', 'or', 'like', 'in' should be present
-        const sqlKeywords = ['and', 'or', 'like', 'in', 'is null'];
-        const hasSqlKeywords = labels.some((l) =>
-            sqlKeywords.some((kw) => l.toLowerCase().trim() === kw)
+        // Fields have sortText "\x00", SQL keywords have sortText "\x02".
+        // With 10+ field suggestions above them, SQL keywords are scrolled out
+        // of Monaco's initial virtual list viewport — only fields are visible.
+        // Assert that FIELD names appear (proving we are NOT in FROM-context
+        // stream-only mode, where streams would replace fields entirely).
+        //
+        // Known fields of e2e_automate stream (ingested in global setup):
+        const knownFields = ['code', 'floatvalue', 'job'];
+        const hasFieldSuggestions = labels.some((l) =>
+            knownFields.some((f) => l.toLowerCase().trim() === f.toLowerCase())
         );
-        expect(hasSqlKeywords).toBe(true);
-        testLogger.info('SQL keywords present in WHERE context — confirmed');
+        expect(hasFieldSuggestions).toBe(true);
+        testLogger.info('Field suggestions visible in WHERE context (not FROM-context stream list) — confirmed');
 
         await page.keyboard.press('Escape');
         await cleanupDashboard(page, pm, dashboardName);
@@ -245,13 +251,19 @@ test.describe('Dashboard SQL Autocomplete', () => {
 
         expect(labels.length).toBeGreaterThan(0);
 
-        // SQL keywords should be back — context is the normal base keyword list
-        const sqlKeywords = ['and', 'or', 'like', 'in'];
-        const hasSqlKeywords = labels.some((l) =>
-            sqlKeywords.some((kw) => l.toLowerCase().trim() === kw)
+        // Fields have sortText "\x00", SQL keywords have sortText "\x02".
+        // With 10+ field suggestions above them, SQL keywords are scrolled out
+        // of Monaco's initial virtual list viewport — only fields are visible.
+        // Assert that FIELD names appear (proving we exited FROM-context and
+        // are now showing the normal field+keyword list, not stream-only list).
+        //
+        // Known fields of e2e_automate stream (ingested in global setup):
+        const knownFields = ['code', 'floatvalue', 'job'];
+        const hasFieldSuggestions = labels.some((l) =>
+            knownFields.some((f) => l.toLowerCase().trim() === f.toLowerCase())
         );
-        expect(hasSqlKeywords).toBe(true);
-        testLogger.info('Base keyword list restored after complete FROM clause — confirmed');
+        expect(hasFieldSuggestions).toBe(true);
+        testLogger.info('Field suggestions restored after WHERE clause (not FROM-context stream list) — confirmed');
 
         await page.keyboard.press('Escape');
         await cleanupDashboard(page, pm, dashboardName);
