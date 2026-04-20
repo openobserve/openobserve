@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="getShadowedBy(props.row)"
                   name="warning_amber"
                   size="14px"
-                  color="warning"
+                  color="orange-10"
                 />
               </div>
             </template>
