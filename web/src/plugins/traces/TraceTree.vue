@@ -411,7 +411,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, nextTick, ref, watch, computed } from "vue";
+import {
+  defineComponent,
+  nextTick,
+  ref,
+  watch,
+  computed,
+  onMounted,
+} from "vue";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
 import SpanBlock from "./SpanBlock.vue";
@@ -424,6 +431,7 @@ import {
 } from "@/utils/traces/convertTraceData";
 import { getKindIcon } from "@/composables/traces/useTraceProcessing";
 import { useVirtualizer } from "@tanstack/vue-virtual";
+import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "TraceTree",
@@ -493,6 +501,7 @@ export default defineComponent({
     const store = useStore();
 
     const { t } = useI18n();
+    const router = useRouter();
 
     // ── Virtualizer ──────────────────────────────────────────────────────────
     const rowVirtualizer = useVirtualizer(
@@ -506,6 +515,12 @@ export default defineComponent({
 
     const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
     const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+
+    onMounted(() => {
+      if (props.selectedSpanId) {
+        scrollToSpan(props.selectedSpanId as string, 300);
+      }
+    });
 
     // ── CSS connector helper ─────────────────────────────────────────────────
     // Returns true if there is a sibling at the same depth after this index,
@@ -593,16 +608,22 @@ export default defineComponent({
         .filter((index: any) => index !== -1);
     };
 
+    const scrollToSpan = (spanId: string, delay: number = 0) => {
+      const spanIndex = (props.spans as any[]).findIndex(
+        (s: any) => s.spanId === spanId || s.span_id === spanId,
+      );
+
+      if (spanIndex !== -1) {
+        setTimeout(() => {
+          rowVirtualizer.value.scrollToIndex(spanIndex, { align: "center" });
+        }, delay);
+      }
+    };
+
     const scrollToMatch = () => {
       if (searchResults.value.length === 0 || currentIndex.value === null)
         return;
-      const targetSpanId = searchResults.value[currentIndex.value];
-      const spanIndex = (props.spans as any[]).findIndex(
-        (s: any) => s.spanId === targetSpanId || s.span_id === targetSpanId,
-      );
-      if (spanIndex !== -1) {
-        rowVirtualizer.value.scrollToIndex(spanIndex, { align: "center" });
-      }
+      scrollToSpan(searchResults.value[currentIndex.value]);
     };
 
     const updateSearch = () => {
@@ -757,6 +778,7 @@ export default defineComponent({
       prevMatch,
       isHighlighted,
       currentSelectedValue,
+      scrollToSpan,
       scrollToMatch,
       findMatches,
       getChildCount,

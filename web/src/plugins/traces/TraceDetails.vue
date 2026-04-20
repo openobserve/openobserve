@@ -2489,14 +2489,10 @@ export default defineComponent({
       showTraceDetails.value = true;
     };
 
-    const scrollSpanIntoView = (spanId: string, delay = 300) => {
-      setTimeout(() => {
-        const el = document.querySelector(
-          `[data-test="trace-tree-span-container-${spanId}"]`,
-        );
-        console.log("el", el);
-        el?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, delay);
+    const scrollSpanIntoView = (spanId: string) => {
+      nextTick(() => {
+        traceTreeRef.value?.scrollToSpan(spanId);
+      });
     };
 
     const updateSelectedSpan = (
@@ -2508,8 +2504,9 @@ export default defineComponent({
       searchObj.data.traceDetails.selectedSpanId = spanId;
       if (swichToWaterfall && activeTab.value !== "waterfall") {
         activeTab.value = "waterfall";
-        scrollSpanIntoView(spanId, 1000);
       }
+
+      scrollSpanIntoView(spanId);
 
       // Emit event for embedded mode
       if (props.mode === "embedded") {
