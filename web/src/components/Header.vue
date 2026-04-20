@@ -465,7 +465,6 @@ dense :ripple="false" data-test="menu-link-help-item">
             anchor="top middle"
             self="bottom middle"
             class="header-user-tooltip"
-            style="width: auto; max-width: none; white-space: nowrap"
           >
             {{
               user.given_name
@@ -884,5 +883,11 @@ export default defineComponent({
     line-height: 28px;
     display: inline-block;
   }
+}
+
+:deep(.header-user-tooltip) {
+  width: auto;
+  max-width: none;
+  white-space: nowrap;
 }
 </style>

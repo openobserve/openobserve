@@ -901,9 +901,6 @@ describe("Header Component", () => {
       const profileBtnHtml = profileBtn.html();
 
       expect(profileBtnHtml).toContain("header-user-tooltip");
-      expect(profileBtnHtml).toContain("width: auto");
-      expect(profileBtnHtml).toContain("max-width: none");
-      expect(profileBtnHtml).toContain("white-space: nowrap");
 
       tooltipWrapper.unmount();
     });
