@@ -101,6 +101,12 @@ async function openSqlPanel(page, pm, dashboardName) {
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
 
+    // Wait for the stream list API to complete before switching mode so that
+    // dashboardPanelData.meta.stream.streamResults is populated and
+    // sqlUpdateStreamKeywords() fires with actual stream names.
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(300);
+
     // Switch to SQL custom query mode
     await page.locator('[data-test="dashboard-sql-query-type"]').click();
     await page.locator('[data-test="dashboard-custom-query-type"]').click();
@@ -153,7 +159,7 @@ test.describe('Dashboard SQL Autocomplete', () => {
     }, async ({ page }) => {
         const dashboardName = generateDashboardName();
         const pm = new PageManager(page);
-        testLogger.testStart('Dashboard SQL — keywords after WHERE', __filename);
+        testLogger.testStart('Dashboard SQL — keywords after WHERE', 'dashboard-sql-autocomplete.spec.js');
 
         await openSqlPanel(page, pm, dashboardName);
 
@@ -186,7 +192,7 @@ test.describe('Dashboard SQL Autocomplete', () => {
     }, async ({ page }) => {
         const dashboardName = generateDashboardName();
         const pm = new PageManager(page);
-        testLogger.testStart('Dashboard SQL — streams after FROM', __filename);
+        testLogger.testStart('Dashboard SQL — streams after FROM', 'dashboard-sql-autocomplete.spec.js');
 
         await openSqlPanel(page, pm, dashboardName);
 
@@ -227,7 +233,7 @@ test.describe('Dashboard SQL Autocomplete', () => {
     }, async ({ page }) => {
         const dashboardName = generateDashboardName();
         const pm = new PageManager(page);
-        testLogger.testStart('Dashboard SQL — context exits after WHERE', __filename);
+        testLogger.testStart('Dashboard SQL — context exits after WHERE', 'dashboard-sql-autocomplete.spec.js');
 
         await openSqlPanel(page, pm, dashboardName);
 
@@ -260,7 +266,7 @@ test.describe('Dashboard SQL Autocomplete', () => {
     }, async ({ page }) => {
         const dashboardName = generateDashboardName();
         const pm = new PageManager(page);
-        testLogger.testStart('Dashboard SQL — FROM "partial stream suggestions', __filename);
+        testLogger.testStart('Dashboard SQL — FROM "partial stream suggestions', 'dashboard-sql-autocomplete.spec.js');
 
         await openSqlPanel(page, pm, dashboardName);
 
@@ -304,7 +310,7 @@ test.describe('Dashboard SQL Autocomplete', () => {
     }, async ({ page }) => {
         const dashboardName = generateDashboardName();
         const pm = new PageManager(page);
-        testLogger.testStart('Dashboard SQL — fields sort above keywords', __filename);
+        testLogger.testStart('Dashboard SQL — fields sort above keywords', 'dashboard-sql-autocomplete.spec.js');
 
         await openSqlPanel(page, pm, dashboardName);
 
@@ -354,7 +360,7 @@ test.describe('Dashboard SQL Autocomplete', () => {
     }, async ({ page }) => {
         const dashboardName = generateDashboardName();
         const pm = new PageManager(page);
-        testLogger.testStart('Dashboard SQL — no suggestions without focus', __filename);
+        testLogger.testStart('Dashboard SQL — no suggestions without focus', 'dashboard-sql-autocomplete.spec.js');
 
         await openSqlPanel(page, pm, dashboardName);
 
@@ -380,7 +386,7 @@ test.describe('Dashboard SQL Autocomplete', () => {
     }, async ({ page }) => {
         const dashboardName = generateDashboardName();
         const pm = new PageManager(page);
-        testLogger.testStart('Dashboard SQL — suggestions on SELECT', __filename);
+        testLogger.testStart('Dashboard SQL — suggestions on SELECT', 'dashboard-sql-autocomplete.spec.js');
 
         await openSqlPanel(page, pm, dashboardName);
 
@@ -410,7 +416,7 @@ test.describe('Dashboard SQL Autocomplete', () => {
     }, async ({ page }) => {
         const dashboardName = generateDashboardName();
         const pm = new PageManager(page);
-        testLogger.testStart('Dashboard SQL — stream suggestion insertion (no double-quote)', __filename);
+        testLogger.testStart('Dashboard SQL — stream suggestion insertion (no double-quote)', 'dashboard-sql-autocomplete.spec.js');
 
         await openSqlPanel(page, pm, dashboardName);
 

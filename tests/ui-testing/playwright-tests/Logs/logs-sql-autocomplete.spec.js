@@ -104,12 +104,19 @@ test.describe("SQL Autocomplete — Logs", () => {
         await navigateToBase(page);
         pm = new PageManager(page);
 
-        // Navigate to logs page and select stream
+        // Navigate to logs page and select stream.
+        // selectStream internally navigates with waitUntil:'domcontentloaded' + 3s wait,
+        // which can be too short for CI to finish loading the stream-list API.
+        // The explicit networkidle wait below ensures updateStreamKeywords() has been
+        // called with the full stream list before any autocomplete test runs.
         await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(streamName);
-        await page.waitForTimeout(1000);
+        // Wait for stream-list API response so streamKeywords is populated before
+        // we trigger suggestions (FROM context needs a non-empty streamKeywords).
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        await page.waitForTimeout(500);
 
         testLogger.info('Logs SQL test setup completed');
     });
