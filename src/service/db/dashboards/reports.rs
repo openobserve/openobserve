@@ -44,11 +44,12 @@ pub async fn get_by_id<C: ConnectionTrait + TransactionTrait>(
     }
 }
 
+/// Creates a new report. Returns the KSUID of the created report.
 pub async fn create<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     folder_snowflake_id: &str,
     report: Report,
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     let org = report.org_id.clone();
     let next_run_at = report.start;
 
@@ -56,14 +57,14 @@ pub async fn create<C: ConnectionTrait + TransactionTrait>(
     let trigger = db::scheduler::Trigger {
         org,
         module: db::scheduler::TriggerModule::Report,
-        module_key: report_id,
+        module_key: report_id.clone(),
         next_run_at,
         ..Default::default()
     };
     db::scheduler::push(trigger)
         .await
         .inspect_err(|e| log::error!("Failed to save trigger: {e}"))?;
-    Ok(())
+    Ok(report_id)
 }
 
 pub async fn update<C: ConnectionTrait + TransactionTrait>(
@@ -161,12 +162,80 @@ pub async fn update_without_updating_trigger<C: ConnectionTrait + TransactionTra
     Ok(report_id)
 }
 
+pub async fn update_by_id<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    report_id: &str,
+    new_folder_snowflake_id: Option<&str>,
+    report: Report,
+) -> Result<(), anyhow::Error> {
+    let org_id = report.org_id.clone();
+    let next_run_at = report.start;
+
+    let id =
+        update_by_id_without_updating_trigger(conn, report_id, new_folder_snowflake_id, report)
+            .await?;
+
+    let trigger = db::scheduler::Trigger {
+        org: org_id.clone(),
+        module: db::scheduler::TriggerModule::Report,
+        module_key: id.clone(),
+        next_run_at,
+        ..Default::default()
+    };
+    let scheduler_exists =
+        db::scheduler::exists(&org_id, db::scheduler::TriggerModule::Report, &id).await;
+    if scheduler_exists {
+        db::scheduler::update_trigger(trigger, false, "")
+            .await
+            .inspect_err(|e| log::error!("Failed to update trigger: {e}"))?;
+    } else {
+        db::scheduler::push(trigger)
+            .await
+            .inspect_err(|e| log::error!("Failed to save trigger: {e}"))?;
+    }
+    Ok(())
+}
+
+pub async fn update_by_id_without_updating_trigger<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    report_id: &str,
+    new_folder_snowflake_id: Option<&str>,
+    report: Report,
+) -> Result<String, anyhow::Error> {
+    let id = table::reports::update_by_id(conn, report_id, new_folder_snowflake_id, report.clone())
+        .await?;
+
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_update_event(&report.org_id.clone(), "", new_folder_snowflake_id, report)
+        .await?;
+    Ok(id)
+}
+
+pub async fn delete_by_id<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    report_id: &str,
+) -> Result<(), anyhow::Error> {
+    let id = table::reports::delete_by_id(conn, report_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error deleting report: {}", e))?;
+    if !id.is_empty() {
+        let _ = db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, &id)
+            .await
+            .inspect_err(|e| log::error!("Failed to delete trigger: {e}"));
+        #[cfg(feature = "enterprise")]
+        super_cluster::emit_delete_event(org_id, "", &id).await?;
+    }
+    Ok(())
+}
+
+/// Deletes a report by folder + name. Returns the KSUID of the deleted report.
 pub async fn delete<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     folder_snowflake_id: &str,
     name: &str,
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     let report_id = table::reports::delete_by_name(conn, org_id, folder_snowflake_id, name)
         .await
         .map_err(|e| anyhow::anyhow!("Error deleting report: {}", e))?;
@@ -175,7 +244,7 @@ pub async fn delete<C: ConnectionTrait + TransactionTrait>(
         .inspect_err(|e| log::error!("Failed to delete trigger: {e}"));
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(org_id, folder_snowflake_id, name).await?;
-    Ok(())
+    Ok(report_id)
 }
 
 pub async fn list<C: ConnectionTrait>(

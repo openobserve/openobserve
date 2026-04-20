@@ -207,6 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'histogram-container--hidden',
         ]"
         v-if="
+          searchObj.meta.logsVisualizeToggle !== 'patterns' &&
           searchObj.data?.histogram?.errorMsg == '' &&
           searchObj.data.histogram.errorCode != -1
         "
@@ -268,6 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'histogram-container--hidden',
         ]"
         v-else-if="
+          searchObj.meta.logsVisualizeToggle !== 'patterns' &&
           searchObj.data.histogram?.errorMsg != '' &&
           searchObj.meta.showHistogram &&
           searchObj.data.histogram.errorCode != -1

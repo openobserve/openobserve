@@ -8,7 +8,7 @@ import OtelCollector from './OtelCollector.vue';
 import CopyContent from '@/components/CopyContent.vue';
 
 vi.mock('../../../aws-exports', () => ({
-  default: { API_ENDPOINT: 'http://localhost:5080', region: 'us-east-1' },
+  default: { API_ENDPOINT: 'http://localhost:5080', region: 'us-east-1', isCloud: 'false' },
 }));
 
 vi.mock('../../../utils/zincutils', () => ({

@@ -1558,12 +1558,12 @@ const applyUnstableDimensionDefaults = (
   }
 
   const result = streams.map((stream) => {
-    const updatedFilters = { ...stream.filters };
+    const updatedFilters = { ...(stream.filters ?? {}) };
     const changedKeys: string[] = [];
     const notMatchedKeys: string[] = [];
 
     // For each filter in the stream, check if it maps to an unstable dimension
-    for (const [filterKey, filterValue] of Object.entries(stream.filters)) {
+    for (const [filterKey, filterValue] of Object.entries(stream.filters ?? {})) {
       // Look up the semantic dimension ID for this field name
       const dimensionId = fieldToDimensionId.get(filterKey);
 
@@ -1889,11 +1889,11 @@ const applyDimensionChanges = () => {
   // Update metric stream filters with new dimension values
   // Use semantic groups to map filter field names to dimension IDs
   selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => {
-    const updatedFilters = { ...stream.filters };
+    const updatedFilters = { ...(stream.filters ?? {}) };
 
     // For each filter in the stream, find its semantic dimension ID
     // and update with the new value from activeDimensions
-    for (const [filterKey, _filterValue] of Object.entries(stream.filters)) {
+    for (const [filterKey, _filterValue] of Object.entries(stream.filters ?? {})) {
       const dimensionId = fieldToDimensionId.get(filterKey);
       if (dimensionId && activeDimensions.value[dimensionId] !== undefined) {
         const newValue = activeDimensions.value[dimensionId];

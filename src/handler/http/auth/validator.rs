@@ -584,7 +584,9 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
     // Hack for v2 apis
     let org_id = if path_columns.len() > 2
         && path_columns[0].eq("v2")
-        && (path_columns[2].eq("alerts") || path_columns[2].eq("folders"))
+        && (path_columns[2].eq("alerts")
+            || path_columns[2].eq("folders")
+            || path_columns[2].eq("reports"))
     {
         path_columns[1]
     } else {
