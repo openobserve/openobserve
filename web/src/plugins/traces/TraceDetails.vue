@@ -1838,7 +1838,7 @@ export default defineComponent({
               countRes.data?.hits?.[0]?.total ?? traceSpans.length;
             searchObj.data.traceDetails.totalSpanCount = totalFromCount;
             searchObj.data.traceDetails.spansTruncated =
-              traceSpans.length >= limit;
+              traceSpans.length > limit;
             if (searchObj.data.traceDetails.spansTruncated) {
               $q.notify({
                 type: "warning",
