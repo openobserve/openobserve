@@ -45,6 +45,11 @@ export const convertMultiSQLData = async (
   // loop on all search query data
   const options: any = [];
   for (let i = 0; i < searchQueryData.length; i++) {
+    const queryMeta = {
+      ...(metadata.queries[i] ?? {}),
+      panelId: panelSchema?.id,
+      queryIndex: i,
+    };
     options.push(
       await convertSQLData(
         panelSchema,
@@ -53,7 +58,7 @@ export const convertMultiSQLData = async (
         chartPanelRef,
         hoveredSeriesState,
         resultMetaData.value?.[i] ?? [],
-        { queries: [metadata.queries[i]] },
+        { queries: [queryMeta], panelId: panelSchema?.id, queryIndex: i },
         chartPanelStyle,
         annotations,
       ),
@@ -122,5 +127,4 @@ export const convertSQLData = async (
     chartPanelStyle,
     annotations,
   );
-
 };

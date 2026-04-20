@@ -103,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <ChartRenderer
           v-else
+          ref="chartRendererRef"
           :data="
             panelSchema.queryType === 'promql' ||
             (panelData.chartType != 'geomap' &&
@@ -362,6 +363,10 @@ import {
   usePanelDownload,
 } from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
+import {
+  overlayNewDataOnOldOptions,
+  isOverlayEligible,
+} from "@/utils/dashboard/streaming";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -584,6 +589,7 @@ export default defineComponent({
     // stores the converted data which can be directly used for rendering different types of panels
     const panelData: any = shallowRef({}); // holds the data to render the panel after getting data from the api based on panel config
     const chartPanelRef: any = ref(null); // holds the ref to the whole div
+    const chartRendererRef: any = ref(null); // holds the ref to the ChartRenderer component
     const selectedAnnotationData: any = ref([]);
     const drilldownPopUpRef: any = ref(null);
 
@@ -705,6 +711,18 @@ export default defineComponent({
       // Return filtered data
       return filtered;
     });
+
+    // The latest metadata chunk's time_offset.start_time (┬╡s) marks the left boundary
+    // of data received so far. Also pull the full query start so the overlay function
+    // can compute the fraction against the complete query range, not just received data.
+    const metadataStartTimeForOverlay = computed(() => {
+      const resultMeta = resultMetaData.value?.[0];
+      if (!resultMeta?.length) return 0;
+      return resultMeta[resultMeta.length - 1]?.time_offset?.start_time ?? 0;
+    });
+    const queryStartTimeForOverlay = computed(() =>
+      Number(metadata.value?.queries?.[0]?.startTime ?? 0),
+    );
 
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef: any = ref(null);
@@ -833,13 +851,13 @@ export default defineComponent({
       annotationPopupRef.value = null;
       tableRendererRef.value = null;
     });
-    const convertPanelDataCommon = async () => {
+    const convertPanelDataCommon = async (applyOverlay = false) => {
       if (
         !errorDetail?.value?.message &&
         validatePanelData?.value?.length === 0
       ) {
         try {
-          panelData.value = await convertPanelData(
+          const result = await convertPanelData(
             panelSchema.value,
             filteredData.value,
             store,
@@ -851,6 +869,34 @@ export default defineComponent({
             annotations,
             loading.value,
           );
+
+          // Apply overlay BEFORE assigning to panelData.value.
+          // This ensures a single watcher trigger with the overlaid options,
+          // avoiding the double-setOption issue (one without graphic, one with).
+          if (
+            applyOverlay &&
+            previousOptionsSnapshot &&
+            isOverlayEligible(panelSchema.value, previousOptionsSnapshot)
+          ) {
+            // Pass container dimensions so the graphic overlay can calculate
+            // width/height (required because ChartRenderer uses notMerge: true).
+            const containerEl = chartPanelRef.value;
+            const containerSize = containerEl
+              ? {
+                  width: containerEl.clientWidth,
+                  height: containerEl.clientHeight,
+                }
+              : undefined;
+            result.options = overlayNewDataOnOldOptions(
+              previousOptionsSnapshot,
+              result.options,
+              containerSize,
+              metadataStartTimeForOverlay.value,
+              queryStartTimeForOverlay.value,
+            );
+          }
+
+          panelData.value = result;
 
           limitNumberOfSeriesWarningMessage.value =
             panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
@@ -887,6 +933,11 @@ export default defineComponent({
     // Track if we've rendered the first chunk with actual data
     let hasRenderedFirstDataChunk = ref(false);
 
+    // --- Streaming overlay state ---
+    // Snapshot of old panelData.options taken when streaming starts (for refresh overlay).
+    // Immutable once set — each chunk overlays against the same original.
+    let previousOptionsSnapshot: any = null;
+
     // Create a throttled version for streaming updates (350ms throttle)
     // Chunks arrive ~300-400ms apart, so 350ms ensures updates every 2-3 chunks
     // This prevents excessive re-renders while showing progressive updates
@@ -894,6 +945,21 @@ export default defineComponent({
       leading: true, // Call immediately on first invocation
       trailing: true, // Ensure final call after throttle period
     });
+
+    // Combined convert + overlay for subsequent streaming chunks.
+    // Must be a single throttled unit because throttle() doesn't return a promise —
+    // calling overlay separately after convertPanelDataThrottled() would run overlay
+    // BEFORE the throttled conversion executes, then the conversion overwrites the result.
+    const convertAndOverlayThrottled = throttle(
+      async () => {
+        await convertPanelDataCommon(true);
+      },
+      350,
+      {
+        leading: true,
+        trailing: true,
+      },
+    );
 
     // Watch for panel schema changes to re-convert panel data
     watch(
@@ -970,30 +1036,103 @@ export default defineComponent({
           };
 
         // Check if this is the first chunk with actual data
+        // SQL queries have data.value[0] as an array of hits (not an object with .result)
+        // PromQL queries have data.value[0] as an object with .result property
         const hasData =
-          data.value?.length > 0 && data.value[0]?.result?.length > 0;
+          data.value?.length > 0 &&
+          (data.value[0]?.result?.length > 0 ||
+            (Array.isArray(data.value[0]) && data.value[0].length > 0));
 
         // Use throttled version during loading (streaming), immediate version when complete
         // This prevents excessive re-renders during PromQL data streaming
         if (loading.value) {
-          // First chunk with actual data: render immediately!
+          // ---- STREAMING (chunks arriving) ----
           if (hasData && !hasRenderedFirstDataChunk.value) {
+            // FIRST CHUNK WITH DATA: render immediately
             hasRenderedFirstDataChunk.value = true;
-            await convertPanelDataCommon();
-          } else {
-            // Subsequent chunks: throttle to reduce re-render frequency
-            await convertPanelDataThrottled();
+
+            // Snapshot old rendered options if they exist — this is IMMUTABLE from here.
+            const hasOldChart = panelData.value?.options?.series?.length > 0;
+            if (hasOldChart) {
+              previousOptionsSnapshot = JSON.parse(
+                JSON.stringify(panelData.value.options),
+              );
+              // Tag with metadata for eligibility checks
+              previousOptionsSnapshot._chartType = panelSchema.value?.type;
+              previousOptionsSnapshot._queryCount =
+                panelSchema.value?.queries?.length;
+
+              // Capture actual grid pixel rect from the ECharts instance.
+              // With containLabel: true, the actual plot area differs from raw grid config.
+              try {
+                const chartInstance = chartRendererRef.value?.chart;
+                if (chartInstance) {
+                  const gridModel = chartInstance
+                    .getModel()
+                    ?.getComponent("grid");
+                  const gridRect = gridModel?.coordinateSystem?.getRect();
+                  if (gridRect) {
+                    previousOptionsSnapshot._gridRect = {
+                      x: gridRect.x,
+                      y: gridRect.y,
+                      width: gridRect.width,
+                      height: gridRect.height,
+                    };
+                  }
+                }
+              } catch (e) {
+                // Ignore — will fall back to grid config values in overlay
+              }
+            }
+
+            // Convert and apply overlay in a single assignment to panelData.value,
+            // so ChartRenderer's watcher fires once with the overlaid options.
+            await convertPanelDataCommon(true);
+          } else if (hasData) {
+            // SUBSEQUENT CHUNKS: throttle conversion + overlay as a single unit
+            convertAndOverlayThrottled();
           }
+          // else: !hasData during loading → skip conversion → old chart stays visible
         } else {
-          // Loading complete: immediate final render with full data
+          // ---- LOADING COMPLETE ----
           // Cancel any pending throttled calls and render immediately
           convertPanelDataThrottled.cancel();
+          convertAndOverlayThrottled.cancel();
           hasRenderedFirstDataChunk.value = false; // Reset for next query
+
+          // Final render with FULL data — no overlay needed (new data is complete)
           await convertPanelDataCommon();
+
+          // Clear streaming state — old snapshot no longer needed
+          if (previousOptionsSnapshot) {
+            previousOptionsSnapshot = null;
+          }
         }
       },
       { deep: true },
     );
+
+    // Watch loading separately to handle stream completion.
+    // The data watcher above watches [data, theme, timezone, annotations] — NOT loading.
+    // When loading transitions from true→false without a simultaneous data change,
+    // the data watcher doesn't fire. This watcher ensures we always clean up
+    // streaming state and do a final render when the stream ends.
+    watch(loading, async (newLoading, oldLoading) => {
+      if (oldLoading === true && newLoading === false) {
+        // Stream just completed
+        convertPanelDataThrottled.cancel();
+        convertAndOverlayThrottled.cancel();
+        hasRenderedFirstDataChunk.value = false;
+
+        // Final render with complete data — no overlay
+        await convertPanelDataCommon();
+
+        // Clear streaming state
+        if (previousOptionsSnapshot) {
+          previousOptionsSnapshot = null;
+        }
+      }
+    });
 
     const checkIfPanelIsTimeSeries = computed(() => {
       return panelData.value?.extras?.isTimeSeries;
@@ -1138,10 +1277,7 @@ export default defineComponent({
         case "metric": {
           return (
             data.value[0]?.length > 1 ||
-            yAlias.every(
-              (y: any) =>
-                getDataValue(firstRow, y) != null,
-            )
+            yAlias.every((y: any) => getDataValue(firstRow, y) != null)
           );
         }
         case "heatmap": {
@@ -1307,6 +1443,7 @@ export default defineComponent({
     return {
       store,
       chartPanelRef,
+      chartRendererRef,
       data,
       loading,
       searchRequestTraceIds,
