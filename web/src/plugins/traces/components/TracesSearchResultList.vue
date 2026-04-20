@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       v-show="hasResults || loading"
       data-test="traces-table-wrapper"
-      class="column tw:h-auto!"
+      class="column tw:h-auto! traces-table-container"
     >
       <!-- Table scroll area: no overflow here — parent handles unified scroll -->
       <div
@@ -381,4 +381,10 @@ const totalPages = computed(() =>
 
 <style lang="scss" scoped>
 @import "@/styles/pagination.scss";
+
+:deep(.traces-table-container) {
+  .table-container {
+    border-radius: 0 !important;
+  }
+}
 </style>

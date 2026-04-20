@@ -423,26 +423,33 @@ describe("FieldValuesPanel.vue", () => {
   // ─── Search bar (showValueSearch) ───────────────────────────────────────────
 
   describe("Value search bar", () => {
-    it("hides search bar when cachedValues count is below defaultValuesCount", () => {
+    it("hides search bar when there are no values", () => {
       wrapper = createWrapper({
-        defaultValuesCount: 10,
-        fieldValues: buildFieldValues(5), // 5 values < 10 defaultValuesCount
+        fieldValues: buildFieldValues(0),
       });
-      // cachedValues only fill after watch fires; initially empty → showValueSearch=false
       expect(wrapper.find(".value-search-container").exists()).toBe(false);
     });
 
-    it("shows search bar once cachedValues reach defaultValuesCount", async () => {
+    it("shows search bar when values exist even below defaultValuesCount", () => {
       wrapper = createWrapper({
-        defaultValuesCount: 3,
-        fieldValues: buildFieldValues(3),
+        defaultValuesCount: 10,
+        fieldValues: buildFieldValues(5),
       });
-      // Trigger the watch by setting cachedValues directly
-      (wrapper.vm as any).cachedValues = [
-        { key: "a", count: 1 },
-        { key: "b", count: 2 },
-        { key: "c", count: 3 },
-      ];
+      expect(wrapper.find(".value-search-container").exists()).toBe(true);
+    });
+
+    it("keeps search bar visible when searching returns no values but cache exists", async () => {
+      wrapper = createWrapper({
+        fieldValues: buildFieldValues(2),
+      });
+      await nextTick();
+      await wrapper.setProps({
+        fieldValues: {
+          isLoading: false,
+          values: [],
+          errMsg: "",
+        },
+      });
       await nextTick();
       expect(wrapper.find(".value-search-container").exists()).toBe(true);
     });
