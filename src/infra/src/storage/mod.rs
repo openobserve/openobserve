@@ -103,6 +103,10 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
     async fn rename_if_not_exists(&self, account: &str, from: &Path, to: &Path) -> Result<()>;
 }
 
+pub fn get_org_storage_key(org_id: &str) -> String {
+    format!("{org_id}:default")
+}
+
 pub async fn list(account: &str, prefix: &str) -> Result<Vec<String>> {
     let files = MULTI_ACCOUNTS
         .list(account, Some(&prefix.into()))
