@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use axum::{
     Json,
     extract::{Path, Query},
@@ -20,7 +22,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::model_pricing::{BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::auth::{UserEmail, check_permissions},
@@ -28,6 +30,14 @@ use {
 };
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::model_pricing};
+
+fn source_priority(source: &PricingSource) -> u8 {
+    match source {
+        PricingSource::Org => 0,
+        PricingSource::MetaOrg => 1,
+        PricingSource::BuiltIn => 2,
+    }
+}
 
 /// ListModelPricing
 ///
@@ -66,47 +76,77 @@ pub async fn list(
     {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
-    // Fetch org-specific entries
-    let mut items = match model_pricing::list(&org_id).await {
-        Ok(items) => items,
+    // Collect all items from all sources without deduplication.
+    // We will group them by match_pattern and build a parent-children hierarchy.
+    let mut all_items: Vec<ModelPricingDefinition> = Vec::new();
+
+    // 1. Org-specific entries (all, enabled or not — UI needs to show disabled ones too).
+    match model_pricing::list(&org_id).await {
+        Ok(items) => all_items.extend(items),
         Err(e) => return MetaHttpResponse::internal_error(e),
-    };
+    }
 
-    // Collect the set of names already present from the org-specific items.
-    let mut seen_names: std::collections::HashSet<String> =
-        items.iter().map(|m| m.name.clone()).collect();
-
-    // For non-meta orgs, also include inherited entries from the meta org.
+    // 2. For non-meta orgs, include inherited entries from the meta org.
     if org_id != META_ORG && org_id != BUILT_IN_ORG {
         match model_pricing::list(META_ORG).await {
-            Ok(meta_items) => {
-                for item in meta_items {
-                    if item.enabled && seen_names.insert(item.name.clone()) {
-                        items.push(item);
-                    }
-                }
-            }
+            Ok(meta_items) => all_items.extend(meta_items.into_iter().filter(|m| m.enabled)),
             Err(e) => return MetaHttpResponse::internal_error(e),
         }
     }
 
-    // Include built-in entries (synced from GitHub), shadowed by org/meta entries.
-    // Filter out disabled built-in models (soft-deleted from upstream) so they
-    // don't appear in the UI list — the hot-path cache already filters them.
+    // 3. Include built-in entries. Filter disabled (soft-deleted from upstream).
     if org_id != BUILT_IN_ORG {
         match model_pricing::list(BUILT_IN_ORG).await {
             Ok(built_in_items) => {
-                for item in built_in_items {
-                    if item.enabled && seen_names.insert(item.name.clone()) {
-                        items.push(item);
-                    }
-                }
+                all_items.extend(built_in_items.into_iter().filter(|m| m.enabled))
             }
             Err(e) => return MetaHttpResponse::internal_error(e),
         }
     }
 
-    MetaHttpResponse::json(items)
+    // Sort all items by priority: source (Org < MetaOrg < BuiltIn), then sort_order, then name.
+    all_items.sort_by(|a, b| {
+        source_priority(&a.source)
+            .cmp(&source_priority(&b.source))
+            .then_with(|| a.sort_order.cmp(&b.sort_order))
+            .then_with(|| a.name.cmp(&b.name))
+    });
+
+    // Build a parent-children hierarchy based on regex overlap.
+    //
+    // For each item (processed in priority order) we derive a testable literal string from its
+    // match_pattern (by stripping flags/anchors and extracting the literal prefix). We then check
+    // whether any already-placed parent's compiled regex matches that test string. If yes the item
+    // is a child (shadowed by that parent). If no, it becomes a new parent.
+    //
+    // This reflects actual runtime behaviour: a parent with pattern `(?i)claude-3` genuinely
+    // shadows any built-in whose pattern starts with "claude-3" (e.g. "claude-3-haiku").
+    let mut parents: Vec<(ModelPricingDefinition, regex::Regex)> = Vec::new();
+
+    for item in all_items {
+        let test_str = derive_test_string(&item.match_pattern);
+
+        let parent_idx = if !test_str.is_empty() {
+            parents
+                .iter()
+                .position(|(_, re)| re.is_match(&test_str))
+        } else {
+            None
+        };
+
+        if let Some(idx) = parent_idx {
+            parents[idx].0.children.push(item);
+        } else {
+            let compiled = regex::RegexBuilder::new(&item.match_pattern)
+                .size_limit(crate::service::db::model_pricing::REGEX_SIZE_LIMIT)
+                .build()
+                .unwrap_or_else(|_| regex::Regex::new("$^").unwrap()); // never matches
+            parents.push((item, compiled));
+        }
+    }
+
+    let result: Vec<ModelPricingDefinition> = parents.into_iter().map(|(def, _)| def).collect();
+    MetaHttpResponse::json(result)
 }
 
 /// GetModelPricing
@@ -522,6 +562,147 @@ pub async fn refresh_built_in(
         Ok(result) => MetaHttpResponse::json(result),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
+}
+
+/// Strip leading inline flag groups like `(?i)`, `(?ms)`, `(?-i)` from a regex pattern.
+fn strip_leading_flags(s: &str) -> &str {
+    let mut rest = s;
+    loop {
+        if let Some(r) = rest.strip_prefix("(?") {
+            if let Some(end) = r.find(')') {
+                let flags = &r[..end];
+                if flags.chars().all(|c| matches!(c, 'i' | 'm' | 's' | 'x' | 'u' | '-')) {
+                    rest = &r[end + 1..];
+                    continue;
+                }
+            }
+        }
+        break;
+    }
+    rest
+}
+
+/// Derive a testable literal string from a regex pattern.
+///
+/// Strips inline flags and leading `^` anchors, then walks the pattern character by character
+/// collecting literal characters. Stops at the first unescaped regex metacharacter
+/// (`(`, `)`, `[`, `]`, `{`, `}`, `*`, `+`, `?`, `|`, `$`, `^`, `.`).
+/// Backslash-escaped characters are treated as their literal value (e.g. `\.` → `.`).
+///
+/// Examples:
+///   `(?i)claude-3-haiku`              → `"claude-3-haiku"`
+///   `(?i)gpt-4o(?:-\d{4}[-\d]*)?$`   → `"gpt-4o"`
+///   `(?i)claude-3-sonnet$`            → `"claude-3-sonnet"`
+///   `(?i)gpt-3\.5`                    → `"gpt-3.5"`
+fn derive_test_string(pattern: &str) -> String {
+    let s = strip_leading_flags(pattern.trim());
+    let s = s.trim_start_matches('^');
+    let mut result = String::new();
+    let mut iter = s.chars().peekable();
+    while let Some(c) = iter.next() {
+        match c {
+            '\\' => {
+                if let Some(next) = iter.next() {
+                    result.push(next);
+                }
+            }
+            '(' | ')' | '[' | ']' | '{' | '}' | '*' | '+' | '?' | '|' | '$' | '^' | '.' => break,
+            _ => result.push(c),
+        }
+    }
+    result
+}
+
+/// Request body for the test-model-match endpoint.
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct TestModelMatchRequest {
+    /// The model name to test (e.g. "gpt-4o", "claude-opus-3-5").
+    pub model_name: String,
+    /// Optional token counts keyed by usage type (e.g. {"input": 1000, "output": 500}).
+    /// When provided, cost is calculated using the matched pricing definition.
+    #[serde(default)]
+    pub usage: HashMap<String, i64>,
+    /// Optional span timestamp in microseconds. When provided, only definitions
+    /// whose `valid_from` <= timestamp are considered.
+    #[serde(default)]
+    pub timestamp: Option<i64>,
+}
+
+/// Response for the test-model-match endpoint.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct TestModelMatchResponse {
+    /// The matched pricing definition, or null if no definition matched.
+    pub matched: Option<ModelPricingDefinition>,
+    /// The name of the selected pricing tier, or null if no definition matched.
+    pub tier: Option<String>,
+    /// Per-usage-key costs (excluding "total").
+    pub costs: HashMap<String, f64>,
+    /// Sum of all per-key costs.
+    pub total_cost: f64,
+}
+
+/// TestModelMatch
+///
+/// #{"ratelimit_module":"ModelPricing", "ratelimit_module_operation":"list"}#
+#[utoipa::path(
+    post,
+    path = "/{org_id}/llm/models/test",
+    context_path = "/api",
+    tag = "LLM",
+    operation_id = "TestModelMatch",
+    summary = "Test which pricing definition matches a model name and calculate cost",
+    description = "Simulates the pricing lookup for a given model name and optional usage data, returning the matched definition, selected tier, and cost breakdown.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = TestModelMatchRequest, description = "Model name and optional usage to test"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = TestModelMatchResponse),
+        (status = 500, description = "Internal server error"),
+    ),
+)]
+pub async fn test_model_match(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<TestModelMatchRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &org_id,
+        &org_id,
+        &user_email.user_id,
+        "model_pricing",
+        "LIST",
+        None,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
+    let entries = model_pricing::get_org_pricing_entries(&org_id);
+    let matched = model_pricing::find_pricing_sync_at(&entries, &req.model_name, req.timestamp);
+
+    let (tier, costs, total_cost) = if let Some(ref def) = matched {
+        let result = model_pricing::calculate_cost_from_definition(def, &req.usage);
+        let total = result.cost.get("total").copied().unwrap_or(0.0);
+        let costs = result
+            .cost
+            .into_iter()
+            .filter(|(k, _)| k != "total")
+            .collect();
+        (Some(result.tier_name), costs, total)
+    } else {
+        (None, HashMap::new(), 0.0)
+    };
+
+    MetaHttpResponse::json(TestModelMatchResponse {
+        matched,
+        tier,
+        costs,
+        total_cost,
+    })
 }
 
 fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {

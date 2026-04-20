@@ -56,6 +56,7 @@ impl TryFrom<Model> for ModelPricingDefinition {
             tiers,
             created_at: model.created_at,
             updated_at: model.updated_at,
+            children: Vec::new(),
         })
     }
 }

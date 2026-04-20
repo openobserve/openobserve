@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Test Match Dialog -->
     <TestModelMatchDialog
       v-model="showTestMatchDialog"
-      :models="models"
     />
 
     <!-- Main List View -->
@@ -105,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-table
       ref="qTableRef"
       data-test="model-pricing-list-table"
-      :rows="filteredModels"
+      :rows="tableRows"
       :columns="columns"
       row-key="id"
       v-model:pagination="pagination"
@@ -167,19 +166,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:body="props">
         <q-tr
           :props="props"
+          :class="{ 'child-pricing-row': props.row.__is_child }"
         >
-          <q-tooltip
-            v-if="getShadowedBy(props.row)"
-            :delay="400"
-            anchor="top middle"
-            self="bottom middle"
-            class="bg-grey-9 text-caption"
-            style="white-space: normal; max-width: 300px;"
+          <q-td
+            v-for="col in columns"
+            :key="col.name"
+            :props="props"
+            :style="col.style"
+            :class="{
+              'tree-name-cell': col.name === 'name',
+              'tree-parent-expanded': col.name === 'name' && !props.row.__is_child && props.row.children?.length > 0 && expandedParents.has(props.row.id),
+              'tree-child': col.name === 'name' && props.row.__is_child,
+              'tree-last-child': col.name === 'name' && props.row.__is_child && props.row.__is_last_child,
+            }"
           >
-            Shadowed by "{{ getShadowedBy(props.row)?.name }}"
-            <div class="tw:mt-1 tw:opacity-75">Higher priority match. This model won't be used for cost calculation.</div>
-          </q-tooltip>
-          <q-td v-for="col in columns" :key="col.name" :props="props" :style="col.style">
             <template v-if="col.name === 'select'">
               <q-checkbox
                 :model-value="selectedIds.includes(props.row.id)"
@@ -190,8 +190,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template v-else-if="col.name === 'name'">
-              <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-0">
-                <span v-if="getSource(props.row) === 'built_in'" class="tw:shrink-0 tw:cursor-default tw:inline-flex">
+              <!-- Parent row with children -->
+              <div v-if="!props.row.__is_child" class="row items-center no-wrap tree-node-content">
+                <div class="tree-icon-wrapper">
+                  <q-icon
+                    v-if="props.row.children?.length > 0"
+                    :name="expandedParents.has(props.row.id) ? 'keyboard_arrow_down' : 'keyboard_arrow_right'"
+                    size="xs"
+                    class="cursor-pointer tree-expand-icon"
+                    @click.stop="toggleExpand(props.row.id)"
+                  />
+                </div>
+                <span v-if="getSource(props.row) === 'built_in'" class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1">
                   <img :src="ooLogo" class="tw:w-[16px] tw:h-[16px]" alt="OpenObserve" />
                   <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Built-in model provided by OpenObserve</q-tooltip>
                 </span>
@@ -199,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else-if="getSource(props.row) === 'meta_org' || (getSource(props.row) === 'org' && props.row.org_id !== orgIdentifier)"
                   name="corporate_fare"
                   size="16px"
-                  class="tw:shrink-0 tw:text-grey-6 tw:cursor-default"
+                  class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                 >
                   <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from meta org</q-tooltip>
                 </q-icon>
@@ -207,38 +217,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else
                   name="person"
                   size="16px"
-                  class="tw:shrink-0 tw:text-grey-6 tw:cursor-default"
+                  class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                 >
                   <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Custom model</q-tooltip>
                 </q-icon>
-                <div class="o2-table-cell-content">
-                  {{ props.row.name }}
-                </div>
+                <div class="o2-table-cell-content">{{ props.row.name }}</div>
                 <q-tooltip
                   v-if="props.row.name.length > 30"
-                  anchor="top middle"
-                  self="bottom middle"
-                  :delay="500"
+                  anchor="top middle" self="bottom middle" :delay="500"
                   style="max-width: none; white-space: normal; word-break: break-all;"
+                >{{ props.row.name }}</q-tooltip>
+              </div>
+              <!-- Child row -->
+              <div v-else class="row items-center no-wrap tree-node-content tree-child-content">
+                <div class="tree-dot-marker" :class="{ 'tree-dot-parent': props.row.children?.length > 0 }" />
+                <span v-if="getSource(props.row) === 'built_in'" class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1">
+                  <img :src="ooLogo" class="tw:w-[16px] tw:h-[16px]" alt="OpenObserve" />
+                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Built-in model provided by OpenObserve</q-tooltip>
+                </span>
+                <q-icon
+                  v-else-if="getSource(props.row) === 'meta_org' || (getSource(props.row) === 'org' && props.row.org_id !== orgIdentifier)"
+                  name="corporate_fare"
+                  size="16px"
+                  class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                 >
-                  {{ props.row.name }}
-                </q-tooltip>
+                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from meta org</q-tooltip>
+                </q-icon>
+                <q-icon
+                  v-else
+                  name="person"
+                  size="16px"
+                  class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
+                >
+                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Custom model</q-tooltip>
+                </q-icon>
+                <div class="o2-table-cell-content tw:opacity-70">{{ props.row.name }}</div>
+                <q-tooltip
+                  v-if="props.row.name.length > 30"
+                  anchor="top middle" self="bottom middle" :delay="500"
+                  style="max-width: none; white-space: normal; word-break: break-all;"
+                >{{ props.row.name }}</q-tooltip>
               </div>
             </template>
             <template v-else-if="col.name === 'match_pattern'">
               <div class="tw:flex tw:items-center tw:gap-1">
                 <code
                   class="text-caption pattern-code o2-table-cell-content"
-                  :class="{'tw:opacity-60 tw:line-through': !!getShadowedBy(props.row)}"
+                  :class="{ 'shadowed-pattern': props.row.__is_child }"
                 >
                   {{ props.row.match_pattern }}
                 </code>
                 <q-icon
-                  v-if="getShadowedBy(props.row)"
+                  v-if="props.row.__is_child"
                   name="warning_amber"
                   size="14px"
+                  class="tw:shrink-0 shadowed-icon"
                   color="orange-10"
-                />
+                >
+                  <q-tooltip :delay="300" anchor="top middle" self="bottom middle" style="max-width: 260px; white-space: normal;">
+                    Shadowed by "{{ getParentName(props.row) }}" — overridden by a higher-priority rule and won't be used for cost calculations
+                  </q-tooltip>
+                </q-icon>
               </div>
             </template>
             <template v-else-if="col.name === 'pricing'">
@@ -259,15 +298,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     +{{ getOverflowCount(props.row) }} more
                     <q-tooltip :delay="400" anchor="top middle" self="bottom middle" class="pricing-overflow-tooltip">
-                      <div class="pricing-overflow-tooltip-inner">
-                        <span
-                          v-for="(price, key) in getDefaultTier(props.row).prices"
-                          :key="key"
-                          class="dimension-badge"
-                          :class="getPriceKeyColorClass(key as string)"
-                        >
-                          <span class="tw:font-medium">{{ formatPriceKey(key as string) }}</span>=<span>{{ formatPerMillion(price as number) }}</span>
-                        </span>
+                      <div class="pricing-breakdown-tooltip">
+                        <div class="pricing-breakdown-title">{{ props.row.name }}</div>
+                        <table class="pricing-breakdown-table">
+                          <thead>
+                            <tr>
+                              <th>Usage Type</th>
+                              <th>Price per 1M tokens</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr v-for="([key, price]) in sortedPriceEntries(getDefaultTier(props.row)?.prices || {})" :key="key">
+                              <td>{{ formatPriceKey(key) }}</td>
+                              <td>{{ formatPerMillion(price) }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
                     </q-tooltip>
                   </span>
@@ -403,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="pricingDialogRow && (getSource(pricingDialogRow) === 'meta_org' || (getSource(pricingDialogRow) === 'org' && pricingDialogRow.org_id !== orgIdentifier))"
             name="corporate_fare"
             size="18px"
-            class="tw:shrink-0 tw:text-grey-6 tw:cursor-default"
+            class="tw:shrink-0 tw:cursor-default source-icon"
           >
             <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from meta org</q-tooltip>
           </q-icon>
@@ -411,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             name="person"
             size="18px"
-            class="tw:shrink-0 tw:text-grey-6 tw:cursor-default"
+            class="tw:shrink-0 tw:cursor-default source-icon"
           >
             <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Custom model</q-tooltip>
           </q-icon>
@@ -445,13 +491,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="pricing-section-label tw:mt-2">Pricing per 1M tokens</div>
             <div class="tw:flex tw:flex-wrap tw:gap-2">
               <span
-                v-for="(price, key) in getDefaultTier(pricingDialogRow)?.prices"
+                v-for="([key, price]) in sortedPriceEntries(getDefaultTier(pricingDialogRow)?.prices || {})"
                 :key="key"
                 class="dimension-badge"
-                :class="getPriceKeyColorClass(key as string)"
+                :class="getPriceKeyColorClass(key)"
                 style="font-size: 13px; padding: 4px 10px;"
               >
-                <span class="tw:font-medium">{{ formatPriceKey(key as string) }}</span>=<span>{{ formatPerMillion(price as number) }}</span>
+                <span class="tw:font-medium">{{ formatPriceKey(key) }}</span>=<span>{{ formatPerMillion(price) }}</span>
               </span>
               <span v-if="!getDefaultTier(pricingDialogRow)?.prices || Object.keys(getDefaultTier(pricingDialogRow)?.prices || {}).length === 0" class="text-grey-5">—</span>
             </div>
@@ -546,6 +592,16 @@ const hasSelectableModels = computed(() =>
   models.value.length > 0
 );
 
+/** Flat list of all models (parents + children) for ID-based lookups. */
+const allModels = computed(() => {
+  const result: any[] = [];
+  for (const m of models.value) {
+    result.push(m);
+    if (m.children?.length) result.push(...m.children);
+  }
+  return result;
+});
+
 const columns = computed(() => {
   const cols: any[] = [];
   if (hasSelectableModels.value) {
@@ -569,23 +625,22 @@ const selectableModels = computed(() =>
   filteredModels.value
 );
 
-/** Selectable models visible on the current page only. */
+/** Selectable rows visible on the current page (parents + expanded children). */
 const currentPageSelectableModels = computed(() => {
   const perPage = pagination.value.rowsPerPage || 0;
-  // rowsPerPage=0 means "show all"
   if (perPage === 0) {
-    return filteredModels.value;
+    return tableRows.value;
   }
   const page = (qTableRef.value?.computedPagination?.page ?? 1);
   const start = (page - 1) * perPage;
   const end = start + perPage;
-  return filteredModels.value.slice(start, end);
+  return tableRows.value.slice(start, end);
 });
 
 const selectedIdsOnlyContainsOwn = computed(() => {
   if (selectedIds.value.length === 0) return false;
   return selectedIds.value.every(id => {
-    const model = models.value.find((m: any) => m.id === id);
+    const model = allModels.value.find((m: any) => m.id === id);
     return model && !isReadOnly(model);
   });
 });
@@ -621,6 +676,13 @@ function toggleSelect(id: string) {
 /** Get the source of a model: 'built_in', 'meta_org', or 'org'. */
 function getSource(model: any): string {
   return model.source || 'org';
+}
+
+/** Return the parent model's name for a child (shadowed) row. */
+function getParentName(row: any): string {
+  if (!row.__parent_id) return '';
+  const parent = models.value.find((m: any) => m.id === row.__parent_id);
+  return parent?.name || '';
 }
 
 
@@ -707,9 +769,18 @@ const filteredModels = computed(() => {
   return sorted;
 });
 
-/** Sort within each section group so section banners stay in place. */
+/** Sort within each section group, keeping child rows attached to their parent. */
 function customSort(rows: any[], sortBy: string, descending: boolean) {
   if (!sortBy) return rows;
+
+  // Separate child rows — they'll be re-inserted after their parent
+  const parentRows = rows.filter((r: any) => !r.__is_child);
+  const childRowsByParent = new Map<string, any[]>();
+  for (const r of rows.filter((r: any) => r.__is_child)) {
+    const arr = childRowsByParent.get(r.__parent_id) || [];
+    arr.push(r);
+    childRowsByParent.set(r.__parent_id, arr);
+  }
 
   const compare = (a: any, b: any) => {
     const aVal = (a[sortBy] ?? '').toString().toLowerCase();
@@ -718,9 +789,9 @@ function customSort(rows: any[], sortBy: string, descending: boolean) {
     return descending ? -cmp : cmp;
   };
 
-  const orgRows = rows.filter((r: any) => getSource(r) === 'org' && r.org_id === orgIdentifier.value);
-  const metaRows = rows.filter((r: any) => getSource(r) === 'meta_org' || (getSource(r) === 'org' && r.org_id !== orgIdentifier.value));
-  const builtInRows = rows.filter((r: any) => getSource(r) === 'built_in');
+  const orgRows = parentRows.filter((r: any) => getSource(r) === 'org' && r.org_id === orgIdentifier.value);
+  const metaRows = parentRows.filter((r: any) => getSource(r) === 'meta_org' || (getSource(r) === 'org' && r.org_id !== orgIdentifier.value));
+  const builtInRows = parentRows.filter((r: any) => getSource(r) === 'built_in');
 
   orgRows.sort(compare);
   metaRows.sort(compare);
@@ -731,7 +802,12 @@ function customSort(rows: any[], sortBy: string, descending: boolean) {
   if (metaRows.length > 0) metaRows[0].__sectionStart = 'meta_org';
   if (builtInRows.length > 0) builtInRows[0].__sectionStart = 'built_in';
 
-  return [...orgRows, ...metaRows, ...builtInRows];
+  const result: any[] = [];
+  for (const parent of [...orgRows, ...metaRows, ...builtInRows]) {
+    result.push(parent);
+    result.push(...(childRowsByParent.get(parent.id) || []));
+  }
+  return result;
 }
 
 function getDefaultTier(model: any) {
@@ -742,13 +818,25 @@ function getDefaultTier(model: any) {
   return fallback || model.tiers?.[0];
 }
 
+const PRICE_KEY_ORDER = ['input', 'output'];
+
+function sortedPriceEntries(prices: Record<string, number>): [string, number][] {
+  return Object.entries(prices).sort(([a], [b]) => {
+    const ai = PRICE_KEY_ORDER.indexOf(a);
+    const bi = PRICE_KEY_ORDER.indexOf(b);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return a.localeCompare(b);
+  });
+}
+
 /** Return the first N prices to display inline as chips. */
 const MAX_VISIBLE_PRICES = 2;
 function getVisiblePrices(model: any): Record<string, number> {
   const tier = getDefaultTier(model);
   if (!tier?.prices) return {};
-  const entries = Object.entries(tier.prices);
-  return Object.fromEntries(entries.slice(0, MAX_VISIBLE_PRICES));
+  return Object.fromEntries(sortedPriceEntries(tier.prices).slice(0, MAX_VISIBLE_PRICES));
 }
 
 /** How many prices are hidden behind the overflow "+N" chip. */
@@ -759,23 +847,35 @@ function getOverflowCount(model: any): number {
   return Math.max(0, total - MAX_VISIBLE_PRICES);
 }
 
-/** Returns the model that shadows this one, or null if not shadowed. */
-function getShadowedBy(model: any): { name: string; match_pattern: string } | null {
-  if (!model.enabled) return null;
-  for (const other of models.value) {
-    if (other.id === model.id) continue;
-    if (!other.enabled) continue;
-    if (other.match_pattern !== model.match_pattern) continue;
-    const otherVf = other.valid_from ?? 0;
-    const thisVf = model.valid_from ?? 0;
-    if (otherVf !== thisVf) continue;
-    const otherSo = other.sort_order ?? 0;
-    const thisSo = model.sort_order ?? 0;
-    if (otherSo < thisSo) return { name: other.name, match_pattern: other.match_pattern };
-    if (otherSo === thisSo && other.name.localeCompare(model.name) < 0) return { name: other.name, match_pattern: other.match_pattern };
-  }
-  return null;
+// ── Parent-children expand/collapse ──────────────────────────────────────────
+
+const expandedParents = ref(new Set<string>());
+
+function toggleExpand(id: string) {
+  const next = new Set(expandedParents.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  expandedParents.value = next;
 }
+
+const tableRows = computed(() => {
+  const result: any[] = [];
+  for (const model of filteredModels.value) {
+    result.push(model);
+    if (model.children?.length > 0 && expandedParents.value.has(model.id)) {
+      model.children.forEach((child: any, idx: number) => {
+        result.push({
+          ...child,
+          __is_child: true,
+          __parent_id: model.id,
+          __sectionStart: null,
+          __is_last_child: idx === model.children.length - 1,
+        });
+      });
+    }
+  }
+  return result;
+});
 
 /** Shorten usage key for display: replace underscores with hyphens, drop trailing "_tokens". */
 function formatPriceKey(key: string): string {
@@ -930,7 +1030,7 @@ function exportModel(model: any) {
 }
 
 function exportSelected() {
-  const selected = models.value.filter(
+  const selected = allModels.value.filter(
     (m: any) => selectedIds.value.includes(m.id)
   );
   if (selected.length === 0) {
@@ -965,7 +1065,7 @@ function confirmDeleteSelected() {
     onConfirm: async () => {
       let successCount = 0;
       for (const id of selectedIds.value) {
-        const modelEntry = models.value.find((m: any) => m.id === id);
+        const modelEntry = allModels.value.find((m: any) => m.id === id);
         const modelName = modelEntry?.name || id;
         try {
           await modelPricingService.delete(orgIdentifier.value, id);
@@ -1114,14 +1214,53 @@ body.body--dark .badge-more {
 
 /* ── Pricing overflow tooltip ──────────────────────── */
 .pricing-overflow-tooltip {
-  padding: 10px 12px;
-  max-width: 440px;
+  padding: 12px 16px;
+  min-width: 260px;
 }
 
-.pricing-overflow-tooltip-inner {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.pricing-breakdown-tooltip {
+  min-width: 240px;
+}
+
+.pricing-breakdown-title {
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+
+.pricing-breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.65;
+    text-align: left;
+    padding: 0 16px 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+
+    &:last-child {
+      text-align: right;
+      padding-right: 0;
+    }
+  }
+
+  td {
+    font-size: 12px;
+    padding: 2px 16px 2px 0;
+    border-bottom: none;
+
+    &:last-child {
+      text-align: right;
+      padding-right: 0;
+      font-weight: 500;
+    }
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
 }
 
 body.body--dark {
@@ -1129,5 +1268,150 @@ body.body--dark {
     color: #ffffff;
     border-color: #4b5563;
   }
+}
+
+/* ── Source icons (person / corporate_fare) ────────────── */
+.source-icon {
+  color: #757575;
+
+  .body--dark & {
+    color: #bdbdbd;
+  }
+}
+
+/* ── Shadowed pattern (strikethrough + dim) ────────────── */
+.shadowed-pattern {
+  opacity: 0.5;
+  text-decoration: line-through;
+  text-decoration-color: currentColor;
+}
+
+/* ── Shadowed icon (orange-ish, muted) ─────────────────── */
+.shadowed-icon {
+  color: #f59e0b; // amber-500
+  opacity: 0.85;
+
+  .body--dark & {
+    color: #fbbf24; // amber-400
+  }
+}
+
+/* ── Child (shadowed) rows ─────────────────────────────── */
+.child-pricing-row {
+  background: rgba(0, 0, 0, 0.015);
+
+  body.body--dark & {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  td {
+    border-top: none !important;
+  }
+}
+
+/* ── Tree connector lines (SearchJobInspector style) ────── */
+
+// The name-column td — always position:relative so absolute children work
+.tree-name-cell {
+  position: relative;
+}
+
+// Expanded parent: draw a line from the chevron centre DOWN to the cell bottom
+// left = td padding-left(5px) + half icon-wrapper-width(10px) = 15px
+.tree-parent-expanded.tree-name-cell::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: calc(50% + 11px);
+  bottom: 0;
+  width: 1.5px;
+  background-color: var(--q-primary);
+  opacity: 0.6;
+  z-index: 1;
+}
+
+// Child rows: vertical line top→bottom, horizontal connector at midpoint
+.tree-child.tree-name-cell {
+  // Vertical line — full height for non-last children
+  &::before {
+    content: '';
+    position: absolute;
+    left: 14px;
+    top: 0;
+    bottom: 0;
+    width: 1.5px;
+    background-color: var(--q-primary);
+    opacity: 0.6;
+    z-index: 1;
+  }
+
+  // Last child: vertical line only runs top→middle (no downward stub)
+  &.tree-last-child::before {
+    bottom: 50%;
+  }
+
+  // Horizontal connector from vertical line to content
+  &::after {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 1.5px;
+    background-color: var(--q-primary);
+    opacity: 0.6;
+    z-index: 1;
+  }
+}
+
+// Icon wrapper — same fixed width as SearchJobInspector
+.tree-icon-wrapper {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.tree-expand-icon {
+  flex-shrink: 0;
+}
+
+// Content container — above the connector lines
+.tree-node-content {
+  position: relative;
+  z-index: 2;
+  min-height: 24px;
+}
+
+// Child row: indent the content so tree lines show on the left
+.tree-child-content {
+  padding-left: 44px;
+}
+
+// Junction dot — matches SearchJobInspector exactly
+// (rendered as a real element because ::before and ::after are used for the lines)
+.tree-dot-marker {
+  position: absolute;
+  left: 33px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 7px;
+  height: 7px;
+  background-color: var(--q-primary);
+  opacity: 0.7;
+  border: 2px solid var(--q-background);
+  border-radius: 0; // square for leaf nodes (no deeper children)
+  z-index: 3;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+// Circular dot when the child itself also has children (matches SearchJobInspector's tree-is-parent)
+.tree-dot-marker.tree-dot-parent {
+  border-radius: 50%;
 }
 </style>

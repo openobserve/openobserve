@@ -119,6 +119,10 @@ pub struct ModelPricingDefinition {
     /// Updated timestamp in microseconds
     #[serde(default)]
     pub updated_at: i64,
+    /// Definitions shadowed by this one (same match_pattern, lower source/sort priority).
+    /// Only populated in list responses — not stored in the database.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<ModelPricingDefinition>,
 }
 
 /// A pricing tier within a model definition.

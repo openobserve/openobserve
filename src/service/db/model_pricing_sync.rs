@@ -111,6 +111,7 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
             description: entry.description,
             created_at: 0, // set by DB layer
             updated_at: 0,
+            children: Vec::new(),
         };
 
         match table::model_pricing::put(definition).await {
