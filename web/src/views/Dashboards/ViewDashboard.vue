@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <RenderDashboardCharts
-        class="tw:flex-1 tw:min-h-0"
+        :class="store.state.printMode ? '' : 'tw:flex-1 tw:min-h-0'"
         :key="currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey"
         v-if="selectedDate"
         ref="renderDashboardChartsRef"
@@ -1946,7 +1946,7 @@ export default defineComponent({
   .print-mode-container {
     height: auto !important;
     overflow: visible !important;
-    max-height: none !important;
+    // max-height: none !important;
   }
 }
 
