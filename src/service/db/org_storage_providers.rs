@@ -47,6 +47,8 @@ pub async fn add(entry: OrgStorageProvider) -> Result<(), anyhow::Error> {
         cache.insert(entry.org_id.clone(), Some(entry.clone()));
     }
 
+    // todo update infra(provider+cache) for this provider
+
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;
     cluster_coordinator
@@ -137,6 +139,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     continue;
                 };
                 let org = entry.org_id.clone();
+
+                // we must invalidate the infra level cache, or there be dragons!
+                infra::table::org_storage_providers::update_cache(&org, entry.clone());
 
                 {
                     let mut cache = CACHE.write().await;

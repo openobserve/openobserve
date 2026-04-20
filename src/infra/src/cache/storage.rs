@@ -59,7 +59,7 @@ impl ObjectStoreExt for CacheFS {
     }
 
     async fn add_account(&self, key: String, acc: Box<dyn ObjectStore>) {
-        storage::add_account(key, acc).await;
+        storage::add_account(&key, acc).await;
     }
 
     async fn put(

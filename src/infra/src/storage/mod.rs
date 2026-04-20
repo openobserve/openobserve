@@ -103,7 +103,7 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
     async fn rename_if_not_exists(&self, account: &str, from: &Path, to: &Path) -> Result<()>;
 }
 
-pub fn get_org_storage_key(org_id: &str) -> String {
+fn get_org_storage_key(org_id: &str) -> String {
     format!("{org_id}:default")
 }
 
@@ -121,7 +121,8 @@ pub fn get_account(org_id: &str, file: &str) -> Option<String> {
     MULTI_ACCOUNTS.get_account(org_id, file)
 }
 
-pub async fn add_account(key: String, acc: Box<dyn ObjectStore>) {
+pub async fn add_account(org_id: &str, acc: Box<dyn ObjectStore>) {
+    let key = get_org_storage_key(org_id);
     MULTI_ACCOUNTS.add_account(key, acc).await;
 }
 
