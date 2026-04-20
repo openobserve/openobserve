@@ -346,7 +346,8 @@ async function submitDexLoginForm(page) {
   // Strategy 3: Submit via JavaScript
   await page.evaluate(() => {
     const form = document.querySelector('form');
-    if (form) form.submit();
+    if (!form) throw new Error('No form found on Dex login page');
+    form.submit();
   });
   testLogger.info('[alpha1] Form submitted via JS form.submit()');
 }
