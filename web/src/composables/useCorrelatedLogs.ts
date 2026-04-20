@@ -150,7 +150,8 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
 
     // ALWAYS use the exact filters from StreamInfo - never use the provided filters parameter
     // The StreamInfo.filters come from the /_correlate API (or fallback) and have the correct field names
-    const exactFilters = streamInfo.filters;
+    // Note: backend omits `filters` when empty (skip_serializing_if = "HashMap::is_empty"), so default to {}
+    const exactFilters = streamInfo.filters ?? {};
 
     // Add dimension filters using exact field names from StreamInfo
     for (const [field, value] of Object.entries(exactFilters)) {

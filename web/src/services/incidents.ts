@@ -19,6 +19,8 @@ import serviceStreamsApi, {
   type CorrelationResponse,
   type StreamInfo,
 } from "./service_streams";
+import { filterDimensionsForCorrelation } from "@/utils/telemetryCorrelation";
+import { loadIdentityConfig, clearIdentityConfigCache, clearAllIdentityConfigCache } from "@/utils/identityConfig";
 
 // Types matching backend API responses
 export interface Incident {
@@ -104,6 +106,7 @@ export interface IncidentCorrelatedStreams {
   traceStreams: StreamInfo[];
   correlationData: CorrelationResponse | null;
 }
+
 
 const incidents = {
   /**
@@ -191,7 +194,8 @@ const incidents = {
    * Get correlated telemetry streams for an incident
    *
    * Uses the incident's group_values to find related logs, metrics, and traces
-   * via the service correlation API.
+   * via the service correlation API. Now filters dimensions to only include
+   * fields that are actually used for disambiguation.
    *
    * @param org_identifier Organization ID
    * @param incident The incident with group_values
@@ -201,17 +205,38 @@ const incidents = {
     org_identifier: string,
     incident: Incident
   ): Promise<IncidentCorrelatedStreams> => {
-    const dimensions = incident.group_values ?? {};
+    const allDimensions = incident.group_values ?? {};
+
+    // Load identity config to filter dimensions (with caching)
+    let filteredDimensions = allDimensions;
+    try {
+      const identityConfig = await loadIdentityConfig(org_identifier);
+
+      // Filter dimensions to only include disambiguation fields
+      filteredDimensions = filterDimensionsForCorrelation(allDimensions, identityConfig);
+
+      console.log("[incidents] Dimension filtering for incident correlation:", {
+        incident_id: incident.id,
+        original_count: Object.keys(allDimensions).length,
+        filtered_count: Object.keys(filteredDimensions).length,
+        original: allDimensions,
+        filtered: filteredDimensions
+      });
+    } catch (err) {
+      console.warn("[incidents] Failed to load identity config for dimension filtering, using all dimensions:", err);
+    }
 
     const request: CorrelationRequest = {
       source_stream:
-        dimensions.service ||
-        dimensions.serviceName ||
-        dimensions["service.name"] ||
-        dimensions["service_name"] ||
+        // filteredDimensions only contains "service" key if present (not variations)
+        filteredDimensions.service ||
+        // Fallback to original dimensions for service name variations
+        allDimensions.serviceName ||
+        allDimensions["service.name"] ||
+        allDimensions["service_name"] ||
         "default",
       source_type: "logs",
-      available_dimensions: dimensions,
+      available_dimensions: filteredDimensions,
     };
 
     const response = await serviceStreamsApi.correlate(org_identifier, request);
@@ -222,7 +247,7 @@ const incidents = {
       return {
         serviceName: "Unknown Service",
         matchedDimensions: {},
-        additionalDimensions: dimensions,
+        additionalDimensions: allDimensions,
         logStreams: [],
         metricStreams: [],
         traceStreams: [],
@@ -259,6 +284,18 @@ const incidents = {
       { comment }
     );
   },
+
+  /**
+   * Clear identity config cache for a specific organization
+   * Call this when identity config settings are updated
+   */
+  clearIdentityConfigCache,
+
+  /**
+   * Clear all identity config caches
+   * Use when switching organizations or on logout
+   */
+  clearAllIdentityConfigCaches: clearAllIdentityConfigCache,
 };
 
 export default incidents;
