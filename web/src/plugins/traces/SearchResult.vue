@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Combined scroll area: RED metrics + trace list scroll together -->
-      <div class="tw:flex-1 tw:overflow-y-auto">
+      <div class="tw:flex-1 tw:overflow-y-auto tw:bg-[var(--o2-card-bg-solid)]">
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <transition
           enter-active-class="transition-all duration-300 ease-in-out"
@@ -121,7 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :filter="searchObj.data.editorValue"
             :streamFields="searchObj.data.stream.selectedStreamFields"
             :show="
-              searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length
+              searchObj.searchApplied &&
+              !searchObj.data.errorMsg?.trim()?.length
             "
             @time-range-selected="onMetricsTimeRangeSelected"
             @filters-updated="onMetricsFiltersUpdated"
