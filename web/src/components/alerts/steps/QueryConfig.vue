@@ -1232,23 +1232,8 @@ export default defineComponent({
       vrlEditorPlaceholderFlag.value = vrlFunctionContent.value === '';
     };
 
-    // Toggle filters and ensure at least one empty condition exists
     const toggleFilters = () => {
       showFilters.value = !showFilters.value;
-      if (showFilters.value && props.inputData.conditions?.conditions) {
-        const conditions = props.inputData.conditions.conditions;
-        if (conditions.length === 0) {
-          conditions.push({
-            filterType: 'condition',
-            column: '',
-            operator: '=',
-            value: '',
-            values: [],
-            logicalOperator: 'AND',
-            id: getUUID(),
-          });
-        }
-      }
     };
 
     // Stream-type-driven: logs/traces are event-based, metrics are aggregation-based
