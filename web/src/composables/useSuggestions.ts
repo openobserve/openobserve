@@ -369,10 +369,10 @@ const useSqlSuggestions = () => {
     //   Without slicing: $ anchors after ")" → regex does NOT match
     //   After slicing at cursor (between "(" and ")"): text is "status IN (" → matches
     //
-    // cursorIndex = 0 means uninitialized (position.cursorIndex default).
-    // Fall back to the full string length so we don't break the pre-existing
-    // behaviour where no cursor tracking was done.
-    const endIdx = cursorIndex > 0 ? cursorIndex + 1 : whereClause.length;
+    // Slice the WHERE clause up to (and including) the cursor position.
+    // Fall back to full string length only when cursorIndex is negative,
+    // which indicates no cursor tracking (e.g. called without a position).
+    const endIdx = cursorIndex >= 0 ? cursorIndex + 1 : whereClause.length;
     const textUpToCursor = whereClause.slice(0, endIdx);
     const match = columnValueRegex.exec(textUpToCursor);
     if (match) {
@@ -398,7 +398,7 @@ const useSqlSuggestions = () => {
 
     // Compute text up to cursor (same slice logic used by analyzeSqlWhereClause).
     const query = autoCompleteData.value.query;
-    const endIdx = cursorIndex > 0 ? cursorIndex + 1 : query.length;
+    const endIdx = cursorIndex >= 0 ? cursorIndex + 1 : query.length;
     const textUpToCursor = query.slice(0, endIdx);
 
     // FROM context: when the cursor is immediately after FROM (and optionally a
@@ -413,7 +413,7 @@ const useSqlSuggestions = () => {
     //
     // When an opening quote is detected, the insertText closes it automatically
     // so the result is  FROM "stream_name"  rather than  FROM "stream_name.
-    const fromMatch = /\bFROM\s+("?)(\w*)$/i.exec(textUpToCursor);
+    const fromMatch = /\bFROM\s+("?)([\w-]*)$/i.exec(textUpToCursor);
     if (streamKeywords.value.length > 0) {
       if (fromMatch) {
         const hasOpenQuote = fromMatch[1] === '"';
@@ -539,39 +539,29 @@ const useSqlSuggestions = () => {
     autoCompleteSuggestions.value = [...defaultSuggestions];
   };
 
-  const updateFieldKeywords = (fields: any[]) => {
-    fieldKeywords = [];
-    fields.forEach((field: any) => {
-      if (field.name == store.state.zoConfig.timestamp_column) {
-        return;
-      }
-      fieldKeywords.push({
-        label: field.name,
+  // Shared helper — builds the field keyword array from a fields list,
+  // excluding the timestamp column. Used by both updateFieldKeywords and
+  // updateAllKeywords to avoid duplicating the mapping logic.
+  const buildFieldKeywords = (fields: any[]) =>
+    fields
+      .filter((f) => f.name !== store.state.zoConfig.timestamp_column)
+      .map((f) => ({
+        label: f.name,
         kind: "Field",
-        insertText: field.name,
+        insertText: f.name,
         insertTextRules: "InsertAsSnippet",
-        sortText: "\x00" + field.name,
-      });
-    });
+        sortText: "\x00" + f.name,
+      }));
+
+  const updateFieldKeywords = (fields: any[]) => {
+    fieldKeywords = buildFieldKeywords(fields);
     updateAutoComplete();
   };
 
   // Single-pass update for both fields and functions — calls updateAutoComplete()
   // only once instead of twice, avoiding redundant keyword array rebuilds.
   const updateAllKeywords = (fields: any[], functions: any[]) => {
-    fieldKeywords = [];
-    fields.forEach((field: any) => {
-      if (field.name == store.state.zoConfig.timestamp_column) {
-        return;
-      }
-      fieldKeywords.push({
-        label: field.name,
-        kind: "Field",
-        insertText: field.name,
-        insertTextRules: "InsertAsSnippet",
-        sortText: "\x00" + field.name,
-      });
-    });
+    fieldKeywords = buildFieldKeywords(fields);
     functionKeywords.value = functions.map((fn: any) => ({
       label: fn.name,
       kind: "Function",
@@ -587,6 +577,7 @@ const useSqlSuggestions = () => {
       label: stream.name,
       kind: "Variable",
       insertText: stream.name,
+      sortText: "\x00" + stream.name,
     }));
   };
 
