@@ -2053,12 +2053,7 @@ export default defineComponent({
       // After the tree is built, scroll the pre-selected span into view (e.g.
       // when arriving from spans search mode with a span_id in the URL).
       if (selectedSpanId.value) {
-        setTimeout(() => {
-          const el = document.querySelector(
-            `[data-test="trace-tree-span-container-${selectedSpanId.value}"]`,
-          );
-          el?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 300);
+        scrollSpanIntoView(selectedSpanId.value);
       }
     }
 
@@ -2494,6 +2489,16 @@ export default defineComponent({
       showTraceDetails.value = true;
     };
 
+    const scrollSpanIntoView = (spanId: string, delay = 300) => {
+      setTimeout(() => {
+        const el = document.querySelector(
+          `[data-test="trace-tree-span-container-${spanId}"]`,
+        );
+        console.log("el", el);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, delay);
+    };
+
     const updateSelectedSpan = (
       spanId: string,
       swichToWaterfall: boolean = false,
@@ -2501,8 +2506,10 @@ export default defineComponent({
       showTraceDetails.value = false;
       searchObj.data.traceDetails.showSpanDetails = true;
       searchObj.data.traceDetails.selectedSpanId = spanId;
-      if (swichToWaterfall && activeTab.value !== "waterfall")
+      if (swichToWaterfall && activeTab.value !== "waterfall") {
         activeTab.value = "waterfall";
+        scrollSpanIntoView(spanId, 1000);
+      }
 
       // Emit event for embedded mode
       if (props.mode === "embedded") {
