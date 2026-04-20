@@ -967,6 +967,15 @@ pub fn service_routes() -> Router {
                 put(organization::org::extend_trial_period),
             )
             .route(
+                "/{org_id}/external_contract",
+                post(organization::org::create_external_contract)
+                    .put(organization::org::extend_external_contract),
+            )
+            .route(
+                "/{org_id}/external_contract/{target_org_id}",
+                delete(organization::org::revoke_external_contract),
+            )
+            .route(
                 "/{org_id}/aws-marketplace/link-subscription",
                 post(cloud::aws_marketplace::link_subscription),
             )

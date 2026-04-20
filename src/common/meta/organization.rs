@@ -158,6 +158,10 @@ pub struct AllOrgListDetails {
     #[serde(default)]
     pub plan: i32,
     pub trial_expires_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contract_end_date: Option<i64>,
+    #[serde(default)]
+    pub billing_provider: String,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -173,6 +177,20 @@ pub struct AllOrganizationResponse {
 #[cfg(feature = "cloud")]
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct ExtendTrialPeriodRequest {
+    pub org_id: String,
+    pub new_end_date: i64,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct CreateExternalContractRequest {
+    pub org_id: String,
+    pub end_date: i64,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ExtendExternalContractRequest {
     pub org_id: String,
     pub new_end_date: i64,
 }

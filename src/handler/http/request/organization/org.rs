@@ -27,12 +27,16 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use {
     crate::common::meta::organization::OrganizationInvites,
     crate::common::meta::organization::{
-        AllOrgListDetails, AllOrganizationResponse, ExtendTrialPeriodRequest,
-        OrganizationInviteUserRecord,
+        AllOrgListDetails, AllOrganizationResponse, CreateExternalContractRequest,
+        ExtendExternalContractRequest, ExtendTrialPeriodRequest, OrganizationInviteUserRecord,
     },
     axum::body::Body,
     axum::http::StatusCode,
-    o2_enterprise::enterprise::cloud::list_customer_billings,
+    o2_enterprise::enterprise::cloud::{
+        billings::{MeteringProvider, SubscriptionType},
+        list_customer_billings,
+    },
+    svix_ksuid::KsuidLike,
 };
 
 use crate::{
@@ -188,30 +192,48 @@ pub async fn all_organizations(
         }
     };
 
-    let all_subscriptions = match list_customer_billings().await {
-        Ok(orgs) => orgs
-            .into_iter()
-            .map(|cb| (cb.org_id, cb.subscription_type as i32))
-            .collect::<HashMap<_, _>>(),
+    let all_billings = match list_customer_billings().await {
+        Ok(cbs) => cbs,
         Err(e) => {
             return MetaHttpResponse::internal_error(e.to_string());
         }
     };
 
+    let all_billing_info: HashMap<_, _> = all_billings
+        .iter()
+        .map(|cb| {
+            (
+                cb.org_id.clone(),
+                (cb.subscription_type, cb.end_date, cb.provider.to_string()),
+            )
+        })
+        .collect();
+
     let mut id = 1;
     for org in all_orgs {
+        let billing_info = all_billing_info.get(&org.identifier);
+        let contract_end_date = billing_info.and_then(|(subscription, end_date, _)| {
+            if *subscription == SubscriptionType::ExternalContract {
+                Some(*end_date)
+            } else {
+                None
+            }
+        });
         let org = AllOrgListDetails {
             id,
             identifier: org.identifier.clone(),
             name: org.org_name,
             org_type: org.org_type.to_string(),
-            plan: all_subscriptions
-                .get(&org.identifier)
-                .cloned()
+            plan: billing_info
+                .map(|(st, ..)| i16::from(*st) as i32)
                 .unwrap_or_default(),
             created_at: org.created_at,
             updated_at: org.updated_at,
             trial_expires_at: Some(org.trial_ends_at),
+            contract_end_date,
+            billing_provider: billing_info
+                .map(|(_, _, provider)| provider.clone())
+                .unwrap_or_default(),
         };
         if !org_names.contains(&org.identifier) {
             org_names.insert(org.identifier.clone());
@@ -558,6 +580,196 @@ pub async fn extend_trial_period(
     let key = format!("{ORG_KEY_PREFIX}{}", req.org_id);
     let _ = infra::db::put_into_db_coordinator(&key, Default::default(), true, None).await;
     ret
+}
+
+/// CreateExternalContract
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/external_contract",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "CreateExternalContract",
+    summary = "Create an external contract subscription for an organization",
+    security(
+        ("Authorization"= [])
+    ),
+    request_body(content = inline(CreateExternalContractRequest), description = "Create external contract request", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = String),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn create_external_contract(
+    Path(org_id): Path<String>,
+    Json(req): Json<CreateExternalContractRequest>,
+) -> Response {
+    use o2_enterprise::enterprise::cloud::billings::CustomerBilling;
+
+    if org_id != "_meta" {
+        return MetaHttpResponse::unauthorized("not authorized to access this resource");
+    }
+
+    // Validate the target org exists
+    if let Err(e) = infra::table::organizations::get(&req.org_id).await {
+        return MetaHttpResponse::not_found(format!("Organization not found: {e}"));
+    }
+
+    // Get the org admin's email for the billing record
+    let admin = match infra::table::org_users::get_admin(&req.org_id).await {
+        Ok(admin) => admin,
+        Err(e) => {
+            return MetaHttpResponse::not_found(format!(
+                "Could not find admin for organization: {e}"
+            ));
+        }
+    };
+
+    let now = chrono::Utc::now().timestamp_micros();
+    if req.end_date <= now {
+        return MetaHttpResponse::bad_request("end_date must be in the future");
+    }
+
+    // Check if org already has an external contract
+    if let Ok(Some(existing)) =
+        o2_enterprise::enterprise::cloud::billings::get_billing_by_org_id(&req.org_id).await
+        && matches!(existing.provider, MeteringProvider::MockMeteringProvider)
+    {
+        return MetaHttpResponse::bad_request(
+            "Organization already has an active external contract",
+        );
+    }
+
+    let mut billing = CustomerBilling::new(&admin.email, &req.org_id);
+    billing.provider = MeteringProvider::MockMeteringProvider;
+    billing.subscription_type = SubscriptionType::ExternalContract;
+    billing.customer_id = Some("custom".to_string());
+    billing.subscription_id = Some(svix_ksuid::Ksuid::new(None, None).to_string());
+    billing.end_date = req.end_date;
+
+    match o2_enterprise::enterprise::cloud::update_customer_billing(billing).await {
+        Ok(_) => MetaHttpResponse::json(serde_json::json!({"status": "ok"})),
+        Err(e) => {
+            MetaHttpResponse::internal_error(format!("Failed to create external contract: {e}"))
+        }
+    }
+}
+
+/// ExtendExternalContract
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    put,
+    path = "/{org_id}/external_contract",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "ExtendExternalContract",
+    summary = "Extend an external contract end date",
+    security(
+        ("Authorization"= [])
+    ),
+    request_body(content = inline(ExtendExternalContractRequest), description = "Extend external contract request", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = String),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn extend_external_contract(
+    Path(org_id): Path<String>,
+    Json(req): Json<ExtendExternalContractRequest>,
+) -> Response {
+    if org_id != "_meta" {
+        return MetaHttpResponse::unauthorized("not authorized to access this resource");
+    }
+
+    let mut billing = match o2_enterprise::enterprise::cloud::billings::get_billing_by_org_id(
+        &req.org_id,
+    )
+    .await
+    {
+        Ok(Some(b)) if matches!(b.provider, MeteringProvider::MockMeteringProvider) => b,
+        Ok(_) => {
+            return MetaHttpResponse::not_found(
+                "No active external contract found for this organization",
+            );
+        }
+        Err(e) => {
+            return MetaHttpResponse::internal_error(e.to_string());
+        }
+    };
+
+    if req.new_end_date <= billing.end_date {
+        return MetaHttpResponse::bad_request(
+            "new_end_date must be after the current contract end date",
+        );
+    }
+
+    billing.end_date = req.new_end_date;
+    // Reset expiry notifications so warnings are sent again for the new end date
+    billing.expiry_notified_checkpoint = 0;
+
+    match o2_enterprise::enterprise::cloud::update_customer_billing(billing).await {
+        Ok(_) => MetaHttpResponse::json(serde_json::json!({"status": "ok"})),
+        Err(e) => {
+            MetaHttpResponse::internal_error(format!("Failed to extend external contract: {e}"))
+        }
+    }
+}
+
+/// RevokeExternalContract
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/external_contract/{target_org_id}",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "RevokeExternalContract",
+    summary = "Revoke an external contract",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Meta organization id"),
+        ("target_org_id" = String, Path, description = "Target organization id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = String),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn revoke_external_contract(
+    Path((org_id, target_org_id)): Path<(String, String)>,
+) -> Response {
+    if org_id != "_meta" {
+        return MetaHttpResponse::unauthorized("not authorized to access this resource");
+    }
+
+    // Verify the org has an external contract before deleting
+    match o2_enterprise::enterprise::cloud::billings::get_billing_by_org_id(&target_org_id).await {
+        Ok(Some(b)) if matches!(b.provider, MeteringProvider::MockMeteringProvider) => {}
+        Ok(_) => {
+            return MetaHttpResponse::not_found(
+                "No active external contract found for this organization",
+            );
+        }
+        Err(e) => {
+            return MetaHttpResponse::internal_error(e.to_string());
+        }
+    };
+
+    match o2_enterprise::enterprise::cloud::customer_billings::delete_by_org_id(&target_org_id)
+        .await
+    {
+        Ok(_) => MetaHttpResponse::json(serde_json::json!({"status": "ok"})),
+        Err(e) => {
+            MetaHttpResponse::internal_error(format!("Failed to revoke external contract: {e}"))
+        }
+    }
 }
 
 /// RenameOrganization
