@@ -11,7 +11,12 @@ vi.mock("vue", async () => {
   };
 });
 
-const makeState = () => ({
+// Re-export the real chunkingDirection module (vitest needs it resolved)
+vi.mock("@/utils/dashboard/chunkingDirection", async () => {
+  return await vi.importActual("../../utils/dashboard/chunkingDirection");
+});
+
+const makeState = (metadataOverride?: any) => ({
   data: [] as any[],
   resultMetaData: [] as any[],
   loading: false,
@@ -21,6 +26,7 @@ const makeState = () => ({
   isPartialData: false,
   isOperationCancelled: false,
   errorDetail: { message: "", code: "" },
+  metadata: metadataOverride ?? { queries: [] },
 });
 
 const makeHandlers = (stateOverride?: any) => {
@@ -154,6 +160,138 @@ describe("handleHistogramResponse", () => {
     );
 
     expect(state.isPartialData).toBe(false);
+  });
+});
+
+// ─── handleHistogramResponse chunking direction ──────────────────────────────
+
+describe("handleHistogramResponse – chunking direction", () => {
+  // User range: 1000..2000 (microseconds)
+  const userStart = 1000;
+  const userEnd = 2000;
+
+  it("detects LTR and appends for asc order (LTR+asc→append)", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    state.resultMetaData[0] = [];
+    state.data[0] = [{ id: 10 }];
+    const { handlers } = makeHandlers(state);
+
+    // First chunk: start_time matches userStart → LTR
+    await handlers.handleHistogramResponse(
+      { meta: { currentQueryIndex: 0 } },
+      {
+        content: {
+          streaming_aggs: false,
+          results: {
+            hits: [{ id: 1 }],
+            order_by: "asc",
+            time_offset: { start_time: userStart, end_time: 1500 },
+          },
+        },
+      },
+    );
+
+    // LTR + asc → append: existing data first, then new
+    expect(state.data[0][0].id).toBe(10);
+    expect(state.data[0][1].id).toBe(1);
+  });
+
+  it("detects LTR and prepends for desc order (LTR+desc→prepend)", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    state.resultMetaData[0] = [];
+    state.data[0] = [{ id: 10 }];
+    const { handlers } = makeHandlers(state);
+
+    await handlers.handleHistogramResponse(
+      { meta: { currentQueryIndex: 0 } },
+      {
+        content: {
+          streaming_aggs: false,
+          results: {
+            hits: [{ id: 1 }],
+            order_by: "desc",
+            time_offset: { start_time: userStart, end_time: 1500 },
+          },
+        },
+      },
+    );
+
+    // LTR + desc → prepend: new data first
+    expect(state.data[0][0].id).toBe(1);
+    expect(state.data[0][1].id).toBe(10);
+  });
+
+  it("detects RTL and prepends for asc order (RTL+asc→prepend)", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    state.resultMetaData[0] = [];
+    state.data[0] = [{ id: 10 }];
+    const { handlers } = makeHandlers(state);
+
+    // First chunk: end_time matches userEnd → RTL
+    await handlers.handleHistogramResponse(
+      { meta: { currentQueryIndex: 0 } },
+      {
+        content: {
+          streaming_aggs: false,
+          results: {
+            hits: [{ id: 1 }],
+            order_by: "asc",
+            time_offset: { start_time: 1500, end_time: userEnd },
+          },
+        },
+      },
+    );
+
+    // RTL + asc → prepend: new data first
+    expect(state.data[0][0].id).toBe(1);
+    expect(state.data[0][1].id).toBe(10);
+  });
+
+  it("detects RTL and appends for desc order (RTL+desc→append)", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    state.resultMetaData[0] = [];
+    state.data[0] = [{ id: 10 }];
+    const { handlers } = makeHandlers(state);
+
+    await handlers.handleHistogramResponse(
+      { meta: { currentQueryIndex: 0 } },
+      {
+        content: {
+          streaming_aggs: false,
+          results: {
+            hits: [{ id: 1 }],
+            order_by: "desc",
+            time_offset: { start_time: 1500, end_time: userEnd },
+          },
+        },
+      },
+    );
+
+    // RTL + desc → append: existing first
+    expect(state.data[0][0].id).toBe(10);
+    expect(state.data[0][1].id).toBe(1);
+  });
+
+  it("defaults to RTL when no time_offset is provided", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    state.resultMetaData[0] = [];
+    state.data[0] = [{ id: 10 }];
+    const { handlers } = makeHandlers(state);
+
+    // No time_offset → defaults to RTL
+    await handlers.handleHistogramResponse(
+      { meta: { currentQueryIndex: 0 } },
+      {
+        content: {
+          streaming_aggs: false,
+          results: { hits: [{ id: 1 }], order_by: "asc" },
+        },
+      },
+    );
+
+    // RTL + asc → prepend
+    expect(state.data[0][0].id).toBe(1);
+    expect(state.data[0][1].id).toBe(10);
   });
 });
 
@@ -292,6 +430,404 @@ describe("handleStreamingHistogramHits", () => {
     );
 
     expect(Array.isArray(state.data[0])).toBe(true);
+  });
+
+  it("appends hits for LTR+asc direction", async () => {
+    const state = makeState({ queries: [{ startTime: 1000, endTime: 2000 }] });
+    state.data[0] = [{ id: 10 }];
+    // Don't pre-set resultMetaData so direction detection works on first metadata
+    const { handlers } = makeHandlers(state);
+
+    // First metadata: start_time matches userStart → LTR detected, order_by: asc
+    handlers.handleStreamingHistogramMetadata(
+      { meta: { currentQueryIndex: 0 } },
+      {
+        content: {
+          time_offset: { start_time: 1000, end_time: 1500 },
+          results: { streaming_aggs: false, order_by: "asc" },
+        },
+      },
+    );
+
+    handlers.handleStreamingHistogramHits(
+      { meta: { currentQueryIndex: 0 } },
+      { content: { results: { hits: [{ id: 1 }] } } },
+    );
+
+    await Promise.resolve();
+
+    // LTR + asc → append
+    expect(state.data[0][0].id).toBe(10);
+    expect(state.data[0][1].id).toBe(1);
+  });
+
+  it("prepends hits for LTR+desc direction", async () => {
+    const state = makeState({ queries: [{ startTime: 1000, endTime: 2000 }] });
+    state.data[0] = [{ id: 10 }];
+    const { handlers } = makeHandlers(state);
+
+    // First metadata: start_time matches userStart → LTR detected, order_by: desc
+    handlers.handleStreamingHistogramMetadata(
+      { meta: { currentQueryIndex: 0 } },
+      {
+        content: {
+          time_offset: { start_time: 1000, end_time: 1500 },
+          results: { streaming_aggs: false, order_by: "desc" },
+        },
+      },
+    );
+
+    handlers.handleStreamingHistogramHits(
+      { meta: { currentQueryIndex: 0 } },
+      { content: { results: { hits: [{ id: 1 }] } } },
+    );
+
+    await Promise.resolve();
+
+    // LTR + desc → prepend
+    expect(state.data[0][0].id).toBe(1);
+    expect(state.data[0][1].id).toBe(10);
+  });
+});
+
+// ─── Comprehensive chunking direction + order_by + streaming_aggs tests ──────
+
+describe("chunking direction – comprehensive edge cases", () => {
+  const userStart = 1000;
+  const userEnd = 2000;
+
+  // Helper: sends metadata then hits via the streaming path
+  const sendStreamingChunk = async (
+    handlers: any,
+    opts: {
+      timeOffset: { start_time: number; end_time: number };
+      orderBy: string;
+      streamingAggs: boolean;
+      hits: any[];
+    },
+  ) => {
+    handlers.handleStreamingHistogramMetadata(
+      { meta: { currentQueryIndex: 0 } },
+      {
+        content: {
+          time_offset: opts.timeOffset,
+          results: {
+            streaming_aggs: opts.streamingAggs,
+            order_by: opts.orderBy,
+          },
+        },
+      },
+    );
+    handlers.handleStreamingHistogramHits(
+      { meta: { currentQueryIndex: 0 } },
+      { content: { results: { hits: opts.hits } } },
+    );
+    await Promise.resolve(); // flush microtask
+  };
+
+  // --- streaming_aggs: true always replaces data regardless of direction ---
+
+  it("streaming_aggs=true replaces data for LTR direction", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    state.data[0] = [{ id: 99 }];
+    const { handlers } = makeHandlers(state);
+
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: userStart, end_time: 1500 },
+      orderBy: "asc",
+      streamingAggs: true,
+      hits: [{ id: 1 }, { id: 2 }],
+    });
+
+    // streaming_aggs replaces regardless of direction
+    expect(state.data[0]).toHaveLength(2);
+    expect(state.data[0][0].id).toBe(1);
+    expect(state.data[0][1].id).toBe(2);
+  });
+
+  it("streaming_aggs=true replaces data for RTL direction", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    state.data[0] = [{ id: 99 }];
+    const { handlers } = makeHandlers(state);
+
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: 1500, end_time: userEnd },
+      orderBy: "desc",
+      streamingAggs: true,
+      hits: [{ id: 5 }],
+    });
+
+    expect(state.data[0]).toHaveLength(1);
+    expect(state.data[0][0].id).toBe(5);
+  });
+
+  // --- missing order_by defaults to desc ---
+
+  it("missing order_by defaults to desc: RTL → append", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    state.data[0] = [{ id: 10 }];
+    const { handlers } = makeHandlers(state);
+
+    // RTL (end matches user end), no order_by → defaults to desc
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: 1500, end_time: userEnd },
+      orderBy: "", // missing/empty → orderAsc = false (desc default)
+      streamingAggs: false,
+      hits: [{ id: 1 }],
+    });
+
+    // RTL + desc → append
+    expect(state.data[0][0].id).toBe(10);
+    expect(state.data[0][1].id).toBe(1);
+  });
+
+  it("missing order_by defaults to desc: LTR → prepend", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    state.data[0] = [{ id: 10 }];
+    const { handlers } = makeHandlers(state);
+
+    // LTR (start matches user start), no order_by → defaults to desc
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: userStart, end_time: 1500 },
+      orderBy: "", // missing → desc
+      streamingAggs: false,
+      hits: [{ id: 1 }],
+    });
+
+    // LTR + desc → prepend
+    expect(state.data[0][0].id).toBe(1);
+    expect(state.data[0][1].id).toBe(10);
+  });
+
+  // --- multi-chunk accumulation: LTR + asc (append, append, append) ---
+
+  it("LTR multi-chunk: appends chronologically for asc order", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    const { handlers } = makeHandlers(state);
+
+    // Chunk 1: earliest
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: userStart, end_time: 1300 },
+      orderBy: "asc",
+      streamingAggs: false,
+      hits: [{ id: 1 }],
+    });
+    // Chunk 2: middle
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: 1300, end_time: 1700 },
+      orderBy: "asc",
+      streamingAggs: false,
+      hits: [{ id: 2 }, { id: 3 }],
+    });
+    // Chunk 3: latest
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: 1700, end_time: userEnd },
+      orderBy: "asc",
+      streamingAggs: false,
+      hits: [{ id: 4 }],
+    });
+
+    expect(state.data[0].map((d: any) => d.id)).toEqual([1, 2, 3, 4]);
+  });
+
+  // --- multi-chunk accumulation: RTL + asc (prepend, prepend, prepend) ---
+
+  it("RTL multi-chunk: prepends to maintain chronological order for asc", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    const { handlers } = makeHandlers(state);
+
+    // Chunk 1: latest (arrives first in RTL)
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: 1700, end_time: userEnd },
+      orderBy: "asc",
+      streamingAggs: false,
+      hits: [{ id: 4 }],
+    });
+    // Chunk 2: middle
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: 1300, end_time: 1700 },
+      orderBy: "asc",
+      streamingAggs: false,
+      hits: [{ id: 2 }, { id: 3 }],
+    });
+    // Chunk 3: earliest (arrives last in RTL)
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: userStart, end_time: 1300 },
+      orderBy: "asc",
+      streamingAggs: false,
+      hits: [{ id: 1 }],
+    });
+
+    expect(state.data[0].map((d: any) => d.id)).toEqual([1, 2, 3, 4]);
+  });
+
+  // --- multi-chunk: LTR + desc (prepend, prepend, prepend) ---
+
+  it("LTR multi-chunk: prepends to maintain desc order", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    const { handlers } = makeHandlers(state);
+
+    // Chunk 1: earliest data, desc within chunk
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: userStart, end_time: 1300 },
+      orderBy: "desc",
+      streamingAggs: false,
+      hits: [{ id: 2 }, { id: 1 }], // desc within chunk
+    });
+    // Chunk 2: later data, desc within chunk
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: 1300, end_time: userEnd },
+      orderBy: "desc",
+      streamingAggs: false,
+      hits: [{ id: 4 }, { id: 3 }],
+    });
+
+    // LTR+desc → prepend: [4,3] prepended before [2,1] → [4,3,2,1]
+    expect(state.data[0].map((d: any) => d.id)).toEqual([4, 3, 2, 1]);
+  });
+
+  // --- multi-chunk: RTL + desc (append, append, append) ---
+
+  it("RTL multi-chunk: appends to maintain desc order", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    const { handlers } = makeHandlers(state);
+
+    // Chunk 1: latest data first, desc within chunk
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: 1300, end_time: userEnd },
+      orderBy: "desc",
+      streamingAggs: false,
+      hits: [{ id: 4 }, { id: 3 }],
+    });
+    // Chunk 2: earlier data, desc within chunk
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: userStart, end_time: 1300 },
+      orderBy: "desc",
+      streamingAggs: false,
+      hits: [{ id: 2 }, { id: 1 }],
+    });
+
+    // RTL+desc → append: [4,3] then [2,1] appended → [4,3,2,1]
+    expect(state.data[0].map((d: any) => d.id)).toEqual([4, 3, 2, 1]);
+  });
+
+  // --- direction detection only happens on first chunk ---
+
+  it("direction is locked after first metadata, not re-detected on subsequent chunks", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    state.data[0] = [{ id: 10 }];
+    const { handlers } = makeHandlers(state);
+
+    // First metadata: LTR detected
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: userStart, end_time: 1500 },
+      orderBy: "asc",
+      streamingAggs: false,
+      hits: [{ id: 1 }],
+    });
+
+    // Second chunk: time_offset would suggest RTL if re-detected, but direction is locked
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: 1500, end_time: userEnd },
+      orderBy: "asc",
+      streamingAggs: false,
+      hits: [{ id: 2 }],
+    });
+
+    // LTR + asc → append for both chunks: [10, 1, 2]
+    expect(state.data[0].map((d: any) => d.id)).toEqual([10, 1, 2]);
+  });
+
+  // --- no metadata available: defaults to RTL ---
+
+  it("defaults to RTL when metadata.queries is empty", async () => {
+    const state = makeState({ queries: [] }); // no query metadata
+    state.data[0] = [{ id: 10 }];
+    const { handlers } = makeHandlers(state);
+
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: 1500, end_time: 1800 },
+      orderBy: "asc",
+      streamingAggs: false,
+      hits: [{ id: 1 }],
+    });
+
+    // No userStart/userEnd → detection fails → defaults to RTL
+    // RTL + asc → prepend
+    expect(state.data[0][0].id).toBe(1);
+    expect(state.data[0][1].id).toBe(10);
+  });
+
+  // --- handleHistogramResponse (non-streaming) direction combos ---
+
+  it("handleHistogramResponse: streaming_aggs=true replaces regardless of direction", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    state.resultMetaData[0] = [];
+    state.data[0] = [{ id: 99 }];
+    const { handlers } = makeHandlers(state);
+
+    await handlers.handleHistogramResponse(
+      { meta: { currentQueryIndex: 0 } },
+      {
+        content: {
+          streaming_aggs: true,
+          results: {
+            hits: [{ id: 1 }],
+            order_by: "asc",
+            time_offset: { start_time: userStart, end_time: 1500 },
+          },
+        },
+      },
+    );
+
+    expect(state.data[0]).toHaveLength(1);
+    expect(state.data[0][0].id).toBe(1);
+  });
+
+  it("handleHistogramResponse: missing order_by defaults to desc", async () => {
+    const state = makeState({ queries: [{ startTime: userStart, endTime: userEnd }] });
+    state.resultMetaData[0] = [];
+    state.data[0] = [{ id: 10 }];
+    const { handlers } = makeHandlers(state);
+
+    // LTR detected, no order_by → desc → shouldPrepend = LTR !== desc = true !== false = true
+    await handlers.handleHistogramResponse(
+      { meta: { currentQueryIndex: 0 } },
+      {
+        content: {
+          streaming_aggs: false,
+          results: {
+            hits: [{ id: 1 }],
+            // order_by omitted → defaults to desc (orderAsc = false)
+            time_offset: { start_time: userStart, end_time: 1500 },
+          },
+        },
+      },
+    );
+
+    // LTR + desc → prepend
+    expect(state.data[0][0].id).toBe(1);
+    expect(state.data[0][1].id).toBe(10);
+  });
+
+  // --- equal distance from both ends → defaults to LTR ---
+
+  it("equal distance to both user start and end → detects as LTR (<=)", async () => {
+    const state = makeState({ queries: [{ startTime: 1000, endTime: 2000 }] });
+    state.data[0] = [{ id: 10 }];
+    const { handlers } = makeHandlers(state);
+
+    // Chunk at exact center: |1500-1000| = 500, |1500-2000| = 500 → <= is true → LTR
+    await sendStreamingChunk(handlers, {
+      timeOffset: { start_time: 1500, end_time: 1500 },
+      orderBy: "asc",
+      streamingAggs: false,
+      hits: [{ id: 1 }],
+    });
+
+    // LTR + asc → append
+    expect(state.data[0][0].id).toBe(10);
+    expect(state.data[0][1].id).toBe(1);
   });
 });
 

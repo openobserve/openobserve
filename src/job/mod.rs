@@ -412,9 +412,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::organization::org_settings_watch());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
-    // Service streams watch only needed on queriers - they serve the UI APIs
+    // Service streams watch only needed on queriers - they serve the UI APIs.
+    // Skip if the feature is disabled to avoid unnecessary coordinator traffic.
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() {
+    if LOCAL_NODE.is_querier() && get_o2_config().service_streams.enabled {
         tokio::task::spawn(async move {
             o2_enterprise::enterprise::service_streams::cache::watch().await
         });
@@ -498,9 +499,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::domain_management::db::cache()
         .await
         .expect("domain management cache failed");
-    // Service streams cache only needed on queriers - they serve the UI APIs
+    // Service streams cache only needed on queriers - they serve the UI APIs.
+    // Skip if the feature is disabled to avoid unnecessary DB load at startup.
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() {
+    if LOCAL_NODE.is_querier() && get_o2_config().service_streams.enabled {
         o2_enterprise::enterprise::service_streams::cache::init_cache()
             .await
             .expect("service discovery cache failed");

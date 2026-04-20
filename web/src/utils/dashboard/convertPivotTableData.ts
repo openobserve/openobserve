@@ -42,6 +42,8 @@ function buildPivotHeaderLevels(
   allPivotKeys: string[],
   yFields: any[],
   showRowTotals: boolean,
+  timestampFieldAliases: Set<string>,
+  timezone: string,
 ): any[] {
   const pivotCount = breakdownFields.length;
   const yCount = yFields.length;
@@ -59,6 +61,19 @@ function buildPivotHeaderLevels(
   // These propagate down so borders align across all header rows.
   const topLevelBoundaries: Set<number> = new Set();
 
+  const formatPivotLabel = (value: string, levelIndex: number) => {
+    if (!value) return value;
+    const fieldAlias = breakdownFields[levelIndex]?.alias;
+    if (!fieldAlias || !timestampFieldAliases.has(fieldAlias)) return value;
+    if (
+      value === PIVOT_TABLE_TOTAL_LABEL ||
+      value === PIVOT_TABLE_OTHERS_LABEL
+    ) {
+      return value;
+    }
+    return parseTimestampValue(value, timezone) || value;
+  };
+
   // Build one header row per pivot level
   for (let lvl = 0; lvl < pivotCount; lvl++) {
     const cells: any[] = [];
@@ -67,6 +82,7 @@ function buildPivotHeaderLevels(
 
     while (i < parsedKeys.length) {
       const groupValue = parsedKeys[i][lvl];
+      const labelValue = formatPivotLabel(groupValue, lvl);
       let span = 0;
 
       while (
@@ -96,7 +112,7 @@ function buildPivotHeaderLevels(
 
       const cell: any = {
         key: `${lvl}_${groupValue}_${i}`,
-        label: groupValue,
+        label: labelValue,
         colspan,
         hasBorder,
         // Sort by the first leaf column under this group header.
@@ -380,6 +396,10 @@ export const convertPivotTableData = (
   // Row field columns (x-axis) — marked with _isRowField for header rendering
   const timezone = store.state.timezone;
   const timestampFieldAliases = detectTimestampFields(xFields, tableRows);
+  const breakdownTimestampAliases = detectTimestampFields(
+    breakdownFields,
+    tableRows,
+  );
 
   for (const xField of xFields) {
     const col: any = {
@@ -411,11 +431,16 @@ export const convertPivotTableData = (
       // When multi-row headers are used, parent headers provide context,
       // so the leaf column label is just the value field label ("Count").
       // When single-row, use the full label ("GET" or "GET - Count").
+      const formattedPivotKey = breakdownTimestampAliases.has(
+        breakdownFields[0]?.alias,
+      )
+        ? parseTimestampValue(pk, timezone) || pk
+        : pk;
       const label = needsMultiRowHeader
         ? yField.label
         : isSingleValueField
-          ? pk
-          : `${pk} - ${yField.label}`;
+          ? formattedPivotKey
+          : `${formattedPivotKey} - ${yField.label}`;
 
       const yAliasLower = yField.alias.toLowerCase();
       const unitToUse = unitConfigMap[yAliasLower]?.unit || config.unit;
@@ -477,6 +502,8 @@ export const convertPivotTableData = (
     allPivotKeys,
     yFields,
     showRowTotals,
+    breakdownTimestampAliases,
+    timezone,
   );
 
   // --- Step 7: Separate sticky total row if needed ---

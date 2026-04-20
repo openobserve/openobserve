@@ -31,16 +31,20 @@ vi.mock("vue-router", async () => {
   const actual = await vi.importActual<typeof vueRouter>("vue-router");
   return {
     ...actual,
-    useRouter: vi.fn(() => ({ push: vi.fn(), replace: vi.fn() })),
+    useRouter: vi.fn(() => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      currentRoute: { value: { query: {} } },
+    })),
   };
 });
 
 vi.mock("@/services/reports", () => ({
   default: {
-    list: vi.fn(),
-    toggleReportState: vi.fn(),
-    deleteReport: vi.fn(),
-    bulkDelete: vi.fn(),
+    listByFolderId: vi.fn(),
+    toggleReportStateById: vi.fn(),
+    deleteReportById: vi.fn(),
+    bulkDeleteById: vi.fn(),
   },
 }));
 
@@ -64,6 +68,10 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
+vi.mock("@/utils/commons", () => ({
+  getFoldersListByType: vi.fn(() => Promise.resolve()),
+}));
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const platform = { is: { desktop: true, mobile: false }, has: { touch: false } };
@@ -71,6 +79,7 @@ const platform = { is: { desktop: true, mobile: false }, has: { touch: false } }
 installQuasar({ plugins: [Dialog, Notify], config: { platform } });
 
 const REPORT_SCHEDULED = {
+  report_id: "uuid-scheduled",
   name: "Scheduled Report",
   enabled: true,
   owner: "user@test.com",
@@ -82,6 +91,7 @@ const REPORT_SCHEDULED = {
 };
 
 const REPORT_CACHED = {
+  report_id: "uuid-cached",
   name: "Cached Report",
   enabled: false,
   owner: "user@test.com",
@@ -99,7 +109,11 @@ node.setAttribute("id", "app");
 document.body.appendChild(node);
 
 function mountComponent() {
-  const mockRouter = { push: vi.fn(), replace: vi.fn() };
+  const mockRouter = {
+    push: vi.fn(),
+    replace: vi.fn(),
+    currentRoute: { value: { query: {} } },
+  };
   vi.mocked(vueRouter.useRouter).mockReturnValue(mockRouter as any);
 
   const wrapper = mount(ReportList, {
@@ -121,9 +135,9 @@ describe("ReportList", () => {
   let mockRouter: { push: ReturnType<typeof vi.fn>; replace: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
-    vi.mocked(reports.list).mockResolvedValue({
+    vi.mocked(reports.listByFolderId).mockResolvedValue({
       data: [REPORT_SCHEDULED, REPORT_CACHED],
-    });
+    } as any);
     store.state.selectedOrganization = {
       identifier: "test-org",
       name: "Test Org",
@@ -184,7 +198,7 @@ describe("ReportList", () => {
 
   describe("component initialization", () => {
     it("should fetch reports from the API on mount", () => {
-      expect(vi.mocked(reports.list)).toHaveBeenCalledWith("test-org");
+      expect(vi.mocked(reports.listByFolderId)).toHaveBeenCalled();
     });
 
     it("should initialize with activeTab set to 'shared'", () => {
@@ -209,7 +223,7 @@ describe("ReportList", () => {
     });
 
     it("should handle non-403 fetch error without crashing", async () => {
-      vi.mocked(reports.list).mockRejectedValueOnce({
+      vi.mocked(reports.listByFolderId).mockRejectedValueOnce({
         response: { status: 500, data: { message: "Server error" } },
       });
       const { wrapper: w } = mountComponent();
@@ -219,7 +233,7 @@ describe("ReportList", () => {
     });
 
     it("should handle 403 fetch error silently", async () => {
-      vi.mocked(reports.list).mockRejectedValueOnce({
+      vi.mocked(reports.listByFolderId).mockRejectedValueOnce({
         response: { status: 403 },
       });
       const { wrapper: w } = mountComponent();
@@ -248,32 +262,27 @@ describe("ReportList", () => {
   // ── Tab filtering ────────────────────────────────────────────────────────
 
   describe("tab filtering", () => {
-    it("should show only reports with destinations on 'shared' tab", async () => {
+    it("should map all staticReportsList rows to reportsTableRows on 'shared' tab", async () => {
       wrapper.vm.staticReportsList = [
         { ...REPORT_SCHEDULED, "#": 1 },
         { ...REPORT_CACHED, "#": 2 },
       ];
       wrapper.vm.activeTab = "shared";
       await wrapper.vm.filterReports();
-      expect(
-        wrapper.vm.reportsTableRows.every(
-          (r: any) => r.destinations.length > 0,
-        ),
-      ).toBe(true);
+      // filterReports re-numbers all rows; tab filtering is done server-side via listByFolderId
+      expect(wrapper.vm.reportsTableRows).toHaveLength(2);
+      expect(wrapper.vm.reportsTableRows[0]["#"]).toBe(1);
+      expect(wrapper.vm.reportsTableRows[1]["#"]).toBe(2);
     });
 
-    it("should show only reports without destinations on 'cached' tab", async () => {
+    it("should map all staticReportsList rows to reportsTableRows on 'cached' tab", async () => {
       wrapper.vm.staticReportsList = [
         { ...REPORT_SCHEDULED, "#": 1 },
         { ...REPORT_CACHED, "#": 2 },
       ];
       wrapper.vm.activeTab = "cached";
       await wrapper.vm.filterReports();
-      expect(
-        wrapper.vm.reportsTableRows.every(
-          (r: any) => r.destinations.length === 0,
-        ),
-      ).toBe(true);
+      expect(wrapper.vm.reportsTableRows).toHaveLength(2);
     });
 
     it("should update resultTotal after filterReports", async () => {
@@ -383,13 +392,13 @@ describe("ReportList", () => {
   // ── Toggle report state ──────────────────────────────────────────────────
 
   describe("toggleReportState", () => {
-    it("should call the toggleReportState API with correct args", async () => {
-      vi.mocked(reports.toggleReportState).mockResolvedValueOnce({} as any);
+    it("should call the toggleReportStateById API with correct args", async () => {
+      vi.mocked(reports.toggleReportStateById).mockResolvedValueOnce({} as any);
       await wrapper.vm.toggleReportState(REPORT_SCHEDULED);
       await flushPromises();
-      expect(vi.mocked(reports.toggleReportState)).toHaveBeenCalledWith(
+      expect(vi.mocked(reports.toggleReportStateById)).toHaveBeenCalledWith(
         "test-org",
-        REPORT_SCHEDULED.name,
+        REPORT_SCHEDULED.report_id,
         false, // toggling enabled→disabled
       );
     });
@@ -397,56 +406,56 @@ describe("ReportList", () => {
     it("should update enabled flag in staticReportsList on success", async () => {
       wrapper.vm.staticReportsList = [{ ...REPORT_SCHEDULED, "#": 1 }];
       wrapper.vm.reportsTableRows = [{ ...REPORT_SCHEDULED, "#": 1 }];
-      vi.mocked(reports.toggleReportState).mockResolvedValueOnce({} as any);
+      vi.mocked(reports.toggleReportStateById).mockResolvedValueOnce({} as any);
       await wrapper.vm.toggleReportState(REPORT_SCHEDULED);
       await flushPromises();
       expect(
         wrapper.vm.staticReportsList.find(
-          (r: any) => r.name === REPORT_SCHEDULED.name,
+          (r: any) => r.report_id === REPORT_SCHEDULED.report_id,
         ).enabled,
       ).toBe(false);
     });
 
     it("should clear loading state after successful toggle", async () => {
-      vi.mocked(reports.toggleReportState).mockResolvedValueOnce({} as any);
+      vi.mocked(reports.toggleReportStateById).mockResolvedValueOnce({} as any);
       await wrapper.vm.toggleReportState(REPORT_SCHEDULED);
       await flushPromises();
       expect(
-        wrapper.vm.reportsStateLoadingMap[REPORT_SCHEDULED.name],
+        wrapper.vm.reportsStateLoadingMap[REPORT_SCHEDULED.report_id],
       ).toBe(false);
     });
 
     it("should set loading state to true during toggle operation", async () => {
       let resolve: (v: any) => void;
-      vi.mocked(reports.toggleReportState).mockReturnValueOnce(
+      vi.mocked(reports.toggleReportStateById).mockReturnValueOnce(
         new Promise((r) => { resolve = r; }) as any,
       );
       const op = wrapper.vm.toggleReportState(REPORT_SCHEDULED);
-      expect(wrapper.vm.reportsStateLoadingMap[REPORT_SCHEDULED.name]).toBe(true);
+      expect(wrapper.vm.reportsStateLoadingMap[REPORT_SCHEDULED.report_id]).toBe(true);
       resolve!({});
       await op;
       await flushPromises();
     });
 
     it("should clear loading state after non-403 error", async () => {
-      vi.mocked(reports.toggleReportState).mockRejectedValueOnce({
+      vi.mocked(reports.toggleReportStateById).mockRejectedValueOnce({
         response: { status: 500, data: { message: "error" } },
       });
       await wrapper.vm.toggleReportState(REPORT_SCHEDULED);
       await flushPromises();
       expect(
-        wrapper.vm.reportsStateLoadingMap[REPORT_SCHEDULED.name],
+        wrapper.vm.reportsStateLoadingMap[REPORT_SCHEDULED.report_id],
       ).toBe(false);
     });
 
     it("should clear loading state silently for 403 error", async () => {
-      vi.mocked(reports.toggleReportState).mockRejectedValueOnce({
+      vi.mocked(reports.toggleReportStateById).mockRejectedValueOnce({
         response: { status: 403 },
       });
       await wrapper.vm.toggleReportState(REPORT_SCHEDULED);
       await flushPromises();
       expect(
-        wrapper.vm.reportsStateLoadingMap[REPORT_SCHEDULED.name],
+        wrapper.vm.reportsStateLoadingMap[REPORT_SCHEDULED.report_id],
       ).toBe(false);
     });
   });
@@ -459,15 +468,12 @@ describe("ReportList", () => {
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createReport",
         query: {
+          report_id: REPORT_SCHEDULED.report_id,
           name: REPORT_SCHEDULED.name,
           org_identifier: "test-org",
+          folder: "default",
         },
       });
-    });
-
-    it("should store cloned report in editingReport", async () => {
-      await wrapper.vm.editReport(REPORT_SCHEDULED);
-      expect(wrapper.vm.editingReport).toEqual(REPORT_SCHEDULED);
     });
 
     it("should trigger navigation from edit button click in table", async () => {
@@ -491,7 +497,10 @@ describe("ReportList", () => {
       expect(wrapper.vm.deleteDialog.message).toBe(
         `Are you sure you want to delete report "${REPORT_SCHEDULED.name}"`,
       );
-      expect(wrapper.vm.deleteDialog.data).toBe(REPORT_SCHEDULED.name);
+      expect(wrapper.vm.deleteDialog.data).toEqual({
+        report_id: REPORT_SCHEDULED.report_id,
+        name: REPORT_SCHEDULED.name,
+      });
     });
 
     it("should remove the report from lists after successful delete", async () => {
@@ -500,20 +509,20 @@ describe("ReportList", () => {
         { ...REPORT_CACHED, "#": 2 },
       ];
       wrapper.vm.reportsTableRows = [{ ...REPORT_SCHEDULED, "#": 1 }];
-      vi.mocked(reports.deleteReport).mockResolvedValueOnce({} as any);
+      vi.mocked(reports.deleteReportById).mockResolvedValueOnce({} as any);
       await wrapper.vm.confirmDeleteReport(REPORT_SCHEDULED);
       await wrapper.vm.deleteReport();
       await flushPromises();
       expect(
         wrapper.vm.staticReportsList.find(
-          (r: any) => r.name === REPORT_SCHEDULED.name,
+          (r: any) => r.report_id === REPORT_SCHEDULED.report_id,
         ),
       ).toBeUndefined();
     });
 
     it("should keep lists intact after non-403 delete error", async () => {
       wrapper.vm.staticReportsList = [{ ...REPORT_SCHEDULED, "#": 1 }];
-      vi.mocked(reports.deleteReport).mockRejectedValueOnce({
+      vi.mocked(reports.deleteReportById).mockRejectedValueOnce({
         response: { status: 500, data: { message: "error" } },
       });
       await wrapper.vm.confirmDeleteReport(REPORT_SCHEDULED);
@@ -524,7 +533,7 @@ describe("ReportList", () => {
 
     it("should silently handle 403 delete error", async () => {
       wrapper.vm.staticReportsList = [{ ...REPORT_SCHEDULED, "#": 1 }];
-      vi.mocked(reports.deleteReport).mockRejectedValueOnce({
+      vi.mocked(reports.deleteReportById).mockRejectedValueOnce({
         response: { status: 403 },
       });
       await wrapper.vm.confirmDeleteReport(REPORT_SCHEDULED);
@@ -552,7 +561,7 @@ describe("ReportList", () => {
       await btn.trigger("click");
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createReport",
-        query: { org_identifier: "test-org" },
+        query: { org_identifier: "test-org", folder: "default" },
       });
     });
   });
@@ -578,36 +587,36 @@ describe("ReportList", () => {
       ];
     });
 
-    it("should call bulkDelete API with selected report names", async () => {
+    it("should call bulkDeleteById API with selected report IDs", async () => {
       wrapper.vm.selectedReports = [REPORT_SCHEDULED];
-      vi.mocked(reports.bulkDelete).mockResolvedValueOnce({
-        data: { successful: [REPORT_SCHEDULED.name], unsuccessful: [] },
+      vi.mocked(reports.bulkDeleteById).mockResolvedValueOnce({
+        data: { successful: [REPORT_SCHEDULED.report_id], unsuccessful: [] },
       } as any);
       await wrapper.vm.bulkDeleteReports();
       await flushPromises();
-      expect(vi.mocked(reports.bulkDelete)).toHaveBeenCalledWith("test-org", {
-        ids: [REPORT_SCHEDULED.name],
+      expect(vi.mocked(reports.bulkDeleteById)).toHaveBeenCalledWith("test-org", {
+        ids: [REPORT_SCHEDULED.report_id],
       });
     });
 
     it("should remove successfully deleted reports from staticReportsList", async () => {
       wrapper.vm.selectedReports = [REPORT_SCHEDULED];
-      vi.mocked(reports.bulkDelete).mockResolvedValueOnce({
-        data: { successful: [REPORT_SCHEDULED.name], unsuccessful: [] },
+      vi.mocked(reports.bulkDeleteById).mockResolvedValueOnce({
+        data: { successful: [REPORT_SCHEDULED.report_id], unsuccessful: [] },
       } as any);
       await wrapper.vm.bulkDeleteReports();
       await flushPromises();
       expect(
         wrapper.vm.staticReportsList.find(
-          (r: any) => r.name === REPORT_SCHEDULED.name,
+          (r: any) => r.report_id === REPORT_SCHEDULED.report_id,
         ),
       ).toBeUndefined();
     });
 
     it("should clear selectedReports after bulk delete", async () => {
       wrapper.vm.selectedReports = [REPORT_SCHEDULED];
-      vi.mocked(reports.bulkDelete).mockResolvedValueOnce({
-        data: { successful: [REPORT_SCHEDULED.name], unsuccessful: [] },
+      vi.mocked(reports.bulkDeleteById).mockResolvedValueOnce({
+        data: { successful: [REPORT_SCHEDULED.report_id], unsuccessful: [] },
       } as any);
       await wrapper.vm.bulkDeleteReports();
       await flushPromises();
@@ -617,8 +626,8 @@ describe("ReportList", () => {
     it("should close confirmBulkDelete dialog after bulk delete", async () => {
       wrapper.vm.selectedReports = [REPORT_SCHEDULED];
       wrapper.vm.confirmBulkDelete = true;
-      vi.mocked(reports.bulkDelete).mockResolvedValueOnce({
-        data: { successful: [REPORT_SCHEDULED.name], unsuccessful: [] },
+      vi.mocked(reports.bulkDeleteById).mockResolvedValueOnce({
+        data: { successful: [REPORT_SCHEDULED.report_id], unsuccessful: [] },
       } as any);
       await wrapper.vm.bulkDeleteReports();
       await flushPromises();
@@ -627,10 +636,10 @@ describe("ReportList", () => {
 
     it("should handle partial success (some failed) without crashing", async () => {
       wrapper.vm.selectedReports = [REPORT_SCHEDULED, REPORT_CACHED];
-      vi.mocked(reports.bulkDelete).mockResolvedValueOnce({
+      vi.mocked(reports.bulkDeleteById).mockResolvedValueOnce({
         data: {
-          successful: [REPORT_SCHEDULED.name],
-          unsuccessful: [REPORT_CACHED.name],
+          successful: [REPORT_SCHEDULED.report_id],
+          unsuccessful: [REPORT_CACHED.report_id],
         },
       } as any);
       await wrapper.vm.bulkDeleteReports();
@@ -638,54 +647,54 @@ describe("ReportList", () => {
       // Only the successful one should be removed
       expect(
         wrapper.vm.staticReportsList.find(
-          (r: any) => r.name === REPORT_SCHEDULED.name,
+          (r: any) => r.report_id === REPORT_SCHEDULED.report_id,
         ),
       ).toBeUndefined();
       expect(
         wrapper.vm.staticReportsList.find(
-          (r: any) => r.name === REPORT_CACHED.name,
+          (r: any) => r.report_id === REPORT_CACHED.report_id,
         ),
       ).toBeDefined();
     });
 
     it("should handle all-failed response without crashing", async () => {
       wrapper.vm.selectedReports = [REPORT_SCHEDULED];
-      vi.mocked(reports.bulkDelete).mockResolvedValueOnce({
-        data: { successful: [], unsuccessful: [REPORT_SCHEDULED.name] },
+      vi.mocked(reports.bulkDeleteById).mockResolvedValueOnce({
+        data: { successful: [], unsuccessful: [REPORT_SCHEDULED.report_id] },
       } as any);
       await wrapper.vm.bulkDeleteReports();
       await flushPromises();
-      // None removed
+      // None removed when successful list is empty
       expect(
         wrapper.vm.staticReportsList.find(
-          (r: any) => r.name === REPORT_SCHEDULED.name,
+          (r: any) => r.report_id === REPORT_SCHEDULED.report_id,
         ),
       ).toBeDefined();
     });
 
-    it("should handle response with no data field (fallback path)", async () => {
+    it("should handle response with no data field without crashing", async () => {
       wrapper.vm.selectedReports = [REPORT_SCHEDULED];
-      vi.mocked(reports.bulkDelete).mockResolvedValueOnce({} as any);
+      vi.mocked(reports.bulkDeleteById).mockResolvedValueOnce({} as any);
       await wrapper.vm.bulkDeleteReports();
       await flushPromises();
-      // Fallback: all selected removed
+      // successful defaults to [] so nothing is removed
       expect(
         wrapper.vm.staticReportsList.find(
-          (r: any) => r.name === REPORT_SCHEDULED.name,
+          (r: any) => r.report_id === REPORT_SCHEDULED.report_id,
         ),
-      ).toBeUndefined();
+      ).toBeDefined();
     });
 
     it("should notify and return early when no reports are selected", async () => {
       wrapper.vm.selectedReports = [];
       await wrapper.vm.bulkDeleteReports();
       await flushPromises();
-      expect(vi.mocked(reports.bulkDelete)).not.toHaveBeenCalled();
+      expect(vi.mocked(reports.bulkDeleteById)).not.toHaveBeenCalled();
     });
 
     it("should handle API error without crashing and close dialog", async () => {
       wrapper.vm.selectedReports = [REPORT_SCHEDULED];
-      vi.mocked(reports.bulkDelete).mockRejectedValueOnce({
+      vi.mocked(reports.bulkDeleteById).mockRejectedValueOnce({
         response: { status: 500, data: { message: "Server error" } },
         message: "Server error",
       });

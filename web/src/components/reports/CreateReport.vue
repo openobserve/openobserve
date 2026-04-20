@@ -1263,19 +1263,23 @@ const frequency = ref({
 onBeforeMount(async () => {
   await getDashboaordFolders();
 
-  isEditingReport.value = !!router.currentRoute.value.query?.name;
+  const query = router.currentRoute.value.query;
+  isEditingReport.value = !!(query?.report_id || query?.name);
 
   if (!isEditingReport.value) setInitialReportData();
 
   if (isEditingReport.value) {
-    isEditingReport.value = true;
     isFetchingReport.value = true;
 
-    const reportName: string = (router.currentRoute.value.query?.name ||
-      "") as string;
+    const reportId = query?.report_id as string | undefined;
+    const reportName = (query?.name || "") as string;
+    const org = store.state.selectedOrganization.identifier;
 
-    reports
-      .getReport(store.state.selectedOrganization.identifier, reportName)
+    const fetchPromise = reportId
+      ? reports.getReportById(org, reportId)
+      : reports.getReport(org, reportName);
+
+    fetchPromise
       .then((res: any) => {
         setupEditingReport(res.data);
         originalReportData.value = JSON.stringify(formData.value);
@@ -1325,12 +1329,14 @@ const setInitialReportData = async () => {
     isCachedReport.value = false;
   }
 
-  if (queryParams.folderId) {
-    formData.value.dashboards[0].folder = queryParams.folderId as string;
-    await onFolderSelection(queryParams.folderId as string);
+  // Support both ?folder= (from ReportList) and ?folderId= (legacy links)
+  const reportFolderId = (queryParams.folder || queryParams.folderId) as string | undefined;
+  if (reportFolderId) {
+    formData.value.dashboards[0].folder = reportFolderId;
+    await onFolderSelection(reportFolderId);
   }
 
-  if (queryParams.folderId && queryParams.dashboardId) {
+  if (reportFolderId && queryParams.dashboardId) {
     formData.value.dashboards[0].dashboard = queryParams.dashboardId as string;
     setDashboardTabOptions(queryParams.dashboardId);
   }
@@ -1654,9 +1660,22 @@ const saveReport = async () => {
     delete reportPayload.dashboards[0].attachment_dimensions;
   }
 
-  const reportAction = isEditingReport.value
-    ? reports.updateReport
-    : reports.createReport;
+  const org = store.state.selectedOrganization.identifier;
+  const routeQuery = router.currentRoute.value.query;
+  const reportId = routeQuery?.report_id as string | undefined;
+  const folderId = (routeQuery?.folder || routeQuery?.folderId) as string | undefined;
+
+  let savePromise: Promise<any>;
+  if (isEditingReport.value && reportId) {
+    // v2 update by ID
+    savePromise = reports.updateReportById(org, reportId, reportPayload);
+  } else if (isEditingReport.value) {
+    // legacy v1 update by name
+    savePromise = reports.updateReport(org, reportPayload);
+  } else {
+    // v2 create with folder
+    savePromise = reports.createReportV2(org, reportPayload, folderId);
+  }
 
   const dismiss = q.notify({
     spinner: true,
@@ -1664,7 +1683,7 @@ const saveReport = async () => {
     timeout: 2000,
   });
 
-  reportAction(store.state.selectedOrganization.identifier, reportPayload)
+  savePromise
     .then(() => {
       q.notify({
         type: "positive",
@@ -1806,10 +1825,13 @@ const validateFrequency = () => {
 };
 
 const goToReports = () => {
+  const routeQuery = router.currentRoute.value.query;
+  const folderId = (routeQuery?.folder || routeQuery?.folderId || "default") as string;
   router.replace({
     name: "reports",
     query: {
       org_identifier: store.state.selectedOrganization.identifier,
+      folder: folderId,
     },
   });
 };

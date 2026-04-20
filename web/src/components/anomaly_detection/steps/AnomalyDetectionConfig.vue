@@ -671,7 +671,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :selectedTimeObj="previewTimeObj"
                     :variablesData="{}"
                     :forceLoad="true"
-                    searchType="dashboards"
+                    searchType="ui"
                     style="height: 180px; width: 100%"
                     data-test="anomaly-sensitivity-chart"
                     @series-data-update="onSeriesDataUpdate"
