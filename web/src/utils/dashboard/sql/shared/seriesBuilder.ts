@@ -115,7 +115,6 @@ export function createSeriesBuilders(deps: SeriesDeps) {
           ? "rgba(0, 0, 0, 0.8)"
           : "rgba(255, 255, 255, 0.8)",
         shadowBlur: 2,
-        zlevel: 1,
       },
     };
   };
