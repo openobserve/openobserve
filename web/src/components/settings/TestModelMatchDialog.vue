@@ -5,8 +5,8 @@
       <!-- Header -->
       <div class="tmm-header">
         <div>
-          <div class="tmm-title">Test Model Match</div>
-          <div class="tmm-subtitle">Simulate how a model name from your spans would match against pricing rules.</div>
+          <div class="tmm-title">{{ t('modelPricing.testMatchTitle') }}</div>
+          <div class="tmm-subtitle">{{ t('modelPricing.testMatchSubtitle') }}</div>
         </div>
         <q-btn icon="cancel" flat round dense v-close-popup />
       </div>
@@ -19,8 +19,8 @@
 
           <!-- Model Name -->
           <div class="tmm-section">
-            <label class="tmm-label">Model Name <span class="tmm-required">*</span></label>
-            <div class="tmm-label-hint">The model name on your generations.</div>
+            <label class="tmm-label">{{ t('modelPricing.modelNameInput') }} <span class="tmm-required">*</span></label>
+            <div class="tmm-label-hint">{{ t('modelPricing.modelNameHint') }}</div>
             <q-input
               ref="modelInputRef"
               v-model="testModelName"
@@ -59,13 +59,13 @@
             <!-- Empty state -->
             <div v-if="!testModelName" key="empty" class="tmm-empty-state" data-test="test-match-empty">
               <q-icon name="manage_search" size="40px" class="tmm-empty-icon" />
-              <div class="tmm-empty-text">Enter a model name to test matching</div>
+              <div class="tmm-empty-text">{{ t('modelPricing.enterModelName') }}</div>
             </div>
 
             <!-- Typed but not yet tested -->
             <div v-else-if="testResult === null" key="waiting" class="tmm-empty-state" data-test="test-match-waiting">
               <q-icon name="ads_click" size="40px" class="tmm-empty-icon" />
-              <div class="tmm-empty-text">Click "Test Match" to see results</div>
+              <div class="tmm-empty-text">{{ t('modelPricing.clickToTest') }}</div>
             </div>
 
             <!-- No Match -->
@@ -75,16 +75,16 @@
                   <q-icon name="error_outline" size="22px" />
                 </div>
                 <div>
-                  <div class="tmm-status-title">No Match Found</div>
-                  <div class="tmm-status-desc">No rule matched "<strong>{{ testModelName }}</strong>".</div>
+                  <div class="tmm-status-title">{{ t('modelPricing.noMatchFound') }}</div>
+                  <div class="tmm-status-desc">{{ t('modelPricing.noMatchDesc', { modelName: testModelName }) }}</div>
                 </div>
               </div>
               <div class="tmm-suggestions">
-                <div class="tmm-suggestions-title">Troubleshooting tips:</div>
+                <div class="tmm-suggestions-title">{{ t('modelPricing.troubleshootingTitle') }}</div>
                 <ul class="tmm-suggestions-list">
-                  <li>Check the spelling of your model name</li>
-                  <li>Verify a rule with a matching regex pattern exists and is <strong>enabled</strong></li>
-                  <li>Create a new model pricing rule from the list</li>
+                  <li>{{ t('modelPricing.tip1') }}</li>
+                  <li>{{ t('modelPricing.tip2') }}</li>
+                  <li>{{ t('modelPricing.tip3') }}</li>
                 </ul>
               </div>
             </div>
@@ -98,7 +98,7 @@
                   <q-icon name="check_circle" size="22px" />
                 </div>
                 <div class="tw:flex-1 tw:min-w-0">
-                  <div class="tmm-status-title">Match Found</div>
+                  <div class="tmm-status-title">{{ t('modelPricing.matchFound') }}</div>
                   <div class="tmm-status-desc tw:truncate">
                     <code class="tmm-model-badge">{{ testResult.matched.name }}</code>
                   </div>
@@ -108,7 +108,7 @@
 
               <!-- Priority flow -->
               <div class="tmm-flow">
-                <div class="tmm-flow-title">Match Priority</div>
+                <div class="tmm-flow-title">{{ t('modelPricing.matchPriority') }}</div>
                 <div class="tmm-flow-steps">
                   <template v-for="(step, sIdx) in matchFlowSteps" :key="step.key">
                     <div class="tmm-flow-arrow" v-if="sIdx > 0">
@@ -137,14 +137,14 @@
                     <div class="tmm-cost-tier-desc" v-if="matchedTierDef?.condition">
                       Condition: <code>{{ matchedTierDef.condition.usage_key }} {{ operatorSymbol(matchedTierDef.condition.operator) }} {{ matchedTierDef.condition.value }}</code>
                     </div>
-                    <div class="tmm-cost-tier-desc" v-else>Default pricing tier</div>
+                    <div class="tmm-cost-tier-desc" v-else>{{ t('modelPricing.defaultPricingTier') }}</div>
                   </div>
                 </div>
 
                 <div class="tmm-cost-table" v-if="pricingRows.length > 0">
                   <div class="tmm-cost-table-head">
-                    <span>Usage Type</span>
-                    <span class="tw:text-right">Price / 1M tokens</span>
+                    <span>{{ t('modelPricing.usageType') }}</span>
+                    <span class="tw:text-right">{{ t('modelPricing.pricePerMTokens') }}</span>
                   </div>
                   <div v-for="row in pricingRows" :key="row.key" class="tmm-cost-table-row">
                     <span class="tmm-cost-usage-key">{{ row.key }}</span>
@@ -153,7 +153,7 @@
                 </div>
                 <div v-else class="tmm-cost-empty">
                   <q-icon name="info_outline" size="15px" />
-                  No pricing defined for this tier.
+                  {{ t('modelPricing.noPricingForTier') }}
                 </div>
               </div>
 
@@ -165,9 +165,9 @@
 
       <!-- Footer -->
       <div class="tmm-footer">
-        <q-btn label="Close" flat no-caps v-close-popup class="o2-secondary-button" data-test="test-match-close-btn" />
+        <q-btn :label="t('modelPricing.close')" flat no-caps v-close-popup class="o2-secondary-button" data-test="test-match-close-btn" />
         <q-btn
-          label="Test Match"
+          :label="t('modelPricing.testMatch')"
           no-caps
           unelevated
           class="o2-primary-button"
@@ -185,6 +185,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useStore } from 'vuex';
 import modelPricingService from '@/services/model_pricing';
 
@@ -193,6 +194,7 @@ const props = defineProps({
 });
 const emit = defineEmits(['update:modelValue']);
 
+const { t } = useI18n();
 const store = useStore();
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || '');
 

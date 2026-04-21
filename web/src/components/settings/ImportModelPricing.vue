@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <base-import
     ref="baseImportRef"
-    title="Import Model Pricing"
+    :title="t('modelPricing.importTitle')"
     test-prefix="model-pricing"
     :is-importing="isImporting"
     container-class="o2-custom-bg"
@@ -39,9 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="modelPricingErrorsToDisplay.length > 0"
           class="text-center text-h6 tw:py-2"
         >
-          Error Validations
+          {{ t('modelPricing.errorValidations') }}
         </div>
-        <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
+        <div v-else class="text-center text-h6 tw:py-2">{{ t('modelPricing.outputMessages') }}</div>
         <q-separator class="q-mx-md q-mt-md" />
         <div class="error-report-container">
           <!-- Model Pricing Errors Section -->
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         data-test="model-pricing-import-name-input"
                         v-model="userSelectedModelPricingName[index]"
-                        :label="'Model Name *'"
+                        :label="t('modelPricing.modelNameLabel')"
                         color="input-border"
                         bg-color="input-bg"
                         class="showLabelOnTop"
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         data-test="model-pricing-import-pattern-input"
                         v-model="userSelectedModelPricingPattern[index]"
-                        :label="'Match Pattern *'"
+                        :label="t('modelPricing.matchPatternLabel')"
                         color="input-border"
                         bg-color="input-bg"
                         class="showLabelOnTop"
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="section-title text-primary"
               data-test="model-pricing-import-creation-title"
             >
-              Model Pricing Creation
+              {{ t('modelPricing.modelPricingCreation') }}
             </div>
             <div
               class="error-list"
@@ -161,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -178,6 +179,7 @@ const emit = defineEmits<{
   "update:list": [];
 }>();
 
+const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 const q = useQuasar();
@@ -200,13 +202,13 @@ const jsonArrayOfObj = computed({
   },
 });
 
-const allTabs = ref([
+const allTabs = computed(() => [
   {
-    label: "File Upload / JSON",
+    label: t("modelPricing.fileUploadTab"),
     value: "import_json_file",
   },
   {
-    label: "URL Import",
+    label: t("modelPricing.urlImportTab"),
     value: "import_json_url",
   },
 ]);

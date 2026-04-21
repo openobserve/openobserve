@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          <div class="tw:flex tw:gap-3">
         <q-input
             v-model="searchQuery"
-            placeholder="Search by model name..."
+            :placeholder="t('modelPricing.searchByModelName')"
             borderless
             dense
             flat
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Refresh -->
         <div>
           <q-btn
-            label="Refresh"
+            :label="t('modelPricing.refresh')"
             flat
             class="o2-secondary-button tw:w-[120px] tw:h-[36px]"
             @click="refreshModels"
@@ -55,14 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Loading State -->
     <div v-if="loading && models.length === 0" class="text-center q-pa-xl">
       <q-spinner-hourglass color="primary" size="50px" />
-      <div class="q-mt-md">Loading models...</div>
+      <div class="q-mt-md">{{ t('modelPricing.loadingModels') }}</div>
     </div>
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center q-pa-xl">
       <q-icon name="error" size="50px" color="negative" />
       <div class="q-mt-md text-negative">{{ error }}</div>
-      <q-btn flat color="primary" label="Try Again" @click="fetchModels()" class="q-mt-md" />
+      <q-btn flat color="primary" :label="t('modelPricing.tryAgain')" @click="fetchModels()" class="q-mt-md" />
     </div>
 
     <div v-else class="q-mb-md q-px-md">
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #no-data>
             <div class="full-width column flex-center q-pa-xl">
               <q-icon name="search_off" size="50px" color="grey-5" />
-              <div class="q-mt-md text-grey-6">No models found</div>
+              <div class="q-mt-md text-grey-6">{{ t('modelPricing.noModelsFound') }}</div>
             </div>
           </template>
 
@@ -165,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import modelPricingService from "@/services/model_pricing";
@@ -191,6 +192,7 @@ export default defineComponent({
   name: "BuiltInModelPricingTab",
   emits: ["import-models"],
   setup(props, { emit }) {
+    const { t } = useI18n();
     const store = useStore();
     const q = useQuasar();
 
@@ -198,12 +200,12 @@ export default defineComponent({
     const loading = ref(false);
     const error = ref("");
     const searchQuery = ref("");
-    const columns = [
-      { name: "select",   label: "",         field: "selected",      align: "center" as const, style: "width: 40px" },
-      { name: "name",     label: "Model",    field: "name",          align: "left"   as const, sortable: true },
-      { name: "pattern",  label: "Pattern",  field: "match_pattern", align: "left"   as const, style: "max-width: 200px" },
-      { name: "pricing",  label: "Pricing",  field: "tiers",         align: "left"   as const },
-    ];
+    const columns = computed(() => [
+      { name: "select",   label: "",                              field: "selected",      align: "center" as const, style: "width: 40px" },
+      { name: "name",     label: t("modelPricing.colModel"),      field: "name",          align: "left"   as const, sortable: true },
+      { name: "pattern",  label: t("modelPricing.colPattern"),    field: "match_pattern", align: "left"   as const, style: "max-width: 200px" },
+      { name: "pricing",  label: t("modelPricing.colPricingSimple"), field: "tiers",      align: "left"   as const },
+    ]);
 
     const filteredModels = computed(() => {
       let result = models.value;
@@ -309,6 +311,7 @@ export default defineComponent({
     onMounted(() => fetchModels());
 
     return {
+      t,
       models, loading, error, searchQuery,
       columns, filteredModels, selectedCount,
       sortedPriceEntries, fmtKey, fmtPrice, fetchModels, refreshModels, importSelectedModels,

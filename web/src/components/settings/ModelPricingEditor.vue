@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="tw:flex tw:flex-col tw:justify-center">
         <div class="q-table__title tw:font-[600] tw:leading-tight" data-test="model-pricing-editor-title">
-          {{ isEdit ? "Edit Model Pricing" : "New Model Pricing" }}
+          {{ isEdit ? t('modelPricing.editTitle') : t('modelPricing.newTitle') }}
         </div>
       </div>
     </div>
@@ -42,14 +42,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="form-card">
           <div class="form-card-header">
             <div>
-              <div class="form-card-title">Model Details</div>
-              <div class="form-card-subtitle">Name this rule and define which models it matches</div>
+              <div class="form-card-title">{{ t('modelPricing.modelDetails') }}</div>
+              <div class="form-card-subtitle">{{ t('modelPricing.modelDetailsDesc') }}</div>
             </div>
           </div>
           <div class="form-card-body tw:flex tw:flex-row tw:gap-4">
             <div class="tw:flex-1">
               <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label">
-                Model Name *
+                {{ t('modelPricing.modelNameField') }}
                 <q-icon
                   name="info"
                   size="14px"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
                 >
                   <q-tooltip anchor="center right" self="center left" max-width="300px">
-                    <span style="font-size: 13px">Name this rule. You can track price changes by using the same name and match pattern across multiple entries.</span>
+                    <span style="font-size: 13px">{{ t('modelPricing.modelNameTooltip') }}</span>
                   </q-tooltip>
                 </q-icon>
               </div>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex-1 tw:flex tw:items-start tw:gap-1">
               <div class="tw:flex-1">
                 <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label">
-                  Match Pattern (Regex) *
+                  {{ t('modelPricing.matchPatternField') }}
                   <q-icon
                     name="info"
                     size="14px"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
                   >
                     <q-tooltip anchor="center right" self="center left" max-width="300px">
-                      <span style="font-size: 13px">Regular expression matched against ingested model names to apply this pricing rule.</span>
+                      <span style="font-size: 13px">{{ t('modelPricing.matchPatternTooltip') }}</span>
                     </q-tooltip>
                   </q-icon>
                 </div>
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="showExamples = true"
               >
                 <q-tooltip anchor="top right" self="bottom right" :offset="[0, 4]">
-                  See pattern examples
+                  {{ t('modelPricing.patternExamplesBtn') }}
                 </q-tooltip>
               </q-btn>
 
@@ -119,16 +119,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-card class="pattern-examples-card">
                   <q-card-section class="tw:flex tw:items-center tw:justify-between tw:pb-0">
                     <div>
-                      <div class="tw:font-semibold tw:text-sm">Match Pattern Examples</div>
-                      <div class="tw:text-xs tw:opacity-50 tw:mt-0.5">Common regex patterns used for popular models</div>
+                      <div class="tw:font-semibold tw:text-sm">{{ t('modelPricing.patternExamplesTitle') }}</div>
+                      <div class="tw:text-xs tw:opacity-50 tw:mt-0.5">{{ t('modelPricing.patternExamplesDesc') }}</div>
                     </div>
                     <q-btn icon="cancel" flat round dense size="sm" v-close-popup />
                   </q-card-section>
                   <q-card-section class="tw:pt-3">
                     <div class="examples-table">
                       <div class="examples-table-head">
-                        <span>Model</span>
-                        <span>Match Pattern</span>
+                        <span>{{ t('modelPricing.patternExamplesModelCol') }}</span>
+                        <span>{{ t('modelPricing.patternExamplesPatternCol') }}</span>
                       </div>
                       <div v-for="ex in patternExamples" :key="ex.name" class="examples-table-row">
                         <span class="examples-model-name">{{ ex.name }}</span>
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="examples-copy-btn"
                           @click="copyPattern(ex.match_pattern)"
                         >
-                          <q-tooltip :offset="[0, 4]">{{ copiedPattern === ex.match_pattern ? 'Copied!' : 'Copy pattern' }}</q-tooltip>
+                          <q-tooltip :offset="[0, 4]">{{ copiedPattern === ex.match_pattern ? t('modelPricing.copied') : t('modelPricing.copyPattern') }}</q-tooltip>
                         </q-btn>
                       </div>
                     </div>
@@ -155,8 +155,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="form-card">
           <div class="form-card-header">
             <div>
-              <div class="form-card-title">Pricing Tiers</div>
-              <div class="form-card-subtitle">The first tier is the default. Additional tiers apply when usage conditions are met.</div>
+              <div class="form-card-title">{{ t('modelPricing.pricingTiers') }}</div>
+              <div class="form-card-subtitle">{{ t('modelPricing.pricingTiersDesc') }}</div>
             </div>
           </div>
 
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Tier Header -->
               <div class="tier-header">
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <span class="tier-name-label">Tier Name</span>
+                  <span class="tier-name-label">{{ t('modelPricing.tierName') }}</span>
                   <q-input
                     v-model="tier.name"
                     placeholder="e.g. Default"
@@ -193,11 +193,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Condition row (non-default tiers only) -->
                 <div v-if="(idx as number) > 0 && tier.condition" class="condition-block">
-                  <div class="sub-label tw:mb-2">Apply this tier when</div>
+                  <div class="sub-label tw:mb-2">{{ t('modelPricing.applyTierWhen') }}</div>
                   <div class="tw:flex tw:gap-2 tw:items-start tw:flex-wrap">
                     <q-input
                       v-model="tier.condition.usage_key"
-                      label="Usage Key"
+                      :label="t('modelPricing.usageKeyCol')"
                       dense borderless
                       class="tw:flex-1 tw:min-w-[130px]"
                       placeholder="e.g. input"
@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <q-input
                       v-model.number="tier.condition.value"
-                      label="Threshold"
+                      :label="t('modelPricing.threshold')"
                       type="number"
                       dense borderless
                       class="tw:w-[140px] tw:flex-shrink-0"
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Quick Setup -->
                 <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-                  <span class="sub-label">Quick setup:</span>
+                  <span class="sub-label">{{ t('modelPricing.quickSetup') }}</span>
                   <button
                     v-for="tpl in usageTemplates"
                     :key="tpl.name"
@@ -243,15 +243,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Price Table -->
                 <div>
                   <div class="price-table-label tw:mb-2">
-                    Token prices
-                    <span class="price-table-label-sub"> — $ per 1M tokens</span>
+                    {{ t('modelPricing.tokenPrices') }}
+                    <span class="price-table-label-sub"> {{ t('modelPricing.tokenPricesUnit') }}</span>
                   </div>
 
                   <div class="price-table">
                     <!-- Column headers (only when rows exist) -->
                     <div v-if="Object.keys(tier.prices).length" class="price-table-head">
-                      <span>Usage Key</span>
-                      <span>$ / 1M tokens</span>
+                      <span>{{ t('modelPricing.usageKeyCol') }}</span>
+                      <span>{{ t('modelPricing.pricePerMillionHeader') }}</span>
                       <span></span>
                     </div>
 
@@ -288,8 +288,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Empty state -->
                     <div v-if="!Object.keys(tier.prices).length" class="price-empty">
-                      <div class="price-empty-title">No prices defined yet</div>
-                      <div class="price-empty-sub">Use quick setup above or add a price below</div>
+                      <div class="price-empty-title">{{ t('modelPricing.noPricesDefined') }}</div>
+                      <div class="price-empty-sub">{{ t('modelPricing.noPricesDesc') }}</div>
                     </div>
 
                     <!-- Add row -->
@@ -320,13 +320,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Price Preview Table -->
                   <div v-if="previewEntries(tier, idx as number).length" class="tw:mt-5 tw:border tw:rounded" style="background: rgba(0,0,0,0.015); border-color: var(--o2-border-color);">
-                     <div class="tw:px-4 tw:py-2 tw:text-xs text-grey-8 tw:font-semibold tw:border-b" style="border-color: var(--o2-border-color);">Price Preview</div>
+                     <div class="tw:px-4 tw:py-2 tw:text-xs text-grey-8 tw:font-semibold tw:border-b" style="border-color: var(--o2-border-color);">{{ t('modelPricing.pricePreview') }}</div>
                      <table class="tw:w-full tw:text-xs" style="border-collapse: collapse;">
                         <thead>
                            <tr class="tw:text-left text-grey-7 tw:border-b" style="border-color: var(--o2-border-color);">
-                             <th class="tw:px-4 tw:py-2 tw:font-medium">Usage Type</th>
-                             <th class="tw:px-4 tw:py-2 tw:font-medium">per 1K</th>
-                             <th class="tw:px-4 tw:py-2 tw:font-medium">per 1M</th>
+                             <th class="tw:px-4 tw:py-2 tw:font-medium">{{ t('modelPricing.usageType') }}</th>
+                             <th class="tw:px-4 tw:py-2 tw:font-medium">{{ t('modelPricing.perThousand') }}</th>
+                             <th class="tw:px-4 tw:py-2 tw:font-medium">{{ t('modelPricing.perMillion') }}</th>
                            </tr>
                         </thead>
                         <tbody>
@@ -345,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               class="o2-secondary-button tw:h-[28px] tw:self-start"
               no-caps flat size="sm"
-              label="Add Tier"
+              :label="t('modelPricing.addTier')"
               @click="addTier"
             />
           </div>
@@ -359,14 +359,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="page-footer">
       <q-btn
         class="o2-secondary-button tw:h-[36px]"
-        label="Cancel" no-caps flat
+        :label="t('modelPricing.cancel')" no-caps flat
         @click="goBack"
         data-test="model-pricing-editor-cancel-btn"
       />
       <q-btn
         class="o2-primary-button no-border tw:h-[36px]"
         no-caps flat
-        label="Save"
+        :label="t('modelPricing.save')"
         :loading="saving"
         :disable="!!nameError || !!regexError"
         @click="save"
@@ -379,12 +379,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onBeforeMount } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import modelPricingService from "@/services/model_pricing";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
+const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();

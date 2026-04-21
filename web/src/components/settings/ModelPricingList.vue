@@ -36,11 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- List View Header -->
     <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]">
       <div class="q-table__title tw:font-[600]" data-test="model-pricing-list-title">
-        LLM Model Pricing
+        {{ t('modelPricing.header') }}
         <q-btn icon="info_outline" flat round dense size="sm" color="grey-6" class="tw:mb-0.5">
           <q-tooltip class="bg-grey-9">
-            <strong>Model Matching Priority:</strong><br>
-            Your Org  &gt;  Global  &gt;  Built-in
+            {{ t('modelPricing.matchingPriorityTooltip') }}
           </q-tooltip>
         </q-btn>
       </div>
@@ -58,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           borderless
           dense
           class="no-border o2-search-input"
-          placeholder="Search models..."
+          :placeholder="t('modelPricing.searchPlaceholder')"
         >
           <template #prepend>
             <q-icon class="o2-search-input-icon" name="search" />
@@ -68,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-secondary-button tw:h-[36px]"
           no-caps
           flat
-          label="Refresh"
+          :label="t('modelPricing.refresh')"
           :loading="refreshing"
           @click="refreshBuiltIn"
           data-test="model-pricing-refresh-btn"
@@ -77,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-secondary-button tw:h-[36px]"
           no-caps
           flat
-          label="Test"
+          :label="t('modelPricing.testBtn')"
           @click="showTestMatchDialog = true"
           data-test="model-pricing-test-match-btn"
         />
@@ -85,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-secondary-button tw:h-[36px]"
           no-caps
           flat
-          label="Import"
+          :label="t('modelPricing.importBtn')"
           @click="openImport"
           data-test="model-pricing-import-btn"
         />
@@ -93,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-primary-button tw:h-[36px]"
           no-caps
           flat
-          label="New Model"
+          :label="t('modelPricing.newModel')"
           @click="openEditor(null)"
           data-test="model-pricing-add-btn"
         />
@@ -162,15 +161,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="height: calc(100vh - 220px); gap: 8px;"
         >
           <q-icon name="monetization_on" size="48px" color="grey-4" />
-          <div class="text-subtitle1 text-grey-7 q-mt-sm">No model pricing definitions</div>
+          <div class="text-subtitle1 text-grey-7 q-mt-sm">{{ t('modelPricing.noModels') }}</div>
           <div class="text-caption text-grey-7">
-            Add a custom pricing definition to track LLM token costs.
+            {{ t('modelPricing.noModelsDesc') }}
           </div>
           <q-btn
             class="o2-primary-button q-mt-md tw:h-[36px]"
             no-caps
             flat
-            label="New Model"
+            :label="t('modelPricing.newModel')"
             @click="openEditor(null)"
             data-test="model-pricing-empty-add-btn"
           />
@@ -268,8 +267,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <table class="pricing-breakdown-table">
                           <thead>
                             <tr>
-                              <th>Usage Type</th>
-                              <th>Price per 1M tokens</th>
+                              <th>{{ t('modelPricing.usageType') }}</th>
+                              <th>{{ t('modelPricing.colPricingSimple') }}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -406,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="pricing-breakdown-tooltip">
                           <div class="pricing-breakdown-title">{{ child.name }}</div>
                           <table class="pricing-breakdown-table">
-                            <thead><tr><th>Usage Type</th><th>Price per 1M tokens</th></tr></thead>
+                            <thead><tr><th>{{ t('modelPricing.usageType') }}</th><th>{{ t('modelPricing.colPricingSimple') }}</th></tr></thead>
                             <tbody>
                               <tr v-for="([key, price]) in sortedPriceEntries(getDefaultTier(child)?.prices || {})" :key="key">
                                 <td>{{ formatPriceKey(key) }}</td>
@@ -453,7 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #bottom="scope">
         <div class="bottom-btn tw:h-[48px]">
           <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px]">
-            {{ resultTotal }} Models
+            {{ t('modelPricing.modelsCount', { count: resultTotal }) }}
           </div>
           <q-btn
             v-if="selectedCount > 0"
@@ -463,7 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             style="width: 160px; height: 32px;"
             icon="download"
-            :label="`Export (${selectedCount})`"
+            :label="t('modelPricing.exportSelected', { count: selectedCount })"
             @click="exportSelected"
           />
           <q-btn
@@ -474,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             flat
             :icon="outlinedDelete"
-            :label="`Delete (${selectedCount})`"
+            :label="t('modelPricing.deleteSelected', { count: selectedCount })"
             @click="confirmDeleteSelected"
           />
           <QTablePagination
@@ -535,20 +534,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="pricingDialogRow">
           <!-- Pattern section -->
           <div class="tw:mb-4">
-            <div class="pricing-section-label">Pattern</div>
+            <div class="pricing-section-label">{{ t('modelPricing.colPattern') }}</div>
             <code class="text-caption pattern-code pattern-code-panel">{{ pricingDialogRow.match_pattern }}</code>
           </div>
           <q-separator class="tw:mb-4" />
 
           <!-- Pricing per 1M tokens section -->
           <div>
-            <div class="pricing-section-label tw:mt-2">Pricing per 1M tokens</div>
+            <div class="pricing-section-label tw:mt-2">{{ t('modelPricing.colPricing') }}</div>
             <div v-if="sortedPriceEntries(getDefaultTier(pricingDialogRow)?.prices || {}).length" class="pricing-panel-table-wrap">
               <table class="pricing-panel-table">
                 <thead>
                   <tr>
-                    <th>Usage Type</th>
-                    <th>Price per 1M tokens</th>
+                    <th>{{ t('modelPricing.usageType') }}</th>
+                    <th>{{ t('modelPricing.colPricing') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -578,6 +577,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onBeforeMount, onActivated, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -590,6 +590,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import TestModelMatchDialog from "@/components/settings/TestModelMatchDialog.vue";
 
+const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 const q = useQuasar();
@@ -667,10 +668,10 @@ const columns = computed(() => {
     cols.push({ name: "select", label: "", field: "select", align: "center", style: "width: 40px; min-width: 40px; max-width: 40px;" });
   }
   cols.push(
-    { name: "name", label: "Model", field: "name", align: "left", sortable: true, style: "width: 280px; min-width: 280px; max-width: 280px;", tooltip: "The display name of the pricing rule." },
-    { name: "match_pattern", label: "Match Pattern", field: "match_pattern", align: "left", style: "width: 280px; min-width: 280px; max-width: 280px; overflow: hidden;", tooltip: "A regex pattern matched against the model name on incoming spans. Rules are evaluated by priority (Your Org → Global → Built-in) — the first match wins. A strikethrough pattern means it is shadowed by a higher-priority rule and will never be used." },
-    { name: "pricing", label: "Pricing (per 1M tokens)", field: "pricing", align: "left", style: "min-width: 200px;", tooltip: "Per-token prices for the default tier, displayed as cost per 1 million tokens." },
-    { name: "actions", label: "Actions", field: "actions", align: "center", style: "width: 120px; min-width: 120px; max-width: 120px;", classes: "actions-column", headerClasses: "actions-column" },
+    { name: "name", label: t("modelPricing.colModel"), field: "name", align: "left", sortable: true, style: "width: 280px; min-width: 280px; max-width: 280px;", tooltip: t("modelPricing.colModelTooltip") },
+    { name: "match_pattern", label: t("modelPricing.colMatchPattern"), field: "match_pattern", align: "left", style: "width: 280px; min-width: 280px; max-width: 280px; overflow: hidden;", tooltip: t("modelPricing.colMatchPatternTooltip") },
+    { name: "pricing", label: t("modelPricing.colPricing"), field: "pricing", align: "left", style: "min-width: 200px;", tooltip: t("modelPricing.colPricingTooltip") },
+    { name: "actions", label: t("modelPricing.colActions"), field: "actions", align: "center", style: "width: 120px; min-width: 120px; max-width: 120px;", classes: "actions-column", headerClasses: "actions-column" },
   );
   return cols;
 });
