@@ -2490,19 +2490,20 @@ export default defineComponent({
 
     const detectHistogramBreakdownField = (): string | null => {
       const selectedStreamFields =
-        searchObj.data.stream?.selectedStreamFields ?? [];
+        (searchObj.data.stream?.selectedStreamFields ?? []) as Array<{
+          name?: string | null;
+        }>;
       const fieldNameMap = new Map<string, string>();
 
-      selectedStreamFields.forEach((field: any) => {
-        if (
-          field?.name &&
-          typeof field.name === "string" &&
-          !fieldNameMap.has(field.name.toLowerCase())
-        ) {
-          fieldNameMap.set(field.name.toLowerCase(), field.name);
+      selectedStreamFields.forEach((field) => {
+        const fieldName = field.name?.toLowerCase();
+        if (fieldName && !fieldNameMap.has(fieldName)) {
+          fieldNameMap.set(fieldName, field.name ?? fieldName);
         }
       });
 
+      // Keep this order aligned with backend histogram breakdown detection in
+      // `src/service/search/sql/histogram.rs`.
       const prioritizedFields = ["severity", "log_level", "level", "status"];
       for (const fieldName of prioritizedFields) {
         if (fieldNameMap.has(fieldName)) {

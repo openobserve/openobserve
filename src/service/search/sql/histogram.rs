@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::sql::is_eligible_for_histogram;
+use config::{meta::stream::StreamType, utils::sql::is_eligible_for_histogram};
 use infra::errors::{Error, ErrorCodes};
 use sqlparser::{
     ast::{SetExpr, Statement},
@@ -92,8 +92,18 @@ fn single_stream_histogram_query(
     Ok(histogram_query)
 }
 
+/// Detects the preferred histogram breakdown field from stream schema fields.
+///
+/// Priority order:
+/// 1. `severity`
+/// 2. `log_level`
+/// 3. `level`
+/// 4. `status`
 pub fn detect_histogram_breakdown_field(schema_fields: &[String]) -> Option<String> {
-    const PRIORITIZED_FIELDS: [&str; 4] = ["severity", "log_level", "level", "status"];
+    // Keep this priority aligned with the Logs visualization fallback in
+    // `web/src/plugins/logs/Index.vue`. Severity is preferred because it is generally the most
+    // explicit and normalized log categorization.
+    const PRIORITIZED_FIELDS: &[&str] = &["severity", "log_level", "level", "status"];
     for prioritized_field in PRIORITIZED_FIELDS {
         if let Some(field) = schema_fields
             .iter()
@@ -103,6 +113,26 @@ pub fn detect_histogram_breakdown_field(schema_fields: &[String]) -> Option<Stri
         }
     }
     None
+}
+
+/// Resolves the histogram breakdown field for a stream by reading its schema
+/// and applying [`detect_histogram_breakdown_field`].
+pub async fn resolve_histogram_breakdown_field(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Option<String> {
+    infra::schema::get(org_id, stream_name, stream_type)
+        .await
+        .ok()
+        .and_then(|schema| {
+            let schema_fields = schema
+                .fields()
+                .iter()
+                .map(|field| field.name().to_string())
+                .collect::<Vec<_>>();
+            detect_histogram_breakdown_field(&schema_fields)
+        })
 }
 
 fn multi_stream_histogram_query(
