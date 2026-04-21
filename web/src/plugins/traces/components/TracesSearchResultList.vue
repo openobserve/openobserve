@@ -174,9 +174,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template
-            #[`cell-${store.state.zoConfig.timestamp_column}`]="{ item }"
+            #[`cell-${store.state.zoConfig.timestamp_column}`]="{ cell }"
           >
-            <TraceTimestampCell :item="item" :search-mode="props.searchMode" />
+            <TraceTimestampCell :value="cell.getValue()" />
           </template>
 
           <template #cell-service_name="{ item }">

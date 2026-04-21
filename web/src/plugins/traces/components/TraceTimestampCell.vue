@@ -20,56 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="text-caption text-weight-medium tw:text-[var(--o2-text-1)]!"
       data-test="trace-row-timestamp-day"
     >
-      {{ formatted.day }} {{ formatted.time }}
+      {{ value }}
     </span>
   </div>
 </template>
 
-<script lang="ts">
-// Module-level moment singleton — loaded once, shared across all row instances
-let _moment: any = null;
-const _momentReady = import("moment-timezone").then((m) => {
-  _moment = m.default;
-});
-</script>
-
 <script setup lang="ts">
-import { ref, watch, onBeforeMount } from "vue";
-import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
-
-const props = defineProps<{
-  item: Record<string, any>;
-  searchMode?: "traces" | "spans";
+defineProps<{
+  value: string;
 }>();
-
-const store = useStore();
-const { t } = useI18n();
-const formatted = ref({ day: "", time: "" });
-
-function buildFormatted() {
-  if (!_moment) return;
-  const tz = store.state.timezone;
-  // traces mode: trace_start_time is µs → divide by 1000 for ms
-  // spans mode:  start_time is ns       → divide by 1_000_000 for ms
-  const ts = props.item.trace_start_time != null
-    ? props.item.trace_start_time / 1000
-    : (props.item.start_time || 0) / 1_000_000;
-  const tsMoment = _moment.tz(new Date(ts), tz);
-  const diffSec = _moment.tz(new Date(), tz).diff(tsMoment, "seconds");
-
-  let day = "";
-  if (diffSec < 86400) day = t('traces.today');
-  else if (diffSec < 86400 * 2) day = t('traces.yesterday');
-  else day = tsMoment.format("D MMM");
-
-  formatted.value = { day, time: tsMoment.format("hh:mm:ss A") };
-}
-
-watch(() => props.item?.trace_start_time ?? props.item?.start_time, buildFormatted);
-
-onBeforeMount(async () => {
-  await _momentReady;
-  buildFormatted();
-});
 </script>

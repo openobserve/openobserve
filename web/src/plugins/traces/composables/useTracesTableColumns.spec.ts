@@ -13,8 +13,42 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// vi.mock calls are hoisted — must appear before any imports of the tested module.
+
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}));
+
+vi.mock("vuex", () => ({
+  useStore: () => ({
+    state: {
+      timezone: "UTC",
+      zoConfig: { timestamp_column: "_timestamp" },
+    },
+  }),
+}));
+
+vi.mock("@/utils/zincutils", () => ({
+  timestampToTimezoneDate: vi.fn(
+    (ms: number, _tz: string, _fmt: string) => `formatted:${ms}`,
+  ),
+}));
+
+vi.mock("@/utils/traces/constants", () => ({
+  SPAN_KIND_MAP: {
+    "0": "Unspecified",
+    "1": "Internal",
+    "2": "Server",
+    "3": "Client",
+    "4": "Producer",
+    "5": "Consumer",
+  },
+}));
+
 import { useTracesTableColumns, LLM_COLUMN_IDS } from "./useTracesTableColumns";
+import { timestampToTimezoneDate } from "@/utils/zincutils";
 
 // Default ordered field lists (mirror DEFAULT_TRACE_COLUMNS in useTraces.ts)
 const DEFAULT_SPANS_FIELDS = [
@@ -47,6 +81,10 @@ function buildCols(
 }
 
 describe("useTracesTableColumns", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   // ── LLM_COLUMN_IDS export ─────────────────────────────────────────────────
 
   describe("LLM_COLUMN_IDS", () => {
@@ -299,6 +337,99 @@ describe("useTracesTableColumns", () => {
         "_timestamp",
         "service",
       ]);
+    });
+  });
+
+  // ── timestamp column ──────────────────────────────────────────────────────
+
+  describe("timestamp column — auto-prepended when absent from selectedFields", () => {
+    it("should have header containing the i18n key and timezone when auto-prepended", () => {
+      // With the mock: t("traces.timestamp") returns "traces.timestamp", timezone is "UTC"
+      const col = buildCols(false, "spans", []).find(
+        (c) => c.id === "_timestamp",
+      );
+      expect(col?.header).toBe("traces.timestamp (UTC)");
+    });
+
+    it("should have size 210 when auto-prepended", () => {
+      const col = buildCols(false, "spans", []).find(
+        (c) => c.id === "_timestamp",
+      );
+      expect(col?.size).toBe(210);
+    });
+
+    it("should have accessorFn defined when auto-prepended", () => {
+      const col = buildCols(false, "spans", []).find(
+        (c) => c.id === "_timestamp",
+      );
+      expect(typeof (col as any)?.accessorFn).toBe("function");
+    });
+
+    it("should have meta.class set to 'tw:capitalize!' when auto-prepended", () => {
+      const col = buildCols(false, "spans", []).find(
+        (c) => c.id === "_timestamp",
+      );
+      const meta = col?.meta as Record<string, unknown>;
+      expect(meta?.class).toBe("tw:capitalize!");
+    });
+
+    it("should have meta.sortable=true on timestamp column", () => {
+      const col = buildCols(false, "spans", []).find(
+        (c) => c.id === "_timestamp",
+      );
+      const meta = col?.meta as Record<string, unknown>;
+      expect(meta?.sortable).toBe(true);
+    });
+
+    it("should call timestampToTimezoneDate with primary field value divided by 1000", () => {
+      const col = buildCols(false, "spans", []).find(
+        (c) => c.id === "_timestamp",
+      );
+      const accessorFn = (col as any)?.accessorFn as (row: any) => string;
+      const row = { _timestamp: 1700000000000000 };
+
+      accessorFn(row);
+
+      expect(vi.mocked(timestampToTimezoneDate)).toHaveBeenCalledWith(
+        1700000000000000 / 1000,
+        "UTC",
+        "yyyy-MM-dd HH:mm:ss.SSS",
+      );
+    });
+
+    it("should use zo_sql_timestamp as fallback when primary timestamp field is absent from row", () => {
+      const col = buildCols(false, "spans", []).find(
+        (c) => c.id === "_timestamp",
+      );
+      const accessorFn = (col as any)?.accessorFn as (row: any) => string;
+      // Row has no _timestamp — accessorFn must fall back to zo_sql_timestamp
+      const row = { zo_sql_timestamp: 1600000000000000 };
+
+      accessorFn(row);
+
+      expect(vi.mocked(timestampToTimezoneDate)).toHaveBeenCalledWith(
+        1600000000000000 / 1000,
+        "UTC",
+        "yyyy-MM-dd HH:mm:ss.SSS",
+      );
+    });
+
+    it("should return the formatted string from timestampToTimezoneDate", () => {
+      const col = buildCols(false, "spans", []).find(
+        (c) => c.id === "_timestamp",
+      );
+      const accessorFn = (col as any)?.accessorFn as (row: any) => string;
+      const result = accessorFn({ _timestamp: 5000 });
+      expect(result).toBe("formatted:5");
+    });
+
+    it("should NOT auto-prepend timestamp when _timestamp is already in selectedFields", () => {
+      // _timestamp is in the list — the guard must prevent a duplicate prepend
+      const ids = buildCols(false, "spans", ["_timestamp", "service"]).map(
+        (c) => c.id,
+      );
+      expect(ids.filter((id) => id === "_timestamp")).toHaveLength(1);
+      expect(ids[0]).toBe("_timestamp");
     });
   });
 });
