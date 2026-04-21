@@ -4769,7 +4769,7 @@ export default defineComponent({
 <style lang="scss" scoped>
 .chat-container {
   width: 100%;
-  height: calc(100vh - 50px);
+  height: calc(100vh - var(--navbar-height) - 50px);
   color: var(--q-primary-text);
   display: flex;
   flex-direction: column;
