@@ -175,6 +175,23 @@ const useIngestionRoutes = () => {
               path: "logs",
               name: "ingestLogs",
               component: IngestLogs,
+              meta: {
+                title: "Custom Log Ingestion",
+                searchable: true,
+                icon: "text_snippet",
+                section: "Data Sources",
+                keywords: [
+                  "custom logs",
+                  "log ingestion",
+                  "curl",
+                  "fluentbit",
+                  "fluentd",
+                  "vector",
+                  "filebeat",
+                  "logstash",
+                  "syslog",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -346,6 +363,20 @@ const useIngestionRoutes = () => {
               path: "metrics",
               name: "ingestMetrics",
               component: IngestMetrics,
+              meta: {
+                title: "Custom Metrics Ingestion",
+                searchable: true,
+                icon: "show_chart",
+                section: "Data Sources",
+                keywords: [
+                  "custom metrics",
+                  "metrics ingestion",
+                  "prometheus",
+                  "telegraf",
+                  "cloudwatch",
+                  "otel metrics",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -435,6 +466,19 @@ const useIngestionRoutes = () => {
               path: "traces",
               name: "ingestTraces",
               component: IngestTraces,
+              meta: {
+                title: "Custom Trace Ingestion",
+                searchable: true,
+                icon: "account_tree",
+                section: "Data Sources",
+                keywords: [
+                  "custom traces",
+                  "trace ingestion",
+                  "opentelemetry",
+                  "OTLP",
+                  "distributed tracing",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -487,6 +531,24 @@ const useIngestionRoutes = () => {
           path: "recommended",
           name: "recommended",
           component: Recommended,
+          meta: {
+            title: "Recommended Integrations",
+            titleKey: "ingestion.recommendedLabel",
+            searchable: true,
+            icon: "star",
+            section: "Data Sources",
+            keywords: [
+              "Kubernetes",
+              "Linux",
+              "Windows",
+              "AWS",
+              "GCP",
+              "Azure",
+              "OpenTelemetry",
+              "RUM",
+              "frontend monitoring",
+            ],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -661,6 +723,27 @@ const useIngestionRoutes = () => {
           path: "databases",
           name: "databases",
           component: DatabaseConfig,
+          meta: {
+            title: "Database Integrations",
+            titleKey: "ingestion.databaseLabel",
+            searchable: true,
+            icon: "storage",
+            section: "Data Sources",
+            keywords: [
+              "database",
+              "SQL",
+              "NoSQL",
+              "relational",
+              "PostgreSQL",
+              "MySQL",
+              "MongoDB",
+              "Redis",
+              "Oracle",
+              "Snowflake",
+              "Cassandra",
+              "DynamoDB",
+            ],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -972,6 +1055,24 @@ const useIngestionRoutes = () => {
           path: "security",
           name: "security",
           component: Security,
+          meta: {
+            title: "Security Integrations",
+            titleKey: "ingestion.securityLabel",
+            searchable: true,
+            icon: "security",
+            section: "Data Sources",
+            keywords: [
+              "SIEM",
+              "endpoint security",
+              "Falco",
+              "osquery",
+              "Okta",
+              "JumpCloud",
+              "OpenVPN",
+              "Microsoft 365",
+              "Google Workspace",
+            ],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -1123,6 +1224,21 @@ const useIngestionRoutes = () => {
           path: "devops",
           name: "devops",
           component: DevOps,
+          meta: {
+            title: "DevOps Integrations",
+            titleKey: "ingestion.devopsLabel",
+            searchable: true,
+            icon: "build",
+            section: "Data Sources",
+            keywords: [
+              "CI/CD",
+              "Jenkins",
+              "Ansible",
+              "Terraform",
+              "GitHub Actions",
+              "infrastructure automation",
+            ],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -1213,6 +1329,14 @@ const useIngestionRoutes = () => {
           path: "networking",
           name: "networking",
           component: Networking,
+          meta: {
+            title: "Networking Integrations",
+            titleKey: "ingestion.networkingLabel",
+            searchable: true,
+            icon: "network_check",
+            section: "Data Sources",
+            keywords: ["network", "NetFlow", "IPFIX", "sFlow", "network traffic"],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -1244,6 +1368,20 @@ const useIngestionRoutes = () => {
           path: "servers",
           name: "servers",
           component: Server,
+          meta: {
+            title: "Server Integrations",
+            titleKey: "ingestion.serverLabel",
+            searchable: true,
+            icon: "dns",
+            section: "Data Sources",
+            keywords: [
+              "web server",
+              "Nginx",
+              "Apache",
+              "IIS",
+              "server logs",
+            ],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -1314,6 +1452,21 @@ const useIngestionRoutes = () => {
           path: "message-queues",
           name: "message-queues",
           component: MessageQueues,
+          meta: {
+            title: "Message Queue Integrations",
+            titleKey: "ingestion.messageQueuesLabel",
+            searchable: true,
+            icon: "queue",
+            section: "Data Sources",
+            keywords: [
+              "message queue",
+              "message broker",
+              "Kafka",
+              "RabbitMQ",
+              "NATS",
+              "event streaming",
+            ],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -1384,6 +1537,24 @@ const useIngestionRoutes = () => {
           path: "languages",
           name: "languages",
           component: Languages,
+          meta: {
+            title: "Language SDKs",
+            titleKey: "ingestion.languagesLabel",
+            searchable: true,
+            icon: "code",
+            section: "Data Sources",
+            keywords: [
+              "SDK",
+              "Python",
+              "Java",
+              "Node.js",
+              "Go",
+              "Rust",
+              ".NET",
+              "FastAPI",
+              "programming language",
+            ],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -1554,6 +1725,21 @@ const useIngestionRoutes = () => {
           path: "others",
           name: "others",
           component: Others,
+          meta: {
+            title: "Other Integrations",
+            titleKey: "ingestion.otherLabel",
+            searchable: true,
+            icon: "extension",
+            section: "Data Sources",
+            keywords: [
+              "Airflow",
+              "Airbyte",
+              "Cribl",
+              "Vercel",
+              "Heroku",
+              "other integrations",
+            ],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
