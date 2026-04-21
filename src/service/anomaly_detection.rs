@@ -1639,15 +1639,27 @@ mod tests {
     use super::*;
     use crate::handler::http::request::anomaly_detection::CreateAnomalyConfigRequest;
 
-    fn make_req(query_mode: &str, histogram_interval: &str, schedule_interval: &str) -> CreateAnomalyConfigRequest {
+    fn make_req(
+        query_mode: &str,
+        histogram_interval: &str,
+        schedule_interval: &str,
+    ) -> CreateAnomalyConfigRequest {
         CreateAnomalyConfigRequest {
             name: "test".to_string(),
             description: None,
             stream_name: "k8s_logs".to_string(),
             stream_type: "logs".to_string(),
             query_mode: query_mode.to_string(),
-            filters: if query_mode == "filters" { Some(serde_json::json!([])) } else { None },
-            custom_sql: if query_mode == "custom_sql" { Some("SELECT count(*) FROM k8s_logs".to_string()) } else { None },
+            filters: if query_mode == "filters" {
+                Some(serde_json::json!([]))
+            } else {
+                None
+            },
+            custom_sql: if query_mode == "custom_sql" {
+                Some("SELECT count(*) FROM k8s_logs".to_string())
+            } else {
+                None
+            },
             detection_function: "count".to_string(),
             detection_function_field: None,
             histogram_interval: histogram_interval.to_string(),
@@ -1683,7 +1695,10 @@ mod tests {
 
     #[test]
     fn test_combine_with_field() {
-        assert_eq!(combine_detection_fn("avg", Some("cpu_millicores")), "avg(cpu_millicores)");
+        assert_eq!(
+            combine_detection_fn("avg", Some("cpu_millicores")),
+            "avg(cpu_millicores)"
+        );
         assert_eq!(combine_detection_fn("sum", Some("bytes")), "sum(bytes)");
     }
 
