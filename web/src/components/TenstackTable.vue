@@ -585,7 +585,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 formattedRows?.[virtualRow.index]?.original?.isExpandedRow
               "
               :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-              class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
+              class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b tw:border-b-[var(--o2-tag-grey-1)] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
               :class="[
                 defaultColumns &&
                 !wrap &&
