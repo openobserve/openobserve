@@ -3408,7 +3408,15 @@
     "never": "절대 안 돼",
     "typeScore": "숫자 점수 (예: 0.0 - 1.0)",
     "typeBoolean": "바이너리/패스-페일 (부울)",
-    "typeCustom": "범주형/사용자 지정 텍스트"
+    "typeCustom": "범주형/사용자 지정 텍스트",
+    "bulkDeleteConfirmation": "정말로 {count} 템플릿을 삭제하시겠습니까?",
+    "search": "템플릿 검색",
+    "dimensionsTooltip": "평가 차원 (예: 정확도, 관련성) 을 추가합니다.입력하고 Enter 키를 눌러 사용자 지정 항목을 추가합니다.",
+    "tooltipName": "이 평가 템플릿의 고유한 이름입니다.",
+    "tooltipDescription": "이 템플릿의 평가 내용을 설명하는 설명 (선택 사항).",
+    "tooltipResponseType": "LLM의 평가 출력 형식 (숫자 점수, 부울 통과/실패 또는 사용자 지정 텍스트) 을 정의합니다.",
+    "tooltipDimensions": "LLM이 판단해야 하는 평가 기준기본값에서 선택하거나 사용자 지정 값을 입력하고 Enter 키를 누릅니다.",
+    "tooltipPromptTemplate": "프롬프트가 LLM에 전송되었습니다.평가 시 동적 값의 자리 표시자로 {input}, {output} 및 {context} 를 사용하십시오."
   },
   "aiToolset": {
     "header": "AI 툴셋",
