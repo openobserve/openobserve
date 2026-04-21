@@ -2579,7 +2579,8 @@
     "maxSeriesPerQueryValidation": "값은 1,000에서 1,000,000 사이여야 하며 기본값은 비워 두어야 합니다.",
     "systemDefault": "시스템 기본값",
     "usageStreamEnabledLabel": "사용 스트림 활성화",
-    "aiToolsets": "AI 툴셋"
+    "aiToolsets": "AI 툴셋",
+    "llmModelPricing": "LLM 모델 가격 책정"
   },
   "iam": {
     "users": "유저",

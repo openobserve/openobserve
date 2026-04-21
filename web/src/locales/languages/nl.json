@@ -2579,7 +2579,8 @@
     "maxSeriesPerQueryValidation": "De waarde moet tussen 1.000 en 1.000.000 liggen, of als standaardwaarde leeg laten",
     "systemDefault": "standaardinstelling van het systeem",
     "usageStreamEnabledLabel": "Usage Stream inschakelen",
-    "aiToolsets": "AI-toolsets"
+    "aiToolsets": "AI-toolsets",
+    "llmModelPricing": "Prijzen van het LLM-model"
   },
   "iam": {
     "users": "Gebruikers",

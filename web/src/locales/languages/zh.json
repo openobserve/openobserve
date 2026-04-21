@@ -2572,7 +2572,8 @@
     "maxSeriesPerQueryValidation": "值必须介于 1,000 和 1,000,000 之间，或留空作为默认值",
     "systemDefault": "系统默认",
     "usageStreamEnabledLabel": "启用使用流",
-    "aiToolsets": "AI 工具集"
+    "aiToolsets": "AI 工具集",
+    "llmModelPricing": "LLM 模型定价"
   },
   "iam": {
     "users": "用户",

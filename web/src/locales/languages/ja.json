@@ -2589,7 +2589,8 @@
     "maxSeriesPerQueryValidation": "値は1,000から1,000,000の間でなければなりません。デフォルトでは空白のままにしてください",
     "systemDefault": "システムデフォルト",
     "usageStreamEnabledLabel": "使用ストリームを有効にする",
-    "aiToolsets": "AI ツールセット"
+    "aiToolsets": "AI ツールセット",
+    "llmModelPricing": "LLM モデルの価格設定"
   },
   "iam": {
     "users": "ユーザー",

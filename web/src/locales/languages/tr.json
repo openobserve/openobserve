@@ -2579,7 +2579,8 @@
     "maxSeriesPerQueryValidation": "Değer 1.000 ile 1.000.000 arasında olmalı veya varsayılan olarak boş bırakılmalıdır",
     "systemDefault": "sistem varsayılan",
     "usageStreamEnabledLabel": "Kullanım Akışını Etkinleştir",
-    "aiToolsets": "Yapay Zeka Araç Setleri"
+    "aiToolsets": "Yapay Zeka Araç Setleri",
+    "llmModelPricing": "LLM Model Fiyatlandırması"
   },
   "iam": {
     "users": "Kullanıcılar",

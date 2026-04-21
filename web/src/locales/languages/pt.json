@@ -2568,7 +2568,8 @@
     "maxSeriesPerQueryValidation": "O valor deve estar entre 1.000 e 1.000.000 ou deixar em branco por padrão",
     "systemDefault": "padrão do sistema",
     "usageStreamEnabledLabel": "Ativar fluxo de uso",
-    "aiToolsets": "Conjuntos de ferramentas de IA"
+    "aiToolsets": "Conjuntos de ferramentas de IA",
+    "llmModelPricing": "Preços do modelo LLM"
   },
   "iam": {
     "users": "Usuários",

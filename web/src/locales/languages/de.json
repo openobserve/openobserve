@@ -2568,7 +2568,8 @@
     "maxSeriesPerQueryValidation": "Der Wert muss zwischen 1.000 und 1.000.000 liegen oder als Standardeinstellung leer lassen",
     "systemDefault": "Systemstandard",
     "usageStreamEnabledLabel": "Nutzungsstream aktivieren",
-    "aiToolsets": "KI-Toolsets"
+    "aiToolsets": "KI-Toolsets",
+    "llmModelPricing": "LLM-Modellpreisgestaltung"
   },
   "iam": {
     "users": "Nutzer",
