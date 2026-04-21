@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Header variant: full-width top bar above the toolbar -->
   <div
-    v-if="webinarData && !isExpired && !isDismissed && variant === 'header'"
+    v-if="1==1"
     class="webinar-top-bar"
     data-test="webinar-header-banner"
     role="banner"

@@ -100,8 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width: 100%;
           min-width: 75px;
           z-index: 10;
-          padding-top: 44px;
           padding-right: 0.625rem;
+          bottom: 0px;
         "
         :class="
           store.state.theme == 'dark'
