@@ -35,7 +35,7 @@ if [ -n "$MERGED_COMMITS" ]; then
   # Check if any commit message has closing keywords
   while IFS= read -r line; do
     COMMIT_MSG=$(echo "$line" | cut -d' ' -f2-)
-    if echo "$COMMIT_MSG" | grep -qiE "(close|fix|resolve)(s|d|)( |:)#${TEST_ISSUE}"; then
+    if echo "$COMMIT_MSG" | grep -qiE "(closes|close|fixed|fixes|fix|resolved|resolves|resolve)( |:)#${TEST_ISSUE}"; then
       HAS_FIX=true
       FIX_PR=$(echo "$line" | grep -oE "\(#[0-9]+\)" | grep -oE "[0-9]+" || echo "unknown")
       echo "✓ Found fix: Commit mentions 'closes/fixes/resolves #${TEST_ISSUE}'"
