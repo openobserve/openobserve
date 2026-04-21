@@ -3397,7 +3397,15 @@
     "never": "決して",
     "typeScore": "数値スコア (例:0.0-1.0)",
     "typeBoolean": "バイナリ/パスフェール (ブーリアン)",
-    "typeCustom": "カテゴリ/カスタムテキスト"
+    "typeCustom": "カテゴリ/カスタムテキスト",
+    "bulkDeleteConfirmation": "{count} 個のテンプレートを削除してよろしいですか?",
+    "search": "テンプレートを検索する",
+    "dimensionsTooltip": "評価ディメンション (精度、関連性など) を追加します。カスタムを追加するには、入力して Enter キーを押します。",
+    "tooltipName": "この評価テンプレートの一意の名前。",
+    "tooltipDescription": "このテンプレートが何を評価するかを説明するオプションの説明。",
+    "tooltipResponseType": "LLM の評価出力の形式 (数値スコア、ブーリアン合格/不合格、カスタムテキスト) を定義します。",
+    "tooltipDimensions": "LLMが判断すべき評価基準。デフォルトから選択するか、カスタム値を入力して Enter キーを押します。",
+    "tooltipPromptTemplate": "LLM に送信されたプロンプト。評価時の動的値のプレースホルダーとして {input}、{output}、{context} を使用してください。"
   },
   "aiToolset": {
     "header": "AI ツールセット",
