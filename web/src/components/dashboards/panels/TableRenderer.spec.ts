@@ -98,10 +98,6 @@ vi.mock("@/composables/useLogsHighlighter", () => ({
   }),
 }));
 
-vi.mock("@/utils/dashboard/panelValidation", () => ({
-  findFirstValidMappedValue: vi.fn().mockReturnValue(null),
-}));
-
 vi.mock("@/utils/dashboard/colorPalette", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
@@ -134,7 +130,7 @@ vi.stubGlobal("URL", {
 });
 
 import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
-import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
+import { findFirstValidMappedValue } from "@/utils/dashboard/dashboardValidator";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
