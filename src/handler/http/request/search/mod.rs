@@ -334,11 +334,34 @@ pub async fn search(
     // Handle histogram data for UI
     let mut converted_histogram_query: Option<String> = None;
     if is_ui_histogram {
+        let histogram_breakdown_field = if !is_multi_stream_search {
+            if let Some(stream_name) = stream_names.first() {
+                infra::schema::get(&org_id, stream_name, stream_type)
+                    .await
+                    .ok()
+                    .and_then(|schema| {
+                        let schema_fields = schema
+                            .fields()
+                            .iter()
+                            .map(|field| field.name().to_string())
+                            .collect::<Vec<_>>();
+                        crate::service::search::sql::histogram::detect_histogram_breakdown_field(
+                            &schema_fields,
+                        )
+                    })
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         // Convert the original query to a histogram query
         match crate::service::search::sql::histogram::convert_to_histogram_query(
             &req.query.sql,
             &stream_names,
             is_multi_stream_search,
+            histogram_breakdown_field.as_deref(),
         ) {
             Ok(histogram_query) => {
                 req.query.sql = histogram_query;

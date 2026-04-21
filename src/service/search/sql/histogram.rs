@@ -27,6 +27,7 @@ pub fn convert_to_histogram_query(
     original_query: &str,
     stream_names: &[String],
     is_multi_stream_search: bool,
+    breakdown_field: Option<&str>,
 ) -> Result<String, Error> {
     let (is_eligible, is_sub_query) =
         is_eligible_for_histogram(original_query, is_multi_stream_search)
@@ -45,7 +46,7 @@ pub fn convert_to_histogram_query(
     let histogram_query = if is_multi_stream_search {
         multi_stream_histogram_query(&statements, stream_names)?
     } else {
-        single_stream_histogram_query(&statements, stream_names, is_sub_query)?
+        single_stream_histogram_query(&statements, stream_names, is_sub_query, breakdown_field)?
     };
 
     Ok(histogram_query)
@@ -55,6 +56,7 @@ fn single_stream_histogram_query(
     statements: &[Statement],
     stream_names: &[String],
     is_sub_query: bool,
+    breakdown_field: Option<&str>,
 ) -> Result<String, Error> {
     let statement = statements
         .first()
@@ -66,9 +68,14 @@ fn single_stream_histogram_query(
         .first()
         .ok_or_else(|| anyhow::anyhow!("No stream name found"))?;
     // Build histogram query
-    let mut histogram_query = format!(
-        "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"{stream_name}\""
-    );
+    let mut histogram_query = match breakdown_field {
+        Some(field) => format!(
+            "SELECT histogram(_timestamp) AS zo_sql_key, \"{field}\" AS zo_sql_breakdown, count(*) AS zo_sql_num FROM \"{stream_name}\""
+        ),
+        None => format!(
+            "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"{stream_name}\""
+        ),
+    };
 
     // Add WHERE clause if it exists
     // skip where clause for sub query
@@ -77,8 +84,25 @@ fn single_stream_histogram_query(
     }
 
     // Add GROUP BY and ORDER BY
-    histogram_query.push_str(" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC");
+    if breakdown_field.is_some() {
+        histogram_query.push_str(" GROUP BY zo_sql_key, zo_sql_breakdown ORDER BY zo_sql_key DESC");
+    } else {
+        histogram_query.push_str(" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC");
+    }
     Ok(histogram_query)
+}
+
+pub fn detect_histogram_breakdown_field(schema_fields: &[String]) -> Option<String> {
+    const PRIORITIZED_FIELDS: [&str; 4] = ["severity", "log_level", "level", "status"];
+    for prioritized_field in PRIORITIZED_FIELDS {
+        if let Some(field) = schema_fields
+            .iter()
+            .find(|field_name| field_name.eq_ignore_ascii_case(prioritized_field))
+        {
+            return Some(field.clone());
+        }
+    }
+    None
 }
 
 fn multi_stream_histogram_query(
@@ -147,7 +171,8 @@ mod tests {
     fn test_convert_simple_query() {
         let original_query = "SELECT * FROM \"logs\" WHERE status = 500";
         let stream_names = vec!["logs".to_string()];
-        let result = convert_to_histogram_query(original_query, &stream_names, false).unwrap();
+        let result =
+            convert_to_histogram_query(original_query, &stream_names, false, None).unwrap();
 
         let expected = "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"logs\" WHERE status = 500 GROUP BY zo_sql_key ORDER BY zo_sql_key DESC";
         assert_eq!(result, expected);
@@ -157,7 +182,8 @@ mod tests {
     fn test_convert_query_without_where() {
         let original_query = "SELECT * FROM \"logs\"";
         let stream_names = vec!["logs".to_string()];
-        let result = convert_to_histogram_query(original_query, &stream_names, false).unwrap();
+        let result =
+            convert_to_histogram_query(original_query, &stream_names, false, None).unwrap();
 
         let expected = "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"logs\" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC";
         assert_eq!(result, expected);
@@ -167,7 +193,8 @@ mod tests {
     fn test_convert_complex_where() {
         let original_query = "SELECT * FROM \"api_logs\" WHERE status >= 400 AND level = 'error' AND user_id IS NOT NULL";
         let stream_names = vec!["api_logs".to_string()];
-        let result = convert_to_histogram_query(original_query, &stream_names, false).unwrap();
+        let result =
+            convert_to_histogram_query(original_query, &stream_names, false, None).unwrap();
 
         let expected = "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"api_logs\" WHERE status >= 400 AND level = 'error' AND user_id IS NOT NULL GROUP BY zo_sql_key ORDER BY zo_sql_key DESC";
         assert_eq!(result, expected);
@@ -177,7 +204,8 @@ mod tests {
     fn test_convert_query_with_group_by() {
         let original_query = "SELECT * FROM \"api_logs\" GROUP BY level";
         let stream_names = vec!["api_logs".to_string()];
-        let result = convert_to_histogram_query(original_query, &stream_names, false).unwrap();
+        let result =
+            convert_to_histogram_query(original_query, &stream_names, false, None).unwrap();
 
         let expected = "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"api_logs\" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC";
         assert_eq!(result, expected);
@@ -187,9 +215,39 @@ mod tests {
     fn test_multi_stream_histogram_query_basic() {
         let original_query = "SELECT * FROM default UNION ALL SELECT * FROM default_enrich";
         let stream_names = vec!["default".to_string(), "default_enrich".to_string()];
-        let result = convert_to_histogram_query(original_query, &stream_names, true).unwrap();
+        let result = convert_to_histogram_query(original_query, &stream_names, true, None).unwrap();
 
         let expected = "WITH multistream_histogram AS (SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"default\" GROUP BY zo_sql_key UNION ALL SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"default_enrich\" GROUP BY zo_sql_key) SELECT zo_sql_key, sum(zo_sql_num) AS zo_sql_num FROM multistream_histogram GROUP BY zo_sql_key ORDER BY zo_sql_key";
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_convert_query_with_breakdown_field() {
+        let original_query = "SELECT * FROM \"logs\" WHERE status = 500";
+        let stream_names = vec!["logs".to_string()];
+        let result =
+            convert_to_histogram_query(original_query, &stream_names, false, Some("severity"))
+                .unwrap();
+
+        let expected = "SELECT histogram(_timestamp) AS zo_sql_key, \"severity\" AS zo_sql_breakdown, count(*) AS zo_sql_num FROM \"logs\" WHERE status = 500 GROUP BY zo_sql_key, zo_sql_breakdown ORDER BY zo_sql_key DESC";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_priority() {
+        let fields = vec![
+            "status".to_string(),
+            "level".to_string(),
+            "severity".to_string(),
+        ];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, Some("severity".to_string()));
+    }
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_log_level_over_level() {
+        let fields = vec!["level".to_string(), "log_level".to_string()];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, Some("log_level".to_string()));
     }
 }
