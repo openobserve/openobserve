@@ -120,6 +120,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Home",
+        titleKey: "menu.home",
         searchable: true,
         icon: "home",
         section: "General",
@@ -133,10 +134,17 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Logs",
+        titleKey: "menu.search",
         searchable: true,
         icon: "article",
         section: "Observability",
-        keywords: ["log search", "log query", "field list", "log patterns", "saved views"],
+        keywords: [
+          "log search",
+          "log query",
+          "field list",
+          "log patterns",
+          "saved views",
+        ],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -161,10 +169,18 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Metrics",
+        titleKey: "menu.metrics",
         searchable: true,
         icon: "query_stats",
         section: "Observability",
-        keywords: ["prometheus", "promql", "time series", "gauge", "counter", "metric explorer"],
+        keywords: [
+          "prometheus",
+          "promql",
+          "time series",
+          "gauge",
+          "counter",
+          "metric explorer",
+        ],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -177,10 +193,16 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         title: "PromQL Query Builder",
+        titleKey: "menu.metrics",
         searchable: true,
         icon: "functions",
         section: "Observability",
-        keywords: ["promql builder", "prometheus query", "metrics query builder"],
+        keywords: [
+          "promql builder",
+          "prometheus query",
+          "metrics query builder",
+          "PromQL Query Builder",
+        ],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -193,10 +215,18 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Traces",
+        titleKey: "menu.traces",
         searchable: true,
         icon: "timeline",
         section: "Observability",
-        keywords: ["distributed tracing", "spans", "service graph", "opentelemetry", "latency", "APM"],
+        keywords: [
+          "distributed tracing",
+          "spans",
+          "service graph",
+          "opentelemetry",
+          "latency",
+          "APM",
+        ],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -236,10 +266,27 @@ const useRoutes = () => {
       component: LogStream,
       meta: {
         title: "Streams",
+        titleKey: "menu.index",
         searchable: true,
         icon: "storage",
         section: "Management",
-        keywords: ["log streams", "metrics streams", "traces streams", "stream schema", "stream management"],
+        keywords: [
+          "log streams",
+          "metrics streams",
+          "traces streams",
+          "stream schema",
+          "stream management",
+          "Sensitive Data Redaction",
+          "Schema Settings",
+          "Extended Retention",
+        ],
+        keywordKeys: [
+          "logStream.labelLogs",
+          "logStream.labelMetrics",
+          "logStream.labelTraces",
+          "logStream.labelMetadata",
+          "logStream.sdr",
+        ],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -261,10 +308,17 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         title: "Dashboards",
+        titleKey: "menu.dashboard",
         searchable: true,
         icon: "dashboard",
         section: "Visualization",
-        keywords: ["charts", "panels", "visualization", "graphs", "dashboard folders"],
+        keywords: [
+          "charts",
+          "panels",
+          "visualization",
+          "graphs",
+          "dashboard folders",
+        ],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -325,10 +379,22 @@ const useRoutes = () => {
       component: Functions,
       meta: {
         title: "Pipeline",
+        titleKey: "menu.pipeline",
         searchable: true,
         icon: "account_tree",
         section: "Management",
-        keywords: ["VRL functions", "enrichment tables", "data pipeline", "stream processing"],
+        keywords: [
+          "VRL functions",
+          "enrichment tables",
+          "data pipeline",
+          "stream processing",
+        ],
+        keywordKeys: [
+          "function.streamPipeline",
+          "function.header",
+          "function.enrichmentTables",
+          "pipeline.evalTemplates",
+        ],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -416,10 +482,24 @@ const useRoutes = () => {
       component: AlertList,
       meta: {
         title: "Alerts",
+        titleKey: "menu.alerts",
         searchable: true,
         icon: "notifications",
         section: "Observability",
-        keywords: ["monitors", "notifications", "anomaly detection", "scheduled alerts", "real-time alerts", "alert rules"],
+        keywords: [
+          "monitors",
+          "notifications",
+          "anomaly detection",
+          "scheduled alerts",
+          "real-time alerts",
+          "alert rules",
+        ],
+        keywordKeys: [
+          "alerts.all",
+          "alerts.scheduled",
+          "alerts.realTime",
+          "alerts.anomalyDetection",
+        ],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -492,6 +572,7 @@ const useRoutes = () => {
         icon: "history",
         section: "Observability",
         keywords: ["triggered alerts", "fired alerts", "alert logs"],
+        keywordKeys: ["alerts.all", "alerts.scheduled", "alerts.realTime"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -507,6 +588,12 @@ const useRoutes = () => {
         icon: "insights",
         section: "Observability",
         keywords: ["alert analytics", "alert quality", "noise reduction"],
+        keywordKeys: [
+          "alerts.insights.tabs.overview",
+          "alerts.insights.tabs.frequency",
+          "alerts.insights.tabs.correlation",
+          "alerts.insights.tabs.quality",
+        ],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -538,10 +625,28 @@ const useRoutes = () => {
       component: RealUserMonitoring,
       meta: {
         title: "Real User Monitoring",
+        titleKey: "menu.rum",
         searchable: true,
         icon: "person_search",
         section: "Observability",
-        keywords: ["session replay", "error tracking", "performance monitoring", "web vitals", "source maps", "browser monitoring", "frontend observability"],
+        keywords: [
+          "session replay",
+          "error tracking",
+          "performance monitoring",
+          "web vitals",
+          "source maps",
+          "browser monitoring",
+          "frontend observability",
+        ],
+        keywordKeys: [
+          "rum.sessions",
+          "rum.errorTracking",
+          "rum.performance",
+          "rum.webVitals",
+          "rum.overview",
+          "rum.errors",
+          "rum.api",
+        ],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -686,10 +791,16 @@ const useRoutes = () => {
         props: true,
         meta: {
           title: "Reports",
+          titleKey: "menu.report",
           searchable: true,
           icon: "summarize",
           section: "Visualization",
-          keywords: ["scheduled reports", "PDF export", "email reports", "dashboard reports"],
+          keywords: [
+            "scheduled reports",
+            "PDF export",
+            "email reports",
+            "dashboard reports",
+          ],
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
