@@ -80,7 +80,7 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                 config.schedule_interval,
                 updated_at,
             );
-            table::upsert(db, config).await.map_err(|e| {
+            table::put(db, config).await.map_err(|e| {
                 log::error!(
                     "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate failed id={}: {e}",
                     anomaly_id

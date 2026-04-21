@@ -113,11 +113,11 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
     Ok(updated)
 }
 
-/// Updates the row if it exists, inserts it if it doesn't.
-///
-/// Used by the super-cluster ConfigUpdate handler to stay in sync even when
-/// the ConfigCreate message was never received.
-pub async fn upsert<C: TransactionTrait + ConnectionTrait>(
+/// Stores a config row — updates if it exists, inserts if it doesn't.
+/// Matches HTTP PUT semantics: "store this resource regardless of whether it
+/// already exists." Used by the super-cluster ConfigUpdate handler to stay in
+/// sync even when the ConfigCreate message was never received.
+pub async fn put<C: TransactionTrait + ConnectionTrait>(
     conn: &C,
     incoming: Model,
 ) -> Result<Model> {
