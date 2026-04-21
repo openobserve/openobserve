@@ -388,7 +388,7 @@ const winnerSource = computed(() => testResult.value?.matched?.source || null);
 
 const matchFlowSteps = [
   { key: 'org', label: 'your org', icon: 'person' },
-  { key: 'meta_org', label: 'meta org', icon: 'corporate_fare' },
+  { key: 'meta_org', label: 'global', icon: 'corporate_fare' },
   { key: 'built_in', label: 'built-in', icon: 'auto_awesome' },
 ];
 
@@ -426,7 +426,7 @@ function sourceColor(model: any) {
 }
 function sourceLabel(model: any) {
   if (!model.source || model.source === 'org') return 'Your Org';
-  if (model.source === 'meta_org') return 'Meta Org';
+  if (model.source === 'meta_org') return 'Global';
   return 'Built-in';
 }
 

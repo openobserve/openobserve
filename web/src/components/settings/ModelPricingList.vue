@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn icon="info_outline" flat round dense size="sm" color="grey-6" class="tw:mb-0.5">
           <q-tooltip class="bg-grey-9">
             <strong>Model Matching Priority:</strong><br>
-            Your Org Models  &gt;  Meta Models  &gt;  Built-in Models
+            Your Org  &gt;  Global  &gt;  Built-in
           </q-tooltip>
         </q-btn>
       </div>
@@ -133,7 +133,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="model-pricing-select-all"
               />
             </template>
-            <template v-else>{{ col.label }}</template>
+            <template v-else>
+              <span class="tw:inline-flex tw:items-center tw:gap-1" :class="{ 'tw:pl-6': col.name === 'name' }">
+                {{ col.label }}
+                <q-icon
+                  v-if="col.tooltip"
+                  name="info_outline"
+                  size="13px"
+                  class="col-header-info-icon"
+                >
+                  <q-tooltip :delay="200" anchor="top middle" self="bottom middle" style="max-width: 260px; white-space: normal;">
+                    {{ col.tooltip }}
+                  </q-tooltip>
+                </q-icon>
+              </span>
+            </template>
           </q-th>
         </q-tr>
       </template>
@@ -164,7 +178,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:body="props">
+        <!-- Shadow banner row -->
+        <q-tr v-if="props.row.__is_shadow_banner" :props="props" class="shadow-banner-row">
+          <q-td :colspan="columns.length" class="shadow-banner-cell">
+            <div class="shadow-banner-tree-line"></div>
+            <q-icon name="warning_amber" size="13px" class="shadow-banner-icon" />
+            The rules below are shadowed by
+            <strong :title="props.row.__parent_name">
+              {{ props.row.__parent_name.length > 25 ? props.row.__parent_name.slice(0, 25) + '…' : props.row.__parent_name }}
+            </strong>
+            — overridden by a higher-priority rule and won't be used for cost calculations.
+          </q-td>
+        </q-tr>
         <q-tr
+          v-else
           :props="props"
           :class="{ 'child-pricing-row': props.row.__is_child }"
         >
@@ -211,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="16px"
                   class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                 >
-                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from meta org</q-tooltip>
+                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from global</q-tooltip>
                 </q-icon>
                 <q-icon
                   v-else
@@ -241,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="16px"
                   class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                 >
-                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from meta org</q-tooltip>
+                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from global</q-tooltip>
                 </q-icon>
                 <q-icon
                   v-else
@@ -451,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="18px"
             class="tw:shrink-0 tw:cursor-default source-icon"
           >
-            <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from meta org</q-tooltip>
+            <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from global</q-tooltip>
           </q-icon>
           <q-icon
             v-else
@@ -608,9 +635,9 @@ const columns = computed(() => {
     cols.push({ name: "select", label: "", field: "select", align: "center", style: "width: 40px; min-width: 40px; max-width: 40px;" });
   }
   cols.push(
-    { name: "name", label: "Model", field: "name", align: "left", sortable: true, style: "width: 280px; min-width: 280px; max-width: 280px;" },
-    { name: "match_pattern", label: "Pattern", field: "match_pattern", align: "left", style: "width: 280px; min-width: 280px; max-width: 280px; overflow: hidden;" },
-    { name: "pricing", label: "Pricing (per 1M tokens)", field: "pricing", align: "left", style: "min-width: 200px;" },
+    { name: "name", label: "Model", field: "name", align: "left", sortable: true, style: "width: 280px; min-width: 280px; max-width: 280px;", tooltip: "The display name of the pricing rule." },
+    { name: "match_pattern", label: "Match Pattern", field: "match_pattern", align: "left", style: "width: 280px; min-width: 280px; max-width: 280px; overflow: hidden;", tooltip: "A regex pattern matched against the model name on incoming spans. Rules are evaluated by priority (Your Org → Global → Built-in) — the first match wins. A strikethrough pattern means it is shadowed by a higher-priority rule and will never be used." },
+    { name: "pricing", label: "Pricing (per 1M tokens)", field: "pricing", align: "left", style: "min-width: 200px;", tooltip: "Per-token prices for the default tier, displayed as cost per 1 million tokens." },
     { name: "actions", label: "Actions", field: "actions", align: "center", style: "width: 120px; min-width: 120px; max-width: 120px;", classes: "actions-column", headerClasses: "actions-column" },
   );
   return cols;
@@ -696,7 +723,7 @@ function sectionIcon(section: string): string {
 }
 
 function sectionLabel(section: string): string {
-  return section === 'built_in' ? 'Built-in (OpenObserve)' : 'Meta Org';
+  return section === 'built_in' ? 'Built-in (OpenObserve)' : 'Global';
 }
 
 const filteredModels = computed(() => {
@@ -863,6 +890,7 @@ const tableRows = computed(() => {
   for (const model of filteredModels.value) {
     result.push(model);
     if (model.children?.length > 0 && expandedParents.value.has(model.id)) {
+      result.push({ __is_shadow_banner: true, __parent_id: model.id, __parent_name: model.name, id: `banner-${model.id}` });
       model.children.forEach((child: any, idx: number) => {
         result.push({
           ...child,
@@ -1270,6 +1298,57 @@ body.body--dark {
   }
 }
 
+/* ── Shadow banner row ─────────────────────────────────── */
+.o2-quasar-table .shadow-banner-row td {
+  height: 26px !important;
+}
+
+.shadow-banner-row td {
+  padding: 3px 12px !important;
+  border-top: none !important;
+  text-align: center;
+  font-size: 11px !important;
+  position: relative;
+  background: rgba(245, 158, 11, 0.06);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.15) !important;
+  color: #92400e;
+  line-height: 1.5;
+
+  .body--dark & {
+    background: rgba(245, 158, 11, 0.08);
+    color: #fcd34d;
+    border-bottom-color: rgba(245, 158, 11, 0.2) !important;
+  }
+
+}
+
+.shadow-banner-tree-line {
+  position: absolute;
+  left: 54px;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background-color: var(--q-primary);
+  opacity: 0.6;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.shadow-banner-icon {
+  color: #f59e0b;
+  margin-right: 5px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* ── Column header info icon ───────────────────────────── */
+.col-header-info-icon {
+  opacity: 0.35;
+  cursor: default;
+  vertical-align: middle;
+  &:hover { opacity: 0.7; }
+}
+
 /* ── Source icons (person / corporate_fare) ────────────── */
 .source-icon {
   color: #757575;
@@ -1316,8 +1395,8 @@ body.body--dark {
   position: relative;
 }
 
+
 // Expanded parent: draw a line from the chevron centre DOWN to the cell bottom
-// left = td padding-left(5px) + half icon-wrapper-width(10px) = 15px
 .tree-parent-expanded.tree-name-cell::after {
   content: '';
   position: absolute;
