@@ -14,6 +14,7 @@
 
 import { expect } from '@playwright/test';
 import testLogger from '../../playwright-tests/utils/test-logger.js';
+import { cleanupTestAnomalies as apiCleanupTestAnomalies } from '../../playwright-tests/utils/api-helper.js';
 
 export class AnomalyDetectionPage {
     constructor(page, commonActions, locators) {
@@ -30,7 +31,7 @@ export class AnomalyDetectionPage {
             // List view
             anomalyListTable: '[data-test="anomaly-detection-list-table"]',
             alertsTable: 'table, .q-table, [data-test="alert-list-table"]',
-            anomalyRow: (name) => `tr:has-text("${name}")`,
+            // Note: For anomaly rows, use getAnomalyRow(name) method which safely handles escaping
 
             // Shared wizard selectors (from AddAlert.vue)
             backButton: '[data-test="add-alert-back-btn"]',
@@ -621,11 +622,13 @@ export class AnomalyDetectionPage {
 
     /**
      * Get anomaly row from list by name
+     * Uses filter with hasText to avoid selector injection issues
      * @param {string} name - Anomaly name
      * @returns {Locator} Row locator
      */
     getAnomalyRow(name) {
-        return this.page.locator(`tr:has-text("${name}")`).first();
+        // Use filter with hasText instead of CSS selector interpolation for safety
+        return this.page.locator('tr').filter({ hasText: name }).first();
     }
 
     /**
@@ -797,13 +800,11 @@ export class AnomalyDetectionPage {
      * Clean up test anomalies by name pattern
      * Delegates to shared api-helper.js cleanupTestAnomalies function
      * @param {string} namePattern - Pattern to match (e.g., 'E2E_Anomaly')
-     * @param {Object} _config - Deprecated: config is now read from environment variables
      * @returns {Promise<number>} - Number of anomalies deleted
      */
-    async cleanupTestAnomalies(namePattern, _config) {
-        // Import shared helper - auth is handled via environment variables
-        const { cleanupTestAnomalies } = require('../../playwright-tests/utils/api-helper.js');
-        return cleanupTestAnomalies(this.page, namePattern);
+    async cleanupTestAnomalies(namePattern) {
+        // Uses imported apiCleanupTestAnomalies - auth is handled via environment variables
+        return apiCleanupTestAnomalies(this.page, namePattern);
     }
 
     // ========== COMPLETE WORKFLOWS ==========

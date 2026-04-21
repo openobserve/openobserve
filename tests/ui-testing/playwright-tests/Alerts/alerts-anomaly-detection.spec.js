@@ -33,24 +33,6 @@ test.describe("Anomaly Detection Alerts", () => {
   // P0 TESTS - SMOKE / CRITICAL PATH
   // ========================================================================
 
-  test.describe("List View Operations", () => {
-
-    test.skip("Anomaly list page loads successfully", {
-      tag: ['@smoke', '@anomaly', '@P0', '@all']
-    }, async ({ page }) => {
-      testLogger.info('Testing anomaly list page load');
-
-      // NOTE: Skipping this test for now as anomaly detection list navigation needs to be confirmed
-      // Anomaly detection might be accessed through the main alerts page or via alert type selection
-      // TODO: Determine the correct navigation path to anomaly detection list
-
-      // Verify list table is visible
-      await pm.anomalyDetectionPage.expectListTableVisible();
-
-      testLogger.info('Anomaly list loaded successfully');
-    });
-  });
-
   test.describe("Create Anomaly Detection - Builder Mode", () => {
 
     test("Create basic anomaly detection with builder mode", {
@@ -1040,12 +1022,8 @@ test.describe("Anomaly Detection Alerts", () => {
   test.afterAll(async ({ browser }) => {
     testLogger.info('Running test cleanup - deleting test anomalies');
 
-    const baseUrl = process.env.ZO_BASE_URL;
-    const email = process.env.ZO_ROOT_USER_EMAIL;
-    const password = process.env.ZO_ROOT_USER_PASSWORD;
-    const org = process.env.ORGNAME;
-
-    if (!baseUrl || !email || !password || !org) {
+    // Verify required env vars are set (auth is handled by api-helper.js)
+    if (!process.env.ZO_BASE_URL || !process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD || !process.env.ORGNAME) {
       testLogger.warn('Skipping cleanup - missing environment variables');
       return;
     }
@@ -1055,14 +1033,8 @@ test.describe("Anomaly Detection Alerts", () => {
 
     try {
       const pm = new PageManager(page);
-
-      await pm.anomalyDetectionPage.cleanupTestAnomalies(`E2E_Anomaly`, {
-        baseUrl,
-        email,
-        password,
-        org
-      });
-
+      // cleanupTestAnomalies uses env vars for auth via shared api-helper.js
+      await pm.anomalyDetectionPage.cleanupTestAnomalies(`E2E_Anomaly`);
       testLogger.info('Test cleanup completed');
     } catch (error) {
       testLogger.warn('Cleanup failed', { error: error.message });
