@@ -57,21 +57,19 @@ pub async fn add(entry: OrgStorageProvider) -> Result<(), anyhow::Error> {
     {
         let config = o2_enterprise::enterprise::common::config::get_config();
         if config.super_cluster.enabled {
-            match o2_enterprise::enterprise::super_cluster::queue::add_sourcemap(entry.clone())
+            match o2_enterprise::enterprise::super_cluster::queue::add_org_storage(entry.clone())
                 .await
             {
                 Ok(_) => {
                     log::info!(
-                        "successfully sent sourcemap add notification to super cluster queue for {}/{}",
-                        entry.org,
-                        entry.source_map_file_name
+                        "successfully sent org storage add notification to super cluster queue for {}",
+                        entry.org_id,
                     );
                 }
                 Err(e) => {
                     log::error!(
-                        "error in sending sourcemap add notification to super cluster queue for {}/{} : {e}",
-                        entry.org,
-                        entry.source_map_file_name
+                        "error in sending org storage add notification to super cluster queue for {} : {e}",
+                        entry.org_id,
                     );
                 }
             }
