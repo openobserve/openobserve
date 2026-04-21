@@ -124,6 +124,7 @@ maximized full-height>
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </q-dialog>
     <PredefinedThemes />
+    <GlobalCommandPalette />
   </q-layout>
 </template>
 
@@ -166,6 +167,7 @@ import {
   KeepAlive,
   computed,
   onMounted,
+  onBeforeUnmount,
   watch,
   markRaw,
   nextTick,
@@ -215,6 +217,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
+import GlobalCommandPalette from "@/components/GlobalCommandPalette.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -254,6 +257,7 @@ export default defineComponent({
     PredefinedThemes,
     O2AIChat,
     GetStarted,
+    GlobalCommandPalette,
   },
   methods: {
     navigateToDocs() {
@@ -549,7 +553,15 @@ export default defineComponent({
       { immediate: true },
     );
 
+    const handleCommandPaletteShortcut = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        store.dispatch("commandPalette/open");
+      }
+    };
+
     onMounted(async () => {
+      window.addEventListener("keydown", handleCommandPaletteShortcut);
       filterMenus();
 
       // TODO OK : Clean get config functions which sets rum user and functions menu. Move it to common method.
@@ -571,6 +583,10 @@ export default defineComponent({
           setRumUser();
         }
       }
+    });
+
+    onBeforeUnmount(() => {
+      window.removeEventListener("keydown", handleCommandPaletteShortcut);
     });
 
     const updateIncidentsMenu = () => {

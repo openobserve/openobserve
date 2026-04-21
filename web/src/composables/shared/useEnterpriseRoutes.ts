@@ -57,6 +57,10 @@ const useEnterpriseRoutes = () => {
           name: "users",
           meta: {
             title: "Users",
+            searchable: true,
+            icon: "group",
+            section: "Management",
+            keywords: ["management", "members", "accounts", "team"],
           },
           component: Users,
           beforeEnter(to: any, from: any, next: any) {
@@ -68,6 +72,10 @@ const useEnterpriseRoutes = () => {
           name: "serviceAccounts",
           meta: {
             title: "Service Accounts",
+            searchable: true,
+            icon: "manage_accounts",
+            section: "Management",
+            keywords: ["management", "API keys", "tokens", "service users"],
           },
           component: ServiceAccountsList,
           beforeEnter(to: any, from: any, next: any) {
@@ -90,6 +98,10 @@ const useEnterpriseRoutes = () => {
           name: "organizations",
           meta: {
             title: "Organizations",
+            searchable: true,
+            icon: "corporate_fare",
+            section: "Management",
+            keywords: ["management", "org", "tenant", "workspace"],
           },
           component: Organizations,
           beforeEnter(to: any, from: any, next: any) {
@@ -110,6 +122,10 @@ const useEnterpriseRoutes = () => {
         component: IncidentList,
         meta: {
           title: "Incidents",
+          searchable: true,
+          icon: "emergency",
+          section: "Observability",
+          keywords: ["incidents", "on-call", "outage", "events"],
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
@@ -132,6 +148,13 @@ const useEnterpriseRoutes = () => {
       path: "actions",
       name: "actionScripts",
       component: ActionScripts,
+      meta: {
+        title: "Action Scripts",
+        searchable: true,
+        icon: "code",
+        section: "Management",
+        keywords: ["management", "scripts", "automation", "actions"],
+      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },

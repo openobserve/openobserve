@@ -81,6 +81,33 @@ export default function (store: any) {
 
   const router = createRouter(routerMap);
 
+  router.afterEach((to: any) => {
+    if (to.meta?.searchable) {
+      try {
+        const STORAGE_KEY = "o2_recent_pages";
+        const MAX_RECENTS = 8;
+        const stored = localStorage.getItem(STORAGE_KEY);
+        const recents: { name: string; path: string; title: string }[] = stored
+          ? JSON.parse(stored)
+          : [];
+        const entry = {
+          name: String(to.name ?? ""),
+          path: to.path,
+          title: String(to.meta.title ?? to.name ?? ""),
+        };
+        // Deduplicate by route name, then prepend newest
+        const filtered = recents.filter((r) => r.name !== entry.name);
+        filtered.unshift(entry);
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify(filtered.slice(0, MAX_RECENTS)),
+        );
+      } catch {
+        // localStorage may be unavailable in some environments
+      }
+    }
+  });
+
   router.beforeEach((to: any, from: any, next: any) => {
     // Set page title with OpenObserve prefix
     if (to.meta && to.meta.title) {

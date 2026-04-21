@@ -119,6 +119,10 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Home",
+        searchable: true,
+        icon: "home",
+        section: "General",
+        keywords: ["home", "overview", "start"],
       },
     },
     {
@@ -128,6 +132,10 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Logs",
+        searchable: true,
+        icon: "article",
+        section: "Observability",
+        keywords: ["search", "query", "log", "stream"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -152,6 +160,10 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Metrics",
+        searchable: true,
+        icon: "query_stats",
+        section: "Observability",
+        keywords: ["prometheus", "promql", "gauge", "counter"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -176,6 +188,10 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Traces",
+        searchable: true,
+        icon: "timeline",
+        section: "Observability",
+        keywords: ["span", "tracing", "distributed", "opentelemetry"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -215,6 +231,10 @@ const useRoutes = () => {
       component: LogStream,
       meta: {
         title: "Streams",
+        searchable: true,
+        icon: "storage",
+        section: "Management",
+        keywords: ["log stream", "index", "schema", "data"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -236,6 +256,10 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         title: "Dashboards",
+        searchable: true,
+        icon: "dashboard",
+        section: "Visualization",
+        keywords: ["charts", "panels", "visualization", "graphs"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -296,6 +320,10 @@ const useRoutes = () => {
       component: Functions,
       meta: {
         title: "Pipeline",
+        searchable: true,
+        icon: "account_tree",
+        section: "Management",
+        keywords: ["functions", "enrichment", "transform", "ingest"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -383,6 +411,10 @@ const useRoutes = () => {
       component: AlertList,
       meta: {
         title: "Alerts",
+        searchable: true,
+        icon: "notifications",
+        section: "Observability",
+        keywords: ["alert", "monitor", "notification", "trigger"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -481,6 +513,10 @@ const useRoutes = () => {
       component: RealUserMonitoring,
       meta: {
         title: "Real User Monitoring",
+        searchable: true,
+        icon: "person_search",
+        section: "Observability",
+        keywords: ["RUM", "sessions", "errors", "performance", "frontend"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

@@ -22,6 +22,7 @@ import {
 import streams from "./streams";
 import logs from "./logs";
 import incidents from "./incidents";
+import commandPalette from "./commandPalette";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -490,6 +491,7 @@ export default createStore({
   modules: {
     streams,
     logs,
-    incidents
+    incidents,
+    commandPalette,
   },
 });

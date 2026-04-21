@@ -14,6 +14,10 @@ const useManagementRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Settings",
+        searchable: true,
+        icon: "settings",
+        section: "Management",
+        keywords: ["management", "configuration", "admin", "preferences"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -45,8 +49,12 @@ const useManagementRoutes = () => {
         {
           path: "alert_destinations",
           name: "alertDestinations",
-          meta:{
+          meta: {
             title: "Alert Destinations",
+            searchable: true,
+            icon: "send",
+            section: "Management",
+            keywords: ["management", "destinations", "channels", "webhook", "email", "slack"],
           },
           component: AlertsDestinationList,
           beforeEnter(to: any, from: any, next: any) {
@@ -56,8 +64,12 @@ const useManagementRoutes = () => {
         {
           path: "templates",
           name: "alertTemplates",
-          meta:{
+          meta: {
             title: "Templates",
+            searchable: true,
+            icon: "description",
+            section: "Management",
+            keywords: ["management", "alert templates", "notification templates"],
           },
           component: TemplateList,
           beforeEnter(to: any, from: any, next: any) {
