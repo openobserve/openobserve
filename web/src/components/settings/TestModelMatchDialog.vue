@@ -47,70 +47,6 @@
             </q-input>
           </div>
 
-          <!-- Usage Details -->
-          <div class="tmm-section">
-            <div class="tmm-section-header">
-              <label class="tmm-label">Usage Details</label>
-              <span class="tmm-optional-badge">optional</span>
-            </div>
-            <div class="tmm-label-hint">Provide token counts to calculate estimated cost. If left empty, the default pricing tier is used.</div>
-
-            <!-- Prefill templates -->
-            <div class="tmm-templates">
-              <span class="tmm-templates-label">Prefill from template:</span>
-              <button
-                v-for="tpl in templates"
-                :key="tpl.name"
-                class="tmm-template-chip"
-                :class="{ 'tmm-template-chip--active': isTemplateActive(tpl) }"
-                :style="{ '--tpl-color': tpl.color }"
-                @click="prefill(tpl)"
-              >
-                <span class="tmm-template-dot"></span>
-                {{ tpl.name }}
-              </button>
-            </div>
-
-            <!-- Usage key-value rows -->
-            <div class="tmm-usage-table">
-              <div class="tmm-usage-head" v-if="usageDetails.length > 0">
-                <span>Usage Type</span>
-                <span>Token Count</span>
-                <span></span>
-              </div>
-              <transition-group name="tmm-row" tag="div">
-                <div v-for="(usage, idx) in usageDetails" :key="idx" class="tmm-usage-row">
-                  <q-input
-                    v-model="usage.key"
-                    dense borderless
-                    class="tmm-usage-input"
-                    placeholder="e.g. input"
-                    :data-test="`test-match-usage-key-${idx}`"
-                  />
-                  <q-input
-                    v-model.number="usage.value"
-                    type="number"
-                    dense borderless
-                    class="tmm-usage-input"
-                    placeholder="0"
-                    :data-test="`test-match-usage-val-${idx}`"
-                  />
-                  <q-btn
-                    icon="delete_outline"
-                    flat round dense size="sm"
-                    color="negative"
-                    @click="removeUsage(idx)"
-                    :data-test="`test-match-usage-del-${idx}`"
-                  />
-                </div>
-              </transition-group>
-              <button class="tmm-add-usage-btn" @click="addUsage" data-test="test-match-add-usage">
-                <q-icon name="add_circle_outline" size="15px" />
-                Add Usage Type
-              </button>
-            </div>
-          </div>
-
         </div>
 
         <!-- ── Vertical divider ── -->
@@ -205,28 +141,19 @@
                   </div>
                 </div>
 
-                <div class="tmm-cost-table" v-if="costCalculations.length > 0">
+                <div class="tmm-cost-table" v-if="pricingRows.length > 0">
                   <div class="tmm-cost-table-head">
                     <span>Usage Type</span>
-                    <span>Tokens</span>
-                    <span>Rate / 1M</span>
-                    <span class="tw:text-right">Cost</span>
+                    <span class="tw:text-right">Price / 1M tokens</span>
                   </div>
-                  <div v-for="calc in costCalculations" :key="calc.key" class="tmm-cost-table-row">
-                    <span class="tmm-cost-usage-key">{{ calc.key }}</span>
-                    <span class="tmm-cost-tokens">{{ formatNumber(calc.tokens) }}</span>
-                    <span class="tmm-cost-rate">${{ formatRate(calc.rate) }}</span>
-                    <span class="tmm-cost-value tw:text-right">${{ formatCost(calc.cost) }}</span>
+                  <div v-for="row in pricingRows" :key="row.key" class="tmm-cost-table-row">
+                    <span class="tmm-cost-usage-key">{{ row.key }}</span>
+                    <span class="tmm-cost-value tw:text-right">${{ formatRate(row.rate) }}</span>
                   </div>
                 </div>
                 <div v-else class="tmm-cost-empty">
                   <q-icon name="info_outline" size="15px" />
-                  Add usage details to calculate estimated cost.
-                </div>
-
-                <div class="tmm-cost-total" v-if="costCalculations.length > 0">
-                  <span>Total Estimated Cost</span>
-                  <span class="tmm-cost-total-value">${{ formatCost(totalCost) }}</span>
+                  No pricing defined for this tier.
                 </div>
               </div>
 
@@ -277,43 +204,6 @@ const internalValue = computed({
 const testModelName = ref('');
 const modelInputRef = ref<any>(null);
 
-const usageDetails = ref([
-  { key: 'input', value: 1000 },
-  { key: 'output', value: 500 }
-]);
-
-const templates = [
-  {
-    name: 'OpenAI',
-    color: '#10a37f',
-    keys: ['input', 'output', 'cache_read_input_tokens']
-  },
-  {
-    name: 'Anthropic',
-    color: '#d97706',
-    keys: ['input', 'output', 'cache_creation_input_tokens', 'cache_read_input_tokens']
-  },
-];
-
-function isTemplateActive(tpl: typeof templates[0]) {
-  const currentKeys = usageDetails.value.filter(u => u.key).map(u => u.key);
-  return tpl.keys.every(k => currentKeys.includes(k)) && currentKeys.length === tpl.keys.length;
-}
-
-function prefill(tpl: typeof templates[0]) {
-  usageDetails.value = tpl.keys.map(key => {
-    const existing = usageDetails.value.find(u => u.key === key);
-    return { key, value: existing?.value ?? (key === 'input' ? 1000 : key === 'output' ? 500 : 0) };
-  });
-}
-
-function addUsage() {
-  usageDetails.value.push({ key: '', value: 0 });
-}
-function removeUsage(idx: number) {
-  usageDetails.value.splice(idx, 1);
-}
-
 function clearAndFocus() {
   testModelName.value = '';
   nextTick(() => modelInputRef.value?.focus());
@@ -341,14 +231,10 @@ async function callTestApi() {
     testResult.value = null;
     return;
   }
-  const usage: Record<string, number> = {};
-  for (const u of usageDetails.value) {
-    if (u.key) usage[u.key] = u.value;
-  }
   try {
     const res = await modelPricingService.test(orgIdentifier.value, {
       model_name: testModelName.value,
-      usage: Object.keys(usage).length > 0 ? usage : undefined,
+      usage: undefined,
       timestamp: null,
     });
     testResult.value = res.data;
@@ -399,20 +285,14 @@ const matchedTierDef = computed(() => {
   return tiers.find((t: any) => (t.name || 'Default') === result.tier) || tiers[0] || null;
 });
 
-const costCalculations = computed(() => {
-  const result = testResult.value;
-  if (!result?.matched || !result.costs) return [];
-  const costs = result.costs as Record<string, number>;
+const pricingRows = computed(() => {
+  if (!testResult.value?.matched) return [];
   const tierPrices = matchedTierDef.value?.prices || {};
-  return sortedPriceEntries(costs).map(([key, cost]) => {
-    const usage = usageDetails.value.find((u: any) => u.key === key);
-    const tokens = usage?.value ?? 0;
-    const rate = (tierPrices[key] ?? 0) * 1_000_000;
-    return { key, tokens, rate, cost };
-  });
+  return sortedPriceEntries(tierPrices).map(([key, pricePerToken]) => ({
+    key,
+    rate: pricePerToken * 1_000_000,
+  }));
 });
-
-const totalCost = computed(() => testResult.value?.total_cost ?? 0);
 
 function operatorSymbol(op: string) {
   const map: Record<string, string> = { gt: '>', gte: '≥', lt: '<', lte: '≤', eq: '=', neq: '≠' };
@@ -430,20 +310,10 @@ function sourceLabel(model: any) {
   return 'Built-in';
 }
 
-function formatCost(cost: number) {
-   if (cost === 0) return "0.0000";
-   if (cost < 0.0001) return cost.toExponential(4);
-   return cost.toFixed(6).replace(/0+$/, '').replace(/\.$/, '.00');
-}
-
 function formatRate(rate: number) {
   if (rate === 0) return "0.00";
   if (rate < 0.01) return rate.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
   return rate.toFixed(2);
-}
-
-function formatNumber(n: number) {
-  return n.toLocaleString();
 }
 </script>
 
@@ -895,7 +765,7 @@ function formatNumber(n: number) {
 /* ── Cost Table ─────────────────────────────────────── */
 .tmm-cost-table-head {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  grid-template-columns: 1.5fr 1fr;
   gap: 8px;
   padding: 7px 14px;
   border-bottom: 1px solid var(--o2-border-color);
@@ -912,7 +782,7 @@ function formatNumber(n: number) {
 
 .tmm-cost-table-row {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  grid-template-columns: 1.5fr 1fr;
   gap: 8px;
   padding: 8px 14px;
   font-size: 12px;
