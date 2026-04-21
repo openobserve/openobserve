@@ -24,24 +24,28 @@ import router from "@/test/unit/helpers/router";
 // vi.mock is hoisted — must be at the top before any component imports.
 // The factory uses require() for vue because top-level imports are not yet
 // evaluated when hoisted factories run.
-vi.mock("@/composables/useCommandPalette", () => ({
-  default: vi.fn(() => {
-    const { ref, computed } = require("vue");
-    return {
-      query: ref(""),
-      activeIndex: ref(0),
-      visibleItems: ref([]),
-      hasResults: computed(() => false),
-      isOpen: computed(() => false),
-      close: vi.fn(),
-      moveUp: vi.fn(),
-      moveDown: vi.fn(),
-      resetActiveIndex: vi.fn(),
-      navigateTo: vi.fn(),
-      navigateSelected: vi.fn(),
-    };
-  }),
-}));
+vi.mock("@/composables/useCommandPalette", async (importOriginal) => {
+  const actual = await importOriginal() as any;
+  return {
+    ...actual,
+    default: vi.fn(() => {
+      const { ref, computed } = require("vue");
+      return {
+        query: ref(""),
+        activeIndex: ref(0),
+        visibleItems: ref([]),
+        hasResults: computed(() => false),
+        isOpen: computed(() => false),
+        close: vi.fn(),
+        moveUp: vi.fn(),
+        moveDown: vi.fn(),
+        resetActiveIndex: vi.fn(),
+        navigateTo: vi.fn(),
+        navigateSelected: vi.fn(),
+      };
+    }),
+  };
+});
 
 import GlobalCommandPalette from "@/components/GlobalCommandPalette.vue";
 import useCommandPalette, {
