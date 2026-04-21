@@ -33,6 +33,11 @@ import {
 } from "@/utils/zincutils";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import {
+  STREAM_SELECTION_STORAGE_KEYS,
+  getPersistedStreamSelection,
+  isStreamSelectionPersistenceEnabled,
+} from "@/utils/streamSelectionPersistence";
 
 export const useStreamFields = () => {
   const { getStreams, getStream } = useStreams();
@@ -800,15 +805,20 @@ export const useStreamFields = () => {
   const loadStreamLists = async (selectStream: boolean = true) => {
     try {
       if (searchObj.data.streamResults.list.length > 0) {
-        let lastUpdatedStreamTime = 0;
-
         let selectedStream: any[] = [];
+        const routeStream = router.currentRoute.value?.query?.stream;
+        const persistenceEnabled = isStreamSelectionPersistenceEnabled(store);
+        const persistedStream = getPersistedStreamSelection(
+          store,
+          STREAM_SELECTION_STORAGE_KEYS.logs,
+        );
 
         searchObj.data.stream.streamLists = [];
         let itemObj: {
           label: string;
           value: string;
         };
+        const streamValues = new Set<string>();
 
         for (const item of searchObj.data.streamResults.list) {
           itemObj = {
@@ -817,19 +827,18 @@ export const useStreamFields = () => {
           };
 
           searchObj.data.stream.streamLists.push(itemObj);
-
-          // If isFirstLoad is true, then select the stream from query params
-          if (router.currentRoute.value?.query?.stream == item.name) {
-            selectedStream.push(itemObj.value);
-          }
-          if (
-            !router.currentRoute.value?.query?.stream &&
-            item.stats.doc_time_max >= lastUpdatedStreamTime
-          ) {
-            selectedStream = [];
-            lastUpdatedStreamTime = item.stats.doc_time_max;
-            selectedStream.push(itemObj.value);
-          }
+          streamValues.add(itemObj.value);
+        }
+        if (routeStream && streamValues.has(routeStream as string)) {
+          selectedStream = [routeStream as string];
+        } else if (
+          persistenceEnabled &&
+          persistedStream &&
+          streamValues.has(persistedStream)
+        ) {
+          selectedStream = [persistedStream];
+        } else if (persistenceEnabled && searchObj.data.stream.streamLists[0]) {
+          selectedStream = [searchObj.data.stream.streamLists[0].value];
         }
         if (
           (store.state.zoConfig.query_on_stream_selection == false ||

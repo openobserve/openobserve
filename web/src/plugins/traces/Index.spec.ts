@@ -335,6 +335,8 @@ describe("Index.vue (Main Traces Page)", () => {
     } as any);
 
   beforeEach(async () => {
+    store.state.zoConfig.persist_last_selected_stream = true;
+    localStorage.clear();
     // Set default stream mock implementations (tests can override with mockResolvedValueOnce)
     mockGetStreams.mockResolvedValue(mockStreamList);
     mockGetStream.mockImplementation((streamName: string) =>
@@ -544,7 +546,7 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   describe("Stream Selection", () => {
-    it("should select the stream with latest data by default", async () => {
+    it("should select the first stream by default when persistence is enabled", async () => {
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -565,7 +567,61 @@ describe("Index.vue (Main Traces Page)", () => {
       // getStreamList uses an un-awaited .then() chain; poll until it resolves
       await vi.waitFor(
         () => {
-          expect(mockSearchObj.data.stream.selectedStream.value).toBeTruthy();
+          expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+        },
+        { timeout: 2000 },
+      );
+    });
+
+    it("should restore persisted stream selection when available", async () => {
+      localStorage.setItem("o2_last_stream_traces", "test-stream");
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      await vi.waitFor(
+        () => {
+          expect(mockSearchObj.data.stream.selectedStream.value).toBe(
+            "test-stream",
+          );
+        },
+        { timeout: 2000 },
+      );
+    });
+
+    it("should not auto select stream when persistence is disabled", async () => {
+      store.state.zoConfig.persist_last_selected_stream = false;
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      await vi.waitFor(
+        () => {
+          expect(mockSearchObj.data.stream.selectedStream.value).toBeFalsy();
         },
         { timeout: 2000 },
       );

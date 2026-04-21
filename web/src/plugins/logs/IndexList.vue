@@ -198,6 +198,10 @@ import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import {
+  STREAM_SELECTION_STORAGE_KEYS,
+  setPersistedStreamSelection,
+} from "@/utils/streamSelectionPersistence";
 
 interface Filter {
   fieldName: string;
@@ -626,6 +630,18 @@ export default defineComponent({
     watch(showUserDefinedSchemaToggle, () => {
       setDefaultFieldTab();
     });
+
+    watch(
+      () => searchObj.data.stream.selectedStream,
+      (selectedStreams: string[]) => {
+        setPersistedStreamSelection(
+          store,
+          STREAM_SELECTION_STORAGE_KEYS.logs,
+          selectedStreams?.[0] || null,
+        );
+      },
+      { deep: true },
+    );
 
     const filterStreamFn = (val: string, update: any) => {
       update(() => {

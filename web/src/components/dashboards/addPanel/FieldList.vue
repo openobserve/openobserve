@@ -571,6 +571,12 @@ import useStreams from "@/composables/useStreams";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
+import {
+  STREAM_SELECTION_STORAGE_KEYS,
+  getPersistedStreamSelection,
+  isStreamSelectionPersistenceEnabled,
+  setPersistedStreamSelection,
+} from "@/utils/streamSelectionPersistence";
 
 export default defineComponent({
   name: "FieldList",
@@ -885,26 +891,61 @@ export default defineComponent({
             ].fields.stream_type
         ) {
           const currentIndex = dashboardPanelData.layout.currentQueryIndex;
+          const selectedStreamForCurrentQuery =
+            dashboardPanelData.data.queries[currentIndex].fields.stream;
+          const persistedSelectionEnabled =
+            dashboardPanelDataPageKey === "metrics" &&
+            isStreamSelectionPersistenceEnabled(store);
+          const persistedStream = persistedSelectionEnabled
+            ? getPersistedStreamSelection(
+                store,
+                STREAM_SELECTION_STORAGE_KEYS.metrics,
+              )
+            : null;
           // Check if selected stream for current query exists in index options
           // If not, set the first index option as the selected stream
           if (
             dashboardPanelData.meta.stream.streamResults.find(
               (it: any) =>
-                it.name ==
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].fields.stream,
+                it.name == selectedStreamForCurrentQuery,
             )
           ) {
             dashboardPanelData.data.queries[currentIndex].fields.stream =
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.stream;
+              selectedStreamForCurrentQuery;
+          } else if (
+            dashboardPanelDataPageKey === "metrics" &&
+            !persistedSelectionEnabled
+          ) {
+            dashboardPanelData.data.queries[currentIndex].fields.stream = "";
           } else {
+            const fallbackStream =
+              persistedStream &&
+              dashboardPanelData.meta.stream.streamResults.find(
+                (it: any) => it.name === persistedStream,
+              )
+                ? persistedStream
+                : dashboardPanelData.meta.stream.streamResults[0]?.name;
             dashboardPanelData.data.queries[currentIndex].fields.stream =
-              dashboardPanelData.meta.stream.streamResults[0]?.name;
+              fallbackStream;
           }
         }
+      },
+    );
+
+    watch(
+      () =>
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream,
+      (streamName) => {
+        if (dashboardPanelDataPageKey !== "metrics") {
+          return;
+        }
+        setPersistedStreamSelection(
+          store,
+          STREAM_SELECTION_STORAGE_KEYS.metrics,
+          streamName || null,
+        );
       },
     );
     // update the current list fields if any of the lists changes
