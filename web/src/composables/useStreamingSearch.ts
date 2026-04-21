@@ -244,7 +244,7 @@ const useHttpStreaming = () => {
         ? "_search_multi_stream"
         : "_search_stream";
 
-      url = `/${streamEndpoint}?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
+      url = `/${streamEndpoint}?type=${pageType}&search_type=ui&use_cache=${use_cache}`;
       if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
       if (meta?.dashboard_name)
         url += `&dashboard_name=${encodeURIComponent(meta?.dashboard_name)}`;

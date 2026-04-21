@@ -33,7 +33,7 @@ type MissingValueCacheEntry = {
   interval: number;
   noValueConfigOption: any;
   endTimeForFill: string;
-  isLeftToRight: boolean;
+  isLTR: boolean;
 };
 
 const missingValueCache = new Map<string, MissingValueCacheEntry>();
@@ -181,7 +181,7 @@ export const fillMissingValues = (
   const formattedUserEnd = formatUtc(endTime);
 
   // Detect chunking direction from first resultMetaData entry.
-  const isLeftToRight =
+  const isLTR =
     detectChunkingDirection(
       resultMetaData?.[0]?.time_offset?.start_time ?? 0,
       resultMetaData?.[0]?.time_offset?.end_time ?? 0,
@@ -192,7 +192,7 @@ export const fillMissingValues = (
   let binnedFillStart: Date;
   let endTimeForFill: string;
 
-  if (isLeftToRight) {
+  if (isLTR) {
     // LTR: fill from user's start to latest chunk's end
     binnedFillStart = binnedDate;
     const lastChunkEndTime =
@@ -240,7 +240,7 @@ export const fillMissingValues = (
   // Build start-edge anchors (RTL only). For LTR, the fill loop already covers
   // the user's start; anchors are added at the end-edge after the fill loop.
   const startAnchorTimes: string[] = [];
-  if (!isLeftToRight && binnedFillStart > binnedDate) {
+  if (!isLTR && binnedFillStart > binnedDate) {
     startAnchorTimes.push(formatUtc(binnedDate));
 
     // Insert a phantom point one interval before the first real data point.
@@ -283,7 +283,7 @@ export const fillMissingValues = (
     if (
       cacheEntry &&
       cacheEntry.anchorTimes.length > 0 &&
-      !isLeftToRight &&
+      !isLTR &&
       binnedFillStart.getTime() <= cacheEntry.binnedDateMs
     ) {
       // RTL: real data has reached the user's start time. Drop cached anchors
@@ -292,9 +292,9 @@ export const fillMissingValues = (
     }
     if (
       hasTimeOffset &&
-      !isLeftToRight &&
+      !isLTR &&
       cacheEntry &&
-      cacheEntry.isLeftToRight === false &&
+      cacheEntry.isLTR === false &&
       cacheEntry.interval === interval &&
       cacheEntry.noValueConfigOption === noValueConfigOption &&
       cacheEntry.timeKey === timeKey &&
@@ -376,7 +376,7 @@ export const fillMissingValues = (
         interval,
         noValueConfigOption,
         endTimeForFill,
-        isLeftToRight,
+        isLTR,
       });
 
       return combined;
@@ -487,7 +487,7 @@ export const fillMissingValues = (
   // Anchor/phantom entries use empty string (not noValueConfigOption) so
   // ECharts renders them as gaps rather than plotted points at the configured value.
   const endAnchorTimes: string[] = [];
-  if (isLeftToRight) {
+  if (isLTR) {
     const binnedUserEnd = dateBin(interval, endTime, origin);
     const formattedBinnedUserEnd = formatUtc(binnedUserEnd);
 
@@ -542,7 +542,7 @@ export const fillMissingValues = (
   }
 
   if (cacheKey) {
-    const cachedAnchorTimes = isLeftToRight ? endAnchorTimes : startAnchorTimes;
+    const cachedAnchorTimes = isLTR ? endAnchorTimes : startAnchorTimes;
     missingValueCache.set(cacheKey, {
       filledData,
       binnedFillStartMs: binnedFillStart.getTime(),
@@ -558,7 +558,7 @@ export const fillMissingValues = (
       interval,
       noValueConfigOption,
       endTimeForFill,
-      isLeftToRight,
+      isLTR,
     });
   }
 

@@ -32,14 +32,22 @@ function toNumericTime(val: any): number {
  * @param oldOptions - Snapshot of old rendered chart (ISO string timestamps after JSON clone)
  * @param newOptions - Complete options built from new accumulated data (Date objects)
  * @param containerSize - Chart container dimensions for graphic overlay positioning
+ * @param boundaryTime - Boundary (µs) separating fresh from stale data. RTL: last
+ *   chunk's start_time (fresh is right of boundary). LTR: last chunk's end_time
+ *   (fresh is left of boundary).
+ * @param queryStartTime - User-selected query start (µs), used as the left edge anchor.
+ * @param queryEndTime - User-selected query end (µs), used as the right edge anchor.
+ * @param isLTR - true for LTR streaming (overlay on RIGHT), false for RTL (overlay on LEFT).
  * @returns Merged options with new data overlaid on old
  */
 export function overlayNewDataOnOldOptions(
   oldOptions: any,
   newOptions: any,
   containerSize?: { width: number; height: number },
-  metadataStartTime?: number,
+  boundaryTime?: number,
   queryStartTime?: number,
+  queryEndTime?: number,
+  isLTR?: boolean,
 ): any {
   if (!oldOptions?.series?.length) return newOptions;
   if (!newOptions?.series?.length) return oldOptions;
@@ -297,35 +305,52 @@ export function overlayNewDataOnOldOptions(
     }
 
     if (plotWidth > 0 && plotHeight > 0) {
-      // Use the metadata start_time (microseconds) of the earliest received chunk
-      // to compute the overlay. Chunks stream newest-first, so metadataStartTime is
-      // the left boundary of data we've already received. Everything from
-      // metadataStartTime → newMaxTime is new; convert µs → ms for comparison.
-      const startTimeMs = metadataStartTime ? metadataStartTime / 1000 : 0;
-      // Use queryStartTime (full query start, µs→ms) as the denominator anchor so
-      // the fraction is relative to the complete query range, not just the received
-      // data range. Falls back to newMinTime if queryStartTime is not available.
-      const queryStartMs = queryStartTime ? queryStartTime / 1000 : newMinTime;
-      const totalRange = newMaxTime - queryStartMs;
-      const hasValidRange =
-        newMinTime !== Infinity && newMaxTime !== -Infinity && totalRange > 0;
-      const newFraction =
-        startTimeMs > 0 && hasValidRange
-          ? Math.max(0, Math.min(1, (newMaxTime - startTimeMs) / totalRange))
-          : 0;
+      // Convert µs → ms for comparison with newMin/newMaxTime.
+      const boundaryMs = boundaryTime ? boundaryTime / 1000 : 0;
+      const queryStartMs = queryStartTime
+        ? queryStartTime / 1000
+        : newMinTime;
+      const queryEndMs = queryEndTime ? queryEndTime / 1000 : newMaxTime;
+      const totalRange = queryEndMs - queryStartMs;
+      const hasValidRange = boundaryMs > 0 && totalRange > 0;
 
-      if (newFraction > 0 && newFraction < 1) {
-        // oldFraction is the stale portion (left side) that hasn't been
-        // refreshed yet. Overlay covers from plotLeft to the boundary
-        // where new data begins.
-        const oldFraction = 1 - newFraction;
-        const overlayWidth = oldFraction * plotWidth;
+      if (hasValidRange) {
+        // Compute the stale fraction (portion awaiting new data) and overlay
+        // it on the correct edge. LTR chunks arrive earliest-first, so stale
+        // is to the RIGHT of boundaryTime. RTL chunks arrive newest-first, so
+        // stale is to the LEFT of boundaryTime.
+        const staleFraction = Math.max(
+          0,
+          Math.min(
+            1,
+            (isLTR ? queryEndMs - boundaryMs : boundaryMs - queryStartMs) /
+              totalRange,
+          ),
+        );
+        const rawOverlayWidth = staleFraction * plotWidth;
+        const rawOverlayLeft = isLTR
+          ? plotLeft + plotWidth - rawOverlayWidth
+          : plotLeft;
 
-        if (overlayWidth > 1) {
+        // Clamp to plot rect so the overlay never bleeds onto y-axis labels
+        // (this can happen when _gridRect is stale or when fallback grid
+        // coordinates underestimate the axis-label width).
+        const plotRight = plotLeft + plotWidth;
+        const overlayLeft = Math.max(
+          plotLeft,
+          Math.min(plotRight, rawOverlayLeft),
+        );
+        const overlayRight = Math.max(
+          plotLeft,
+          Math.min(plotRight, rawOverlayLeft + rawOverlayWidth),
+        );
+        const overlayWidth = overlayRight - overlayLeft;
+
+        if (overlayWidth > 1 && staleFraction < 1) {
           merged.graphic = [
             {
               type: "rect",
-              left: plotLeft,
+              left: overlayLeft,
               top: plotTop,
               shape: {
                 width: overlayWidth,

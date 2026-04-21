@@ -367,6 +367,7 @@ import {
   overlayNewDataOnOldOptions,
   isOverlayEligible,
 } from "@/utils/dashboard/streaming";
+import { detectChunkingDirection } from "@/utils/dashboard/chunkingDirection";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -715,14 +716,44 @@ export default defineComponent({
     // The latest metadata chunk's time_offset.start_time (┬╡s) marks the left boundary
     // of data received so far. Also pull the full query start so the overlay function
     // can compute the fraction against the complete query range, not just received data.
-    const metadataStartTimeForOverlay = computed(() => {
+    // Direction-aware boundary for the streaming overlay.
+    //
+    //  - RTL (chunks arrive newest-first): fresh data is to the RIGHT of
+    //    `boundaryTime`. Overlay covers the stale LEFT portion. boundaryTime
+    //    is the LAST entry's time_offset.start_time (earliest received).
+    //  - LTR (chunks arrive earliest-first): fresh data is to the LEFT of
+    //    `boundaryTime`. Overlay covers the stale RIGHT portion. boundaryTime
+    //    is the LAST entry's time_offset.end_time (latest received).
+    //
+    // Times are in microseconds to match resultMetaData; convert to ms downstream.
+    const overlayBoundaryInfo = computed(() => {
       const resultMeta = resultMetaData.value?.[0];
-      if (!resultMeta?.length) return 0;
-      return resultMeta[resultMeta.length - 1]?.time_offset?.start_time ?? 0;
+      const queryStart = Number(
+        metadata.value?.queries?.[0]?.startTime ?? 0,
+      );
+      const queryEnd = Number(metadata.value?.queries?.[0]?.endTime ?? 0);
+
+      if (!resultMeta?.length) {
+        return { boundaryTime: 0, queryStart, queryEnd, isLTR: false };
+      }
+
+      const firstEntry = resultMeta[0];
+      const lastEntry = resultMeta[resultMeta.length - 1];
+
+      const isLTR =
+        detectChunkingDirection(
+          firstEntry?.time_offset?.start_time ?? 0,
+          firstEntry?.time_offset?.end_time ?? 0,
+          queryStart,
+          queryEnd,
+        ) ?? false;
+
+      const boundaryTime = isLTR
+        ? (lastEntry?.time_offset?.end_time ?? 0)
+        : (lastEntry?.time_offset?.start_time ?? 0);
+
+      return { boundaryTime, queryStart, queryEnd, isLTR };
     });
-    const queryStartTimeForOverlay = computed(() =>
-      Number(metadata.value?.queries?.[0]?.startTime ?? 0),
-    );
 
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef: any = ref(null);
@@ -887,12 +918,15 @@ export default defineComponent({
                   height: containerEl.clientHeight,
                 }
               : undefined;
+            const boundaryInfo = overlayBoundaryInfo.value;
             result.options = overlayNewDataOnOldOptions(
               previousOptionsSnapshot,
               result.options,
               containerSize,
-              metadataStartTimeForOverlay.value,
-              queryStartTimeForOverlay.value,
+              boundaryInfo.boundaryTime,
+              boundaryInfo.queryStart,
+              boundaryInfo.queryEnd,
+              boundaryInfo.isLTR,
             );
           }
 
