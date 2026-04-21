@@ -87,6 +87,16 @@ const useEnvRoutes = () => {
       component: EvalTemplateManager,
       meta: {
         title: "Evaluation Templates",
+        titleKey: "pipeline.evalTemplates",
+        searchable: true,
+        icon: "rule",
+        section: "Management",
+        keywords: [
+          "eval templates",
+          "pipeline evaluation",
+          "LLM evaluation",
+          "pipeline templates",
+        ],
         keepAlive: false,
       },
     },

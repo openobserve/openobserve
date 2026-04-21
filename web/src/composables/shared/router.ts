@@ -404,6 +404,19 @@ const useRoutes = () => {
           path: "functions",
           name: "functionList",
           component: FunctionList,
+          meta: {
+            title: "Functions",
+            titleKey: "function.header",
+            searchable: true,
+            icon: "functions",
+            section: "Management",
+            keywords: [
+              "VRL functions",
+              "data transformation",
+              "stream functions",
+              "custom functions",
+            ],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -412,6 +425,19 @@ const useRoutes = () => {
           path: "enrichment-tables",
           name: "enrichmentTables",
           component: EnrichmentTableList,
+          meta: {
+            title: "Enrichment Tables",
+            titleKey: "function.enrichmentTables",
+            searchable: true,
+            icon: "dataset",
+            section: "Management",
+            keywords: [
+              "lookup tables",
+              "data enrichment",
+              "reference data",
+              "enrichment",
+            ],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -420,6 +446,19 @@ const useRoutes = () => {
           path: "pipelines",
           name: "pipelines",
           component: PipelinesList,
+          meta: {
+            title: "Pipelines",
+            titleKey: "function.streamPipeline",
+            searchable: true,
+            icon: "lan",
+            section: "Management",
+            keywords: [
+              "stream pipelines",
+              "data pipeline",
+              "log pipeline",
+              "pipeline list",
+            ],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -658,6 +697,17 @@ const useRoutes = () => {
           component: AppSessions,
           meta: {
             keepAlive: true,
+            title: "RUM Sessions",
+            titleKey: "rum.sessions",
+            searchable: true,
+            icon: "play_circle",
+            section: "Observability",
+            keywords: [
+              "session replay",
+              "user sessions",
+              "RUM sessions",
+              "browser sessions",
+            ],
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -681,6 +731,17 @@ const useRoutes = () => {
           component: AppErrors,
           meta: {
             keepAlive: true,
+            title: "RUM Error Tracking",
+            titleKey: "rum.errorTracking",
+            searchable: true,
+            icon: "error",
+            section: "Observability",
+            keywords: [
+              "error tracking",
+              "JavaScript errors",
+              "browser errors",
+              "frontend exceptions",
+            ],
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -704,6 +765,16 @@ const useRoutes = () => {
           component: SourceMaps,
           meta: {
             keepAlive: true,
+            title: "Source Maps",
+            searchable: true,
+            icon: "map",
+            section: "Observability",
+            keywords: [
+              "source maps",
+              "stack trace",
+              "JavaScript debugging",
+              "upload source maps",
+            ],
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -727,6 +798,20 @@ const useRoutes = () => {
           props: true,
           meta: {
             keepAlive: true,
+            title: "RUM Performance",
+            titleKey: "rum.performance",
+            searchable: true,
+            icon: "speed",
+            section: "Observability",
+            keywords: [
+              "performance monitoring",
+              "Core Web Vitals",
+              "page speed",
+              "LCP",
+              "FID",
+              "CLS",
+              "TTFB",
+            ],
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -736,6 +821,18 @@ const useRoutes = () => {
               path: "overview",
               name: "rumPerformanceSummary",
               component: PerformanceSummary,
+              meta: {
+                title: "Performance Overview",
+                titleKey: "rum.overview",
+                searchable: true,
+                icon: "dashboard",
+                section: "Observability",
+                keywords: [
+                  "performance summary",
+                  "RUM overview",
+                  "performance dashboard",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -744,6 +841,22 @@ const useRoutes = () => {
               path: "web-vitals",
               name: "rumPerformanceWebVitals",
               component: WebVitalsDashboard,
+              meta: {
+                title: "Web Vitals",
+                titleKey: "rum.webVitals",
+                searchable: true,
+                icon: "speed",
+                section: "Observability",
+                keywords: [
+                  "Core Web Vitals",
+                  "LCP",
+                  "FID",
+                  "CLS",
+                  "TTFB",
+                  "web performance",
+                  "INP",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -752,6 +865,19 @@ const useRoutes = () => {
               path: "errors",
               name: "rumPerformanceErrors",
               component: ErrorsDashboard,
+              meta: {
+                title: "Performance Errors",
+                titleKey: "rum.errors",
+                searchable: true,
+                icon: "error_outline",
+                section: "Observability",
+                keywords: [
+                  "JavaScript errors",
+                  "runtime errors",
+                  "performance errors",
+                  "error rate",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -760,6 +886,21 @@ const useRoutes = () => {
               path: "apis",
               name: "rumPerformanceApis",
               component: ApiDashboard,
+              meta: {
+                title: "Performance APIs",
+                titleKey: "rum.api",
+                searchable: true,
+                icon: "api",
+                section: "Observability",
+                keywords: [
+                  "API monitoring",
+                  "network requests",
+                  "AJAX",
+                  "fetch",
+                  "XHR",
+                  "API latency",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
