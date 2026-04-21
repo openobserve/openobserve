@@ -656,6 +656,7 @@ pub async fn create_external_contract(
     billing.customer_id = Some("custom".to_string());
     billing.subscription_id = Some(svix_ksuid::Ksuid::new(None, None).to_string());
     billing.end_date = req.end_date;
+    billing.expiry_notified_checkpoint = i16::MAX;
 
     match o2_enterprise::enterprise::cloud::update_customer_billing(billing).await {
         Ok(_) => MetaHttpResponse::json(serde_json::json!({"status": "ok"})),

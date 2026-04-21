@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="toggleExtendTrialDialog(props.row)"
             ></q-btn>
             <q-btn
-              v-if="props.row.billing_provider !== 'custom'"
+              v-if="props.row.billing_provider !== 'no_op'"
               label="Add Contract"
               class="q-ml-xs text-capitalize"
               unelevated
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="toggleContractDialog(props.row, 'create')"
             ></q-btn>
             <q-btn
-              v-if="props.row.billing_provider === 'custom'"
+              v-if="props.row.billing_provider === 'no_op'"
               label="Extend Contract"
               class="q-ml-xs text-capitalize"
               unelevated
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="toggleContractDialog(props.row, 'extend')"
             ></q-btn>
             <q-btn
-              v-if="props.row.billing_provider === 'custom'"
+              v-if="props.row.billing_provider === 'no_op'"
               label="Revoke"
               class="q-ml-xs text-capitalize"
               unelevated
