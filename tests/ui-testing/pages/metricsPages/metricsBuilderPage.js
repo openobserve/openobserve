@@ -368,29 +368,56 @@ export class MetricsBuilderPage {
      * @param {string} operationName - e.g., "Rate", "Sum", "Avg"
      */
     async selectOperation(operationName) {
-        // Wait for dialog to appear
+        // Wait for dialog to appear and fully render (expansion items are default-opened)
         const dialog = this.page.locator('.q-dialog');
         await dialog.waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.waitForTimeout(300);
 
-        // Wait for operation list items to populate before searching
-        await dialog.locator('.q-item').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        // Do NOT fill the search input: typing triggers a Vue re-render that temporarily
+        // collapses q-expansion-item sections, making items transiently invisible.
+        // The full un-filtered list is already rendered with all sections expanded.
 
-        // Search for the operation
-        const searchInput = dialog.locator('input').first();
-        if (await searchInput.isVisible({ timeout: 2000 })) {
-            await searchInput.fill(operationName);
-        }
+        // Find a clickable q-item inside expansion content whose primary label matches.
+        // Structure: .q-expansion-item__content > .q-list > .q-item
+        //              > .q-item__section > .q-item__label (op name, NOT caption)
+        const opItem = dialog
+            .locator('.q-expansion-item__content .q-item')
+            .filter({
+                has: this.page.locator('.q-item__label').filter({
+                    hasText: new RegExp(`^\\s*${operationName}\\s*$`)
+                })
+            })
+            .first();
 
-        // Wait for the filtered operation item to appear
-        const opItem = dialog.locator(`.q-item:has-text("${operationName}")`).first();
-        try {
-            await opItem.waitFor({ state: 'visible', timeout: 5000 });
+        if (await opItem.isVisible({ timeout: 3000 })) {
             await opItem.click();
             await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
-        } catch {
-            return false;
         }
+
+        // Fallback: explicitly open all expansion sections, then retry
+        const expansionHeaders = dialog.locator('.q-expansion-item__container > .q-item');
+        const headerCount = await expansionHeaders.count();
+        for (let i = 0; i < headerCount; i++) {
+            await expansionHeaders.nth(i).click().catch(() => {});
+        }
+        await this.page.waitForTimeout(400);
+
+        const opItemRetry = dialog
+            .locator('.q-expansion-item__content .q-item')
+            .filter({
+                has: this.page.locator('.q-item__label').filter({
+                    hasText: new RegExp(`^\\s*${operationName}\\s*$`)
+                })
+            })
+            .first();
+
+        if (await opItemRetry.isVisible({ timeout: 3000 })) {
+            await opItemRetry.click();
+            await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -888,15 +915,15 @@ export class MetricsBuilderPage {
 
         // Get header texts
         const headers = [];
-        const thElements = table.locator('thead th, .q-table__top th');
+        const thElements = table.locator('thead th');
         const headerCount = await thElements.count().catch(() => 0);
         for (let i = 0; i < headerCount; i++) {
             const text = await thElements.nth(i).textContent().catch(() => '');
             if (text.trim()) headers.push(text.trim());
         }
 
-        // Count data rows (tbody tr or virtual scroll rows)
-        const rows = table.locator('tbody tr, .q-virtual-scroll__content tr');
+        // Count data rows (TanStack dashboard mode uses dashboard-data-row class)
+        const rows = table.locator('tbody tr.dashboard-data-row, tbody tr');
         const rowCount = await rows.count().catch(() => 0);
 
         return { visible, rowCount, headers };

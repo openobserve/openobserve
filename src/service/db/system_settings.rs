@@ -456,12 +456,15 @@ pub async fn get_service_identity_config(
         correlation::{IdentitySet, ServiceIdentityConfig},
         system_settings::SettingScope,
     };
+
+    // Intentionally kept here since there's no way to satisfy non-enterprise path
+    // TODO: move the entire module to enterprise so that there's no access restrictions
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
     let mut config = match db::get(&SettingScope::Org, Some(org_id), None, "service_identity").await
     {
         Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
-            .unwrap_or_else(|_| ServiceIdentityConfig::default_config()),
-        _ => ServiceIdentityConfig::default_config(),
+            .unwrap_or_else(|_| ServiceIdentityConfig::new_default()),
+        _ => ServiceIdentityConfig::new_default(),
     };
 
     // If tracked_alias_ids is empty (old stored config or default), populate from env default
@@ -476,17 +479,41 @@ pub async fn get_service_identity_config(
             .collect();
     }
 
-    // Auto-config: if sets is empty but tracked_alias_ids is not empty, create category-based sets
+    // Auto-config: if sets is empty but tracked_alias_ids is not empty, create category-based sets.
+    // Only aliases with is_workload_type=true are used as distinguish_by fields — this prevents
+    // HTTP, Database, System, Observability, and Network aliases from being treated as workload
+    // identity discriminators.
     if config.sets.is_empty() && !config.tracked_alias_ids.is_empty() {
-        // Group tracked alias IDs by their semantic categories
-        let semantic_groups = get_semantic_field_groups(org_id).await;
+        // Group tracked alias IDs by their semantic categories.
+        // If the DB-stored groups predate the is_workload_type field (all false/missing), patch
+        // them from the defaults file by ID so user-customised fields are preserved.
+        let mut semantic_groups = get_semantic_field_groups(org_id).await;
+        let has_workload_types = semantic_groups.iter().any(|g| g.is_workload_type);
+        if !has_workload_types {
+            log::debug!(
+                "[ServiceIdentityConfig] DB semantic groups for org {} have no is_workload_type=true entries (stale), patching from defaults",
+                org_id
+            );
+            let default_groups = get_default_semantic_field_groups();
+            let default_workload: std::collections::HashMap<&str, bool> = default_groups
+                .iter()
+                .map(|g| (g.id.as_str(), g.is_workload_type))
+                .collect();
+            for group in &mut semantic_groups {
+                if let Some(&is_workload) = default_workload.get(group.id.as_str()) {
+                    group.is_workload_type = is_workload;
+                }
+            }
+        }
         let mut category_groups = std::collections::HashMap::new();
 
-        // Map each tracked alias ID to its semantic group category
-        // Use String as HashMap key to ensure proper equality comparison
-        // (avoids potential issues with &str slices from different iterations)
+        // Only include aliases that are explicitly marked as workload-type dimensions.
+        // The group field on those aliases is used as the identity set id/label.
         for alias_id in &config.tracked_alias_ids {
-            if let Some(group) = semantic_groups.iter().find(|g| g.id == *alias_id) {
+            if let Some(group) = semantic_groups
+                .iter()
+                .find(|g| g.id == *alias_id && g.is_workload_type)
+            {
                 let category = group.group.as_deref().unwrap_or("Common").to_string();
                 category_groups
                     .entry(category)
@@ -651,7 +678,7 @@ mod tests {
         // (This condition check still applies in the new logic)
         use config::meta::correlation::{IdentitySet, ServiceIdentityConfig};
 
-        let mut config = ServiceIdentityConfig::default_config();
+        let mut config = ServiceIdentityConfig::new_default();
         config.tracked_alias_ids = vec!["service".to_string(), "environment".to_string()];
         config.sets = vec![IdentitySet {
             id: "existing".to_string(),
@@ -674,26 +701,15 @@ mod tests {
     }
 
     #[test]
-    fn test_service_identity_config_no_auto_config_when_tracked_alias_ids_empty() {
-        // Test that auto-config doesn't run when tracked_alias_ids is empty
-        // (This condition check still applies in the new logic)
+    fn test_service_identity_config_default_from_env_has_defaults() {
+        // new_default() returns an intentionally empty config — sets and tracked_alias_ids are
+        // populated dynamically at runtime by get_service_identity_config(), not hardcoded here.
         use config::meta::correlation::ServiceIdentityConfig;
 
-        let config = ServiceIdentityConfig::default_config();
-        // sets is empty (default), tracked_alias_ids is also empty (default)
+        let config = ServiceIdentityConfig::new_default();
 
-        let original_sets_len = config.sets.len();
-
-        // Test the condition that prevents auto-config (still relevant)
-        let should_auto_config = config.sets.is_empty() && !config.tracked_alias_ids.is_empty();
-        assert!(
-            !should_auto_config,
-            "Auto-config should not run when tracked_alias_ids is empty"
-        );
-
-        // Verify sets are unchanged
-        assert_eq!(config.sets.len(), original_sets_len);
-        assert!(config.sets.is_empty());
+        assert_eq!(config.sets.len(), 0);
+        assert_eq!(config.tracked_alias_ids.len(), 0);
     }
 
     #[test]

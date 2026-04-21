@@ -1107,6 +1107,7 @@ export default defineComponent({
       input.folder_id = folderId;
       input.owner = store.state.userInfo.email;
       input.last_edited_by = store.state.userInfo.email;
+      if (input.hasOwnProperty("id")) delete input.id;
 
       // VERSION DETECTION AND CONVERSION
       // Convert V0 and V1 conditions to V2 format before creating alert
