@@ -288,8 +288,8 @@ const flameGraphDataAndDepth = computed(() => {
             ? "#2563EB"
             : span.hasError
               ? "#EF4444"
-              : "#ffffff",
-          borderWidth: isSelected ? 3 : span.hasError ? 2 : 1,
+              : "transparent",
+          borderWidth: isSelected ? 3 : span.hasError ? 2 : 0,
         },
         emphasis: {
           itemStyle: {
@@ -311,6 +311,7 @@ const chartOptions = computed(() => {
   const { data, maxRow } = flameGraphDataAndDepth.value;
 
   return {
+    backgroundColor: "transparent",
     tooltip: {
       trigger: "item",
       backgroundColor: "rgba(30, 41, 59, 0.95)",
@@ -418,8 +419,8 @@ const chartOptions = computed(() => {
                     type: "text",
                     style: {
                       text: data[params.dataIndex].spanData.operationName,
-                      fill: "#ffffff",
-                      font: "11px Inter, sans-serif",
+                      fill: "#eaebec",
+                      font: "12px monospace",
                       overflow: "truncate",
                       width: rectWidth - 8,
                     },

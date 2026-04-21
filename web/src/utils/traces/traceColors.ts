@@ -7,82 +7,60 @@
  * Light mode span colors (50 colors)
  */
 export const LIGHT_SPAN_COLORS = [
-  "#10B981",
-  "#06B6D4",
-  "#84CC16",
-  "#6366F1",
-  "#F59E0B",
-  "#3B82F6",
-  "#14B8A6",
-  "#D946EF",
-  "#7C3AED",
-  "#F59E0B",
-  "#0284C7",
-  "#84CC16",
-  "#6366F1",
-  "#F9A8D4",
-  "#10B981",
-  "#8B5CF6",
-  "#F97316",
-  "#22D3EE",
-  "#06B6D4",
-  "#21cb60",
-  "#A855F7",
-  "#FBBF24",
-  "#3B82F6",
-  "#14B8A6",
-  "#6366F1",
-  "#FB923C",
-  "#0EA5E9",
-  "#F472B6",
-  "#A855F7",
-  "#818CF8",
-  "#F97316",
-  "#FCA5A5",
-  "#06B6D4",
-  "#A78BFA",
-  "#3B82F6",
+  "#A16A05",
+  "#003d5c",
+  "#31497e",
+  "#674f95",
+  "#AB52A3",
+  "#C44783",
+  "#65212a",
+  "#31497e",
+  "#4972C4",
+  "#7159EB",
+  "#AB5D43",
+  "#277D79",
+  "#B36205",
 ] as const;
 
 /**
  * Dark mode span colors (50 colors)
  */
 export const DARK_SPAN_COLORS = [
-  "#60A5FA",
-  "#F87171",
-  "#34D399",
-  "#C084FC",
-  "#FB923C",
-  "#22D3EE",
-  "#F472B6",
-  "#A3E635",
-  "#818CF8",
-  "#FBBF24",
-  "#2DD4BF",
-  "#E879F9",
-  "#4ADE80",
-  "#A78BFA",
-  "#FCD34D",
-  "#38BDF8",
-  "#FB7185",
-  "#BEF264",
-  "#818CF8",
-  "#FCA5A5",
-  "#6EE7B7",
-  "#C084FC",
-  "#FDBA74",
-  "#67E8F9",
-  "#F9A8D4",
-  "#86EFAC",
-  "#D8B4FE",
-  "#FDE68A",
-  "#93C5FD",
-  "#FECACA",
-  "#5EEAD4",
-  "#F0ABFC",
-  "#D9F99D",
-  "#A5B4FC",
-  "#FED7AA",
+  "#0F766E",
+  "#DC2626",
+  "#2563EB",
+  "#A21CAF",
+  "#C2410C",
+  "#7C3AED",
+  "#15803D",
+  "#E11D48",
+  "#0369A1",
+  "#B45309",
+  "#9333EA",
+  "#047857",
+  "#4F46E5",
+  "#BE185D",
+  "#0E7490",
+  "#6D28D9",
+  "#854D0E",
+  "#4338CA",
+  "#9A3412",
+  "#1D4ED8",
+  "#166534",
+  "#7E22CE",
+  "#115E59",
+  "#BE123C",
+  "#92400E",
+  "#3730A3",
+  "#9D174D",
+  "#065F46",
+  "#B91C1C",
+  "#155E75",
+  "#3F6212",
+  "#86198F",
+  "#075985",
+  "#1E40AF",
+  "#991B1B",
 ] as const;
 
 /**
@@ -107,7 +85,7 @@ export const getSpanColorHex = (
   index: number,
   theme: "light" | "dark" = "light",
 ): string => {
-  const colors = theme === "dark" ? DARK_SPAN_COLORS : LIGHT_SPAN_COLORS;
+  const colors = LIGHT_SPAN_COLORS;
   const colorIndex =
     (((index - 1) % colors.length) + colors.length) % colors.length;
   return colors[colorIndex];
@@ -176,9 +154,9 @@ export const getSpanColorWithOpacity = (
 export const getAllSpanColors = (
   theme: "light" | "dark" = "light",
 ): string[] => {
-  const colors = theme === "dark" ? DARK_SPAN_COLORS : LIGHT_SPAN_COLORS;
+  const colors = LIGHT_SPAN_COLORS;
   // Return reversed order to maintain existing behavior (was 50-i)
-  return [...colors].reverse();
+  return [...colors];
 };
 
 /**
