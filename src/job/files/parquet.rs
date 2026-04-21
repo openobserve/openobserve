@@ -878,7 +878,22 @@ async fn merge_files(
             let stream_count =
                 crate::service::db::schema::get_stream_count_cached(&org_id, stream_type).await;
 
-            // Check if we should process this file (adaptive per-type sampling)
+            // Get coverage deficit: how many known services are missing streams of this type.
+            // Derived entirely from the in-memory cache — no DB I/O.
+            // Feeds the fast-lane boost in the sampler: 100% incomplete → rate=1 (all streams
+            // active), tapering back to normal as coverage fills in.
+            // Passing (0, 0) when disabled is the documented no-op sentinel for the sampler.
+            let coverage_deficit = if service_streams_config.coverage_catchup_enabled {
+                o2_enterprise::enterprise::service_streams::cache::get_coverage_deficit(
+                    &org_id,
+                    stream_type,
+                )
+                .await
+            } else {
+                (0, 0)
+            };
+
+            // Check if we should process this file (adaptive per-type sampling with fast lane)
             let should_process =
                 o2_enterprise::enterprise::service_streams::sampler::should_process_file(
                     &org_id,
@@ -886,6 +901,7 @@ async fn merge_files(
                     &stream_name,
                     &new_file_key,
                     stream_count,
+                    coverage_deficit,
                 );
 
             if should_process {

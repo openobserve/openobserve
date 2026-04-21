@@ -284,7 +284,7 @@ const search = {
     size: number;
     stream_name: string;
   }) => {
-    const url = `/api/${org_identifier}/${stream_name}/traces/latest?filter=${filter}&start_time=${start_time}&end_time=${end_time}&from=${from}&size=${size}`;
+    const url = `/api/${org_identifier}/${stream_name}/traces/latest?filter=${encodeURIComponent(filter)}&start_time=${start_time}&end_time=${end_time}&from=${from}&size=${size}`;
     return http().get(url);
   },
   getTraceDAG: (
