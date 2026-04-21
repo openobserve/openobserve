@@ -149,3 +149,186 @@ fn extract_panel_info(path: &str, dashboard: &Value) -> Option<PanelInfo> {
             .to_string(),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn test_validate_valid_dashboard() {
+        let json_str = include_str!("../../../../../../test-fixtures/valid/minimal-dashboard.json");
+        let json: Value = serde_json::from_str(json_str).unwrap();
+        let errors = validate(&json);
+        assert!(errors.is_empty(), "Expected no errors, got: {:?}", errors);
+    }
+
+    #[test]
+    fn test_validate_missing_title() {
+        let json_str = include_str!("../../../../../../test-fixtures/invalid/missing-title.json");
+        let json: Value = serde_json::from_str(json_str).unwrap();
+        let errors = validate(&json);
+        assert!(!errors.is_empty());
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.message.contains("title") || e.message.contains("required"))
+        );
+    }
+
+    #[test]
+    fn test_validate_invalid_chart_type() {
+        let json_str =
+            include_str!("../../../../../../test-fixtures/invalid/invalid-chart-type.json");
+        let json: Value = serde_json::from_str(json_str).unwrap();
+        let errors = validate(&json);
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_validate_promql_dashboard() {
+        let json_str = include_str!("../../../../../../test-fixtures/valid/promql-dashboard.json");
+        let json: Value = serde_json::from_str(json_str).unwrap();
+        let errors = validate(&json);
+        assert!(errors.is_empty(), "Expected no errors, got: {:?}", errors);
+    }
+
+    #[test]
+    fn test_validate_maps_dashboard() {
+        let json_str =
+            include_str!("../../../../../../test-fixtures/valid/maps-custom-query-dashboard.json");
+        let json: Value = serde_json::from_str(json_str).unwrap();
+        let errors = validate(&json);
+        assert!(errors.is_empty(), "Expected no errors, got: {:?}", errors);
+    }
+
+    #[test]
+    fn test_validate_empty_object() {
+        let json = json!({});
+        let errors = validate(&json);
+        // Should have schema errors (missing required fields)
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_validate_error_has_schema_validation_code() {
+        let json = json!({});
+        let errors = validate(&json);
+        assert!(errors.iter().all(|e| e.code == "SCHEMA_VALIDATION"));
+    }
+
+    #[test]
+    fn test_extract_panel_info_valid_path() {
+        let dashboard = json!({
+            "tabs": [{
+                "panels": [{
+                    "id": "panel-1",
+                    "type": "line"
+                }]
+            }]
+        });
+        let info = extract_panel_info("/tabs/0/panels/0/queries", &dashboard);
+        assert!(info.is_some());
+        let info = info.unwrap();
+        assert_eq!(info.id, "panel-1");
+        assert_eq!(info.chart_type, "line");
+    }
+
+    #[test]
+    fn test_extract_panel_info_short_path() {
+        let dashboard = json!({"tabs": []});
+        let info = extract_panel_info("/tabs/0", &dashboard);
+        assert!(info.is_none());
+    }
+
+    #[test]
+    fn test_extract_panel_info_wrong_structure() {
+        let dashboard = json!({"tabs": []});
+        let info = extract_panel_info("/foo/0/bar/0/baz", &dashboard);
+        assert!(info.is_none());
+    }
+
+    #[test]
+    fn test_extract_panel_info_invalid_index() {
+        let dashboard = json!({"tabs": [{"panels": []}]});
+        let info = extract_panel_info("/tabs/0/panels/99/field", &dashboard);
+        assert!(info.is_none());
+    }
+
+    #[test]
+    fn test_extract_panel_info_missing_id() {
+        let dashboard = json!({
+            "tabs": [{
+                "panels": [{"type": "bar"}]
+            }]
+        });
+        let info = extract_panel_info("/tabs/0/panels/0/queries", &dashboard);
+        assert!(info.is_some());
+        assert_eq!(info.unwrap().id, "unknown");
+    }
+
+    #[test]
+    fn test_map_error_message_dashboard_title_required() {
+        let msg = map_error_message(
+            "",
+            "required",
+            "\"title\" is a required property",
+            &json!({}),
+        );
+        assert_eq!(msg, "Dashboard title is required");
+    }
+
+    #[test]
+    fn test_map_error_message_root_slash_title_required() {
+        let msg = map_error_message(
+            "/",
+            "required",
+            "\"title\" is a required property",
+            &json!({}),
+        );
+        assert_eq!(msg, "Dashboard title is required");
+    }
+
+    #[test]
+    fn test_map_error_message_tabs_min_items() {
+        let msg = map_error_message("/tabs", "minItems", "raw error text", &json!({}));
+        assert_eq!(msg, "Dashboard must have at least one tab");
+    }
+
+    #[test]
+    fn test_map_error_message_panel_unsupported_chart_type() {
+        let dashboard = json!({
+            "tabs": [{
+                "panels": [{
+                    "id": "p1",
+                    "type": "invalid"
+                }]
+            }]
+        });
+        let msg = map_error_message("/tabs/0/panels/0/type", "enum", "raw error", &dashboard);
+        assert!(msg.contains("Panel p1"));
+        assert!(msg.contains("not supported"));
+    }
+
+    #[test]
+    fn test_map_error_message_fallback() {
+        let msg = map_error_message("/some/random/path", "unknown", "raw error text", &json!({}));
+        assert_eq!(msg, "raw error text");
+    }
+
+    #[test]
+    fn test_map_error_message_no_panel_context() {
+        let msg = map_error_message("/description", "minLength", "raw error text", &json!({}));
+        assert_eq!(msg, "raw error text");
+    }
+
+    #[test]
+    fn test_validate_pie_wrong_fields() {
+        let json_str =
+            include_str!("../../../../../../test-fixtures/invalid/pie-wrong-fields.json");
+        let json: Value = serde_json::from_str(json_str).unwrap();
+        let errors = validate(&json);
+        assert!(!errors.is_empty());
+    }
+}

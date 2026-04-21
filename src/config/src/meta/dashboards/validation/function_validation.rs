@@ -380,3 +380,526 @@ fn validate_function(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    fn make_dashboard(panel: serde_json::Value) -> serde_json::Value {
+        json!({
+            "tabs": [{
+                "tabId": "t1",
+                "panels": [panel]
+            }]
+        })
+    }
+
+    #[test]
+    fn test_skip_html_panel() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "html",
+            "queryType": "sql",
+            "queries": [{
+                "customQuery": false,
+                "fields": {
+                    "x": [{"alias": "f1", "type": "build", "functionName": "nonexistent"}]
+                }
+            }]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_skip_markdown_panel() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "markdown",
+            "queryType": "sql",
+            "queries": [{
+                "customQuery": false,
+                "fields": {
+                    "x": [{"alias": "f1", "type": "build", "functionName": "nonexistent"}]
+                }
+            }]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_skip_promql_query_type() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "line",
+            "queryType": "promql",
+            "queries": [{
+                "customQuery": false,
+                "fields": {
+                    "x": [{"alias": "f1", "type": "build", "functionName": "nonexistent"}]
+                }
+            }]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_skip_promql_builder_query_type() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "line",
+            "queryType": "promql-builder",
+            "queries": [{
+                "customQuery": false,
+                "fields": {
+                    "x": [{"alias": "f1", "type": "build", "functionName": "nonexistent"}]
+                }
+            }]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_skip_custom_query() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "line",
+            "queryType": "sql",
+            "queries": [{
+                "customQuery": true,
+                "fields": {
+                    "x": [{"alias": "f1", "type": "build", "functionName": "nonexistent"}]
+                }
+            }]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_raw_query_empty() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "line",
+            "queryType": "sql",
+            "queries": [{
+                "customQuery": false,
+                "fields": {
+                    "x": [{"alias": "f1", "type": "raw", "rawQuery": ""}]
+                }
+            }]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.iter().any(|e| e.code == "RAW_QUERY_EMPTY"));
+    }
+
+    #[test]
+    fn test_raw_query_whitespace_only() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "line",
+            "queryType": "sql",
+            "queries": [{
+                "customQuery": false,
+                "fields": {
+                    "x": [{"alias": "f1", "type": "raw", "rawQuery": "   "}]
+                }
+            }]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.iter().any(|e| e.code == "RAW_QUERY_EMPTY"));
+    }
+
+    #[test]
+    fn test_raw_query_valid() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "line",
+            "queryType": "sql",
+            "queries": [{
+                "customQuery": false,
+                "fields": {
+                    "x": [{"alias": "f1", "type": "raw", "rawQuery": "SELECT 1"}]
+                }
+            }]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.iter().all(|e| e.code != "RAW_QUERY_EMPTY"));
+    }
+
+    #[test]
+    fn test_invalid_function_name() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "line",
+            "queryType": "sql",
+            "queries": [{
+                "customQuery": false,
+                "fields": {
+                    "x": [{"alias": "f1", "type": "build", "functionName": "nonexistent_func_xyz"}]
+                }
+            }]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.iter().any(|e| e.code == "INVALID_FUNCTION"));
+    }
+
+    #[test]
+    fn test_valid_count_function() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "line",
+            "queryType": "sql",
+            "queries": [{
+                "customQuery": false,
+                "fields": {
+                    "y": [{
+                        "alias": "y1",
+                        "type": "build",
+                        "functionName": "count",
+                        "args": [
+                            {"type": "field", "value": {"field": "_timestamp"}}
+                        ]
+                    }]
+                }
+            }]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.is_empty(), "Expected no errors, got: {:?}", errors);
+    }
+
+    #[test]
+    fn test_field_arg_without_field_selection() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "line",
+            "queryType": "sql",
+            "queries": [{
+                "customQuery": false,
+                "fields": {
+                    "y": [{
+                        "alias": "y1",
+                        "type": "build",
+                        "functionName": "count",
+                        "args": [
+                            {"type": "field", "value": {}}
+                        ]
+                    }]
+                }
+            }]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.iter().any(|e| e.code == "FIELD_NOT_SELECTED"));
+    }
+
+    #[test]
+    fn test_number_arg_invalid() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "line",
+            "queryType": "sql",
+            "queries": [{
+                "customQuery": false,
+                "fields": {
+                    "y": [{
+                        "alias": "y1",
+                        "type": "build",
+                        "functionName": "count",
+                        "args": [
+                            {"type": "number", "value": "not_a_number"}
+                        ]
+                    }]
+                }
+            }]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        // Might error as INVALID_ARG_TYPE if number isn't allowed for count,
+        // or INVALID_NUMBER if it is
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn test_string_arg_empty() {
+        // string_length accepts [field, string, function] as first arg
+        let func = json!({
+            "alias": "f1",
+            "type": "build",
+            "functionName": "string_length",
+            "args": [
+                {"type": "string", "value": ""}
+            ]
+        });
+        let mut errors = Vec::new();
+        validate_function(&func, "Field", &mut errors);
+        assert!(errors.iter().any(|e| e.code == "INVALID_STRING"));
+    }
+
+    #[test]
+    fn test_string_arg_valid() {
+        let func = json!({
+            "alias": "f1",
+            "type": "build",
+            "functionName": "string_length",
+            "args": [
+                {"type": "string", "value": "hello"}
+            ]
+        });
+        let mut errors = Vec::new();
+        validate_function(&func, "Field", &mut errors);
+        assert!(errors.iter().all(|e| e.code != "INVALID_STRING"));
+    }
+
+    #[test]
+    fn test_null_arg_skipped() {
+        let func = json!({
+            "alias": "f1",
+            "type": "build",
+            "functionName": null,
+            "args": [null]
+        });
+        let mut errors = Vec::new();
+        validate_function(&func, "Field", &mut errors);
+        // null args should be skipped, not cause errors
+        assert!(errors.iter().all(|e| e.code != "INVALID_ARG_TYPE"));
+    }
+
+    #[test]
+    fn test_derived_field_skipped() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "line",
+            "queryType": "sql",
+            "queries": [{
+                "customQuery": false,
+                "fields": {
+                    "x": [{
+                        "alias": "f1",
+                        "type": "build",
+                        "isDerived": true,
+                        "functionName": "nonexistent_func_xyz"
+                    }]
+                }
+            }]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_no_tabs() {
+        let dashboard = json!({});
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_no_queries() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "line",
+            "queryType": "sql"
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_no_fields_in_query() {
+        let dashboard = make_dashboard(json!({
+            "id": "p1",
+            "type": "line",
+            "queryType": "sql",
+            "queries": [{"customQuery": false}]
+        }));
+        let mut errors = Vec::new();
+        validate_all_function_args(&dashboard, &mut errors);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_histogram_interval_valid_string() {
+        // histogram accepts [histogramInterval, string, function] as second arg
+        let func = json!({
+            "alias": "f1",
+            "type": "build",
+            "functionName": "histogram",
+            "args": [
+                {"type": "field", "value": {"field": "_timestamp"}},
+                {"type": "histogramInterval", "value": "5m"}
+            ]
+        });
+        let mut errors = Vec::new();
+        validate_function(&func, "Field", &mut errors);
+        assert!(
+            errors
+                .iter()
+                .all(|e| e.code != "INVALID_HISTOGRAM_INTERVAL")
+        );
+    }
+
+    #[test]
+    fn test_histogram_interval_null_valid() {
+        let func = json!({
+            "alias": "f1",
+            "type": "build",
+            "functionName": "histogram",
+            "args": [
+                {"type": "field", "value": {"field": "_timestamp"}},
+                {"type": "histogramInterval", "value": null}
+            ]
+        });
+        let mut errors = Vec::new();
+        validate_function(&func, "Field", &mut errors);
+        assert!(
+            errors
+                .iter()
+                .all(|e| e.code != "INVALID_HISTOGRAM_INTERVAL")
+        );
+    }
+
+    #[test]
+    fn test_histogram_interval_no_value_valid() {
+        let func = json!({
+            "alias": "f1",
+            "type": "build",
+            "functionName": "histogram",
+            "args": [
+                {"type": "field", "value": {"field": "_timestamp"}},
+                {"type": "histogramInterval"}
+            ]
+        });
+        let mut errors = Vec::new();
+        validate_function(&func, "Field", &mut errors);
+        assert!(
+            errors
+                .iter()
+                .all(|e| e.code != "INVALID_HISTOGRAM_INTERVAL")
+        );
+    }
+
+    #[test]
+    fn test_histogram_interval_invalid_number() {
+        let func = json!({
+            "alias": "f1",
+            "type": "build",
+            "functionName": "histogram",
+            "args": [
+                {"type": "field", "value": {"field": "_timestamp"}},
+                {"type": "histogramInterval", "value": 123}
+            ]
+        });
+        let mut errors = Vec::new();
+        validate_function(&func, "Field", &mut errors);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.code == "INVALID_HISTOGRAM_INTERVAL")
+        );
+    }
+
+    #[test]
+    fn test_function_arg_with_nested_function() {
+        // null function accepts [field, function] as first arg
+        let func = json!({
+            "alias": "f1",
+            "type": "build",
+            "functionName": null,
+            "args": [
+                {
+                    "type": "function",
+                    "value": {
+                        "alias": "nested",
+                        "type": "build",
+                        "functionName": null,
+                        "args": []
+                    }
+                }
+            ]
+        });
+        let mut errors = Vec::new();
+        validate_function(&func, "Field", &mut errors);
+        assert!(errors.iter().all(|e| e.code != "INVALID_FUNCTION_ARG"));
+    }
+
+    #[test]
+    fn test_function_arg_invalid_structure() {
+        let func = json!({
+            "alias": "f1",
+            "type": "build",
+            "functionName": null,
+            "args": [
+                {"type": "function", "value": "not_an_object"}
+            ]
+        });
+        let mut errors = Vec::new();
+        validate_function(&func, "Field", &mut errors);
+        assert!(errors.iter().any(|e| e.code == "INVALID_FUNCTION_ARG"));
+    }
+
+    #[test]
+    fn test_function_arg_missing_value() {
+        let func = json!({
+            "alias": "f1",
+            "type": "build",
+            "functionName": null,
+            "args": [
+                {"type": "function"}
+            ]
+        });
+        let mut errors = Vec::new();
+        validate_function(&func, "Field", &mut errors);
+        assert!(errors.iter().any(|e| e.code == "INVALID_FUNCTION_ARG"));
+    }
+
+    #[test]
+    fn test_number_arg_valid() {
+        // abs accepts [field, number, function] as first arg
+        let func = json!({
+            "alias": "f1",
+            "type": "build",
+            "functionName": "abs",
+            "args": [
+                {"type": "number", "value": 42}
+            ]
+        });
+        let mut errors = Vec::new();
+        validate_function(&func, "Field", &mut errors);
+        assert!(errors.iter().all(|e| e.code != "INVALID_NUMBER"));
+    }
+
+    #[test]
+    fn test_number_arg_invalid_string() {
+        // abs accepts [field, number, function] as first arg
+        let func = json!({
+            "alias": "f1",
+            "type": "build",
+            "functionName": "abs",
+            "args": [
+                {"type": "number", "value": "abc"}
+            ]
+        });
+        let mut errors = Vec::new();
+        validate_function(&func, "Field", &mut errors);
+        assert!(errors.iter().any(|e| e.code == "INVALID_NUMBER"));
+    }
+}
