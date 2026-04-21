@@ -31,6 +31,11 @@ test.describe("Anomaly Detection Alerts", () => {
     const page = await context.newPage();
 
     try {
+      // Navigate to base URL first - required for page.evaluate() to make fetch calls
+      // The apiCall helper uses page.evaluate() which needs a valid origin
+      await page.goto(process.env.ZO_BASE_URL);
+      await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+
       // Create a prerequisite destination to enable the Add Alert button
       const createResp = await createMockDestination(page, prerequisiteDestinationName);
       if (createResp.status === 200) {
@@ -1071,6 +1076,10 @@ test.describe("Anomaly Detection Alerts", () => {
     const page = await context.newPage();
 
     try {
+      // Navigate to base URL first - required for page.evaluate() to make fetch calls
+      await page.goto(process.env.ZO_BASE_URL);
+      await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+
       const pm = new PageManager(page);
       // cleanupTestAnomalies uses env vars for auth via shared api-helper.js
       await pm.anomalyDetectionPage.cleanupTestAnomalies(`E2E_Anomaly`);
