@@ -1385,8 +1385,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="router.currentRoute.value.name === 'logs'"
                 ref="queryEditorRef"
                 :query="searchObj.data.query"
-                :keywords="autoCompleteKeywords"
-                :suggestions="autoCompleteSuggestions"
+                :keywords="effectiveKeywords"
+                :suggestions="effectiveSuggestions"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
                 :show-ai-icon="
@@ -2695,9 +2695,12 @@ export default defineComponent({
       autoCompleteData,
       autoCompleteKeywords,
       autoCompleteSuggestions,
+      effectiveKeywords,
+      effectiveSuggestions,
       getSuggestions,
       updateFieldKeywords,
       updateFunctionKeywords,
+      updateStreamKeywords,
     } = useSqlSuggestions();
 
     const refreshTimeChange = (item) => {
@@ -2818,6 +2821,16 @@ export default defineComponent({
         if (fields != undefined && fields.length) updateFieldKeywords(fields);
       },
       { immediate: true, deep: true },
+    );
+
+    watch(
+      () => searchObj.data.streamResults?.list,
+      (list) => {
+        updateStreamKeywords(
+          (list ?? []).map((s: any) => ({ name: s.name })),
+        );
+      },
+      { immediate: true, deep: false },
     );
     watch(
       () => searchObj.meta.showSearchScheduler,
@@ -5218,6 +5231,8 @@ export default defineComponent({
       handleRunQueryFn,
       autoCompleteKeywords,
       autoCompleteSuggestions,
+      effectiveKeywords,
+      effectiveSuggestions,
       onRefreshIntervalUpdate,
       updateTimezone,
       dateTimeRef,
