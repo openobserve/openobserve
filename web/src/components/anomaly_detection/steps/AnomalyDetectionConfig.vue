@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:font-semibold flex items-center"
             style="width: 178px; min-height: 36px;"
           >
-            Filters
+            {{ t('alerts.anomaly.filters') }}
           </div>
           <div style="width: calc(100% - 190px)">
             <div
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 fill-input
                 hide-selected
                 input-debounce="200"
-                :placeholder="filter.field ? '' : 'Field'"
+                :placeholder="filter.field ? '' : t('alerts.anomaly.fieldPlaceholder')"
                 class="alert-v3-select filter-field-select"
                 style="width: 200px"
                 :loading="loadingFields"
@@ -74,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-item-section class="text-grey">
                       {{
                         config.stream_name
-                          ? "No fields found"
-                          : "Select a stream first"
+                          ? t('alerts.anomaly.noFieldsFound')
+                          : t('alerts.anomaly.selectStreamFirst')
                       }}
                     </q-item-section>
                   </q-item>
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="filter.value"
                 dense
                 borderless
-                placeholder="Value"
+                :placeholder="t('alerts.placeholders.value')"
                 class="alert-v3-input"
                 style=" max-width: 160px"
               />
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               no-caps
               dense
-              label="Add filter"
+              :label="t('alerts.anomaly.addFilter')"
               class="o2-secondary-button q-mt-sm"
               size="sm"
               style="width: 110px;"
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :show-auto-complete="true"
                 :disable-ai="!config.stream_name"
                 :disable-ai-reason="
-                  !config.stream_name ? 'Select a stream first' : ''
+                  !config.stream_name ? t('alerts.anomaly.selectStreamFirst') : ''
                 "
                 editor-height="100%"
                 data-test="anomaly-custom-sql"
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-red-8 q-pt-xs"
               style="font-size: 11px; line-height: 12px"
             >
-              SQL is required in custom SQL mode
+              {{ t('alerts.anomaly.sqlRequired') }}
             </div>
             <div
               v-if="hasTimestampAlias"
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 borderless
                 use-input
                 input-debounce="200"
-                :placeholder="config.detection_function_field ? '' : 'Field'"
+                :placeholder="config.detection_function_field ? '' : t('alerts.anomaly.fieldPlaceholder')"
                 :loading="loadingFields"
                 :rules="[(v) => !!v || 'Field is required']"
                 hide-bottom-space
@@ -232,8 +232,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-item-section class="text-grey">
                       {{
                         config.stream_name
-                          ? "No fields found"
-                          : "Select a stream first"
+                          ? t('alerts.anomaly.noFieldsFound')
+                          : t('alerts.anomaly.selectStreamFirst')
                       }}
                     </q-item-section>
                   </q-item>
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Detection Resolution -->
           <div class="paired-col">
             <div class="paired-col-label tw:font-semibold">
-              Detection Resolution <span class="text-negative tw:ml-1">*</span>
+              {{ t('alerts.anomaly.detectionResolution') }} <span class="text-negative tw:ml-1">*</span>
               <q-icon
                 name="info"
                 size="17px"
@@ -254,10 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <q-tooltip anchor="center right" self="center left" max-width="300px">
-                  <span style="font-size: 14px">
-                    How granular each data point is. E.g. "5m" means anomalies
-                    are detected at 5-minute resolution.
-                  </span>
+                  <span style="font-size: 14px">{{ t('alerts.anomaly.detectionResolutionTooltip') }}</span>
                 </q-tooltip>
               </q-icon>
             </div>
@@ -320,10 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  How granular each data point is. E.g. "5m" means anomalies are
-                  detected at 5-minute resolution.
-                </span>
+                <span style="font-size: 14px">{{ t('alerts.anomaly.detectionResolutionTooltip') }}</span>
               </q-tooltip>
             </q-icon>
           </div>
@@ -371,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Check Every -->
           <div class="paired-col">
             <div class="paired-col-label tw:font-semibold">
-              Check Every <span class="text-negative tw:ml-1">*</span>
+              {{ t('alerts.anomaly.checkEvery') }} <span class="text-negative tw:ml-1">*</span>
               <q-icon
                 name="info"
                 size="17px"
@@ -381,10 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <q-tooltip anchor="center right" self="center left" max-width="300px">
-                  <span style="font-size: 14px">
-                    How often the detection job runs. Can be larger than the
-                    sample period (e.g. sample every 5m, run detection every 1h).
-                  </span>
+                  <span style="font-size: 14px">{{ t('alerts.anomaly.checkEveryTooltip') }}</span>
                 </q-tooltip>
               </q-icon>
             </div>
@@ -429,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Look Back Window -->
           <div class="paired-col">
             <div class="paired-col-label tw:font-semibold">
-              Look Back Window <span class="text-negative tw:ml-1">*</span>
+              {{ t('alerts.anomaly.lookBackWindow') }} <span class="text-negative tw:ml-1">*</span>
               <q-icon
                 name="info"
                 size="17px"
@@ -439,10 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <q-tooltip anchor="center right" self="center left" max-width="300px">
-                  <span style="font-size: 14px">
-                    How far back each detection run queries. Caps the window even
-                    after a long pause. Defaults to Check Every interval.
-                  </span>
+                  <span style="font-size: 14px">{{ t('alerts.anomaly.lookBackWindowTooltip') }}</span>
                 </q-tooltip>
               </q-icon>
             </div>
@@ -533,8 +521,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 days (seasonality:
                 {{
                   config.training_window_days >= 7
-                    ? "hour + day-of-week"
-                    : "hour-of-day"
+                    ? t('alerts.anomaly.seasonalityWeekly')
+                    : t('alerts.anomaly.seasonalityDaily')
                 }})
               </span>
             </div>
@@ -542,7 +530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Retrain Every -->
           <div class="paired-col">
             <div class="paired-col-label tw:font-semibold">
-              Retrain Every
+              {{ t('alerts.anomaly.retrainEvery') }}
               <q-icon
                 name="info"
                 size="17px"
@@ -552,10 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <q-tooltip anchor="center right" self="center left" max-width="300px">
-                  <span style="font-size: 14px"
-                    >How often to automatically retrain the model. "Never" means
-                    train once and keep the model until manually retrained.</span
-                  >
+                  <span style="font-size: 14px">{{ t('alerts.anomaly.retrainEveryTooltip') }}</span>
                 </q-tooltip>
               </q-icon>
             </div>
@@ -581,7 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:font-semibold flex items-center"
             style="width: 190px; padding-top: 4px"
           >
-            Sensitivity
+            {{ t('alerts.sensitivity') }}
             <q-icon
               name="info"
               size="17px"
@@ -595,12 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 self="center left"
                 max-width="300px"
               >
-                <span style="font-size: 14px"
-                  >Adjust the anomaly score range to control sensitivity. Points
-                  with scores outside this range will not trigger alerts. Use
-                  the chart to visualize historical data and tune
-                  accordingly.</span
-                >
+                <span style="font-size: 14px">{{ t('alerts.anomaly.sensitivityTooltip') }}</span>
               </q-tooltip>
             </q-icon>
           </div>
@@ -610,9 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Header row: range labels + load button -->
               <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <span class="text-caption text-grey-6"
-                    >Anomaly Score Range:</span
-                  >
+                  <span class="text-caption text-grey-6">{{ t('alerts.anomaly.anomalyScoreRange') }}</span>
                   <span
                     class="tw:font-semibold text-caption"
                     data-test="anomaly-threshold-range-label"
@@ -629,13 +607,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   class="o2-secondary-button"
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  label="Load data"
+                  :label="t('alerts.anomaly.loadData')"
                   size="sm"
                   data-test="anomaly-sensitivity-load-btn"
                   @click="loadPreview"
                 >
-                  <q-tooltip v-if="!config.stream_name">select a stream first</q-tooltip>
-                  <q-tooltip v-else-if="config.query_mode === 'custom_sql' && !config.custom_sql">enter a SQL query first</q-tooltip>
+                  <q-tooltip v-if="!config.stream_name">{{ t('alerts.anomaly.selectStreamFirstTooltip') }}</q-tooltip>
+                  <q-tooltip v-else-if="config.query_mode === 'custom_sql' && !config.custom_sql">{{ t('alerts.anomaly.enterSqlFirst') }}</q-tooltip>
                 </q-btn>
               </div>
 
@@ -660,8 +638,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <span class="text-caption">{{
                       !config.stream_name
-                        ? "Select a stream first"
-                        : "Click Load Data to preview the time series"
+                        ? t('alerts.anomaly.selectStreamFirst')
+                        : t('alerts.anomaly.clickLoadDataHint')
                     }}</span>
                   </div>
                   <PanelSchemaRenderer

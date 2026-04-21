@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
                 </span>
-                <q-btn v-if="anomalyConfig.status === 'failed'" flat no-caps dense size="xs" color="negative" icon="replay" label="Retry" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" />
+                <q-btn v-if="anomalyConfig.status === 'failed'" flat no-caps dense size="xs" color="negative" icon="replay" :label="t('alerts.retry')" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" />
               </template>
             </template>
 
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 borderless
                 no-error-icon
-                :placeholder="'Alert name'"
+                :placeholder="t('alerts.alertNamePlaceholder')"
                 class="alert-v3-field topbar-name-input tw:text-sm"
                 :class="alertNameError ? 'field-error' : ''"
                 hide-bottom-space
@@ -91,12 +91,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="anomalyConfig.name"
                 dense
                 borderless
-                placeholder="Anomaly name"
+                :placeholder="t('alerts.anomalyNamePlaceholder')"
                 class="alert-v3-field topbar-name-input tw:text-sm"
                 hide-bottom-space
               />
               <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0 tw:ml-2">
-                <label class="alert-v3-inline-label">Folder</label>
+                <label class="alert-v3-inline-label">{{ t('alerts.folder') }}</label>
                 <InlineSelectFolderDropdown
                   :model-value="activeFolderId"
                   type="alerts"
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="streamNameError = false; updateStreamFields($event)"
               behavior="menu"
             />
-            <q-tooltip v-if="!formData.stream_type">Select a stream type first</q-tooltip>
+            <q-tooltip v-if="!formData.stream_type">{{ t('alerts.selectStreamTypeFirst') }}</q-tooltip>
           </div>
 
           <!-- Separator before Alert Type -->
@@ -376,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:w-px tw:h-4" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" />
               <q-icon :name="activeEvaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'" :color="activeEvaluationStatus.wouldTrigger ? 'positive' : 'grey-5'" size="16px" />
               <span class="tw:text-xs tw:font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-green-600' : 'tw:text-gray-400'">
-                {{ activeEvaluationStatus.wouldTrigger ? 'Would Trigger' : 'Would Not Trigger' }}
+                {{ activeEvaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
               </span>
               <span class="tw:text-xs tw:opacity-60">{{ activeEvaluationStatus.reason }}</span>
             </template>
@@ -389,7 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="!formData.stream_name" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2">
                 <q-icon name="query_stats" size="36px" class="tw:opacity-20" />
                 <span class="tw:text-sm tw:font-medium" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
-                  Select a stream type and stream name to see a preview
+                  {{ t('alerts.previewEmptyState') }}
                 </span>
               </div>
               <preview-alert
@@ -450,7 +450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <JsonEditor
       :data="formData"
-      :title="'Edit Alert JSON'"
+      :title="t('alerts.editJson')"
       :type="'alerts'"
       :validation-errors="validationErrors"
       @close="showJsonEditorDialog = false"
