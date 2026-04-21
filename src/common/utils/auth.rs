@@ -870,8 +870,6 @@ where
 
             if method.eq("GET") && url_len == 5 && path_columns.get(4) == Some(&"stats") {
                 method = "LIST".to_string();
-            } else if method.eq("GET") {
-                // GET /{incident_id} and GET /{incident_id}/events both require GET
             } else if method.eq("PATCH") {
                 // PATCH /{incident_id}/update → PUT
                 method = "PUT".to_string();
