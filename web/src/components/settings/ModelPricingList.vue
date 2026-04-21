@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-table
       ref="qTableRef"
       data-test="model-pricing-list-table"
-      :rows="tableRows"
+      :rows="filteredModels"
       :columns="columns"
       row-key="id"
       v-model:pagination="pagination"
@@ -178,22 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:body="props">
-        <!-- Shadow banner row -->
-        <q-tr v-if="props.row.__is_shadow_banner" :props="props" class="shadow-banner-row">
-          <q-td :colspan="columns.length" class="shadow-banner-cell">
-            <div class="shadow-banner-tree-line"></div>
-            <q-icon name="warning_amber" size="13px" class="shadow-banner-icon" />
-            The rules below are shadowed by
-            <strong :title="props.row.__parent_name">
-              {{ props.row.__parent_name.length > 25 ? props.row.__parent_name.slice(0, 25) + '…' : props.row.__parent_name }}
-            </strong>
-            — overridden by a higher-priority rule and won't be used for cost calculations.
-          </q-td>
-        </q-tr>
+        <!-- Parent row -->
         <q-tr
-          v-else
           :props="props"
-          :class="{ 'child-pricing-row': props.row.__is_child }"
         >
           <q-td
             v-for="col in columns"
@@ -202,9 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :style="col.style"
             :class="{
               'tree-name-cell': col.name === 'name',
-              'tree-parent-expanded': col.name === 'name' && !props.row.__is_child && props.row.children?.length > 0 && expandedParents.has(props.row.id),
-              'tree-child': col.name === 'name' && props.row.__is_child,
-              'tree-last-child': col.name === 'name' && props.row.__is_child && props.row.__is_last_child,
+              'tree-parent-expanded': col.name === 'name' && props.row.children?.length > 0 && expandedParents.has(props.row.id),
             }"
           >
             <template v-if="col.name === 'select'">
@@ -217,8 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template v-else-if="col.name === 'name'">
-              <!-- Parent row with children -->
-              <div v-if="!props.row.__is_child" class="row items-center no-wrap tree-node-content">
+              <div class="row items-center no-wrap tree-node-content">
                 <div class="tree-icon-wrapper">
                   <q-icon
                     v-if="props.row.children?.length > 0"
@@ -255,56 +239,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="max-width: none; white-space: normal; word-break: break-all;"
                 >{{ props.row.name }}</q-tooltip>
               </div>
-              <!-- Child row -->
-              <div v-else class="row items-center no-wrap tree-node-content tree-child-content">
-                <div class="tree-dot-marker" :class="{ 'tree-dot-parent': props.row.children?.length > 0 }" />
-                <span v-if="getSource(props.row) === 'built_in'" class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1">
-                  <img :src="ooLogo" class="tw:w-[16px] tw:h-[16px]" alt="OpenObserve" />
-                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Built-in model provided by OpenObserve</q-tooltip>
-                </span>
-                <q-icon
-                  v-else-if="getSource(props.row) === 'meta_org' || (getSource(props.row) === 'org' && props.row.org_id !== orgIdentifier)"
-                  name="corporate_fare"
-                  size="16px"
-                  class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
-                >
-                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from global</q-tooltip>
-                </q-icon>
-                <q-icon
-                  v-else
-                  name="person"
-                  size="16px"
-                  class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
-                >
-                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Custom model</q-tooltip>
-                </q-icon>
-                <div class="o2-table-cell-content tw:opacity-70">{{ props.row.name }}</div>
-                <q-tooltip
-                  v-if="props.row.name.length > 30"
-                  anchor="top middle" self="bottom middle" :delay="500"
-                  style="max-width: none; white-space: normal; word-break: break-all;"
-                >{{ props.row.name }}</q-tooltip>
-              </div>
             </template>
             <template v-else-if="col.name === 'match_pattern'">
               <div class="tw:flex tw:items-center tw:gap-1">
-                <code
-                  class="text-caption pattern-code o2-table-cell-content"
-                  :class="{ 'shadowed-pattern': props.row.__is_child }"
-                >
-                  {{ props.row.match_pattern }}
-                </code>
-                <q-icon
-                  v-if="props.row.__is_child"
-                  name="warning_amber"
-                  size="14px"
-                  class="tw:shrink-0 shadowed-icon"
-                  color="orange-10"
-                >
-                  <q-tooltip :delay="300" anchor="top middle" self="bottom middle" style="max-width: 260px; white-space: normal;">
-                    Shadowed by "{{ getParentName(props.row) }}" — overridden by a higher-priority rule and won't be used for cost calculations
-                  </q-tooltip>
-                </q-icon>
+                <code class="text-caption pattern-code o2-table-cell-content">{{ props.row.match_pattern }}</code>
               </div>
             </template>
             <template v-else-if="col.name === 'pricing'">
@@ -350,77 +288,166 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else-if="col.name === 'actions'">
               <div class="tw:flex tw:items-center tw:gap-1 tw:justify-end">
-                <!-- Own entries: pause/play + edit + duplicate -->
                 <template v-if="!isReadOnly(props.row)">
                   <q-btn
-                    dense
-                    unelevated
-                    size="sm"
+                    dense unelevated size="sm" round flat
                     :color="props.row.enabled ? 'negative' : 'positive'"
                     :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-                    round
-                    flat
                     :title="props.row.enabled ? 'Disable' : 'Enable'"
                     @click.stop="toggleEnabled(props.row, !props.row.enabled)"
                     data-test="model-pricing-toggle-btn"
                   />
-                  <q-btn
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
-                    icon="edit"
-                    title="Edit"
-                    @click.stop="openEditor(props.row)"
-                    data-test="model-pricing-edit-btn"
-                  />
-                  <q-btn
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
-                    :icon="outlinedDelete"
-                    title="Delete"
-                    @click.stop="confirmDelete(props.row)"
-                    data-test="model-pricing-delete-btn"
-                  />
-                  <q-btn
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
-                    icon="content_copy"
-                    title="Duplicate"
-                    @click.stop="duplicateModel(props.row)"
-                    data-test="model-pricing-duplicate-btn"
-                  />
+                  <q-btn padding="sm" unelevated size="sm" round flat icon="edit" title="Edit"
+                    @click.stop="openEditor(props.row)" data-test="model-pricing-edit-btn" />
+                  <q-btn padding="sm" unelevated size="sm" round flat :icon="outlinedDelete" title="Delete"
+                    @click.stop="confirmDelete(props.row)" data-test="model-pricing-delete-btn" />
+                  <q-btn padding="sm" unelevated size="sm" round flat icon="content_copy" title="Duplicate"
+                    @click.stop="duplicateModel(props.row)" data-test="model-pricing-duplicate-btn" />
                 </template>
-                <!-- Read-only entries (meta/built-in): clone -->
                 <template v-else>
-                  <q-btn
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
-                    icon="content_copy"
-                    title="Clone to this org"
-                    @click.stop="duplicateModel(props.row)"
-                    data-test="model-pricing-clone-btn"
-                  />
+                  <q-btn padding="sm" unelevated size="sm" round flat icon="content_copy" title="Clone to this org"
+                    @click.stop="duplicateModel(props.row)" data-test="model-pricing-clone-btn" />
                 </template>
               </div>
             </template>
             <template v-else>
-              <div class="o2-table-cell-content">
-                {{ props.row[col.field] }}
-              </div>
+              <div class="o2-table-cell-content">{{ props.row[col.field] }}</div>
             </template>
           </q-td>
         </q-tr>
+
+        <!-- Inline children (not counted by q-table pagination) -->
+        <template v-if="props.row.children?.length > 0 && expandedParents.has(props.row.id)">
+          <!-- Shadow banner -->
+          <q-tr class="shadow-banner-row">
+            <q-td :colspan="columns.length" class="shadow-banner-cell">
+              <div class="shadow-banner-tree-line"></div>
+              <q-icon name="warning_amber" size="13px" class="shadow-banner-icon" />
+              The rules below are shadowed by
+              <strong :title="props.row.name">
+                {{ props.row.name.length > 25 ? props.row.name.slice(0, 25) + '…' : props.row.name }}
+              </strong>
+              — overridden by a higher-priority rule and won't be used for cost calculations.
+            </q-td>
+          </q-tr>
+          <!-- Child rows -->
+          <q-tr
+            v-for="(child, idx) in props.row.children"
+            :key="child.id"
+            class="child-pricing-row"
+          >
+            <q-td
+              v-for="col in columns"
+              :key="col.name"
+              :style="col.style + (col.align ? `; text-align: ${col.align};` : '')"
+              :class="{
+                'tree-name-cell': col.name === 'name',
+                'tree-child': col.name === 'name',
+                'tree-last-child': col.name === 'name' && idx === props.row.children.length - 1,
+              }"
+            >
+              <template v-if="col.name === 'select'">
+                <q-checkbox
+                  :model-value="selectedIds.includes(child.id)"
+                  size="sm"
+                  class="o2-table-checkbox"
+                  @update:model-value="toggleSelect(child.id)"
+                />
+              </template>
+              <template v-else-if="col.name === 'name'">
+                <div class="row items-center no-wrap tree-node-content tree-child-content">
+                  <div class="tree-dot-marker" :class="{ 'tree-dot-parent': child.children?.length > 0 }" />
+                  <span v-if="getSource(child) === 'built_in'" class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1">
+                    <img :src="ooLogo" class="tw:w-[16px] tw:h-[16px]" alt="OpenObserve" />
+                    <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Built-in model provided by OpenObserve</q-tooltip>
+                  </span>
+                  <q-icon
+                    v-else-if="getSource(child) === 'meta_org' || (getSource(child) === 'org' && child.org_id !== orgIdentifier)"
+                    name="corporate_fare" size="16px" class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
+                  >
+                    <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from global</q-tooltip>
+                  </q-icon>
+                  <q-icon v-else name="person" size="16px" class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon">
+                    <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Custom model</q-tooltip>
+                  </q-icon>
+                  <div class="o2-table-cell-content tw:opacity-70">{{ child.name }}</div>
+                  <q-tooltip v-if="child.name.length > 30" anchor="top middle" self="bottom middle" :delay="500"
+                    style="max-width: none; white-space: normal; word-break: break-all;">{{ child.name }}</q-tooltip>
+                </div>
+              </template>
+              <template v-else-if="col.name === 'match_pattern'">
+                <div class="tw:flex tw:items-center tw:gap-1">
+                  <code class="text-caption pattern-code o2-table-cell-content shadowed-pattern">{{ child.match_pattern }}</code>
+                  <q-icon name="warning_amber" size="14px" class="tw:shrink-0 shadowed-icon" color="orange-10">
+                    <q-tooltip :delay="300" anchor="top middle" self="bottom middle" style="max-width: 260px; white-space: normal;">
+                      Shadowed by "{{ props.row.name }}" — overridden by a higher-priority rule and won't be used for cost calculations
+                    </q-tooltip>
+                  </q-icon>
+                </div>
+              </template>
+              <template v-else-if="col.name === 'pricing'">
+                <div class="tw:flex tw:flex-wrap tw:gap-1">
+                  <template v-if="getDefaultTier(child) && Object.keys(getDefaultTier(child).prices || {}).length">
+                    <span
+                      v-for="(price, key) in getVisiblePrices(child)"
+                      :key="key"
+                      class="dimension-badge"
+                      :class="getPriceKeyColorClass(key as string)"
+                    >
+                      <span class="tw:font-medium">{{ formatPriceKey(key as string) }}</span>=<span>{{ formatPerMillion(price as number) }}</span>
+                    </span>
+                    <span
+                      v-if="getOverflowCount(child) > 0"
+                      class="dimension-badge badge-more tw:cursor-pointer"
+                      @click.stop="openPricingDialog(child)"
+                    >
+                      +{{ getOverflowCount(child) }} more
+                      <q-tooltip :delay="400" anchor="top middle" self="bottom middle" class="pricing-overflow-tooltip">
+                        <div class="pricing-breakdown-tooltip">
+                          <div class="pricing-breakdown-title">{{ child.name }}</div>
+                          <table class="pricing-breakdown-table">
+                            <thead><tr><th>Usage Type</th><th>Price per 1M tokens</th></tr></thead>
+                            <tbody>
+                              <tr v-for="([key, price]) in sortedPriceEntries(getDefaultTier(child)?.prices || {})" :key="key">
+                                <td>{{ formatPriceKey(key) }}</td>
+                                <td>{{ formatPerMillion(price) }}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </q-tooltip>
+                    </span>
+                  </template>
+                  <span v-else class="text-grey-5">—</span>
+                </div>
+              </template>
+              <template v-else-if="col.name === 'actions'">
+                <div class="tw:flex tw:items-center tw:gap-1 tw:justify-end">
+                  <template v-if="!isReadOnly(child)">
+                    <q-btn dense unelevated size="sm" round flat
+                      :color="child.enabled ? 'negative' : 'positive'"
+                      :icon="child.enabled ? outlinedPause : outlinedPlayArrow"
+                      :title="child.enabled ? 'Disable' : 'Enable'"
+                      @click.stop="toggleEnabled(child, !child.enabled)" />
+                    <q-btn padding="sm" unelevated size="sm" round flat icon="edit" title="Edit"
+                      @click.stop="openEditor(child)" />
+                    <q-btn padding="sm" unelevated size="sm" round flat :icon="outlinedDelete" title="Delete"
+                      @click.stop="confirmDelete(child)" />
+                    <q-btn padding="sm" unelevated size="sm" round flat icon="content_copy" title="Duplicate"
+                      @click.stop="duplicateModel(child)" />
+                  </template>
+                  <template v-else>
+                    <q-btn padding="sm" unelevated size="sm" round flat icon="content_copy" title="Clone to this org"
+                      @click.stop="duplicateModel(child)" />
+                  </template>
+                </div>
+              </template>
+              <template v-else>
+                <div class="o2-table-cell-content">{{ child[col.field] }}</div>
+              </template>
+            </q-td>
+          </q-tr>
+        </template>
       </template>
 
       <template #bottom="scope">
@@ -660,13 +687,21 @@ const selectableModels = computed(() =>
 /** Selectable rows visible on the current page (parents + expanded children). */
 const currentPageSelectableModels = computed(() => {
   const perPage = pagination.value.rowsPerPage || 0;
-  if (perPage === 0) {
-    return tableRows.value;
+  const allParents = filteredModels.value;
+  const pageParents = perPage === 0
+    ? allParents
+    : allParents.slice(
+        ((qTableRef.value?.computedPagination?.page ?? 1) - 1) * perPage,
+        (qTableRef.value?.computedPagination?.page ?? 1) * perPage,
+      );
+  const result: any[] = [];
+  for (const parent of pageParents) {
+    result.push(parent);
+    if (parent.children?.length > 0 && expandedParents.value.has(parent.id)) {
+      result.push(...parent.children);
+    }
   }
-  const page = (qTableRef.value?.computedPagination?.page ?? 1);
-  const start = (page - 1) * perPage;
-  const end = start + perPage;
-  return tableRows.value.slice(start, end);
+  return result;
 });
 
 const selectedIdsOnlyContainsOwn = computed(() => {
@@ -710,21 +745,10 @@ function getSource(model: any): string {
   return model.source || 'org';
 }
 
-/** Return the parent model's name for a child (shadowed) row. */
-function getParentName(row: any): string {
-  if (!row.__parent_id) return '';
-  const parent = models.value.find((m: any) => m.id === row.__parent_id);
-  return parent?.name || '';
-}
-
 
 /** True when a model entry is read-only (built-in or from another org). */
 function isReadOnly(model: any): boolean {
   return model.source === 'built_in' || model.org_id !== orgIdentifier.value;
-}
-
-function sectionIcon(section: string): string {
-  return section === 'built_in' ? 'auto_awesome' : 'corporate_fare';
 }
 
 function sectionLabel(section: string): string {
@@ -801,18 +825,9 @@ const filteredModels = computed(() => {
   return sorted;
 });
 
-/** Sort within each section group, keeping child rows attached to their parent. */
+/** Sort within each section group (q-table only receives parent rows). */
 function customSort(rows: any[], sortBy: string, descending: boolean) {
   if (!sortBy) return rows;
-
-  // Separate child rows — they'll be re-inserted after their parent
-  const parentRows = rows.filter((r: any) => !r.__is_child);
-  const childRowsByParent = new Map<string, any[]>();
-  for (const r of rows.filter((r: any) => r.__is_child)) {
-    const arr = childRowsByParent.get(r.__parent_id) || [];
-    arr.push(r);
-    childRowsByParent.set(r.__parent_id, arr);
-  }
 
   const compare = (a: any, b: any) => {
     const aVal = (a[sortBy] ?? '').toString().toLowerCase();
@@ -821,25 +836,19 @@ function customSort(rows: any[], sortBy: string, descending: boolean) {
     return descending ? -cmp : cmp;
   };
 
-  const orgRows = parentRows.filter((r: any) => getSource(r) === 'org' && r.org_id === orgIdentifier.value);
-  const metaRows = parentRows.filter((r: any) => getSource(r) === 'meta_org' || (getSource(r) === 'org' && r.org_id !== orgIdentifier.value));
-  const builtInRows = parentRows.filter((r: any) => getSource(r) === 'built_in');
+  const orgRows = rows.filter((r: any) => getSource(r) === 'org' && r.org_id === orgIdentifier.value);
+  const metaRows = rows.filter((r: any) => getSource(r) === 'meta_org' || (getSource(r) === 'org' && r.org_id !== orgIdentifier.value));
+  const builtInRows = rows.filter((r: any) => getSource(r) === 'built_in');
 
   orgRows.sort(compare);
   metaRows.sort(compare);
   builtInRows.sort(compare);
 
-  // Clear and re-apply section markers
   [...orgRows, ...metaRows, ...builtInRows].forEach((r: any) => { r.__sectionStart = null; });
   if (metaRows.length > 0) metaRows[0].__sectionStart = 'meta_org';
   if (builtInRows.length > 0) builtInRows[0].__sectionStart = 'built_in';
 
-  const result: any[] = [];
-  for (const parent of [...orgRows, ...metaRows, ...builtInRows]) {
-    result.push(parent);
-    result.push(...(childRowsByParent.get(parent.id) || []));
-  }
-  return result;
+  return [...orgRows, ...metaRows, ...builtInRows];
 }
 
 function getDefaultTier(model: any) {
@@ -890,25 +899,6 @@ function toggleExpand(id: string) {
   expandedParents.value = next;
 }
 
-const tableRows = computed(() => {
-  const result: any[] = [];
-  for (const model of filteredModels.value) {
-    result.push(model);
-    if (model.children?.length > 0 && expandedParents.value.has(model.id)) {
-      result.push({ __is_shadow_banner: true, __parent_id: model.id, __parent_name: model.name, id: `banner-${model.id}` });
-      model.children.forEach((child: any, idx: number) => {
-        result.push({
-          ...child,
-          __is_child: true,
-          __parent_id: model.id,
-          __sectionStart: null,
-          __is_last_child: idx === model.children.length - 1,
-        });
-      });
-    }
-  }
-  return result;
-});
 
 /** Shorten usage key for display: replace underscores with hyphens, drop trailing "_tokens". */
 function formatPriceKey(key: string): string {
