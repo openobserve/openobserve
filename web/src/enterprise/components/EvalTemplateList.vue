@@ -402,7 +402,7 @@ const loadTemplates = async () => {
     if (err?.response?.status !== 403) {
       q.notify({
         type: "negative",
-        message: err?.data?.message || t("evalTemplate.loadFailed"),
+        message: err?.response?.data?.message || t("evalTemplate.loadFailed"),
         timeout: 3000,
       });
     }
