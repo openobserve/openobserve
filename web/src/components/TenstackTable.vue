@@ -493,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="copy-btn q-mr-xs"
                       @click.stop="
                         copyCellContent(
-                          cell.getValue(),
+                          getCellDisplayValue(cell),
                           idx as number,
                           cell.column.id,
                         )
@@ -538,7 +538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="copy-btn q-ml-xs"
                       @click.stop="
                         copyCellContent(
-                          cell.getValue(),
+                          getCellDisplayValue(cell),
                           idx as number,
                           cell.column.id,
                         )
@@ -785,7 +785,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="copy-btn q-mr-xs"
                           @click.stop="
                             copyCellContent(
-                              cell.getValue(),
+                              getCellDisplayValue(cell),
                               virtualRow.index,
                               cell.column.id,
                             )
@@ -869,7 +869,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="copy-btn q-ml-xs"
                           @click.stop="
                             copyCellContent(
-                              cell.getValue(),
+                              getCellDisplayValue(cell),
                               virtualRow.index,
                               cell.column.id,
                             )

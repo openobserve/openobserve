@@ -13,10 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
+
+// Hoist copyToClipboard mock so it can be referenced inside vi.mock factory below.
+const { mockCopyToClipboard } = vi.hoisted(() => ({
+  mockCopyToClipboard: vi.fn().mockResolvedValue(undefined),
+}));
 
 // ---------------------------------------------------------------------------
 // Module mocks — must appear before any import of the tested component.
@@ -41,7 +46,7 @@ vi.mock("@tanstack/vue-virtual", () => ({
 
 vi.mock("quasar", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
-  return { ...actual, debounce: (fn: any) => fn };
+  return { ...actual, debounce: (fn: any) => fn, copyToClipboard: mockCopyToClipboard };
 });
 
 vi.mock("vuex", () => ({
@@ -1308,6 +1313,277 @@ describe("TenstackTable", () => {
 
     it("should return [0] when showPagination=false", () => {
       expect(getOptions(10, false)).toEqual([0]);
+    });
+  });
+
+  // ── copy cell — clipboard receives the formatted value, not the raw ISO T-string ──
+  // Regression: before the fix, copyCellContent was called with cell.getValue()
+  // (raw ISO timestamp like "2024-01-15T10:30:00Z").  After the fix it is called
+  // with getCellDisplayValue(cell) which applies the column's format function,
+  // producing "2024-01-15 10:30:00" — no "T" separator.
+  describe("copy cell — timestamp value is formatted before clipboard write", () => {
+    const ISO_RAW = "2024-01-15T10:30:00Z";
+    const FORMATTED = "2024-01-15 10:30:00";
+    // Minimal simulation of parseTimestampValue: strips the "T" ISO separator and "Z" suffix.
+    const timestampFormat = (val: any): string =>
+      val ? String(val).replace("T", " ").replace("Z", "") : val;
+
+    beforeEach(() => {
+      mockCopyToClipboard.mockClear();
+    });
+
+    it("should copy the formatted display value (not raw ISO) when copy button is clicked on a left-aligned timestamp column", async () => {
+      const cols = [
+        {
+          name: "event_time",
+          label: "EVENT TIME",
+          field: "event_time",
+          align: "left",
+          format: timestampFormat,
+        },
+      ];
+      wrapper = mountTable({
+        columns: cols,
+        rows: [{ event_time: ISO_RAW }],
+        useVirtualScroll: false,
+        enableCellCopy: true,
+      });
+      await flushPromises();
+
+      const copyBtn = wrapper.find(".copy-btn");
+      expect(copyBtn.exists()).toBe(true);
+      await copyBtn.trigger("click");
+      await flushPromises();
+
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+    });
+
+    it("should NOT pass the raw ISO 'T' separator to the clipboard when a timestamp format function is defined", async () => {
+      const cols = [
+        {
+          name: "ts",
+          label: "TIMESTAMP",
+          field: "ts",
+          align: "left",
+          format: timestampFormat,
+        },
+      ];
+      wrapper = mountTable({
+        columns: cols,
+        rows: [{ ts: ISO_RAW }],
+        useVirtualScroll: false,
+        enableCellCopy: true,
+      });
+      await flushPromises();
+
+      await wrapper.find(".copy-btn").trigger("click");
+      await flushPromises();
+
+      expect(mockCopyToClipboard).toHaveBeenCalledOnce();
+      const copiedValue = mockCopyToClipboard.mock.calls[0][0] as string;
+      // The raw ISO "T" separator must not appear in the clipboard value.
+      expect(copiedValue).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    });
+
+    it("should copy the formatted display value from the left-side copy button on a right-aligned timestamp column", async () => {
+      const cols = [
+        {
+          name: "ts",
+          label: "TIMESTAMP",
+          field: "ts",
+          align: "right",
+          format: timestampFormat,
+        },
+      ];
+      wrapper = mountTable({
+        columns: cols,
+        rows: [{ ts: ISO_RAW }],
+        useVirtualScroll: false,
+        enableCellCopy: true,
+      });
+      await flushPromises();
+
+      const copyBtn = wrapper.find(".copy-btn");
+      expect(copyBtn.exists()).toBe(true);
+      await copyBtn.trigger("click");
+      await flushPromises();
+
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+    });
+
+    it("should copy the raw value unchanged when the column has no format function", async () => {
+      const cols = [
+        { name: "label", label: "LABEL", field: "label", align: "left" },
+      ];
+      wrapper = mountTable({
+        columns: cols,
+        rows: [{ label: "plain-text" }],
+        useVirtualScroll: false,
+        enableCellCopy: true,
+      });
+      await flushPromises();
+
+      await wrapper.find(".copy-btn").trigger("click");
+      await flushPromises();
+
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("plain-text");
+    });
+
+    it("should copy the formatted value for a center-aligned timestamp column", async () => {
+      const cols = [
+        {
+          name: "ts",
+          label: "TIMESTAMP",
+          field: "ts",
+          align: "center",
+          format: timestampFormat,
+        },
+      ];
+      wrapper = mountTable({
+        columns: cols,
+        rows: [{ ts: ISO_RAW }],
+        useVirtualScroll: false,
+        enableCellCopy: true,
+      });
+      await flushPromises();
+
+      await wrapper.find(".copy-btn").trigger("click");
+      await flushPromises();
+
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+    });
+  });
+
+  // ── copy cell — pivot table mode ──────────────────────────────────────────
+  // Pivot tables go through the same non-virtual DOM path so the format function
+  // must also be applied when a copy button is clicked in pivot mode.
+  describe("copy cell — pivot table timestamp formatting", () => {
+    const ISO_RAW = "2024-01-15T10:30:00Z";
+    const FORMATTED = "2024-01-15 10:30:00";
+    const timestampFormat = (val: any): string =>
+      val ? String(val).replace("T", " ").replace("Z", "") : val;
+
+    const oneLevel = [
+      {
+        isLeaf: true,
+        cells: [{ label: "TIMESTAMP", colspan: 1, _sortColumn: "ts" }],
+      },
+    ];
+
+    beforeEach(() => {
+      mockCopyToClipboard.mockClear();
+    });
+
+    it("should copy the formatted timestamp value when copy button is clicked in pivot mode (left-aligned)", async () => {
+      const pivotCols = [
+        {
+          name: "region",
+          label: "REGION",
+          field: "region",
+          _isRowField: true,
+          align: "left",
+        },
+        {
+          name: "ts",
+          label: "TIMESTAMP",
+          field: "ts",
+          align: "left",
+          format: timestampFormat,
+        },
+      ];
+      wrapper = mountTable({
+        columns: pivotCols,
+        rows: [{ region: "EMEA", ts: ISO_RAW }],
+        useVirtualScroll: false,
+        pivotHeaderLevels: oneLevel,
+        enableCellCopy: true,
+      });
+      await flushPromises();
+
+      // Two copy buttons: index 0 = "region" cell, index 1 = "ts" cell.
+      const copyBtns = wrapper.findAll(".copy-btn");
+      expect(copyBtns.length).toBeGreaterThanOrEqual(2);
+      await copyBtns[1].trigger("click");
+      await flushPromises();
+
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+    });
+
+    it("should NOT contain the ISO 'T' separator in the copied pivot timestamp value", async () => {
+      const pivotCols = [
+        {
+          name: "region",
+          label: "REGION",
+          field: "region",
+          _isRowField: true,
+          align: "left",
+        },
+        {
+          name: "ts",
+          label: "TIMESTAMP",
+          field: "ts",
+          align: "left",
+          format: timestampFormat,
+        },
+      ];
+      wrapper = mountTable({
+        columns: pivotCols,
+        rows: [{ region: "EMEA", ts: ISO_RAW }],
+        useVirtualScroll: false,
+        pivotHeaderLevels: oneLevel,
+        enableCellCopy: true,
+      });
+      await flushPromises();
+
+      const copyBtns = wrapper.findAll(".copy-btn");
+      await copyBtns[1].trigger("click");
+      await flushPromises();
+
+      const copiedValue = mockCopyToClipboard.mock.calls[0][0] as string;
+      expect(copiedValue).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    });
+
+    it("should copy the formatted timestamp from a right-aligned column in pivot mode", async () => {
+      const pivotCols = [
+        {
+          name: "region",
+          label: "REGION",
+          field: "region",
+          _isRowField: true,
+          align: "left",
+        },
+        {
+          name: "ts",
+          label: "TS",
+          field: "ts",
+          align: "right",
+          format: timestampFormat,
+        },
+      ];
+      const rightAlignedLevel = [
+        {
+          isLeaf: true,
+          cells: [{ label: "TS", colspan: 1, _sortColumn: "ts" }],
+        },
+      ];
+      wrapper = mountTable({
+        columns: pivotCols,
+        rows: [{ region: "EMEA", ts: ISO_RAW }],
+        useVirtualScroll: false,
+        pivotHeaderLevels: rightAlignedLevel,
+        enableCellCopy: true,
+      });
+      await flushPromises();
+
+      // Right-aligned column renders copy button on the LEFT side of the cell.
+      // The button for the right-aligned "ts" column is last in the list
+      // (region is index 0, ts right-aligned is index 1).
+      const copyBtns = wrapper.findAll(".copy-btn");
+      expect(copyBtns.length).toBeGreaterThanOrEqual(2);
+      await copyBtns[1].trigger("click");
+      await flushPromises();
+
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
     });
   });
 });
