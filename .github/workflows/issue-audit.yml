@@ -1,7 +1,7 @@
 name: Issue Audit - Check Fix & Test Coverage
 
 on:
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:  # Manual trigger only
     inputs:
       test_mode:
         description: 'Test mode - limit to specific issues (comma-separated issue numbers, or "all" for full audit)'
@@ -13,8 +13,6 @@ on:
         required: false
         default: false
         type: boolean
-  schedule:
-    - cron: '0 0 * * 1'  # Weekly on Monday at midnight UTC
 
 permissions:
   issues: write
