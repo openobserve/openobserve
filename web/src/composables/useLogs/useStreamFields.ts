@@ -818,7 +818,7 @@ export const useStreamFields = () => {
           label: string;
           value: string;
         };
-        const streamValues = new Set<string>();
+        const availableStreamNames = new Set<string>();
 
         for (const item of searchObj.data.streamResults.list) {
           itemObj = {
@@ -827,14 +827,14 @@ export const useStreamFields = () => {
           };
 
           searchObj.data.stream.streamLists.push(itemObj);
-          streamValues.add(itemObj.value);
+          availableStreamNames.add(itemObj.value);
         }
-        if (routeStream && streamValues.has(routeStream as string)) {
+        if (routeStream && availableStreamNames.has(routeStream as string)) {
           selectedStream = [routeStream as string];
         } else if (
           persistenceEnabled &&
           persistedStream &&
-          streamValues.has(persistedStream)
+          availableStreamNames.has(persistedStream)
         ) {
           selectedStream = [persistedStream];
         } else if (persistenceEnabled && searchObj.data.stream.streamLists[0]) {

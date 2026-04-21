@@ -567,7 +567,9 @@ describe("Index.vue (Main Traces Page)", () => {
       // getStreamList uses an un-awaited .then() chain; poll until it resolves
       await vi.waitFor(
         () => {
-          expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+          expect(mockSearchObj.data.stream.selectedStream.value).toBe(
+            mockStreamList.list[0].name,
+          );
         },
         { timeout: 2000 },
       );
