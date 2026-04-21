@@ -28,7 +28,8 @@ import Error404 from "@/views/Error404.vue";
 import ShortUrl from "@/views/ShortUrl.vue";
 
 const Search = () => import("@/plugins/logs/Index.vue");
-const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
+const SearchJobInspector = () =>
+  import("@/plugins/logs/SearchJobInspector.vue");
 const AppMetrics = () => import("@/plugins/metrics/Index.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
 const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
@@ -122,7 +123,7 @@ const useRoutes = () => {
         searchable: true,
         icon: "home",
         section: "General",
-        keywords: ["home", "overview", "start"],
+        keywords: ["overview"],
       },
     },
     {
@@ -135,7 +136,7 @@ const useRoutes = () => {
         searchable: true,
         icon: "article",
         section: "Observability",
-        keywords: ["search", "query", "log", "stream"],
+        keywords: ["log search", "log query", "field list", "log patterns", "saved views"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -163,7 +164,7 @@ const useRoutes = () => {
         searchable: true,
         icon: "query_stats",
         section: "Observability",
-        keywords: ["prometheus", "promql", "gauge", "counter"],
+        keywords: ["prometheus", "promql", "time series", "gauge", "counter", "metric explorer"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -176,6 +177,10 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         title: "PromQL Query Builder",
+        searchable: true,
+        icon: "functions",
+        section: "Observability",
+        keywords: ["promql builder", "prometheus query", "metrics query builder"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -191,7 +196,7 @@ const useRoutes = () => {
         searchable: true,
         icon: "timeline",
         section: "Observability",
-        keywords: ["span", "tracing", "distributed", "opentelemetry"],
+        keywords: ["distributed tracing", "spans", "service graph", "opentelemetry", "latency", "APM"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -234,7 +239,7 @@ const useRoutes = () => {
         searchable: true,
         icon: "storage",
         section: "Management",
-        keywords: ["log stream", "index", "schema", "data"],
+        keywords: ["log streams", "metrics streams", "traces streams", "stream schema", "stream management"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -259,7 +264,7 @@ const useRoutes = () => {
         searchable: true,
         icon: "dashboard",
         section: "Visualization",
-        keywords: ["charts", "panels", "visualization", "graphs"],
+        keywords: ["charts", "panels", "visualization", "graphs", "dashboard folders"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -323,7 +328,7 @@ const useRoutes = () => {
         searchable: true,
         icon: "account_tree",
         section: "Management",
-        keywords: ["functions", "enrichment", "transform", "ingest"],
+        keywords: ["VRL functions", "enrichment tables", "data pipeline", "stream processing"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -414,7 +419,7 @@ const useRoutes = () => {
         searchable: true,
         icon: "notifications",
         section: "Observability",
-        keywords: ["alert", "monitor", "notification", "trigger"],
+        keywords: ["monitors", "notifications", "anomaly detection", "scheduled alerts", "real-time alerts", "alert rules"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -441,8 +446,14 @@ const useRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         const store = (window as any).store;
         const isOss = store?.state?.zoConfig?.build_type === "opensource";
-        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
-          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+        if (
+          isOss ||
+          (config.isEnterprise !== "true" && config.isCloud !== "true")
+        ) {
+          next({
+            name: "alertList",
+            query: { org_identifier: to.query.org_identifier },
+          });
           return;
         }
         routeGuard(to, from, next);
@@ -458,8 +469,14 @@ const useRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         const store = (window as any).store;
         const isOss = store?.state?.zoConfig?.build_type === "opensource";
-        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
-          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+        if (
+          isOss ||
+          (config.isEnterprise !== "true" && config.isCloud !== "true")
+        ) {
+          next({
+            name: "alertList",
+            query: { org_identifier: to.query.org_identifier },
+          });
           return;
         }
         routeGuard(to, from, next);
@@ -471,6 +488,10 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/AlertHistory.vue"),
       meta: {
         title: "Alert History",
+        searchable: true,
+        icon: "history",
+        section: "Observability",
+        keywords: ["triggered alerts", "fired alerts", "alert logs"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -482,6 +503,10 @@ const useRoutes = () => {
       component: () => import("@/components/alerts/AlertInsights.vue"),
       meta: {
         title: "Alert Insights",
+        searchable: true,
+        icon: "insights",
+        section: "Observability",
+        keywords: ["alert analytics", "alert quality", "noise reduction"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -516,7 +541,7 @@ const useRoutes = () => {
         searchable: true,
         icon: "person_search",
         section: "Observability",
-        keywords: ["RUM", "sessions", "errors", "performance", "frontend"],
+        keywords: ["session replay", "error tracking", "performance monitoring", "web vitals", "source maps", "browser monitoring", "frontend observability"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -661,6 +686,10 @@ const useRoutes = () => {
         props: true,
         meta: {
           title: "Reports",
+          searchable: true,
+          icon: "summarize",
+          section: "Visualization",
+          keywords: ["scheduled reports", "PDF export", "email reports", "dashboard reports"],
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);

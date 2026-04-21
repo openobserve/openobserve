@@ -173,6 +173,18 @@ size="16px" class="q-mr-xs" />
         </div>
       </q-btn>
 
+      <!-- COMMAND PALETTE SEARCH BUTTON -->
+      <button
+        class="cmd-palette-btn q-mx-xs"
+        data-test="header-command-palette-btn"
+        @click="openCommandPalette"
+        :aria-label="`Search pages (${isMac ? '⌘' : 'Ctrl'}K)`"
+      >
+        <q-icon name="search" class="cmd-palette-btn__icon" />
+        <span class="cmd-palette-btn__text">Search…</span>
+        <kbd class="cmd-palette-btn__kbd">{{ isMac ? "⌘" : "Ctrl" }}K</kbd>
+      </button>
+
       <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
       <q-btn
         v-if="
@@ -815,6 +827,15 @@ export default defineComponent({
       showEnterpriseDialog.value = true;
     };
 
+    // Detect macOS for correct shortcut label
+    // eslint-disable-next-line no-undef
+    const isMac = computed(() => /mac/i.test(navigator.platform));
+
+    // Open command palette
+    const openCommandPalette = () => {
+      props.store.dispatch("commandPalette/open");
+    };
+
     return {
       t,
       outlinedSettings,
@@ -837,6 +858,8 @@ export default defineComponent({
       handleMouseLeave,
       handleOrgSelection,
       openEnterpriseDialog,
+      isMac,
+      openCommandPalette,
     };
   },
 });
@@ -882,6 +905,51 @@ export default defineComponent({
     font-weight: 500;
     line-height: 28px;
     display: inline-block;
+  }
+}
+
+.cmd-palette-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.875rem;
+  padding: 0 0.625rem;
+  background: var(--o2-muted-background);
+  border: 1px solid var(--o2-border);
+  border-radius: 0.375rem;
+  cursor: pointer;
+  color: var(--o2-text-muted);
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+  align-self: center;
+  vertical-align: middle;
+
+  &:hover {
+    background: var(--o2-hover-accent);
+    border-color: var(--o2-primary-color);
+    color: var(--o2-text-primary);
+  }
+
+  &__icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  &__text {
+    font-size: 0.8125rem;
+    white-space: nowrap;
+  }
+
+  &__kbd {
+    font-size: 0.6875rem;
+    padding: 0.1rem 0.3rem;
+    border: 1px solid var(--o2-border);
+    border-radius: 0.25rem;
+    background: var(--o2-card-background);
+    font-family: inherit;
+    flex-shrink: 0;
+    line-height: 1.4;
   }
 }
 

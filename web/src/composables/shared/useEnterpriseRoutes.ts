@@ -60,7 +60,7 @@ const useEnterpriseRoutes = () => {
             searchable: true,
             icon: "group",
             section: "Management",
-            keywords: ["management", "members", "accounts", "team"],
+            keywords: ["user management", "team members", "roles", "permissions"],
           },
           component: Users,
           beforeEnter(to: any, from: any, next: any) {
@@ -75,14 +75,15 @@ const useEnterpriseRoutes = () => {
             searchable: true,
             icon: "manage_accounts",
             section: "Management",
-            keywords: ["management", "API keys", "tokens", "service users"],
+            keywords: ["API keys", "service accounts", "programmatic access", "tokens"],
           },
           component: ServiceAccountsList,
           beforeEnter(to: any, from: any, next: any) {
             // Check if service accounts are enabled
             // Note: Using window.store here because useStore() doesn't work in route guards
             const store = (window as any).store;
-            const serviceAccountEnabled = store?.state?.zoConfig?.service_account_enabled ?? true;
+            const serviceAccountEnabled =
+              store?.state?.zoConfig?.service_account_enabled ?? true;
 
             if (!serviceAccountEnabled) {
               // Redirect to users page if service accounts are disabled
@@ -101,7 +102,7 @@ const useEnterpriseRoutes = () => {
             searchable: true,
             icon: "corporate_fare",
             section: "Management",
-            keywords: ["management", "org", "tenant", "workspace"],
+            keywords: ["organization management", "switch org", "tenants"],
           },
           component: Organizations,
           beforeEnter(to: any, from: any, next: any) {
@@ -125,7 +126,7 @@ const useEnterpriseRoutes = () => {
           searchable: true,
           icon: "emergency",
           section: "Observability",
-          keywords: ["incidents", "on-call", "outage", "events"],
+          keywords: ["incident management", "on-call", "outage", "SLO breach"],
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
@@ -153,7 +154,7 @@ const useEnterpriseRoutes = () => {
         searchable: true,
         icon: "code",
         section: "Management",
-        keywords: ["management", "scripts", "automation", "actions"],
+        keywords: ["automation", "runbooks", "remediation scripts", "alert actions"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

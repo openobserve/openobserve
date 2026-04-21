@@ -3,7 +3,8 @@ import { routeGuard } from "@/utils/zincutils";
 
 const Settings = () => import("@/components/settings/index.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
-const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
+const AlertsDestinationList = () =>
+  import("@/components/alerts/AlertsDestinationList.vue");
 
 const useManagementRoutes = () => {
   const routes: any = [
@@ -17,7 +18,7 @@ const useManagementRoutes = () => {
         searchable: true,
         icon: "settings",
         section: "Management",
-        keywords: ["management", "configuration", "admin", "preferences"],
+        keywords: ["configuration", "admin", "organization parameters", "platform settings"],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -37,7 +38,7 @@ const useManagementRoutes = () => {
         {
           path: "organization",
           name: "organizationSettings",
-          meta:{
+          meta: {
             title: "Organization Parameters",
           },
           component: () =>
@@ -54,7 +55,7 @@ const useManagementRoutes = () => {
             searchable: true,
             icon: "send",
             section: "Management",
-            keywords: ["management", "destinations", "channels", "webhook", "email", "slack"],
+            keywords: ["notification channels", "webhook", "email", "Slack", "PagerDuty", "SNS", "MSTeams"],
           },
           component: AlertsDestinationList,
           beforeEnter(to: any, from: any, next: any) {
@@ -69,7 +70,7 @@ const useManagementRoutes = () => {
             searchable: true,
             icon: "description",
             section: "Management",
-            keywords: ["management", "alert templates", "notification templates"],
+            keywords: ["alert templates", "notification templates"],
           },
           component: TemplateList,
           beforeEnter(to: any, from: any, next: any) {
@@ -89,6 +90,10 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
             title: "Query Management",
+            searchable: true,
+            icon: "manage_search",
+            section: "Management",
+            keywords: ["running queries", "query management", "active queries"],
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -121,7 +126,7 @@ const useManagementRoutes = () => {
         {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
-          meta:{
+          meta: {
             title: "Pipeline Destinations",
           },
           component: () =>
@@ -165,12 +170,12 @@ const useManagementRoutes = () => {
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
-
         },
         {
           path: "correlation/:tab?",
           name: "correlationSettings",
-          component: () => import("@/components/settings/CorrelationSettings.vue"),
+          component: () =>
+            import("@/components/settings/CorrelationSettings.vue"),
           meta: {
             keepAlive: true,
             title: "Correlation Settings",
@@ -196,7 +201,8 @@ const useManagementRoutes = () => {
         {
           path: "organization_management",
           name: "orgnizationManagement",
-          component: () => import("@/components/settings/OrganizationManagement.vue"),
+          component: () =>
+            import("@/components/settings/OrganizationManagement.vue"),
           meta: {
             keepAlive: true,
             title: "Organization Management",
@@ -204,9 +210,9 @@ const useManagementRoutes = () => {
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
-        }
-      ]
-    )
+        },
+      ],
+    );
   }
   return routes;
 };
