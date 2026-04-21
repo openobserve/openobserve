@@ -404,7 +404,9 @@ async fn check_external_contract_expiry() {
             if let Err(e) =
                 o2_enterprise::enterprise::cloud::customer_billings::delete_by_org_id(org_id).await
             {
-                log::error!("[EXT_CONTRACT] Failed to delete expired billing for org {org_id}: {e}");
+                log::error!(
+                    "[EXT_CONTRACT] Failed to delete expired billing for org {org_id}: {e}"
+                );
             }
             continue;
         }
