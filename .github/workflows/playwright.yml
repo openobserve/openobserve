@@ -175,6 +175,7 @@ jobs:
                 # "alerts-scheduled-features.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
                 "alerts-vrl-encoding.spec.js",
+                "alerts-anomaly-detection.spec.js",
               ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
