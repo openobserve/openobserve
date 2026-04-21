@@ -2,6 +2,17 @@ name: Issue Audit - Check Fix & Test Coverage
 
 on:
   workflow_dispatch:  # Manual trigger
+    inputs:
+      test_mode:
+        description: 'Test mode - limit to specific issues (comma-separated issue numbers, or "all" for full audit)'
+        required: false
+        default: 'all'
+        type: string
+      dry_run:
+        description: 'Dry run - do not close issues or post comments, only generate report'
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: '0 0 * * 1'  # Weekly on Monday at midnight UTC
 
@@ -54,7 +65,18 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const issues = JSON.parse('${{ steps.fetch-issues.outputs.issues }}');
+            let issues = JSON.parse('${{ steps.fetch-issues.outputs.issues }}');
+
+            // Apply test mode filter if specified
+            const testMode = '${{ inputs.test_mode }}' || 'all';
+            if (testMode !== 'all' && testMode !== '') {
+              const testIssueNumbers = testMode.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+              if (testIssueNumbers.length > 0) {
+                console.log(`\n🧪 TEST MODE: Filtering to issues: ${testIssueNumbers.join(', ')}`);
+                issues = issues.filter(i => testIssueNumbers.includes(i.number));
+                console.log(`Filtered to ${issues.length} issue(s)\n`);
+              }
+            }
 
             const results = {
               ready_to_close: [],      // Has fix + test
@@ -175,7 +197,7 @@ jobs:
             core.setOutput('ready_to_close_count', results.ready_to_close.length);
 
       - name: Auto-close issues with fix + test
-        if: steps.audit.outputs.ready_to_close_count > 0
+        if: ${{ steps.audit.outputs.ready_to_close_count > 0 && !inputs.dry_run }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -221,6 +243,7 @@ The fix has been implemented and proper test coverage exists with the \`@bug-${i
             }
 
       - name: Comment on issues needing tests
+        if: ${{ !inputs.dry_run }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -287,10 +310,19 @@ Place the test in \`tests/ui-testing/playwright-tests/RegressionSet/\`
           script: |
             const results = JSON.parse('${{ steps.audit.outputs.results }}');
 
+            const dryRun = '${{ inputs.dry_run }}' === 'true';
+            const testMode = '${{ inputs.test_mode }}' || 'all';
+
             let report = `# Issue Audit Report\n\n`;
             report += `**Run ID**: ${context.runId}\n`;
-            report += `**Date**: ${new Date().toISOString()}\n\n`;
-            report += `---\n\n`;
+            report += `**Date**: ${new Date().toISOString()}\n`;
+            if (dryRun) {
+              report += `**Mode**: 🧪 DRY RUN (no actions taken)\n`;
+            }
+            if (testMode !== 'all') {
+              report += `**Test Mode**: Issues ${testMode}\n`;
+            }
+            report += `\n---\n\n`;
 
             // Summary table
             report += `## Summary\n\n`;
