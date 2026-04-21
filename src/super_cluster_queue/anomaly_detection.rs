@@ -28,7 +28,7 @@ use infra::{
     table::entity::anomaly_detection_config,
 };
 use o2_enterprise::enterprise::super_cluster::queue::{AnomalyDetectionMessage, Message};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let msg: AnomalyDetectionMessage = msg.try_into().map_err(|e| {
@@ -114,16 +114,55 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                     );
                     infra::errors::Error::Message(e.to_string())
                 })?;
-            if existing.is_some() {
+            if let Some(existing) = existing {
+                // Build the ActiveModel from the DB-fetched row so the PK is
+                // Unchanged — required by SeaORM for a correct UPDATE WHERE clause.
+                // Overwrite every field from the incoming message.
                 let updated_at = config.updated_at;
-                config.into_active_model().update(db).await.map_err(|e| {
+                let mut active = existing.into_active_model();
+                active.org_id = Set(config.org_id);
+                active.stream_name = Set(config.stream_name);
+                active.stream_type = Set(config.stream_type);
+                active.enabled = Set(config.enabled);
+                active.name = Set(config.name);
+                active.description = Set(config.description);
+                active.query_mode = Set(config.query_mode);
+                active.filters = Set(config.filters);
+                active.custom_sql = Set(config.custom_sql);
+                active.detection_function = Set(config.detection_function);
+                active.histogram_interval = Set(config.histogram_interval);
+                active.schedule_interval = Set(config.schedule_interval);
+                active.detection_window_seconds = Set(config.detection_window_seconds);
+                active.training_window_days = Set(config.training_window_days);
+                active.retrain_interval_days = Set(config.retrain_interval_days);
+                active.threshold = Set(config.threshold);
+                active.seasonality = Set(config.seasonality);
+                active.is_trained = Set(config.is_trained);
+                active.training_started_at = Set(config.training_started_at);
+                active.training_completed_at = Set(config.training_completed_at);
+                active.last_error = Set(config.last_error);
+                active.last_processed_timestamp = Set(config.last_processed_timestamp);
+                active.current_model_version = Set(config.current_model_version);
+                active.rcf_num_trees = Set(config.rcf_num_trees);
+                active.rcf_tree_size = Set(config.rcf_tree_size);
+                active.rcf_shingle_size = Set(config.rcf_shingle_size);
+                active.alert_enabled = Set(config.alert_enabled);
+                active.alert_destinations = Set(config.alert_destinations);
+                active.folder_id = Set(config.folder_id);
+                active.owner = Set(config.owner);
+                active.status = Set(config.status);
+                active.retries = Set(config.retries);
+                active.last_updated = Set(config.last_updated);
+                active.updated_at = Set(config.updated_at);
+                // Note: created_at is intentionally not overwritten.
+                active.update(db).await.map_err(|e| {
                     log::error!(
                         "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate update failed id={}: {e}",
                         anomaly_id
                     );
                     infra::errors::Error::Message(e.to_string())
                 })?;
-                log::debug!(
+                log::info!(
                     "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate successfully wrote to DB id={} updated_at={}",
                     anomaly_id,
                     updated_at,
