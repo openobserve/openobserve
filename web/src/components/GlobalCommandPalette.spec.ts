@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { nextTick } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -71,7 +71,18 @@ function makePaletteItem(overrides: Partial<PaletteItem> = {}): PaletteItem {
 
 function mountPalette() {
   return mount(GlobalCommandPalette, {
-    global: { plugins: [store, router] },
+    global: {
+      plugins: [store, router],
+      stubs: {
+        // q-dialog renders via Quasar teleport (outside wrapper DOM).
+        // Stub it to render the slot inline so wrapper.find() works.
+        "q-dialog": {
+          props: ["modelValue"],
+          template: '<div v-if="modelValue"><slot /></div>',
+        },
+        "q-icon": true,
+      },
+    },
   });
 }
 
@@ -233,18 +244,20 @@ describe("GlobalCommandPalette.vue", () => {
   describe("when palette is closed (isOpen = false)", () => {
     beforeEach(() => {
       vi.mocked(useCommandPalette).mockReturnValue({
-        query: { value: "" } as any,
-        activeIndex: { value: 0 } as any,
-        visibleItems: { value: [] } as any,
-        hasResults: { value: false } as any,
-        isOpen: { value: false } as any,
+        query: ref(""),
+        activeIndex: ref(0),
+        visibleItems: ref([]),
+        recentPages: ref([]),
+        hasResults: computed(() => false),
+        isDefaultView: computed(() => true),
+        isOpen: ref(false),
         close: vi.fn(),
         moveUp: vi.fn(),
         moveDown: vi.fn(),
         resetActiveIndex: vi.fn(),
         navigateTo: vi.fn(),
         navigateSelected: vi.fn(),
-      });
+      } as any);
       wrapper = mountPalette();
     });
 
@@ -270,18 +283,20 @@ describe("GlobalCommandPalette.vue", () => {
   describe("when palette is open (isOpen = true)", () => {
     beforeEach(() => {
       vi.mocked(useCommandPalette).mockReturnValue({
-        query: { value: "" } as any,
-        activeIndex: { value: 0 } as any,
-        visibleItems: { value: [] } as any,
-        hasResults: { value: false } as any,
-        isOpen: { value: true } as any,
+        query: ref(""),
+        activeIndex: ref(0),
+        visibleItems: ref([]),
+        recentPages: ref([]),
+        hasResults: computed(() => false),
+        isDefaultView: computed(() => true),
+        isOpen: ref(true),
         close: vi.fn(),
         moveUp: vi.fn(),
         moveDown: vi.fn(),
         resetActiveIndex: vi.fn(),
         navigateTo: vi.fn(),
         navigateSelected: vi.fn(),
-      });
+      } as any);
       wrapper = mountPalette();
     });
 
@@ -317,18 +332,20 @@ describe("GlobalCommandPalette.vue", () => {
 
     beforeEach(() => {
       vi.mocked(useCommandPalette).mockReturnValue({
-        query: { value: "log" } as any,
-        activeIndex: { value: 0 } as any,
-        visibleItems: { value: mockItems } as any,
-        hasResults: { value: true } as any,
-        isOpen: { value: true } as any,
+        query: ref("log"),
+        activeIndex: ref(0),
+        visibleItems: ref(mockItems),
+        recentPages: ref([]),
+        hasResults: computed(() => true),
+        isDefaultView: computed(() => false),
+        isOpen: ref(true),
         close: vi.fn(),
         moveUp: vi.fn(),
         moveDown: vi.fn(),
         resetActiveIndex: vi.fn(),
         navigateTo: vi.fn(),
         navigateSelected: vi.fn(),
-      });
+      } as any);
       wrapper = mountPalette();
     });
 
@@ -358,18 +375,20 @@ describe("GlobalCommandPalette.vue", () => {
   describe("when palette is open with no matching results and a query", () => {
     beforeEach(() => {
       vi.mocked(useCommandPalette).mockReturnValue({
-        query: { value: "zzznomatch" } as any,
-        activeIndex: { value: 0 } as any,
-        visibleItems: { value: [] } as any,
-        hasResults: { value: false } as any,
-        isOpen: { value: true } as any,
+        query: ref("zzznomatch"),
+        activeIndex: ref(0),
+        visibleItems: ref([]),
+        recentPages: ref([]),
+        hasResults: computed(() => false),
+        isDefaultView: computed(() => false),
+        isOpen: ref(true),
         close: vi.fn(),
         moveUp: vi.fn(),
         moveDown: vi.fn(),
         resetActiveIndex: vi.fn(),
         navigateTo: vi.fn(),
         navigateSelected: vi.fn(),
-      });
+      } as any);
       wrapper = mountPalette();
     });
 
