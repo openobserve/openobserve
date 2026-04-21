@@ -46,7 +46,7 @@ const run = async (
   c.autoCompleteData.value.query = query;
   (c.autoCompleteData.value as any).cursorIndex = cursorIndex ?? query.length;
   await c.getSuggestions();
-  return c.autoCompleteKeywords.value;
+  return c.effectiveKeywords.value;
 };
 
 // ─── operator detection ───────────────────────────────────────────────────────
