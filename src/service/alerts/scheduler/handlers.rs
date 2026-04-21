@@ -4026,4 +4026,35 @@ mod tests {
         // The final timestamp should be adjusted based on the logic
         assert!(final_timestamp >= supposed_to_run_at);
     }
+
+    #[test]
+    fn test_parse_detection_interval_hours() {
+        assert_eq!(parse_detection_interval_to_micros("1h"), 3_600_000_000);
+        assert_eq!(parse_detection_interval_to_micros("2h"), 7_200_000_000);
+        assert_eq!(parse_detection_interval_to_micros(" 3h "), 10_800_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_minutes() {
+        assert_eq!(parse_detection_interval_to_micros("30m"), 1_800_000_000);
+        assert_eq!(parse_detection_interval_to_micros("5m"), 300_000_000);
+        assert_eq!(parse_detection_interval_to_micros(" 10m "), 600_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_raw_seconds() {
+        // no suffix → treated as minutes
+        assert_eq!(parse_detection_interval_to_micros("60"), 3_600_000_000);
+        assert_eq!(parse_detection_interval_to_micros("5"), 300_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_bad_number_falls_back() {
+        // bad hour suffix → unwrap_or(1) → 1h = 3600s
+        assert_eq!(parse_detection_interval_to_micros("xh"), 3_600_000_000);
+        // bad minute suffix → unwrap_or(5) → 5m = 300s
+        assert_eq!(parse_detection_interval_to_micros("xm"), 300_000_000);
+        // no suffix bad → unwrap_or(5) → 5m = 300s
+        assert_eq!(parse_detection_interval_to_micros("abc"), 300_000_000);
+    }
 }

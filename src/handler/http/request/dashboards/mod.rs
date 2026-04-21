@@ -723,3 +723,50 @@ fn set_dashboard_owner_if_empty(
         dashboard.set_owner(user_email.to_string());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::http::{HeaderMap, HeaderValue};
+
+    use super::*;
+
+    // --- is_overwrite ---
+
+    #[test]
+    fn test_is_overwrite_true() {
+        assert!(is_overwrite("overwrite=true"));
+    }
+
+    #[test]
+    fn test_is_overwrite_false_explicit() {
+        assert!(!is_overwrite("overwrite=false"));
+    }
+
+    #[test]
+    fn test_is_overwrite_missing() {
+        assert!(!is_overwrite(""));
+        assert!(!is_overwrite("foo=bar"));
+    }
+
+    #[test]
+    fn test_is_overwrite_invalid_value() {
+        // parse::<bool>().unwrap_or_default() → false
+        assert!(!is_overwrite("overwrite=yes"));
+        assert!(!is_overwrite("overwrite=1"));
+    }
+
+    // --- get_user_id ---
+
+    #[test]
+    fn test_get_user_id_present() {
+        let mut headers = HeaderMap::new();
+        headers.insert("user_id", HeaderValue::from_static("alice@example.com"));
+        assert_eq!(get_user_id(&headers), Some("alice@example.com".to_string()));
+    }
+
+    #[test]
+    fn test_get_user_id_absent() {
+        let headers = HeaderMap::new();
+        assert_eq!(get_user_id(&headers), None);
+    }
+}

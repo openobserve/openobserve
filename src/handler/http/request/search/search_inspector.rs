@@ -555,3 +555,42 @@ fn format_trace_id(trace_id: Option<String>) -> String {
     }
     cols.join("-")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_trace_id_none() {
+        assert_eq!(format_trace_id(None), "");
+    }
+
+    #[test]
+    fn test_format_trace_id_single_col() {
+        // No dash → cols.len() < 2, returned as-is
+        assert_eq!(
+            format_trace_id(Some("019cae07a3f0740ab34831ba04563200".to_string())),
+            "019cae07a3f0740ab34831ba04563200"
+        );
+    }
+
+    #[test]
+    fn test_format_trace_id_numeric_second_col() {
+        // Second col is all digits → keep two cols
+        assert_eq!(
+            format_trace_id(Some(
+                "019cae07a3f0740ab34831ba04563200-1-13jPR6A".to_string()
+            )),
+            "019cae07a3f0740ab34831ba04563200-1"
+        );
+    }
+
+    #[test]
+    fn test_format_trace_id_non_numeric_second_col() {
+        // Second col is NOT all digits → keep only first col
+        assert_eq!(
+            format_trace_id(Some("21aae3eed2c6fd63aabba9feed664331-Evlj599".to_string())),
+            "21aae3eed2c6fd63aabba9feed664331"
+        );
+    }
+}
