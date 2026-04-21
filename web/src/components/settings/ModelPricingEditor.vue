@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Price Preview Table -->
-                  <div v-if="Object.keys(tier.prices).length" class="tw:mt-5 tw:border tw:rounded" style="background: rgba(0,0,0,0.015); border-color: var(--o2-border-color);">
+                  <div v-if="previewEntries(tier, idx as number).length" class="tw:mt-5 tw:border tw:rounded" style="background: rgba(0,0,0,0.015); border-color: var(--o2-border-color);">
                      <div class="tw:px-4 tw:py-2 tw:text-xs text-grey-8 tw:font-semibold tw:border-b" style="border-color: var(--o2-border-color);">Price Preview</div>
                      <table class="tw:w-full tw:text-xs" style="border-collapse: collapse;">
                         <thead>
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            </tr>
                         </thead>
                         <tbody>
-                           <tr v-for="entry in priceEntries(tier)" :key="entry.stableId" class="tw:border-b last:tw:border-none" style="border-color: var(--o2-border-color);">
+                           <tr v-for="entry in previewEntries(tier, idx as number)" :key="entry.stableId" class="tw:border-b last:tw:border-none" :class="{ 'preview-row-pending': entry.stableId === -1 }" style="border-color: var(--o2-border-color);">
                               <td class="tw:px-4 tw:py-2 text-grey-9 tw:font-medium">{{ entry.key }}</td>
                               <td class="tw:px-4 tw:py-2 text-grey-9">${{ formatPreviewCost(entry.value, 1000) }}</td>
                               <td class="tw:px-4 tw:py-2 text-grey-9">${{ formatPreviewCost(entry.value, 1000000) }}</td>
@@ -588,6 +588,20 @@ function toPerMillion(perToken: number): number {
 
 function fromPerMillion(perMillion: number): number {
   return perMillion > 0 ? perMillion / 1_000_000 : 0;
+}
+
+/** Entries for the live preview = committed prices + any pending add-row entry. */
+function previewEntries(tier: any, idx: number) {
+  const committed = priceEntries(tier);
+  const pending = addState.value[idx];
+  if (pending?.key.trim()) {
+    const pendingValue = fromPerMillion(pending.value || 0);
+    // Don't duplicate if the key already exists
+    if (!committed.find(e => e.key === pending.key.trim())) {
+      committed.push({ key: pending.key.trim(), value: pendingValue, stableId: -1 });
+    }
+  }
+  return committed;
 }
 
 function formatPreviewCost(costPerUnit: number, multiplier: number) {
@@ -1123,6 +1137,12 @@ onBeforeMount(async () => {
   .body--dark & {
     background: rgba(255, 255, 255, 0.08);
   }
+}
+
+/* ── Pending preview row (typed but not yet committed) ── */
+.preview-row-pending {
+  opacity: 0.5;
+  font-style: italic;
 }
 
 /* ── Field label ────────────────────────────────────── */
