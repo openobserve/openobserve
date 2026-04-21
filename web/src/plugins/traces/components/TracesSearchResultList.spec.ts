@@ -57,6 +57,16 @@ vi.mock("@/composables/useTraces", () => ({
     searchObj: sharedSearchObj,
     updatedLocalLogFilterField: vi.fn(),
   }),
+  DEFAULT_TRACE_COLUMNS: {
+    traces: ["service_name", "operation_name", "duration", "spans", "status", "service_latency"],
+    spans: ["service_name", "operation_name", "duration", "span_status", "status_code", "method"],
+  },
+}));
+
+vi.mock("@/plugins/traces/composables/useTracesTableColumns", () => ({
+  useTracesTableColumns: () => ({
+    buildColumns: vi.fn(() => []),
+  }),
 }));
 
 // ─── CellActions stub — emits copy/add-search-term with the field + value

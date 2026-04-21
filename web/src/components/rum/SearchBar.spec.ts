@@ -84,8 +84,10 @@ vi.doMock("@/composables/useSuggestions", () => ({
   default: () => ({
     autoCompleteData: mockAutoCompleteData,
     autoCompleteKeywords: mockAutoCompleteKeywords,
+    effectiveKeywords: { value: [] },
     getSuggestions: vi.fn(),
     updateFieldKeywords: vi.fn(),
+    updateStreamKeywords: vi.fn(),
   }),
 }));
 

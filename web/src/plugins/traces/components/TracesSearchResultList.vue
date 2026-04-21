@@ -203,12 +203,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { copyToClipboard as qCopyToClipboard } from "quasar";
 import TenstackTable from "@/components/TenstackTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
-import useTraces from "@/composables/useTraces";
+import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
+import { useTracesTableColumns } from "@/plugins/traces/composables/useTracesTableColumns";
 import TraceTimestampCell from "./TraceTimestampCell.vue";
 import TraceServiceCell from "./TraceServiceCell.vue";
 import TraceLatencyCell from "./TraceLatencyCell.vue";
@@ -309,6 +310,13 @@ const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 const rowsPerPageOptions = [10, 25, 50, 100];
 
 const { searchObj, updatedLocalLogFilterField } = useTraces();
+const { buildColumns } = useTracesTableColumns();
+
+onMounted(() => {
+  if (!searchObj.data.resultGrid.columns.length) {
+    searchObj.data.resultGrid.columns = buildColumns(false, "traces", DEFAULT_TRACE_COLUMNS.traces);
+  }
+});
 
 // const rebuildColumns = () => {
 //   buildColumns(

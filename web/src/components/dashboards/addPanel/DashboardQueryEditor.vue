@@ -420,11 +420,14 @@ export default defineComponent({
     } = usePromqlSuggestions();
 
     const {
+      autoCompleteData: sqlAutoCompleteData,
       autoCompleteKeywords: sqlAutoCompleteKeywords,
       autoCompleteSuggestions: sqlAutoCompleteSuggestions,
+      effectiveKeywords: sqlEffectiveKeywords,
+      effectiveSuggestions: sqlEffectiveSuggestions,
       getSuggestions: sqlGetSuggestions,
-      updateFieldKeywords: sqlUpdateFieldKeywords,
-      updateFunctionKeywords: sqlUpdateFunctionKeywords,
+      updateAllKeywords: sqlUpdateAllKeywords,
+      updateStreamKeywords: sqlUpdateStreamKeywords,
     } = useSqlSuggestions();
 
     const queryEditorRef = ref(null);
@@ -433,14 +436,14 @@ export default defineComponent({
       if (dashboardPanelData.data.queryType === "promql") {
         return promqlAutoCompleteKeywords.value;
       }
-      return sqlAutoCompleteKeywords.value;
+      return sqlEffectiveKeywords.value;
     });
 
     const currentEditorSuggestions = computed(() => {
       if (dashboardPanelData.data.queryType === "promql") {
         return [];
       }
-      return sqlAutoCompleteSuggestions.value;
+      return sqlEffectiveSuggestions.value;
     });
 
     const functionEditorPlaceholderFlag = ref(true);
@@ -496,11 +499,14 @@ export default defineComponent({
       if (dashboardPanelData.data.queryType === "promql") {
         updatePromQLQuery(query, event);
       } else {
+        sqlAutoCompleteData.value.query = query;
+        sqlAutoCompleteData.value.cursorIndex =
+          queryEditorRef.value?.getCursorIndex();
+        sqlAutoCompleteData.value.popup.open =
+          queryEditorRef.value?.triggerAutoComplete;
+        sqlAutoCompleteData.value.popup.close =
+          queryEditorRef.value?.disableSuggestionPopup;
         sqlGetSuggestions();
-        sqlUpdateFieldKeywords(
-          selectedStreamFieldsBasedOnUserDefinedSchema.value,
-        );
-        sqlUpdateFunctionKeywords(functionList.value);
       }
     };
 
@@ -515,7 +521,46 @@ export default defineComponent({
       },
     );
 
+    // SQL field + function keyword autocomplete.
+    // Sources (in priority order):
+    //   1. selectedStreamFieldsBasedOnUserDefinedSchema — user-defined schema when enabled
+    //   2. customQueryFields — columns derived from query results (custom SQL mode, post-run)
+    //   3. groupedFields[].schema — stream schema fetched on stream selection (always available)
+    // groupedFields is the primary source in SQL/custom mode because selectedStreamFields
+    // is always [] (never populated by the dashboard composable — only groupedFields is).
+    // Field lists and function lists are replaced as new array references (never mutated
+    // in-place), so deep watching is unnecessary and expensive.
+    watch(
+      [
+        () => selectedStreamFieldsBasedOnUserDefinedSchema.value,
+        () => dashboardPanelData.meta.stream.customQueryFields,
+        () => dashboardPanelData.meta.streamFields.groupedFields,
+        () => functionList.value,
+      ],
+      ([streamFields, customFields, groupedFields, functions]) => {
+        // Flatten schema fields from all selected streams (the Fields panel source).
+        const schemaFields = (groupedFields as any[] ?? []).flatMap(
+          (group: any) => group.schema ?? [],
+        );
+        // Merge all sources; deduplicate by name so fields don't appear twice.
+        const allFields = [
+          ...(streamFields as any[] ?? []),
+          ...(customFields as any[] ?? []),
+          ...schemaFields,
+        ];
+        const seen = new Set<string>();
+        const uniqueFields = allFields.filter((f: any) => {
+          if (seen.has(f.name)) return false;
+          seen.add(f.name);
+          return true;
+        });
+        sqlUpdateAllKeywords(uniqueFields, functions as any[] ?? []);
+      },
+      { immediate: true },
+    );
+
     // Feed stream names into PromQL metric keyword autocomplete
+    // and SQL FROM autocomplete (stream suggestions after FROM keyword).
     watch(
       [
         () => dashboardPanelData.meta?.stream?.streamResults,
@@ -532,6 +577,10 @@ export default defineComponent({
         } else {
           updateMetricKeywords([]);
         }
+        // SQL: always update stream keywords so FROM suggestions stay in sync.
+        sqlUpdateStreamKeywords(
+          (newResults ?? []).map((stream: any) => ({ name: stream.name })),
+        );
       },
       { immediate: true },
     );

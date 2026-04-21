@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           editor-id="rum-searchbar-query-editor"
           class="monaco-editor"
           v-model:query="searchObj.data.editorValue"
-          :keywords="autoCompleteKeywords"
+          :keywords="effectiveKeywords"
           v-model:functions="searchObj.data.stream.functions"
           @update:query="updateQueryValue"
           @run-query="searchData"
@@ -143,8 +143,10 @@ export default defineComponent({
     const {
       autoCompleteData,
       autoCompleteKeywords,
+      effectiveKeywords,
       getSuggestions,
       updateFieldKeywords,
+      updateStreamKeywords,
     } = useSqlSuggestions();
 
     onBeforeMount(async () => {
@@ -167,6 +169,15 @@ export default defineComponent({
         if (fields.length) updateFieldKeywords(fields);
       },
       { immediate: true, deep: true },
+    );
+
+    // Feed all available RUM streams into FROM autocomplete.
+    watch(
+      () => searchObj.data.streamResults?.list,
+      (list) => {
+        updateStreamKeywords((list ?? []).map((s: any) => ({ name: s.name })));
+      },
+      { immediate: true },
     );
 
     const updateAutoComplete = (value) => {
@@ -298,6 +309,7 @@ export default defineComponent({
       downloadLogs,
       setEditorValue,
       autoCompleteKeywords,
+      effectiveKeywords,
     };
   },
   watch: {
