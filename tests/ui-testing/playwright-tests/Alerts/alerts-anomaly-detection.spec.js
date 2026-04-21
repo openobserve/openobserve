@@ -117,8 +117,10 @@ test.describe("Anomaly Detection Alerts", () => {
       // Go to Alerting tab using POM method
       await pm.anomalyDetectionPage.clickTab('Alerting');
 
-      // Take screenshot to see Alerting tab state
-      await page.screenshot({ path: 'test-logs/anomaly-alerting-tab.png', fullPage: true });
+      // Take screenshot to see Alerting tab state (only in debug mode)
+      if (process.env.DEBUG) {
+        await page.screenshot({ path: 'test-logs/anomaly-alerting-tab.png', fullPage: true });
+      }
 
       // Find and toggle off the alert enabled switch - it's a q-toggle
       const alertToggle = page.locator(pm.anomalyDetectionPage.selectors.alertEnabled);
@@ -138,9 +140,11 @@ test.describe("Anomaly Detection Alerts", () => {
         }
       }
 
-      // Take screenshot to see current state before save
-      testLogger.info('Taking screenshot before save');
-      await page.screenshot({ path: 'test-logs/anomaly-before-save.png', fullPage: true });
+      // Take screenshot to see current state before save (only in debug mode)
+      if (process.env.DEBUG) {
+        testLogger.info('Taking screenshot before save');
+        await page.screenshot({ path: 'test-logs/anomaly-before-save.png', fullPage: true });
+      }
 
       // Click save button
       const saveButton = page.locator(pm.anomalyDetectionPage.selectors.saveButton);
@@ -500,8 +504,10 @@ test.describe("Anomaly Detection Alerts", () => {
 
       if (!destFound) {
         testLogger.warn('Could not find destination in dropdown - checking if any destinations exist');
-        // Take screenshot for debugging
-        await page.screenshot({ path: 'test-logs/anomaly-dest-dropdown.png', fullPage: true });
+        // Take screenshot for debugging (only in debug mode)
+        if (process.env.DEBUG) {
+          await page.screenshot({ path: 'test-logs/anomaly-dest-dropdown.png', fullPage: true });
+        }
       }
 
       // Close dropdown

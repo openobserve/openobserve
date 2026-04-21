@@ -791,91 +791,19 @@ export class AnomalyDetectionPage {
     }
 
     // ========== API CLEANUP HELPERS ==========
-
-    /**
-     * Delete anomaly via API (for test cleanup)
-     * @param {string} anomalyId - Anomaly ID to delete
-     * @param {Object} config - API configuration { baseUrl, email, password, org }
-     * @returns {Promise<boolean>} - True if deleted successfully
-     */
-    async deleteAnomalyViaApi(anomalyId, config) {
-        testLogger.info('Deleting anomaly via API', { anomalyId });
-
-        const authToken = Buffer.from(`${config.email}:${config.password}`).toString('base64');
-
-        const result = await this.page.evaluate(async ({ url, authToken }) => {
-            try {
-                const resp = await fetch(url, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Basic ${authToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                return { status: resp.status, ok: resp.ok };
-            } catch (e) {
-                return { status: 0, ok: false, error: e.message };
-            }
-        }, {
-            url: `${config.baseUrl}/api/${config.org}/anomaly_detection/${anomalyId}`,
-            authToken
-        });
-
-        testLogger.info('Delete anomaly response', { anomalyId, status: result.status });
-        return result.ok || result.status === 404; // 404 means already deleted
-    }
-
-    /**
-     * List anomalies via API (for finding test anomalies to clean up)
-     * @param {Object} config - API configuration { baseUrl, email, password, org }
-     * @returns {Promise<Array>} - Array of anomaly objects
-     */
-    async listAnomaliesViaApi(config) {
-        testLogger.info('Listing anomalies via API');
-
-        const authToken = Buffer.from(`${config.email}:${config.password}`).toString('base64');
-
-        const result = await this.page.evaluate(async ({ url, authToken }) => {
-            try {
-                const resp = await fetch(url, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Basic ${authToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                const data = await resp.json().catch(() => ({}));
-                return { status: resp.status, data };
-            } catch (e) {
-                return { status: 0, data: [], error: e.message };
-            }
-        }, {
-            url: `${config.baseUrl}/api/${config.org}/anomaly_detection`,
-            authToken
-        });
-
-        return result.data?.configs || result.data || [];
-    }
+    // Note: These methods delegate to the shared api-helper.js for consistent auth handling
 
     /**
      * Clean up test anomalies by name pattern
+     * Delegates to shared api-helper.js cleanupTestAnomalies function
      * @param {string} namePattern - Pattern to match (e.g., 'E2E_Anomaly')
-     * @param {Object} config - API configuration { baseUrl, email, password, org }
+     * @param {Object} _config - Deprecated: config is now read from environment variables
+     * @returns {Promise<number>} - Number of anomalies deleted
      */
-    async cleanupTestAnomalies(namePattern, config) {
-        testLogger.info('Cleaning up test anomalies', { namePattern });
-
-        const anomalies = await this.listAnomaliesViaApi(config);
-        const testAnomalies = anomalies.filter(a => a.name && a.name.includes(namePattern));
-
-        testLogger.info(`Found ${testAnomalies.length} test anomalies to clean up`);
-
-        for (const anomaly of testAnomalies) {
-            const id = anomaly.anomaly_id || anomaly.id;
-            if (id) {
-                await this.deleteAnomalyViaApi(id, config);
-            }
-        }
+    async cleanupTestAnomalies(namePattern, _config) {
+        // Import shared helper - auth is handled via environment variables
+        const { cleanupTestAnomalies } = require('../../playwright-tests/utils/api-helper.js');
+        return cleanupTestAnomalies(this.page, namePattern);
     }
 
     // ========== COMPLETE WORKFLOWS ==========

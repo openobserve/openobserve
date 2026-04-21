@@ -55,7 +55,7 @@ function getOrgName() {
 
 /**
  * Create a test destination via API (useful for CI/CD testing)
- * Uses httpbin.org as a mock webhook endpoint
+ * Uses MOCK_WEBHOOK_URL env var or falls back to httpbin.org
  * @param {import('@playwright/test').Page} page - Playwright page instance
  * @param {string} name - Destination name
  * @param {string} [template='Slack'] - Template type
@@ -63,16 +63,18 @@ function getOrgName() {
  */
 async function createMockDestination(page, name, template = 'Slack') {
   const org = getOrgName();
+  // Allow CI to override the mock webhook URL for reliability
+  const webhookUrl = process.env.MOCK_WEBHOOK_URL || "https://httpbin.org/post";
   const payload = {
     name,
     template,
-    url: "https://httpbin.org/post", // CI/CD compatible mock endpoint
+    url: webhookUrl,
     method: "post",
     headers: {},
     skip_tls_verify: false
   };
 
-  testLogger.info('Creating mock destination via API', { name, template });
+  testLogger.info('Creating mock destination via API', { name, template, webhookUrl });
   return apiCall(page, 'POST', `/api/${org}/alerts/destinations`, payload);
 }
 
@@ -123,6 +125,46 @@ async function getAnomalyHistory(page, anomalyId, limit = 5) {
   return apiCall(page, 'GET', `/api/${org}/anomaly_detection/${anomalyId}/history?limit=${limit}`);
 }
 
+/**
+ * Delete an anomaly detection via API
+ * @param {import('@playwright/test').Page} page - Playwright page instance
+ * @param {string} anomalyId - Anomaly ID to delete
+ * @returns {Promise<{status: number, data: any}>}
+ */
+async function deleteAnomaly(page, anomalyId) {
+  const org = getOrgName();
+  testLogger.info('Deleting anomaly via API', { anomalyId });
+  return apiCall(page, 'DELETE', `/api/${org}/anomaly_detection/${anomalyId}`);
+}
+
+/**
+ * Clean up test anomalies by name pattern
+ * @param {import('@playwright/test').Page} page - Playwright page instance
+ * @param {string} namePattern - Pattern to match anomaly names (e.g., 'E2E_Anomaly')
+ * @returns {Promise<number>} - Number of anomalies deleted
+ */
+async function cleanupTestAnomalies(page, namePattern) {
+  testLogger.info('Cleaning up test anomalies', { namePattern });
+
+  const anomalies = await listAnomalyDetections(page);
+  const testAnomalies = anomalies.filter(a => a.name && a.name.includes(namePattern));
+
+  testLogger.info(`Found ${testAnomalies.length} test anomalies to clean up`);
+
+  let deleted = 0;
+  for (const anomaly of testAnomalies) {
+    const id = anomaly.anomaly_id || anomaly.id;
+    if (id) {
+      const result = await deleteAnomaly(page, id);
+      if (result.status === 200 || result.status === 404) {
+        deleted++;
+      }
+    }
+  }
+
+  return deleted;
+}
+
 module.exports = {
   apiCall,
   getOrgName,
@@ -130,5 +172,7 @@ module.exports = {
   deleteDestination,
   listAnomalyDetections,
   triggerAnomalyDetection,
-  getAnomalyHistory
+  getAnomalyHistory,
+  deleteAnomaly,
+  cleanupTestAnomalies
 };
