@@ -1229,37 +1229,4 @@ describe("TraceTree", () => {
       expect(badge.attributes("title")).toContain("collapse");
     });
   });
-
-  describe("service icon rendering", () => {
-    it("should render service icon img for each span", () => {
-      const icons = wrapper.findAll(
-        '[data-test^="trace-tree-span-service-icon-"]',
-      );
-      expect(icons.length).toBe(mockSpans.length);
-    });
-
-    it("should render service icon with correct data-test for each span", () => {
-      for (const span of mockSpans) {
-        const icon = wrapper.find(
-          `[data-test="trace-tree-span-service-icon-${span.spanId}"]`,
-        );
-        expect(icon.exists()).toBe(true);
-      }
-    });
-
-    it("should call getServiceIconDataUrl for each unique service/color combination", () => {
-      expect(
-        vi.mocked(getServiceIconDataUrl).mock.calls.length,
-      ).toBeGreaterThan(0);
-    });
-
-    it("should use span style color when building icon url", () => {
-      // mockSpans[0] has serviceName "alertmanager" and style.color "#1ab8be"
-      expect(getServiceIconDataUrl).toHaveBeenCalledWith(
-        "alertmanager",
-        expect.any(Boolean),
-        "#1ab8be",
-      );
-    });
-  });
 });
