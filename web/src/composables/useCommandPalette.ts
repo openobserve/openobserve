@@ -224,8 +224,9 @@ const useCommandPalette = () => {
   // ─── Navigation ───────────────────────────────────────────────────────────
 
   function navigateTo(item: PaletteItem) {
+    const org = store.state.selectedOrganization?.identifier ?? "default";
     store.dispatch("commandPalette/close");
-    router.push(item.path);
+    router.push({ path: item.path, query: { org_identifier: org } });
   }
 
   function navigateSelected() {
