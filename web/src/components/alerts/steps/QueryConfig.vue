@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Section header -->
       <div class="section-header">
         <div class="section-header-accent" />
-        <span class="section-header-title">Conditions</span>
+        <span class="section-header-title">{{ t('alerts.queryConfig.sectionTitle') }}</span>
       </div>
       <div class="tw:px-3 tw:py-2 tw:min-w-0 tw:w-full tw:box-border">
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-secondary-button"
           @click="viewSqlEditor = true"
         >
-        Open Full Editor
+        {{ t('alerts.queryConfig.openFullEditor') }}
       </q-btn>
       </div>
 
@@ -175,9 +175,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- group by row (hidden for count mode) -->
               <div v-if="selectedFunction !== 'total_events'" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
-                  Group by
+                  {{ t('alerts.groupBy') }}
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    Group results by these fields — alert triggers per unique combination
+                    {{ t('alerts.queryConfig.groupByTooltip') }}
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     color="primary"
                     @click="addLogGroupByColumn"
                   >
-                    <q-tooltip>Add group by field</q-tooltip>
+                    <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
                   </q-btn>
                 </div>
               </div>
@@ -231,9 +231,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- no. of groups row — visible only when group-by fields are added -->
               <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
-                  Having groups
+                  {{ t('alerts.queryConfig.havingGroups') }}
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    Minimum number of groups that must satisfy the condition above to trigger the alert.
+                    {{ t('alerts.queryConfig.havingGroupsTooltip') }}
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
@@ -381,9 +381,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- group by row — hidden for count mode -->
               <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
-                  Group by
+                  {{ t('alerts.groupBy') }}
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    Group results by these fields — alert triggers per unique combination
+                    {{ t('alerts.queryConfig.groupByTooltip') }}
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
@@ -429,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     color="primary"
                     @click="addGroupByColumn"
                   >
-                    <q-tooltip>Add group by field</q-tooltip>
+                    <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
                   </q-btn>
                 </div>
               </div>
@@ -437,9 +437,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- no. of groups row — visible only when group-by fields are added -->
               <div v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
-                  Having groups
+                  {{ t('alerts.queryConfig.havingGroups') }}
                   <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    Minimum number of groups that must satisfy the condition above to trigger the alert.
+                    {{ t('alerts.queryConfig.havingGroupsTooltip') }}
                   </q-tooltip>
                 </span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
@@ -766,11 +766,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       clearable
                       class="mini-select alert-v3-select"
                       style="width: 130px;"
-                      placeholder="Saved functions"
+                      :placeholder="t('alerts.placeholders.savedFunctions')"
                       @update:model-value="(fn) => fn && (vrlFunctionContent = fn.function || fn.body || '')"
                     >
                       <template #no-option>
-                        <q-item><q-item-section>No functions</q-item-section></q-item>
+                        <q-item><q-item-section>{{ t('alerts.queryConfig.noFunctions') }}</q-item-section></q-item>
                       </template>
                     </q-select>
                     <q-toggle
@@ -819,11 +819,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
                 <q-icon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
-                <span>Write a query to get started</span>
+                <span>{{ t('alerts.queryConfig.writeQueryHint') }}</span>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--idle'">
                 <q-icon name="check_circle_outline" size="12px" style="flex-shrink:0;opacity:0.7;" />
-                <span>Use open full editor to run and validate</span>
+                <span>{{ t('alerts.queryConfig.sqlEditorHint') }}</span>
               </template>
             </div>
             <q-tooltip
@@ -889,7 +889,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="alert-v3-select"
                       placeholder="timezone"
                       :display-value="cronTimezone || 'timezone'"
-                      style="min-width: 100px; max-width: 100px;"
+                      style="min-width: 150px; max-width: 150px;"
                       @filter="timezoneFilterFn"
                       @update:model-value="onCronTimezoneChange"
                     >
@@ -1232,23 +1232,8 @@ export default defineComponent({
       vrlEditorPlaceholderFlag.value = vrlFunctionContent.value === '';
     };
 
-    // Toggle filters and ensure at least one empty condition exists
     const toggleFilters = () => {
       showFilters.value = !showFilters.value;
-      if (showFilters.value && props.inputData.conditions?.conditions) {
-        const conditions = props.inputData.conditions.conditions;
-        if (conditions.length === 0) {
-          conditions.push({
-            filterType: 'condition',
-            column: '',
-            operator: '=',
-            value: '',
-            values: [],
-            logicalOperator: 'AND',
-            id: getUUID(),
-          });
-        }
-      }
     };
 
     // Stream-type-driven: logs/traces are event-based, metrics are aggregation-based
@@ -1513,9 +1498,9 @@ export default defineComponent({
     };
 
     const frequencyUnitOptions = [
-      { label: 'minutes', value: 'minutes' },
-      { label: 'hours', value: 'hours' },
-      { label: 'cron', value: 'cron' },
+      { label: 'Minutes', value: 'minutes' },
+      { label: 'Hours', value: 'hours' },
+      { label: 'Cron', value: 'cron' },
     ];
 
     const onFrequencyUnitChange = (unit: string) => {
