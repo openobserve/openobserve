@@ -42,7 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="
                 depth === 1 ||
-                hasNextSiblingAtAncestorDepth(depth - 1, virtualRow.index)
+                ancestorSiblingMap.get(
+                  `${virtualRow.index}-${(spans as any[])[virtualRow.index]?.depth - depth + 1}`,
+                )
               "
               data-test="vertical-segment"
               :data-left="
@@ -56,10 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (spanDimensions?.gap ?? 15) * (depth - 1) +
                   'px',
                 top: '0',
-                height: hasNextSiblingAtSameDepth(virtualRow.index)
+                height: nextSiblingMap[(virtualRow.index as number)]
                   ? spanDimensions.height + 'px'
-                  : (spans as any[])[virtualRow.index]?.depth + 1 - depth ===
-                      (spans as any[])[virtualRow.index]?.depth
+                  : depth === 1
                     ? spanDimensions.height / 2 + 'px'
                     : spanDimensions.height + 'px',
                 borderLeft: '1.5px solid var(--o2-border-color)',
@@ -525,36 +526,58 @@ export default defineComponent({
       }
     });
 
-    // ── CSS connector helper ─────────────────────────────────────────────────
-    // Returns true if there is a sibling at the same depth after this index,
-    // meaning the vertical connector line must continue past the row midpoint.
-    const hasNextSiblingAtSameDepth = (index: number): boolean => {
-      const currentDepth = (props.spans as any[])[index]?.depth ?? 0;
-      for (let i = index + 1; i < (props.spans as any[]).length; i++) {
-        const nextDepth = (props.spans as any[])[i]?.depth ?? 0;
-        if (nextDepth < currentDepth) return false;
-        if (nextDepth === currentDepth) return true;
-      }
-      return false;
-    };
-
-    // Returns true if the ancestor `depthOffset` levels above `index` has a
-    // next sibling at its own depth (depthOffset=0 checks the node itself).
-    const hasNextSiblingAtAncestorDepth = (
-      depthOffset: number,
-      index: number,
-    ): boolean => {
-      if (depthOffset === 0) return hasNextSiblingAtSameDepth(index);
+    // ── CSS connector helpers (pre-computed, O(n) total) ────────────────────
+    // nextSiblingMap[i] = true when spans[i] has a next sibling at the same
+    // depth with no shallower span in between. Built in a single RTL scan so
+    // the template reads O(1) instead of O(n) per row per depth level.
+    const nextSiblingMap = computed((): boolean[] => {
       const spans = props.spans as any[];
-      const ancestorTreeDepth = (spans[index]?.depth ?? 0) - depthOffset;
-      if (ancestorTreeDepth < 0) return false;
-      for (let i = index - 1; i >= 0; i--) {
-        if ((spans[i]?.depth ?? 0) === ancestorTreeDepth) {
-          return hasNextSiblingAtSameDepth(i);
+      const result = new Array<boolean>(spans.length).fill(false);
+      // lastSeenAtDepth[d] = index of the most-recently-seen span at depth d
+      // (undefined once a shallower span has been encountered)
+      const lastSeenAtDepth: (number | undefined)[] = [];
+
+      for (let i = spans.length - 1; i >= 0; i--) {
+        const d: number = spans[i]?.depth ?? 0;
+        result[i] = lastSeenAtDepth[d] !== undefined;
+        // Invalidate all deeper entries — they belong to a subtree we've passed
+        for (let j = d + 1; j < lastSeenAtDepth.length; j++) {
+          lastSeenAtDepth[j] = undefined;
         }
+        lastSeenAtDepth[d] = i;
       }
-      return false;
-    };
+      return result;
+    });
+
+    // ancestorSiblingMap key: `${spanIndex}-${ancestorTreeDepth}` → true when
+    // the ancestor of spans[spanIndex] at tree depth ancestorTreeDepth has a
+    // next sibling. Built in a single LTR scan using an ancestor index stack.
+    const ancestorSiblingMap = computed((): Map<string, boolean> => {
+      const spans = props.spans as any[];
+      const ns = nextSiblingMap.value;
+      const map = new Map<string, boolean>();
+      // ancestorStack[d] = index of the most-recent span seen at tree depth d
+      const ancestorStack: (number | undefined)[] = [];
+
+      for (let i = 0; i < spans.length; i++) {
+        const d: number = spans[i]?.depth ?? 0;
+        // Self entry (depthOffset = 0)
+        map.set(`${i}-${d}`, ns[i]);
+        // Ancestor entries for each ancestor depth level
+        for (let td = 0; td < d; td++) {
+          const ancestorIdx = ancestorStack[td];
+          if (ancestorIdx !== undefined) {
+            map.set(`${i}-${td}`, ns[ancestorIdx]);
+          }
+        }
+        // Update stack: clear deeper entries, record self at depth d
+        for (let j = d + 1; j < ancestorStack.length; j++) {
+          ancestorStack[j] = undefined;
+        }
+        ancestorStack[d] = i;
+      }
+      return map;
+    });
 
     // ── Actions ──────────────────────────────────────────────────────────────
     function toggleSpanCollapse(spanId: number | string) {
@@ -798,8 +821,8 @@ export default defineComponent({
       // virtualizer
       virtualRows,
       totalSize,
-      hasNextSiblingAtSameDepth,
-      hasNextSiblingAtAncestorDepth,
+      nextSiblingMap,
+      ancestorSiblingMap,
     };
   },
   components: { SpanBlock },
