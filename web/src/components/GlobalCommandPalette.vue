@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="palette-container">
       <!-- Search input -->
       <div class="palette-input-row">
-        <q-icon name="search" class="palette-search-icon" size="1.25rem" />
+        <q-icon name="search" class="palette-search-icon" />
         <input
           ref="inputRef"
           v-model="query"
@@ -48,29 +48,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="hasResults || !query.trim()" class="palette-divider" />
 
       <!-- Results -->
+      <!-- eslint-disable-next-line vue/max-attributes-per-line -->
       <div v-if="hasResults" class="palette-results" role="listbox">
-        <!-- Section label -->
-        <div class="palette-section-label">
-          {{ query.trim() ? "Pages" : "Recent" }}
-        </div>
+        <!-- Default view: Recents section -->
+        <template v-if="isDefaultView && recentPages.length > 0">
+          <div class="palette-section-label">Recents</div>
+          <div
+            v-for="(item, idx) in recentPages"
+            :key="'recent-' + item.name"
+            class="palette-result-item"
+            :class="{ 'is-active': idx === activeIndex }"
+            role="option"
+            :aria-selected="idx === activeIndex"
+            data-test="command-palette-result-item"
+            @mouseenter="activeIndex = idx"
+            @click="navigateTo(item)"
+          >
+            <q-icon :name="item.icon" class="palette-item-icon" />
+            <span class="palette-item-title">{{ item.title }}</span>
+            <span class="palette-item-path">{{ item.path }}</span>
+          </div>
+        </template>
 
-        <div
-          v-for="(item, idx) in visibleItems"
-          :key="item.name"
-          class="palette-result-item"
-          :class="{ 'is-active': idx === activeIndex }"
-          role="option"
-          :aria-selected="idx === activeIndex"
-          data-test="command-palette-result-item"
-          @mouseenter="activeIndex = idx"
-          @click="navigateTo(item)"
-        >
-          <q-icon :name="item.icon" class="palette-item-icon" size="1.1rem" />
-          <span class="palette-item-title">{{ item.title }}</span>
-          <span v-if="item.section" class="palette-item-section">
-            {{ item.section }}
-          </span>
-        </div>
+        <!-- Default view: Pages section (top pages after recents) -->
+        <template v-if="isDefaultView">
+          <div class="palette-section-label">Pages</div>
+          <div
+            v-for="(item, idx) in defaultPageItems"
+            :key="'page-' + item.name"
+            class="palette-result-item"
+            :class="{ 'is-active': recentPages.length + idx === activeIndex }"
+            role="option"
+            :aria-selected="recentPages.length + idx === activeIndex"
+            data-test="command-palette-result-item"
+            @mouseenter="activeIndex = recentPages.length + idx"
+            @click="navigateTo(item)"
+          >
+            <q-icon :name="item.icon" class="palette-item-icon" />
+            <span class="palette-item-title">{{ item.title }}</span>
+            <span class="palette-item-path">{{ item.path }}</span>
+          </div>
+        </template>
+
+        <!-- Search results view -->
+        <template v-if="!isDefaultView">
+          <div class="palette-section-label">Pages</div>
+          <div
+            v-for="(item, idx) in visibleItems"
+            :key="item.name"
+            class="palette-result-item"
+            :class="{ 'is-active': idx === activeIndex }"
+            role="option"
+            :aria-selected="idx === activeIndex"
+            data-test="command-palette-result-item"
+            @mouseenter="activeIndex = idx"
+            @click="navigateTo(item)"
+          >
+            <q-icon :name="item.icon" class="palette-item-icon" />
+            <span class="palette-item-title">{{ item.title }}</span>
+            <span class="palette-item-path">{{ item.path }}</span>
+          </div>
+        </template>
       </div>
 
       <!-- Empty state: query entered but no match -->
@@ -86,17 +124,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { nextTick, watch } from "vue";
-import { ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import useCommandPalette from "@/composables/useCommandPalette";
 
+// eslint-disable-next-line no-undef
 const inputRef = ref<HTMLInputElement | null>(null);
 
 const {
   query,
   activeIndex,
+  recentPages,
   visibleItems,
   hasResults,
+  isDefaultView,
   isOpen,
   close,
   moveUp,
@@ -105,6 +145,13 @@ const {
   navigateTo,
   navigateSelected,
 } = useCommandPalette();
+
+/** Pages shown below recents in the default (empty query) view */
+const defaultPageItems = computed(() => {
+  if (!isDefaultView.value) return [];
+  const recentNames = new Set(recentPages.value.map((r) => r.name));
+  return visibleItems.value.filter((item) => !recentNames.has(item.name));
+});
 
 // Focus input whenever dialog opens
 watch(isOpen, async (val) => {
@@ -117,7 +164,7 @@ watch(isOpen, async (val) => {
 
 <style lang="scss" scoped>
 .palette-container {
-  width: min(38rem, 92vw);
+  width: min(42rem, 92vw);
   background: var(--o2-card-background);
   border-radius: 0.625rem;
   box-shadow:
@@ -137,6 +184,7 @@ watch(isOpen, async (val) => {
 .palette-search-icon {
   color: var(--o2-text-muted);
   flex-shrink: 0;
+  font-size: 1.25rem;
 }
 
 .palette-input {
@@ -170,7 +218,7 @@ watch(isOpen, async (val) => {
 }
 
 .palette-results {
-  max-height: 22rem;
+  max-height: 24rem;
   overflow-y: auto;
   padding: 0.375rem 0 0.5rem;
 }
@@ -181,16 +229,15 @@ watch(isOpen, async (val) => {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--o2-text-muted);
-  padding: 0.4rem 1rem 0.25rem;
+  padding: 0.5rem 1rem 0.25rem;
 }
 
 .palette-result-item {
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  padding: 0.5rem 1rem;
+  padding: 0.45rem 1rem;
   cursor: pointer;
-  border-radius: 0;
   transition: background 0.1s;
 
   &:hover,
@@ -202,24 +249,28 @@ watch(isOpen, async (val) => {
 .palette-item-icon {
   color: var(--o2-text-muted);
   flex-shrink: 0;
+  font-size: 1.1rem;
 }
 
 .palette-item-title {
   flex: 1;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   color: var(--o2-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.palette-item-section {
+.palette-item-path {
   font-size: 0.75rem;
   color: var(--o2-text-muted);
   flex-shrink: 0;
-  padding: 0.1rem 0.4rem;
-  border: 1px solid var(--o2-border);
-  border-radius: 0.25rem;
+  font-family: monospace;
+  opacity: 0.8;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .palette-empty {

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+/* global localStorage */
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -27,7 +28,6 @@ export interface PaletteItem {
 }
 
 const STORAGE_KEY = "o2_recent_pages";
-const MAX_RECENTS = 8;
 
 /**
  * Score a page item against a query string.
@@ -67,8 +67,7 @@ const useCommandPalette = () => {
    * Only routes with `meta.searchable === true` are included.
    */
   const pageIndex = computed<PaletteItem[]>(() => {
-    const org =
-      store.state.selectedOrganization?.identifier ?? "default";
+    const org = store.state.selectedOrganization?.identifier ?? "default";
     const routes = router.getRoutes();
     const items: PaletteItem[] = [];
 
@@ -132,18 +131,33 @@ const useCommandPalette = () => {
       .map(({ item }) => item);
   });
 
+  const TOP_PAGES_COUNT = 10;
+
   /**
    * Items currently visible in the palette.
-   * When query is empty → show recents.
+   * When query is empty → show recents first, then fill up to TOP_PAGES_COUNT with top pages.
    * When query is non-empty → show filtered page results.
    */
   const visibleItems = computed<PaletteItem[]>(() => {
     const q = query.value.trim();
-    if (!q) return recentPages.value;
+    if (!q) {
+      const recents = recentPages.value;
+      const recentNames = new Set(recents.map((r) => r.name));
+      const topPages = pageIndex.value
+        .filter((p) => !recentNames.has(p.name))
+        .slice(0, Math.max(0, TOP_PAGES_COUNT - recents.length));
+      return [...recents, ...topPages].slice(0, TOP_PAGES_COUNT);
+    }
     return filteredPages.value;
   });
 
   const hasResults = computed(() => visibleItems.value.length > 0);
+
+  /**
+   * Whether we are in the "empty query, default view" mode.
+   * Used by the UI to render RECENTS + PAGES section labels.
+   */
+  const isDefaultView = computed(() => !query.value.trim());
 
   // ─── Keyboard navigation ──────────────────────────────────────────────────
 
@@ -196,6 +210,7 @@ const useCommandPalette = () => {
     filteredPages,
     visibleItems,
     hasResults,
+    isDefaultView,
     isOpen,
     open,
     close,
