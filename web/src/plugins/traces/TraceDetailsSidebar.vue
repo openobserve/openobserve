@@ -915,6 +915,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :fts-fields="correlationProps.ftsFields"
           :time-range="correlationProps.timeRange"
           :hide-dimension-filters="true"
+          :metric-group-definitions="metricGroupResources"
           @close="activeTab = 'attributes'"
         />
         <!-- Loading/Empty state when no data -->
@@ -972,6 +973,8 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import { type MetricGroupDefinition } from "@/utils/metrics/metricGrouping";
+import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import TenstackTable from "@/components/TenstackTable.vue";
@@ -1028,6 +1031,7 @@ export default defineComponent({
     EqualIcon,
     NotEqualIcon,
     AttributeValueCell,
+    DeployedCode,
   },
   emits: [
     "close",
@@ -1698,6 +1702,14 @@ export default defineComponent({
       }
     });
 
+    // Metric group definitions — controls which category tabs appear in the metrics dashboard.
+    const metricGroupResources = ref<MetricGroupDefinition[]>([
+      { id: "pods", label: "Pods", icon: DeployedCode },
+      { id: "nodes", label: "Nodes", icon: "dns" },
+      { id: "network", label: "Network", icon: "wifi" },
+      { id: "others", label: "Others", icon: "category" },
+    ]);
+
     // Correlation state
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
@@ -2133,6 +2145,7 @@ export default defineComponent({
       correlationLoading,
       correlationError,
       correlationProps,
+      metricGroupResources,
       config,
       // LLM
       isLLMSpan,
