@@ -1,12 +1,15 @@
 use std::time::Duration;
 
+use bytes::Bytes;
 use config::get_config;
 use infra::table::org_storage_providers::{
     AwsCredentials, AzureCredentials, GcpCredentials, OrgStorageProvider, ProviderType,
 };
-use object_store::ObjectStore;
+use object_store::{ObjectStore, ObjectStoreExt};
 
 use super::db::org_storage_providers;
+
+const TEST_FILE: &str = "o2_test/check.txt";
 
 fn get_aws(config: AwsCredentials) -> object_store::Result<object_store::aws::AmazonS3> {
     let cfg = get_config();
@@ -94,6 +97,57 @@ fn get_gcp(config: GcpCredentials) -> object_store::Result<object_store::gcp::Go
     builder.build()
 }
 
+async fn test_provider(provider: &Box<dyn ObjectStore>) -> Result<(), anyhow::Error> {
+    // Test upload
+    let path = object_store::path::Path::parse(TEST_FILE)?;
+    let data = Bytes::from("Hello, OpenObserve!");
+    if let Err(e) = provider.put(&path, data.into()).await {
+        return Err(anyhow::anyhow!("upload test failed: {e}"));
+    }
+
+    // Test download
+    match provider.get(&path).await {
+        Ok(_) => {
+            return Ok(());
+        }
+        Err(e) => match e {
+            object_store::Error::NotFound { .. } => {}
+            object_store::Error::PermissionDenied { path: _, source }
+                if source.to_string().contains("ListBucket") => {}
+            _ => {
+                return Err(anyhow::anyhow!("download test failed: {e}"));
+            }
+        },
+    };
+
+    Ok(())
+}
+
+async fn _get_provider(
+    typ: ProviderType,
+    data: &str,
+) -> Result<Box<dyn ObjectStore>, anyhow::Error> {
+    let ret: Box<dyn ObjectStore>;
+    match typ {
+        ProviderType::AwsCredential => {
+            let creds: AwsCredentials = serde_json::from_str(data)?;
+            let store = get_aws(creds)?;
+            ret = Box::new(store);
+        }
+        ProviderType::GcpCredentials => {
+            let creds: GcpCredentials = serde_json::from_str(data)?;
+            let store = get_gcp(creds)?;
+            ret = Box::new(store);
+        }
+        ProviderType::AzureCredentials => {
+            let creds: AzureCredentials = serde_json::from_str(data)?;
+            let store = get_azure(creds)?;
+            ret = Box::new(store);
+        }
+    }
+    Ok(ret)
+}
+
 pub async fn get_provider_list() -> Result<Vec<(String, Box<dyn ObjectStore>)>, anyhow::Error> {
     let list = org_storage_providers::list_all()
         .await
@@ -102,24 +156,18 @@ pub async fn get_provider_list() -> Result<Vec<(String, Box<dyn ObjectStore>)>, 
     let mut ret: Vec<(String, Box<dyn ObjectStore>)> = Vec::with_capacity(list.len());
 
     for provider in list {
-        match provider.provider_type {
-            ProviderType::AwsCredential => {
-                let creds: AwsCredentials = serde_json::from_str(&provider.data)?;
-                let store = get_aws(creds)?;
-                ret.push((provider.org_id, Box::new(store)))
-            }
-            ProviderType::GcpCredentials => {
-                let creds: GcpCredentials = serde_json::from_str(&provider.data)?;
-                let store = get_gcp(creds)?;
-                ret.push((provider.org_id, Box::new(store)))
-            }
-            ProviderType::AzureCredentials => {
-                let creds: AzureCredentials = serde_json::from_str(&provider.data)?;
-                let store = get_azure(creds)?;
-                ret.push((provider.org_id, Box::new(store)))
+        match _get_provider(provider.provider_type, &provider.data).await {
+            Ok(v) => ret.push((provider.org_id, Box::new(v))),
+            Err(e) => {
+                log::error!(
+                    "error in getting storage provider for org {}, skipping : {e}",
+                    provider.org_id
+                );
+                continue;
             }
         }
     }
+
     Ok(ret)
 }
 
@@ -135,6 +183,8 @@ fn redact(v: &str) -> String {
     )
 }
 
+// NOTE : what we redact here matters for updating the creds in merge_configs, as that
+// uses response from this for baseline. Be careful when redacting new things
 pub async fn get_redacted_config(
     org_id: &str,
 ) -> Result<Option<OrgStorageProvider>, anyhow::Error> {
@@ -162,4 +212,51 @@ pub async fn get_redacted_config(
         }
     };
     Ok(provider)
+}
+
+pub async fn set_storage(provider_data: OrgStorageProvider) -> Result<(), anyhow::Error> {
+    let provider = _get_provider(provider_data.provider_type, &provider_data.data).await?;
+
+    test_provider(&provider).await?;
+
+    super::db::org_storage_providers::add(provider_data).await?;
+
+    // todo: sync to actual infra providers
+    Ok(())
+}
+
+fn _merge_aws_credentials(existing: &str, new: &str) -> Result<String, anyhow::Error> {
+    let mut existing: AwsCredentials = serde_json::from_str(existing)?;
+    let new: AwsCredentials = serde_json::from_str(new)?;
+    existing.access_key = new.access_key;
+    existing.secret_key = new.secret_key;
+    Ok(serde_json::to_string(&existing)?)
+}
+
+fn _merge_gcp_credentials(existing: &str, new: &str) -> Result<String, anyhow::Error> {
+    let mut existing: GcpCredentials = serde_json::from_str(existing)?;
+    let new: GcpCredentials = serde_json::from_str(new)?;
+    existing.access_key = new.access_key;
+    Ok(serde_json::to_string(&existing)?)
+}
+
+fn _merge_azure_credentials(existing: &str, new: &str) -> Result<String, anyhow::Error> {
+    let mut existing: AzureCredentials = serde_json::from_str(existing)?;
+    let new: AzureCredentials = serde_json::from_str(new)?;
+    existing.access_key = new.access_key;
+    existing.secret_key = new.secret_key;
+    Ok(serde_json::to_string(&existing)?)
+}
+
+// what is redacted in get_redacted_config above matters, as we use its response here as existing
+pub fn merge_configs(
+    provider_type: ProviderType,
+    existing: &str,
+    new: &str,
+) -> Result<String, anyhow::Error> {
+    match provider_type {
+        ProviderType::AwsCredential => _merge_aws_credentials(existing, new),
+        ProviderType::GcpCredentials => _merge_aws_credentials(existing, new),
+        ProviderType::AzureCredentials => _merge_azure_credentials(existing, new),
+    }
 }

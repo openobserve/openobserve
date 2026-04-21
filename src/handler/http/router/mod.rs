@@ -826,7 +826,10 @@ pub fn service_routes() -> Router {
         // sourcemaps
         .route("/{org_id}/sourcemaps",get(sourcemaps::list).post(sourcemaps::upload_maps).delete(sourcemaps::delete))
         .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
-        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace));
+        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace))
+        
+        // todo: org storage
+        .route("/{org_id}/storage",get(org_storage::get).post(org_storage::save).put(org_storage::update));
 
     #[cfg(feature = "enterprise")]
     {

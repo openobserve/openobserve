@@ -45,6 +45,7 @@ pub mod logs;
 pub mod mcp;
 pub mod metrics;
 pub mod model_pricing;
+pub mod org_storage;
 pub mod organization;
 pub mod patterns;
 pub mod pipeline;
