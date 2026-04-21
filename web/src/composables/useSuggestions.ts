@@ -434,7 +434,7 @@ const useSqlSuggestions = () => {
           ...kw,
           insertText: (hasOpenQuote && !hasTrailingQuote) ? kw.label + '"' : kw.label,
         }));
-        autoCompleteData.value.popup.open(autoCompleteData.value.query);
+        autoCompleteData.value.popup.open?.(autoCompleteData.value.query);
         return;
       }
     }
@@ -512,7 +512,7 @@ const useSqlSuggestions = () => {
           return { label: item, insertText, kind: "Value", sortText };
         });
 
-        autoCompleteData.value.popup.open(autoCompleteData.value.query);
+        autoCompleteData.value.popup.open?.(autoCompleteData.value.query);
         // Return early — do NOT fall through to updateAutoComplete().
         // We don't want keywords/fields/functions mixed into a value dropdown.
         return;

@@ -23,8 +23,8 @@
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
-import PageManager from '../../pages/page-manager';
-import { waitForDashboardPage, deleteDashboard } from './utils/dashCreation.js';
+const PageManager = require('../../pages/page-manager.js');
+const { waitForDashboardPage, deleteDashboard } = require('./utils/dashCreation.js');
 
 // ============================================================================
 // HELPERS
