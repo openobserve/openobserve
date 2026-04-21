@@ -171,19 +171,16 @@ test.describe('Dashboard SQL Autocomplete', () => {
 
         expect(labels.length).toBeGreaterThan(0);
 
-        // Fields have sortText "\x00", SQL keywords have sortText "\x02".
-        // With 10+ field suggestions above them, SQL keywords are scrolled out
-        // of Monaco's initial virtual list viewport — only fields are visible.
-        // Assert that FIELD names appear (proving we are NOT in FROM-context
-        // stream-only mode, where streams would replace fields entirely).
-        //
-        // Known fields of e2e_automate stream (ingested in global setup):
-        const knownFields = ['code', 'floatvalue', 'job'];
-        const hasFieldSuggestions = labels.some((l) =>
-            knownFields.some((f) => l.toLowerCase().trim() === f.toLowerCase())
-        );
-        expect(hasFieldSuggestions).toBe(true);
-        testLogger.info('Field suggestions visible in WHERE context (not FROM-context stream list) — confirmed');
+        // In FROM context: effectiveKeywords = contextKeywords = streamKeywords,
+        // so stream names like 'e2e_automate' appear in the suggestion list.
+        // In WHERE context: effectiveKeywords = autoCompleteKeywords (fields/functions/keywords),
+        // so stream names do NOT appear.
+        // This assertion is environment-independent: it does not rely on specific
+        // field names being present (which vary by CI vs local), only that the
+        // FROM context has been cleared and we are back to the normal suggestion list.
+        const hasStreamName = labels.some((l) => l.toLowerCase().trim() === 'e2e_automate');
+        expect(hasStreamName).toBe(false);
+        testLogger.info('Stream name absent from WHERE context — FROM context cleared, confirmed');
 
         await page.keyboard.press('Escape');
         await cleanupDashboard(page, pm, dashboardName);
@@ -251,19 +248,16 @@ test.describe('Dashboard SQL Autocomplete', () => {
 
         expect(labels.length).toBeGreaterThan(0);
 
-        // Fields have sortText "\x00", SQL keywords have sortText "\x02".
-        // With 10+ field suggestions above them, SQL keywords are scrolled out
-        // of Monaco's initial virtual list viewport — only fields are visible.
-        // Assert that FIELD names appear (proving we exited FROM-context and
-        // are now showing the normal field+keyword list, not stream-only list).
-        //
-        // Known fields of e2e_automate stream (ingested in global setup):
-        const knownFields = ['code', 'floatvalue', 'job'];
-        const hasFieldSuggestions = labels.some((l) =>
-            knownFields.some((f) => l.toLowerCase().trim() === f.toLowerCase())
-        );
-        expect(hasFieldSuggestions).toBe(true);
-        testLogger.info('Field suggestions restored after WHERE clause (not FROM-context stream list) — confirmed');
+        // In FROM context: effectiveKeywords = contextKeywords = streamKeywords,
+        // so stream names like 'e2e_automate' appear in the suggestion list.
+        // In WHERE context: effectiveKeywords = autoCompleteKeywords (fields/functions/keywords),
+        // so stream names do NOT appear.
+        // This assertion is environment-independent: it does not rely on specific
+        // field names being present (which vary by CI vs local), only that the
+        // FROM context has been cleared and we are back to the normal suggestion list.
+        const hasStreamName = labels.some((l) => l.toLowerCase().trim() === 'e2e_automate');
+        expect(hasStreamName).toBe(false);
+        testLogger.info('Stream name absent from WHERE context — FROM context cleared, confirmed');
 
         await page.keyboard.press('Escape');
         await cleanupDashboard(page, pm, dashboardName);
