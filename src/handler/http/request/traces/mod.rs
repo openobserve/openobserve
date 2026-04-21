@@ -1072,7 +1072,14 @@ async fn process_latest_traces_stream(
     let total_partitions = partitions.len();
     // Partitions from search_partition are already in DESC order (newest-first) by default,
     // since the partition SQL has no ORDER BY and the default is OrderBy::Desc.
-    let partitions_desc = partitions;
+    let partitions_desc = if sql_order_expr == "zo_sql_timestamp DESC" {
+        partitions
+    } else if sql_order_expr == "zo_sql_timestamp ASC" {
+        partitions.into_iter().rev().collect::<Vec<_>>()
+    } else {
+        // order by other fields can't be multiple partitions
+        vec![[partition_req.start_time, partition_req.end_time]]
+    };
 
     // `from` is a global offset: skip the first `from` hits across all partitions,
     // then deliver `size` hits. We track how many we've seen and delivered so far.
