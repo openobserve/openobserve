@@ -1614,6 +1614,9 @@ export default defineComponent({
       };
     };
 
+    const sanitizeTraceId = (id: string): string =>
+      String(id).replace(/['"\\]/g, "");
+
     const buildTraceCountQuery = (trace: any) => {
       const req = getDefaultRequest();
       req.query.from = 0;
@@ -1621,7 +1624,7 @@ export default defineComponent({
       req.query.start_time = trace.from;
       req.query.end_time = trace.to;
       req.query.sql = b64EncodeUnicode(
-        `SELECT COUNT(*) as total FROM "${trace.stream}" WHERE trace_id = '${trace.trace_id}'`,
+        `SELECT COUNT(*) as total FROM "${trace.stream}" WHERE trace_id = '${sanitizeTraceId(trace.trace_id)}'`,
       ) as string;
       return req;
     };
@@ -1638,7 +1641,7 @@ export default defineComponent({
       req.query.end_time = trace.to;
 
       req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM "${trace.stream}" WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
+        `SELECT * FROM "${trace.stream}" WHERE trace_id = '${sanitizeTraceId(trace.trace_id)}' ORDER BY start_time`,
       ) as string;
 
       return req;
@@ -1838,7 +1841,7 @@ export default defineComponent({
               countRes.data?.hits?.[0]?.total ?? traceSpans.length;
             searchObj.data.traceDetails.totalSpanCount = totalFromCount;
             searchObj.data.traceDetails.spansTruncated =
-              traceSpans.length > limit;
+              totalFromCount > traceSpans.length;
             if (searchObj.data.traceDetails.spansTruncated) {
               $q.notify({
                 type: "warning",
