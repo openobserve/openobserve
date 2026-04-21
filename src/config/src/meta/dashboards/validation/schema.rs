@@ -78,7 +78,10 @@ fn map_error_message(path: &str, keyword: &str, raw_message: &str, dashboard: &V
         } else if keyword == "maxItems" {
             format!("{}:maxItems", field)
         } else if keyword == "required" {
-            format!("{}:required", field)
+            // For required errors, instance_path points to the parent object, not the missing
+            // property. Parse the property name from the error message instead.
+            let prop = raw_message.split('"').nth(1).unwrap_or(field);
+            format!("{}:required", prop)
         } else if keyword == "enum" {
             format!("{}:enum", field)
         } else if keyword == "minLength" {
