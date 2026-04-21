@@ -128,10 +128,11 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             data: this.getMarkLineData(panelSchema),
             zlevel: 2,
             lineStyle: {
-              shadowColor: store.state.theme === "dark"
-                ? "rgba(0, 0, 0, 0.8)"
-                : "rgba(255, 255, 255, 0.8)",
-              shadowBlur: 1,
+              shadowColor: store.state.theme === "light"
+                ? "rgba(255, 255, 255, 0.7)"
+                : "rgba(0, 0, 0, 0.7)",
+              shadowBlur: 2,
+              width: 2,
             },
           },
         });

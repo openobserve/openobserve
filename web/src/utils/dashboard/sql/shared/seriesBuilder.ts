@@ -111,9 +111,10 @@ export function createSeriesBuilders(deps: SeriesDeps) {
       lineStyle: {
         color: "#8B5A2B",
         type: [8, 4],
-        shadowColor: store.state.theme === "dark"
-          ? "rgba(0, 0, 0, 0.8)"
-          : "rgba(255, 255, 255, 0.8)",
+        width: 2,
+        shadowColor: store.state.theme === "light"
+          ? "rgba(255, 255, 255, 0.7)"
+          : "rgba(0, 0, 0, 0.7)",
         shadowBlur: 2,
       },
     };
