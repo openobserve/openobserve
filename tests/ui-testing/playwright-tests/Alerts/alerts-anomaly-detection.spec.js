@@ -2,6 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
+const { getOrgName, createMockDestination, deleteDestination, listAnomalyDetections, triggerAnomalyDetection, getAnomalyHistory } = require('../utils/api-helper.js');
 
 test.describe("Anomaly Detection Alerts", () => {
   test.describe.configure({ mode: 'serial' });
@@ -407,50 +408,11 @@ test.describe("Anomaly Detection Alerts", () => {
     }, async ({ page }) => {
       testLogger.info('Creating anomaly with alerting enabled');
 
-      // Helper function to make API calls
-      // Helper function to make API calls - uses environment variables (no hardcoded fallbacks)
-      const apiCall = async (method, path, body = null) => {
-        const baseUrl = process.env.ZO_BASE_URL;
-        const email = process.env.ZO_ROOT_USER_EMAIL;
-        const password = process.env.ZO_ROOT_USER_PASSWORD;
-
-        if (!baseUrl || !email || !password) {
-          throw new Error('Required environment variables missing: ZO_BASE_URL, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD');
-        }
-
-        const authToken = Buffer.from(`${email}:${password}`).toString('base64');
-        const headers = {
-          'Authorization': `Basic ${authToken}`,
-          'Content-Type': 'application/json'
-        };
-
-        return page.evaluate(async ({ url, method, headers, body }) => {
-          const opts = { method, headers };
-          if (body) opts.body = JSON.stringify(body);
-          const resp = await fetch(url, opts);
-          const data = await resp.json().catch(() => ({}));
-          return { status: resp.status, data };
-        }, { url: `${baseUrl}${path}`, method, headers, body });
-      };
-
-      const org = process.env.ORGNAME;
-      if (!org) {
-        throw new Error('Required environment variable missing: ORGNAME');
-      }
+      const org = getOrgName();
       const testDestinationName = `e2e_anomaly_dest_${randomValue}`;
 
       // Step 1: Create a mock destination via API (using httpbin.org for CI/CD)
-      testLogger.info('Creating mock destination via API', { testDestinationName });
-      const destPayload = {
-        name: testDestinationName,
-        template: "Slack",
-        url: "https://httpbin.org/post",
-        method: "post",
-        headers: {},
-        skip_tls_verify: false
-      };
-
-      const createDestResp = await apiCall('POST', `/api/${org}/alerts/destinations`, destPayload);
+      const createDestResp = await createMockDestination(page, testDestinationName);
       testLogger.info('Create destination response', { status: createDestResp.status });
 
       if (createDestResp.status !== 200) {
@@ -553,7 +515,7 @@ test.describe("Anomaly Detection Alerts", () => {
         testLogger.warn('Destination error still visible - destination may not be selected, skipping save');
         // Cancel and cleanup
         await pm.anomalyDetectionPage.clickBack();
-        await apiCall('DELETE', `/api/${org}/alerts/destinations/${testDestinationName}`);
+        await deleteDestination(page, testDestinationName);
         test.skip(true, 'Could not select destination in dropdown');
         return;
       }
@@ -566,7 +528,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
       // Step 3: Cleanup - delete the test destination via API
       testLogger.info('Cleaning up test destination');
-      await apiCall('DELETE', `/api/${org}/alerts/destinations/${testDestinationName}`);
+      await deleteDestination(page, testDestinationName);
     });
 
     test("Refresh destinations list", {
@@ -740,43 +702,11 @@ test.describe("Anomaly Detection Alerts", () => {
     }, async ({ page }) => {
       testLogger.info('Testing trigger anomaly detection via API');
 
-      // Helper function to make API calls - uses environment variables (no hardcoded fallbacks)
-      const apiCall = async (method, path, body = null) => {
-        const baseUrl = process.env.ZO_BASE_URL;
-        const email = process.env.ZO_ROOT_USER_EMAIL;
-        const password = process.env.ZO_ROOT_USER_PASSWORD;
-
-        if (!baseUrl || !email || !password) {
-          throw new Error('Required environment variables missing: ZO_BASE_URL, ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD');
-        }
-
-        const authToken = Buffer.from(`${email}:${password}`).toString('base64');
-        const headers = {
-          'Authorization': `Basic ${authToken}`,
-          'Content-Type': 'application/json'
-        };
-
-        return page.evaluate(async ({ url, method, headers, body }) => {
-          const opts = { method, headers };
-          if (body) opts.body = JSON.stringify(body);
-          const resp = await fetch(url, opts);
-          const data = await resp.json().catch(() => ({}));
-          return { status: resp.status, data };
-        }, { url: `${baseUrl}${path}`, method, headers, body });
-      };
-
-      const org = process.env.ORGNAME;
-      if (!org) {
-        throw new Error('Required environment variable missing: ORGNAME');
-      }
-
       // List anomaly detections to find one we can trigger
       testLogger.info('Listing anomaly detections via API');
-      const listResp = await apiCall('GET', `/api/${org}/anomaly_detection`);
+      const anomalies = await listAnomalyDetections(page);
 
-      testLogger.info('Anomaly list response', { status: listResp.status, count: listResp.data?.configs?.length || listResp.data?.length || 0 });
-
-      const anomalies = listResp.data?.configs || listResp.data || [];
+      testLogger.info('Anomaly list response', { count: anomalies.length });
 
       if (anomalies.length > 0) {
         // Try to trigger the first anomaly that's enabled and trained
@@ -786,8 +716,8 @@ test.describe("Anomaly Detection Alerts", () => {
 
         testLogger.info('Triggering detection for anomaly', { anomalyId, anomalyName, status: targetAnomaly.status });
 
-        // Trigger detection via API: POST /api/{org}/anomaly_detection/{anomaly_id}/detect
-        const triggerResp = await apiCall('POST', `/api/${org}/anomaly_detection/${anomalyId}/detect`, {});
+        // Trigger detection via API
+        const triggerResp = await triggerAnomalyDetection(page, anomalyId);
 
         testLogger.info('Trigger detection response', { status: triggerResp.status, data: triggerResp.data });
 
@@ -801,7 +731,7 @@ test.describe("Anomaly Detection Alerts", () => {
         }
 
         // Optional: Check detection history to verify trigger was recorded
-        const historyResp = await apiCall('GET', `/api/${org}/anomaly_detection/${anomalyId}/history?limit=5`);
+        const historyResp = await getAnomalyHistory(page, anomalyId);
         testLogger.info('Detection history', { status: historyResp.status, entries: historyResp.data?.length || 0 });
 
       } else {

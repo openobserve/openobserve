@@ -102,12 +102,26 @@ export class AnomalyDetectionPage {
 
     /**
      * Navigate to anomaly detection list page
+     * Anomaly detections are shown in the main alerts list page
+     * They can be identified by their alert_type = 'anomaly'
      */
     async navigateToAnomalyList() {
-        testLogger.info('Navigating to anomaly detection list');
-        // TODO: Implement based on actual navigation structure
-        // This might be via a tab or menu item
+        testLogger.info('Navigating to anomaly detection list (alerts page)');
+
+        // Get org from environment
+        const org = process.env.ORGNAME;
+        if (!org) {
+            throw new Error('ORGNAME environment variable is required for navigation');
+        }
+
+        // Navigate to alerts page - anomaly detections appear in the same list
+        await this.page.goto(`/web/alerts/?org_identifier=${org}`);
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+        // Wait for alerts table to be visible
+        await this.page.locator(this.selectors.alertsTable).first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
+        testLogger.info('Navigated to alerts list page');
     }
 
     /**
@@ -413,20 +427,23 @@ export class AnomalyDetectionPage {
         // Get slider bounds
         const sliderBox = await slider.boundingBox();
 
-        // Calculate positions (vertical slider, 0 at bottom, 100 at top)
-        const minY = sliderBox.y + sliderBox.height - (min / 100 * sliderBox.height);
-        const maxY = sliderBox.y + sliderBox.height - (max / 100 * sliderBox.height);
+        // Calculate RELATIVE positions for dragTo (vertical slider, 0 at bottom, 100 at top)
+        // For vertical slider: Y=0 is top (100%), Y=height is bottom (0%)
+        // So to set value V%: relativeY = height * (1 - V/100)
+        const minRelativeY = sliderBox.height * (1 - min / 100);
+        const maxRelativeY = sliderBox.height * (1 - max / 100);
+        const centerX = sliderBox.width / 2;
 
         // Drag handles
         const handles = slider.locator('.q-slider__thumb');
 
-        // Bottom handle (min)
+        // Bottom handle (min) - drag to min position
         const bottomHandle = handles.first();
-        await bottomHandle.dragTo(slider, { targetPosition: { x: 0, y: minY } });
+        await bottomHandle.dragTo(slider, { targetPosition: { x: centerX, y: minRelativeY } });
 
-        // Top handle (max)
+        // Top handle (max) - drag to max position
         const topHandle = handles.last();
-        await topHandle.dragTo(slider, { targetPosition: { x: 0, y: maxY } });
+        await topHandle.dragTo(slider, { targetPosition: { x: centerX, y: maxRelativeY } });
 
         await this.page.waitForTimeout(500);
 
@@ -881,7 +898,7 @@ export class AnomalyDetectionPage {
         await this.fillBasicSetup(config.name, config.streamType, config.streamName);
 
         // Step 2: Configure detection
-        await this.clickTab('Config');
+        await this.clickTab('Detection Config');
 
         if (config.detection.mode === 'builder') {
             await this.selectQueryMode('builder');
