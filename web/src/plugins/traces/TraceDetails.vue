@@ -33,9 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <header
           class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)]"
         >
-          <div
-            class="tw:flex tw:items-center tw:space-x-4 tw:w-[calc(100%-17rem)]!"
-          >
+          <div class="tw:flex tw:items-center tw:space-x-4 tw:w-fit!">
             <!-- Back button -->
             <q-btn
               v-if="mode === 'standalone' && showBackButton"
@@ -60,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Operation Name -->
               <div
                 data-test="trace-details-operation-name"
-                class="tw:text-base tw:font-semibold tw:leading-tight tw:text-[var(--o2-text-primary)] tw:truncate tw:min-w-0 tw:max-w-[calc(100%-32rem)]!"
+                class="tw:text-base tw:font-semibold tw:leading-tight tw:text-[var(--o2-text-primary)] tw:truncate tw:min-w-0 tw:max-w-[24rem]!"
                 :title="traceTree[0]?.operationName"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
@@ -178,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div
-            class="tw:flex tw:justify-end tw:items-center tw:space-x-3 tw:w-[25rem]!"
+            class="tw:flex tw:justify-end tw:items-center tw:space-x-3 tw:w-fit!"
           >
             <!-- Apply filters button (standalone mode, right side) -->
             <q-btn
