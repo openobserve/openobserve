@@ -33,7 +33,7 @@ static CACHE: Lazy<RwLock<HashMap<String, Option<OrgStorageProvider>>>> =
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ProviderType {
-    AwsCredential,
+    AwsCredentials,
     GcpCredentials,
     AzureCredentials,
 }
@@ -74,10 +74,10 @@ pub struct AzureCredentials {
 impl From<String> for ProviderType {
     fn from(value: String) -> Self {
         match value.as_str().to_ascii_lowercase().as_str() {
-            "aws_credentials" => Self::AwsCredential,
+            "aws_credentials" => Self::AwsCredentials,
             "gcp_credentials" => Self::GcpCredentials,
             "azure_credentials" => Self::AzureCredentials,
-            _ => Self::AwsCredential,
+            _ => Self::AwsCredentials,
         }
     }
 }
@@ -85,7 +85,7 @@ impl From<String> for ProviderType {
 impl std::fmt::Display for ProviderType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AwsCredential => write!(f, "aws_credentials"),
+            Self::AwsCredentials => write!(f, "aws_credentials"),
             Self::AzureCredentials => write!(f, "azure_credentials"),
             Self::GcpCredentials => write!(f, "gcp_credentials"),
         }

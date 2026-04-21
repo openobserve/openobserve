@@ -123,13 +123,13 @@ async fn test_provider(provider: &Box<dyn ObjectStore>) -> Result<(), anyhow::Er
     Ok(())
 }
 
-async fn _get_provider(
+pub(super) async fn get_provider(
     typ: ProviderType,
     data: &str,
 ) -> Result<Box<dyn ObjectStore>, anyhow::Error> {
     let ret: Box<dyn ObjectStore>;
     match typ {
-        ProviderType::AwsCredential => {
+        ProviderType::AwsCredentials => {
             let creds: AwsCredentials = serde_json::from_str(data)?;
             let store = get_aws(creds)?;
             ret = Box::new(store);
@@ -156,7 +156,7 @@ pub async fn get_provider_list() -> Result<Vec<(String, Box<dyn ObjectStore>)>, 
     let mut ret: Vec<(String, Box<dyn ObjectStore>)> = Vec::with_capacity(list.len());
 
     for provider in list {
-        match _get_provider(provider.provider_type, &provider.data).await {
+        match get_provider(provider.provider_type, &provider.data).await {
             Ok(v) => ret.push((provider.org_id, Box::new(v))),
             Err(e) => {
                 log::error!(
@@ -192,7 +192,7 @@ pub async fn get_redacted_config(
 
     if let Some(config) = provider.as_mut() {
         match config.provider_type {
-            ProviderType::AwsCredential => {
+            ProviderType::AwsCredentials => {
                 let mut creds: AwsCredentials = serde_json::from_str(&config.data)?;
                 creds.access_key = redact(&creds.access_key);
                 creds.secret_key = redact(&creds.secret_key);
@@ -214,14 +214,18 @@ pub async fn get_redacted_config(
     Ok(provider)
 }
 
-pub async fn set_storage(provider_data: OrgStorageProvider) -> Result<(), anyhow::Error> {
-    let provider = _get_provider(provider_data.provider_type, &provider_data.data).await?;
+pub async fn set_storage(
+    org_id: &str,
+    provider_data: OrgStorageProvider,
+) -> Result<(), anyhow::Error> {
+    let provider = get_provider(provider_data.provider_type, &provider_data.data).await?;
 
     test_provider(&provider).await?;
 
-    super::db::org_storage_providers::add(provider_data).await?;
+    super::db::org_storage_providers::add(provider_data.clone()).await?;
 
-    // todo: sync to actual infra providers
+    infra::table::org_storage_providers::update_cache(org_id, provider_data);
+    infra::storage::add_account(org_id, provider).await;
     Ok(())
 }
 
@@ -255,7 +259,7 @@ pub fn merge_configs(
     new: &str,
 ) -> Result<String, anyhow::Error> {
     match provider_type {
-        ProviderType::AwsCredential => _merge_aws_credentials(existing, new),
+        ProviderType::AwsCredentials => _merge_aws_credentials(existing, new),
         ProviderType::GcpCredentials => _merge_aws_credentials(existing, new),
         ProviderType::AzureCredentials => _merge_azure_credentials(existing, new),
     }

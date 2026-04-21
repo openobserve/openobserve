@@ -47,8 +47,6 @@ pub async fn add(entry: OrgStorageProvider) -> Result<(), anyhow::Error> {
         cache.insert(entry.org_id.clone(), Some(entry.clone()));
     }
 
-    // todo update infra(provider+cache) for this provider
-
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;
     cluster_coordinator
@@ -139,6 +137,22 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     continue;
                 };
                 let org = entry.org_id.clone();
+
+                let provider = match super::super::org_storage_providers::get_provider(
+                    entry.provider_type,
+                    &entry.data,
+                )
+                .await
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!(
+                            "error getting provider for org {org} which was synced via events, skipping update : {e}"
+                        );
+                        continue;
+                    }
+                };
+                infra::storage::add_account(&org, provider).await;
 
                 // we must invalidate the infra level cache, or there be dragons!
                 infra::table::org_storage_providers::update_cache(&org, entry.clone());

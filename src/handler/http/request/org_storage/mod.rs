@@ -93,7 +93,7 @@ pub async fn save(Path(org_id): Path<String>, Json(body): Json<SetupStorageReque
         data: req.data.to_string(),
     };
 
-    match crate::service::org_storage_providers::set_storage(provider).await {
+    match crate::service::org_storage_providers::set_storage(&org_id, provider).await {
         Ok(_) => {
             log::info!("successfully set org-level storage for org {org_id}");
             HttpResponse::created("successfully setup storage")
@@ -212,7 +212,7 @@ pub async fn update(Path(org_id): Path<String>, Json(req): Json<SetupStorageRequ
     existing.data = new_creds;
     existing.updated_at = chrono::Utc::now().timestamp_micros();
 
-    match crate::service::org_storage_providers::set_storage(existing).await {
+    match crate::service::org_storage_providers::set_storage(&org_id, existing).await {
         Ok(_) => {
             log::info!("successfully updated org-level storage credentials for org {org_id}");
             HttpResponse::created("successfully updated storage credentials")
