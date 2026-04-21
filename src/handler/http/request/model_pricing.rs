@@ -121,15 +121,14 @@ pub async fn list(
     //
     // This reflects actual runtime behaviour: a parent with pattern `(?i)claude-3` genuinely
     // shadows any built-in whose pattern starts with "claude-3" (e.g. "claude-3-haiku").
+    let never_matches = regex::Regex::new("$^").unwrap();
     let mut parents: Vec<(ModelPricingDefinition, regex::Regex)> = Vec::new();
 
     for item in all_items {
         let test_str = derive_test_string(&item.match_pattern);
 
         let parent_idx = if !test_str.is_empty() {
-            parents
-                .iter()
-                .position(|(_, re)| re.is_match(&test_str))
+            parents.iter().position(|(_, re)| re.is_match(&test_str))
         } else {
             None
         };
@@ -140,7 +139,7 @@ pub async fn list(
             let compiled = regex::RegexBuilder::new(&item.match_pattern)
                 .size_limit(crate::service::db::model_pricing::REGEX_SIZE_LIMIT)
                 .build()
-                .unwrap_or_else(|_| regex::Regex::new("$^").unwrap()); // never matches
+                .unwrap_or_else(|_| never_matches.clone());
             parents.push((item, compiled));
         }
     }
@@ -568,13 +567,16 @@ pub async fn refresh_built_in(
 fn strip_leading_flags(s: &str) -> &str {
     let mut rest = s;
     loop {
-        if let Some(r) = rest.strip_prefix("(?") {
-            if let Some(end) = r.find(')') {
-                let flags = &r[..end];
-                if flags.chars().all(|c| matches!(c, 'i' | 'm' | 's' | 'x' | 'u' | '-')) {
-                    rest = &r[end + 1..];
-                    continue;
-                }
+        if let Some(r) = rest.strip_prefix("(?")
+            && let Some(end) = r.find(')')
+        {
+            let flags = &r[..end];
+            if flags
+                .chars()
+                .all(|c| matches!(c, 'i' | 'm' | 's' | 'x' | 'u' | '-'))
+            {
+                rest = &r[end + 1..];
+                continue;
             }
         }
         break;
