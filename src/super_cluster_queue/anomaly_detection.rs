@@ -69,7 +69,7 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
             if exists {
                 // Row already exists — skip. ConfigCreate fires once at creation time;
                 // any replay is always the original stale message. Matches alerts behavior.
-                log::info!(
+                log::debug!(
                     "[SUPER_CLUSTER:anomaly_detection] ConfigCreate skipped (already exists) id={}",
                     anomaly_id
                 );
@@ -84,7 +84,7 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                         );
                         infra::errors::Error::Message(e.to_string())
                     })?;
-                log::info!(
+                log::debug!(
                     "[SUPER_CLUSTER:anomaly_detection] ConfigCreate inserted new row id={}",
                     anomaly_id
                 );
@@ -115,6 +115,7 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                     infra::errors::Error::Message(e.to_string())
                 })?;
             if existing.is_some() {
+                let updated_at = config.updated_at;
                 config.into_active_model().update(db).await.map_err(|e| {
                     log::error!(
                         "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate update failed id={}: {e}",
@@ -122,10 +123,10 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                     );
                     infra::errors::Error::Message(e.to_string())
                 })?;
-                log::info!(
+                log::debug!(
                     "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate successfully wrote to DB id={} updated_at={}",
                     anomaly_id,
-                    config.updated_at,
+                    updated_at,
                 );
             } else {
                 log::warn!(
@@ -142,7 +143,7 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                         );
                         infra::errors::Error::Message(e.to_string())
                     })?;
-                log::info!(
+                log::debug!(
                     "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate inserted missing row id={}",
                     anomaly_id
                 );
