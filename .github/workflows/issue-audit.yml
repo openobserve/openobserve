@@ -1,0 +1,354 @@
+name: Issue Audit - Check Fix & Test Coverage
+
+on:
+  workflow_dispatch:  # Manual trigger
+  schedule:
+    - cron: '0 0 * * 1'  # Weekly on Monday at midnight UTC
+
+permissions:
+  issues: write
+  pull-requests: read
+  contents: read
+
+jobs:
+  audit-issues:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch all open issues
+        id: fetch-issues
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'bug',  // Only audit bug issues
+              per_page: 100
+            });
+
+            // Filter out PRs (GitHub API returns both)
+            const bugIssues = issues.filter(issue => !issue.pull_request);
+
+            core.setOutput('count', bugIssues.length);
+            core.setOutput('issues', JSON.stringify(bugIssues.map(i => ({
+              number: i.number,
+              title: i.title,
+              url: i.html_url,
+              created_at: i.created_at
+            }))));
+
+            console.log(`Found ${bugIssues.length} open bug issues to audit`);
+
+      - name: Audit each issue for fix + test coverage
+        id: audit
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issues = JSON.parse('${{ steps.fetch-issues.outputs.issues }}');
+
+            const results = {
+              ready_to_close: [],      // Has fix + test
+              needs_test: [],          // Has fix, no test
+              needs_fix: [],           // Has test, no fix (weird case)
+              needs_both: []           // No fix, no test
+            };
+
+            for (const issue of issues) {
+              console.log(`\n=== Auditing Issue #${issue.number}: ${issue.title} ===`);
+
+              // 1. Check for merged PR that fixes this issue
+              let hasFix = false;
+              let fixPR = null;
+
+              try {
+                const timeline = await github.rest.issues.listEventsForTimeline({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  per_page: 100
+                });
+
+                // Look for "referenced" events from merged PRs
+                for (const event of timeline.data) {
+                  if (event.event === 'referenced' && event.source?.type === 'issue') {
+                    // Check if the referencing PR is merged
+                    const prNumber = event.source.issue.number;
+                    const pr = await github.rest.pulls.get({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      pull_number: prNumber
+                    });
+
+                    if (pr.data.merged) {
+                      // Check if PR body mentions this issue with closing keywords
+                      const prBody = (pr.data.body || '').toLowerCase();
+                      const issueRef = `#${issue.number}`;
+                      const closingKeywords = ['closes', 'fixes', 'resolves', 'fixed', 'close', 'resolve'];
+
+                      if (closingKeywords.some(keyword =>
+                        prBody.includes(`${keyword} ${issueRef}`) ||
+                        prBody.includes(`${keyword}: ${issueRef}`)
+                      )) {
+                        hasFix = true;
+                        fixPR = {
+                          number: pr.data.number,
+                          title: pr.data.title,
+                          url: pr.data.html_url,
+                          merged_at: pr.data.merged_at
+                        };
+                        console.log(`  ✓ Found fix: PR #${fixPR.number}`);
+                        break;
+                      }
+                    }
+                  }
+                }
+              } catch (error) {
+                console.log(`  ⚠️  Error checking PRs: ${error.message}`);
+              }
+
+              // 2. Check for test with @bug-{issue#} tag
+              const { execSync } = require('child_process');
+              let hasTest = false;
+              let testFile = null;
+
+              try {
+                const searchResult = execSync(
+                  `grep -r "@bug-${issue.number}" tests/ui-testing/playwright-tests/ --include="*.spec.js" -l || true`,
+                  { encoding: 'utf-8' }
+                ).trim();
+
+                if (searchResult) {
+                  hasTest = true;
+                  testFile = searchResult.split('\n')[0];  // Take first match
+                  console.log(`  ✓ Found test: ${testFile}`);
+                } else {
+                  console.log(`  ✗ No test found with @bug-${issue.number}`);
+                }
+              } catch (error) {
+                console.log(`  ⚠️  Error checking tests: ${error.message}`);
+              }
+
+              // 3. Categorize the issue
+              const result = {
+                issue: issue,
+                hasFix: hasFix,
+                hasTest: hasTest,
+                fixPR: fixPR,
+                testFile: testFile
+              };
+
+              if (hasFix && hasTest) {
+                console.log(`  → Category: READY TO CLOSE`);
+                results.ready_to_close.push(result);
+              } else if (hasFix && !hasTest) {
+                console.log(`  → Category: NEEDS TEST`);
+                results.needs_test.push(result);
+              } else if (!hasFix && hasTest) {
+                console.log(`  → Category: NEEDS FIX (has test but no merged PR)`);
+                results.needs_fix.push(result);
+              } else {
+                console.log(`  → Category: NEEDS BOTH`);
+                results.needs_both.push(result);
+              }
+            }
+
+            // Log summary
+            console.log(`\n=== AUDIT SUMMARY ===`);
+            console.log(`Total issues audited: ${issues.length}`);
+            console.log(`Ready to close: ${results.ready_to_close.length}`);
+            console.log(`Needs test: ${results.needs_test.length}`);
+            console.log(`Needs fix: ${results.needs_fix.length}`);
+            console.log(`Needs both: ${results.needs_both.length}`);
+
+            // Save results
+            core.setOutput('results', JSON.stringify(results));
+            core.setOutput('ready_to_close_count', results.ready_to_close.length);
+
+      - name: Auto-close issues with fix + test
+        if: steps.audit.outputs.ready_to_close_count > 0
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const results = JSON.parse('${{ steps.audit.outputs.results }}');
+
+            for (const item of results.ready_to_close) {
+              const issue = item.issue;
+              const fixPR = item.fixPR;
+              const testFile = item.testFile;
+
+              console.log(`Closing issue #${issue.number}: ${issue.title}`);
+
+              // Post closing comment
+              const comment = `## ✅ Issue Resolved - Auto-Closed by Issue Audit
+
+This issue has been automatically closed because:
+- ✅ **Fix merged**: PR #${fixPR.number} (${fixPR.url})
+- ✅ **Test coverage**: \`${testFile}\`
+
+The fix has been implemented and proper test coverage exists with the \`@bug-${issue.number}\` tag.
+
+---
+*🤖 Automated by [Issue Audit Workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})*`;
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: comment
+              });
+
+              // Close the issue
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed'
+              });
+
+              console.log(`  ✓ Closed issue #${issue.number}`);
+            }
+
+      - name: Comment on issues needing tests
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const results = JSON.parse('${{ steps.audit.outputs.results }}');
+
+            for (const item of results.needs_test) {
+              const issue = item.issue;
+              const fixPR = item.fixPR;
+
+              console.log(`Commenting on issue #${issue.number}: needs test`);
+
+              // Check if we already posted this comment
+              const comments = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number
+              });
+
+              const alreadyCommented = comments.data.some(c =>
+                c.body.includes('Issue Audit Workflow') &&
+                c.body.includes('needs test coverage')
+              );
+
+              if (alreadyCommented) {
+                console.log(`  → Already commented, skipping`);
+                continue;
+              }
+
+              const comment = `## ⚠️  Missing Test Coverage
+
+**Status**: This issue has been fixed but lacks E2E test coverage.
+
+- ✅ **Fix merged**: PR #${fixPR.number} (${fixPR.url})
+- ❌ **No test found**: Missing \`@bug-${issue.number}\` tag
+
+**Action needed**:
+Please add an E2E test with proper tags:
+\`\`\`javascript
+test("Test description @bug-${issue.number} @regression", async ({ page }) => {
+  // Test implementation
+});
+\`\`\`
+
+Place the test in \`tests/ui-testing/playwright-tests/RegressionSet/\`
+
+---
+*🤖 Detected by [Issue Audit Workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})*`;
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: comment
+              });
+
+              console.log(`  ✓ Posted comment on issue #${issue.number}`);
+            }
+
+      - name: Generate audit report
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const results = JSON.parse('${{ steps.audit.outputs.results }}');
+
+            let report = `# Issue Audit Report\n\n`;
+            report += `**Run ID**: ${context.runId}\n`;
+            report += `**Date**: ${new Date().toISOString()}\n\n`;
+            report += `---\n\n`;
+
+            // Summary table
+            report += `## Summary\n\n`;
+            report += `| Category | Count |\n`;
+            report += `|----------|-------|\n`;
+            report += `| ✅ Auto-closed (fix + test) | ${results.ready_to_close.length} |\n`;
+            report += `| ⚠️  Needs test | ${results.needs_test.length} |\n`;
+            report += `| ⚠️  Needs fix | ${results.needs_fix.length} |\n`;
+            report += `| ❌ Needs both | ${results.needs_both.length} |\n`;
+            report += `| **Total audited** | **${results.ready_to_close.length + results.needs_test.length + results.needs_fix.length + results.needs_both.length}** |\n\n`;
+
+            // Details
+            if (results.ready_to_close.length > 0) {
+              report += `## ✅ Auto-Closed Issues (${results.ready_to_close.length})\n\n`;
+              results.ready_to_close.forEach(item => {
+                report += `- #${item.issue.number}: ${item.issue.title}\n`;
+                report += `  - Fix: PR #${item.fixPR.number}\n`;
+                report += `  - Test: \`${item.testFile}\`\n\n`;
+              });
+            }
+
+            if (results.needs_test.length > 0) {
+              report += `## ⚠️  Issues Needing Tests (${results.needs_test.length})\n\n`;
+              results.needs_test.forEach(item => {
+                report += `- #${item.issue.number}: ${item.issue.title}\n`;
+                report += `  - Fix: PR #${item.fixPR.number} (merged ${item.fixPR.merged_at})\n`;
+                report += `  - Missing test with @bug-${item.issue.number} tag\n\n`;
+              });
+            }
+
+            if (results.needs_fix.length > 0) {
+              report += `## ⚠️  Issues with Tests but No Fix (${results.needs_fix.length})\n\n`;
+              results.needs_fix.forEach(item => {
+                report += `- #${item.issue.number}: ${item.issue.title}\n`;
+                report += `  - Test exists: \`${item.testFile}\`\n`;
+                report += `  - No merged PR found\n\n`;
+              });
+            }
+
+            if (results.needs_both.length > 0) {
+              report += `## ❌ Issues Needing Both Fix and Test (${results.needs_both.length})\n\n`;
+              results.needs_both.forEach(item => {
+                report += `- #${item.issue.number}: ${item.issue.title}\n`;
+              });
+            }
+
+            report += `\n---\n`;
+            report += `*Generated by Issue Audit Workflow*\n`;
+
+            console.log(report);
+
+            // Save report as artifact
+            const fs = require('fs');
+            fs.writeFileSync('issue-audit-report.md', report);
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-audit-report
+          path: issue-audit-report.md
+          retention-days: 90
