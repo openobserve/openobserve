@@ -13,6 +13,39 @@ test.describe("Anomaly Detection Alerts", () => {
   const testStreamName = 'e2e_automate'; // Stream created by global setup
   const testAnomalyName = (suffix) => `E2E_Anomaly_${suffix}_${randomValue}`;
 
+  // Prerequisite destination name - ensures Add Alert button is enabled
+  const prerequisiteDestinationName = `e2e_anomaly_prerequisite_${randomValue}`;
+  let prerequisiteDestinationCreated = false;
+
+  // Setup: Create a test destination to ensure Add Alert button is enabled
+  // The Add Alert button is disabled when no destinations exist in the system
+  test.beforeAll(async ({ browser }) => {
+    testLogger.info('Setting up prerequisites - creating test destination');
+
+    if (!process.env.ZO_BASE_URL || !process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD || !process.env.ORGNAME) {
+      testLogger.warn('Skipping prerequisite setup - missing environment variables');
+      return;
+    }
+
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    try {
+      // Create a prerequisite destination to enable the Add Alert button
+      const createResp = await createMockDestination(page, prerequisiteDestinationName);
+      if (createResp.status === 200) {
+        prerequisiteDestinationCreated = true;
+        testLogger.info('Prerequisite destination created successfully', { name: prerequisiteDestinationName });
+      } else {
+        testLogger.warn('Failed to create prerequisite destination', { status: createResp.status, data: createResp.data });
+      }
+    } catch (error) {
+      testLogger.warn('Error creating prerequisite destination', { error: error.message });
+    } finally {
+      await context.close();
+    }
+  });
+
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
 
@@ -25,6 +58,12 @@ test.describe("Anomaly Detection Alerts", () => {
 
     // Wait for alerts table to be ready
     await page.locator(pm.anomalyDetectionPage.selectors.alertsTable).first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
+    // Wait for Add Alert button to be enabled (destinations must exist)
+    const addButtonEnabled = await pm.anomalyDetectionPage.waitForAddAlertButtonEnabled(15000);
+    if (!addButtonEnabled) {
+      testLogger.warn('Add Alert button not enabled - tests may fail. Ensure destinations exist.');
+    }
 
     testLogger.info('Test setup completed', { randomValue });
   });
@@ -1018,9 +1057,9 @@ test.describe("Anomaly Detection Alerts", () => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  // Cleanup: Delete all test anomalies created during this test run
+  // Cleanup: Delete all test anomalies and prerequisite destination
   test.afterAll(async ({ browser }) => {
-    testLogger.info('Running test cleanup - deleting test anomalies');
+    testLogger.info('Running test cleanup - deleting test anomalies and prerequisite destination');
 
     // Verify required env vars are set (auth is handled by api-helper.js)
     if (!process.env.ZO_BASE_URL || !process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD || !process.env.ORGNAME) {
@@ -1035,7 +1074,14 @@ test.describe("Anomaly Detection Alerts", () => {
       const pm = new PageManager(page);
       // cleanupTestAnomalies uses env vars for auth via shared api-helper.js
       await pm.anomalyDetectionPage.cleanupTestAnomalies(`E2E_Anomaly`);
-      testLogger.info('Test cleanup completed');
+      testLogger.info('Test anomalies cleanup completed');
+
+      // Clean up the prerequisite destination created in beforeAll
+      if (prerequisiteDestinationCreated) {
+        testLogger.info('Cleaning up prerequisite destination', { name: prerequisiteDestinationName });
+        await deleteDestination(page, prerequisiteDestinationName);
+        testLogger.info('Prerequisite destination deleted');
+      }
     } catch (error) {
       testLogger.warn('Cleanup failed', { error: error.message });
     } finally {

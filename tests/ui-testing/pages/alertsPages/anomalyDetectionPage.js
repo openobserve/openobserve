@@ -127,12 +127,52 @@ export class AnomalyDetectionPage {
 
     /**
      * Click to start creating a new anomaly detection alert
+     * Waits for the button to be enabled first (button is disabled when no destinations exist)
      */
     async clickNewAnomaly() {
         testLogger.info('Starting new anomaly creation');
+        await this.waitForAddAlertButtonEnabled();
         await this.page.locator(this.locators.addAlertButton).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
+    }
+
+    /**
+     * Wait for the Add Alert button to be enabled
+     * The button is disabled when no destinations exist in the system
+     * @param {number} timeout - Maximum time to wait in ms
+     * @returns {Promise<boolean>} - True if button is enabled, false if timed out
+     */
+    async waitForAddAlertButtonEnabled(timeout = 10000) {
+        testLogger.info('Waiting for Add Alert button to be enabled');
+        const addButton = this.page.locator(this.locators.addAlertButton);
+
+        try {
+            // Wait for button to be visible and enabled
+            await expect(addButton).toBeVisible({ timeout: 5000 });
+            await expect(addButton).toBeEnabled({ timeout });
+            testLogger.info('Add Alert button is enabled');
+            return true;
+        } catch (error) {
+            // Check if button is disabled due to no destinations
+            const isDisabled = await addButton.getAttribute('disabled');
+            const title = await addButton.getAttribute('title');
+
+            if (isDisabled !== null || title?.includes('noDestinations')) {
+                testLogger.warn('Add Alert button is disabled - no destinations configured', { title });
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Check if Add Alert button is enabled (destinations exist)
+     * @returns {Promise<boolean>}
+     */
+    async isAddAlertEnabled() {
+        const addButton = this.page.locator(this.locators.addAlertButton);
+        const isDisabled = await addButton.getAttribute('disabled');
+        return isDisabled === null;
     }
 
     // ========== BASIC SETUP ==========
@@ -496,11 +536,43 @@ export class AnomalyDetectionPage {
 
     /**
      * Click refresh destinations button
+     * Uses multiple fallback selectors for robustness
      */
     async refreshDestinations() {
         testLogger.info('Refreshing destinations');
-        await this.page.getByRole('button', { name: 'Refresh destinations' }).click();
-        await this.page.waitForTimeout(1000);
+
+        // Try multiple selectors for the refresh button
+        const selectors = [
+            // Icon button with refresh icon near destination dropdown
+            this.selectors.refreshDestinationsBtn,
+            // Button with refresh icon
+            'button:has(i.q-icon:has-text("refresh"))',
+            // Any button with refresh in title/aria-label
+            'button[title*="refresh" i], button[aria-label*="refresh" i]',
+            // Icon hover button class near destinations
+            '.destination-refresh-btn',
+        ];
+
+        for (const selector of selectors) {
+            const btn = this.page.locator(selector).first();
+            if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await btn.click();
+                testLogger.info('Refresh button clicked', { selector });
+                await this.page.waitForTimeout(1000);
+                return;
+            }
+        }
+
+        // Fallback: try to find any refresh icon button near the destination area
+        const refreshIcon = this.page.locator('.q-icon').filter({ hasText: /refresh/i }).first();
+        if (await refreshIcon.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await refreshIcon.click();
+            testLogger.info('Refresh icon clicked via fallback');
+            await this.page.waitForTimeout(1000);
+            return;
+        }
+
+        testLogger.warn('Could not find refresh destinations button');
     }
 
     /**
