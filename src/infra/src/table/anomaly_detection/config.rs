@@ -105,7 +105,7 @@ pub async fn create_if_not_exists<C: TransactionTrait + ConnectionTrait>(
         .is_some();
 
     if exists {
-        log::info!(
+        log::debug!(
             "[anomaly_detection_config] create_if_not_exists: skipping, row already exists id={anomaly_id}"
         );
     } else {
@@ -113,7 +113,7 @@ pub async fn create_if_not_exists<C: TransactionTrait + ConnectionTrait>(
             .exec(&txn)
             .await
             .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
-        log::info!("[anomaly_detection_config] create_if_not_exists: inserted id={anomaly_id}");
+        log::debug!("[anomaly_detection_config] create_if_not_exists: inserted id={anomaly_id}");
     }
 
     txn.commit().await?;
@@ -174,22 +174,22 @@ pub async fn put<C: TransactionTrait + ConnectionTrait>(
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
 
     let result: Model = if let Some(existing) = existing {
-        log::info!("[anomaly_detection_config] put: updating existing row id={anomaly_id}");
+        log::debug!("[anomaly_detection_config] put: updating existing row id={anomaly_id}");
         let mut active = existing.into_active_model();
         patch_all_fields(&mut active, incoming);
         let updated = active
             .update(&txn)
             .await
             .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
-        log::info!("[anomaly_detection_config] put: update done id={anomaly_id}");
+        log::debug!("[anomaly_detection_config] put: update done id={anomaly_id}");
         updated
     } else {
-        log::info!("[anomaly_detection_config] put: row not found, inserting id={anomaly_id}");
+        log::debug!("[anomaly_detection_config] put: row not found, inserting id={anomaly_id}");
         let inserted = anomaly_detection_config::Entity::insert(into_active_model(incoming))
             .exec_with_returning(&txn)
             .await
             .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
-        log::info!("[anomaly_detection_config] put: insert done id={anomaly_id}");
+        log::debug!("[anomaly_detection_config] put: insert done id={anomaly_id}");
         inserted
     };
 
