@@ -1265,6 +1265,12 @@ pub struct Common {
         help = "Show docs count and stream dates"
     )]
     pub show_stream_dates_doc_num: bool,
+    #[env_config(
+        name = "O2_PERSIST_LAST_SELECTED_STREAM",
+        default = false,
+        help = "Persist and restore the last selected stream on logs, metrics, and traces pages."
+    )]
+    pub persist_last_selected_stream: bool,
     #[env_config(name = "ZO_INGEST_BLOCKED_STREAMS", default = "")] // use comma to split
     pub blocked_streams: String,
     #[env_config(name = "ZO_REPORT_USER_NAME", default = "")]

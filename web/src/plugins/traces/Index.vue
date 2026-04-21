@@ -308,6 +308,12 @@ import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
+import {
+  STREAM_SELECTION_STORAGE_KEYS,
+  getPersistedStreamSelection,
+  isStreamSelectionPersistenceEnabled,
+  setPersistedStreamSelection,
+} from "@/utils/streamSelectionPersistence";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -386,6 +392,17 @@ searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
 
 const selectedStreamName = computed(
   () => searchObj.data.stream.selectedStream.value,
+);
+
+watch(
+  selectedStreamName,
+  (streamName) => {
+    setPersistedStreamSelection(
+      store,
+      STREAM_SELECTION_STORAGE_KEYS.traces,
+      streamName || null,
+    );
+  },
 );
 
 const isLLMSpanPresent = ref(false);
@@ -491,10 +508,13 @@ async function getStreamList() {
 function loadStreamLists() {
   try {
     const queryParams = router.currentRoute.value.query;
-    const previouslySelectedStream = searchObj.data.stream.selectedStream.value;
+    const persistenceEnabled = isStreamSelectionPersistenceEnabled(store);
+    const persistedStream = getPersistedStreamSelection(
+      store,
+      STREAM_SELECTION_STORAGE_KEYS.traces,
+    );
     searchObj.data.stream.streamLists = [];
     if (searchObj.data.streamResults.list.length > 0) {
-      let lastUpdatedStreamTime = 0;
       let selectedStreamItemObj = {};
       let foundPriorityMatch = false;
       searchObj.data.streamResults.list.map((item: any) => {
@@ -510,19 +530,22 @@ function loadStreamLists() {
         } else if (
           !foundPriorityMatch &&
           !queryParams.stream &&
-          previouslySelectedStream === item.name
+          persistenceEnabled &&
+          persistedStream === item.name
         ) {
           selectedStreamItemObj = itemObj;
           foundPriorityMatch = true;
-        } else if (
-          !foundPriorityMatch &&
-          !queryParams.stream &&
-          item.stats.doc_time_max >= lastUpdatedStreamTime
-        ) {
-          lastUpdatedStreamTime = item.stats.doc_time_max;
-          selectedStreamItemObj = itemObj;
         }
       });
+
+      if (
+        !foundPriorityMatch &&
+        !queryParams.stream &&
+        persistenceEnabled &&
+        searchObj.data.stream.streamLists.length
+      ) {
+        selectedStreamItemObj = searchObj.data.stream.streamLists[0];
+      }
 
       if (selectedStreamItemObj.label != undefined) {
         searchObj.data.stream.selectedStream = selectedStreamItemObj;
