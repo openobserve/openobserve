@@ -1676,7 +1676,7 @@ export default defineComponent({
 
         const req = {
           query: {
-            sql: `SELECT * FROM "_rumdata" WHERE _oo_trace_id = '${traceId}' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
+            sql: `SELECT * FROM "_rumdata" WHERE _oo_trace_id = '${sanitizeTraceId(traceId)}' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
             start_time: startTime - 10000000,
             end_time: endTime + 10000000,
             from: 0,
@@ -2686,7 +2686,7 @@ export default defineComponent({
 
         const req = {
           query: {
-            sql: `SELECT * FROM "${evalPipelineStreamName.value}" WHERE trace_id = '${effectiveTraceId.value}' ORDER BY _timestamp ASC`,
+            sql: `SELECT * FROM "${evalPipelineStreamName.value}" WHERE trace_id = '${sanitizeTraceId(effectiveTraceId.value)}' ORDER BY _timestamp ASC`,
             start_time: effectiveTimeRange.value.from - 60000000,
             end_time: effectiveTimeRange.value.to + 60000000,
             from: 0,
