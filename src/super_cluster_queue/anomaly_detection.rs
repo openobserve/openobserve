@@ -87,7 +87,7 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                 );
                 infra::errors::Error::Message(e.to_string())
             })?;
-            log::info!(
+            log::debug!(
                 "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate successfully wrote to DB id={} updated_at={}",
                 anomaly_id,
                 updated_at,
