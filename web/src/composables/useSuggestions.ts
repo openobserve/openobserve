@@ -1,4 +1,4 @@
-import { ref, nextTick } from "vue";
+import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import { getFieldValuesForSuggestion } from "@/composables/useFieldValueStore";
 
@@ -295,10 +295,34 @@ const useSqlSuggestions = () => {
   });
   const autoCompleteSuggestions: any = ref([]);
   const loading = ref(false);
+  // Base keywords — always reflects fields + functions + defaults.
+  // Maintained exclusively by updateAutoComplete(); never overwritten by
+  // getSuggestions() context branches.
   const autoCompleteKeywords: any = ref([]);
   const store = useStore();
   const functionKeywords: any = ref([]);
   let fieldKeywords: any = [];
+  const streamKeywords: any = ref([]);
+
+  // Context-specific override keywords (streams in FROM context, field values
+  // after an operator).  Non-empty while the user is inside such a context.
+  // Cleared back to [] in the normal branch of getSuggestions().
+  const contextKeywords: any = ref([]);
+
+  // What the editor actually receives:
+  //   - contextKeywords when non-empty (FROM / value context)
+  //   - autoCompleteKeywords otherwise (field / function / SQL keywords)
+  // This lets watchers freely update autoCompleteKeywords without disturbing
+  // an active context dropdown, and the transition back to normal keywords is
+  // instant the moment getSuggestions() exits the context branch.
+  const effectiveKeywords = computed(() =>
+    contextKeywords.value.length
+      ? contextKeywords.value
+      : autoCompleteKeywords.value,
+  );
+  const effectiveSuggestions = computed(() =>
+    contextKeywords.value.length ? [] : autoCompleteSuggestions.value,
+  );
 
   function analyzeSqlWhereClause(whereClause: string, cursorIndex: number) {
     const labelMeta = {
@@ -345,10 +369,10 @@ const useSqlSuggestions = () => {
     //   Without slicing: $ anchors after ")" → regex does NOT match
     //   After slicing at cursor (between "(" and ")"): text is "status IN (" → matches
     //
-    // cursorIndex = 0 means uninitialized (position.cursorIndex default).
-    // Fall back to the full string length so we don't break the pre-existing
-    // behaviour where no cursor tracking was done.
-    const endIdx = cursorIndex > 0 ? cursorIndex + 1 : whereClause.length;
+    // Slice the WHERE clause up to (and including) the cursor position.
+    // Fall back to full string length only when cursorIndex is negative,
+    // which indicates no cursor tracking (e.g. called without a position).
+    const endIdx = cursorIndex >= 0 ? cursorIndex + 1 : whereClause.length;
     const textUpToCursor = whereClause.slice(0, endIdx);
     const match = columnValueRegex.exec(textUpToCursor);
     if (match) {
@@ -364,8 +388,6 @@ const useSqlSuggestions = () => {
   }
 
   const getSuggestions = async () => {
-    autoCompleteKeywords.value = [];
-
     // SearchBar sets autoCompleteData.value.cursorIndex at the top level.
     // autoCompleteData.value.position.cursorIndex is the legacy field — it
     // is never updated by SearchBar and stays 0. We read the top-level one
@@ -373,6 +395,49 @@ const useSqlSuggestions = () => {
     const cursorIndex =
       (autoCompleteData.value as any).cursorIndex ??
       autoCompleteData.value.position.cursorIndex;
+
+    // Compute text up to cursor (same slice logic used by analyzeSqlWhereClause).
+    const query = autoCompleteData.value.query;
+    const endIdx = cursorIndex >= 0 ? cursorIndex + 1 : query.length;
+    let textUpToCursor = query.slice(0, endIdx);
+    // CodeQueryEditor.vue emits getValue().trim(), which strips trailing
+    // whitespace. When the cursor (tracked against Monaco's un-trimmed model)
+    // sits at or past the end of the trimmed query, the user likely just typed
+    // a space that was stripped. Re-append one space so that the FROM-context
+    // regex (which requires \s+ after FROM) can still fire correctly.
+    if (cursorIndex >= query.length && query.length > 0) {
+      textUpToCursor = textUpToCursor + " ";
+    }
+
+    // FROM context: when the cursor is immediately after FROM (and optionally a
+    // partial stream name), show stream suggestions instead of field/function
+    // suggestions. This avoids confusion between stream names and field names.
+    //
+    // Regex: \bFROM\s+("?)(\w*)$
+    //   - group 1: optional opening double-quote (handles  FROM "stream  syntax)
+    //   - group 2: partial stream name being typed
+    //   - $ anchored at cursor — does NOT match once additional tokens follow
+    //     the stream name (e.g. WHERE clause after a complete stream name)
+    //
+    // When an opening quote is detected, the insertText closes it automatically
+    // so the result is  FROM "stream_name"  rather than  FROM "stream_name.
+    const fromMatch = /\bFROM\s+("?)([\w-]*)$/i.exec(textUpToCursor);
+    if (streamKeywords.value.length > 0) {
+      if (fromMatch) {
+        const hasOpenQuote = fromMatch[1] === '"';
+        // Monaco auto-closes " → "". When the cursor sits between the two quotes,
+        // query[endIdx] is already the closing " that Monaco inserted.
+        // In that case we must NOT append another " or the result will be "stream"".
+        const charAfterCursor = query[endIdx] ?? '';
+        const hasTrailingQuote = charAfterCursor === '"';
+        contextKeywords.value = streamKeywords.value.map((kw: any) => ({
+          ...kw,
+          insertText: (hasOpenQuote && !hasTrailingQuote) ? kw.label + '"' : kw.label,
+        }));
+        autoCompleteData.value.popup.open?.(autoCompleteData.value.query);
+        return;
+      }
+    }
 
     // Determine if the cursor is currently after an operator expecting a value.
     // If so, sqlWhereClause.meta.label is the field name (e.g. "status").
@@ -421,7 +486,7 @@ const useSqlSuggestions = () => {
         const hasOpenQuote = sqlWhereClause.meta.hasOpenQuote;
 
         // Build Monaco suggestion items with smart quoting and sort order.
-        autoCompleteKeywords.value = merged.map((item, idx) => {
+        contextKeywords.value = merged.map((item, idx) => {
           const isNumeric = item !== "" && !isNaN(Number(item));
           const isBoolean = item === "true" || item === "false";
 
@@ -447,56 +512,93 @@ const useSqlSuggestions = () => {
           return { label: item, insertText, kind: "Value", sortText };
         });
 
-        autoCompleteData.value.popup.open(autoCompleteData.value.query);
+        autoCompleteData.value.popup.open?.(autoCompleteData.value.query);
         // Return early — do NOT fall through to updateAutoComplete().
         // We don't want keywords/fields/functions mixed into a value dropdown.
         return;
       }
     }
 
-    // No value context detected — show the default keywords, fields, functions.
+    // Normal context — clear the context override so effectiveKeywords falls
+    // back to autoCompleteKeywords (fields + functions + SQL keywords).
+    contextKeywords.value = [];
     updateAutoComplete();
   };
 
   const updateAutoComplete = () => {
+    // Rebuild base keywords from the latest field/function/default lists.
+    // Does NOT touch contextKeywords — effectiveKeywords handles the switch.
+    //
+    // Sort order via sortText prefixes (Monaco sorts alphabetically by sortText):
+    //   \x00 — fields    (appear first — most relevant while writing SELECT/WHERE)
+    //   \x01 — functions (appear second)
+    //   \x02 — SQL keywords like AND, OR, LIKE, operators (appear last)
     autoCompleteKeywords.value = [];
-    autoCompleteKeywords.value.push(...functionKeywords.value);
     for (const item of fieldKeywords) {
       autoCompleteKeywords.value.push(item);
     }
-    autoCompleteKeywords.value.push(...defaultKeywords);
+    autoCompleteKeywords.value.push(...functionKeywords.value);
+    autoCompleteKeywords.value.push(
+      ...defaultKeywords.map((kw) => ({
+        ...kw,
+        sortText: "\x02" + kw.label,
+      })),
+    );
     autoCompleteSuggestions.value = [...defaultSuggestions];
   };
 
-  const updateFieldKeywords = (fields: any[]) => {
-    autoCompleteKeywords.value = [];
-    fieldKeywords = [];
-    let itemObj: any = {};
-    fields.forEach((field: any) => {
-      if (field.name == store.state.zoConfig.timestamp_column) {
-        return;
-      }
-      itemObj = {
-        label: field.name,
+  // Shared helper — builds the field keyword array from a fields list,
+  // excluding the timestamp column. Used by both updateFieldKeywords and
+  // updateAllKeywords to avoid duplicating the mapping logic.
+  const buildFieldKeywords = (fields: any[]) =>
+    fields
+      .filter((f) => f.name !== store.state.zoConfig.timestamp_column)
+      .map((f) => ({
+        label: f.name,
         kind: "Field",
-        insertText: field.name,
+        insertText: f.name,
         insertTextRules: "InsertAsSnippet",
-      };
-      fieldKeywords.push(itemObj);
-    });
+        sortText: "\x00" + f.name,
+      }));
+
+  const updateFieldKeywords = (fields: any[]) => {
+    fieldKeywords = buildFieldKeywords(fields);
     updateAutoComplete();
+  };
+
+  // Single-pass update for both fields and functions — calls updateAutoComplete()
+  // only once instead of twice, avoiding redundant keyword array rebuilds.
+  const updateAllKeywords = (fields: any[], functions: any[]) => {
+    fieldKeywords = buildFieldKeywords(fields);
+    functionKeywords.value = functions.map((fn: any) => ({
+      label: fn.name,
+      kind: "Function",
+      insertText: fn.name + fn.args,
+      insertTextRules: "InsertAsSnippet",
+      sortText: "\x01" + fn.name,
+    }));
+    updateAutoComplete();
+  };
+
+  const updateStreamKeywords = (streams: { name: string }[]) => {
+    streamKeywords.value = streams.map((stream) => ({
+      label: stream.name,
+      kind: "Variable",
+      insertText: stream.name,
+      sortText: "\x00" + stream.name,
+    }));
   };
 
   const updateFunctionKeywords = (functions: any[]) => {
     functionKeywords.value = [];
     functions.forEach((field: any) => {
-      const itemObj = {
+      functionKeywords.value.push({
         label: field.name,
         kind: "Function",
         insertText: field.name + field.args,
         insertTextRules: "InsertAsSnippet",
-      };
-      functionKeywords.value.push(itemObj);
+        sortText: "\x01" + field.name,
+      });
     });
     updateAutoComplete();
   };
@@ -505,10 +607,14 @@ const useSqlSuggestions = () => {
     autoCompleteData,
     autoCompleteKeywords,
     autoCompleteSuggestions,
+    effectiveKeywords,
+    effectiveSuggestions,
     loading,
     getSuggestions,
     updateFieldKeywords,
     updateFunctionKeywords,
+    updateAllKeywords,
+    updateStreamKeywords,
     defaultSuggestions, // Export for use in natural language detection
   };
 };
