@@ -489,7 +489,7 @@ const columns = computed<QTableProps["columns"]>(() => {
 // ── Load reports ──────────────────────────────────────────────────────────────
 const loadReports = async (folderId: string, nameQuery?: string) => {
   // Use Vuex cache for folder loads (no nameQuery = normal folder navigation)
-  if (!nameQuery && store.state.organizationData.allReportsListByFolderId[folderId]) {
+  if (!nameQuery && store.state.organizationData.allReportsListByFolderId?.[folderId]) {
     const cached = store.state.organizationData.allReportsListByFolderId[folderId];
     staticReportsList.value = cached;
     cachedFolderReports.value = cached;
