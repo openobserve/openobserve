@@ -539,6 +539,12 @@ pub async fn update_config(
 
     let updated = active_model.update(db).await?;
 
+    // Evict any cached model for this config — training params may have changed,
+    // so the next detection run should load a fresh model from S3.
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::anomaly_detection::cache::invalidate_config(&updated.anomaly_id)
+        .await;
+
     // Broadcast config update to all super cluster regions.
     #[cfg(feature = "enterprise")]
     {

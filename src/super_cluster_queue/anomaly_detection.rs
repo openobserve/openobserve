@@ -147,6 +147,10 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                     anomaly_id
                 );
             }
+            // Evict any cached model — training params may have changed on the primary.
+            #[cfg(feature = "enterprise")]
+            o2_enterprise::enterprise::anomaly_detection::cache::invalidate_config(&anomaly_id)
+                .await;
         }
         AnomalyDetectionMessage::ConfigDelete { org_id, config_id } => {
             log::debug!(
