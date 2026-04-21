@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="tw:flex tw:flex-col tw:pr-[0.625rem]"
     style="height: calc(100vh - var(--navbar-height) - 14px)"
   >
-    <!-- Header bar — 64px like CreateReport, back btn like AddAlert -->
+    <!-- Header bar -->
     <div class="card-container tw:mb-2 tw:shrink-0">
       <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[64px]">
         <q-btn
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="filteredDimensionOptions"
             color="input-border"
             bg-color="input-bg"
-            class="no-case fingerprint-select tw:w-full"
+            class="no-case dimensions-select tw:w-full"
             dense
             borderless
             multiple
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Footer — matches AddAlert footer card -->
+    <!-- Footer -->
     <div
       class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
     >
@@ -316,14 +316,13 @@ onBeforeMount(async () => {
 </script>
 
 <style scoped lang="scss">
-// ── Chip-select (fingerprint-select) ──────────────────────────────────────────
-:deep(.fingerprint-select) {
+:deep(.dimensions-select) {
   .q-field__bottom {
     display: none !important;
   }
 }
 
-:deep(.fingerprint-select.q-field--auto-height) {
+:deep(.dimensions-select.q-field--auto-height) {
   max-width: 100%;
   min-width: 0;
 
@@ -381,7 +380,7 @@ onBeforeMount(async () => {
   }
 }
 
-.body--dark :deep(.fingerprint-select) .q-chip {
+.body--dark :deep(.dimensions-select) .q-chip {
   background-color: rgba(255, 255, 255, 0.1) !important;
   color: #e0e0e0 !important;
 
@@ -392,7 +391,7 @@ onBeforeMount(async () => {
   }
 }
 
-.body--light :deep(.fingerprint-select) .q-chip {
+.body--light :deep(.dimensions-select) .q-chip {
   background-color: rgba(0, 0, 0, 0.08) !important;
   color: #424242 !important;
 
