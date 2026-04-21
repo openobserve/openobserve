@@ -76,6 +76,11 @@ pub struct Engine {
     eval_ctx: EvalContext,
     /// Only select columns with certain labels
     label_selector: HashSet<String>,
+    /// If true, skip column pruning and load all label columns. Set when the
+    /// expression contains label-creating functions (`label_replace`,
+    /// `label_join`) whose output labels don't exist in the source schema and
+    /// whose source labels may not be in the aggregation grouping set.
+    disable_label_selector: bool,
     /// The result type of the query
     result_type: Option<String>,
 }
@@ -86,6 +91,7 @@ impl Engine {
             ctx,
             eval_ctx,
             label_selector: HashSet::new(),
+            disable_label_selector: false,
             result_type: None,
             trace_id: trace_id.to_string(),
         }
@@ -103,6 +109,9 @@ impl Engine {
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
         self.extract_columns_from_prom_expr(prom_expr)?;
+        if self.disable_label_selector {
+            self.label_selector.clear();
+        }
         let value = self.exec_expr(prom_expr).await?;
         Ok((value, self.result_type.clone()))
     }
@@ -153,7 +162,16 @@ impl Engine {
             }
             PromExpr::Paren(ParenExpr { expr }) => self.extract_columns_from_prom_expr(expr),
             PromExpr::Subquery(expr) => self.extract_columns_from_prom_expr(&expr.expr),
-            PromExpr::Call(Call { func: _, args }) => {
+            PromExpr::Call(Call { func, args }) => {
+                // `label_replace` / `label_join` create new labels that don't
+                // exist in the source schema. Restricting column selection
+                // based on the aggregation `by()` list would then drop both the
+                // source labels these functions read from and leave the
+                // newly-created label absent from the loaded data, so the
+                // aggregation groups everything together. See issue #11321.
+                if matches!(func.name, "label_replace" | "label_join") {
+                    self.disable_label_selector = true;
+                }
                 _ = args
                     .args
                     .iter()
@@ -568,9 +586,11 @@ impl Engine {
         let start_time = std::time::Instant::now();
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
         let offset_modifier = get_offset_modifier(selector.offset.clone());
+        // Positive offset (e.g. `offset 10m`) looks into the past, so we shift
+        // the data-load window backwards by `offset_modifier`.
         let start =
-            self.ctx.start - range.map_or(self.ctx.lookback_delta, micros) + offset_modifier;
-        let end = self.ctx.end + offset_modifier; // 30 minutes + 5m = 35m
+            self.ctx.start - range.map_or(self.ctx.lookback_delta, micros) - offset_modifier;
+        let end = self.ctx.end - offset_modifier;
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
@@ -659,8 +679,8 @@ impl Engine {
         label_selector.extend(self.ctx.label_selector.iter().cloned());
 
         // Calculate step and lookback for the optimization
-        let start = self.eval_ctx.start + offset_modifier;
-        let end = self.eval_ctx.end + offset_modifier;
+        let start = self.eval_ctx.start - offset_modifier;
+        let end = self.eval_ctx.end - offset_modifier;
         let step = self.eval_ctx.step;
         let lookback = range.map_or(self.ctx.lookback_delta, micros);
 
@@ -2245,6 +2265,56 @@ mod tests {
         assert!(!engine.label_selector.is_empty());
         assert!(engine.label_selector.contains("env"));
         assert!(engine.label_selector.contains("service"));
+    }
+
+    #[test]
+    fn test_extract_columns_label_replace_disables_selector() {
+        // Regression test for #11321: `count by (new) (label_replace(m, "new", ...))`
+        // must not restrict loaded columns to `{"new"}`, since `new` is created
+        // by `label_replace` and the source label it reads from would otherwise
+        // not be loaded, so aggregation collapses all series into one group.
+        let trace_id = "test_trace";
+        let org_id = "test_org";
+        let mut engine = Engine::new(
+            trace_id,
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx(trace_id, org_id, 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+
+        let label_replace_call = PromExpr::Call(Call {
+            func: Function {
+                name: "label_replace",
+                arg_types: vec![],
+                variadic: false,
+                return_type: ValueType::Vector,
+            },
+            args: FunctionArgs { args: vec![] },
+        });
+        let aggregate_expr = PromExpr::Aggregate(AggregateExpr {
+            op: create_test_token(),
+            expr: Box::new(label_replace_call),
+            param: None,
+            modifier: Some(LabelModifier::Include(promql_parser::label::Labels {
+                labels: vec!["new".to_string()],
+            })),
+        });
+
+        engine
+            .extract_columns_from_prom_expr(&aggregate_expr)
+            .unwrap();
+        assert!(
+            engine.disable_label_selector,
+            "label_replace must set disable_label_selector"
+        );
+        // `exec()` clears the selector when the flag is set; mimic that here.
+        if engine.disable_label_selector {
+            engine.label_selector.clear();
+        }
+        assert!(engine.label_selector.is_empty());
     }
 
     #[test]
