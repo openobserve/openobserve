@@ -48,13 +48,13 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
         AnomalyDetectionMessage::ConfigCreate { config } => {
             let anomaly_id = config.anomaly_id.clone();
             log::info!(
-                "[SUPER_CLUSTER:anomaly_detection] ConfigCreate org={} id={} status={} is_trained={}",
+                "[SUPER_CLUSTER:anomaly_detection] ConfigCreate org={} id={} status={} is_trained={} updated_at={}",
                 config.org_id,
                 anomaly_id,
                 config.status,
                 config.is_trained,
+                config.updated_at,
             );
-            // Upsert — overwrite if the config already exists from a previous sync.
             let existing = anomaly_detection_config::Entity::find_by_id(&anomaly_id)
                 .one(db)
                 .await
@@ -70,18 +70,30 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                 anomaly_id,
                 existing.is_some()
             );
-            if existing.is_some() {
-                config.into_active_model().update(db).await.map_err(|e| {
-                    log::error!(
-                        "[SUPER_CLUSTER:anomaly_detection] ConfigCreate update failed id={}: {e}",
+            if let Some(existing) = existing {
+                // Only overwrite if the incoming message is strictly newer.
+                // NATS re-delivery on compactor restart can replay old ConfigCreate
+                // messages that would otherwise clobber newer ConfigUpdate state.
+                if config.updated_at <= existing.updated_at {
+                    log::info!(
+                        "[SUPER_CLUSTER:anomaly_detection] ConfigCreate skipped (stale) id={} msg_updated_at={} db_updated_at={}",
+                        anomaly_id,
+                        config.updated_at,
+                        existing.updated_at,
+                    );
+                } else {
+                    config.into_active_model().update(db).await.map_err(|e| {
+                        log::error!(
+                            "[SUPER_CLUSTER:anomaly_detection] ConfigCreate update failed id={}: {e}",
+                            anomaly_id
+                        );
+                        infra::errors::Error::Message(e.to_string())
+                    })?;
+                    log::info!(
+                        "[SUPER_CLUSTER:anomaly_detection] ConfigCreate updated existing row id={}",
                         anomaly_id
                     );
-                    infra::errors::Error::Message(e.to_string())
-                })?;
-                log::info!(
-                    "[SUPER_CLUSTER:anomaly_detection] ConfigCreate updated existing row id={}",
-                    anomaly_id
-                );
+                }
             } else {
                 anomaly_detection_config::Entity::insert(config.into_active_model())
                     .exec(db)
@@ -128,18 +140,29 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                 anomaly_id,
                 existing.is_some()
             );
-            if existing.is_some() {
-                config.into_active_model().update(db).await.map_err(|e| {
-                    log::error!(
-                        "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate update failed id={}: {e}",
-                        anomaly_id
+            if let Some(existing) = existing {
+                // Skip stale replays — only apply if this message is strictly newer.
+                if config.updated_at <= existing.updated_at {
+                    log::info!(
+                        "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate skipped (stale) id={} msg_updated_at={} db_updated_at={}",
+                        anomaly_id,
+                        config.updated_at,
+                        existing.updated_at,
                     );
-                    infra::errors::Error::Message(e.to_string())
-                })?;
-                log::info!(
-                    "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate successfully wrote to DB id={}",
-                    anomaly_id
-                );
+                } else {
+                    config.into_active_model().update(db).await.map_err(|e| {
+                        log::error!(
+                            "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate update failed id={}: {e}",
+                            anomaly_id
+                        );
+                        infra::errors::Error::Message(e.to_string())
+                    })?;
+                    log::info!(
+                        "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate successfully wrote to DB id={} updated_at={}",
+                        anomaly_id,
+                        config.updated_at,
+                    );
+                }
             } else {
                 log::warn!(
                     "[SUPER_CLUSTER:anomaly_detection] ConfigUpdate: row not found for id={}, inserting instead",
