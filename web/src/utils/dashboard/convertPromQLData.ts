@@ -676,7 +676,7 @@ export const convertPromQLData = async (
                   data: getMarkLineData(panelSchema),
                   lineStyle: {
                     color: "#8B5A2B",
-                    type: [6, 2],
+                    type: [8, 4],
                     shadowColor: store.state.theme === "dark"
                       ? "rgba(0, 0, 0, 0.8)"
                       : "rgba(255, 255, 255, 0.8)",
@@ -746,11 +746,11 @@ export const convertPromQLData = async (
                   data: getMarkLineData(panelSchema),
                   lineStyle: {
                     color: "#8B5A2B",
-                    type: [6, 2],
+                    type: [8, 4],
                     shadowColor: store.state.theme === "dark"
                       ? "rgba(0, 0, 0, 0.8)"
                       : "rgba(255, 255, 255, 0.8)",
-                    shadowBlur: 2,
+                    shadowBlur: 8,
                   },
                 },
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
