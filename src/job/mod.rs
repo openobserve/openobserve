@@ -412,10 +412,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::organization::org_settings_watch());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
-    // Service streams watch only needed on queriers - they serve the UI APIs.
-    // Skip if the feature is disabled to avoid unnecessary coordinator traffic.
+    // Watch needed on queriers (UI APIs) and on whichever node role is the configured
+    // processing node (ingester or compactor) so their local cache stays in sync with
+    // coordinator events emitted by the flusher.
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() && get_o2_config().service_streams.enabled {
+    if get_o2_config().service_streams.enabled
+        && get_o2_config().service_streams.local_node_needs_cache()
+    {
         tokio::task::spawn(async move {
             o2_enterprise::enterprise::service_streams::cache::watch().await
         });
@@ -499,10 +502,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::domain_management::db::cache()
         .await
         .expect("domain management cache failed");
-    // Service streams cache only needed on queriers - they serve the UI APIs.
-    // Skip if the feature is disabled to avoid unnecessary DB load at startup.
+    // Warm the cache on queriers (UI APIs) and on whichever node role is the configured
+    // processing node so that get_coverage_deficit returns accurate data from startup
+    // rather than always returning (0, 0) until files happen to be processed.
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() && get_o2_config().service_streams.enabled {
+    if get_o2_config().service_streams.enabled
+        && get_o2_config().service_streams.local_node_needs_cache()
+    {
         o2_enterprise::enterprise::service_streams::cache::init_cache()
             .await
             .expect("service discovery cache failed");

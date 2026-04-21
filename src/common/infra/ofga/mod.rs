@@ -70,6 +70,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_service_streams_migration = false;
     let mut need_eval_templates_migration = false;
     let mut need_ai_toolsets_migration = false;
+    let mut need_report_folders_migration = false;
+    let mut need_incidents_migration = false;
     let mut need_model_pricing_migration = false;
 
     let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
@@ -250,6 +252,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let v0_0_27 = version_compare::Version::from("0.0.27").unwrap();
                 let v0_0_28 = version_compare::Version::from("0.0.28").unwrap();
                 let v0_0_29 = version_compare::Version::from("0.0.29").unwrap();
+                let v0_0_30 = version_compare::Version::from("0.0.30").unwrap();
+                let v0_0_31 = version_compare::Version::from("0.0.31").unwrap();
 
                 if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
                     need_pipeline_migration = true;
@@ -306,6 +310,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     need_ai_toolsets_migration = true;
                     log::info!("[OFGA:Local] model_pricing permissions migration needed");
                     need_model_pricing_migration = true;
+                }
+                if existing_model_version < v0_0_30 {
+                    log::info!("[OFGA:Local] report folders migration needed");
+                    need_report_folders_migration = true;
+                }
+                if existing_model_version < v0_0_31 {
+                    log::info!("[OFGA:Local] incidents permissions migration needed");
+                    need_incidents_migration = true;
                 }
             }
 
@@ -391,6 +403,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         get_ownership_all_org_tuple(org_name, "alert_folders", &mut tuples);
                         get_ownership_tuple(org_name, "alert_folders", DEFAULT_FOLDER, &mut tuples);
                     }
+                    if need_report_folders_migration {
+                        get_ownership_all_org_tuple(org_name, "report_folders", &mut tuples);
+                        get_ownership_tuple(
+                            org_name,
+                            "report_folders",
+                            DEFAULT_FOLDER,
+                            &mut tuples,
+                        );
+                    }
                     if need_ratelimit_migration {
                         get_ownership_all_org_tuple(org_name, "ratelimit", &mut tuples);
                     }
@@ -423,6 +444,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     if need_ai_toolsets_migration {
                         get_ownership_all_org_tuple(org_name, "ai_toolsets", &mut tuples);
                     }
+                    if need_incidents_migration {
+                        get_ownership_all_org_tuple(org_name, "incidents", &mut tuples);
+                    }
                     if need_model_pricing_migration {
                         get_ownership_all_org_tuple(org_name, "model_pricing", &mut tuples);
                     }
@@ -435,6 +459,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         Err(e) => {
                             log::error!(
                                 "[OFGA:Local] Error migrating alert folders to openfga: {e}"
+                            );
+                        }
+                    }
+                }
+                if need_report_folders_migration {
+                    match migrations::migrate_report_folders().await {
+                        Ok(_) => {
+                            log::info!("[OFGA:Local] Report folders migrated to openfga");
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[OFGA:Local] Error migrating report folders to openfga: {e}"
                             );
                         }
                     }

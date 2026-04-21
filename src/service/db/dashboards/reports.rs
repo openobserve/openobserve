@@ -37,9 +37,9 @@ pub async fn get<C: ConnectionTrait + TransactionTrait>(
 pub async fn get_by_id<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     id: &str,
-) -> Result<Report, anyhow::Error> {
+) -> Result<(Folder, Report), anyhow::Error> {
     match table::reports::get_by_id(conn, id).await? {
-        Some((_, report)) => Ok(report),
+        Some((folder, report)) => Ok((folder, report)),
         _ => Err(anyhow::anyhow!("Report not found")),
     }
 }

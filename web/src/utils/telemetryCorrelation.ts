@@ -71,26 +71,18 @@ export function extractSemanticDimensions(
 ): Record<string, string> {
   const dimensions: Record<string, string> = {};
 
-  // Build reverse lookup: field name -> { dimensionId, isStable }
-  const fieldToDimension = new Map<string, { id: string; isStable: boolean }>();
+  // Iterate groups and their fields in definition order (same as backend processor.rs).
+  // First field found in context.fields wins — deterministic, matches ingestion behaviour.
   for (const group of semanticGroups) {
-    for (const field of group.fields) {
-      fieldToDimension.set(field, {
-        id: group.id,
-        isStable: group.is_stable ?? false
-      });
+    if (stableOnly && !(group.is_stable ?? false)) {
+      continue;
     }
-  }
-
-  // Extract dimensions from context fields
-  for (const [fieldName, value] of Object.entries(context.fields)) {
-    const dimInfo = fieldToDimension.get(fieldName);
-    if (dimInfo && value !== null && value !== undefined) {
-      // Skip unstable dimensions if stableOnly is true
-      if (stableOnly && !dimInfo.isStable) {
-        continue;
+    for (const field of group.fields) {
+      const value = context.fields[field];
+      if (value !== null && value !== undefined) {
+        dimensions[group.id] = String(value);
+        break; // first match by group definition order wins
       }
-      dimensions[dimInfo.id] = String(value);
     }
   }
 

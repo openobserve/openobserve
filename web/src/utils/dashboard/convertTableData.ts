@@ -63,8 +63,11 @@ export const convertTableData = (
   );
   const fieldNameCache: Record<string, string> = {}; // Cache for case-insensitive lookups
 
- // Cache timezone to avoid repeated store lookups
+  // Cache timezone to avoid repeated store lookups
   const timezone = store.state.timezone;
+
+  // Value to display when a cell is null/undefined/empty (configured per panel)
+  const missingValue = String(panelSchema.config?.no_value_replacement ?? "");
 
   try {
     // Pre-build case-insensitive field name cache
@@ -144,9 +147,9 @@ export const convertTableData = (
       }
 
       obj["format"] = (val: any) => {
+        if (val === null || val === undefined || val === "") return missingValue;
         // value mapping - use cached lookup
         const valueMapping = lookupValueMapping(val, valueMappingCache);
-
         if (valueMapping != null) {
           return valueMapping;
         }
@@ -171,6 +174,7 @@ export const convertTableData = (
         const decimals = panelSchema.config?.decimals ?? 2;
 
         obj["format"] = (val: any) => {
+          if (val === null || val === undefined || val === "") return missingValue;
           // value mapping - use cached lookup
           const valueMapping = lookupValueMapping(val, valueMappingCache);
 
@@ -197,6 +201,7 @@ export const convertTableData = (
       // Just apply value mapping if needed
       if (histogramFields.includes(it.alias)) {
         obj["format"] = (val: any) => {
+          if (val === null || val === undefined || val === "") return missingValue;
           // value mapping - use cached lookup
           const valueMapping = lookupValueMapping(val, valueMappingCache);
           if (valueMapping != null) {
@@ -210,8 +215,11 @@ export const convertTableData = (
     });
   } else {
     // lets get all columns from a particular field
+    // Note: do NOT use ?? "" here — null/undefined values must stay as-is so that
+    // String(null) = "null" gives a non-empty column key that passes TanStack's filter.
+    // Using "" as a fallback would produce an empty column id that TanStack can't handle.
     const transposeColumns = searchQueryData[0].map(
-      (it: any) => getDataValue(it, transposeColumn) ?? "",
+      (it: any) => getDataValue(it, transposeColumn),
     );
 
     let uniqueTransposeColumns: any = [];
@@ -275,9 +283,12 @@ export const convertTableData = (
         let obj: any = {};
         const isNumber = isSampleValuesNumbers(tableRows, it, 20);
 
-        obj["name"] = it;
-        obj["field"] = it;
-        obj["label"] = it;
+        // String(null) = "null", String(undefined) = "undefined" — always non-empty,
+        // so the TanStack filter never strips this column. The label is blank for
+        // null/undefined values so the header renders as empty visually.
+        obj["name"] = String(it);
+        obj["field"] = String(it);
+        obj["label"] = it != null && it !== "" ? String(it) : "";
         obj["align"] = !isNumber ? "left" : "right";
         obj["sortable"] = true;
         // pass color mode info for renderer
@@ -286,13 +297,12 @@ export const convertTableData = (
         }
 
         obj["format"] = (val: any) => {
+          if (val === null || val === undefined || val === "") return missingValue;
           // value mapping - use cached lookup
           const valueMapping = lookupValueMapping(val, valueMappingCache);
-
           if (valueMapping != null) {
             return valueMapping;
           }
-
           return val;
         };
 
@@ -305,6 +315,7 @@ export const convertTableData = (
           const decimals = panelSchema.config?.decimals ?? 2;
 
           obj["format"] = (val: any) => {
+            if (val === null || val === undefined || val === "") return missingValue;
             // value mapping - use cached lookup
             const valueMapping = lookupValueMapping(val, valueMappingCache);
 
@@ -330,6 +341,7 @@ export const convertTableData = (
         // Check if it's a histogram field
         if (histogramFields.includes(it)) {
           obj["format"] = (val: any) => {
+            if (val === null || val === undefined || val === "") return missingValue;
             // value mapping - use cached lookup
             const valueMapping = lookupValueMapping(val, valueMappingCache);
             if (valueMapping != null) {
