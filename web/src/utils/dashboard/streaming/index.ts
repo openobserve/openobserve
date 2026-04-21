@@ -34,7 +34,6 @@ export function isOverlayEligible(
     "h-bar",
     "h-stacked",
     "scatter",
-    "heatmap",
   ]);
   if (!eligibleTypes.has(panelSchema.type)) return false;
 
