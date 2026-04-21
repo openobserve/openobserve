@@ -632,18 +632,26 @@ pub async fn create_external_contract(
         return MetaHttpResponse::bad_request("end_date must be in the future");
     }
 
-    // Check if org already has an external contract
+    // Block if the org already has any active billing record to avoid silently
+    // overwriting a live Stripe/AWS/Azure subscription.
     if let Ok(Some(existing)) =
         o2_enterprise::enterprise::cloud::billings::get_billing_by_org_id(&req.org_id).await
-        && matches!(existing.provider, MeteringProvider::MockMeteringProvider)
     {
-        return MetaHttpResponse::bad_request(
-            "Organization already has an active external contract",
-        );
+        let msg = if matches!(existing.provider, MeteringProvider::NoOp) {
+            "Organization already has an active external contract"
+        } else {
+            log::warn!(
+                "[EXT_CONTRACT] Refusing to create external contract for org {}: existing {} subscription would be overwritten",
+                req.org_id,
+                existing.provider
+            );
+            "Organization already has an active subscription; cancel it before creating an external contract"
+        };
+        return MetaHttpResponse::bad_request(msg);
     }
 
     let mut billing = CustomerBilling::new(&admin.email, &req.org_id);
-    billing.provider = MeteringProvider::MockMeteringProvider;
+    billing.provider = MeteringProvider::NoOp;
     billing.subscription_type = SubscriptionType::ExternalContract;
     billing.customer_id = Some("custom".to_string());
     billing.subscription_id = Some(svix_ksuid::Ksuid::new(None, None).to_string());
@@ -690,7 +698,7 @@ pub async fn extend_external_contract(
     )
     .await
     {
-        Ok(Some(b)) if matches!(b.provider, MeteringProvider::MockMeteringProvider) => b,
+        Ok(Some(b)) if matches!(b.provider, MeteringProvider::NoOp) => b,
         Ok(_) => {
             return MetaHttpResponse::not_found(
                 "No active external contract found for this organization",
@@ -709,7 +717,7 @@ pub async fn extend_external_contract(
 
     billing.end_date = req.new_end_date;
     // Reset expiry notifications so warnings are sent again for the new end date
-    billing.expiry_notified_checkpoint = 0;
+    billing.expiry_notified_checkpoint = i16::MAX;
 
     match o2_enterprise::enterprise::cloud::update_customer_billing(billing).await {
         Ok(_) => MetaHttpResponse::json(serde_json::json!({"status": "ok"})),
@@ -751,7 +759,7 @@ pub async fn revoke_external_contract(
 
     // Verify the org has an external contract before deleting
     match o2_enterprise::enterprise::cloud::billings::get_billing_by_org_id(&target_org_id).await {
-        Ok(Some(b)) if matches!(b.provider, MeteringProvider::MockMeteringProvider) => {}
+        Ok(Some(b)) if matches!(b.provider, MeteringProvider::NoOp) => {}
         Ok(_) => {
             return MetaHttpResponse::not_found(
                 "No active external contract found for this organization",

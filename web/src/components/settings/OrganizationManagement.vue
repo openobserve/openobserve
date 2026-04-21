@@ -386,7 +386,10 @@ export default defineComponent({
     };
 
     const dateToMicros = (dateStr: string): number => {
-      return new Date(dateStr).getTime() * 1000;
+      // Treat the picked date as end-of-day UTC so selecting today is still in the future.
+      const d = new Date(dateStr);
+      d.setUTCHours(23, 59, 59, 999);
+      return d.getTime() * 1000;
     };
 
     const getData = () => {

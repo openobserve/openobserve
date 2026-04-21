@@ -386,7 +386,7 @@ async fn check_external_contract_expiry() {
     let day_micros = hour_micros(24);
 
     for cb in billings {
-        if !matches!(cb.provider, MeteringProvider::MockMeteringProvider) {
+        if !matches!(cb.provider, MeteringProvider::NoOp) {
             continue;
         }
 
@@ -416,7 +416,7 @@ async fn check_external_contract_expiry() {
         let pending_checkpoint = EXPIRY_WARNING_DAYS
             .iter()
             .find(|&&threshold| {
-                days_remaining <= threshold as i64 && cb.expiry_notified_checkpoint < threshold
+                days_remaining <= threshold as i64 && cb.expiry_notified_checkpoint > threshold
             })
             .copied();
 

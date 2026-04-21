@@ -39,16 +39,21 @@ pub struct ListSubscriptionResponseBody {
     pub subscription_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub customer_id: Option<String>,
-    /// Billing provider: "stripe" or "aws"
-    pub provider: String,
+    /// Billing provider: "stripe", "aws", or "azure". Omitted for external-contract subs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
 }
 
 impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
     fn from(value: cloud_billings::CustomerBilling) -> Self {
+        let provider = match value.provider {
+            cloud_billings::MeteringProvider::NoOp => None,
+            other => Some(other.to_string()),
+        };
         Self {
             subscription_type: value.subscription_type.to_string(),
             customer_id: value.customer_id,
-            provider: value.provider.to_string(),
+            provider,
         }
     }
 }
