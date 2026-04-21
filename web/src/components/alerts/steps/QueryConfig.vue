@@ -889,7 +889,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="alert-v3-select"
                       placeholder="timezone"
                       :display-value="cronTimezone || 'timezone'"
-                      style="min-width: 100px; max-width: 100px;"
+                      style="min-width: 150px; max-width: 150px;"
                       @filter="timezoneFilterFn"
                       @update:model-value="onCronTimezoneChange"
                     >
@@ -1498,9 +1498,9 @@ export default defineComponent({
     };
 
     const frequencyUnitOptions = [
-      { label: 'minutes', value: 'minutes' },
-      { label: 'hours', value: 'hours' },
-      { label: 'cron', value: 'cron' },
+      { label: 'Minutes', value: 'minutes' },
+      { label: 'Hours', value: 'hours' },
+      { label: 'Cron', value: 'cron' },
     ];
 
     const onFrequencyUnitChange = (unit: string) => {
