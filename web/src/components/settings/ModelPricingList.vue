@@ -516,18 +516,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Pricing per 1M tokens section -->
           <div>
             <div class="pricing-section-label tw:mt-2">Pricing per 1M tokens</div>
-            <div class="tw:flex tw:flex-wrap tw:gap-2">
-              <span
-                v-for="([key, price]) in sortedPriceEntries(getDefaultTier(pricingDialogRow)?.prices || {})"
-                :key="key"
-                class="dimension-badge"
-                :class="getPriceKeyColorClass(key)"
-                style="font-size: 13px; padding: 4px 10px;"
-              >
-                <span class="tw:font-medium">{{ formatPriceKey(key) }}</span>=<span>{{ formatPerMillion(price) }}</span>
-              </span>
-              <span v-if="!getDefaultTier(pricingDialogRow)?.prices || Object.keys(getDefaultTier(pricingDialogRow)?.prices || {}).length === 0" class="text-grey-5">—</span>
+            <div v-if="sortedPriceEntries(getDefaultTier(pricingDialogRow)?.prices || {}).length" class="pricing-panel-table-wrap">
+              <table class="pricing-panel-table">
+                <thead>
+                  <tr>
+                    <th>Usage Type</th>
+                    <th>Price per 1M tokens</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="([key, price]) in sortedPriceEntries(getDefaultTier(pricingDialogRow)?.prices || {})" :key="key">
+                    <td>{{ formatPriceKey(key) }}</td>
+                    <td>{{ formatPerMillion(price) }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+            <span v-else class="text-grey-5">—</span>
           </div>
         </div>
       </div>
@@ -1238,6 +1243,46 @@ body.body--dark .badge-more {
 .pricing-dialog-body {
   flex: 1;
   overflow-y: auto;
+}
+
+/* ── Pricing panel table (side panel) ──────────────── */
+.pricing-panel-table-wrap {
+  margin-top: 8px;
+  border: 1px solid var(--o2-border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pricing-panel-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.5;
+    text-align: left;
+    padding: 6px 14px;
+    background: rgba(0, 0, 0, 0.025);
+    border-bottom: 1px solid var(--o2-border-color);
+
+    .body--dark & { background: rgba(255, 255, 255, 0.04); }
+
+    &:last-child { text-align: right; }
+  }
+
+  td {
+    font-size: 13px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--o2-border-color);
+
+    &:last-child {
+      text-align: right;
+      font-weight: 600;
+    }
+  }
+
+  tr:last-child td { border-bottom: none; }
 }
 
 /* ── Pricing overflow tooltip ──────────────────────── */
