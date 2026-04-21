@@ -1050,8 +1050,8 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
     )
 )]
 pub async fn list_invitations(Headers(user_email): Headers<UserEmail>) -> Response {
-    let user_id = user_email.user_id.as_str();
-    match users::list_user_invites(user_id, true).await {
+    let user_id = user_email.user_id.to_lowercase();
+    match users::list_user_invites(&user_id, true).await {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e),
     }

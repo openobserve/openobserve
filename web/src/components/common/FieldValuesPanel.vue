@@ -177,7 +177,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ formatLargeNumber(value.count) }}
               </div>
             </div>
-
           </q-item>
         </q-list>
       </div>
@@ -307,9 +306,11 @@ const displayValues = computed(() => {
   return props.fieldValues?.values || [];
 });
 
-// Show search box once original values hit the fetch limit.
+// Show search box whenever there are values to search.
 const showValueSearch = computed(
-  () => cachedValues.value.length >= props.defaultValuesCount,
+  () =>
+    cachedValues.value.length > 0 ||
+    (props.fieldValues?.values?.length ?? 0) > 0,
 );
 
 watchDebounced(

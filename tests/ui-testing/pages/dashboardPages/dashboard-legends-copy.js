@@ -159,18 +159,16 @@ export default class DashboardLegendsCopy {
 
   /**
    * Ensure the table's internal scroll container has data rows visible.
-   * q-table with virtual scroll uses position:absolute and overflow:auto,
-   * so Playwright's scrollIntoViewIfNeeded may not work for internal scrolling.
+   * TanStack table (dashboard mode) renders regular DOM rows ΓÇö no virtual scroll.
+   * The scroll container is the standard .container.table-container div.
    */
   async ensureTableDataVisible() {
     await this.page.evaluate(() => {
-      // Scroll the q-table's internal scroll container to top to show first rows
+      // Scroll the TanStack table container to top to show first rows
       const scrollContainer = document.querySelector(
-        '[data-test="dashboard-panel-table"] .q-table__middle.scroll'
+        '[data-test="dashboard-panel-table"] .table-container'
       ) || document.querySelector(
-        '[data-test="dashboard-panel-table"] .q-virtual-scroll'
-      ) || document.querySelector(
-        '.my-sticky-virtscroll-table .q-table__middle'
+        '[data-test="dashboard-panel-table"] .container'
       );
       if (scrollContainer) {
         scrollContainer.scrollTop = 0;
@@ -190,10 +188,10 @@ export default class DashboardLegendsCopy {
    * @returns {import('@playwright/test').Locator}
    */
   getTableCell(rowIndex, colIndex) {
-    // q-table virtual scroll adds spacer <tr> with a single <td colspan="N">.
-    // Real data rows contain <td class="copy-cell-td" data-col-index="...">
+    // TanStack table (dashboard mode) renders rows directly in tbody with class dashboard-data-row.
+    // All data cells use class copy-cell-td.
     const dataRows = this.dashboardTable
-      .locator('tbody tr')
+      .locator('tbody tr.dashboard-data-row')
       .filter({ has: this.page.locator('td.copy-cell-td') });
     return dataRows.nth(rowIndex).locator('td.copy-cell-td').nth(colIndex);
   }
