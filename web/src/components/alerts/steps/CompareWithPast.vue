@@ -261,7 +261,7 @@ export default defineComponent({
 
     const comparisonDisabledTooltip = computed(() => {
       if (props.selectedTab !== "sql") {
-        return "Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.";
+        return t('alerts.compareWithPast.comparisonDisabledTooltip');
       }
       return "";
     });
