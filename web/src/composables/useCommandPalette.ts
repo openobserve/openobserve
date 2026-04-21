@@ -17,6 +17,7 @@
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 
 export interface PaletteItem {
   name: string;
@@ -32,6 +33,8 @@ const STORAGE_KEY = "o2_recent_pages";
 /**
  * Score a page item against a query string.
  * Returns 0 when the item should be excluded from results.
+ * Scoring is locale-agnostic: `title` is already the localised string,
+ * and `keywords` contains both English terms and localised tab labels.
  */
 function scoreItem(item: PaletteItem, query: string): number {
   const q = query.toLowerCase().trim();
@@ -56,6 +59,7 @@ function scoreItem(item: PaletteItem, query: string): number {
 const useCommandPalette = () => {
   const store = useStore();
   const router = useRouter();
+  const { t, locale } = useI18n();
 
   const query = ref("");
   const activeIndex = ref(0);
@@ -65,28 +69,67 @@ const useCommandPalette = () => {
   /**
    * Build the searchable page index from registered routes.
    * Only routes with `meta.searchable === true` are included.
+   *
+   * Multi-language support
+   * ─────────────────────
+   * Route meta can carry two optional i18n fields:
+   *
+   *   titleKey?: string
+   *     An i18n key whose translation becomes the page title shown in the
+   *     palette AND searched against.  When the user switches to Chinese the
+   *     computed re-runs automatically (locale is a dependency) and every
+   *     title updates — no manual translation work required.
+   *     Example:  titleKey: "menu.search"  →  "Logs" / "日志" / "Journaux" …
+   *
+   *   keywordKeys?: string[]
+   *     Array of i18n keys for tab labels or section names that live on the
+   *     page.  They are resolved to the current locale and appended to the
+   *     static English `keywords` array so users can search in their language.
+   *     Example:  keywordKeys: ["alerts.scheduled", "alerts.realTime"]
+   *               → adds "Scheduled"/"轮询" and "Realtime"/"实时" as keywords.
    */
   const pageIndex = computed<PaletteItem[]>(() => {
     const org = store.state.selectedOrganization?.identifier ?? "default";
     const routes = router.getRoutes();
     const items: PaletteItem[] = [];
 
+    // Reading locale.value makes this computed reactive to locale changes.
+    void locale.value;
+
     for (const route of routes) {
       if (!route.meta?.searchable) continue;
+
       // Replace :org_identifier param with current org when present
       const path = route.path.includes(":org_identifier")
         ? route.path.replace(":org_identifier", org)
         : route.path;
 
+      // Prefer the i18n-translated title; fall back to the static string.
+      const title = route.meta.titleKey
+        ? t(String(route.meta.titleKey))
+        : String(route.meta.title ?? route.name ?? "");
+
+      // Resolve keywordKeys to localized strings (tab labels, section names).
+      const localizedKwds = Array.isArray(route.meta.keywordKeys)
+        ? (route.meta.keywordKeys as string[]).map((k) => t(k))
+        : [];
+
+      // Merge static English keywords with localised keyword-key resolutions.
+      // Deduplication is intentionally omitted — minor overhead, simpler code.
+      const keywords = [
+        ...(Array.isArray(route.meta.keywords)
+          ? (route.meta.keywords as string[])
+          : []),
+        ...localizedKwds,
+      ];
+
       items.push({
         name: String(route.name ?? ""),
         path,
-        title: String(route.meta.title ?? route.name ?? ""),
+        title,
         icon: String(route.meta.icon ?? "circle"),
         section: String(route.meta.section ?? ""),
-        keywords: Array.isArray(route.meta.keywords)
-          ? (route.meta.keywords as string[])
-          : [],
+        keywords,
       });
     }
 
@@ -102,12 +145,14 @@ const useCommandPalette = () => {
       const recents: { name: string; path: string; title: string }[] =
         JSON.parse(stored);
       return recents.map((r) => {
-        // Enrich from page index when possible
+        // Enrich from page index when possible (picks up localised title too)
         const match = pageIndex.value.find((p) => p.name === r.name);
         return {
           name: r.name,
           path: r.path,
-          title: r.title,
+          // Show the current-locale title when the page is indexed; fall back
+          // to the stored English title for pages that were removed from index.
+          title: match?.title ?? r.title,
           icon: match?.icon ?? "history",
           section: match?.section ?? "",
           keywords: match?.keywords ?? [],

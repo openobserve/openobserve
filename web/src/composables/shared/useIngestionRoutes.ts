@@ -113,10 +113,51 @@ const useIngestionRoutes = () => {
       component: Ingestion,
       meta: {
         title: "Ingestion",
+        titleKey: "menu.ingestion",
         searchable: true,
         icon: "input",
         section: "Management",
-        keywords: ["data sources", "Kubernetes", "Linux", "Windows", "AWS", "GCP", "Azure", "OpenTelemetry", "Fluent Bit", "Fluentd", "Vector", "Filebeat", "Telegraf", "database integrations", "message queues"],
+        keywords: [
+          "data sources",
+          "Kubernetes",
+          "Linux",
+          "Windows",
+          "AWS",
+          "GCP",
+          "Azure",
+          "OpenTelemetry",
+          "Fluent Bit",
+          "Fluentd",
+          "Vector",
+          "Filebeat",
+          "Telegraf",
+          "database integrations",
+          "message queues",
+        ],
+        // All tab labels on the Ingestion page — resolved in current locale
+        keywordKeys: [
+          "ingestion.recommendedLabel",
+          "ingestion.customLabel",
+          "ingestion.serverLabel",
+          "ingestion.databaseLabel",
+          "ingestion.securityLabel",
+          "ingestion.devopsLabel",
+          "ingestion.networkingLabel",
+          "ingestion.messageQueuesLabel",
+          "ingestion.languagesLabel",
+          "ingestion.otherLabel",
+          "ingestion.logsLabel",
+          "ingestion.metricsLabel",
+          "ingestion.tracesLabel",
+          "ingestion.kubernetes",
+          "ingestion.linux",
+          "ingestion.windows",
+          "ingestion.awsconfig",
+          "ingestion.gcpconfig",
+          "ingestion.azure",
+          "ingestion.tracesotlp",
+          "ingestion.rum",
+        ],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -142,6 +183,19 @@ const useIngestionRoutes = () => {
                   path: "curl",
                   name: "curl",
                   component: Curl,
+                  meta: {
+                    title: "Curl (HTTP API)",
+                    searchable: true,
+                    icon: "http",
+                    section: "Data Sources",
+                    keywords: [
+                      "HTTP ingestion",
+                      "REST API logs",
+                      "curl",
+                      "raw logs",
+                      "custom logs",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -150,6 +204,18 @@ const useIngestionRoutes = () => {
                   path: "fluentbit",
                   name: "fluentbit",
                   component: FluentBit,
+                  meta: {
+                    title: "Fluent Bit",
+                    searchable: true,
+                    icon: "stream",
+                    section: "Data Sources",
+                    keywords: [
+                      "log collector",
+                      "lightweight log agent",
+                      "fluent-bit",
+                      "log shipping",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -158,6 +224,18 @@ const useIngestionRoutes = () => {
                   path: "fluentd",
                   name: "fluentd",
                   component: Fluentd,
+                  meta: {
+                    title: "Fluentd",
+                    searchable: true,
+                    icon: "stream",
+                    section: "Data Sources",
+                    keywords: [
+                      "log aggregator",
+                      "log collector",
+                      "fluentd",
+                      "log forwarding",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -166,6 +244,18 @@ const useIngestionRoutes = () => {
                   path: "vector",
                   name: "vector",
                   component: Vector,
+                  meta: {
+                    title: "Vector",
+                    searchable: true,
+                    icon: "stream",
+                    section: "Data Sources",
+                    keywords: [
+                      "log pipeline",
+                      "metrics pipeline",
+                      "event pipeline",
+                      "vector.dev",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -174,6 +264,18 @@ const useIngestionRoutes = () => {
                   path: "filebeat",
                   name: "filebeat",
                   component: FileBeat,
+                  meta: {
+                    title: "Filebeat",
+                    searchable: true,
+                    icon: "text_snippet",
+                    section: "Data Sources",
+                    keywords: [
+                      "Elastic Filebeat",
+                      "log shipper",
+                      "log collector",
+                      "filebeat",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -182,6 +284,18 @@ const useIngestionRoutes = () => {
                   path: "otel",
                   name: "ingestLogsFromOtel",
                   component: OtelConfig,
+                  meta: {
+                    title: "OpenTelemetry Logs",
+                    searchable: true,
+                    icon: "stream",
+                    section: "Data Sources",
+                    keywords: [
+                      "OTEL logs",
+                      "OpenTelemetry collector",
+                      "OTel",
+                      "otel logs ingestion",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -190,6 +304,18 @@ const useIngestionRoutes = () => {
                   path: "logstash",
                   name: "logstash",
                   component: LogstashDatasource,
+                  meta: {
+                    title: "Logstash",
+                    searchable: true,
+                    icon: "stream",
+                    section: "Data Sources",
+                    keywords: [
+                      "ELK stack",
+                      "log processing",
+                      "log pipeline",
+                      "Logstash",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -198,6 +324,18 @@ const useIngestionRoutes = () => {
                   path: "syslogng",
                   name: "syslogNg",
                   component: SyslogNg,
+                  meta: {
+                    title: "Syslog-ng",
+                    searchable: true,
+                    icon: "text_snippet",
+                    section: "Data Sources",
+                    keywords: [
+                      "syslog",
+                      "syslog-ng",
+                      "log collection",
+                      "log aggregation",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -216,6 +354,18 @@ const useIngestionRoutes = () => {
                   path: "prometheus",
                   name: "prometheus",
                   component: PrometheusConfig,
+                  meta: {
+                    title: "Prometheus",
+                    searchable: true,
+                    icon: "show_chart",
+                    section: "Data Sources",
+                    keywords: [
+                      "metrics scraping",
+                      "prometheus remote write",
+                      "time series",
+                      "PromQL",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -224,6 +374,18 @@ const useIngestionRoutes = () => {
                   path: "otelcollector",
                   name: "otelCollector",
                   component: OtelCollector,
+                  meta: {
+                    title: "OpenTelemetry Collector (Metrics)",
+                    searchable: true,
+                    icon: "analytics",
+                    section: "Data Sources",
+                    keywords: [
+                      "OTEL metrics",
+                      "OTel collector",
+                      "metrics pipeline",
+                      "OpenTelemetry metrics",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -232,6 +394,17 @@ const useIngestionRoutes = () => {
                   path: "telegraf",
                   name: "telegraf",
                   component: TelegrafConfig,
+                  meta: {
+                    title: "Telegraf",
+                    searchable: true,
+                    icon: "analytics",
+                    section: "Data Sources",
+                    keywords: [
+                      "InfluxDB telegraf",
+                      "metrics collection",
+                      "telegraf agent",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -240,6 +413,18 @@ const useIngestionRoutes = () => {
                   path: "cloudwatchMetrics",
                   name: "cloudwatchMetrics",
                   component: CloudWatchMetricConfig,
+                  meta: {
+                    title: "CloudWatch Metrics",
+                    searchable: true,
+                    icon: "cloud",
+                    section: "Data Sources",
+                    keywords: [
+                      "AWS CloudWatch",
+                      "cloud metrics",
+                      "AWS monitoring",
+                      "CloudWatch",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -258,6 +443,18 @@ const useIngestionRoutes = () => {
                   path: "opentelemetry",
                   name: "tracesOTLP",
                   component: OpenTelemetry,
+                  meta: {
+                    title: "OpenTelemetry Traces",
+                    searchable: true,
+                    icon: "account_tree",
+                    section: "Data Sources",
+                    keywords: [
+                      "OTLP traces",
+                      "distributed tracing",
+                      "OTel traces",
+                      "OpenTelemetry",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -266,6 +463,18 @@ const useIngestionRoutes = () => {
                   path: "otel",
                   name: "ingestTracesFromOtel",
                   component: OtelConfig,
+                  meta: {
+                    title: "OpenTelemetry Collector (Traces)",
+                    searchable: true,
+                    icon: "account_tree",
+                    section: "Data Sources",
+                    keywords: [
+                      "OTEL traces",
+                      "OTel collector",
+                      "trace pipeline",
+                      "OpenTelemetry collector traces",
+                    ],
+                  },
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -286,6 +495,20 @@ const useIngestionRoutes = () => {
               path: "kubernetes",
               name: "ingestFromKubernetes",
               component: KubernetesConfig,
+              meta: {
+                title: "Kubernetes",
+                searchable: true,
+                icon: "hub",
+                section: "Data Sources",
+                keywords: [
+                  "k8s",
+                  "container logs",
+                  "pod logs",
+                  "cluster monitoring",
+                  "Helm",
+                  "Kubernetes ingestion",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -294,6 +517,18 @@ const useIngestionRoutes = () => {
               path: "windows",
               name: "ingestFromWindows",
               component: WindowsConfig,
+              meta: {
+                title: "Windows",
+                searchable: true,
+                icon: "computer",
+                section: "Data Sources",
+                keywords: [
+                  "Windows logs",
+                  "Windows events",
+                  "WinEvent",
+                  "Windows monitoring",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -302,6 +537,18 @@ const useIngestionRoutes = () => {
               path: "linux",
               name: "ingestFromLinux",
               component: LinuxConfig,
+              meta: {
+                title: "Linux",
+                searchable: true,
+                icon: "terminal",
+                section: "Data Sources",
+                keywords: [
+                  "Linux logs",
+                  "syslog",
+                  "Linux monitoring",
+                  "system logs",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -310,6 +557,19 @@ const useIngestionRoutes = () => {
               path: "aws",
               name: "AWSConfig",
               component: AWSConfig,
+              meta: {
+                title: "AWS",
+                searchable: true,
+                icon: "cloud",
+                section: "Data Sources",
+                keywords: [
+                  "Amazon Web Services",
+                  "CloudWatch",
+                  "S3 logs",
+                  "AWS ingestion",
+                  "cloud logs",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -318,6 +578,18 @@ const useIngestionRoutes = () => {
               path: "gcp",
               name: "GCPConfig",
               component: GCPConfig,
+              meta: {
+                title: "GCP",
+                searchable: true,
+                icon: "cloud",
+                section: "Data Sources",
+                keywords: [
+                  "Google Cloud Platform",
+                  "GCP logs",
+                  "Cloud Logging",
+                  "Pub/Sub",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -326,6 +598,18 @@ const useIngestionRoutes = () => {
               path: "azure",
               name: "AzureConfig",
               component: AzureConfig,
+              meta: {
+                title: "Azure",
+                searchable: true,
+                icon: "cloud",
+                section: "Data Sources",
+                keywords: [
+                  "Microsoft Azure",
+                  "Azure Monitor",
+                  "Azure logs",
+                  "cloud logs",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -334,6 +618,18 @@ const useIngestionRoutes = () => {
               path: "traces",
               name: "ingestFromTraces",
               component: OpenTelemetry,
+              meta: {
+                title: "OpenTelemetry Traces",
+                searchable: true,
+                icon: "account_tree",
+                section: "Data Sources",
+                keywords: [
+                  "OTLP traces",
+                  "distributed tracing",
+                  "trace ingestion",
+                  "OpenTelemetry",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -342,6 +638,19 @@ const useIngestionRoutes = () => {
               path: "frontend-monitoring",
               name: "frontendMonitoring",
               component: RUMWeb,
+              meta: {
+                title: "Frontend Monitoring (RUM)",
+                searchable: true,
+                icon: "monitor",
+                section: "Data Sources",
+                keywords: [
+                  "Real User Monitoring",
+                  "RUM",
+                  "browser monitoring",
+                  "JavaScript SDK",
+                  "frontend telemetry",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -360,6 +669,18 @@ const useIngestionRoutes = () => {
               path: "sqlserver",
               name: "sqlserver",
               component: SqlServer,
+              meta: {
+                title: "SQL Server",
+                searchable: true,
+                icon: "storage",
+                section: "Data Sources",
+                keywords: [
+                  "Microsoft SQL Server",
+                  "MSSQL",
+                  "relational database",
+                  "SQL database",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -368,6 +689,18 @@ const useIngestionRoutes = () => {
               path: "postgres",
               name: "postgres",
               component: Postgres,
+              meta: {
+                title: "PostgreSQL",
+                searchable: true,
+                icon: "storage",
+                section: "Data Sources",
+                keywords: [
+                  "Postgres",
+                  "PostgreSQL",
+                  "relational database",
+                  "SQL database",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -376,6 +709,18 @@ const useIngestionRoutes = () => {
               path: "mongodb",
               name: "mongodb",
               component: MongoDB,
+              meta: {
+                title: "MongoDB",
+                searchable: true,
+                icon: "storage",
+                section: "Data Sources",
+                keywords: [
+                  "NoSQL",
+                  "document database",
+                  "MongoDB",
+                  "document store",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -384,6 +729,18 @@ const useIngestionRoutes = () => {
               path: "redis",
               name: "redis",
               component: Redis,
+              meta: {
+                title: "Redis",
+                searchable: true,
+                icon: "storage",
+                section: "Data Sources",
+                keywords: [
+                  "in-memory database",
+                  "Redis cache",
+                  "key-value store",
+                  "Redis",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -392,6 +749,18 @@ const useIngestionRoutes = () => {
               path: "couchdb",
               name: "couchdb",
               component: CouchDB,
+              meta: {
+                title: "CouchDB",
+                searchable: true,
+                icon: "storage",
+                section: "Data Sources",
+                keywords: [
+                  "Apache CouchDB",
+                  "document database",
+                  "NoSQL",
+                  "CouchDB",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -400,6 +769,19 @@ const useIngestionRoutes = () => {
               path: "elasticsearch",
               name: "elasticsearch",
               component: Elasticsearch,
+              meta: {
+                title: "Elasticsearch",
+                searchable: true,
+                icon: "search",
+                section: "Data Sources",
+                keywords: [
+                  "Elastic search",
+                  "search engine",
+                  "ELK stack",
+                  "search index",
+                  "Elasticsearch",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -408,6 +790,18 @@ const useIngestionRoutes = () => {
               path: "mysql",
               name: "mysql",
               component: MySQL,
+              meta: {
+                title: "MySQL",
+                searchable: true,
+                icon: "storage",
+                section: "Data Sources",
+                keywords: [
+                  "MySQL",
+                  "relational database",
+                  "SQL",
+                  "MariaDB",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -416,6 +810,18 @@ const useIngestionRoutes = () => {
               path: "oracle",
               name: "oracle",
               component: Oracle,
+              meta: {
+                title: "Oracle Database",
+                searchable: true,
+                icon: "storage",
+                section: "Data Sources",
+                keywords: [
+                  "Oracle DB",
+                  "Oracle SQL",
+                  "relational database",
+                  "Oracle",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -424,6 +830,18 @@ const useIngestionRoutes = () => {
               path: "saphana",
               name: "saphana",
               component: SAPHana,
+              meta: {
+                title: "SAP HANA",
+                searchable: true,
+                icon: "storage",
+                section: "Data Sources",
+                keywords: [
+                  "SAP HANA",
+                  "in-memory database",
+                  "SAP database",
+                  "HANA analytics",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -432,6 +850,18 @@ const useIngestionRoutes = () => {
               path: "snowflake",
               name: "snowflake",
               component: Snowflake,
+              meta: {
+                title: "Snowflake",
+                searchable: true,
+                icon: "ac_unit",
+                section: "Data Sources",
+                keywords: [
+                  "Snowflake data warehouse",
+                  "cloud database",
+                  "data warehouse",
+                  "Snowflake",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -440,6 +870,18 @@ const useIngestionRoutes = () => {
               path: "zookeeper",
               name: "zookeeper",
               component: Zookeeper,
+              meta: {
+                title: "Zookeeper",
+                searchable: true,
+                icon: "storage",
+                section: "Data Sources",
+                keywords: [
+                  "Apache ZooKeeper",
+                  "distributed coordination",
+                  "configuration management",
+                  "ZooKeeper",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -448,6 +890,18 @@ const useIngestionRoutes = () => {
               path: "cassandra",
               name: "cassandra",
               component: Cassandra,
+              meta: {
+                title: "Cassandra",
+                searchable: true,
+                icon: "storage",
+                section: "Data Sources",
+                keywords: [
+                  "Apache Cassandra",
+                  "NoSQL",
+                  "wide-column store",
+                  "distributed database",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -456,6 +910,18 @@ const useIngestionRoutes = () => {
               path: "aerospike",
               name: "aerospike",
               component: Aerospike,
+              meta: {
+                title: "Aerospike",
+                searchable: true,
+                icon: "storage",
+                section: "Data Sources",
+                keywords: [
+                  "Aerospike database",
+                  "in-memory NoSQL",
+                  "key-value database",
+                  "Aerospike",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -464,6 +930,18 @@ const useIngestionRoutes = () => {
               path: "dynamodb",
               name: "dynamodb",
               component: DynamoDB,
+              meta: {
+                title: "DynamoDB",
+                searchable: true,
+                icon: "storage",
+                section: "Data Sources",
+                keywords: [
+                  "AWS DynamoDB",
+                  "NoSQL",
+                  "serverless database",
+                  "Amazon database",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -472,6 +950,18 @@ const useIngestionRoutes = () => {
               path: "databricks",
               name: "databricks",
               component: Databricks,
+              meta: {
+                title: "Databricks",
+                searchable: true,
+                icon: "analytics",
+                section: "Data Sources",
+                keywords: [
+                  "Databricks",
+                  "data lakehouse",
+                  "Apache Spark",
+                  "data engineering",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -490,6 +980,18 @@ const useIngestionRoutes = () => {
               path: "falco",
               name: "falco",
               component: Falco,
+              meta: {
+                title: "Falco",
+                searchable: true,
+                icon: "security",
+                section: "Data Sources",
+                keywords: [
+                  "runtime security",
+                  "cloud-native security",
+                  "container security",
+                  "Falco SIEM",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -498,6 +1000,18 @@ const useIngestionRoutes = () => {
               path: "osquery",
               name: "osquery",
               component: OSQuery,
+              meta: {
+                title: "OSQuery",
+                searchable: true,
+                icon: "security",
+                section: "Data Sources",
+                keywords: [
+                  "osquery",
+                  "endpoint security",
+                  "system introspection",
+                  "SQL endpoint queries",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -506,6 +1020,18 @@ const useIngestionRoutes = () => {
               path: "okta",
               name: "okta",
               component: Okta,
+              meta: {
+                title: "Okta",
+                searchable: true,
+                icon: "lock",
+                section: "Data Sources",
+                keywords: [
+                  "identity management",
+                  "SSO",
+                  "Okta logs",
+                  "authentication",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -514,6 +1040,18 @@ const useIngestionRoutes = () => {
               path: "jumpcloud",
               name: "jumpcloud",
               component: Jumpcloud,
+              meta: {
+                title: "JumpCloud",
+                searchable: true,
+                icon: "lock",
+                section: "Data Sources",
+                keywords: [
+                  "JumpCloud directory",
+                  "identity provider",
+                  "SSO",
+                  "cloud directory",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -522,6 +1060,18 @@ const useIngestionRoutes = () => {
               path: "openvpn",
               name: "openvpn",
               component: OpenVPN,
+              meta: {
+                title: "OpenVPN",
+                searchable: true,
+                icon: "vpn_lock",
+                section: "Data Sources",
+                keywords: [
+                  "VPN logs",
+                  "OpenVPN access server",
+                  "network access",
+                  "VPN monitoring",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -530,6 +1080,19 @@ const useIngestionRoutes = () => {
               path: "office365",
               name: "office365",
               component: Office365,
+              meta: {
+                title: "Microsoft 365",
+                searchable: true,
+                icon: "business",
+                section: "Data Sources",
+                keywords: [
+                  "Office 365",
+                  "Microsoft 365",
+                  "Exchange logs",
+                  "SharePoint logs",
+                  "M365",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -538,6 +1101,18 @@ const useIngestionRoutes = () => {
               path: "google-workspace",
               name: "google-workspace",
               component: GoogleWorkspace,
+              meta: {
+                title: "Google Workspace",
+                searchable: true,
+                icon: "business",
+                section: "Data Sources",
+                keywords: [
+                  "Google Workspace",
+                  "G Suite",
+                  "Gmail logs",
+                  "Google audit logs",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -556,6 +1131,18 @@ const useIngestionRoutes = () => {
               path: "jenkins",
               name: "jenkins",
               component: Jenkins,
+              meta: {
+                title: "Jenkins",
+                searchable: true,
+                icon: "build",
+                section: "Data Sources",
+                keywords: [
+                  "CI/CD",
+                  "Jenkins pipeline",
+                  "build automation",
+                  "continuous integration",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -564,6 +1151,18 @@ const useIngestionRoutes = () => {
               path: "ansible",
               name: "ansible",
               component: Ansible,
+              meta: {
+                title: "Ansible",
+                searchable: true,
+                icon: "settings_ethernet",
+                section: "Data Sources",
+                keywords: [
+                  "configuration management",
+                  "Ansible playbook",
+                  "infrastructure automation",
+                  "Ansible",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -572,6 +1171,18 @@ const useIngestionRoutes = () => {
               path: "terraform",
               name: "terraform",
               component: Terraform,
+              meta: {
+                title: "Terraform",
+                searchable: true,
+                icon: "construction",
+                section: "Data Sources",
+                keywords: [
+                  "infrastructure as code",
+                  "IaC",
+                  "Terraform state",
+                  "HashiCorp",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -580,6 +1191,18 @@ const useIngestionRoutes = () => {
               path: "github-actions",
               name: "github-actions",
               component: GithubActions,
+              meta: {
+                title: "GitHub Actions",
+                searchable: true,
+                icon: "play_circle",
+                section: "Data Sources",
+                keywords: [
+                  "CI/CD",
+                  "GitHub workflows",
+                  "GitHub Actions logs",
+                  "continuous delivery",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -598,6 +1221,19 @@ const useIngestionRoutes = () => {
               path: "netflow",
               name: "netflow",
               component: Netflow,
+              meta: {
+                title: "NetFlow",
+                searchable: true,
+                icon: "network_check",
+                section: "Data Sources",
+                keywords: [
+                  "network flow",
+                  "NetFlow protocol",
+                  "network traffic",
+                  "IPFIX",
+                  "sFlow",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -616,6 +1252,18 @@ const useIngestionRoutes = () => {
               path: "nginx",
               name: "nginx",
               component: Nginx,
+              meta: {
+                title: "Nginx",
+                searchable: true,
+                icon: "dns",
+                section: "Data Sources",
+                keywords: [
+                  "Nginx web server",
+                  "reverse proxy",
+                  "load balancer",
+                  "web server logs",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -624,6 +1272,18 @@ const useIngestionRoutes = () => {
               path: "apache",
               name: "apache",
               component: Apache,
+              meta: {
+                title: "Apache HTTP Server",
+                searchable: true,
+                icon: "dns",
+                section: "Data Sources",
+                keywords: [
+                  "Apache web server",
+                  "httpd",
+                  "web server logs",
+                  "Apache access logs",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -632,6 +1292,18 @@ const useIngestionRoutes = () => {
               path: "iis",
               name: "iis",
               component: IIS,
+              meta: {
+                title: "IIS",
+                searchable: true,
+                icon: "dns",
+                section: "Data Sources",
+                keywords: [
+                  "Internet Information Services",
+                  "IIS logs",
+                  "Windows web server",
+                  "Microsoft IIS",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -650,6 +1322,18 @@ const useIngestionRoutes = () => {
               path: "rabbitmq",
               name: "rabbitmq",
               component: RabbitMQ,
+              meta: {
+                title: "RabbitMQ",
+                searchable: true,
+                icon: "queue",
+                section: "Data Sources",
+                keywords: [
+                  "message broker",
+                  "RabbitMQ",
+                  "AMQP",
+                  "message queue",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -658,6 +1342,18 @@ const useIngestionRoutes = () => {
               path: "kafka",
               name: "kafka",
               component: Kafka,
+              meta: {
+                title: "Apache Kafka",
+                searchable: true,
+                icon: "queue",
+                section: "Data Sources",
+                keywords: [
+                  "Kafka streaming",
+                  "event streaming",
+                  "message broker",
+                  "Kafka topics",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -666,6 +1362,18 @@ const useIngestionRoutes = () => {
               path: "nats",
               name: "nats",
               component: NATS,
+              meta: {
+                title: "NATS",
+                searchable: true,
+                icon: "queue",
+                section: "Data Sources",
+                keywords: [
+                  "NATS messaging",
+                  "pub/sub",
+                  "message bus",
+                  "event streaming",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -684,6 +1392,18 @@ const useIngestionRoutes = () => {
               path: "python",
               name: "python",
               component: Python,
+              meta: {
+                title: "Python",
+                searchable: true,
+                icon: "code",
+                section: "Data Sources",
+                keywords: [
+                  "Python SDK",
+                  "Python logs",
+                  "Python tracing",
+                  "Python application monitoring",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -692,6 +1412,19 @@ const useIngestionRoutes = () => {
               path: "dotnettracing",
               name: "dotnettracing",
               component: DotNetTracing,
+              meta: {
+                title: ".NET Tracing",
+                searchable: true,
+                icon: "code",
+                section: "Data Sources",
+                keywords: [
+                  ".NET",
+                  "C#",
+                  "ASP.NET tracing",
+                  "dotnet traces",
+                  "OpenTelemetry .NET",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -700,6 +1433,18 @@ const useIngestionRoutes = () => {
               path: "dotnetlogs",
               name: "dotnetlogs",
               component: DotNetLogs,
+              meta: {
+                title: ".NET Logs",
+                searchable: true,
+                icon: "code",
+                section: "Data Sources",
+                keywords: [
+                  ".NET logs",
+                  "C# logging",
+                  "ASP.NET logs",
+                  "dotnet application logs",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -708,6 +1453,18 @@ const useIngestionRoutes = () => {
               path: "nodejs",
               name: "nodejs",
               component: NodeJS,
+              meta: {
+                title: "Node.js",
+                searchable: true,
+                icon: "code",
+                section: "Data Sources",
+                keywords: [
+                  "Node.js SDK",
+                  "JavaScript backend",
+                  "Express logs",
+                  "Node application monitoring",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -716,6 +1473,18 @@ const useIngestionRoutes = () => {
               path: "java",
               name: "java",
               component: Java,
+              meta: {
+                title: "Java",
+                searchable: true,
+                icon: "code",
+                section: "Data Sources",
+                keywords: [
+                  "Java SDK",
+                  "Spring Boot",
+                  "JVM tracing",
+                  "Java application monitoring",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -724,6 +1493,18 @@ const useIngestionRoutes = () => {
               path: "go",
               name: "go",
               component: Go,
+              meta: {
+                title: "Go (Golang)",
+                searchable: true,
+                icon: "code",
+                section: "Data Sources",
+                keywords: [
+                  "Golang SDK",
+                  "Go application logs",
+                  "Go tracing",
+                  "Golang monitoring",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -732,6 +1513,17 @@ const useIngestionRoutes = () => {
               path: "rust",
               name: "rust",
               component: Rust,
+              meta: {
+                title: "Rust",
+                searchable: true,
+                icon: "code",
+                section: "Data Sources",
+                keywords: [
+                  "Rust SDK",
+                  "Rust application logs",
+                  "Rust tracing",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -740,6 +1532,18 @@ const useIngestionRoutes = () => {
               path: "fastapi",
               name: "fastapi",
               component: FastAPI,
+              meta: {
+                title: "FastAPI",
+                searchable: true,
+                icon: "code",
+                section: "Data Sources",
+                keywords: [
+                  "FastAPI Python",
+                  "REST API monitoring",
+                  "Python web framework",
+                  "FastAPI logs",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -758,6 +1562,18 @@ const useIngestionRoutes = () => {
               path: "airflow",
               name: "airflow",
               component: Airflow,
+              meta: {
+                title: "Apache Airflow",
+                searchable: true,
+                icon: "air",
+                section: "Data Sources",
+                keywords: [
+                  "Airflow DAGs",
+                  "workflow orchestration",
+                  "data pipeline logs",
+                  "Airflow",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -766,6 +1582,18 @@ const useIngestionRoutes = () => {
               path: "airbyte",
               name: "airbyte",
               component: Airbyte,
+              meta: {
+                title: "Airbyte",
+                searchable: true,
+                icon: "sync",
+                section: "Data Sources",
+                keywords: [
+                  "Airbyte ETL",
+                  "data integration",
+                  "ELT platform",
+                  "data pipeline",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -774,6 +1602,18 @@ const useIngestionRoutes = () => {
               path: "cribl",
               name: "cribl",
               component: Cribl,
+              meta: {
+                title: "Cribl",
+                searchable: true,
+                icon: "settings_input_component",
+                section: "Data Sources",
+                keywords: [
+                  "Cribl Stream",
+                  "data routing",
+                  "log management",
+                  "Cribl",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -782,6 +1622,18 @@ const useIngestionRoutes = () => {
               path: "vercel",
               name: "vercel",
               component: Vercel,
+              meta: {
+                title: "Vercel",
+                searchable: true,
+                icon: "cloud_upload",
+                section: "Data Sources",
+                keywords: [
+                  "Vercel logs",
+                  "serverless deployment",
+                  "Next.js hosting",
+                  "edge functions",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -790,6 +1642,18 @@ const useIngestionRoutes = () => {
               path: "heroku",
               name: "heroku",
               component: Heroku,
+              meta: {
+                title: "Heroku",
+                searchable: true,
+                icon: "cloud_upload",
+                section: "Data Sources",
+                keywords: [
+                  "Heroku logs",
+                  "PaaS",
+                  "Heroku dyno",
+                  "cloud application platform",
+                ],
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },

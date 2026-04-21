@@ -15,10 +15,16 @@ const useManagementRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Settings",
+        titleKey: "menu.settings",
         searchable: true,
         icon: "settings",
         section: "Management",
-        keywords: ["configuration", "admin", "organization parameters", "platform settings"],
+        keywords: [
+          "configuration",
+          "admin",
+          "organization parameters",
+          "platform settings",
+        ],
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -28,7 +34,18 @@ const useManagementRoutes = () => {
           path: "general",
           name: "general",
           meta: {
-            title: "General",
+            title: "General Settings",
+            titleKey: "settings.generalLabel",
+            searchable: true,
+            icon: "tune",
+            section: "Management",
+            keywords: [
+              "general",
+              "default timezone",
+              "scrape interval",
+              "platform settings",
+              "max series per query",
+            ],
           },
           component: () => import("@/components/settings/General.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -40,6 +57,17 @@ const useManagementRoutes = () => {
           name: "organizationSettings",
           meta: {
             title: "Organization Parameters",
+            titleKey: "settings.orgLabel",
+            searchable: true,
+            icon: "corporate_fare",
+            section: "Management",
+            keywords: [
+              "org settings",
+              "retention period",
+              "ingest flatten level",
+              "max file size",
+              "partition time level",
+            ],
           },
           component: () =>
             import("@/components/settings/OrganizationSettings.vue"),
@@ -51,11 +79,22 @@ const useManagementRoutes = () => {
           path: "alert_destinations",
           name: "alertDestinations",
           meta: {
-            title: "Alert Destinations",
+            // Tab label in Settings sidebar: t("alert_destinations.header") = "Notification Destinations"
+            title: "Notification Destinations",
+            titleKey: "alert_destinations.header",
             searchable: true,
             icon: "send",
             section: "Management",
-            keywords: ["notification channels", "webhook", "email", "Slack", "PagerDuty", "SNS", "MSTeams"],
+            keywords: [
+              "alert destinations",
+              "notification channels",
+              "webhook",
+              "email",
+              "Slack",
+              "PagerDuty",
+              "SNS",
+              "MSTeams",
+            ],
           },
           component: AlertsDestinationList,
           beforeEnter(to: any, from: any, next: any) {
@@ -66,7 +105,9 @@ const useManagementRoutes = () => {
           path: "templates",
           name: "alertTemplates",
           meta: {
+            // Tab label in Settings sidebar: t("alert_templates.header") = "Templates"
             title: "Templates",
+            titleKey: "alert_templates.header",
             searchable: true,
             icon: "description",
             section: "Management",
@@ -90,10 +131,17 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
             title: "Query Management",
+            titleKey: "settings.queryManagement",
             searchable: true,
             icon: "manage_search",
             section: "Management",
-            keywords: ["running queries", "query management", "active queries"],
+            keywords: [
+              "running queries",
+              "query management",
+              "active queries",
+              "Summary",
+              "All Queries",
+            ],
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -106,6 +154,16 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
             title: "Cipher Keys",
+            titleKey: "settings.cipherKeys",
+            searchable: true,
+            icon: "key",
+            section: "Management",
+            keywords: [
+              "encryption",
+              "data encryption",
+              "cipher",
+              "security keys",
+            ],
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -118,6 +176,17 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
             title: "AI Toolsets",
+            titleKey: "settings.aiToolsets",
+            searchable: true,
+            icon: "smart_toy",
+            section: "Management",
+            keywords: [
+              "AI tools",
+              "LLM",
+              "AI assistant",
+              "toolsets",
+              "AI configuration",
+            ],
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -128,6 +197,15 @@ const useManagementRoutes = () => {
           name: "pipelineDestinations",
           meta: {
             title: "Pipeline Destinations",
+            searchable: true,
+            icon: "output",
+            section: "Management",
+            keywords: [
+              "pipeline output",
+              "stream destination",
+              "data forwarding",
+              "pipeline routing",
+            ],
           },
           component: () =>
             import("@/components/alerts/PipelinesDestinationList.vue"),
@@ -142,6 +220,16 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
             title: "Nodes",
+            searchable: true,
+            icon: "device_hub",
+            section: "Management",
+            keywords: [
+              "cluster nodes",
+              "querier",
+              "ingester",
+              "compactor",
+              "node status",
+            ],
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -153,7 +241,19 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/DomainManagement.vue"),
           meta: {
             keepAlive: true,
-            title: "Domain Management",
+            // Tab label in Settings sidebar: t("settings.ssoDomainRestrictions") = "SSO Management"
+            title: "SSO Management",
+            titleKey: "settings.ssoDomainRestrictions",
+            searchable: true,
+            icon: "dns",
+            section: "Management",
+            keywords: [
+              "domain management",
+              "custom domain",
+              "CNAME",
+              "SSO domain restrictions",
+              "allowed domains",
+            ],
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -165,7 +265,22 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/RegexPatternList.vue"),
           meta: {
             keepAlive: true,
-            title: "Regex Patterns",
+            // Tab label in Settings sidebar: t("regex_patterns.title") = "Sensitive Data Redaction"
+            title: "Sensitive Data Redaction",
+            titleKey: "regex_patterns.title",
+            searchable: true,
+            icon: "code",
+            section: "Management",
+            keywords: [
+              "regex patterns",
+              "regex",
+              "pattern matching",
+              "log parsing",
+              "field extraction",
+              "Built-in Patterns",
+              "data masking",
+              "PII redaction",
+            ],
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -179,6 +294,24 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
             title: "Correlation Settings",
+            titleKey: "settings.correlationSettings",
+            searchable: true,
+            icon: "join_inner",
+            section: "Management",
+            keywords: [
+              "log correlation",
+              "trace correlation",
+              "cross-stream correlation",
+              "field correlation",
+              "linked fields",
+            ],
+            // Tab labels resolved via i18n → work in every supported language
+            keywordKeys: [
+              "settings.correlation.discoveredServicesTab",
+              "settings.correlation.serviceDiscoveryTab",
+              "settings.correlation.alertCorrelationTab",
+              "settings.correlation.fieldAliasesTab",
+            ],
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
@@ -188,6 +321,13 @@ const useManagementRoutes = () => {
           path: "license",
           name: "license",
           component: () => import("@/components/settings/License.vue"),
+          meta: {
+            title: "License",
+            searchable: true,
+            icon: "verified",
+            section: "Management",
+            keywords: ["license key", "enterprise license", "activation"],
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -206,6 +346,15 @@ const useManagementRoutes = () => {
           meta: {
             keepAlive: true,
             title: "Organization Management",
+            searchable: true,
+            icon: "business",
+            section: "Management",
+            keywords: [
+              "manage organization",
+              "billing",
+              "subscription",
+              "cloud org",
+            ],
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

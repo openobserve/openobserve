@@ -153,9 +153,11 @@ const defaultPageItems = computed(() => {
   return visibleItems.value.filter((item) => !recentNames.has(item.name));
 });
 
-// Focus input whenever dialog opens
+// On every open: clear previous query, reset selection, then focus input
 watch(isOpen, async (val) => {
   if (val) {
+    query.value = "";
+    resetActiveIndex();
     await nextTick();
     inputRef.value?.focus();
   }
