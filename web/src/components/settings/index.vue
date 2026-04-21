@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                   content-class="tab_content"
                   icon="paid"
-                  label="LLM Model Pricing"
+                  :label="t('settings.llmModelPricing')"
                 >
                 </q-route-tab>
                 <q-route-tab

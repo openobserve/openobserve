@@ -2737,6 +2737,7 @@
     "claimParserRecentErrors": "Recent Errors (Last 24 Hours)",
     "noRecentErrors": "No errors found in the last 24 hours",
     "cipherKeys": "Cipher Keys",
+    "llmModelPricing": "LLM Model Pricing",
     "aiToolsets": "AI Toolsets",
     "nodes": "Nodes",
     "enableStreamingSearch": "Enable Streaming Search",
