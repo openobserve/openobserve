@@ -48,10 +48,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div v-if="localTemplate" class="ellipsis">{{ localTemplate }}<q-tooltip>{{ localTemplate }}</q-tooltip></div>
               </template>
               <template v-slot:no-option>
-                <q-item><q-item-section class="text-grey">No templates available</q-item-section></q-item>
+                <q-item><q-item-section class="text-grey">{{ t('alerts.advanced.noTemplatesAvailable') }}</q-item-section></q-item>
               </template>
             </q-select>
-            <q-btn icon="refresh" padding="xs" unelevated size="sm" round flat title="Refresh latest Templates" @click="$emit('refresh:templates')" />
+            <q-btn icon="refresh" padding="xs" unelevated size="sm" round flat :title="t('alerts.advanced.refreshTemplates')" @click="$emit('refresh:templates')" />
           </div>
         </div>
 

@@ -71,6 +71,13 @@ const SERVICES = {
   'ml-service':             { version: '2.0.3', environment: 'production' },
   'cache':                  { version: '7.2.0', environment: 'production' },
   'database':               { version: '15.4.0', environment: 'production' },
+  // Edge case services for topology testing
+  'service-a':              { version: '1.0.0', environment: 'test' },
+  'service-b':              { version: '1.0.0', environment: 'test' },
+  'service-c':              { version: '1.0.0', environment: 'test' },
+  'recursive-service':      { version: '1.0.0', environment: 'test' },
+  'orphan-handler':         { version: '1.0.0', environment: 'test' },
+  'unknown-external-api':   { version: '1.0.0', environment: 'test' },
 };
 
 // ============================================================================
