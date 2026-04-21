@@ -3408,7 +3408,15 @@
     "never": "Nooit",
     "typeScore": "Numerieke score (bijvoorbeeld 0,0 - 1,0)",
     "typeBoolean": "Binair/Pass-Fail (Booleaans)",
-    "typeCustom": "Categorische/aangepaste tekst"
+    "typeCustom": "Categorische/aangepaste tekst",
+    "bulkDeleteConfirmation": "Weet je zeker dat je {count} template (s) wilt verwijderen?",
+    "search": "Sjablonen zoeken",
+    "dimensionsTooltip": "Evaluatiedimensies toevoegen (bijv. nauwkeurigheid, relevantie). Typ en druk op Enter om aangepaste bestanden toe te voegen.",
+    "tooltipName": "Een unieke naam voor dit evaluatiesjabloon.",
+    "tooltipDescription": "Optionele beschrijving om uit te leggen wat dit sjabloon evalueert.",
+    "tooltipResponseType": "Definieert het formaat van de evaluatie-output van de LLM: numerieke score, booleaanse pass/fail of aangepaste tekst.",
+    "tooltipDimensions": "Evaluatiecriteria die de LLM moet beoordelen. Selecteer een van de standaardinstellingen of typ een aangepaste versie en druk op Enter.",
+    "tooltipPromptTemplate": "De prompt die naar de LLM is gestuurd. Gebruik {input}, {output} en {context} als tijdelijke aanduidingen voor dynamische waarden tijdens de evaluatie."
   },
   "aiToolset": {
     "header": "AI-toolsets",
