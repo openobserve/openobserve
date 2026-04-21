@@ -24,11 +24,8 @@ use config::{
     },
     utils::time::now_micros,
 };
-use infra::{db::ORM_CLIENT, table::entity::anomaly_detection_config};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter,
-    QueryOrder, Set,
-};
+use infra::{db::ORM_CLIENT, table::anomaly_detection::config as anomaly_config_table};
+use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
 use svix_ksuid::KsuidLike;
 
 use crate::{
@@ -129,11 +126,9 @@ pub async fn list_configs(
         .get()
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
 
-    let configs = anomaly_detection_config::Entity::find()
-        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
-        .order_by_desc(anomaly_detection_config::Column::CreatedAt)
-        .all(db)
-        .await?;
+    let configs = anomaly_config_table::list_by_org(db, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     // Build a map of anomaly_id → trigger for O(1) lookups.
     let trigger_map: std::collections::HashMap<String, _> =
@@ -247,10 +242,9 @@ pub async fn get_config(org_id: &str, anomaly_id: &str) -> Result<Option<serde_j
         .get()
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
 
-    let config = anomaly_detection_config::Entity::find_by_id(anomaly_id)
-        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
-        .one(db)
-        .await?;
+    let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     match config {
         None => Ok(None),
@@ -290,69 +284,72 @@ pub async fn create_config(
         .await
         .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_name))?;
 
-    let new_config = anomaly_detection_config::ActiveModel {
-        anomaly_id: Set(anomaly_id.clone()),
-        org_id: Set(org_id.to_string()),
-        stream_name: Set(req.stream_name.clone()),
-        stream_type: Set(req.stream_type.clone()),
-        enabled: Set(req.enabled.unwrap_or(true)),
-        name: Set(req.name.clone()),
-        description: Set(req.description.clone()),
-        query_mode: Set(req.query_mode.clone()),
-        filters: Set(req.filters.clone()),
-        custom_sql: Set(req.custom_sql.clone()),
-        detection_function: Set(combine_detection_fn(
+    use infra::table::entity::anomaly_detection_config::Model as ConfigModel;
+    let new_config = ConfigModel {
+        anomaly_id: anomaly_id.clone(),
+        org_id: org_id.to_string(),
+        stream_name: req.stream_name.clone(),
+        stream_type: req.stream_type.clone(),
+        enabled: req.enabled.unwrap_or(true),
+        name: req.name.clone(),
+        description: req.description.clone(),
+        query_mode: req.query_mode.clone(),
+        filters: req.filters.clone(),
+        custom_sql: req.custom_sql.clone(),
+        detection_function: combine_detection_fn(
             &req.detection_function,
             req.detection_function_field.as_deref(),
-        )),
-        histogram_interval: Set(req.histogram_interval.clone()),
-        schedule_interval: Set(req.schedule_interval.clone()),
-        detection_window_seconds: Set(req.detection_window_seconds),
-        training_window_days: Set(req.training_window_days.unwrap_or(7)),
-        retrain_interval_days: Set(req.retrain_interval_days.unwrap_or(7)),
+        ),
+        histogram_interval: req.histogram_interval.clone(),
+        schedule_interval: req.schedule_interval.clone(),
+        detection_window_seconds: req.detection_window_seconds,
+        training_window_days: req.training_window_days.unwrap_or(7),
+        retrain_interval_days: req.retrain_interval_days.unwrap_or(7),
         // Store percentile as i32 (e.g. 97.0 → 97). Whole-number percentiles are
         // sufficient; the valid range is 50–99 and we clamp at the model level.
-        threshold: Set(req.percentile.unwrap_or(97.0).clamp(50.0, 99.9) as i32),
-        is_trained: Set(false),
-        training_started_at: Set(None),
-        training_completed_at: Set(None),
-        last_error: Set(None),
-        last_processed_timestamp: Set(None),
-        current_model_version: Set(0),
-        rcf_num_trees: Set(req.rcf_num_trees.unwrap_or(
+        threshold: req.percentile.unwrap_or(97.0).clamp(50.0, 99.9) as i32,
+        is_trained: false,
+        training_started_at: None,
+        training_completed_at: None,
+        last_error: None,
+        last_processed_timestamp: None,
+        current_model_version: 0,
+        rcf_num_trees: req.rcf_num_trees.unwrap_or(
             o2_enterprise::enterprise::common::config::get_config()
                 .anomaly_detection
                 .rcf_num_trees as i32,
-        )),
-        rcf_tree_size: Set(req.rcf_tree_size.unwrap_or(
+        ),
+        rcf_tree_size: req.rcf_tree_size.unwrap_or(
             o2_enterprise::enterprise::common::config::get_config()
                 .anomaly_detection
                 .rcf_tree_size as i32,
-        )),
+        ),
         // shingle_size default comes from O2_ANOMALY_RCF_SHINGLE_SIZE env var (default=4).
         // 4 consecutive time-buckets gives the RCF model enough temporal context.
-        rcf_shingle_size: Set(req.rcf_shingle_size.unwrap_or(
+        rcf_shingle_size: req.rcf_shingle_size.unwrap_or(
             o2_enterprise::enterprise::common::config::get_config()
                 .anomaly_detection
                 .rcf_shingle_size as i32,
-        )),
-        alert_enabled: Set(req.alert_enabled.unwrap_or(true)),
-        alert_destinations: Set(Some(
+        ),
+        alert_enabled: req.alert_enabled.unwrap_or(true),
+        alert_destinations: Some(
             serde_json::to_value(&req.alert_destinations).unwrap_or(serde_json::json!([])),
-        )),
-        folder_id: Set(folder_pk),
-        owner: Set(req.owner.clone()),
-        status: Set(0i32), // 0 = waiting
-        retries: Set(0),
-        last_updated: Set(now_us),
+        ),
+        folder_id: folder_pk,
+        owner: req.owner.clone(),
+        status: 0i32, // 0 = waiting
+        retries: 0,
+        last_updated: now_us,
         // Seasonality is auto-determined at training time from training_window_days;
         // initialise to "none" as a placeholder until the first training run.
-        seasonality: Set("none".to_string()),
-        created_at: Set(now_us),
-        updated_at: Set(now_us),
+        seasonality: "none".to_string(),
+        created_at: now_us,
+        updated_at: now_us,
     };
 
-    let result = new_config.insert(db).await?;
+    let result = anomaly_config_table::create(db, new_config)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     // Broadcast config creation to all super cluster regions for API-read consistency.
     #[cfg(feature = "enterprise")]
@@ -431,14 +428,14 @@ pub async fn update_config(
         .get()
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
 
-    // Fetch existing config
-    let existing = anomaly_detection_config::Entity::find_by_id(anomaly_id)
-        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
-        .one(db)
-        .await?
+    // Fetch existing config — into_active_model() on a DB-fetched model sets the PK as
+    // Unchanged, which is required for SeaORM to generate UPDATE … WHERE anomaly_id = ?
+    let existing = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
-    let mut active_model: anomaly_detection_config::ActiveModel = existing.into_active_model();
+    let mut active_model = existing.into_active_model();
 
     // Update only provided fields
     // Track whether we need to push a trigger after the DB save (see below).
@@ -645,13 +642,15 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
         .get()
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
 
-    let config = anomaly_detection_config::Entity::find_by_id(anomaly_id)
-        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
-        .one(db)
-        .await?
+    // Verify the config exists before deleting (returns 404 if missing).
+    anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
-    config.delete(db).await?;
+    anomaly_config_table::delete(db, org_id, anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     // Broadcast config deletion to all super cluster regions.
     #[cfg(feature = "enterprise")]
@@ -710,10 +709,9 @@ pub async fn clone_config(
         .get()
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
 
-    let src = anomaly_detection_config::Entity::find_by_id(anomaly_id)
-        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
-        .one(db)
-        .await?
+    let src = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
     let new_id = svix_ksuid::Ksuid::new(None, None).to_string();
@@ -729,46 +727,49 @@ pub async fn clone_config(
         src.folder_id.clone()
     };
 
-    let cloned = anomaly_detection_config::ActiveModel {
-        anomaly_id: Set(new_id.clone()),
-        org_id: Set(src.org_id.clone()),
-        stream_name: Set(src.stream_name.clone()),
-        stream_type: Set(src.stream_type.clone()),
-        enabled: Set(src.enabled),
-        name: Set(new_name.unwrap_or_else(|| format!("{}_copy", src.name))),
-        description: Set(src.description.clone()),
-        query_mode: Set(src.query_mode.clone()),
-        filters: Set(src.filters.clone()),
-        custom_sql: Set(src.custom_sql.clone()),
-        detection_function: Set(src.detection_function.clone()),
-        histogram_interval: Set(src.histogram_interval.clone()),
-        schedule_interval: Set(src.schedule_interval.clone()),
-        detection_window_seconds: Set(src.detection_window_seconds),
-        training_window_days: Set(src.training_window_days),
-        retrain_interval_days: Set(src.retrain_interval_days),
-        threshold: Set(src.threshold),
-        seasonality: Set(src.seasonality.clone()),
-        is_trained: Set(false),
-        training_started_at: Set(None),
-        training_completed_at: Set(None),
-        last_error: Set(None),
-        last_processed_timestamp: Set(None),
-        current_model_version: Set(0),
-        rcf_num_trees: Set(src.rcf_num_trees),
-        rcf_tree_size: Set(src.rcf_tree_size),
-        rcf_shingle_size: Set(src.rcf_shingle_size),
-        alert_enabled: Set(src.alert_enabled),
-        alert_destinations: Set(src.alert_destinations.clone()),
-        folder_id: Set(resolved_folder_id),
-        owner: Set(src.owner.clone()),
-        status: Set(0i32),
-        retries: Set(0),
-        last_updated: Set(now_us),
-        created_at: Set(now_us),
-        updated_at: Set(now_us),
+    use infra::table::entity::anomaly_detection_config::Model as ConfigModel;
+    let cloned = ConfigModel {
+        anomaly_id: new_id.clone(),
+        org_id: src.org_id.clone(),
+        stream_name: src.stream_name.clone(),
+        stream_type: src.stream_type.clone(),
+        enabled: src.enabled,
+        name: new_name.unwrap_or_else(|| format!("{}_copy", src.name)),
+        description: src.description.clone(),
+        query_mode: src.query_mode.clone(),
+        filters: src.filters.clone(),
+        custom_sql: src.custom_sql.clone(),
+        detection_function: src.detection_function.clone(),
+        histogram_interval: src.histogram_interval.clone(),
+        schedule_interval: src.schedule_interval.clone(),
+        detection_window_seconds: src.detection_window_seconds,
+        training_window_days: src.training_window_days,
+        retrain_interval_days: src.retrain_interval_days,
+        threshold: src.threshold,
+        seasonality: src.seasonality.clone(),
+        is_trained: false,
+        training_started_at: None,
+        training_completed_at: None,
+        last_error: None,
+        last_processed_timestamp: None,
+        current_model_version: 0,
+        rcf_num_trees: src.rcf_num_trees,
+        rcf_tree_size: src.rcf_tree_size,
+        rcf_shingle_size: src.rcf_shingle_size,
+        alert_enabled: src.alert_enabled,
+        alert_destinations: src.alert_destinations.clone(),
+        folder_id: resolved_folder_id,
+        owner: src.owner.clone(),
+        status: 0i32,
+        retries: 0,
+        last_updated: now_us,
+        created_at: now_us,
+        updated_at: now_us,
     };
 
-    let result = cloned.insert(db).await?;
+    let result = anomaly_config_table::create(db, cloned)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     // Register detection trigger for the new config
     {
@@ -807,10 +808,9 @@ pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
         .get()
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
 
-    let config = anomaly_detection_config::Entity::find_by_id(anomaly_id)
-        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
-        .one(db)
-        .await?
+    let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
     let mut active = config.into_active_model();
@@ -831,10 +831,9 @@ pub async fn train_model(org_id: &str, anomaly_id: &str) -> Result<serde_json::V
     let db = ORM_CLIENT
         .get()
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
-    anomaly_detection_config::Entity::find_by_id(anomaly_id)
-        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
-        .one(db)
-        .await?
+    anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
     #[cfg(feature = "enterprise")]
@@ -858,10 +857,9 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
 
     // Fetch config
-    let config = anomaly_detection_config::Entity::find_by_id(anomaly_id)
-        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
-        .one(db)
-        .await?
+    let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
     // Check if trained
@@ -1069,11 +1067,7 @@ pub async fn recover_detection_triggers_on_startup() {
         }
     };
 
-    let configs = match anomaly_detection_config::Entity::find()
-        .filter(anomaly_detection_config::Column::Enabled.eq(true))
-        .all(db)
-        .await
-    {
+    let configs = match anomaly_config_table::list_all_enabled(db).await {
         Ok(c) => c,
         Err(e) => {
             log::warn!(
@@ -1173,7 +1167,7 @@ fn parse_interval(interval: &str) -> Result<i64> {
 
 #[cfg(feature = "enterprise")]
 pub fn config_to_training_config(
-    config: &anomaly_detection_config::Model,
+    config: &infra::table::entity::anomaly_detection_config::Model,
 ) -> Result<o2_enterprise::enterprise::anomaly_detection::types::AnomalyConfig> {
     use o2_enterprise::enterprise::anomaly_detection::types::AnomalyConfig;
 

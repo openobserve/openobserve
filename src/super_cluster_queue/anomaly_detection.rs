@@ -25,7 +25,7 @@
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     errors::Result,
-    table::anomaly_detection_config as table,
+    table::anomaly_detection::config as table,
 };
 use o2_enterprise::enterprise::super_cluster::queue::{AnomalyDetectionMessage, Message};
 
@@ -54,15 +54,13 @@ pub(crate) async fn process_msg(msg: AnomalyDetectionMessage) -> Result<()> {
                 config.is_trained,
                 config.updated_at,
             );
-            table::create_if_not_exists(db, config)
-                .await
-                .map_err(|e| {
-                    log::error!(
-                        "[SUPER_CLUSTER:anomaly_detection] ConfigCreate failed id={}: {e}",
-                        anomaly_id
-                    );
-                    infra::errors::Error::Message(e.to_string())
-                })?;
+            table::create_if_not_exists(db, config).await.map_err(|e| {
+                log::error!(
+                    "[SUPER_CLUSTER:anomaly_detection] ConfigCreate failed id={}: {e}",
+                    anomaly_id
+                );
+                infra::errors::Error::Message(e.to_string())
+            })?;
             log::debug!(
                 "[SUPER_CLUSTER:anomaly_detection] ConfigCreate done id={}",
                 anomaly_id

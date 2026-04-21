@@ -89,8 +89,7 @@ async fn handle_anomaly_detection_triggers(
     mut trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     use config::utils::time::now_micros;
-    use infra::table::entity::anomaly_detection_config;
-    use sea_orm::EntityTrait;
+    use infra::table::anomaly_detection::config as anomaly_config_table;
 
     let anomaly_id = trigger.module_key.clone();
 
@@ -103,9 +102,9 @@ async fn handle_anomaly_detection_triggers(
         .get()
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
 
-    let config = anomaly_detection_config::Entity::find_by_id(&anomaly_id)
-        .one(db)
-        .await?;
+    let config = anomaly_config_table::get_by_id(db, &trigger.org, &anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     // If config is not found locally, it may not have synced yet from the primary
     // region (super cluster race: trigger row arrives before ConfigCreate NATS message).
@@ -226,9 +225,8 @@ async fn handle_anomaly_detection_triggers(
     if trigger_status == TriggerDataStatus::Completed && config.is_trained {
         use o2_enterprise::enterprise::anomaly_detection::types::Status as AnomalyStatus;
         if config.status != AnomalyStatus::Active.to_i32() {
-            use infra::table::entity::anomaly_detection_config;
-            use sea_orm::{ActiveModelTrait, Set};
-            let mut active: anomaly_detection_config::ActiveModel = config.into();
+            use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
+            let mut active = config.into_active_model();
             active.status = Set(AnomalyStatus::Active.to_i32());
             active.updated_at = Set(run_end_us);
             if let Err(e) = active.update(db).await {
