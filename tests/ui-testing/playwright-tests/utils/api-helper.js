@@ -70,11 +70,10 @@ async function createMockDestination(page, name, template = 'Slack') {
   const webhookUrl = process.env.MOCK_WEBHOOK_URL;
 
   if (!webhookUrl) {
-    // Warn about using external URL - may fail in restricted CI environments
-    testLogger.warn('MOCK_WEBHOOK_URL not set, using httpbin.org fallback. Set MOCK_WEBHOOK_URL for CI environments without internet access.');
+    throw new Error('MOCK_WEBHOOK_URL environment variable is required. Set it to a reachable webhook endpoint before running these tests.');
   }
 
-  const finalUrl = webhookUrl || "https://httpbin.org/post";
+  const finalUrl = webhookUrl;
   const payload = {
     name,
     template,

@@ -676,8 +676,9 @@ export class AnomalyDetectionPage {
         const alertsTable = this.page.locator('table, .q-table, [data-test="alert-list-table"]').first();
         if (!await alertsTable.isVisible({ timeout: 5000 }).catch(() => false)) {
             testLogger.warn('May not be on alerts list page after save');
-            // Take screenshot for debugging
-            await this.page.screenshot({ path: 'test-logs/anomaly-after-save.png', fullPage: true }).catch(() => {});
+            if (process.env.DEBUG) {
+                await this.page.screenshot({ path: 'test-logs/anomaly-after-save.png', fullPage: true }).catch(() => {});
+            }
         }
     }
 
