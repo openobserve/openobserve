@@ -1578,7 +1578,14 @@
     "configSectionComparison": "Vergelijking",
     "configSectionMarkLines": "Lijnen markeren",
     "configSectionBackground": "Achtergrond",
-    "tableFiltering": "Kolomfiltering"
+    "tableFiltering": "Kolomfiltering",
+    "columnFormattingTitle": "Kolomopmaak",
+    "sectionValueFormatting": "Waardeopmaak",
+    "sectionAlignment": "Uitlijning",
+    "sectionStyling": "Styling",
+    "textColor": "Tekst",
+    "bgColor": "Achtergrond",
+    "colorNone": "geen"
   },
   "panel": {
     "header": "Paneel",

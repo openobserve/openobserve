@@ -1578,7 +1578,14 @@
     "configSectionComparison": "Karşılaştırma",
     "configSectionMarkLines": "Çizgileri İşaretle",
     "configSectionBackground": "Arkaplan",
-    "tableFiltering": "Sütun Filtreleme"
+    "tableFiltering": "Sütun Filtreleme",
+    "columnFormattingTitle": "Sütun Biçimlendirme",
+    "sectionValueFormatting": "Değer Biçimlendirme",
+    "sectionAlignment": "Hizalama",
+    "sectionStyling": "Şekillendirme",
+    "textColor": "Metin",
+    "bgColor": "Arkaplan",
+    "colorNone": "hiçbiri"
   },
   "panel": {
     "header": "Panel",

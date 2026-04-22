@@ -1580,7 +1580,14 @@
     "axisLabelTruncateTooltipText": "将 x 轴标签截断为指定宽度（以像素为单位）。",
     "axisLabelTooltipNotePrefix": "注意：",
     "axisLabelTooltipNoteText": " 时间序列 x 轴字段不支持此选项。",
-    "tableFiltering": "列过滤"
+    "tableFiltering": "列过滤",
+    "columnFormattingTitle": "列格式",
+    "sectionValueFormatting": "值格式",
+    "sectionAlignment": "对齐",
+    "sectionStyling": "造型",
+    "textColor": "文本",
+    "bgColor": "背景",
+    "colorNone": "无"
   },
   "panel": {
     "header": "面板",

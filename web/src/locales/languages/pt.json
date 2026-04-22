@@ -1580,7 +1580,14 @@
     "axisLabelTruncateTooltipText": "Trunque os rótulos do eixo x na largura especificada (em pixels).",
     "axisLabelTooltipNotePrefix": "Nota:",
     "axisLabelTooltipNoteText": " Essa opção não é suportada para campos do eixo x de séries temporais.",
-    "tableFiltering": "Filtragem de colunas"
+    "tableFiltering": "Filtragem de colunas",
+    "columnFormattingTitle": "Formatação de coluna",
+    "sectionValueFormatting": "Formatação de valor",
+    "sectionAlignment": "Alinhamento",
+    "sectionStyling": "Estilo",
+    "textColor": "Texto",
+    "bgColor": "Plano de fundo",
+    "colorNone": "nenhum"
   },
   "panel": {
     "header": "Painel",

@@ -1580,7 +1580,14 @@
     "axisLabelTruncateTooltipText": "Kürzt die Beschriftungen der X-Achse auf die angegebene Breite (in Pixeln).",
     "axisLabelTooltipNotePrefix": "Hinweis:",
     "axisLabelTooltipNoteText": " Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt.",
-    "tableFiltering": "Filtern von Spalten"
+    "tableFiltering": "Filtern von Spalten",
+    "columnFormattingTitle": "Formatierung von Spalten",
+    "sectionValueFormatting": "Formatierung von Werten",
+    "sectionAlignment": "Ausrichtung",
+    "sectionStyling": "Styling",
+    "textColor": "Text",
+    "bgColor": "Hintergrund",
+    "colorNone": "keine"
   },
   "panel": {
     "header": "Panel",

@@ -1580,7 +1580,14 @@
     "axisLabelTruncateTooltipText": "Tronquez les étiquettes de l'axe X à la largeur spécifiée (en pixels).",
     "axisLabelTooltipNotePrefix": "Remarque :",
     "axisLabelTooltipNoteText": " Cette option n'est pas prise en charge pour les champs de l'axe X de séries chronologiques.",
-    "tableFiltering": "Filtrage des colonnes"
+    "tableFiltering": "Filtrage des colonnes",
+    "columnFormattingTitle": "Formatage des colonnes",
+    "sectionValueFormatting": "Formatage des valeurs",
+    "sectionAlignment": "Alignement",
+    "sectionStyling": "Coiffage",
+    "textColor": "Texte",
+    "bgColor": "Contexte",
+    "colorNone": "aucune"
   },
   "panel": {
     "header": "Panneau",

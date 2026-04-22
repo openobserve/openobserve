@@ -1578,7 +1578,14 @@
     "configSectionComparison": "비교",
     "configSectionMarkLines": "마크 라인",
     "configSectionBackground": "백그라운드",
-    "tableFiltering": "컬럼 필터링"
+    "tableFiltering": "컬럼 필터링",
+    "columnFormattingTitle": "열 형식 지정",
+    "sectionValueFormatting": "값 형식 지정",
+    "sectionAlignment": "얼라인먼트",
+    "sectionStyling": "스타일링",
+    "textColor": "텍스트",
+    "bgColor": "백그라운드",
+    "colorNone": "없음"
   },
   "panel": {
     "header": "패널",

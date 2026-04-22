@@ -1578,7 +1578,14 @@
     "configSectionComparison": "Confronto",
     "configSectionMarkLines": "Segna linee",
     "configSectionBackground": "Sfondo",
-    "tableFiltering": "Filtraggio delle colonne"
+    "tableFiltering": "Filtraggio delle colonne",
+    "columnFormattingTitle": "Formattazione delle colonne",
+    "sectionValueFormatting": "Formattazione dei valori",
+    "sectionAlignment": "Allineamento",
+    "sectionStyling": "Stile",
+    "textColor": "Testo",
+    "bgColor": "Sfondo",
+    "colorNone": "nessuna"
   },
   "panel": {
     "header": "Pannello",

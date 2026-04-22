@@ -1597,7 +1597,14 @@
     "axisLabelTruncateTooltipText": "X 軸のラベルを指定された幅 (ピクセル単位) に切り捨てます。",
     "axisLabelTooltipNotePrefix": "注記:",
     "axisLabelTooltipNoteText": " このオプションは、時系列の X 軸フィールドではサポートされていません。",
-    "tableFiltering": "列フィルタリング"
+    "tableFiltering": "列フィルタリング",
+    "columnFormattingTitle": "列のフォーマット",
+    "sectionValueFormatting": "値のフォーマット",
+    "sectionAlignment": "アラインメント",
+    "sectionStyling": "スタイリング",
+    "textColor": "[テキスト]",
+    "bgColor": "バックグラウンド",
+    "colorNone": "無し"
   },
   "panel": {
     "header": "パネル",

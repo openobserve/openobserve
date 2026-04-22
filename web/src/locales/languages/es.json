@@ -1580,7 +1580,14 @@
     "axisLabelTruncateTooltipText": "Trunque las etiquetas del eje x al ancho especificado (en píxeles).",
     "axisLabelTooltipNotePrefix": "Nota:",
     "axisLabelTooltipNoteText": " Esta opción no es compatible con los campos del eje x de series temporales.",
-    "tableFiltering": "Filtrado de columnas"
+    "tableFiltering": "Filtrado de columnas",
+    "columnFormattingTitle": "Formato de columna",
+    "sectionValueFormatting": "Formato de valores",
+    "sectionAlignment": "Alineación",
+    "sectionStyling": "Estilismo",
+    "textColor": "Texto",
+    "bgColor": "Antecedentes",
+    "colorNone": "ninguna"
   },
   "panel": {
     "header": "Panel",
