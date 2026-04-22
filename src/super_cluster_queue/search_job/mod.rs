@@ -22,7 +22,6 @@ use infra::{
     coordinator::get_coordinator,
     errors::{Error, Result},
     table::{
-        org_storage_providers::OrgStorageProvider,
         search_job::{
             search_job_partitions::PartitionJobOperator, search_job_results::JobResultOperator,
             search_jobs::JobOperator,
@@ -32,7 +31,7 @@ use infra::{
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
-use crate::service::db::{org_storage_providers::OSP_PREFIX, sourcemaps::SOURCEMAP_PREFIX};
+use crate::service::db::sourcemaps::SOURCEMAP_PREFIX;
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
@@ -113,25 +112,6 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     true,
                     None,
                 )
-                .await?;
-        }
-        MessageType::OrgStoragePut => {
-            let entry: OrgStorageProvider = json::from_slice(&msg.value.unwrap())?;
-            match infra::table::org_storage_providers::add(entry.clone()).await {
-                Ok(_) => {}
-                Err(e) => {
-                    log::info!(
-                        "error while saving storage provider for org {} to db : {e}",
-                        entry.org_id
-                    );
-                    return Err(e);
-                }
-            }
-            // the cache will be updated in the event handler itself
-            // trigger watch event by putting value to cluster coordinator
-            let cluster_coordinator = get_coordinator().await;
-            cluster_coordinator
-                .put(OSP_PREFIX, serde_json::to_vec(&entry)?.into(), true, None)
                 .await?;
         }
         _ => {
