@@ -1,0 +1,44 @@
+/* ============================================================
+   DARK MODE TOKEN OVERRIDES
+   Overrides semantic (and component) tokens for dark themes.
+   ============================================================ */
+
+@custom-variant dark (.dark) {
+  :root {
+    /* --- Text --- */
+    --color-text-primary:   var(--color-grey-50);
+    --color-text-secondary: var(--color-grey-400);
+    --color-text-disabled:  var(--color-grey-600);
+    --color-text-inverse:   var(--color-grey-900);
+
+    /* --- Surfaces --- */
+    --color-surface-base:    var(--color-grey-950);
+    --color-surface-panel:   var(--color-grey-900);
+    --color-surface-overlay: var(--color-grey-800);
+
+    /* --- Borders --- */
+    --color-border-default: var(--color-grey-700);
+    --color-border-strong:  var(--color-grey-500);
+
+    /* ---- Button overrides ---- */
+
+    /* secondary (darkened surface) */
+    --color-button-secondary:            var(--color-grey-800);
+    --color-button-secondary-hover:      var(--color-grey-700);
+    --color-button-secondary-active:     var(--color-grey-600);
+    --color-button-secondary-disabled:   var(--color-grey-800);
+    --color-button-secondary-foreground: var(--color-grey-100);
+
+    /* outline */
+    --color-button-outline-text:         var(--color-grey-100);
+    --color-button-outline-border:       var(--color-grey-600);
+    --color-button-outline-hover-bg:     var(--color-grey-800);
+    --color-button-outline-hover-border: var(--color-grey-500);
+    --color-button-outline-active-bg:    var(--color-grey-700);
+
+    /* ghost */
+    --color-button-ghost-text:           var(--color-grey-200);
+    --color-button-ghost-hover-bg:       var(--color-grey-800);
+    --color-button-ghost-active-bg:      var(--color-grey-700);
+  }
+}

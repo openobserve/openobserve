@@ -1,0 +1,11 @@
+/* ============================================================
+   O2 Component Library — CSS entry point
+   Import this file once in the app to activate all tokens.
+   ============================================================ */
+
+@import "tailwindcss" prefix(tw);
+
+@import "./tokens/base.css";
+@import "./tokens/semantic.css";
+@import "./tokens/component.css";
+@import "./tokens/dark.css";
