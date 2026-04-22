@@ -237,6 +237,30 @@ pub async fn update(
     };
 
     if rotate_token {
+        // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here.
+        // Enterprise without OpenFGA: same — middleware is a no-op, so enforce here.
+        // Enterprise with OpenFGA enabled: RBAC middleware already verified the caller has
+        // permission before the handler was invoked, so no additional check is needed.
+        #[cfg(not(feature = "enterprise"))]
+        let needs_role_check = true;
+        #[cfg(feature = "enterprise")]
+        let needs_role_check = {
+            use o2_openfga::config::get_config as get_openfga_config;
+            !get_openfga_config().enabled
+        };
+
+        if needs_role_check {
+            match users::get_user(Some(&org_id), &user_email.user_id).await {
+                Some(initiator)
+                    if initiator.role == UserRole::Admin || initiator.role == UserRole::Root => {}
+                _ => {
+                    return MetaHttpResponse::forbidden(
+                        "Admin or Root role required to rotate service account tokens",
+                    );
+                }
+            }
+        }
+
         return match crate::service::organization::update_passcode(Some(&org_id), &email_id).await {
             Ok(passcode) => (
                 StatusCode::OK,
