@@ -15,26 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column-formatting-popup" style="padding: 0 10px; min-width: min(720px, 90vw)">
+  <div class="column-formatting-popup">
     <!-- Header -->
-    <div
-      class="flex justify-between items-center q-py-md"
-      style="border-bottom: 2px solid gray; margin-bottom: 8px"
-    >
-      <span class="q-table__title">{{ t("dashboard.columnFormattingTitle") }}</span>
-      <q-btn icon="close" unelevated size="sm" round outline :title="t('dashboard.cancel')" @click="closePopup" />
+    <div class="popup-header">
+      <span class="popup-title">{{ t("dashboard.columnFormattingTitle") }}</span>
+      <q-btn icon="close" flat round size="sm" @click="closePopup" />
     </div>
 
-    <!-- Column override cards -->
-    <div style="max-height: 65vh; overflow-y: auto">
-      <div
-        v-for="(col, idx) in columnOverrides"
-        :key="idx"
-        class="column-card q-mb-sm"
-        style="border: 1px solid rgba(128,128,128,0.3); border-radius: 6px; padding: 12px"
-      >
-        <!-- Card header: column selector + remove -->
-        <div class="flex items-center q-mb-sm" style="gap: 8px">
+    <!-- Scrollable body -->
+    <div class="overrides-body">
+      <div v-for="(col, idx) in columnOverrides" :key="idx" class="override-card">
+        <!-- Field selector row -->
+        <div class="override-card-head">
           <q-select
             v-model="col.field"
             :options="columnOptionsFor(idx)"
@@ -46,67 +38,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             map-options
             input-debounce="0"
             hide-bottom-space
-            class="flex-1 o2-custom-select-dashboard"
-            style="min-width: 160px"
+            class="override-field-select o2-custom-select-dashboard"
           />
           <q-btn icon="delete_outline" flat dense round size="sm" color="grey-6" @click="removeColumn(idx)" />
         </div>
 
         <template v-if="col.field">
-          <!-- ── Value Formatting (numeric columns only) ── -->
+          <!-- VALUE FORMATTING (numeric only) -->
           <template v-if="isNumericColumn(col.field)">
-            <div class="section-label q-mb-xs">{{ t("dashboard.sectionValueFormatting") }}</div>
-            <div class="flex items-start q-gutter-sm q-mb-sm">
-              <q-select
-                v-model="col.unit"
-                :options="unitOptions"
-                :label="t('dashboard.overrideConfigUnitLabel')"
-                dense
-                borderless
-                emit-value
-                map-options
-                input-debounce="0"
-                hide-bottom-space
-                class="o2-custom-select-dashboard"
-                style="min-width: 160px"
-              />
-              <q-input
-                v-if="col.unit === 'custom'"
-                v-model="col.customUnit"
-                :label="t('dashboard.customunitLabel')"
-                dense
-                borderless
-                hide-bottom-space
-                style="min-width: 120px"
-              />
+            <div class="config-section">
+              <div class="section-label">{{ t("dashboard.sectionValueFormatting") }}</div>
+              <div class="control-row">
+                <q-select
+                  v-model="col.unit"
+                  :options="unitOptions"
+                  :label="t('dashboard.overrideConfigUnitLabel')"
+                  dense
+                  outlined
+                  emit-value
+                  map-options
+                  input-debounce="0"
+                  hide-bottom-space
+                  class="o2-custom-select-dashboard"
+                  style="min-width: 160px"
+                />
+                <q-input
+                  v-if="col.unit === 'custom'"
+                  v-model="col.customUnit"
+                  :label="t('dashboard.customunitLabel')"
+                  dense
+                  outlined
+                  hide-bottom-space
+                  style="min-width: 110px"
+                />
+              </div>
             </div>
           </template>
 
-          <!-- ── Cell Type (numeric columns only) ── -->
+          <!-- CELL TYPE (numeric only) -->
           <template v-if="isNumericColumn(col.field)">
-            <div class="section-label q-mb-xs">{{ t("dashboard.sectionCellType") }}</div>
-            <div class="flex q-mb-sm" style="gap: 4px">
-              <q-btn
-                v-for="ct in cellTypeOptions"
-                :key="ct.value"
-                :icon="ct.icon"
-                :label="ct.label"
-                flat
-                dense
-                no-caps
-                size="sm"
-                :color="col.cellType === ct.value ? 'primary' : 'grey-5'"
-                style="border: 1px solid rgba(128,128,128,0.3); border-radius: 4px; padding: 2px 8px"
-                @click="col.cellType = ct.value"
-              />
-            </div>
+            <div class="config-section">
+              <div class="section-label">{{ t("dashboard.sectionCellType") }}</div>
+              <div class="toggle-group">
+                <q-btn
+                  v-for="ct in cellTypeOptions"
+                  :key="ct.value"
+                  :icon="ct.icon"
+                  :label="ct.label"
+                  flat
+                  no-caps
+                  size="sm"
+                  :class="['toggle-btn', col.cellType === ct.value && 'toggle-btn--active']"
+                  @click="col.cellType = ct.value"
+                />
+              </div>
 
-            <!-- ── Progress Bar / Sparkline color (shown when a visual cell type is active) ── -->
-            <template v-if="col.cellType === 'progress_bar' || col.cellType === 'sparkline'">
-              <div class="section-label q-mb-xs">{{ t("dashboard.sectionProgressBar") }}</div>
-              <div class="flex items-center q-gutter-sm q-mb-sm flex-wrap">
-                <div class="flex items-center" style="gap: 6px">
-                  <span class="text-caption">{{ t("dashboard.progressColor") }}</span>
+              <!-- Color (shown for progress_bar and sparkline) -->
+              <template v-if="col.cellType === 'progress_bar' || col.cellType === 'sparkline'">
+                <div class="inline-control q-mt-sm">
+                  <span class="option-label">{{ t("dashboard.progressColor") }}</span>
                   <label class="color-swatch-label">
                     <span
                       class="color-swatch"
@@ -120,199 +110,208 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @input="(e) => col.progressColor = (e.target as HTMLInputElement).value"
                     />
                   </label>
-                  <span v-if="col.progressColor" class="text-caption text-mono">{{ col.progressColor }}</span>
-                  <q-btn v-if="col.progressColor" icon="close" size="xs" flat round dense @click="col.progressColor = ''" />
+                  <template v-if="col.progressColor">
+                    <span class="hex-value">{{ col.progressColor }}</span>
+                    <q-btn icon="close" size="xs" flat round dense @click="col.progressColor = ''" />
+                  </template>
                   <span v-else class="text-caption text-grey-5">{{ t("dashboard.colorNone") }}</span>
                 </div>
-              </div>
-              <!-- ── Sparkline style: Line / Bar ── -->
+              </template>
+
+              <!-- Sparkline style -->
               <template v-if="col.cellType === 'sparkline'">
-                <div class="section-label q-mb-xs">{{ t("dashboard.sparklineStyle") }}</div>
-                <div class="flex q-mb-sm" style="gap: 4px">
-                  <q-btn
-                    v-for="s in sparklineStyleOptions"
-                    :key="s.value"
-                    :icon="s.icon"
-                    :label="s.label"
-                    flat dense no-caps size="sm"
-                    :color="(col.sparklineStyle || 'line') === s.value ? 'primary' : 'grey-5'"
-                    style="border: 1px solid rgba(128,128,128,0.3); border-radius: 4px; padding: 2px 8px"
-                    @click="col.sparklineStyle = s.value as 'line' | 'bar'"
-                  />
+                <div class="inline-control q-mt-sm">
+                  <span class="option-label">{{ t("dashboard.sparklineStyle") }}</span>
+                  <div class="toggle-group">
+                    <q-btn
+                      v-for="s in sparklineStyleOptions"
+                      :key="s.value"
+                      :icon="s.icon"
+                      :label="s.label"
+                      flat
+                      no-caps
+                      size="sm"
+                      :class="['toggle-btn', (col.sparklineStyle || 'line') === s.value && 'toggle-btn--active']"
+                      @click="col.sparklineStyle = s.value as 'line' | 'bar'"
+                    />
+                  </div>
                 </div>
               </template>
-            </template>
+            </div>
           </template>
 
-          <!-- ── Alignment ── -->
-          <div class="section-label q-mb-xs">{{ t("dashboard.sectionAlignment") }}</div>
-          <div class="flex q-mb-sm" style="gap: 4px">
-            <q-btn
-              v-for="dir in alignOptions"
-              :key="dir.value"
-              :icon="dir.icon"
-              :title="dir.label"
-              flat
-              dense
-              size="sm"
-              :color="col.alignment === dir.value ? 'primary' : 'grey-5'"
-              style="border: 1px solid rgba(128,128,128,0.3); border-radius: 4px"
-              @click="col.alignment = col.alignment === dir.value ? '' : dir.value"
-            />
+          <!-- ALIGNMENT -->
+          <div class="config-section">
+            <div class="section-label">{{ t("dashboard.sectionAlignment") }}</div>
+            <div class="toggle-group">
+              <q-btn
+                v-for="dir in alignOptions"
+                :key="dir.value"
+                :icon="dir.icon"
+                :title="dir.label"
+                flat
+                size="sm"
+                :class="['toggle-btn', col.alignment === dir.value && 'toggle-btn--active']"
+                @click="col.alignment = col.alignment === dir.value ? '' : dir.value"
+              />
+            </div>
           </div>
 
-          <!-- ── Styling ── -->
-          <div class="section-label q-mb-xs">{{ t("dashboard.sectionStyling") }}</div>
-          <div class="flex items-center q-gutter-md q-mb-sm flex-wrap">
-            <!-- Text color -->
-            <div class="flex items-center" style="gap: 6px">
-              <span class="text-caption">{{ t("dashboard.textColor") }}</span>
-              <label class="color-swatch-label">
-                <span
-                  class="color-swatch"
-                  :style="col.textColor ? { background: col.textColor } : {}"
-                  :class="{ 'color-swatch--empty': !col.textColor }"
-                />
-                <input
-                  type="color"
-                  class="color-input-hidden"
-                  :value="col.textColor || '#000000'"
-                  @input="(e) => col.textColor = (e.target as HTMLInputElement).value"
-                />
-              </label>
-              <span v-if="col.textColor" class="text-caption text-mono">{{ col.textColor }}</span>
-              <q-btn v-if="col.textColor" icon="close" size="xs" flat round dense @click="col.textColor = ''" />
-              <span v-else class="text-caption text-grey-5">{{ t("dashboard.colorNone") }}</span>
-            </div>
+          <!-- STYLING -->
+          <div class="config-section">
+            <div class="section-label">{{ t("dashboard.sectionStyling") }}</div>
+            <div class="control-row flex-wrap" style="gap: 16px">
+              <div class="inline-control">
+                <span class="option-label">{{ t("dashboard.textColor") }}</span>
+                <label class="color-swatch-label">
+                  <span
+                    class="color-swatch"
+                    :style="col.textColor ? { background: col.textColor } : {}"
+                    :class="{ 'color-swatch--empty': !col.textColor }"
+                  />
+                  <input
+                    type="color"
+                    class="color-input-hidden"
+                    :value="col.textColor || '#000000'"
+                    @input="(e) => col.textColor = (e.target as HTMLInputElement).value"
+                  />
+                </label>
+                <template v-if="col.textColor">
+                  <span class="hex-value">{{ col.textColor }}</span>
+                  <q-btn icon="close" size="xs" flat round dense @click="col.textColor = ''" />
+                </template>
+                <span v-else class="text-caption text-grey-5">{{ t("dashboard.colorNone") }}</span>
+              </div>
 
-            <!-- Background color -->
-            <div class="flex items-center" style="gap: 6px">
-              <span class="text-caption">{{ t("dashboard.bgColor") }}</span>
-              <label class="color-swatch-label">
-                <span
-                  class="color-swatch"
-                  :style="col.bgColor ? { background: col.bgColor } : {}"
-                  :class="{ 'color-swatch--empty': !col.bgColor }"
-                />
-                <input
-                  type="color"
-                  class="color-input-hidden"
-                  :value="col.bgColor || '#ffffff'"
-                  @input="(e) => col.bgColor = (e.target as HTMLInputElement).value"
-                />
-              </label>
-              <span v-if="col.bgColor" class="text-caption text-mono">{{ col.bgColor }}</span>
-              <q-btn v-if="col.bgColor" icon="close" size="xs" flat round dense @click="col.bgColor = ''" />
-              <span v-else class="text-caption text-grey-5">{{ t("dashboard.colorNone") }}</span>
-            </div>
+              <div class="inline-control">
+                <span class="option-label">{{ t("dashboard.bgColor") }}</span>
+                <label class="color-swatch-label">
+                  <span
+                    class="color-swatch"
+                    :style="col.bgColor ? { background: col.bgColor } : {}"
+                    :class="{ 'color-swatch--empty': !col.bgColor }"
+                  />
+                  <input
+                    type="color"
+                    class="color-input-hidden"
+                    :value="col.bgColor || '#ffffff'"
+                    @input="(e) => col.bgColor = (e.target as HTMLInputElement).value"
+                  />
+                </label>
+                <template v-if="col.bgColor">
+                  <span class="hex-value">{{ col.bgColor }}</span>
+                  <q-btn icon="close" size="xs" flat round dense @click="col.bgColor = ''" />
+                </template>
+                <span v-else class="text-caption text-grey-5">{{ t("dashboard.colorNone") }}</span>
+              </div>
 
-            <!-- Auto-color by value -->
-            <q-checkbox
-              v-model="col.autoColor"
-              :label="t('dashboard.overrideConfigUniqueValueColor')"
-              dense
-              size="sm"
-            />
+              <q-checkbox
+                v-model="col.autoColor"
+                :label="t('dashboard.overrideConfigUniqueValueColor')"
+                dense
+                size="sm"
+              />
+            </div>
           </div>
 
-          <!-- ── Conditional Styling (numeric columns only) ── -->
+          <!-- CONDITIONAL STYLING (numeric only) -->
           <template v-if="isNumericColumn(col.field)">
-          <div class="section-label q-mb-xs">{{ t("dashboard.sectionConditionalStyling") }}</div>
-          <div
-            v-for="(rule, ruleIdx) in col.conditions"
-            :key="ruleIdx"
-            class="flex items-center q-mb-xs flex-wrap"
-            style="gap: 6px; padding: 6px 8px; background: rgba(128,128,128,0.05); border-radius: 4px"
-          >
-            <q-select
-              v-model="rule.operator"
-              :options="conditionOperators"
-              dense
-              borderless
-              emit-value
-              map-options
-              hide-bottom-space
-              style="min-width: 72px; max-width: 72px"
-              class="o2-custom-select-dashboard"
-            />
-            <q-input
-              v-model="rule.threshold"
-              :label="t('dashboard.conditionThreshold')"
-              type="number"
-              dense
-              borderless
-              hide-bottom-space
-              style="min-width: 80px; max-width: 100px"
-            />
-            <!-- Rule text color -->
-            <div class="flex items-center" style="gap: 4px">
-              <span class="text-caption text-grey-6">{{ t("dashboard.textColor") }}</span>
-              <label class="color-swatch-label">
-                <span
-                  class="color-swatch color-swatch--sm"
-                  :style="rule.textColor ? { background: rule.textColor } : {}"
-                  :class="{ 'color-swatch--empty': !rule.textColor }"
+            <div class="config-section">
+              <div class="section-label">{{ t("dashboard.sectionConditionalStyling") }}</div>
+              <div
+                v-for="(rule, ruleIdx) in col.conditions"
+                :key="ruleIdx"
+                class="condition-rule"
+              >
+                <q-select
+                  v-model="rule.operator"
+                  :options="conditionOperators"
+                  dense
+                  outlined
+                  emit-value
+                  map-options
+                  hide-bottom-space
+                  class="condition-operator o2-custom-select-dashboard"
                 />
-                <input
-                  type="color"
-                  class="color-input-hidden"
-                  :value="rule.textColor || '#000000'"
-                  @input="(e) => rule.textColor = (e.target as HTMLInputElement).value"
+                <q-input
+                  v-model="rule.threshold"
+                  :label="t('dashboard.conditionThreshold')"
+                  type="number"
+                  dense
+                  outlined
+                  hide-bottom-space
+                  class="condition-value"
                 />
-              </label>
-              <q-btn v-if="rule.textColor" icon="close" size="xs" flat round dense @click="rule.textColor = ''" />
+                <div class="inline-control">
+                  <span class="option-label text-grey-6">{{ t("dashboard.textColor") }}</span>
+                  <label class="color-swatch-label">
+                    <span
+                      class="color-swatch color-swatch--sm"
+                      :style="rule.textColor ? { background: rule.textColor } : {}"
+                      :class="{ 'color-swatch--empty': !rule.textColor }"
+                    />
+                    <input
+                      type="color"
+                      class="color-input-hidden"
+                      :value="rule.textColor || '#000000'"
+                      @input="(e) => rule.textColor = (e.target as HTMLInputElement).value"
+                    />
+                  </label>
+                  <q-btn v-if="rule.textColor" icon="close" size="xs" flat round dense @click="rule.textColor = ''" />
+                </div>
+                <div class="inline-control">
+                  <span class="option-label text-grey-6">{{ t("dashboard.bgColor") }}</span>
+                  <label class="color-swatch-label">
+                    <span
+                      class="color-swatch color-swatch--sm"
+                      :style="rule.bgColor ? { background: rule.bgColor } : {}"
+                      :class="{ 'color-swatch--empty': !rule.bgColor }"
+                    />
+                    <input
+                      type="color"
+                      class="color-input-hidden"
+                      :value="rule.bgColor || '#ffffff'"
+                      @input="(e) => rule.bgColor = (e.target as HTMLInputElement).value"
+                    />
+                  </label>
+                  <q-btn v-if="rule.bgColor" icon="close" size="xs" flat round dense @click="rule.bgColor = ''" />
+                </div>
+                <q-space />
+                <q-btn icon="delete_outline" flat dense round size="xs" color="grey-6" @click="col.conditions.splice(ruleIdx, 1)" />
+              </div>
+              <q-btn
+                :label="t('dashboard.conditionAddRule')"
+                no-caps
+                flat
+                dense
+                size="sm"
+                color="primary"
+                class="q-mt-xs"
+                @click="col.conditions.push({ operator: '<', threshold: '', textColor: '', bgColor: '' })"
+              />
             </div>
-            <!-- Rule bg color -->
-            <div class="flex items-center" style="gap: 4px">
-              <span class="text-caption text-grey-6">{{ t("dashboard.bgColor") }}</span>
-              <label class="color-swatch-label">
-                <span
-                  class="color-swatch color-swatch--sm"
-                  :style="rule.bgColor ? { background: rule.bgColor } : {}"
-                  :class="{ 'color-swatch--empty': !rule.bgColor }"
-                />
-                <input
-                  type="color"
-                  class="color-input-hidden"
-                  :value="rule.bgColor || '#ffffff'"
-                  @input="(e) => rule.bgColor = (e.target as HTMLInputElement).value"
-                />
-              </label>
-              <q-btn v-if="rule.bgColor" icon="close" size="xs" flat round dense @click="rule.bgColor = ''" />
-            </div>
-            <q-btn icon="delete_outline" flat dense round size="xs" color="grey-6" @click="col.conditions.splice(ruleIdx, 1)" />
-          </div>
-          <q-btn
-            icon="add"
-            :label="t('dashboard.conditionAddRule')"
-            no-caps
-            flat
-            dense
-            size="sm"
-            class="q-mt-xs q-mb-sm"
-            @click="col.conditions.push({ operator: '<', threshold: '', textColor: '', bgColor: '' })"
-          />
           </template>
         </template>
       </div>
     </div>
 
-    <!-- Add column -->
-    <q-btn
-      icon="add"
-      :label="t('dashboard.overrideConfigAddNew')"
-      no-caps
-      flat
-      class="q-mt-sm el-border"
-      :disable="availableColumnsToAdd.length === 0"
-      @click="addColumn"
-    />
+    <!-- Add field override -->
+    <div class="add-override-row">
+      <q-btn
+        :label="t('dashboard.overrideConfigAddNew')"
+        no-caps
+        flat
+        class="add-override-btn full-width"
+        :disable="availableColumnsToAdd.length === 0"
+        @click="addColumn"
+      />
+    </div>
 
     <!-- Footer -->
-    <q-card-actions align="right" class="q-pt-sm">
-      <q-btn :label="t('dashboard.cancel')" flat @click="closePopup" />
-      <q-btn :label="t('dashboard.overrideConfigSave')" color="primary" @click="saveOverrides" />
-    </q-card-actions>
+    <div class="popup-footer">
+      <q-btn :label="t('dashboard.cancel')" flat no-caps @click="closePopup" />
+      <q-btn :label="t('dashboard.overrideConfigSave')" color="primary" no-caps unelevated @click="saveOverrides" />
+    </div>
   </div>
 </template>
 
@@ -582,15 +581,167 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.section-label {
-  font-size: 0.78rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--q-secondary, #757575);
-  padding-top: 4px;
+.column-formatting-popup {
+  min-width: min(720px, 90vw);
+  max-height: min(85vh, 680px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
+// ── Header ────────────────────────────────────────────────────────────────────
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+}
+
+.popup-title {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+// ── Scrollable body ───────────────────────────────────────────────────────────
+.overrides-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.4) transparent;
+
+  &::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.35);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(128, 128, 128, 0.6);
+  }
+}
+
+// ── Override cards ────────────────────────────────────────────────────────────
+.override-card {
+  flex-shrink: 0; // prevent flex container from squeezing card height as more cards are added
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  border-left: 3px solid var(--q-primary, #1976d2);
+  border-radius: 6px;
+  max-height: 340px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.4) transparent;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(128, 128, 128, 0.3);
+    border-radius: 3px;
+  }
+}
+
+.override-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(245, 245, 245, 0.97);
+  border-bottom: 1px solid rgba(128, 128, 128, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+
+  body.body--dark & {
+    background: rgba(30, 30, 30, 0.97);
+  }
+}
+
+.override-field-select {
+  flex: 1;
+  min-width: 0;
+}
+
+// ── Config sections ───────────────────────────────────────────────────────────
+.config-section {
+  padding: 8px 12px;
+  border-top: 1px solid rgba(128, 128, 128, 0.08);
+}
+
+.section-label {
+  font-size: 0.71rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--q-secondary, #757575);
+  margin-bottom: 8px;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.option-label {
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+// ── Toggle button groups ──────────────────────────────────────────────────────
+.toggle-group {
+  display: inline-flex;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.toggle-btn {
+  border-radius: 0 !important;
+  color: rgba(0, 0, 0, 0.55) !important;
+  transition: background-color 0.12s, color 0.12s;
+
+  body.body--dark & {
+    color: rgba(255, 255, 255, 0.6) !important;
+  }
+
+  &:not(:last-child) {
+    border-right: 1px solid rgba(128, 128, 128, 0.2) !important;
+  }
+
+  &--active {
+    background: var(--q-primary, #1976d2) !important;
+    color: #fff !important;
+  }
+}
+
+// ── Color pickers ─────────────────────────────────────────────────────────────
 .color-swatch-label {
   cursor: pointer;
   position: relative;
@@ -600,22 +751,29 @@ export default defineComponent({
 
 .color-swatch {
   display: inline-block;
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  border: 1px solid rgba(128, 128, 128, 0.4);
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  border: 1.5px solid rgba(128, 128, 128, 0.35);
   vertical-align: middle;
+  transition: border-color 0.12s, box-shadow 0.12s;
+
+  .color-swatch-label:hover & {
+    border-color: var(--q-primary, #1976d2);
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.18);
+  }
 
   &--sm {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
   }
 
   &--empty {
     background: repeating-linear-gradient(
       45deg,
-      rgba(128, 128, 128, 0.15),
-      rgba(128, 128, 128, 0.15) 2px,
+      rgba(128, 128, 128, 0.12),
+      rgba(128, 128, 128, 0.12) 2px,
       transparent 2px,
       transparent 8px
     );
@@ -630,8 +788,58 @@ export default defineComponent({
   pointer-events: none;
 }
 
-.text-mono {
+.hex-value {
   font-family: monospace;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  color: var(--q-secondary, #757575);
+}
+
+// ── Conditional rules ─────────────────────────────────────────────────────────
+.condition-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(128, 128, 128, 0.04);
+  border: 1px solid rgba(128, 128, 128, 0.1);
+  border-radius: 5px;
+  margin-bottom: 5px;
+  flex-wrap: wrap;
+}
+
+.condition-operator {
+  min-width: 70px;
+  max-width: 70px;
+}
+
+.condition-value {
+  min-width: 80px;
+  max-width: 110px;
+}
+
+// ── Add override button ───────────────────────────────────────────────────────
+.add-override-row {
+  padding: 8px 16px;
+}
+
+.add-override-btn {
+  border: 1.5px dashed rgba(128, 128, 128, 0.3) !important;
+  border-radius: 6px !important;
+  transition: border-color 0.12s, color 0.12s;
+
+  &:not([disabled]):hover {
+    border-color: var(--q-primary, #1976d2) !important;
+    color: var(--q-primary, #1976d2) !important;
+  }
+}
+
+// ── Footer ────────────────────────────────────────────────────────────────────
+.popup-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(128, 128, 128, 0.12);
 }
 </style>
