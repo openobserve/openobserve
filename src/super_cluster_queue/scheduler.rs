@@ -210,9 +210,6 @@ async fn update(msg: Message) -> Result<()> {
         }
         TriggerModule::AnomalyDetection => {
             // Only sync if the anomaly detection config still exists in this region.
-            // Use an empty string for org_id — the table method filters by anomaly_id only
-            // when we pass "" (no org scoping needed here; we just need existence).
-            // Actually pass the trigger org so the org-scoped lookup is correct.
             if infra::table::anomaly_detection::config::get_by_id(
                 conn,
                 &trigger.org,
