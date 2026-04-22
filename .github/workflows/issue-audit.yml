@@ -241,8 +241,8 @@ jobs:
                 const midRemaining = midRateLimit.data.rate.remaining;
                 console.log(`  📊 Rate limit check: ${midRemaining} remaining`);
 
-                if (midRemaining < 20) {
-                  core.warning(`Rate limit exhausted (${midRemaining} remaining). Stopping early with partial results.`);
+                if (midRemaining < 100) {
+                  core.warning(`Rate limit low (${midRemaining} remaining). Stopping early with partial results.`);
                   break;
                 }
               }
@@ -260,7 +260,7 @@ jobs:
             core.setOutput('results', JSON.stringify(results));
             core.setOutput('ready_to_close_count', results.ready_to_close.length);
 
-      - name: Auto-close issues with fix + test
+      - name: Label issues ready to close (fix + test found)
         if: ${{ steps.audit.outputs.ready_to_close_count > 0 && !inputs.dry_run }}
         uses: actions/github-script@v7
         env:
@@ -275,20 +275,20 @@ jobs:
               const fixPR = item.fixPR;
               const testFile = item.testFile;
 
-              console.log(`Closing issue #${issue.number}: ${issue.title}`);
+              console.log(`Processing issue #${issue.number}: ${issue.title}`);
 
-              // Post closing comment
+              // Post comment requesting human confirmation to close
               const commentLines = [
-                '## ✅ Issue Resolved - Auto-Closed by Issue Audit',
+                '## ✅ Ready to Close - Human Confirmation Required',
                 '',
-                'This issue has been automatically closed because:',
+                'This issue appears to be resolved with proper test coverage:',
                 `- ✅ **Fix merged**: PR #${fixPR.number} (${fixPR.url})`,
-                `- ✅ **Test coverage**: \`${testFile}\``,
+                `- ✅ **Test coverage**: \`${testFile}\` (tagged \`@bug-${issue.number}\`)`,
                 '',
-                `The fix has been implemented and proper test coverage exists with the \`@bug-${issue.number}\` tag.`,
+                '**Action Required**: Please verify the fix resolves this issue, then close it manually.',
                 '',
                 '---',
-                `*🤖 Automated by [Issue Audit Workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})*`
+                `*🤖 Detected by [Issue Audit Workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})*`
               ];
               const comment = commentLines.join('\n');
 
@@ -299,16 +299,20 @@ jobs:
                 body: comment
               });
 
-              // Close the issue
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                state: 'closed',
-                state_reason: 'completed'
-              });
+              // Add label instead of auto-closing
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['Ready to Close']
+                });
+                console.log(`  ✓ Added "Ready to Close" label`);
+              } catch (error) {
+                console.log(`  ⚠️  Could not add label: ${error.message}`);
+              }
 
-              console.log(`  ✓ Closed issue #${issue.number}`);
+              console.log(`  ✓ Posted confirmation request (NOT auto-closed)`);
             }
 
       - name: Analyze PR files for automation needs
@@ -320,7 +324,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const results = JSON.parse(process.env.RESULTS_JSON);
+            const defaultResults = '{"ready_to_close":[],"needs_test":[],"needs_fix":[],"needs_both":[]}';
+            const results = JSON.parse(process.env.RESULTS_JSON || defaultResults);
 
             // Helper function to categorize a single file
             function categorizeFile(filename) {
@@ -625,7 +630,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const results = JSON.parse(process.env.RESULTS_JSON);
+            const defaultResults = '{"ready_to_close":[],"needs_test":[],"needs_fix":[],"needs_both":[]}';
+            const results = JSON.parse(process.env.RESULTS_JSON || defaultResults);
 
             const dryRun = process.env.DRY_RUN === 'true';
             const testMode = process.env.TEST_MODE || 'all';
