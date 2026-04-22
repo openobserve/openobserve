@@ -65,30 +65,24 @@ async fn patch_sre_readonly_eval_templates() {
 
     const MIGRATION_ORG: &str = "_migration";
     const FLAG_KEY: &str = "sre_readonly_eval_templates_v1";
+    const LOCK_KEY: &str = "/ofga/migration/sre_readonly_eval_templates";
+    // 5-minute timeout: enough for large deployments, releases lock if node dies mid-run
+    const LOCK_TTL_SECS: u64 = 300;
 
-    // Already done — fast path, no cluster coordination needed
-    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
-        .await
-        .is_ok()
-    {
-        return;
-    }
+    // Acquire dist_lock first — serialises across all nodes.
+    // KV flag is checked *inside* the lock to close the TOCTOU window between
+    // "check flag" and "run + set flag".
+    let lock = match infra::dist_lock::lock(LOCK_KEY, LOCK_TTL_SECS).await {
+        Ok(l) => l,
+        Err(e) => {
+            log::error!("patch_sre_readonly_eval_templates: failed to acquire dist_lock: {e}");
+            return;
+        }
+    };
 
-    // Only the node with the lowest id runs the migration.
-    // Sorting by id is stable across restarts and requires no locking infrastructure.
-    // If the chosen node is down the next-lowest will not run it either — but the
-    // KV flag is only set on success, so the migration will retry on next startup.
-    let is_leader = infra::cluster::get_cached_online_nodes()
-        .await
-        .and_then(|mut nodes| {
-            nodes.sort_by_key(|n| n.id);
-            nodes.into_iter().next()
-        })
-        .map(|first| first.id == LOCAL_NODE.id)
-        .unwrap_or(true); // single-node / no cluster info → always run
-
-    if !is_leader {
-        log::debug!("patch_sre_readonly_eval_templates: not the lowest-id node, skipping");
+    // Re-check flag inside the lock — another node may have finished while we waited.
+    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY).await.is_ok() {
+        let _ = infra::dist_lock::unlock(&lock).await;
         return;
     }
 
@@ -96,12 +90,13 @@ async fn patch_sre_readonly_eval_templates() {
         Ok(orgs) => orgs,
         Err(e) => {
             log::error!("Failed to list orgs for sre-readonly eval_templates patch: {e}");
+            let _ = infra::dist_lock::unlock(&lock).await;
             return;
         }
     };
 
     let mut failed = false;
-    for org in orgs {
+    for org in &orgs {
         if let Err(e) =
             o2_openfga::authorizer::roles::patch_sre_readonly_role_resources(&org.identifier).await
         {
@@ -115,6 +110,7 @@ async fn patch_sre_readonly_eval_templates() {
 
     if failed {
         log::warn!("sre-readonly eval_templates patch had failures — will retry on next startup");
+        let _ = infra::dist_lock::unlock(&lock).await;
         return;
     }
 
@@ -125,50 +121,73 @@ async fn patch_sre_readonly_eval_templates() {
     } else {
         log::info!("sre-readonly eval_templates patch complete");
     }
+
+    let _ = infra::dist_lock::unlock(&lock).await;
 }
 
 #[cfg(feature = "enterprise")]
 async fn backfill_sys_rca_agent_openfga_tuples() {
     use bytes::Bytes;
 
-    // Use a dedicated system org for migration flags, separate from user orgs.
     const MIGRATION_ORG: &str = "_migration";
     const FLAG_KEY: &str = "sys_rca_agent_openfga_migration_v1";
+    const LOCK_KEY: &str = "/ofga/migration/sys_rca_agent_tuples";
+    const LOCK_TTL_SECS: u64 = 300;
 
-    // Check if already done via KV flag
-    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
-        .await
-        .is_ok()
-    {
-        return; // Already done
+    // Acquire dist_lock — serialises across all nodes.
+    let lock = match infra::dist_lock::lock(LOCK_KEY, LOCK_TTL_SECS).await {
+        Ok(l) => l,
+        Err(e) => {
+            log::error!("backfill_sys_rca_agent_openfga_tuples: failed to acquire dist_lock: {e}");
+            return;
+        }
+    };
+
+    // Re-check flag inside the lock — another node may have finished while we waited.
+    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY).await.is_ok() {
+        let _ = infra::dist_lock::unlock(&lock).await;
+        return;
     }
 
-    // Get all orgs and ensure SA exists (idempotent — creates OpenFGA tuples for existing DB rows)
-    match crate::service::db::organization::list(None).await {
-        Ok(orgs) => {
-            for org in orgs {
-                if let Err(e) =
-                    crate::service::organization::ensure_sys_rca_agent(&org.identifier).await
-                {
-                    log::warn!(
-                        "Failed to backfill SysRcaAgent OpenFGA tuples for org '{}': {e}",
-                        org.identifier
-                    );
-                }
-            }
-            // Set flag so we don't run again
-            if let Err(e) =
-                crate::service::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
-            {
-                log::error!("Failed to set OpenFGA backfill flag: {e}");
-            } else {
-                log::info!("SysRcaAgent OpenFGA tuple backfill complete");
-            }
-        }
+    let orgs = match crate::service::db::organization::list(None).await {
+        Ok(orgs) => orgs,
         Err(e) => {
             log::error!("Failed to list orgs for OpenFGA backfill: {e}");
+            let _ = infra::dist_lock::unlock(&lock).await;
+            return;
+        }
+    };
+
+    // Track failures — only set the KV flag when ALL orgs succeed so that
+    // failed orgs are retried on the next startup rather than silently skipped.
+    let mut failed = false;
+    for org in &orgs {
+        if let Err(e) =
+            crate::service::organization::ensure_sys_rca_agent(&org.identifier).await
+        {
+            log::warn!(
+                "Failed to backfill SysRcaAgent OpenFGA tuples for org '{}': {e}",
+                org.identifier
+            );
+            failed = true;
         }
     }
+
+    if failed {
+        log::warn!("SysRcaAgent OpenFGA backfill had failures — will retry on next startup");
+        let _ = infra::dist_lock::unlock(&lock).await;
+        return;
+    }
+
+    if let Err(e) =
+        crate::service::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
+    {
+        log::error!("Failed to set OpenFGA backfill flag: {e}");
+    } else {
+        log::info!("SysRcaAgent OpenFGA tuple backfill complete");
+    }
+
+    let _ = infra::dist_lock::unlock(&lock).await;
 }
 
 #[cfg(feature = "enterprise")]
@@ -400,8 +419,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
         // One-time OpenFGA migrations — dist_lock ensures only one node runs each
         // migration even in multi-node deployments. KV flag prevents re-runs.
-        backfill_sys_rca_agent_openfga_tuples().await;
-        patch_sre_readonly_eval_templates().await;
+        // Spawned on background threads so they do not block server startup.
+        tokio::task::spawn(backfill_sys_rca_agent_openfga_tuples());
+        tokio::task::spawn(patch_sre_readonly_eval_templates());
     }
 
     tokio::task::spawn(promql_self_consume::run());
