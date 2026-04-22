@@ -458,13 +458,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
 pub async fn init_deferred() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
-        o2_enterprise::enterprise::license::start_license_check(
-            crate::service::self_reporting::search::get_usage,
-            get_nats_lock,
-            crate::service::self_reporting::search::get_license_usage_data_from_node,
-            LOCAL_NODE.is_router() || LOCAL_NODE.is_single_role(),
-        )
-        .await;
+        // run license check only on ingester and queriers, as only those two
+        // actually participate in the search flow where the license matters
+        if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
+            o2_enterprise::enterprise::license::start_license_check(
+                crate::service::self_reporting::search::get_usage,
+                get_nats_lock,
+                crate::service::self_reporting::search::get_license_usage_data_from_node,
+                LOCAL_NODE.is_single_role(),
+            )
+            .await;
+        }
         tokio::task::spawn(db::license::watch());
     }
 
