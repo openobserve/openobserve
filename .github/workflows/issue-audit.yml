@@ -101,16 +101,33 @@ jobs:
 
             // Check initial rate limit status
             const rateLimit = await github.rest.rateLimit.get();
-            console.log(`\n📊 Rate Limit Status:`);
-            console.log(`  Remaining: ${rateLimit.data.rate.remaining}/${rateLimit.data.rate.limit}`);
-            console.log(`  Resets at: ${new Date(rateLimit.data.rate.reset * 1000).toISOString()}`);
+            const remaining = rateLimit.data.rate.remaining;
+            const resetTime = new Date(rateLimit.data.rate.reset * 1000).toISOString();
+            const estimatedCalls = issues.length * 5;
 
-            if (rateLimit.data.rate.remaining < issues.length * 5) {
-              console.log(`\n⚠️  Warning: Low rate limit. May need to pause during execution.`);
+            console.log(`\n📊 Rate Limit Status:`);
+            console.log(`  Remaining: ${remaining}/${rateLimit.data.rate.limit}`);
+            console.log(`  Resets at: ${resetTime}`);
+            console.log(`  Estimated calls needed: ~${estimatedCalls}`);
+
+            // Hard limit: exit early if we definitely can't complete
+            if (remaining < 50) {
+              core.warning(`Rate limit critically low (${remaining} remaining). Aborting to prevent incomplete results.`);
+              core.setOutput('results', JSON.stringify(results));
+              core.setOutput('ready_to_close_count', 0);
+              return;
             }
 
+            // Soft warning: may run out during execution
+            if (remaining < estimatedCalls) {
+              core.warning(`Low rate limit: ${remaining} remaining but ~${estimatedCalls} calls estimated. Results may be incomplete.`);
+              core.warning(`Consider using test_mode with specific issue numbers to process fewer issues.`);
+            }
+
+            let processedCount = 0;
             for (const issue of issues) {
-              console.log(`\n=== Auditing Issue #${issue.number}: ${issue.title} ===`);
+              processedCount++;
+              console.log(`\n=== [${processedCount}/${issues.length}] Auditing Issue #${issue.number}: ${issue.title} ===`);
 
               // 1. Check for merged PR that fixes this issue
               let hasFix = false;
@@ -217,6 +234,18 @@ jobs:
 
               // Small delay to avoid rate limiting (100ms between issues)
               await new Promise(resolve => setTimeout(resolve, 100));
+
+              // Check rate limit every 10 issues
+              if (processedCount % 10 === 0) {
+                const midRateLimit = await github.rest.rateLimit.get();
+                const midRemaining = midRateLimit.data.rate.remaining;
+                console.log(`  📊 Rate limit check: ${midRemaining} remaining`);
+
+                if (midRemaining < 20) {
+                  core.warning(`Rate limit exhausted (${midRemaining} remaining). Stopping early with partial results.`);
+                  break;
+                }
+              }
             }
 
             // Log summary
@@ -239,7 +268,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const results = JSON.parse(process.env.RESULTS_JSON);
+            const results = JSON.parse(process.env.RESULTS_JSON || '{"ready_to_close":[]}');
 
             for (const item of results.ready_to_close) {
               const issue = item.issue;
@@ -421,7 +450,11 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const enrichedItems = JSON.parse(process.env.ENRICHED_ITEMS_JSON);
+            const enrichedItems = JSON.parse(process.env.ENRICHED_ITEMS_JSON || '[]');
+            if (enrichedItems.length === 0) {
+              console.log('No enriched items to process');
+              return;
+            }
 
             for (const item of enrichedItems) {
               const issue = item.issue;
@@ -526,6 +559,7 @@ jobs:
                 console.log(`  ✓ Posted automation request comment`);
 
               } else {
+                // Doc-only fix: DO NOT auto-close - requires human review
                 let filesList = '';
                 if (analysis) {
                   filesList = '\n\n**Changed files:**\n';
@@ -539,19 +573,21 @@ jobs:
                 }
 
                 const commentLines = [
-                  '## ✅ Issue Resolved - Auto-Closed (No Automation Required)',
+                  '## 📋 Review Needed - Documentation/Config Only Fix',
                   '',
-                  '**Status**: This issue has been fixed with documentation/configuration changes only.',
+                  '**Status**: This issue has a merged PR with only documentation/configuration changes.',
                   '',
                   `- ✅ **Fix merged**: PR #${fixPR.number} (${fixPR.url})`,
                   `- ℹ️  **Analysis**: ${reasoning}`,
-                  '- ✓ **No E2E test required** for this type of change',
+                  '- ❓ **No E2E test required** - but human review needed to confirm fix',
                   filesList,
                   '',
-                  'The fix has been implemented and does not require additional test automation.',
+                  '**Action Required**: Please verify that this PR actually resolves the reported issue.',
+                  '- If the fix is complete, close this issue manually',
+                  '- If further changes are needed, leave it open',
                   '',
                   '---',
-                  `*🤖 Automated by [Issue Audit Workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})*`
+                  `*🤖 Detected by [Issue Audit Workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})*`
                 ];
                 const comment = commentLines.join('\n');
 
@@ -562,15 +598,20 @@ jobs:
                   body: comment
                 });
 
-                await github.rest.issues.update({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issue.number,
-                  state: 'closed',
-                  state_reason: 'completed'
-                });
+                // Add label for review instead of auto-closing
+                try {
+                  await github.rest.issues.addLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    labels: ['Review Needed']
+                  });
+                  console.log(`  ✓ Added "Review Needed" label`);
+                } catch (error) {
+                  console.log(`  ⚠️  Could not add label: ${error.message}`);
+                }
 
-                console.log(`  ✓ Closed issue (doc-only fix)`);
+                console.log(`  ✓ Posted review request (doc-only fix - NOT auto-closed)`);
               }
             }
 
