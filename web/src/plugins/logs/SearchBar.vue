@@ -4639,7 +4639,10 @@ export default defineComponent({
       }
 
       queryEditorRef.value?.setValue(searchObj.data.query);
-      if (store.state.zoConfig.query_on_stream_selection == false) {
+      if (
+        store.state.zoConfig.query_on_stream_selection == false ||
+        (store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode)
+      ) {
         handleRunQueryFn();
       }
     };
