@@ -362,6 +362,10 @@ export default defineComponent({
       if (deploymentMode.value === 'single') {
         launchSingleRegion(organizationId, email, passcode);
       } else {
+        if (targetRegions.value.length === 0) {
+          q.notify({ type: "warning", message: "Select at least one target region.", timeout: 3000 });
+          return;
+        }
         launchStackSet(organizationId);
       }
     };
