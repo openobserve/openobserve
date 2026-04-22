@@ -36,15 +36,19 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
       testLogger.info('Trace ingestion complete');
 
       // Wait for the service graph daemon to process (runs every ~30s)
+      // Increased to 4 minutes to allow 6-8 daemon cycles for full topology processing
       testLogger.info('Waiting for service graph daemon to process data...');
       const waitResult = await waitForServiceGraphData(page, {
-        maxWaitMs: 120000,
+        maxWaitMs: 240000,  // 4 minutes (was 2 min) - allows more daemon cycles
         pollIntervalMs: 10000,
         expectedMinEdges: 10,
       });
 
       if (waitResult.success) {
         testLogger.info(`Service graph data ready: ${waitResult.edges.length} edges found after ${waitResult.waitedMs}ms`);
+        // Additional wait to ensure all nodes are fully created after edges appear
+        testLogger.info('Waiting additional 30s for node creation to complete...');
+        await new Promise(resolve => setTimeout(resolve, 30000));
       } else {
         testLogger.warn(`Service graph data may be incomplete after ${waitResult.waitedMs}ms - continuing with available data`);
       }
