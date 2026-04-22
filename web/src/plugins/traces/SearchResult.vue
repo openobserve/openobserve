@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-count-badge"
           rounded
           :label="`${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}`"
-          class="text-caption tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-2)]! tw:mr-[0.6rem]"
+          class="text-caption tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
         />
         <q-badge
           v-if="
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-error-count-badge"
           rounded
           :label="`${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}`"
-          class="text-caption tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-field-type-boolean-bg)]! tw:mr-[0.85rem]"
+          class="text-caption tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]! tw:mr-[0.85rem]"
         />
         <!-- Insights Button -->
         <q-btn
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Combined scroll area: RED metrics + trace list scroll together -->
-      <div class="tw:flex-1 tw:overflow-y-auto">
+      <div class="tw:flex-1 tw:overflow-y-auto tw:bg-[var(--o2-card-bg-solid)]">
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <transition
           enter-active-class="transition-all duration-300 ease-in-out"
@@ -121,7 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :filter="searchObj.data.editorValue"
             :streamFields="searchObj.data.stream.selectedStreamFields"
             :show="
-              searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length
+              searchObj.searchApplied &&
+              !searchObj.data.errorMsg?.trim()?.length
             "
             @time-range-selected="onMetricsTimeRangeSelected"
             @filters-updated="onMetricsFiltersUpdated"
