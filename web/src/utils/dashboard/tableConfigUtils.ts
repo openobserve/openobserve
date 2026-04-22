@@ -186,40 +186,72 @@ export interface UnitConfig {
   customUnit: string;
 }
 
+export interface ColumnStyleConfig {
+  alignment?: "left" | "center" | "right";
+  textColor?: string;
+  bgColor?: string;
+}
+
 export interface OverrideMaps {
   colorConfigMap: Record<string, ColorConfig>;
   unitConfigMap: Record<string, UnitConfig>;
+  styleConfigMap: Record<string, ColumnStyleConfig>;
 }
 
 /**
- * Parse `config.override_config` into colour and unit lookup maps
+ * Parse `config.override_config` into colour, unit, and style lookup maps
  * keyed by lower-cased field alias.
+ * Each override entry may carry multiple config items in its `config[]` array.
  */
 export const parseOverrideConfigs = (
   overrideConfigs: any[] | undefined,
 ): OverrideMaps => {
   const colorConfigMap: Record<string, ColorConfig> = {};
   const unitConfigMap: Record<string, UnitConfig> = {};
+  const styleConfigMap: Record<string, ColumnStyleConfig> = {};
 
-  if (!overrideConfigs) return { colorConfigMap, unitConfigMap };
+  if (!overrideConfigs) return { colorConfigMap, unitConfigMap, styleConfigMap };
 
   for (const o of overrideConfigs) {
     const alias = o?.field?.value;
-    const cfg = o?.config?.[0];
-    if (alias && cfg) {
-      const aliasLower = alias.toLowerCase();
-      if (cfg.type === "unique_value_color") {
-        colorConfigMap[aliasLower] = { autoColor: cfg.autoColor };
-      } else if (cfg.type === "unit") {
-        unitConfigMap[aliasLower] = {
-          unit: cfg.value?.unit ?? "",
-          customUnit: cfg.value?.customUnit ?? "",
-        };
+    if (!alias) continue;
+    const aliasLower = alias.toLowerCase();
+
+    for (const cfg of o?.config ?? []) {
+      if (!cfg?.type) continue;
+      switch (cfg.type) {
+        case "unit":
+          unitConfigMap[aliasLower] = {
+            unit: cfg.value?.unit ?? "",
+            customUnit: cfg.value?.customUnit ?? "",
+          };
+          break;
+        case "unique_value_color":
+          colorConfigMap[aliasLower] = { autoColor: !!cfg.autoColor };
+          break;
+        case "alignment":
+          styleConfigMap[aliasLower] = {
+            ...styleConfigMap[aliasLower],
+            alignment: cfg.value,
+          };
+          break;
+        case "text_color":
+          styleConfigMap[aliasLower] = {
+            ...styleConfigMap[aliasLower],
+            textColor: cfg.value,
+          };
+          break;
+        case "background_color":
+          styleConfigMap[aliasLower] = {
+            ...styleConfigMap[aliasLower],
+            bgColor: cfg.value,
+          };
+          break;
       }
     }
   }
 
-  return { colorConfigMap, unitConfigMap };
+  return { colorConfigMap, unitConfigMap, styleConfigMap };
 };
 
 // ---------------------------------------------------------------------------

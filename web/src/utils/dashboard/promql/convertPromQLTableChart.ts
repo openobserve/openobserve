@@ -98,8 +98,8 @@ export class TableConverter implements PromQLChartConverter {
     const config = panelSchema.config || {};
     const tableMode = config.promql_table_mode || "single";
 
-    // Build override maps (color/unit) to mimic SQL table behavior
-    const { colorConfigMap, unitConfigMap } = parseOverrideConfigs(
+    // Build override maps (color/unit/style) to mimic SQL table behavior
+    const { colorConfigMap, unitConfigMap, styleConfigMap } = parseOverrideConfigs(
       panelSchema.config?.override_config,
     );
 
@@ -113,45 +113,35 @@ export class TableConverter implements PromQLChartConverter {
 
     // In "single" (Timestamp) mode, show timestamp + value columns
     if (tableMode === "single") {
+      const tsStyle = styleConfigMap["timestamp"];
+      const valStyle = styleConfigMap["value"];
       return [
         {
           name: "timestamp",
           field: "timestamp",
           label: "Timestamp",
-          align: "left",
+          align: tsStyle?.alignment || "left",
           sortable: true,
-          // support override configs for coloring
-          colorMode: colorConfigMap["timestamp"]?.autoColor
-            ? "auto"
-            : undefined,
+          colorMode: colorConfigMap["timestamp"]?.autoColor ? "auto" : undefined,
+          ...(tsStyle?.textColor ? { textColor: tsStyle.textColor } : {}),
+          ...(tsStyle?.bgColor ? { bgColor: tsStyle.bgColor } : {}),
         },
         {
           name: "value",
           field: "value",
           label: "Value",
-          align: "right",
+          align: valStyle?.alignment || "right",
           sortable: true,
           format: (val: any) => {
-            // Apply configured value mappings first
             const mapped = findFirstValidMappedValue(val, mappings, "text");
             if (mapped && mapped.text) return mapped.text;
-
-            // Allow per-field unit override via override_config
-            const aliasLower = "value";
-            const unitToUse = unitConfigMap[aliasLower]?.unit || config?.unit;
-            const customUnitToUse =
-              unitConfigMap[aliasLower]?.customUnit || config?.unit_custom;
-
-            const unitValue = getUnitValue(
-              val,
-              unitToUse,
-              customUnitToUse,
-              config?.decimals,
-            );
-            return formatUnitValue(unitValue);
+            const unitToUse = unitConfigMap["value"]?.unit || config?.unit;
+            const customUnitToUse = unitConfigMap["value"]?.customUnit || config?.unit_custom;
+            return formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, config?.decimals));
           },
-          // support override configs for coloring
           colorMode: colorConfigMap["value"]?.autoColor ? "auto" : undefined,
+          ...(valStyle?.textColor ? { textColor: valStyle.textColor } : {}),
+          ...(valStyle?.bgColor ? { bgColor: valStyle.bgColor } : {}),
         },
       ];
     }
@@ -195,78 +185,64 @@ export class TableConverter implements PromQLChartConverter {
       const stickyColumns = config.sticky_columns || [];
       const makeFirstSticky = config.sticky_first_column || false;
 
+      const tsStyle2 = styleConfigMap["timestamp"];
       const columns: any[] = [
         {
           name: "timestamp",
           field: "timestamp",
           label: "Timestamp",
-          align: "left",
+          align: tsStyle2?.alignment || "left",
           sortable: true,
-          sticky: makeFirstSticky, // Make timestamp sticky if first column should be sticky
+          sticky: makeFirstSticky,
           headerClasses: makeFirstSticky ? "sticky-column" : undefined,
           classes: makeFirstSticky ? "sticky-column" : undefined,
-          // support override configs for coloring
-          colorMode: colorConfigMap["timestamp"]?.autoColor
-            ? "auto"
-            : undefined,
+          colorMode: colorConfigMap["timestamp"]?.autoColor ? "auto" : undefined,
+          ...(tsStyle2?.textColor ? { textColor: tsStyle2.textColor } : {}),
+          ...(tsStyle2?.bgColor ? { bgColor: tsStyle2.bgColor } : {}),
         },
       ];
 
-      // Add columns for each label with custom ordering
       const sortedLabelKeys = this.applyColumnOrdering(filteredLabelKeys, config);
       sortedLabelKeys.forEach((key) => {
         const isSticky = stickyColumns.includes(key);
-        // Note: Don't apply makeFirstSticky here because timestamp is already the first column
-
+        const keyLower = key.toLowerCase();
+        const keyStyle = styleConfigMap[keyLower];
         columns.push({
           name: key,
           field: key,
           label: key,
-          align: "left",
+          align: keyStyle?.alignment || "left",
           sortable: true,
-          sticky: isSticky, // Make sticky only if explicitly in sticky_columns list
+          sticky: isSticky,
           headerClasses: isSticky ? "sticky-column" : undefined,
           classes: isSticky ? "sticky-column" : undefined,
-          // apply value mapping for label columns
           format: (val: any) => {
             const mapped = findFirstValidMappedValue(val, mappings, "text");
             return mapped && mapped.text ? mapped.text : val;
           },
-          // support override configs for coloring
-          colorMode: colorConfigMap[key.toLowerCase()]?.autoColor
-            ? "auto"
-            : undefined,
+          colorMode: colorConfigMap[keyLower]?.autoColor ? "auto" : undefined,
+          ...(keyStyle?.textColor ? { textColor: keyStyle.textColor } : {}),
+          ...(keyStyle?.bgColor ? { bgColor: keyStyle.bgColor } : {}),
         });
       });
 
-      // Add value column at the end
+      const valStyle2 = styleConfigMap["value"];
       columns.push({
         name: "value",
         field: "value",
         label: "Value",
-        align: "right",
+        align: valStyle2?.alignment || "right",
         sortable: true,
         format: (val: any) => {
-          // Apply configured value mappings first
           const mapped = findFirstValidMappedValue(val, mappings, "text");
           if (mapped && mapped.text) return mapped.text;
-
-          // Unit override support
-          const aliasLower = "value";
-          const unitToUse = unitConfigMap[aliasLower]?.unit || config?.unit;
-          const customUnitToUse =
-            unitConfigMap[aliasLower]?.customUnit || config?.unit_custom;
-
-          const unitValue = getUnitValue(
-            val,
-            unitToUse,
-            customUnitToUse,
-            config?.decimals,
-          );
-          return formatUnitValue(unitValue);
+          const unitToUse = unitConfigMap["value"]?.unit || config?.unit;
+          const customUnitToUse = unitConfigMap["value"]?.customUnit || config?.unit_custom;
+          return formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, config?.decimals));
         },
-        // support override configs for coloring
         colorMode: colorConfigMap["value"]?.autoColor ? "auto" : undefined,
+        ...(valStyle2?.textColor ? { textColor: valStyle2.textColor } : {}),
+        ...(valStyle2?.bgColor ? { bgColor: valStyle2.bgColor } : {}),
       });
 
       return columns;
@@ -320,63 +296,48 @@ export class TableConverter implements PromQLChartConverter {
     const columns = sortedLabelKeys.map((key, index) => {
       const isSticky =
         stickyColumns.includes(key) || (makeFirstSticky && index === 0);
-
+      const keyLower = key.toLowerCase();
+      const keyStyle = styleConfigMap[keyLower];
       return {
         name: key,
         field: key,
         label: key,
-        align: "left",
+        align: keyStyle?.alignment || "left",
         sortable: true,
-        // Mark column as sticky for CSS styling
         sticky: isSticky,
         headerClasses: isSticky ? "sticky-column" : undefined,
         classes: isSticky ? "sticky-column" : undefined,
-        // value mapping for text replacement
         format: (val: any) => {
           const mapped = findFirstValidMappedValue(val, mappings, "text");
           return mapped && mapped.text ? mapped.text : val;
         },
-        // optional override-config based automatic color
-        colorMode: colorConfigMap[key.toLowerCase()]?.autoColor
-          ? "auto"
-          : undefined,
+        colorMode: colorConfigMap[keyLower]?.autoColor ? "auto" : undefined,
+        ...(keyStyle?.textColor ? { textColor: keyStyle.textColor } : {}),
+        ...(keyStyle?.bgColor ? { bgColor: keyStyle.bgColor } : {}),
       };
     });
 
-    // Add value columns for each selected aggregation
     aggregations.forEach((agg: string) => {
       const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
-      const columnLabel =
-        aggregations.length === 1 ? "Value" : `Value (${agg})`;
-
+      const columnLabel = aggregations.length === 1 ? "Value" : `Value (${agg})`;
+      const colNameLower = columnName.toLowerCase();
+      const colStyle = styleConfigMap[colNameLower];
       columns.push({
         name: columnName,
         field: columnName,
         label: columnLabel,
-        align: "right",
+        align: colStyle?.alignment || "right",
         sortable: true,
-        // Apply value mapping and per-column unit overrides
         format: (val: any) => {
           const mapped = findFirstValidMappedValue(val, mappings, "text");
           if (mapped && mapped.text) return mapped.text;
-
-          const aliasLower = columnName.toLowerCase();
-          const unitToUse = unitConfigMap[aliasLower]?.unit || config?.unit;
-          const customUnitToUse =
-            unitConfigMap[aliasLower]?.customUnit || config?.unit_custom;
-
-          const unitValue = getUnitValue(
-            val,
-            unitToUse,
-            customUnitToUse,
-            config?.decimals,
-          );
-          return formatUnitValue(unitValue);
+          const unitToUse = unitConfigMap[colNameLower]?.unit || config?.unit;
+          const customUnitToUse = unitConfigMap[colNameLower]?.customUnit || config?.unit_custom;
+          return formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, config?.decimals));
         },
-        // support override configs for coloring
-        colorMode: colorConfigMap[columnName.toLowerCase()]?.autoColor
-          ? "auto"
-          : undefined,
+        colorMode: colorConfigMap[colNameLower]?.autoColor ? "auto" : undefined,
+        ...(colStyle?.textColor ? { textColor: colStyle.textColor } : {}),
+        ...(colStyle?.bgColor ? { bgColor: colStyle.bgColor } : {}),
       } as any);
     });
 

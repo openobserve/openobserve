@@ -58,7 +58,7 @@ export const convertTableData = (
   // Build value mapping cache once for all cells
   const valueMappingCache = buildValueMappingCache(panelSchema.config?.mappings);
 
-  const { colorConfigMap, unitConfigMap } = parseOverrideConfigs(
+  const { colorConfigMap, unitConfigMap, styleConfigMap } = parseOverrideConfigs(
     panelSchema.config.override_config,
   );
   const fieldNameCache: Record<string, string> = {}; // Cache for case-insensitive lookups
@@ -133,13 +133,18 @@ export const convertTableData = (
       obj["name"] = it.label || it.alias;
       obj["field"] = actualField;
       obj["label"] = it.label || it.alias;
-      obj["align"] = !isNumber ? "left" : "right";
+      obj["align"] = styleConfigMap?.[aliasLower]?.alignment || (!isNumber ? "left" : "right");
       obj["sortable"] = true;
 
       // pass color mode info for renderer - use pre-lowercased lookup
       if (colorConfigMap?.[aliasLower]?.autoColor) {
         obj["colorMode"] = "auto";
       }
+
+      // pass column-level style overrides to renderer
+      const colStyle = styleConfigMap?.[aliasLower];
+      if (colStyle?.textColor) obj["textColor"] = colStyle.textColor;
+      if (colStyle?.bgColor) obj["bgColor"] = colStyle.bgColor;
 
       // pass showFieldAsJson flag to renderer
       if (it.showFieldAsJson) {

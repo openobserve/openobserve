@@ -158,6 +158,15 @@ export default defineComponent({
         return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
       }
 
+      // 3) Column-level text / background color override.
+      const colDef = (cell.column.columnDef.meta as any)?._col;
+      if (colDef?.bgColor || colDef?.textColor) {
+        const parts: string[] = [];
+        if (colDef.bgColor) parts.push(`background-color: ${colDef.bgColor}`);
+        if (colDef.textColor) parts.push(`color: ${colDef.textColor}`);
+        return parts.join("; ");
+      }
+
       return "";
     });
 

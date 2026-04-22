@@ -824,6 +824,21 @@ pub enum Config {
         #[serde(default)]
         auto_color: bool,
     },
+    #[serde(rename = "alignment")]
+    Alignment {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
+    #[serde(rename = "text_color")]
+    TextColor {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
+    #[serde(rename = "background_color")]
+    BackgroundColor {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
