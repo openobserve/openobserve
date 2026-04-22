@@ -204,6 +204,8 @@ export const DEFAULT_LOGS_CONFIG = {
     histogram: {
       xData: [],
       yData: [],
+      breakdownField: null,
+      breakdownSeries: null,
       chartParams: {
         title: "",
         unparsed_x_data: [],

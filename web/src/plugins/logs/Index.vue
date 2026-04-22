@@ -810,8 +810,22 @@ export default defineComponent({
       clearAllTimeouts();
       try {
         if (searchObj) {
-          // Turn off all loaders before saving view
-          let savedSearchObj = JSON.parse(JSON.stringify(searchObj));
+          // Serialize breakdownSeries Map as entries array before JSON cloning
+          const breakdownSeries = searchObj.data?.histogram?.breakdownSeries;
+          const serializableSearchObj = {
+            ...searchObj,
+            data: {
+              ...searchObj.data,
+              histogram: {
+                ...searchObj.data?.histogram,
+                breakdownSeries:
+                  breakdownSeries instanceof Map
+                    ? [...breakdownSeries.entries()]
+                    : null,
+              },
+            },
+          };
+          let savedSearchObj = JSON.parse(JSON.stringify(serializableSearchObj));
           savedSearchObj.loading = false;
           savedSearchObj.loadingHistogram = false;
           savedSearchObj.loadingCounter = false;

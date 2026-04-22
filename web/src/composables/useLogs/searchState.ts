@@ -27,6 +27,8 @@ import {
 interface HistogramData {
   xData: any[];
   yData: any[];
+  breakdownField: string | null;
+  breakdownSeries: Map<string, number[]> | null;
   chartParams: {
     title: string;
     unparsed_x_data: any[];
@@ -188,6 +190,8 @@ export const searchState = () => {
           histogram: {
             xData: [],
             yData: [],
+            breakdownField: null,
+            breakdownSeries: null,
             chartParams: {
               title: "",
               unparsed_x_data: [],
@@ -209,9 +213,17 @@ export const searchState = () => {
       searchObj.data.sortedQueryResults = JSON.parse(
         JSON.stringify(state.data.sortedQueryResults),
       );
-      searchObj.data.histogram = JSON.parse(
-        JSON.stringify(state.data.histogram),
-      );
+      // Restore histogram — breakdownSeries was serialized as an entries array
+      // (Map is not JSON-serializable), so reconstruct the Map here.
+      const savedBreakdown = state.data.histogram.breakdownSeries;
+      searchObj.data.histogram = {
+        ...JSON.parse(
+          JSON.stringify({ ...state.data.histogram, breakdownSeries: null }),
+        ),
+        breakdownSeries: Array.isArray(savedBreakdown)
+          ? new Map(savedBreakdown)
+          : null,
+      };
 
       await nextTick();
       return true;
@@ -260,6 +272,8 @@ export const searchState = () => {
     searchObj.data.histogram = {
       xData: [],
       yData: [],
+      breakdownField: null,
+      breakdownSeries: null,
       chartParams: {
         title: "",
         unparsed_x_data: [],

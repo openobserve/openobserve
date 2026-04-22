@@ -215,17 +215,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.data.histogram.errorCode != -1
         "
       >
-        <ChartRenderer
+        <div
           v-if="
             searchObj.meta.showHistogram &&
             (searchObj.data?.queryResults?.aggs?.length > 0 ||
               (plotChart && Object.keys(plotChart)?.length > 0))
           "
-          data-test="logs-search-result-bar-chart"
-          :data="plotChart"
           class="histogram-chart"
-          @updated:dataZoom="onChartUpdate"
-        />
+          @click="onHistogramAreaClick"
+        >
+          <ChartRenderer
+            ref="histogramChart"
+            data-test="logs-search-result-bar-chart"
+            :data="plotChart"
+            style="width:100%;height:100%"
+            @updated:dataZoom="onChartUpdate"
+          />
+        </div>
 
         <div
           class="histogram-empty"
@@ -311,6 +317,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </h6>
       </div>
+
+      <!-- Pinned breakdown tooltip — teleported to body to avoid stacking context issues -->
+      <Teleport to="body">
+        <div v-if="pinnedTooltip.visible" class="oo-pin-backdrop" @click="closePinnedTooltip" />
+        <div
+          v-if="pinnedTooltip.visible"
+          class="oo-pin-tooltip"
+          :style="{ top: pinnedTooltip.y + 'px', left: pinnedTooltip.x + 'px' }"
+          @keydown.esc="closePinnedTooltip"
+          tabindex="-1"
+        >
+          <div class="oo-pin-tooltip__time">{{ pinnedTooltip.timestamp }}</div>
+          <div
+            v-for="row in pinnedTooltip.rows"
+            :key="row.rawValue"
+            class="oo-pin-tooltip__row"
+          >
+            <span class="oo-pin-tooltip__dot" :style="{ background: row.color }" />
+            <span class="oo-pin-tooltip__name">{{ row.displayLabel }}</span>
+            <span class="oo-pin-tooltip__count">{{ formatCount(row.count) }}</span>
+            <span class="oo-pin-tooltip__row-actions">
+              <span class="oo-pin-tooltip__action oo-pin-tooltip__action--include" title="include" @click.stop="applyPinnedFilter(row.rawValue, 'include')">=</span>
+              <span class="oo-pin-tooltip__action oo-pin-tooltip__action--exclude" title="exclude" @click.stop="applyPinnedFilter(row.rawValue, 'exclude')">≠</span>
+            </span>
+          </div>
+        </div>
+      </Teleport>
 
       <!-- Logs View -->
       <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
@@ -498,7 +531,12 @@ import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
 import { extractConstantsFromPattern } from "@/plugins/logs/patterns/patternUtils";
-import { convertLogData } from "@/utils/logs/convertLogData";
+import {
+  convertLogData,
+  convertStackedLogData,
+  formatDate,
+  formatCount,
+} from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
 import { useSearchAround } from "@/composables/useLogs/searchAround";
@@ -906,14 +944,103 @@ export default defineComponent({
       }
     };
 
+    // Re-render stacked chart with correct palette when dark/light mode switches
+    watch(
+      () => store.state.theme,
+      () => reDrawChart(),
+    );
+
+    // Pinned tooltip — frozen on bar click so user can explore and select
+    const pinnedTooltip = ref<{
+      visible: boolean;
+      x: number;
+      y: number;
+      field: string;
+      timestamp: string;
+      rows: { displayLabel: string; rawValue: string; count: number; color: string }[];
+    }>({
+      visible: false,
+      x: 0,
+      y: 0,
+      field: "",
+      timestamp: "",
+      rows: [],
+    });
+
+    const histogramChart: any = ref(null);
+
+    const closePinnedTooltip = () => {
+      pinnedTooltip.value.visible = false;
+      // Restore tooltip mouse tracking
+      histogramChart.value?.chart?.setOption({ tooltip: { triggerOn: "mousemove|click" } }, false);
+    };
+
+    const onHistogramAreaClick = (event: MouseEvent) => {
+      const { breakdownField, breakdownSeries, xData } = searchObj.data.histogram;
+      if (!breakdownSeries?.size || !xData?.length) return;
+
+      const eChart = histogramChart.value?.chart;
+      if (!eChart) return;
+
+      // Convert click pixel to nearest data index
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      const pixelX = event.clientX - rect.left;
+      const pixelY = event.clientY - rect.top;
+
+      // Ignore clicks outside the plot area (e.g. legend items)
+      if (!eChart.containPixel("grid", [pixelX, pixelY])) return;
+
+      const dataPoint = eChart.convertFromPixel({ seriesIndex: 0 }, [pixelX, pixelY]);
+      if (!dataPoint) return;
+
+      const clickedTs: number = dataPoint[0];
+      let dataIndex = 0;
+      let minDiff = Infinity;
+      (xData as number[]).forEach((ts: number, i: number) => {
+        const diff = Math.abs(ts - clickedTs);
+        if (diff < minDiff) { minDiff = diff; dataIndex = i; }
+      });
+
+      const timestamp = formatDate(new Date(xData[dataIndex]));
+
+      const rows = [...breakdownSeries.entries()].map(([category, counts]) => {
+        const label = category || "(empty)";
+        const displayLabel = label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
+        const rawValue = label.toLowerCase() === "(empty)" ? "" : label.toLowerCase();
+        const matchedSeries = (plotChart.value?.options?.series ?? []).find(
+          (s: any) => s.name?.toLowerCase() === displayLabel.toLowerCase(),
+        );
+        return {
+          displayLabel,
+          rawValue,
+          count: (counts as number[])[dataIndex] ?? 0,
+          color: matchedSeries?.itemStyle?.color ?? "#888",
+        };
+      });
+
+      const margin = 10;
+      const panelW = 250;
+      const panelH = rows.length * 28 + 60;
+      const x = Math.min(event.clientX + margin, window.innerWidth - panelW - margin);
+      const y = Math.min(event.clientY + margin, window.innerHeight - panelH - margin);
+
+      pinnedTooltip.value = { visible: true, x, y, field: breakdownField ?? "", timestamp, rows };
+
+      eChart.dispatchAction({ type: "hideTip" });
+      eChart.setOption({ tooltip: { triggerOn: "none" } }, false);
+    };
+
+    const applyPinnedFilter = (rawValue: string, action: "include" | "exclude") => {
+      const field = pinnedTooltip.value.field;
+      addSearchTerm(field, rawValue, action);
+    };
+
     onMounted(() => {
       reDrawChart();
-      // Listen for theme color changes
       window.addEventListener("themeColorChanged", handleThemeColorChange);
     });
 
     onBeforeUnmount(() => {
-      // Remove event listener to prevent memory leaks
       window.removeEventListener("themeColorChanged", handleThemeColorChange);
       // Clear any pending debounce timer
       if (debounceTimer) {
@@ -935,15 +1062,20 @@ export default defineComponent({
         // eslint-disable-next-line no-prototype-builtins
         searchObj.data.histogram.hasOwnProperty("xData") &&
         searchObj.data.histogram.xData.length > 0
-        // && plotChart.value?.reDraw
       ) {
-        //format data in form of echarts options
-        plotChart.value = convertLogData(
-          searchObj.data.histogram.xData,
-          searchObj.data.histogram.yData,
-          searchObj.data.histogram.chartParams,
-        );
-        // plotChart.value.forceReLayout();
+        const { xData, yData, breakdownSeries, chartParams, breakdownField } =
+          searchObj.data.histogram;
+
+        if (breakdownSeries && breakdownSeries.size > 0) {
+          plotChart.value = convertStackedLogData(
+            xData,
+            breakdownSeries,
+            { ...chartParams, breakdownField: breakdownField ?? null },
+            store.state.theme === "dark",
+          );
+        } else {
+          plotChart.value = convertLogData(xData, yData, chartParams);
+        }
       }
     };
 
@@ -1445,6 +1577,12 @@ export default defineComponent({
       searchAroundData,
       addSearchTerm,
       removeSearchTerm,
+      histogramChart,
+      pinnedTooltip,
+      closePinnedTooltip,
+      onHistogramAreaClick,
+      applyPinnedFilter,
+      formatCount,
       openLogDetails,
       changeMaxRecordToReturn,
       navigateRowDetail,
