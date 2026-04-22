@@ -399,6 +399,7 @@ import {
   onActivated,
   computed,
 } from "vue";
+import { debounce } from "lodash-es";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -478,6 +479,17 @@ export default defineComponent({
     let parser: any;
     let streamName = "";
     const dateTimeRef = ref(null);
+
+    // Debounced auto-run for live mode when user edits the query in the editor.
+    const debouncedLiveModeQueryEmit = debounce(() => {
+      if (
+        store.state.zoConfig?.auto_query_enabled &&
+        searchObj.meta.liveMode &&
+        !searchObj.loading
+      ) {
+        emit("searchdata");
+      }
+    }, 500);
 
     const { getStream } = useStreams();
 
@@ -559,8 +571,13 @@ export default defineComponent({
       getSuggestions();
     };
 
-    const updateQueryValue = async (value: string) => {
+    const updateQueryValue = async (value: string, event?: any) => {
       updateAutoComplete(value);
+      // Only auto-run for real user edits, not programmatic setValue calls.
+      // Monaco sets e.isFlush=true when setValue() is called programmatically.
+      if (!event?.isFlush) {
+        debouncedLiveModeQueryEmit();
+      }
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
         if (searchObj.data.parsedQuery?.from?.length > 0) {
@@ -866,7 +883,6 @@ export default defineComponent({
           this.searchObj.data.editorValue,
         );
         this.searchObj.data.editorValue = newValue;
-        this.searchObj.data.query = newValue;
         this.searchObj.data.stream.addToFilter = "";
         if (this.queryEditorRef?.setValue)
           this.queryEditorRef.setValue(newValue);
@@ -885,7 +901,6 @@ export default defineComponent({
         fieldName,
       );
       this.searchObj.data.editorValue = newValue;
-      this.searchObj.data.query = newValue;
       this.searchObj.data.stream.removeFilterField = "";
       if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
       if (

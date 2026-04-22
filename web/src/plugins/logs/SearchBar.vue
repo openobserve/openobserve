@@ -2398,7 +2398,7 @@ import {
 
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, debounce } from "lodash-es";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { inject } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
@@ -2682,6 +2682,19 @@ export default defineComponent({
       cancelQuery,
     } = useSearchBar();
     const { loadStreamLists, extractFields } = useStreamFields();
+
+    // Debounced auto-run for live mode when user edits the query in the editor.
+    const debouncedLiveModeQueryEmit = debounce(() => {
+      if (
+        store.state.zoConfig?.auto_query_enabled &&
+        searchObj.meta.liveMode &&
+        searchObj.meta.logsVisualizeToggle === "logs" &&
+        !searchObj.loading &&
+        !searchObj.loadingHistogram
+      ) {
+        emit("searchdata");
+      }
+    }, 500);
 
     const {
       refreshData,
@@ -3046,12 +3059,17 @@ export default defineComponent({
       return columnNames;
     };
 
-    const updateQueryValue = (value: string) => {
+    const updateQueryValue = (value: string, event?: any) => {
       // if (searchObj.meta.jobId != "") {
       //   searchObj.meta.jobId = "";
       //   getQueryData(false);
       // }
       searchObj.data.editorValue = value;
+      // Only auto-run for real user edits, not programmatic setValue calls.
+      // Monaco sets e.isFlush=true when setValue() is called programmatically.
+      if (!event?.isFlush) {
+        debouncedLiveModeQueryEmit();
+      }
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
         if (
