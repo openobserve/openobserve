@@ -13,11 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
-
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, INDEX_FIELD_NAME_FOR_ALL, ORIGINAL_DATA_COL_NAME,
-    TIMESTAMP_COL_NAME, meta::stream::StreamType,
+    TIMESTAMP_COL_NAME,
+    meta::{sql::TableReferenceExt, stream::StreamType},
 };
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
@@ -136,25 +135,40 @@ pub async fn validate_query_fields(
 
     let sql = Sql::new_with_options(&search_query, org_id, stream_type, None, false).await?;
 
-    // Step 2: Get schema and UDS fields (from cache)
-    let schema = infra::schema::get(org_id, stream_name, stream_type)
-        .await
-        .map_err(|_| Error::ErrorCode(ErrorCodes::SearchStreamNotFound(stream_name.to_string())))?;
+    // Step 2: Resolve which stream and fields to validate.
+    //
+    // For multi-stream CTE queries sql.stream_names lists every real stream referenced
+    // (e.g. ["default", "k8s_events"]). Each stream has its own set of fields in
+    // sql.columns. Look up the entry matching stream_name so that fields belonging to
+    // a different stream are not incorrectly checked against stream_name's schema.
+    let (target_stream, target_fields) = sql
+        .stream_names
+        .iter()
+        .find(|r| r.stream_name() == stream_name)
+        .map(|r| {
+            let fields = sql.columns.get(r).cloned().unwrap_or_default();
+            (stream_name.to_string(), fields)
+        })
+        .unwrap_or_else(|| {
+            // stream_name not found in sql.stream_names (aliased or unresolved table).
+            // Fall back to original behaviour: all tracked columns against stream_name.
+            let fields = sql.columns.values().flatten().cloned().collect();
+            (stream_name.to_string(), fields)
+        });
 
-    let settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    // Step 3: Validate target stream's fields against its own schema and UDS.
+    let schema = infra::schema::get(org_id, &target_stream, stream_type)
+        .await
+        .map_err(|_| Error::ErrorCode(ErrorCodes::SearchStreamNotFound(target_stream.clone())))?;
+
+    let settings = infra::schema::get_settings(org_id, &target_stream, stream_type).await;
     let uds_fields = infra::schema::get_stream_setting_defined_schema_fields(&settings);
 
-    // Step 3: Get fields used in query
-    let used_fields: HashSet<String> = sql.columns.values().flatten().cloned().collect();
-
-    // Step 4: Validate each field
-    for field in used_fields {
-        // Skip system fields
+    for field in target_fields {
         if is_system_field(&field) {
             continue;
         }
 
-        // Check 1: Field must exist in schema
         if schema.field_with_name(&field).is_err() {
             return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(format!(
                 "{}. Field not found in stream schema.",
@@ -162,7 +176,6 @@ pub async fn validate_query_fields(
             ))));
         }
 
-        // Check 2: If UDS is defined, field must be in UDS
         if !uds_fields.is_empty() && !uds_fields.contains(&field) {
             return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(format!(
                 "{field}. Field exists but not in User-Defined Schema (UDS)",
@@ -898,5 +911,104 @@ JOIN "test1" AS b ON a._timestamp = b._timestamp"#;
                 "Should fail when complex query uses field not in UDS"
             );
         }
+    }
+}
+
+// ============================================================================
+// Regression test: CTE multi-stream field validation
+//
+// Bug: validate_query_fields flattened ALL streams' columns and checked them
+// against ONE stream's schema. Fields from stream B (e.g. body_type in
+// k8s_events) were rejected when validating stream A (default), producing a
+// false SearchFieldNotFound error.
+//
+// This test FAILS on the unfixed code and PASSES after the fix.
+// ============================================================================
+#[cfg(test)]
+mod test_cte_multi_stream_regression {
+    use arrow_schema::{DataType, Field, Schema};
+    use config::meta::stream::{StreamSettings, StreamType};
+    use infra::schema::{STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_cte_join_cross_stream_field_not_rejected() {
+        let org_id = "test_cte_regression";
+        let st = StreamType::Logs;
+
+        // default stream: pod/container logs — does NOT have body_type
+        let default_schema = Schema::new(vec![
+            Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("k8s_cluster", DataType::Utf8, true),
+            Field::new("k8s_namespace_name", DataType::Utf8, true),
+            Field::new("k8s_pod_name", DataType::Utf8, true),
+            Field::new("severity", DataType::Utf8, true),
+        ]);
+
+        // k8s_events stream: has body_type — the field the old code falsely rejected
+        let k8s_events_schema = Schema::new(vec![
+            Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("body_type", DataType::Utf8, true),
+            Field::new("event_name", DataType::Utf8, true),
+            Field::new("k8s_cluster", DataType::Utf8, true),
+            Field::new("k8s_namespace_name", DataType::Utf8, true),
+        ]);
+
+        let key_default = format!("{org_id}/{st}/default");
+        let key_k8s = format!("{org_id}/{st}/k8s_events");
+
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.insert(key_default.clone(), SchemaCache::new(default_schema));
+            w.insert(key_k8s.clone(), SchemaCache::new(k8s_events_schema));
+        }
+        {
+            let mut w = STREAM_SETTINGS.write().await;
+            w.insert(key_default.clone(), StreamSettings::default());
+            w.insert(key_k8s.clone(), StreamSettings::default());
+            let mut atomic = hashbrown::HashMap::new();
+            atomic.insert(key_default.clone(), StreamSettings::default());
+            atomic.insert(key_k8s.clone(), StreamSettings::default());
+            infra::schema::set_stream_settings_atomic(atomic);
+        }
+
+        // Exact query shape that triggered the bug in alerts validation
+        let sql = r#"
+WITH pod_logs AS (
+    SELECT DISTINCT k8s_pod_name, k8s_namespace_name, k8s_cluster
+    FROM "default"
+    WHERE severity = '0'
+),
+k8s_events_agg AS (
+    SELECT e.k8s_cluster, e.k8s_namespace_name, e.event_name, e.body_type
+    FROM "k8s_events" e
+    INNER JOIN pod_logs p
+        ON e.k8s_cluster = p.k8s_cluster
+        AND e.k8s_namespace_name = p.k8s_namespace_name
+)
+SELECT k8s_cluster, k8s_namespace_name, event_name, body_type
+FROM k8s_events_agg"#;
+
+        let result = validate_query_fields(org_id, "default", st, sql).await;
+
+        {
+            let mut w = STREAM_SCHEMAS_LATEST.write().await;
+            w.remove(&key_default);
+            w.remove(&key_k8s);
+        }
+        {
+            let mut w = STREAM_SETTINGS.write().await;
+            w.remove(&key_default);
+            w.remove(&key_k8s);
+        }
+
+        // OLD code: body_type (k8s_events field) checked against default schema → Err
+        // FIXED:    only default's fields validated against default schema → Ok
+        assert!(
+            result.is_ok(),
+            "body_type belongs to k8s_events, not default — must not be rejected \
+             when validating the default stream. Got: {result:?}"
+        );
     }
 }
