@@ -327,6 +327,18 @@ jobs:
             const defaultResults = '{"ready_to_close":[],"needs_test":[],"needs_fix":[],"needs_both":[]}';
             const results = JSON.parse(process.env.RESULTS_JSON || defaultResults);
 
+            // Check rate limit before processing
+            const rateLimit = await github.rest.rateLimit.get();
+            const remaining = rateLimit.data.rate.remaining;
+            console.log(`📊 Rate Limit: ${remaining} remaining`);
+
+            if (remaining < 100) {
+              core.warning(`Rate limit too low (${remaining}). Skipping file analysis.`);
+              core.setOutput('enriched_needs_test', JSON.stringify([]));
+              core.setOutput('count', 0);
+              return;
+            }
+
             // Helper function to categorize a single file
             function categorizeFile(filename) {
               const docPatterns = [
@@ -651,7 +663,7 @@ jobs:
             report += `## Summary\n\n`;
             report += `| Category | Count |\n`;
             report += `|----------|-------|\n`;
-            report += `| ✅ Auto-closed (fix + test) | ${results.ready_to_close.length} |\n`;
+            report += `| ✅ Ready to Close (human action needed) | ${results.ready_to_close.length} |\n`;
             report += `| ⚠️  Needs test | ${results.needs_test.length} |\n`;
             report += `| ⚠️  Needs fix | ${results.needs_fix.length} |\n`;
             report += `| ❌ Needs both | ${results.needs_both.length} |\n`;
@@ -659,11 +671,12 @@ jobs:
 
             // Details
             if (results.ready_to_close.length > 0) {
-              report += `## ✅ Auto-Closed Issues (${results.ready_to_close.length})\n\n`;
+              report += `## ✅ Ready to Close - Awaiting Human Confirmation (${results.ready_to_close.length})\n\n`;
               results.ready_to_close.forEach(item => {
                 report += `- #${item.issue.number}: ${item.issue.title}\n`;
                 report += `  - Fix: PR #${item.fixPR.number}\n`;
-                report += `  - Test: \`${item.testFile}\`\n\n`;
+                report += `  - Test: \`${item.testFile}\`\n`;
+                report += `  - **Status**: Labeled "Ready to Close" - awaiting human verification\n\n`;
               });
             }
 

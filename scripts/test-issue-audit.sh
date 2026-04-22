@@ -83,13 +83,15 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 if [ "$HAS_FIX" = true ] && [ "$HAS_TEST" = true ]; then
   echo "Category: ✅ READY TO CLOSE"
   echo ""
-  echo "Action: Would auto-close with comment:"
+  echo "Action: Would add 'Ready to Close' label + comment:"
   echo "┌─────────────────────────────────────────────────────┐"
-  echo "│ ## ✅ Issue Resolved - Auto-Closed by Issue Audit  │"
+  echo "│ ## ✅ Ready to Close - Human Confirmation Required │"
   echo "│                                                     │"
-  echo "│ This issue has been automatically closed because:  │"
+  echo "│ This issue appears to be resolved:                 │"
   echo "│ - ✅ Fix merged: PR #${FIX_PR}                      │"
   echo "│ - ✅ Test coverage: ${TEST_FILE}                    │"
+  echo "│                                                     │"
+  echo "│ Action Required: Verify fix, then close manually.  │"
   echo "└─────────────────────────────────────────────────────┘"
 
 elif [ "$HAS_FIX" = true ] && [ "$HAS_TEST" = false ]; then
