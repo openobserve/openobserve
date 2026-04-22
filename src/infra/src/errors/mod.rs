@@ -75,6 +75,10 @@ pub enum Error {
     NatsKJetstreamConsumerStreamError(#[from] NatsError<jetstream::consumer::StreamErrorKind>),
     #[error("Error# {0}")]
     Message(String),
+    #[error("DuplicateName# {0}")]
+    DuplicateName(String),
+    #[error("ReadOnly# {0}")]
+    ReadOnly(String),
     #[error("ErrorCode# {0}")]
     ErrorCode(ErrorCodes),
     #[error("Not implemented")]
