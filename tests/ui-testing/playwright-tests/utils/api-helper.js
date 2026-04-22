@@ -56,24 +56,18 @@ function getOrgName() {
 /**
  * Create a test destination via API (useful for CI/CD testing)
  *
- * IMPORTANT: Set MOCK_WEBHOOK_URL env var in CI environments without external internet access.
- * Falls back to https://httpbin.org/post which requires outbound internet connectivity.
+ * Uses MOCK_WEBHOOK_URL env var if set, otherwise falls back to httpbin.org/post
+ * which requires outbound internet connectivity.
  *
  * @param {import('@playwright/test').Page} page - Playwright page instance
  * @param {string} name - Destination name
  * @param {string} [template='Slack'] - Template type
  * @returns {Promise<{status: number, data: any}>}
- * @throws {Error} If in CI environment without MOCK_WEBHOOK_URL set (optional strict mode)
  */
 async function createMockDestination(page, name, template = 'Slack') {
   const org = getOrgName();
-  const webhookUrl = process.env.MOCK_WEBHOOK_URL;
-
-  if (!webhookUrl) {
-    throw new Error('MOCK_WEBHOOK_URL environment variable is required. Set it to a reachable webhook endpoint before running these tests.');
-  }
-
-  const finalUrl = webhookUrl;
+  // Use MOCK_WEBHOOK_URL if set, otherwise fall back to httpbin.org
+  const finalUrl = process.env.MOCK_WEBHOOK_URL || 'https://httpbin.org/post';
   const payload = {
     name,
     template,

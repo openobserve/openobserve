@@ -27,7 +27,6 @@ import { LogsPage } from "./logsPages/logsPage.js";
 import { StreamsPage } from "./streamsPages/streamsPage.js";
 import { AlertTemplatesPage } from "./alertsPages/alertTemplatesPage.js";
 import { AlertDestinationsPage } from "./alertsPages/alertDestinationsPage.js";
-import { AnomalyDetectionPage } from "./alertsPages/anomalyDetectionPage.js";
 import { PipelinesPage } from "./pipelinesPages/pipelinesPage.js";
 import { LoginPage } from "./generalPages/loginPage.js";
 import { IngestionPage } from "./generalPages/ingestionPage.js";
@@ -109,7 +108,6 @@ class PageManager {
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
-    this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.alertsPage.commonActions, this.alertsPage.locators);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);

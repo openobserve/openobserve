@@ -112,6 +112,19 @@ class AnomalyDetectionPage {
     // ==================== HELPER METHODS FOR TESTS ====================
 
     /**
+     * Wait for alerts table to be visible
+     * @param {number} timeout - Timeout in ms
+     */
+    async waitForAlertsTable(timeout = 10000) {
+        try {
+            await this.page.locator(this.selectors.alertsTable).first().waitFor({ state: 'visible', timeout });
+            testLogger.info('Alerts table is visible');
+        } catch (e) {
+            testLogger.warn('Alerts table not visible within timeout', { timeout, error: e.message });
+        }
+    }
+
+    /**
      * Wait for Add Alert button to be enabled
      * @param {number} timeout - Timeout in ms
      * @returns {Promise<boolean>}
@@ -180,7 +193,7 @@ class AnomalyDetectionPage {
         }
 
         if (!tabFound) {
-            console.log(`📝 Warning: Tab "${tabName}" not found with any selector`);
+            testLogger.warn('Tab not found with any selector', { tabName });
         }
     }
 
@@ -190,7 +203,7 @@ class AnomalyDetectionPage {
      * @returns {import('@playwright/test').Locator}
      */
     getAnomalyRow(name) {
-        return this.page.locator(`tr:has-text("${name}")`);
+        return this.page.locator('tr').filter({ hasText: name });
     }
 
     /**
@@ -300,7 +313,7 @@ class AnomalyDetectionPage {
      * Disable alerting
      */
     async disableAlerting() {
-        console.log('📝 Disabling alerting to allow save');
+        testLogger.info('Disabling alerting to allow save');
 
         // Try multiple ways to find and click the Alerting tab
         const tabSelectors = [
@@ -315,18 +328,18 @@ class AnomalyDetectionPage {
             const tab = this.page.locator(selector).first();
             if (await tab.isVisible({ timeout: 2000 }).catch(() => false)) {
                 alertingTab = tab;
-                console.log(`📝 Found Alerting tab using selector: ${selector}`);
+                testLogger.info('Found Alerting tab', { selector });
                 break;
             }
         }
 
         if (!alertingTab) {
-            console.log('📝 Warning: Alerting tab not found');
+            testLogger.warn('Alerting tab not found');
             return;
         }
 
         await alertingTab.click();
-        console.log('📝 Clicked Alerting tab');
+        testLogger.info('Clicked Alerting tab');
         await this.page.waitForTimeout(2000); // Wait longer for tab content to load
 
         // Try multiple selectors for the toggle
@@ -341,38 +354,38 @@ class AnomalyDetectionPage {
             const loc = this.page.locator(selector).first();
             if (await loc.isVisible({ timeout: 3000 }).catch(() => false)) {
                 toggle = loc;
-                console.log(`📝 Found alerting toggle using: ${selector}`);
+                testLogger.info('Found alerting toggle', { selector });
                 break;
             }
         }
 
         if (!toggle) {
-            console.log('📝 Warning: Alerting toggle not found');
+            testLogger.warn('Alerting toggle not found');
             return;
         }
 
         // Get toggle label to determine state
         const toggleLabel = await toggle.locator('div.q-toggle__label').textContent().catch(() => '');
-        console.log(`📝 Alert toggle state | {"toggleLabel":"${toggleLabel}"}`);
+        testLogger.info('Alert toggle state', { toggleLabel });
 
         if (toggleLabel.toLowerCase().includes('enabled')) {
-            console.log('📝 Alerting is enabled, clicking to disable');
+            testLogger.info('Alerting is enabled, clicking to disable');
             await toggle.click();
             await this.page.waitForTimeout(1000);
 
             // Verify it was disabled
             const newLabel = await toggle.locator('div.q-toggle__label').textContent().catch(() => '');
-            console.log(`📝 After clicking toggle | {"toggleLabel":"${newLabel}"}`);
+            testLogger.info('After clicking toggle', { toggleLabel: newLabel });
             testLogger.info('Disabled alerting');
         } else {
-            console.log('📝 Alerting already disabled');
+            testLogger.info('Alerting already disabled');
         }
 
         // Navigate back to Config tab
-        console.log('📝 Navigating back to Config tab');
+        testLogger.info('Navigating back to Config tab');
         await this.clickTab('Detection Config');
         await this.page.waitForTimeout(1000);
-        console.log('📝 Clicked Config tab');
+        testLogger.info('Clicked Config tab');
     }
 
     /**
@@ -565,12 +578,309 @@ class AnomalyDetectionPage {
     }
 
     /**
+     * Expect edit button to be visible for anomaly
+     * @param {string} name - Anomaly name
+     */
+    async expectEditButtonVisible(name) {
+        const editButton = this.page.locator(this.selectors.editButton(name));
+        await expect(editButton).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Expect pause button to be visible for anomaly
+     * @param {string} name - Anomaly name
+     */
+    async expectPauseButtonVisible(name) {
+        const pauseButton = this.page.locator(this.selectors.pauseButton(name));
+        await expect(pauseButton).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Expect detection function field to be visible
+     */
+    async expectDetectionFieldVisible() {
+        const field = this.page.locator(this.selectors.detectionFunctionField);
+        await expect(field).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Expect filter count
+     * @param {number} count - Expected filter count
+     */
+    async expectFilterCount(count) {
+        const filterRows = this.page.locator('.tw\\:flex.tw\\:items-center.tw\\:gap-2.tw\\:mb-2');
+        await expect(filterRows).toHaveCount(count, { timeout: 5000 });
+    }
+
+    /**
+     * Expect custom SQL editor to be visible
+     */
+    async expectSqlEditorVisible() {
+        const sqlEditor = this.page.locator(this.selectors.customSql);
+        await expect(sqlEditor).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Expect summary text to be visible
+     */
+    async expectSummaryVisible() {
+        const summary = this.page.locator(this.selectors.summaryText);
+        await expect(summary).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Expect summary to contain text
+     * @param {string} text - Text to check
+     */
+    async expectSummaryContains(text) {
+        const summary = this.page.locator(this.selectors.summaryText);
+        await expect(summary).toContainText(text);
+    }
+
+    /**
+     * Expect filter row with specific field
+     * @param {string} field - Field name
+     */
+    async expectFilterRowWithField(field) {
+        const filterRow = this.page.locator(this.selectors.filterRow).filter({ hasText: field });
+        await expect(filterRow).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Expect sensitivity empty state to be visible
+     */
+    async expectSensitivityEmptyState() {
+        const emptyState = this.page.locator(this.selectors.sensitivityEmpty);
+        await expect(emptyState).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Expect destination selector to be visible
+     */
+    async expectDestinationSelectorVisible() {
+        const dest = this.page.locator(this.selectors.destination);
+        await expect(dest).toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Scroll to sensitivity section
+     */
+    async scrollToSensitivitySection() {
+        const loadBtn = this.page.locator(this.selectors.sensitivityLoadBtn);
+        await loadBtn.scrollIntoViewIfNeeded();
+    }
+
+    /**
+     * Get threshold range label text
+     * @returns {Promise<string>}
+     */
+    async getThresholdRangeLabel() {
+        const label = this.page.locator(this.selectors.thresholdRangeLabel);
+        return await label.textContent();
+    }
+
+    /**
+     * Expect save button to be disabled
+     */
+    async expectSaveButtonDisabled() {
+        const saveBtn = this.page.locator(this.selectors.saveButton);
+        await expect(saveBtn).toBeDisabled({ timeout: 5000 });
+    }
+
+    /**
+     * Expect destination error to contain text
+     * @param {string} text - Text to check
+     */
+    async expectDestinationErrorContains(text) {
+        const error = this.page.locator(this.selectors.destinationError);
+        await expect(error).toContainText(text);
+    }
+
+    /**
+     * Expect timestamp error to contain text
+     * @param {string} text - Text to check
+     */
+    async expectTimestampErrorContains(text) {
+        const error = this.page.locator(this.selectors.customSqlTimestampError);
+        await expect(error).toContainText(text);
+    }
+
+    /**
+     * Expect to be in edit mode (Detection Config tab visible)
+     */
+    async expectEditModeOpen() {
+        // Detection Config tab should be visible when in edit mode
+        const tabSelectors = [
+            '[class*="tw:cursor-pointer"]:has-text("Detection Config")',
+            'text=Detection Config',
+            '.q-tab:has-text("Detection Config")'
+        ];
+
+        let found = false;
+        for (const selector of tabSelectors) {
+            const tab = this.page.locator(selector).first();
+            if (await tab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            throw new Error('Edit mode not open - Detection Config tab not visible');
+        }
+        testLogger.info('Edit mode verified - Detection Config tab visible');
+    }
+
+    /**
+     * Expect seasonality text to be visible
+     * @param {string} text - Expected seasonality text (e.g., 'hour + day-of-week')
+     */
+    async expectSeasonalityText(text) {
+        const seasonalityElement = this.page.getByText(text).first();
+        await expect(seasonalityElement).toBeVisible({ timeout: 5000 });
+        testLogger.info('Seasonality text verified', { text });
+    }
+
+    /**
+     * Select a destination from the dropdown
+     * @param {string} destinationName - Name of the destination to select
+     * @returns {Promise<boolean>} - True if destination was selected
+     */
+    async selectDestination(destinationName) {
+        testLogger.info('Selecting destination', { destinationName });
+
+        const destSelect = this.page.locator(this.selectors.destination);
+        await destSelect.click();
+        await this.page.waitForTimeout(1000);
+
+        // Type to filter
+        await this.page.keyboard.type(destinationName);
+        await this.page.waitForTimeout(1000);
+
+        // Try multiple selectors to find and click the option
+        let destFound = false;
+
+        // Try via menu item
+        const destOption = this.page.locator(this.selectors.qMenuItem).filter({ hasText: destinationName }).first();
+        if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await destOption.click();
+            await this.page.waitForTimeout(500);
+            destFound = true;
+            testLogger.info('Destination selected via menu item');
+        }
+
+        if (!destFound) {
+            // Try selecting via checkbox in dropdown
+            const checkboxItem = this.page.locator(this.selectors.qMenuItem).filter({ hasText: new RegExp(destinationName.split('_')[0]) }).first();
+            if (await checkboxItem.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await checkboxItem.click();
+                await this.page.waitForTimeout(500);
+                destFound = true;
+                testLogger.info('Destination selected via checkbox');
+            }
+        }
+
+        // Close dropdown
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
+
+        if (!destFound) {
+            testLogger.warn('Could not find destination in dropdown', { destinationName });
+        }
+
+        return destFound;
+    }
+
+    /**
+     * Check if destination error is visible
+     * @returns {Promise<boolean>}
+     */
+    async isDestinationErrorVisible() {
+        const destError = this.page.locator(this.selectors.destinationError);
+        return await destError.isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
+    /**
+     * Open more options menu for an anomaly
+     * @param {string} anomalyName - Anomaly name
+     */
+    async openMoreOptionsMenu(anomalyName) {
+        const moreOptionsButton = this.page.locator(this.selectors.moreOptionsButton(anomalyName));
+        await expect(moreOptionsButton).toBeVisible({ timeout: 5000 });
+        await moreOptionsButton.click();
+        await this.page.waitForTimeout(500);
+        testLogger.info('Opened more options menu', { anomalyName });
+    }
+
+    /**
+     * Click trigger detection from more options menu
+     * @param {string} anomalyName - Anomaly name
+     * @returns {Promise<boolean>} - True if trigger detection was clicked
+     */
+    async clickTriggerDetection(anomalyName) {
+        // First open the more options menu
+        await this.openMoreOptionsMenu(anomalyName);
+
+        // Look for "Trigger Detection" menu item
+        const triggerMenuItem = this.page.locator(this.selectors.triggerDetectionButton(anomalyName));
+
+        if (await triggerMenuItem.isVisible({ timeout: 2000 }).catch(() => false)) {
+            testLogger.info('Found Trigger Detection menu item');
+            await triggerMenuItem.click();
+            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+            testLogger.info('Anomaly detection triggered via UI');
+            return true;
+        }
+
+        // Alternative: try clicking by text in menu
+        const triggerByText = this.page.locator(this.selectors.qMenu).getByText(/trigger.*detection/i).first();
+        if (await triggerByText.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await triggerByText.click();
+            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+            testLogger.info('Anomaly detection triggered via text selector');
+            return true;
+        }
+
+        testLogger.info('Trigger Detection menu item not available - anomaly may need to be trained first');
+        // Close menu
+        await this.page.keyboard.press('Escape');
+        return false;
+    }
+
+    /**
+     * Clear detection window value (for validation testing)
+     */
+    async clearDetectionWindowValue() {
+        const input = this.page.locator(this.selectors.detectionWindowValue);
+        await input.fill('');
+    }
+
+    /**
+     * Click save button without waiting for success (for validation testing)
+     */
+    async clickSaveForValidation() {
+        const saveBtn = this.page.locator(this.selectors.saveButton);
+        await saveBtn.click();
+    }
+
+    /**
      * Clean up test anomalies
      * @param {string} pattern - Name pattern to match
      */
     async cleanupTestAnomalies(pattern) {
         testLogger.info('Cleaning up test anomalies', { pattern });
-        // This would need API implementation - just log for now
+
+        // Import and use API helper for cleanup
+        const { cleanupTestAnomalies: apiCleanup } = require('../../playwright-tests/utils/api-helper.js');
+
+        try {
+            const deletedCount = await apiCleanup(this.page, pattern);
+            testLogger.info('Test anomalies cleanup completed', { pattern, deletedCount });
+            return deletedCount;
+        } catch (error) {
+            testLogger.warn('Failed to cleanup test anomalies via API', { pattern, error: error.message });
+            return 0;
+        }
     }
 
     // ==================== NAVIGATION METHODS ====================
@@ -893,7 +1203,7 @@ class AnomalyDetectionPage {
         await this.page.waitForTimeout(1000);
 
         // Check if anomaly appears in alert list with anomaly icon
-        const anomalyRow = this.page.locator(`tr:has-text("${name}")`).first();
+        const anomalyRow = this.page.locator('tr').filter({ hasText: name }).first();
         await expect(anomalyRow).toBeVisible({ timeout: 10000 });
 
         // Verify it has anomaly icon (query_stats)
@@ -909,7 +1219,7 @@ class AnomalyDetectionPage {
      * @returns {Promise<string>} Status (training, ready, failed, etc.)
      */
     async getAnomalyStatus(name) {
-        const row = this.page.locator(`tr:has-text("${name}")`).first();
+        const row = this.page.locator('tr').filter({ hasText: name }).first();
         const badge = row.locator('.q-badge');
 
         if (await badge.isVisible({ timeout: 3000 })) {

@@ -36,7 +36,7 @@ test.describe("Anomaly Detection Alerts", () => {
     await pm.anomalyDetectionPage.navigateToAnomalyTab();
 
     // Wait for alerts table to be ready
-    await page.locator(pm.anomalyDetectionPage.selectors.alertsTable).first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    await pm.anomalyDetectionPage.waitForAlertsTable();
 
     testLogger.info('Test setup completed', { randomValue });
   });
@@ -55,8 +55,7 @@ test.describe("Anomaly Detection Alerts", () => {
       const anomalyName = testAnomalyName('Basic');
 
       // Start anomaly creation
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      await pm.anomalyDetectionPage.clickAddAnomaly();
 
       // Fill basic setup
       await pm.anomalyDetectionPage.fillBasicSetup(
@@ -70,33 +69,15 @@ test.describe("Anomaly Detection Alerts", () => {
 
       testLogger.info('Checking if anomaly configuration UI is visible');
 
-      // Check if detection config tab exists and click it if needed
-      const detectionConfigTab = page.getByText('Detection Config');
-      if (await detectionConfigTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await detectionConfigTab.click();
-        await page.waitForTimeout(500);
-      }
+      // Click Detection Config tab using POM method
+      await pm.anomalyDetectionPage.clickTab('Detection Config');
 
-      // Configure detection resolution (histogram interval)
-      testLogger.info('Setting detection resolution');
-      const resolutionInput = page.locator(pm.anomalyDetectionPage.selectors.histogramIntervalValue);
-      await expect(resolutionInput).toBeVisible({ timeout: 5000 });
-      await resolutionInput.fill('5');
-
-      // Set schedule interval (check every)
-      testLogger.info('Setting schedule interval');
-      const scheduleInput = page.locator(pm.anomalyDetectionPage.selectors.scheduleIntervalValue);
-      await scheduleInput.fill('10');
-
-      // Set detection window (look back)
-      testLogger.info('Setting detection window');
-      const windowInput = page.locator(pm.anomalyDetectionPage.selectors.detectionWindowValue);
-      await windowInput.fill('30');
-
-      // Set training window (minimum 1 day)
-      testLogger.info('Setting training window');
-      const trainingInput = page.locator(pm.anomalyDetectionPage.selectors.trainingWindow);
-      await trainingInput.fill('1');
+      // Configure detection settings using POM methods
+      testLogger.info('Setting detection configuration');
+      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
+      await pm.anomalyDetectionPage.setCheckEvery(10, 'm');
+      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
+      await pm.anomalyDetectionPage.setTrainingWindow(1);
 
       // Set retrain interval - it should already be set to "Never" by default, skip if not critical
       testLogger.info('Skipping retrain interval (default is Never)');
@@ -105,111 +86,14 @@ test.describe("Anomaly Detection Alerts", () => {
       await page.keyboard.press('Escape');
       await page.waitForTimeout(1000);
 
-      // Go to Alerting tab and DISABLE alerting (it's enabled by default with no destination)
-      testLogger.info('Disabling alerting to allow save');
-
-      // Wait for tabs to be visible - look for tab container
-      await page.waitForSelector('.alert-v3-tabs', { timeout: 5000 }).catch(() => {});
-
-      // Try to find and click Alerting tab with multiple fallbacks
-      const alertingTabSelectors = [
-        'text="Alerting"',
-        '[class*="tw:cursor-pointer"]:has-text("Alerting")',
-        '.tw\\:cursor-pointer:has-text("Alert")',
-        'div[class*="cursor-pointer"]'
-      ];
-
-      let alertingTab = null;
-      for (const selector of alertingTabSelectors) {
-        const tab = page.locator(selector).filter({ hasText: /alert/i }).first();
-        if (await tab.isVisible({ timeout: 2000 }).catch(() => false)) {
-          alertingTab = tab;
-          testLogger.info(`Found Alerting tab using selector: ${selector}`);
-          break;
-        }
-      }
-
-      if (alertingTab) {
-        await alertingTab.click();
-      } else {
-        testLogger.warn('Could not find Alerting tab, it may already be visible or not exist');
-      }
-      await page.waitForTimeout(1000);
-      testLogger.info('Clicked Alerting tab');
-
-      // Take screenshot to see Alerting tab state (only in debug mode)
-      if (process.env.DEBUG) {
-        await page.screenshot({ path: 'test-logs/anomaly-alerting-tab.png', fullPage: true });
-      }
-
-      // Find the alert toggle - it should have data-test="anomaly-alert-enabled"
-      const alertToggle = page.locator('[data-test="anomaly-alert-enabled"]');
-
-      // Wait for toggle to be visible
-      try {
-        await alertToggle.waitFor({ state: 'visible', timeout: 5000 });
-
-        // Check if alerting is currently enabled (toggle label shows "Enabled")
-        let toggleLabel = await alertToggle.locator('.q-toggle__label').textContent().catch(() => '');
-        testLogger.info('Alert toggle state', { toggleLabel });
-
-        if (toggleLabel.toLowerCase().includes('enabled')) {
-          testLogger.info('Alerting is enabled, clicking to disable');
-
-          // Click the toggle
-          await alertToggle.click();
-
-          // Wait for the toggle state to update
-          await page.waitForTimeout(1500);
-
-          // Verify the toggle label changed to "Disabled"
-          toggleLabel = await alertToggle.locator('.q-toggle__label').textContent().catch(() => '');
-          testLogger.info('After clicking toggle', { toggleLabel });
-
-          if (!toggleLabel.toLowerCase().includes('disabled')) {
-            testLogger.warn('Toggle label did not change to Disabled, retrying click');
-            await alertToggle.click();
-            await page.waitForTimeout(1500);
-            toggleLabel = await alertToggle.locator('.q-toggle__label').textContent().catch(() => '');
-            testLogger.info('After second click', { toggleLabel });
-          }
-        } else {
-          testLogger.info('Alerting is already disabled');
-        }
-      } catch (e) {
-        testLogger.warn('Could not find alert toggle with data-test selector, trying alternative');
-        // Try alternative: find toggle with "Enabled" or "Disabled" text
-        const toggleAlt = page.locator('.q-toggle').filter({ hasText: /enabled|disabled/i }).first();
-        if (await toggleAlt.isVisible({ timeout: 2000 }).catch(() => false)) {
-          const label = await toggleAlt.locator('.q-toggle__label').textContent().catch(() => '');
-          if (label.toLowerCase().includes('enabled')) {
-            await toggleAlt.click();
-            await page.waitForTimeout(1500);
-            testLogger.info('Alternative toggle clicked');
-          }
-        }
-      }
-
-      // Navigate back to Config tab after disabling alerting
-      testLogger.info('Navigating back to Config tab');
-      const configTab = page.locator('[class*="tw:cursor-pointer"]').filter({ hasText: /config/i }).first();
-      if (await configTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await configTab.click();
-        await page.waitForTimeout(1000);
-        testLogger.info('Clicked Config tab');
-      }
+      // Disable alerting using POM method (alerting is enabled by default with no destination)
+      await pm.anomalyDetectionPage.disableAlerting();
 
       // Wait for Vue reactivity and validation to complete
       await page.waitForTimeout(1500);
 
-      // Click save button
-      const saveButton = page.locator(pm.anomalyDetectionPage.selectors.saveButton);
-      await expect(saveButton).toBeVisible({ timeout: 5000 });
-      await expect(saveButton).toBeEnabled({ timeout: 5000 });
-      await saveButton.click();
-
-      // Wait for navigation back to list
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      // Click save button using POM method
+      await pm.anomalyDetectionPage.clickSave();
 
       // Verify we're back on the list and the anomaly appears
       const anomalyRow = pm.anomalyDetectionPage.getAnomalyRow(anomalyName);
@@ -229,12 +113,9 @@ test.describe("Anomaly Detection Alerts", () => {
       const anomalyRow = pm.anomalyDetectionPage.getAnomalyRow(anomalyName);
       await expect(anomalyRow).toBeVisible({ timeout: 10000 });
 
-      // Verify action buttons using POM dynamic selectors
-      const editButton = page.locator(pm.anomalyDetectionPage.selectors.editButton(anomalyName));
-      const pauseButton = page.locator(pm.anomalyDetectionPage.selectors.pauseButton(anomalyName));
-
-      await expect(editButton).toBeVisible({ timeout: 5000 });
-      await expect(pauseButton).toBeVisible({ timeout: 5000 });
+      // Verify action buttons using POM methods
+      await pm.anomalyDetectionPage.expectEditButtonVisible(anomalyName);
+      await pm.anomalyDetectionPage.expectPauseButtonVisible(anomalyName);
 
       testLogger.info('Anomaly visible in list with action buttons');
     });
@@ -246,37 +127,20 @@ test.describe("Anomaly Detection Alerts", () => {
 
       const anomalyName = testAnomalyName('Basic');
 
-      // Click edit button using POM selector
-      const editButton = page.locator(pm.anomalyDetectionPage.selectors.editButton(anomalyName));
-      await expect(editButton).toBeVisible({ timeout: 5000 });
-      await editButton.click();
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      // Click edit button using POM method
+      await pm.anomalyDetectionPage.editAnomaly(anomalyName);
 
-      // Verify wizard opens - should see the anomaly name in the form
-      await expect(page.locator('input').filter({ hasText: anomalyName }).or(
-        page.locator(`input[value="${anomalyName}"]`)
-      ).first()).toBeVisible({ timeout: 5000 }).catch(async () => {
-        // Alternative: just verify we're in edit mode by checking for Detection Config tab
-        await expect(page.getByText('Detection Config')).toBeVisible({ timeout: 5000 });
-      });
+      // Verify wizard opens in edit mode
+      await pm.anomalyDetectionPage.expectEditModeOpen();
 
       // Change training window to 7 days
-      const trainingInput = page.locator(pm.anomalyDetectionPage.selectors.trainingWindow);
-      if (await trainingInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await trainingInput.fill('7');
-        await page.waitForTimeout(500);
-      }
+      await pm.anomalyDetectionPage.setTrainingWindow(7);
 
-      // Verify seasonality text changes (use .first() to avoid strict mode error)
-      await expect(page.getByText('hour + day-of-week').first()).toBeVisible({ timeout: 5000 });
+      // Verify seasonality text changes
+      await pm.anomalyDetectionPage.expectSeasonalityText('hour + day-of-week');
 
-      // Save changes
-      const saveButton = page.locator(pm.anomalyDetectionPage.selectors.saveButton);
-      await expect(saveButton).toBeEnabled({ timeout: 5000 });
-      await saveButton.click();
-
-      // Wait for save and navigation back to list
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      // Save changes using POM method
+      await pm.anomalyDetectionPage.clickSave();
 
       // Verify still in list
       const anomalyRow = pm.anomalyDetectionPage.getAnomalyRow(anomalyName);
@@ -292,34 +156,8 @@ test.describe("Anomaly Detection Alerts", () => {
 
       const anomalyName = testAnomalyName('Basic');
 
-      // Click the "more options" button to open the menu using POM selector
-      const moreOptionsButton = page.locator(pm.anomalyDetectionPage.selectors.moreOptionsButton(anomalyName));
-      await expect(moreOptionsButton).toBeVisible({ timeout: 5000 });
-      await moreOptionsButton.click();
-      await page.waitForTimeout(500);
-
-      // Click delete option in the dropdown menu
-      const deleteMenuItem = page.locator(pm.anomalyDetectionPage.selectors.qMenuItem).filter({ has: page.locator('.q-icon').filter({ hasText: /delete/i }) }).first();
-      if (await deleteMenuItem.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await deleteMenuItem.click();
-      } else {
-        // Alternative: click by text
-        const deleteByText = page.locator(pm.anomalyDetectionPage.selectors.qMenu).getByText('Delete').first();
-        await deleteByText.click();
-      }
-      await page.waitForTimeout(500);
-
-      // Verify confirmation dialog and click confirm
-      const confirmDialog = page.locator(pm.anomalyDetectionPage.selectors.qDialog);
-      await expect(confirmDialog).toBeVisible({ timeout: 5000 });
-
-      // Click OK/Confirm button in dialog
-      const confirmButton = confirmDialog.locator('button').filter({ hasText: /ok|confirm|delete|yes/i }).first();
-      await expect(confirmButton).toBeVisible({ timeout: 3000 });
-      await confirmButton.click();
-
-      // Wait for deletion to complete
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      // Delete anomaly using POM method
+      await pm.anomalyDetectionPage.deleteAnomaly(anomalyName);
 
       // Verify removed from list
       const anomalyRow = pm.anomalyDetectionPage.getAnomalyRow(anomalyName);
@@ -343,8 +181,7 @@ test.describe("Anomaly Detection Alerts", () => {
       const anomalyName = testAnomalyName('SQL');
 
       // Start creation
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForTimeout(1000);
+      await pm.anomalyDetectionPage.clickAddAnomaly();
 
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
 
@@ -353,7 +190,7 @@ test.describe("Anomaly Detection Alerts", () => {
       await pm.anomalyDetectionPage.selectQueryMode('sql');
 
       // Verify SQL editor appears (Monaco editor takes time to initialize)
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.customSql)).toBeVisible({ timeout: 10000 });
+      await pm.anomalyDetectionPage.expectSqlEditorVisible();
 
       // Set custom SQL - use simple count without invalid field references
       const customSql = `SELECT histogram(_timestamp, '10m') AS time_bucket, count(*) AS value FROM "${testStreamName}" GROUP BY time_bucket ORDER BY time_bucket`;
@@ -388,8 +225,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
       const anomalyName = testAnomalyName('Avg');
 
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForTimeout(1000);
+      await pm.anomalyDetectionPage.clickAddAnomaly();
 
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
 
@@ -403,7 +239,7 @@ test.describe("Anomaly Detection Alerts", () => {
       });
 
       // Verify field selector appeared
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.detectionFunctionField)).toBeVisible();
+      await pm.anomalyDetectionPage.expectDetectionFieldVisible();
 
       // Set other config
       await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
@@ -429,8 +265,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
       const anomalyName = testAnomalyName('Filtered');
 
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForTimeout(1000);
+      await pm.anomalyDetectionPage.clickAddAnomaly();
 
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
 
@@ -441,14 +276,8 @@ test.describe("Anomaly Detection Alerts", () => {
       await pm.anomalyDetectionPage.addFilter('code', '=', '200');
       await pm.anomalyDetectionPage.addFilter('stream', 'Contains', 'stdout');
 
-      // Verify filters added - check for filter rows with the expected values
-      // Look for filter rows containing the field values in inputs or divs
-      const filterRows = page.locator('.tw\\:flex.tw\\:items-center.tw\\:gap-2.tw\\:mb-2');
-      await expect(filterRows).toHaveCount(2, { timeout: 5000 });
-
-      // Also verify the values are present somewhere in the filter area
-      const filterArea = page.locator('.alert-settings-row').filter({ hasText: 'Filters' });
-      await expect(filterArea).toBeVisible({ timeout: 5000 });
+      // Verify filters added using POM method
+      await pm.anomalyDetectionPage.expectFilterCount(2);
 
       // Complete config
       await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
@@ -478,8 +307,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
       const anomalyName = testAnomalyName('WithAlerts');
 
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForTimeout(1000);
+      await pm.anomalyDetectionPage.clickAddAnomaly();
 
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
 
@@ -494,63 +322,17 @@ test.describe("Anomaly Detection Alerts", () => {
       await pm.anomalyDetectionPage.clickTab('Alerting');
 
       // Alerting should already be enabled by default, but ensure it's on
-      const alertToggle = page.locator(pm.anomalyDetectionPage.selectors.alertEnabled);
-      const toggleLabel = await alertToggle.locator(pm.anomalyDetectionPage.selectors.alertToggleLabel).textContent().catch(() => '');
-      if (toggleLabel.toLowerCase().includes('disabled')) {
-        await alertToggle.click();
-        await page.waitForTimeout(500);
-      }
+      await pm.anomalyDetectionPage.toggleNotifications(true);
 
       // Verify destination selector appears
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.destination)).toBeVisible({ timeout: 5000 });
+      await pm.anomalyDetectionPage.expectDestinationSelectorVisible();
 
-      // Select the prerequisite destination created in beforeEach
-      testLogger.info('Selecting destination', { testDestinationName });
-      const destSelect = page.locator(pm.anomalyDetectionPage.selectors.destination);
-      await destSelect.click();
-      await page.waitForTimeout(1000);
-
-      // Type to filter - use the destination name
-      await page.keyboard.type(testDestinationName);
-      await page.waitForTimeout(1000);
-
-      // Click on the matching option - try multiple selectors
-      let destFound = false;
-      const destOption = page.locator(pm.anomalyDetectionPage.selectors.qMenuItem).filter({ hasText: testDestinationName }).first();
-      if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await destOption.click();
-        await page.waitForTimeout(500);
-        destFound = true;
-        testLogger.info('Destination selected via menu item');
-      }
-
-      if (!destFound) {
-        // Try selecting via checkbox in dropdown
-        const checkboxItem = page.locator(pm.anomalyDetectionPage.selectors.qMenuItem).filter({ hasText: /e2e_anomaly_dest/ }).first();
-        if (await checkboxItem.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await checkboxItem.click();
-          await page.waitForTimeout(500);
-          destFound = true;
-          testLogger.info('Destination selected via checkbox');
-        }
-      }
-
-      if (!destFound) {
-        testLogger.warn('Could not find destination in dropdown');
-        // Take screenshot for debugging (only in debug mode)
-        if (process.env.DEBUG) {
-          await page.screenshot({ path: 'test-logs/anomaly-dest-dropdown.png', fullPage: true });
-        }
-      }
-
-      // Close dropdown
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(300);
+      // Select the prerequisite destination created in beforeEach using POM method
+      const destFound = await pm.anomalyDetectionPage.selectDestination(testDestinationName);
 
       // Verify destination error is gone (destination selected)
-      const destError = page.locator(pm.anomalyDetectionPage.selectors.destinationError);
-      const errorVisible = await destError.isVisible({ timeout: 2000 }).catch(() => false);
-      if (errorVisible) {
+      const errorVisible = await pm.anomalyDetectionPage.isDestinationErrorVisible();
+      if (errorVisible || !destFound) {
         testLogger.warn('Destination error still visible - destination may not be selected');
         // Cancel and skip test
         await pm.anomalyDetectionPage.clickBack();
@@ -572,8 +354,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
       const anomalyName = testAnomalyName('RefreshDest');
 
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForTimeout(1000);
+      await pm.anomalyDetectionPage.clickAddAnomaly();
 
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
 
@@ -590,7 +371,7 @@ test.describe("Anomaly Detection Alerts", () => {
       await pm.anomalyDetectionPage.refreshDestinations();
 
       // Verify no errors (destinations reloaded)
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.destination)).toBeVisible();
+      await pm.anomalyDetectionPage.expectDestinationSelectorVisible();
 
       // Cancel creation
       await pm.anomalyDetectionPage.clickBack();
@@ -663,71 +444,29 @@ test.describe("Anomaly Detection Alerts", () => {
       // The P0 tests should have left some anomalies or we create one
       const anomalyName = testAnomalyName('Trigger');
 
-      // Create anomaly first
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForTimeout(1000);
-
+      // Create anomaly first using POM methods
+      await pm.anomalyDetectionPage.clickAddAnomaly();
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
-      await page.waitForTimeout(2000);
 
       // Set minimal config
-      const detectionConfigTab = page.getByText('Detection Config');
-      if (await detectionConfigTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await detectionConfigTab.click();
-        await page.waitForTimeout(500);
-      }
-
-      // Fill required fields using POM selectors
-      await page.locator(pm.anomalyDetectionPage.selectors.histogramIntervalValue).fill('5');
-      await page.locator(pm.anomalyDetectionPage.selectors.scheduleIntervalValue).fill('10');
-      await page.locator(pm.anomalyDetectionPage.selectors.detectionWindowValue).fill('30');
-      await page.locator(pm.anomalyDetectionPage.selectors.trainingWindow).fill('1');
+      await pm.anomalyDetectionPage.clickTab('Detection Config');
+      await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
+      await pm.anomalyDetectionPage.setCheckEvery(10, 'm');
+      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
+      await pm.anomalyDetectionPage.setTrainingWindow(1);
 
       // Disable alerting to allow save
       await pm.anomalyDetectionPage.disableAlerting();
 
       // Save
-      const saveButton = page.locator(pm.anomalyDetectionPage.selectors.saveButton);
-      await expect(saveButton).toBeEnabled({ timeout: 5000 });
-      await saveButton.click();
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      await pm.anomalyDetectionPage.clickSave();
 
       // Verify created
-      const anomalyRow = pm.anomalyDetectionPage.getAnomalyRow(anomalyName);
-      await expect(anomalyRow).toBeVisible({ timeout: 15000 });
+      await pm.anomalyDetectionPage.expectAnomalyInList(anomalyName);
 
-      // Now trigger detection via the UI menu
+      // Now trigger detection via the UI menu using POM method
       testLogger.info('Triggering detection via UI');
-
-      // Click more options menu using POM selector
-      const moreOptionsButton = page.locator(pm.anomalyDetectionPage.selectors.moreOptionsButton(anomalyName));
-      await expect(moreOptionsButton).toBeVisible({ timeout: 5000 });
-      await moreOptionsButton.click();
-      await page.waitForTimeout(500);
-
-      // Look for "Trigger Detection" menu item using POM selector
-      const triggerMenuItem = page.locator(pm.anomalyDetectionPage.selectors.triggerDetectionButton(anomalyName));
-
-      if (await triggerMenuItem.isVisible({ timeout: 2000 }).catch(() => false)) {
-        testLogger.info('Found Trigger Detection menu item');
-        await triggerMenuItem.click();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-        // Should see success toast or status change
-        testLogger.info('Anomaly detection triggered successfully via UI');
-      } else {
-        // Alternative: try clicking by text
-        const triggerByText = page.locator(pm.anomalyDetectionPage.selectors.qMenu).getByText(/trigger.*detection/i).first();
-        if (await triggerByText.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await triggerByText.click();
-          await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-          testLogger.info('Anomaly detection triggered via text selector');
-        } else {
-          testLogger.info('Trigger Detection menu item not available - anomaly may need to be trained first');
-          // Close menu
-          await page.keyboard.press('Escape');
-        }
-      }
+      await pm.anomalyDetectionPage.clickTriggerDetection(anomalyName);
 
       testLogger.info('Trigger anomaly detection test completed');
     });
@@ -786,8 +525,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
       const anomalyName = testAnomalyName('Preview');
 
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForTimeout(1000);
+      await pm.anomalyDetectionPage.clickAddAnomaly();
 
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
 
@@ -801,10 +539,10 @@ test.describe("Anomaly Detection Alerts", () => {
       await pm.anomalyDetectionPage.setTrainingWindow(1);
 
       // Scroll to sensitivity section
-      await page.locator(pm.anomalyDetectionPage.selectors.sensitivityLoadBtn).scrollIntoViewIfNeeded();
+      await pm.anomalyDetectionPage.scrollToSensitivitySection();
 
       // Verify empty state initially
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.sensitivityEmpty)).toBeVisible({ timeout: 5000 });
+      await pm.anomalyDetectionPage.expectSensitivityEmptyState();
 
       // Load preview
       await pm.anomalyDetectionPage.loadSensitivityPreview();
@@ -826,8 +564,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
       const anomalyName = testAnomalyName('Slider');
 
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForTimeout(1000);
+      await pm.anomalyDetectionPage.clickAddAnomaly();
 
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
 
@@ -837,14 +574,14 @@ test.describe("Anomaly Detection Alerts", () => {
       await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
       await pm.anomalyDetectionPage.setTrainingWindow(1);
 
-      await page.locator(pm.anomalyDetectionPage.selectors.sensitivityLoadBtn).scrollIntoViewIfNeeded();
+      await pm.anomalyDetectionPage.scrollToSensitivitySection();
       await pm.anomalyDetectionPage.loadSensitivityPreview();
 
       // Adjust slider
       await pm.anomalyDetectionPage.adjustSensitivitySlider(20, 80);
 
       // Verify range label updates
-      const label = await page.locator(pm.anomalyDetectionPage.selectors.thresholdRangeLabel).textContent();
+      const label = await pm.anomalyDetectionPage.getThresholdRangeLabel();
       testLogger.info('Sensitivity range updated', { label });
 
       // Label should contain the range values
@@ -866,8 +603,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
       const anomalyName = testAnomalyName('Summary');
 
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForTimeout(1000);
+      await pm.anomalyDetectionPage.clickAddAnomaly();
 
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
 
@@ -881,12 +617,12 @@ test.describe("Anomaly Detection Alerts", () => {
       // Go to summary
       await pm.anomalyDetectionPage.clickTab('Summary');
 
-      // Verify summary text appears using POM selector
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.summaryText)).toBeVisible({ timeout: 5000 });
+      // Verify summary text appears using POM methods
+      await pm.anomalyDetectionPage.expectSummaryVisible();
 
       // Verify summary contains key information
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.summaryText)).toContainText(testStreamName);
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.summaryText)).toContainText('7'); // training window days
+      await pm.anomalyDetectionPage.expectSummaryContains(testStreamName);
+      await pm.anomalyDetectionPage.expectSummaryContains('7'); // training window days
 
       await pm.anomalyDetectionPage.clickBack();
 
@@ -903,8 +639,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
       const anomalyName = testAnomalyName('TabSwitch');
 
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForTimeout(1000);
+      await pm.anomalyDetectionPage.clickAddAnomaly();
 
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
 
@@ -920,15 +655,15 @@ test.describe("Anomaly Detection Alerts", () => {
       await pm.anomalyDetectionPage.selectQueryMode('sql');
 
       // Verify SQL editor appears and query was generated (should contain the filter)
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.customSql)).toBeVisible({ timeout: 10000 });
+      await pm.anomalyDetectionPage.expectSqlEditorVisible();
       // SQL should contain the WHERE clause for the filter
       // (This is implementation-dependent, may need adjustment)
 
       // Switch back to Builder
       await pm.anomalyDetectionPage.selectQueryMode('builder');
 
-      // Verify filter still there using POM selector
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.filterRow).filter({ hasText: 'status' })).toBeVisible();
+      // Verify filter still there using POM method
+      await pm.anomalyDetectionPage.expectFilterRowWithField('status');
 
       await pm.anomalyDetectionPage.clickBack();
 
@@ -947,8 +682,7 @@ test.describe("Anomaly Detection Alerts", () => {
     }, async ({ page }) => {
       testLogger.info('Testing validation errors');
 
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForTimeout(1000);
+      await pm.anomalyDetectionPage.clickAddAnomaly();
 
       // Try to proceed without filling required fields
       const anomalyName = testAnomalyName('Validation');
@@ -958,10 +692,10 @@ test.describe("Anomaly Detection Alerts", () => {
       await pm.anomalyDetectionPage.clickTab('Detection Config');
 
       // Clear detection window to trigger validation
-      await page.locator(pm.anomalyDetectionPage.selectors.detectionWindowValue).fill('');
+      await pm.anomalyDetectionPage.clearDetectionWindowValue();
 
       // Try to save - should show validation error
-      await page.locator(pm.anomalyDetectionPage.selectors.saveButton).click();
+      await pm.anomalyDetectionPage.clickSaveForValidation();
 
       // Verify error appears
       await pm.anomalyDetectionPage.expectValidationError(pm.anomalyDetectionPage.selectors.detectionWindowError);
@@ -990,8 +724,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
       const anomalyName = testAnomalyName('DestValidation');
 
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForTimeout(1000);
+      await pm.anomalyDetectionPage.clickAddAnomaly();
 
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
 
@@ -1008,13 +741,13 @@ test.describe("Anomaly Detection Alerts", () => {
       // Don't select any destinations
 
       // Try to save
-      await page.locator(pm.anomalyDetectionPage.selectors.saveButton).click();
+      await pm.anomalyDetectionPage.clickSaveForValidation();
 
       // Verify error message
       await pm.anomalyDetectionPage.expectValidationError(pm.anomalyDetectionPage.selectors.destinationError);
 
       // Verify error text
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.destinationError)).toContainText('At least one destination is required');
+      await pm.anomalyDetectionPage.expectDestinationErrorContains('At least one destination is required');
 
       // Cancel
       await pm.anomalyDetectionPage.clickBack();
@@ -1029,8 +762,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
       const anomalyName = testAnomalyName('TimestampError');
 
-      await page.locator(pm.alertsPage.locators.addAlertButton).click();
-      await page.waitForTimeout(1000);
+      await pm.anomalyDetectionPage.clickAddAnomaly();
 
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
 
@@ -1050,11 +782,10 @@ test.describe("Anomaly Detection Alerts", () => {
       // Verify error appears
       await pm.anomalyDetectionPage.expectValidationError(pm.anomalyDetectionPage.selectors.customSqlTimestampError);
 
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.customSqlTimestampError))
-        .toContainText('_timestamp cannot be used as a column alias');
+      await pm.anomalyDetectionPage.expectTimestampErrorContains('_timestamp cannot be used as a column alias');
 
       // Save should be blocked
-      await expect(page.locator(pm.anomalyDetectionPage.selectors.saveButton)).toBeDisabled();
+      await pm.anomalyDetectionPage.expectSaveButtonDisabled();
 
       await pm.anomalyDetectionPage.clickBack();
 
