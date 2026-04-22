@@ -195,7 +195,6 @@ jobs:
               }
 
               // 2. Check for test with @bug-{issue#} tag
-              const fs = require('fs');
               let hasTest = false;
               let testFile = null;
 
