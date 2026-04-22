@@ -275,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-menu :offset="[0, 4]" style="min-width: 160px; max-width: 300px" @click.stop>
                       <q-list dense separator>
                         <q-item
-                          v-for="rawVal in uniqueValuesPerColumn[header.column.id] || []"
+                          v-for="rawVal in getUniqueValuesForColumn(header.column.id)"
                           :key="String(rawVal)"
                           dense
                           clickable
@@ -293,9 +293,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ getFilterDisplayValue(header.column.id, rawVal) }}
                           </q-item-section>
                         </q-item>
-                        <q-separator v-if="(uniqueValuesPerColumn[header.column.id] || []).length" />
+                        <q-separator v-if="getUniqueValuesForColumn(header.column.id).length" />
                         <q-item dense clickable @click.stop="clearColFilter(header.column.id)">
-                          <q-item-section class="tw:text-xs text-grey-6">Clear filter</q-item-section>
+                          <q-item-section class="tw:text-xs text-grey-6">{{ t('common.clearFilter') }}</q-item-section>
                         </q-item>
                       </q-list>
                     </q-menu>
@@ -1070,6 +1070,7 @@ import {
   type ColumnDef,
   type SortingState,
   type ColumnFiltersState,
+  type Updater,
   useVueTable,
   getCoreRowModel,
   getSortedRowModel,
@@ -1281,35 +1282,33 @@ const sorting = ref<SortingState>([]);
 // ── Column filtering ──────────────────────────────────────────────────────────
 const columnFiltersState = ref<ColumnFiltersState>([]);
 
-const setColumnFilters = (updater: any) => {
+const setColumnFilters = (updater: Updater<ColumnFiltersState>) => {
   columnFiltersState.value =
     typeof updater === "function"
       ? updater(columnFiltersState.value)
       : updater;
 };
 
-/** Unique raw values per column id, computed from the full (unfiltered) row set. */
-const uniqueValuesPerColumn = computed<Record<string, any[]>>(() => {
-  if (!props.enableColumnFilter) return {};
-  const result: Record<string, any[]> = {};
+const uniqueValuesCache = shallowRef<Map<string, any[]>>(new Map());
+
+const getUniqueValuesForColumn = (colId: string): any[] => {
+  if (!props.enableColumnFilter) return [];
+  const cache = uniqueValuesCache.value;
+  if (cache.has(colId)) return cache.get(colId)!;
   const rows = tableRows.value || [];
-  const cols = (dashboardColumns.value ?? []) as any[];
-  for (const col of cols) {
-    const key = col.id as string;
-    const seen = new Set<any>();
-    for (const row of rows) {
-      const val = (row as any)[key];
-      if (val !== null && val !== undefined && val !== "") seen.add(val);
-    }
-    const vals = Array.from(seen);
-    vals.sort((a, b) => {
-      if (typeof a === "number" && typeof b === "number") return a - b;
-      return String(a).localeCompare(String(b));
-    });
-    result[key] = vals;
+  const seen = new Set<any>();
+  for (const row of rows) {
+    const val = (row as any)[colId];
+    if (val !== null && val !== undefined && val !== "") seen.add(val);
   }
-  return result;
-});
+  const vals = Array.from(seen);
+  vals.sort((a, b) => {
+    if (typeof a === "number" && typeof b === "number") return a - b;
+    return String(a).localeCompare(String(b));
+  });
+  cache.set(colId, vals);
+  return vals;
+};
 
 /** Return the formatted display label for a raw cell value in the filter dropdown. */
 const getFilterDisplayValue = (colId: string, rawVal: any): string => {
@@ -1394,6 +1393,8 @@ const tableRowSize = ref(0);
 const columnOrder = ref<any>([]);
 
 const tableRows = shallowRef<any[]>([...(props.rows ?? [])]);
+// Invalidate unique-values filter cache whenever rows are replaced
+watch(tableRows, () => { uniqueValuesCache.value = new Map(); });
 
 // ── Dashboard: convert Quasar column defs → TanStack ColumnDef[] ─────────────
 const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
@@ -1624,25 +1625,34 @@ const getProgressBarPct = (cell: any): number => {
   return Math.min(100, Math.max(0, ((val - min) / (max - min)) * 100));
 };
 
-const getSparklinePoints = (cell: any): string => {
-  const allRows = cell.getContext().table.getPrePaginationRowModel().rows;
-  const colId = cell.column.id;
-  const values: number[] = allRows
-    .map((row: any) => parseFloat(String(row.getValue(colId))))
-    .filter((v: number) => !isNaN(v));
-  if (values.length < 2) return "";
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const W = 80, H = 20;
-  return values
-    .map((v: number, i: number) => {
-      const x = (i / (values.length - 1)) * W;
-      const y = H - ((v - min) / range) * (H - 4) - 2;
+/** Pre-computed sparkline SVG point strings keyed by column field id. Recomputed only when rows change. */
+const sparklineCache = computed((): Map<string, string> => {
+  const cache = new Map<string, string>();
+  const cols = (props.columns as any[]) ?? [];
+  const rows = tableRows.value ?? [];
+  for (const col of cols) {
+    if (col.cellType !== "sparkline") continue;
+    const key = String(col.field ?? col.name);
+    const nums: number[] = [];
+    for (const row of rows) {
+      const v = parseFloat(String((row as any)[key]));
+      if (!isNaN(v)) nums.push(v);
+    }
+    if (nums.length < 2) { cache.set(key, ""); continue; }
+    let mn = nums[0], mx = nums[0];
+    for (const v of nums) { if (v < mn) mn = v; if (v > mx) mx = v; }
+    const W = 80, H = 20, range = mx - mn || 1;
+    cache.set(key, nums.map((v, i) => {
+      const x = (i / (nums.length - 1)) * W;
+      const y = H - ((v - mn) / range) * (H - 4) - 2;
       return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-};
+    }).join(" "));
+  }
+  return cache;
+});
+
+const getSparklinePoints = (cell: any): string =>
+  sparklineCache.value.get(cell.column.id) ?? "";
 
 const getCellDisplayValue = (cell: any): any => {
   const value = cell.getValue();

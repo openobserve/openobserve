@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       type="color"
                       class="color-input-hidden"
                       :value="col.progressColor || '#1976d2'"
-                      @change="(e) => col.progressColor = (e.target as HTMLInputElement).value"
+                      @input="(e) => col.progressColor = (e.target as HTMLInputElement).value"
                     />
                   </label>
                   <span v-if="col.progressColor" class="text-caption text-mono">{{ col.progressColor }}</span>
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="color"
                   class="color-input-hidden"
                   :value="col.textColor || '#000000'"
-                  @change="(e) => col.textColor = (e.target as HTMLInputElement).value"
+                  @input="(e) => col.textColor = (e.target as HTMLInputElement).value"
                 />
               </label>
               <span v-if="col.textColor" class="text-caption text-mono">{{ col.textColor }}</span>
@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="color"
                   class="color-input-hidden"
                   :value="col.bgColor || '#ffffff'"
-                  @change="(e) => col.bgColor = (e.target as HTMLInputElement).value"
+                  @input="(e) => col.bgColor = (e.target as HTMLInputElement).value"
                 />
               </label>
               <span v-if="col.bgColor" class="text-caption text-mono">{{ col.bgColor }}</span>
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="color"
                   class="color-input-hidden"
                   :value="rule.textColor || '#000000'"
-                  @change="(e) => rule.textColor = (e.target as HTMLInputElement).value"
+                  @input="(e) => rule.textColor = (e.target as HTMLInputElement).value"
                 />
               </label>
               <q-btn v-if="rule.textColor" icon="close" size="xs" flat round dense @click="rule.textColor = ''" />
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="color"
                   class="color-input-hidden"
                   :value="rule.bgColor || '#ffffff'"
-                  @change="(e) => rule.bgColor = (e.target as HTMLInputElement).value"
+                  @input="(e) => rule.bgColor = (e.target as HTMLInputElement).value"
                 />
               </label>
               <q-btn v-if="rule.bgColor" icon="close" size="xs" flat round dense @click="rule.bgColor = ''" />
@@ -523,7 +523,8 @@ export default defineComponent({
           }
 
           return { field: { matchBy: "name", value: c.field }, config };
-        });
+        })
+        .filter((entry) => entry.config.length > 0);
 
     // ── Actions ────────────────────────────────────────────────────────────────
     const closePopup = () => emit("close");
