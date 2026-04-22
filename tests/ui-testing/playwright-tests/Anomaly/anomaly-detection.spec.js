@@ -286,7 +286,7 @@ test.describe("Anomaly Detection testcases", () => {
     await page.waitForTimeout(2000);
 
     // Verify it's removed from list (should not be visible)
-    const row = page.locator(`tr:has-text("${anomalyName}")`);
+    const row = page.locator('tr').filter({ hasText: anomalyName });
     await expect(row).not.toBeVisible({ timeout: 5000 });
 
     testLogger.info('Successfully deleted anomaly detection config');

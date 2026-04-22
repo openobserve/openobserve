@@ -14,6 +14,7 @@
 
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { cleanupTestAnomalies: apiCleanupTestAnomalies } = require('../../playwright-tests/utils/api-helper.js');
 
 class AnomalyDetectionPage {
     constructor(page, commonActions) {
@@ -171,24 +172,34 @@ class AnomalyDetectionPage {
      * @param {string} tabName - Tab name
      */
     async clickTab(tabName) {
-        // Try multiple selectors for tabs
-        const tabSelectors = [
-            `[class*="tw:cursor-pointer"]:has-text("${tabName}")`,
-            `text=${tabName}`,
-            `.q-tab:has-text("${tabName}")`,
-            `button:has-text("${tabName}")`,
-            `div[role="tab"]:has-text("${tabName}")`
+        // Try multiple base selectors with filter pattern to avoid injection
+        const baseSelectors = [
+            '[class*="tw:cursor-pointer"]',
+            '.q-tab',
+            'button',
+            'div[role="tab"]'
         ];
 
         let tabFound = false;
-        for (const selector of tabSelectors) {
-            const tab = this.page.locator(selector).first();
+        for (const baseSelector of baseSelectors) {
+            const tab = this.page.locator(baseSelector).filter({ hasText: tabName }).first();
             if (await tab.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await tab.click();
                 await this.page.waitForTimeout(1000); // Wait for tab content to load
-                testLogger.info('Clicked tab', { tabName, selector });
+                testLogger.info('Clicked tab', { tabName, baseSelector });
                 tabFound = true;
                 break;
+            }
+        }
+
+        // Fallback: try text selector
+        if (!tabFound) {
+            const textTab = this.page.getByText(tabName, { exact: true }).first();
+            if (await textTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await textTab.click();
+                await this.page.waitForTimeout(1000);
+                testLogger.info('Clicked tab via text selector', { tabName });
+                tabFound = true;
             }
         }
 
@@ -876,11 +887,8 @@ class AnomalyDetectionPage {
     async cleanupTestAnomalies(pattern) {
         testLogger.info('Cleaning up test anomalies', { pattern });
 
-        // Import and use API helper for cleanup
-        const { cleanupTestAnomalies: apiCleanup } = require('../../playwright-tests/utils/api-helper.js');
-
         try {
-            const deletedCount = await apiCleanup(this.page, pattern);
+            const deletedCount = await apiCleanupTestAnomalies(this.page, pattern);
             testLogger.info('Test anomalies cleanup completed', { pattern, deletedCount });
             return deletedCount;
         } catch (error) {
