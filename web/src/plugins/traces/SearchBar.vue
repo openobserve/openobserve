@@ -709,6 +709,9 @@ export default defineComponent({
       searchObj.data.editorValue = current;
       if (queryEditorRef.value?.setValue)
         queryEditorRef.value.setValue(current);
+      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
+        emit("searchdata");
+      }
     };
 
     // Remove all conditions for a given field from the editor value.
@@ -731,6 +734,9 @@ export default defineComponent({
       searchObj.data.editorValue = newValue as string;
       if (queryEditorRef.value?.setValue)
         queryEditorRef.value.setValue(newValue);
+      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
+        emit("searchdata");
+      }
     };
 
     const jsonToCsv = (jsonData) => {
@@ -781,6 +787,10 @@ export default defineComponent({
 
       // Emit event to notify parent that filters were reset
       emit("filters-reset");
+
+      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
+        emit("searchdata");
+      }
     };
 
     const onErrorOnlyToggle = (value: boolean) => {
