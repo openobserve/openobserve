@@ -300,6 +300,10 @@ export function useConfigPanel(
         label: t("dashboard.tableDynamicColumns"),
         visible: !promqlMode.value && dashboardPanelData.data.type === "table",
       },
+      filtering: {
+        label: t("dashboard.tableFiltering"),
+        visible: dashboardPanelData.data.type === "table",
+      },
       pagination: {
         label: t("dashboard.pagination"),
         visible: dashboardPanelData.data.type === "table",

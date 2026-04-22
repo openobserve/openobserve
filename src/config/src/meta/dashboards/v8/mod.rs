@@ -639,6 +639,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     table_pagination_rows_per_page: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    table_filtering: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     table_pivot_show_row_totals: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     table_pivot_show_col_totals: Option<bool>,

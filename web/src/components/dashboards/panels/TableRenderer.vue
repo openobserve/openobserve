@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :enable-row-expand="false"
       :enable-status-bar="false"
       :enable-ai-context-button="false"
+      :enable-column-filter="enableFiltering"
       data-test="dashboard-panel-table"
       @click:dataRow="(row: any, _idx: number, evt?: MouseEvent) => $emit('row-click', evt ?? null, row, _idx)"
     >
@@ -104,6 +105,11 @@ export default defineComponent({
       required: false,
       type: Number,
       default: TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
+    },
+    enableFiltering: {
+      required: false,
+      type: Boolean,
+      default: false,
     },
   },
   emits: ["row-click"],

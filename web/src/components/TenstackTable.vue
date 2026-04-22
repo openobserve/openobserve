@@ -257,6 +257,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </template>
                 </div>
+                <!-- Slot for extra per-column header content (e.g. filter button) -->
+                <slot name="header-cell" :column-id="header.column.id" />
+
+                <!-- Built-in column filter button -->
+                <template v-if="enableColumnFilter">
+                  <q-btn
+                    icon="filter_list"
+                    size="xs"
+                    flat
+                    round
+                    dense
+                    :color="isColFiltered(header.column.id) ? 'primary' : 'grey-5'"
+                    class="tw:ml-0.5 tw:shrink-0"
+                    @click.stop
+                  >
+                    <q-menu :offset="[0, 4]" style="min-width: 160px; max-width: 300px" @click.stop>
+                      <q-list dense separator>
+                        <q-item
+                          v-for="rawVal in uniqueValuesPerColumn[header.column.id] || []"
+                          :key="String(rawVal)"
+                          dense
+                          clickable
+                          @click.stop="toggleColFilterValue(header.column.id, rawVal)"
+                        >
+                          <q-item-section avatar style="min-width: 28px">
+                            <q-checkbox
+                              :model-value="getColFilterValues(header.column.id).includes(rawVal)"
+                              dense
+                              size="sm"
+                              @update:model-value="toggleColFilterValue(header.column.id, rawVal)"
+                            />
+                          </q-item-section>
+                          <q-item-section class="tw:text-sm">
+                            {{ getFilterDisplayValue(header.column.id, rawVal) }}
+                          </q-item-section>
+                        </q-item>
+                        <q-separator v-if="(uniqueValuesPerColumn[header.column.id] || []).length" />
+                        <q-item dense clickable @click.stop="clearColFilter(header.column.id)">
+                          <q-item-section class="tw:text-xs text-grey-6">Clear filter</q-item-section>
+                        </q-item>
+                      </q-list>
+                    </q-menu>
+                  </q-btn>
+                </template>
                 <div
                   :data-test="`o2-table-add-data-from-column-${header.column.columnDef.header}`"
                   class="tw:invisible tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions tw:h-full tw:flex"
@@ -987,9 +1031,11 @@ import {
   FlexRender,
   type ColumnDef,
   type SortingState,
+  type ColumnFiltersState,
   useVueTable,
   getCoreRowModel,
   getSortedRowModel,
+  getFilteredRowModel,
 } from "@tanstack/vue-table";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -1163,6 +1209,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  /** Enable Excel-style column filter dropdowns. Default: false */
+  enableColumnFilter: {
+    type: Boolean,
+    default: false,
+  },
   /** Enable paginated mode (turns off virtual scroll). Default: false */
   showPagination: {
     type: Boolean,
@@ -1188,6 +1239,76 @@ const emits = defineEmits([
 ]);
 
 const sorting = ref<SortingState>([]);
+
+// ── Column filtering ──────────────────────────────────────────────────────────
+const columnFiltersState = ref<ColumnFiltersState>([]);
+
+const setColumnFilters = (updater: any) => {
+  columnFiltersState.value =
+    typeof updater === "function"
+      ? updater(columnFiltersState.value)
+      : updater;
+};
+
+/** Unique raw values per column id, computed from the full (unfiltered) row set. */
+const uniqueValuesPerColumn = computed<Record<string, any[]>>(() => {
+  if (!props.enableColumnFilter) return {};
+  const result: Record<string, any[]> = {};
+  const rows = tableRows.value || [];
+  const cols = (dashboardColumns.value ?? []) as any[];
+  for (const col of cols) {
+    const key = col.id as string;
+    const seen = new Set<any>();
+    for (const row of rows) {
+      const val = (row as any)[key];
+      if (val !== null && val !== undefined && val !== "") seen.add(val);
+    }
+    const vals = Array.from(seen);
+    vals.sort((a, b) => {
+      if (typeof a === "number" && typeof b === "number") return a - b;
+      return String(a).localeCompare(String(b));
+    });
+    result[key] = vals;
+  }
+  return result;
+});
+
+/** Return the formatted display label for a raw cell value in the filter dropdown. */
+const getFilterDisplayValue = (colId: string, rawVal: any): string => {
+  const col = table?.getColumn(colId);
+  const fmt = (col?.columnDef?.meta as any)?.format;
+  if (fmt) {
+    const formatted = fmt(rawVal);
+    return formatted != null ? String(formatted) : String(rawVal ?? "");
+  }
+  return String(rawVal ?? "");
+};
+
+const isColFiltered = (colId: string): boolean =>
+  columnFiltersState.value.some(
+    (f) => f.id === colId && (f.value as any[])?.length > 0,
+  );
+
+const getColFilterValues = (colId: string): any[] =>
+  (columnFiltersState.value.find((f) => f.id === colId)?.value as any[]) ?? [];
+
+const toggleColFilterValue = (colId: string, rawVal: any) => {
+  const current = getColFilterValues(colId);
+  const idx = current.indexOf(rawVal);
+  const next = idx === -1 ? [...current, rawVal] : current.filter((_, i) => i !== idx);
+  if (next.length === 0) {
+    columnFiltersState.value = columnFiltersState.value.filter((f) => f.id !== colId);
+  } else {
+    const exists = columnFiltersState.value.some((f) => f.id === colId);
+    columnFiltersState.value = exists
+      ? columnFiltersState.value.map((f) => (f.id === colId ? { id: colId, value: next } : f))
+      : [...columnFiltersState.value, { id: colId, value: next }];
+  }
+};
+
+const clearColFilter = (colId: string) => {
+  columnFiltersState.value = columnFiltersState.value.filter((f) => f.id !== colId);
+};
 
 /** Replace characters invalid in CSS custom property names (e.g. dots) with underscores. */
 const sanitizeCssId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -1656,8 +1777,12 @@ let table: any = useVueTable({
     get columnOrder() {
       return columnOrder.value;
     },
+    get columnFilters() {
+      return columnFiltersState.value;
+    },
   },
   onSortingChange: setSorting,
+  onColumnFiltersChange: setColumnFilters,
   // Disable TanStack client sort for pivot (rows are pre-sorted manually)
   // and for dashboard mode (TableRenderer handles sorting externally).
   get enableSorting() {
@@ -1665,9 +1790,15 @@ let table: any = useVueTable({
   },
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
+  getFilteredRowModel: getFilteredRowModel(),
   defaultColumn: {
     minSize: 60,
     maxSize: 800,
+    // Multi-value include filter: row value must be one of the selected values.
+    filterFn: (row: any, columnId: string, filterValue: any[]) => {
+      if (!filterValue || filterValue.length === 0) return true;
+      return filterValue.includes(row.getValue(columnId));
+    },
   },
   columnResizeMode,
   enableColumnResizing: true,
@@ -1710,6 +1841,14 @@ onBeforeUnmount(() => {
   parentRef.value = null;
   table = null;
 });
+
+// Reset column filters when the column set changes (dashboard re-query).
+watch(
+  () => props.columns,
+  () => {
+    if (columnFiltersState.value.length > 0) columnFiltersState.value = [];
+  },
+);
 
 const hasDefaultSourceColumn = computed(
   () => props.defaultColumns && columnOrder.value.includes("source"),

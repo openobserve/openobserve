@@ -1504,6 +1504,7 @@
     "legendsOfCharts": "Legends",
     "totalLegends": "Total: {count}",
     "noLegendsAvailable": "No legends available",
+    "tableFiltering": "Column Filtering",
     "wraptext": "Wrap table cells",
     "tableTranspose": "Transpose",
     "tableDynamicColumns": "Allow Dynamic Columns",

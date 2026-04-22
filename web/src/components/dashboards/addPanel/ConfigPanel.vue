@@ -1401,6 +1401,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <q-toggle
+          v-show="isConfigOptionVisible('table', 'filtering')"
+          v-model="dashboardPanelData.data.config.table_filtering"
+          :label="t('dashboard.tableFiltering')"
+          data-test="dashboard-config-table-filtering"
+          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          size="lg"
+          :class="
+            store.state.theme === 'dark'
+              ? 'o2-toggle-button-lg-dark'
+              : 'o2-toggle-button-lg-light'
+          "
+        />
+
+        <q-toggle
           v-show="isConfigOptionVisible('table', 'pagination')"
           v-model="dashboardPanelData.data.config.table_pagination"
           :label="t('dashboard.pagination')"
@@ -2624,6 +2638,11 @@ export default defineComponent({
       // by default, use wrap_table_cells as false
       if (!dashboardPanelData.data.config.wrap_table_cells) {
         dashboardPanelData.data.config.wrap_table_cells = false;
+      }
+
+      // by default, tableFiltering is disabled
+      if (dashboardPanelData.data.config.table_filtering === undefined) {
+        dashboardPanelData.data.config.table_filtering = false;
       }
 
       // by default, use table_transpose as false
