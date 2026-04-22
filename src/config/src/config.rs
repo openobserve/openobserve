@@ -1426,7 +1426,7 @@ pub struct Common {
     pub enable_cross_linking: bool,
     #[env_config(
         name = "ZO_AUTO_QUERY_ENABLED",
-        default = true,
+        default = false,
         help = "Enable Live Mode feature in the UI. When true, users can toggle auto-query on filter/time-range changes. When false, the Live Mode toggle is hidden and Run Query button is always shown."
     )]
     pub auto_query_enabled: bool,
