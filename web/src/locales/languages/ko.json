@@ -386,7 +386,8 @@
     "liveMode": "라이브",
     "liveModeTooltip": "필터/시간 변경 시 쿼리 자동 실행",
     "turnOnLiveMode": "라이브 모드 켜기",
-    "turnOffLiveMode": "라이브 모드 끄기"
+    "turnOffLiveMode": "라이브 모드 끄기",
+    "autoRunEnabled": "자동 실행 활성화"
   },
   "menu": {
     "home": "홈",

@@ -386,7 +386,8 @@
     "liveMode": "Canlı",
     "liveModeTooltip": "Filtre/zaman değişikliklerinde sorguyu otomatik çalıştırın",
     "turnOnLiveMode": "Canlı modu açın",
-    "turnOffLiveMode": "Canlı modu kapat"
+    "turnOffLiveMode": "Canlı modu kapat",
+    "autoRunEnabled": "Otomatik çalıştırma etkin"
   },
   "menu": {
     "home": "Ana Sayfa",
