@@ -123,7 +123,8 @@
     "version": "版本",
     "create": "创建",
     "resources": "资源",
-    "updated_at": "更新于"
+    "updated_at": "更新于",
+    "clearFilter": "清除过滤器"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -1598,7 +1599,10 @@
     "progressColor": "条形颜色",
     "sectionConditionalStyling": "条件样式",
     "conditionThreshold": "价值",
-    "conditionAddRule": "+ 添加规则"
+    "conditionAddRule": "+ 添加规则",
+    "sparklineStyle": "风格",
+    "sparklineStyleLine": "线",
+    "sparklineStyleBar": "酒吧"
   },
   "panel": {
     "header": "面板",

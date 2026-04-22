@@ -123,7 +123,8 @@
     "version": "[バージョン]",
     "create": "作成",
     "resources": "リソース",
-    "updated_at": "更新日"
+    "updated_at": "更新日",
+    "clearFilter": "フィルターをクリア"
   },
   "search": {
     "metrics": "メトリクス",
@@ -1615,7 +1616,10 @@
     "progressColor": "バーカラー",
     "sectionConditionalStyling": "条件付きスタイリング",
     "conditionThreshold": "価値",
-    "conditionAddRule": "+ ルールを追加"
+    "conditionAddRule": "+ ルールを追加",
+    "sparklineStyle": "スタイル",
+    "sparklineStyleLine": "ライン",
+    "sparklineStyleBar": "バー"
   },
   "panel": {
     "header": "パネル",

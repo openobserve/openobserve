@@ -123,7 +123,8 @@
     "create": "Creëren",
     "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden...",
     "resources": "Hulpbronnen",
-    "updated_at": "Bijgewerkt op"
+    "updated_at": "Bijgewerkt op",
+    "clearFilter": "Filter verwijderen"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -1596,7 +1597,10 @@
     "progressColor": "Kleur van de balk",
     "sectionConditionalStyling": "Voorwaardelijke styling",
     "conditionThreshold": "Waarde",
-    "conditionAddRule": "+ Regel toevoegen"
+    "conditionAddRule": "+ Regel toevoegen",
+    "sparklineStyle": "Stijl",
+    "sparklineStyleLine": "Lijn",
+    "sparklineStyleBar": "Bar"
   },
   "panel": {
     "header": "Paneel",

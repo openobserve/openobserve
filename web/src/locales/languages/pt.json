@@ -123,7 +123,8 @@
     "version": "Versão",
     "create": "Criar",
     "resources": "Recursos",
-    "updated_at": "Atualizado em"
+    "updated_at": "Atualizado em",
+    "clearFilter": "Filtro claro"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -1598,7 +1599,10 @@
     "progressColor": "Cor da barra",
     "sectionConditionalStyling": "Estilo condicional",
     "conditionThreshold": "Valor",
-    "conditionAddRule": "+ Adicionar regra"
+    "conditionAddRule": "+ Adicionar regra",
+    "sparklineStyle": "Estilo",
+    "sparklineStyleLine": "Linha",
+    "sparklineStyleBar": "Barra"
   },
   "panel": {
     "header": "Painel",

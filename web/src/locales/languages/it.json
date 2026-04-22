@@ -123,7 +123,8 @@
     "create": "Crea",
     "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi...",
     "resources": "Risorse",
-    "updated_at": "Aggiornato a"
+    "updated_at": "Aggiornato a",
+    "clearFilter": "Cancella filtro"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -1596,7 +1597,10 @@
     "progressColor": "Colore della barra",
     "sectionConditionalStyling": "Stile condizionale",
     "conditionThreshold": "Valore",
-    "conditionAddRule": "+ Aggiungi regola"
+    "conditionAddRule": "+ Aggiungi regola",
+    "sparklineStyle": "Stile",
+    "sparklineStyleLine": "Linea",
+    "sparklineStyleBar": "Bar"
   },
   "panel": {
     "header": "Pannello",

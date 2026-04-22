@@ -123,7 +123,8 @@
     "create": "Oluştur",
     "redirectingHome": "{geri sayım} saniye içinde eve yönlendiriliyor...",
     "resources": "Kaynaklar",
-    "updated_at": "Güncellendi:"
+    "updated_at": "Güncellendi:",
+    "clearFilter": "Filtreyi temizle"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -1596,7 +1597,10 @@
     "progressColor": "Çubuk Rengi",
     "sectionConditionalStyling": "Koşullu Stil",
     "conditionThreshold": "Değer",
-    "conditionAddRule": "+ Kural ekle"
+    "conditionAddRule": "+ Kural ekle",
+    "sparklineStyle": "Tarz",
+    "sparklineStyleLine": "Çizgi",
+    "sparklineStyleBar": "Bar"
   },
   "panel": {
     "header": "Panel",
