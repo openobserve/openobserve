@@ -20,77 +20,8 @@ import { isTimeSeries } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
 import { detectChunkingDirection } from "./chunkingDirection";
 
-type MissingValueCacheEntry = {
-  filledData: any[];
-  binnedFillStartMs: number;
-  binnedDateMs: number;
-  anchorTimes: string[];
-  anchorEntryCount: number;
-  timeKey: string;
-  uniqueKey?: string;
-  hasBreakdown: boolean;
-  uniqueValues: Set<any>;
-  interval: number;
-  noValueConfigOption: any;
-  endTimeForFill: string;
-  isLTR: boolean;
-};
-
-const missingValueCache = new Map<string, MissingValueCacheEntry>();
-
 const formatUtc = (date: Date) =>
   format(toZonedTime(date, "UTC"), "yyyy-MM-dd'T'HH:mm:ss");
-
-const areSetsEqual = (a: Set<any>, b: Set<any>) => {
-  if (a.size !== b.size) return false;
-  for (const value of a) {
-    if (!b.has(value)) return false;
-  }
-  return true;
-};
-
-const areAnchorTimesEqual = (a: string[], b: string[]) => {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-};
-
-const getStreamingCacheKey = (
-  metadata: any,
-  panelSchema: any,
-  interval: number,
-  xAxisKeys: string[],
-  yAxisKeys: string[],
-  zAxisKeys: string[],
-  breakDownKeys: string[],
-  noValueConfigOption: any,
-) => {
-  const panelId = metadata?.panelId ?? panelSchema?.id;
-  const queryIndex = metadata?.queryIndex;
-  if (panelId == null || queryIndex == null) return null;
-
-  const query = metadata?.queries?.[0]?.query ?? "";
-  const startTime = metadata?.queries?.[0]?.startTime ?? "";
-  const endTime = metadata?.queries?.[0]?.endTime ?? "";
-  const type = panelSchema?.type ?? "";
-
-  return JSON.stringify({
-    panelId,
-    queryIndex,
-    query,
-    startTime,
-    endTime,
-    type,
-    interval,
-    xAxisKeys,
-    yAxisKeys,
-    zAxisKeys,
-    breakDownKeys,
-    noValueConfigOption,
-  });
-};
 
 /**
  * Fills in missing time-series data points between the start and end time
@@ -212,17 +143,6 @@ export const fillMissingValues = (
     endTimeForFill = formattedUserEnd;
   }
 
-  const cacheKey = getStreamingCacheKey(
-    metadata,
-    panelSchema,
-    interval,
-    xAxisKeys,
-    yAxisKeys,
-    zAxisKeys,
-    breakDownKeys,
-    noValueConfigOption,
-  );
-
   // Build map from processedData for O(1) lookup
   const hasBreakdown =
     xAxisKeysWithoutTimeStamp.length > 0 ||
@@ -237,196 +157,44 @@ export const fillMissingValues = (
 
   const filledData: any = [];
 
-  // Build start-edge anchors (RTL only). For LTR, the fill loop already covers
-  // the user's start; anchors are added at the end-edge after the fill loop.
-  const startAnchorTimes: string[] = [];
+  // RTL: insert anchors at the user's selected start time when the fill loop
+  // doesn't yet cover it. Anchor/phantom entries use empty string (not
+  // noValueConfigOption) so ECharts renders them as gaps rather than plotted
+  // points at the configured value.
+  //  - Edge anchor (pinned at user's start): pins the x-axis left edge.
+  //  - Phantom anchor (one interval before first real data): gives ECharts a
+  //    consecutive pair so it can derive the correct bar width.
   if (!isLTR && binnedFillStart > binnedDate) {
-    startAnchorTimes.push(formatUtc(binnedDate));
+    const startAnchorTimes: string[] = [formatUtc(binnedDate)];
 
-    // Insert a phantom point one interval before the first real data point.
-    // This gives ECharts a consecutive pair (nearAnchor → first data) so it
-    // can derive the correct bar width, instead of using the huge gap from
-    // user-start to first chunk (~hours/days).
     const nearAnchorTime = new Date(
       binnedFillStart.getTime() - interval * 1000,
     );
-    // Only add the near-anchor if it's strictly after the starting anchor
     if (nearAnchorTime > binnedDate) {
       startAnchorTimes.push(formatUtc(nearAnchorTime));
     }
-  }
 
-  const hasTimeOffset = Boolean(
-    resultMetaData?.[resultMetaData.length - 1]?.time_offset?.start_time,
-  );
-
-  // Build a lookup map from old cached filledData to use as fallback when the
-  // current processedData doesn't cover a time slot. During streaming, previously
-  // rendered real data is preserved instead of being replaced by null entries.
-  // This works in tandem with overlayNewDataOnOldOptions at the chart level.
-  let oldFilledDataMap: Map<string, any> | null = null;
-
-  if (cacheKey) {
-    const cacheEntry = missingValueCache.get(cacheKey);
-
-    // Build old data map BEFORE the cache entry might be deleted below
-    if (cacheEntry?.filledData?.length) {
-      oldFilledDataMap = new Map();
-      for (const entry of cacheEntry.filledData) {
-        const mapKey = hasBreakdown
-          ? `${getDataValue(entry, timeKey)}-${getDataValue(entry, uniqueKey)}`
-          : `${getDataValue(entry, timeKey)}`;
-        oldFilledDataMap.set(mapKey, entry);
-      }
-    }
-
-    if (
-      cacheEntry &&
-      cacheEntry.anchorTimes.length > 0 &&
-      !isLTR &&
-      binnedFillStart.getTime() <= cacheEntry.binnedDateMs
-    ) {
-      // RTL: real data has reached the user's start time. Drop cached anchors
-      // and rebuild once so anchors are replaced by actual data points.
-      missingValueCache.delete(cacheKey);
-    }
-    if (
-      hasTimeOffset &&
-      !isLTR &&
-      cacheEntry &&
-      cacheEntry.isLTR === false &&
-      cacheEntry.interval === interval &&
-      cacheEntry.noValueConfigOption === noValueConfigOption &&
-      cacheEntry.timeKey === timeKey &&
-      cacheEntry.hasBreakdown === hasBreakdown &&
-      cacheEntry.endTimeForFill === endTimeForFill &&
-      cacheEntry.binnedDateMs === binnedDate.getTime() &&
-      cacheEntry.anchorEntryCount ===
-        (cacheEntry.anchorTimes.length *
-          (cacheEntry.hasBreakdown ? cacheEntry.uniqueValues.size : 1) || 0) &&
-      cacheEntry.binnedFillStartMs > binnedFillStart.getTime() &&
-      areAnchorTimesEqual(cacheEntry.anchorTimes, startAnchorTimes) &&
-      areSetsEqual(cacheEntry.uniqueValues, uniqueXAxisValues)
-    ) {
-      // RTL patch-prefix: new chunks arrived with earlier start times.
-      // Instead of rebuilding the whole array, fill only the new prefix
-      // from the new binnedFillStart to just before the cached one.
-      const prependStart = binnedFillStart;
-      const prependEnd = new Date(
-        cacheEntry.binnedFillStartMs - intervalMillis,
-      );
-
-      const patchData: any[] = [];
-
-      let currentTime = prependStart;
-      let currentFormattedTime = formatUtc(currentTime);
-      const prependEndFormatted = formatUtc(prependEnd);
-
-      while (currentFormattedTime <= prependEndFormatted) {
-        if (!hasBreakdown) {
-          const key = `${currentFormattedTime}`;
-          const currentData = searchDataMap.get(key);
-          if (currentData) {
-            patchData.push(currentData);
-          } else {
-            const nullEntry: any = { [timeKey]: currentFormattedTime };
-            keys.forEach((key) => {
-              if (key !== timeKey) nullEntry[key] = noValueConfigOption;
-            });
-            patchData.push(nullEntry);
-          }
-        } else {
-          uniqueXAxisValues.forEach((uniqueValue: any) => {
-            const key = `${currentFormattedTime}-${uniqueValue}`;
-            const currentData = searchDataMap.get(key);
-            if (currentData) {
-              patchData.push(currentData);
-            } else {
-              const nullEntry: any = {
-                [timeKey]: currentFormattedTime,
-                [uniqueKey]: uniqueValue,
-              };
-              keys.forEach((key) => {
-                if (key !== timeKey && key !== uniqueKey) {
-                  nullEntry[key] = noValueConfigOption;
-                }
-              });
-              patchData.push(nullEntry);
-            }
-          });
-        }
-
-        currentTime = new Date(currentTime.getTime() + intervalMillis);
-        currentFormattedTime = formatUtc(currentTime);
-      }
-
-      const combined = patchData.concat(cacheEntry.filledData);
-      missingValueCache.set(cacheKey, {
-        filledData: combined,
-        binnedFillStartMs: binnedFillStart.getTime(),
-        binnedDateMs: binnedDate.getTime(),
-        anchorTimes: startAnchorTimes,
-        anchorEntryCount:
-          startAnchorTimes.length *
-          (hasBreakdown ? uniqueXAxisValues.size : 1),
-        timeKey,
-        uniqueKey,
-        hasBreakdown,
-        uniqueValues: new Set(uniqueXAxisValues),
-        interval,
-        noValueConfigOption,
-        endTimeForFill,
-        isLTR,
-      });
-
-      return combined;
-    }
-  }
-
-  // RTL: insert anchors at the user's selected start time when the fill loop
-  // doesn't yet cover it.
-  //  - Edge anchor (index 0, pinned at user's start): ALWAYS null (""). Ignores
-  //    cached old data so the edge doesn't show stale values on cancel.
-  //  - Phantom anchor (index 1+, near first real data): falls back to old
-  //    cached data when available; null otherwise. Gives ECharts a realistic
-  //    consecutive pair for bar sizing.
-  if (startAnchorTimes.length > 0) {
-    const edgeAnchorTime = startAnchorTimes[0];
     if (!hasBreakdown) {
       startAnchorTimes.forEach((t) => {
-        const isEdge = t === edgeAnchorTime;
-        const oldEntry = isEdge ? null : oldFilledDataMap?.get(`${t}`);
-        if (oldEntry) {
-          filledData.push(oldEntry);
-        } else {
-          const anchorEntry: any = { [timeKey]: t };
-          keys.forEach((key) => {
-            if (key !== timeKey) anchorEntry[key] = "";
-          });
-          filledData.push(anchorEntry);
-        }
+        const anchorEntry: any = { [timeKey]: t };
+        keys.forEach((key) => {
+          if (key !== timeKey) anchorEntry[key] = "";
+        });
+        filledData.push(anchorEntry);
       });
     } else {
       startAnchorTimes.forEach((t) => {
-        const isEdge = t === edgeAnchorTime;
         uniqueXAxisValues.forEach((uniqueValue: any) => {
-          const oldEntry = isEdge
-            ? null
-            : oldFilledDataMap?.get(`${t}-${uniqueValue}`);
-          if (oldEntry) {
-            filledData.push(oldEntry);
-          } else {
-            const anchorEntry: any = {
-              [timeKey]: t,
-              [uniqueKey]: uniqueValue,
-            };
-            keys.forEach((key) => {
-              if (key !== timeKey && key !== uniqueKey) {
-                anchorEntry[key] = "";
-              }
-            });
-            filledData.push(anchorEntry);
-          }
+          const anchorEntry: any = {
+            [timeKey]: t,
+            [uniqueKey]: uniqueValue,
+          };
+          keys.forEach((key) => {
+            if (key !== timeKey && key !== uniqueKey) {
+              anchorEntry[key] = "";
+            }
+          });
+          filledData.push(anchorEntry);
         });
       });
     }
@@ -445,17 +213,11 @@ export const fillMissingValues = (
       if (currentData) {
         filledData.push(currentData);
       } else {
-        // Use old cached data if available, otherwise create null entry
-        const oldEntry = oldFilledDataMap?.get(key);
-        if (oldEntry) {
-          filledData.push(oldEntry);
-        } else {
-          const nullEntry: any = { [timeKey]: currentFormattedTime };
-          keys.forEach((key) => {
-            if (key !== timeKey) nullEntry[key] = noValueConfigOption;
-          });
-          filledData.push(nullEntry);
-        }
+        const nullEntry: any = { [timeKey]: currentFormattedTime };
+        keys.forEach((key) => {
+          if (key !== timeKey) nullEntry[key] = noValueConfigOption;
+        });
+        filledData.push(nullEntry);
       }
     } else {
       uniqueXAxisValues.forEach((uniqueValue: any) => {
@@ -464,22 +226,16 @@ export const fillMissingValues = (
         if (currentData) {
           filledData.push(currentData);
         } else {
-          // Use old cached data if available, otherwise create null entry
-          const oldEntry = oldFilledDataMap?.get(key);
-          if (oldEntry) {
-            filledData.push(oldEntry);
-          } else {
-            const nullEntry: any = {
-              [timeKey]: currentFormattedTime,
-              [uniqueKey]: uniqueValue,
-            };
-            keys.forEach((key) => {
-              if (key !== timeKey && key !== uniqueKey) {
-                nullEntry[key] = noValueConfigOption;
-              }
-            });
-            filledData.push(nullEntry);
-          }
+          const nullEntry: any = {
+            [timeKey]: currentFormattedTime,
+            [uniqueKey]: uniqueValue,
+          };
+          keys.forEach((key) => {
+            if (key !== timeKey && key !== uniqueKey) {
+              nullEntry[key] = noValueConfigOption;
+            }
+          });
+          filledData.push(nullEntry);
         }
       });
     }
@@ -489,89 +245,46 @@ export const fillMissingValues = (
   }
 
   // LTR: insert anchors at the user's selected end time when the fill loop
-  // doesn't yet cover it. Real data is preserved from cache when available.
-  // Anchor/phantom entries use empty string (not noValueConfigOption) so
-  // ECharts renders them as gaps rather than plotted points at the configured value.
-  const endAnchorTimes: string[] = [];
+  // doesn't yet cover it. Same empty-string semantics as the RTL anchors.
+  //  - Phantom anchor (one interval after last real data): consecutive pair
+  //    for bar sizing.
+  //  - Edge anchor (pinned at user's end): pins the x-axis right edge.
   if (isLTR) {
     const binnedUserEnd = dateBin(interval, endTime, origin);
     const formattedBinnedUserEnd = formatUtc(binnedUserEnd);
 
     if (endTimeForFill < formattedBinnedUserEnd) {
-      // `currentTime` after the fill loop is one interval past the last filled
-      // slot, giving ECharts a consecutive pair (last data → nearAnchor) so it
-      // can derive the correct bar width, instead of using the huge gap from
-      // last chunk to user-end (~hours/days).
-      //  - Phantom anchor (earlier index, near last real data): falls back to
-      //    old cached data when available; null otherwise.
-      //  - Edge anchor (last index, pinned at user's end): ALWAYS null ("").
-      //    Ignores cached old data so the edge doesn't show stale values on cancel.
+      const endAnchorTimes: string[] = [];
       if (currentFormattedTime < formattedBinnedUserEnd) {
         endAnchorTimes.push(currentFormattedTime);
       }
       endAnchorTimes.push(formattedBinnedUserEnd);
 
-      const edgeAnchorTime = endAnchorTimes[endAnchorTimes.length - 1];
       if (!hasBreakdown) {
         endAnchorTimes.forEach((t) => {
-          const isEdge = t === edgeAnchorTime;
-          const oldEntry = isEdge ? null : oldFilledDataMap?.get(`${t}`);
-          if (oldEntry) {
-            filledData.push(oldEntry);
-          } else {
-            const anchorEntry: any = { [timeKey]: t };
-            keys.forEach((key) => {
-              if (key !== timeKey) anchorEntry[key] = "";
-            });
-            filledData.push(anchorEntry);
-          }
+          const anchorEntry: any = { [timeKey]: t };
+          keys.forEach((key) => {
+            if (key !== timeKey) anchorEntry[key] = "";
+          });
+          filledData.push(anchorEntry);
         });
       } else {
         endAnchorTimes.forEach((t) => {
-          const isEdge = t === edgeAnchorTime;
           uniqueXAxisValues.forEach((uniqueValue: any) => {
-            const oldEntry = isEdge
-              ? null
-              : oldFilledDataMap?.get(`${t}-${uniqueValue}`);
-            if (oldEntry) {
-              filledData.push(oldEntry);
-            } else {
-              const anchorEntry: any = {
-                [timeKey]: t,
-                [uniqueKey]: uniqueValue,
-              };
-              keys.forEach((key) => {
-                if (key !== timeKey && key !== uniqueKey) {
-                  anchorEntry[key] = "";
-                }
-              });
-              filledData.push(anchorEntry);
-            }
+            const anchorEntry: any = {
+              [timeKey]: t,
+              [uniqueKey]: uniqueValue,
+            };
+            keys.forEach((key) => {
+              if (key !== timeKey && key !== uniqueKey) {
+                anchorEntry[key] = "";
+              }
+            });
+            filledData.push(anchorEntry);
           });
         });
       }
     }
-  }
-
-  if (cacheKey) {
-    const cachedAnchorTimes = isLTR ? endAnchorTimes : startAnchorTimes;
-    missingValueCache.set(cacheKey, {
-      filledData,
-      binnedFillStartMs: binnedFillStart.getTime(),
-      binnedDateMs: binnedDate.getTime(),
-      anchorTimes: cachedAnchorTimes,
-      anchorEntryCount:
-        cachedAnchorTimes.length *
-        (hasBreakdown ? uniqueXAxisValues.size : 1),
-      timeKey,
-      uniqueKey,
-      hasBreakdown,
-      uniqueValues: new Set(uniqueXAxisValues),
-      interval,
-      noValueConfigOption,
-      endTimeForFill,
-      isLTR,
-    });
   }
 
   return filledData;
