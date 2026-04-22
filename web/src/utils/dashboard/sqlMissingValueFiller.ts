@@ -384,14 +384,18 @@ export const fillMissingValues = (
   }
 
   // RTL: insert anchors at the user's selected start time when the fill loop
-  // doesn't yet cover it. Real data is preserved from cache when available.
-  // Anchor/phantom entries use empty string (not noValueConfigOption) so
-  // ECharts renders them as gaps rather than plotted points at the configured value.
+  // doesn't yet cover it.
+  //  - Edge anchor (index 0, pinned at user's start): ALWAYS null (""). Ignores
+  //    cached old data so the edge doesn't show stale values on cancel.
+  //  - Phantom anchor (index 1+, near first real data): falls back to old
+  //    cached data when available; null otherwise. Gives ECharts a realistic
+  //    consecutive pair for bar sizing.
   if (startAnchorTimes.length > 0) {
+    const edgeAnchorTime = startAnchorTimes[0];
     if (!hasBreakdown) {
       startAnchorTimes.forEach((t) => {
-        const lookupKey = `${t}`;
-        const oldEntry = oldFilledDataMap?.get(lookupKey);
+        const isEdge = t === edgeAnchorTime;
+        const oldEntry = isEdge ? null : oldFilledDataMap?.get(`${t}`);
         if (oldEntry) {
           filledData.push(oldEntry);
         } else {
@@ -404,9 +408,11 @@ export const fillMissingValues = (
       });
     } else {
       startAnchorTimes.forEach((t) => {
+        const isEdge = t === edgeAnchorTime;
         uniqueXAxisValues.forEach((uniqueValue: any) => {
-          const lookupKey = `${t}-${uniqueValue}`;
-          const oldEntry = oldFilledDataMap?.get(lookupKey);
+          const oldEntry = isEdge
+            ? null
+            : oldFilledDataMap?.get(`${t}-${uniqueValue}`);
           if (oldEntry) {
             filledData.push(oldEntry);
           } else {
@@ -492,20 +498,24 @@ export const fillMissingValues = (
     const formattedBinnedUserEnd = formatUtc(binnedUserEnd);
 
     if (endTimeForFill < formattedBinnedUserEnd) {
-      // Phantom point one interval after the last real data point.
       // `currentTime` after the fill loop is one interval past the last filled
       // slot, giving ECharts a consecutive pair (last data → nearAnchor) so it
       // can derive the correct bar width, instead of using the huge gap from
       // last chunk to user-end (~hours/days).
+      //  - Phantom anchor (earlier index, near last real data): falls back to
+      //    old cached data when available; null otherwise.
+      //  - Edge anchor (last index, pinned at user's end): ALWAYS null ("").
+      //    Ignores cached old data so the edge doesn't show stale values on cancel.
       if (currentFormattedTime < formattedBinnedUserEnd) {
         endAnchorTimes.push(currentFormattedTime);
       }
       endAnchorTimes.push(formattedBinnedUserEnd);
 
+      const edgeAnchorTime = endAnchorTimes[endAnchorTimes.length - 1];
       if (!hasBreakdown) {
         endAnchorTimes.forEach((t) => {
-          const lookupKey = `${t}`;
-          const oldEntry = oldFilledDataMap?.get(lookupKey);
+          const isEdge = t === edgeAnchorTime;
+          const oldEntry = isEdge ? null : oldFilledDataMap?.get(`${t}`);
           if (oldEntry) {
             filledData.push(oldEntry);
           } else {
@@ -518,9 +528,11 @@ export const fillMissingValues = (
         });
       } else {
         endAnchorTimes.forEach((t) => {
+          const isEdge = t === edgeAnchorTime;
           uniqueXAxisValues.forEach((uniqueValue: any) => {
-            const lookupKey = `${t}-${uniqueValue}`;
-            const oldEntry = oldFilledDataMap?.get(lookupKey);
+            const oldEntry = isEdge
+              ? null
+              : oldFilledDataMap?.get(`${t}-${uniqueValue}`);
             if (oldEntry) {
               filledData.push(oldEntry);
             } else {
