@@ -67,14 +67,16 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             // Parse issues with null/empty guard
+            const fs = require('fs');
             if (!process.env.ISSUES_JSON || process.env.ISSUES_JSON === '[]') {
               console.log('No bug issues to audit');
-              core.setOutput('results', JSON.stringify({
+              const emptyResults = {
                 ready_to_close: [],
                 needs_test: [],
                 needs_fix: [],
                 needs_both: []
-              }));
+              };
+              fs.writeFileSync('audit-results.json', JSON.stringify(emptyResults));
               core.setOutput('ready_to_close_count', 0);
               return;
             }
@@ -114,7 +116,7 @@ jobs:
             // Hard limit: exit early if we definitely can't complete
             if (remaining < 50) {
               core.warning(`Rate limit critically low (${remaining} remaining). Aborting to prevent incomplete results.`);
-              core.setOutput('results', JSON.stringify(results));
+              fs.writeFileSync('audit-results.json', JSON.stringify(results));
               core.setOutput('ready_to_close_count', 0);
               return;
             }
@@ -193,7 +195,6 @@ jobs:
               }
 
               // 2. Check for test with @bug-{issue#} tag
-              const { execSync } = require('child_process');
               const fs = require('fs');
               let hasTest = false;
               let testFile = null;
@@ -273,19 +274,26 @@ jobs:
             console.log(`Needs fix: ${results.needs_fix.length}`);
             console.log(`Needs both: ${results.needs_both.length}`);
 
-            // Save results
-            core.setOutput('results', JSON.stringify(results));
+            // Save results to file (avoids step output size limits)
+            fs.writeFileSync('audit-results.json', JSON.stringify(results));
             core.setOutput('ready_to_close_count', results.ready_to_close.length);
 
       - name: Label issues ready to close (fix + test found)
         if: ${{ steps.audit.outputs.ready_to_close_count > 0 && !inputs.dry_run }}
         uses: actions/github-script@v7
-        env:
-          RESULTS_JSON: ${{ steps.audit.outputs.results }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const results = JSON.parse(process.env.RESULTS_JSON || '{"ready_to_close":[]}');
+            // Read results from file (avoids step output size limits)
+            const fs = require('fs');
+            let results;
+            try {
+              const data = fs.readFileSync('audit-results.json', 'utf-8');
+              results = JSON.parse(data);
+            } catch (error) {
+              console.log(`Could not read audit-results.json: ${error.message}`);
+              results = { ready_to_close: [] };
+            }
 
             for (const item of results.ready_to_close) {
               const issue = item.issue;
@@ -356,13 +364,20 @@ jobs:
         id: analyze-files
         if: ${{ !inputs.dry_run }}
         uses: actions/github-script@v7
-        env:
-          RESULTS_JSON: ${{ steps.audit.outputs.results }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const defaultResults = '{"ready_to_close":[],"needs_test":[],"needs_fix":[],"needs_both":[]}';
-            const results = JSON.parse(process.env.RESULTS_JSON || defaultResults);
+            // Read results from file (avoids step output size limits)
+            const fs = require('fs');
+            const defaultResults = { ready_to_close: [], needs_test: [], needs_fix: [], needs_both: [] };
+            let results;
+            try {
+              const data = fs.readFileSync('audit-results.json', 'utf-8');
+              results = JSON.parse(data);
+            } catch (error) {
+              console.log(`Could not read audit-results.json: ${error.message}`);
+              results = defaultResults;
+            }
 
             // Check rate limit before processing
             const rateLimit = await github.rest.rateLimit.get();
@@ -465,9 +480,11 @@ jobs:
             }
 
             const enrichedResults = [];
+            let processedCount = 0;
 
             for (const item of results.needs_test) {
-              console.log(`\nAnalyzing PR #${item.fixPR.number}: ${item.fixPR.title}`);
+              processedCount++;
+              console.log(`\nAnalyzing PR #${item.fixPR.number}: ${item.fixPR.title} [${processedCount}/${results.needs_test.length}]`);
 
               const analysis = await analyzePR(item.fixPR.number);
 
@@ -488,10 +505,21 @@ jobs:
                   fileAnalysis: null
                 });
               }
+
+              // Check rate limit every 10 items
+              if (processedCount % 10 === 0) {
+                const midRateLimit = await github.rest.rateLimit.get();
+                const midRemaining = midRateLimit.data.rate.remaining;
+                console.log(`  📊 Rate limit check: ${midRemaining} remaining`);
+
+                if (midRemaining < 100) {
+                  core.warning(`Rate limit low (${midRemaining} remaining). Stopping early with partial results.`);
+                  break;
+                }
+              }
             }
 
             // Write to file to avoid env var size limits (~256KB)
-            const fs = require('fs');
             fs.writeFileSync('enriched-needs-test.json', JSON.stringify(enrichedResults));
             console.log(`Wrote enriched results to enriched-needs-test.json`);
 
@@ -684,15 +712,23 @@ jobs:
       - name: Generate audit report
         uses: actions/github-script@v7
         env:
-          RESULTS_JSON: ${{ steps.audit.outputs.results }}
           DRY_RUN: ${{ inputs.dry_run }}
           TEST_MODE: ${{ inputs.test_mode }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            const defaultResults = '{"ready_to_close":[],"needs_test":[],"needs_fix":[],"needs_both":[]}';
-            const results = JSON.parse(process.env.RESULTS_JSON || defaultResults);
+            const defaultResults = { ready_to_close: [], needs_test: [], needs_fix: [], needs_both: [] };
+
+            // Read audit results from file (avoids step output size limits)
+            let results;
+            try {
+              const data = fs.readFileSync('audit-results.json', 'utf-8');
+              results = JSON.parse(data);
+            } catch (error) {
+              console.log(`Could not read audit-results.json: ${error.message}`);
+              results = defaultResults;
+            }
 
             // Read enriched items from file (avoids env var size limits)
             let enrichedItemsFromFile = [];
@@ -819,7 +855,6 @@ jobs:
             console.log(report);
 
             // Save report as artifact
-            const fs = require('fs');
             fs.writeFileSync('issue-audit-report.md', report);
 
       - name: Upload audit report
