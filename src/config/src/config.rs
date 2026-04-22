@@ -1559,6 +1559,8 @@ pub struct Limit {
     pub query_values_default_num: i64,
     #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 1)] // seconds
     pub query_partition_by_secs: usize,
+    #[env_config(name = "ZO_DISABLE_PARTITIONS_FOR_NON_TS_ORDER_BY", default = false)]
+    pub disable_partitions_for_non_ts_order_by: bool,
     #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 768)] // MB/s/core
     pub query_group_base_speed: usize,
     // Default Config: Run Query Recommendation Analysis for last one hour for every hour

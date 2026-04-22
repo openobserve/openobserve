@@ -1009,6 +1009,25 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
+    if cfg.limit.disable_partitions_for_non_ts_order_by
+        && !is_aggregate
+        && !is_histogram
+        && sql
+            .order_by
+            .first()
+            .map(|(field, _)| {
+                field.as_str() != TIMESTAMP_COL_NAME
+                    && ts_column.as_deref().map_or(true, |ts| field.as_str() != ts)
+            })
+            .unwrap_or(false)
+    {
+        log::info!(
+            "[trace_id {trace_id}] search_partition: ORDER BY on non-timestamp column, disabling partitioning"
+        );
+        resp.partitions = vec![[req.start_time, req.end_time]];
+        return Ok(resp);
+    }
+
     log::debug!(
         "[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}",
         total_secs,
