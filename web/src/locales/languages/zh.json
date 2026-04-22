@@ -1603,7 +1603,13 @@
     "conditionAddRule": "+ 添加规则",
     "sparklineStyle": "风格",
     "sparklineStyleLine": "线",
-    "sparklineStyleBar": "酒吧"
+    "sparklineStyleBar": "酒吧",
+    "configSectionFieldOverridesAliases": [
+      "Field Overrides",
+      "Override Config",
+      "Override",
+      "Column Formatting"
+    ]
   },
   "panel": {
     "header": "面板",

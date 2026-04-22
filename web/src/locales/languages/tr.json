@@ -1601,7 +1601,13 @@
     "conditionAddRule": "+ Kural ekle",
     "sparklineStyle": "Tarz",
     "sparklineStyleLine": "Çizgi",
-    "sparklineStyleBar": "Bar"
+    "sparklineStyleBar": "Bar",
+    "configSectionFieldOverridesAliases": [
+      "Field Overrides",
+      "Override Config",
+      "Override",
+      "Column Formatting"
+    ]
   },
   "panel": {
     "header": "Panel",

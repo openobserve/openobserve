@@ -1601,7 +1601,13 @@
     "conditionAddRule": "+ 규칙 추가",
     "sparklineStyle": "스타일",
     "sparklineStyleLine": "선",
-    "sparklineStyleBar": "바"
+    "sparklineStyleBar": "바",
+    "configSectionFieldOverridesAliases": [
+      "Field Overrides",
+      "Override Config",
+      "Override",
+      "Column Formatting"
+    ]
   },
   "panel": {
     "header": "패널",

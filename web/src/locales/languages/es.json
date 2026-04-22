@@ -1603,7 +1603,13 @@
     "conditionAddRule": "+ Añadir regla",
     "sparklineStyle": "Estilo",
     "sparklineStyleLine": "Línea",
-    "sparklineStyleBar": "Bar"
+    "sparklineStyleBar": "Bar",
+    "configSectionFieldOverridesAliases": [
+      "Field Overrides",
+      "Override Config",
+      "Override",
+      "Column Formatting"
+    ]
   },
   "panel": {
     "header": "Panel",

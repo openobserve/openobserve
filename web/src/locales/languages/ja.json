@@ -1620,7 +1620,13 @@
     "conditionAddRule": "+ ルールを追加",
     "sparklineStyle": "スタイル",
     "sparklineStyleLine": "ライン",
-    "sparklineStyleBar": "バー"
+    "sparklineStyleBar": "バー",
+    "configSectionFieldOverridesAliases": [
+      "Field Overrides",
+      "Override Config",
+      "Override",
+      "Column Formatting"
+    ]
   },
   "panel": {
     "header": "パネル",
