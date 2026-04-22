@@ -19,6 +19,7 @@ export interface AzureIntegration {
   displayName: string;
   icon: string;
   description: string;
+  armTemplate?: string; // HTTPS URL to ARM template JSON on S3
   hasDashboard: boolean;
   dashboardFolderId?: string;
   dashboardGithubUrl?: string;
@@ -27,6 +28,17 @@ export interface AzureIntegration {
 }
 
 export const azureIntegrations: AzureIntegration[] = [
+  {
+    id: 'activity-logs',
+    name: 'Activity Logs',
+    displayName: 'Azure Activity Logs',
+    icon: '',
+    description: 'Stream Azure subscription activity logs to OpenObserve via Event Hub and Event Publisher',
+    armTemplate: 'https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/azure/activity-logs-to-openobserve.json',
+    hasDashboard: false,
+    documentationUrl: 'https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/activity-log',
+    category: 'logs',
+  },
   {
     id: 'aks',
     name: 'AKS',
@@ -188,6 +200,27 @@ export const azureIntegrations: AzureIntegration[] = [
     category: 'networking',
   },
 ];
+
+/**
+ * Generate Azure portal custom deployment URL with pre-filled parameters.
+ * Uses the ARM template quick-deploy format:
+ * https://portal.azure.com/#create/Microsoft.Template/uri/{encoded-template-url}/parameters/{encoded-params}
+ */
+export const generateARMTemplateURL = (
+  integration: AzureIntegration,
+  endpoint: string,
+  accessKey: string,
+): string => {
+  if (!integration.armTemplate) return '';
+
+  const templateUri = encodeURIComponent(integration.armTemplate);
+  const parameters = encodeURIComponent(JSON.stringify({
+    openObserveEndpoint: { value: endpoint },
+    openObserveAccessKey: { value: accessKey },
+  }));
+
+  return `https://portal.azure.com/#create/Microsoft.Template/uri/${templateUri}/parameters/${parameters}`;
+};
 
 /**
  * Generate dashboard URL for the current environment
