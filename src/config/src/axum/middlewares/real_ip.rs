@@ -13,58 +13,98 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{net::IpAddr, str::FromStr};
+use std::{
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+    sync::Arc,
+};
 
-use axum::{body::Body, extract::Extension, http::Request, middleware::Next, response::Response};
+use axum::{
+    body::Body,
+    extract::{ConnectInfo, Extension, FromRequestParts},
+    http::Request,
+    middleware::Next,
+    response::Response,
+};
 use axum_client_ip::{ClientIp, ClientIpSource};
 
-/// The real client IP resolved by [`ClientIpSource`] and attached to the
-/// request by [`extract_real_ip`]. Consumers should read this extension
-/// instead of parsing `X-Forwarded-For`/`Forwarded` headers directly.
+/// The real client IP resolved by [`extract_real_ip`] and attached to the
+/// request extensions. Consumers should read this instead of parsing
+/// `X-Forwarded-For` / `Forwarded` headers directly.
 #[derive(Clone, Copy, Debug)]
 pub struct RealIp(pub IpAddr);
 
-/// Resolve the [`ClientIpSource`] from the configured string.
-/// Empty / unrecognised values fall back to [`ClientIpSource::ConnectInfo`]
-/// (the TCP peer), which is the only safe default when no proxy is in front.
-pub fn resolve_client_ip_source(configured: &str) -> ClientIpSource {
-    let trimmed = configured.trim();
-    if trimmed.is_empty() {
-        return ClientIpSource::ConnectInfo;
-    }
-    match ClientIpSource::from_str(trimmed) {
-        Ok(source) => source,
-        Err(_) => {
-            log::warn!(
-                "invalid ZO_HTTP_REAL_IP_SOURCE={trimmed:?}, falling back to ConnectInfo; \
-                 valid values: ConnectInfo, RightmostXForwardedFor, RightmostForwarded, \
-                 XRealIp, CfConnectingIp, TrueClientIp, FlyClientIp, XEnvoyExternalAddress, \
-                 CloudFrontViewerAddress"
-            );
-            ClientIpSource::ConnectInfo
-        }
-    }
+/// Ordered list of IP sources to try, injected as a request extension by the
+/// router. The middleware tries each in turn and uses the first one that
+/// resolves; if none do, it implicitly falls back to [`ClientIpSource::ConnectInfo`]
+/// (the TCP peer).
+#[derive(Clone)]
+pub struct ClientIpSources(pub Arc<Vec<ClientIpSource>>);
+
+/// Parse a comma-separated list of source names (e.g.
+/// `"XEnvoyExternalAddress,XRealIp"`) into a [`ClientIpSources`] chain.
+/// Empty / all-invalid input resolves to an empty chain; the middleware
+/// will still fall back to `ConnectInfo` at request time.
+pub fn resolve_client_ip_sources(configured: &str) -> ClientIpSources {
+    let sources: Vec<ClientIpSource> = configured
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .filter_map(|s| match ClientIpSource::from_str(s) {
+            Ok(src) => Some(src),
+            Err(_) => {
+                log::warn!(
+                    "invalid ZO_HTTP_REAL_IP_SOURCE entry {s:?}, skipping; \
+                     valid values: ConnectInfo, RightmostXForwardedFor, \
+                     RightmostForwarded, XRealIp, CfConnectingIp, TrueClientIp, \
+                     FlyClientIp, XEnvoyExternalAddress, CloudFrontViewerAddress"
+                );
+                None
+            }
+        })
+        .collect();
+    ClientIpSources(Arc::new(sources))
 }
 
-/// Middleware that extracts the client IP per the configured [`ClientIpSource`]
-/// and stores it in the request extensions as [`RealIp`].
+/// Middleware that resolves the real client IP by trying each configured
+/// [`ClientIpSource`] in order, with an implicit [`ClientIpSource::ConnectInfo`]
+/// fallback. The first source that yields an IP wins; the result is stored
+/// as a [`RealIp`] request extension.
 ///
-/// Extraction failures (missing header / missing `ConnectInfo`) are swallowed
-/// so the request still reaches downstream handlers; logging middlewares will
-/// show `-` for the IP in that case.
+/// Extraction failures are silent — logging middlewares will render `-`
+/// for the IP if nothing resolved (not even the TCP peer, which only
+/// happens if the server was started without `ConnectInfo` support).
 pub async fn extract_real_ip(
-    client_ip: Result<ClientIp, axum_client_ip::Rejection>,
-    Extension(source): Extension<ClientIpSource>,
-    mut req: Request<Body>,
+    Extension(sources): Extension<ClientIpSources>,
+    req: Request<Body>,
     next: Next,
 ) -> Response {
-    match client_ip {
-        Ok(ClientIp(ip)) => {
-            req.extensions_mut().insert(RealIp(ip));
+    let (mut parts, body) = req.into_parts();
+
+    let mut resolved: Option<IpAddr> = None;
+    for source in sources.0.iter() {
+        // `ClientIp` reads the `ClientIpSource` extension to decide which
+        // header (or ConnectInfo) to use; swap it in for each attempt.
+        parts.extensions.insert(source.clone());
+        if let Ok(ClientIp(ip)) = ClientIp::from_request_parts(&mut parts, &()).await {
+            resolved = Some(ip);
+            break;
         }
-        Err(e) => {
-            log::debug!("failed to resolve client IP via {source:?}: {e}");
-        }
+    }
+
+    // Implicit fallback: TCP peer. Useful for local dev / health checks that
+    // skip the ingress, and harmless when an ingress is present (yields the
+    // ingress pod IP, which is at least a real cluster address).
+    if resolved.is_none() {
+        resolved = parts
+            .extensions
+            .get::<ConnectInfo<SocketAddr>>()
+            .map(|c| c.0.ip());
+    }
+
+    let mut req = Request::from_parts(parts, body);
+    if let Some(ip) = resolved {
+        req.extensions_mut().insert(RealIp(ip));
     }
     next.run(req).await
 }
