@@ -246,6 +246,14 @@ export function overlayNewDataOnOldOptions(
           ...(oldSeries.itemStyle || {}),
           opacity: 0.3,
         },
+        ...(oldSeries.areaStyle
+          ? {
+              areaStyle: {
+                ...oldSeries.areaStyle,
+                opacity: 0.3,
+              },
+            }
+          : {}),
       });
     }
   }
