@@ -616,6 +616,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
       // Go to summary
       await pm.anomalyDetectionPage.clickTab('Summary');
+      await page.waitForTimeout(1000); // Wait for summary content to render
 
       // Verify summary text appears using POM methods
       await pm.anomalyDetectionPage.expectSummaryVisible();

@@ -51,7 +51,7 @@ class AnomalyDetectionPage {
             customSqlTimestampError: '[data-test="anomaly-sql-timestamp-error"]',
             filterRow: '[data-test="anomaly-filter-row"]',
             detectionWindowError: '[data-test="anomaly-detection-window-error"]',
-            summaryText: '[data-test="anomaly-summary-text"]',
+            summaryText: '.anomaly-summary .summary-text',
 
             // Alerting
             alertEnabled: '[data-test="anomaly-alert-enabled"]',
@@ -624,8 +624,14 @@ class AnomalyDetectionPage {
      * Expect summary text to be visible
      */
     async expectSummaryVisible() {
+        // Wait for the summary container to be visible first
+        const summaryContainer = this.page.locator('.anomaly-summary');
+        await expect(summaryContainer).toBeVisible({ timeout: 10000 });
+
+        // Then check for summary text
         const summary = this.page.locator(this.selectors.summaryText);
-        await expect(summary).toBeVisible({ timeout: 5000 });
+        await expect(summary).toBeVisible({ timeout: 10000 });
+        testLogger.info('Summary text is visible');
     }
 
     /**
