@@ -1018,7 +1018,10 @@ async function getQueryData(
             if ((isPagination && partition === 1) || !appendResult) {
               searchObj.data.queryResults.hits = formattedHits;
             } else {
-              searchObj.data.queryResults.hits.push(...formattedHits);
+              searchObj.data.queryResults.hits = [
+                ...searchObj.data.queryResults.hits,
+                ...formattedHits,
+              ];
             }
             searchObj.data.queryResults.from = queryReq.query.from;
 

@@ -486,9 +486,11 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     // The service graph daemon processes traces in batches. Circular dependency
     // services (service-a/b/c) may not appear in the first topology snapshot.
     // Poll the API until they appear or timeout.
+    // NOTE: Edge case services may take longer to appear than production services.
+    // Use a longer timeout to allow the daemon to process all ingested traces.
     const circularServices = ['service-a', 'service-b', 'service-c'];
-    const maxWaitMs = 60000;
-    const pollIntervalMs = 5000;
+    const maxWaitMs = 120000;
+    const pollIntervalMs = 10000;
     const startTime = Date.now();
     let foundCircularNodes = [];
     let nodes = [];

@@ -418,6 +418,30 @@ where
                 OFGA_MODELS.get(key).map_or(key, |model| model.key),
                 entity
             )
+        } else if path_columns[1].eq("llm") {
+            // LLM model pricing routes — uses dedicated "model_pricing" resource.
+            // url_len==3: /{org_id}/llm/models  (list / create)
+            // url_len==4: /{org_id}/llm/models/built-in  (read-only catalog)
+            // url_len==4: /{org_id}/llm/models/{model_id}  (get / update / delete)
+            let resource_key = OFGA_MODELS
+                .get("model_pricing")
+                .map_or("model_pricing", |m| m.key);
+            if url_len == 3 {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                } else if method.eq("POST") {
+                    method = "PUT".to_string();
+                }
+                format!("{resource_key}:{}", path_columns[0])
+            } else if path_columns.get(3) == Some(&"built-in") {
+                method = "LIST".to_string();
+                format!("{resource_key}:{}", path_columns[0])
+            } else if path_columns.get(3) == Some(&"refresh-built-in") {
+                method = "PUT".to_string();
+                format!("{resource_key}:{}", path_columns[0])
+            } else {
+                format!("{resource_key}:{}", path_columns[0])
+            }
         } else if path_columns[1].eq("groups") || path_columns[1].eq("roles") {
             // for groups or roles, path will be of format /org/roles/id , so we need
             // to check permission on role:org/id for permissions on that specific role
@@ -638,7 +662,19 @@ where
         } else if url_len == 4 {
             // Handle /v2 alert and report apis
             if path_columns[0].eq(V2_API_PREFIX) {
-                if path_columns[2].eq("alerts") || path_columns[2].eq("reports") {
+                if path_columns[2].eq("alerts") && path_columns[3].eq("incidents") {
+                    // GET /v2/{org_id}/alerts/incidents → list incidents
+                    if method.eq("GET") {
+                        method = "LIST".to_string();
+                    }
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get("incidents")
+                            .map_or("incidents", |model| model.key),
+                        path_columns[1] // org_id
+                    )
+                } else if path_columns[2].eq("alerts") || path_columns[2].eq("reports") {
                     format!(
                         "{}:{}",
                         OFGA_MODELS
@@ -847,64 +883,30 @@ where
             && path_columns.get(3) == Some(&"incidents")
             && url_len >= 5
         {
-            // Handle v2 alert incident endpoints (5+ parts)
-            // Incidents use alert_folders permissions:
-            // - LIST permission on alert_folders → can LIST incidents and get stats and get
-            //   specific incidents
-            // - POST permission on alert_folders → can POST/PATCH incidents (update status, trigger
-            //   RCA)
+            // Incident RBAC — all checks are on incidents:{org_id}
+            //
+            // url_len 5, GET, path[4]=="stats"  → LIST  (aggregate read)
+            // url_len 5, GET, path[4]=={id}     → GET   (read specific incident)
+            // url_len 6, GET, path[5]=="events" → GET   (read sub-resource)
+            // url_len 6, PATCH, path[5]=="update"→ PUT  (modify state)
+            // url_len 6, POST, path[5]=="rca"   → POST  (trigger action)
+            // url_len 7, POST  (events/comment) → POST  (create comment)
 
             if method.eq("GET") && url_len == 5 && path_columns.get(4) == Some(&"stats") {
-                // GET incident stats - requires LIST permission on alert_folders
                 method = "LIST".to_string();
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get("alert_folders")
-                        .map_or("alert_folders", |model| model.key),
-                    path_columns[1] // org_id
-                )
-            } else if method.eq("GET") && url_len == 5 {
-                // GET list of incidents - requires LIST permission on alert_folders
-                method = "LIST".to_string();
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get("alert_folders")
-                        .map_or("alert_folders", |model| model.key),
-                    path_columns[1] // org_id
-                )
-            } else if url_len == 6 && method.eq("GET") {
-                // GET specific incident or sub-resources (service_graph)
-                // Requires LIST permission on alert_folders
-                method = "LIST".to_string();
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get("alert_folders")
-                        .map_or("alert_folders", |model| model.key),
-                    path_columns[1] // org_id (check org-level alert_folders permission)
-                )
-            } else if url_len == 6 && (method.eq("PATCH") || method.eq("POST")) {
-                // PATCH incident status or POST RCA - requires POST permission on alert_folders
-                method = "POST".to_string();
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get("alert_folders")
-                        .map_or("alert_folders", |model| model.key),
-                    path_columns[1] // org_id (check org-level alert_folders permission)
-                )
-            } else {
-                // Fallback for other incident operations
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get("alert_folders")
-                        .map_or("alert_folders", |model| model.key),
-                    path_columns[1] // org_id
-                )
+            } else if method.eq("PATCH") {
+                // PATCH /{incident_id}/update → PUT
+                method = "PUT".to_string();
             }
+            // POST (rca, comment) stays POST
+
+            format!(
+                "{}:{}",
+                OFGA_MODELS
+                    .get("incidents")
+                    .map_or("incidents", |model| model.key),
+                path_columns[1] // org_id
+            )
         } else if method.eq("PUT") || method.eq("DELETE") || method.eq("PATCH") {
             method = resolve_write_method(&method, &path_columns);
 

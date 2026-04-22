@@ -550,7 +550,7 @@ describe("Search Service", () => {
       await search.get_traces(params);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/traces/traces/latest?filter=service_name='webapp'&start_time=1609459200&end_time=1609545600&from=0&size=100"
+        `/api/test-org/traces/traces/latest?filter=${encodeURIComponent("service_name='webapp'")}&start_time=1609459200&end_time=1609545600&from=0&size=100`
       );
     });
   });

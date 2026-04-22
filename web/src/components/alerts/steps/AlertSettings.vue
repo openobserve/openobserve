@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Section header -->
     <div class="section-header">
       <div class="section-header-accent" />
-      <span class="section-header-title">Settings</span>
+      <span class="section-header-title">{{ t('alerts.alertSettings.sectionTitle') }}</span>
     </div>
     <div class="tw:px-3 tw:py-2">
       <q-form ref="alertSettingsForm" @submit.prevent>
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-red-8 q-pt-xs"
               style="font-size: 11px; line-height: 12px"
             >
-              Field is required!
+              {{ t('alerts.alertSettings.fieldRequired') }}
             </div>
           </div>
         </div>
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-slot:no-option>
                   <q-item>
-                    <q-item-section class="text-grey">No destinations available</q-item-section>
+                    <q-item-section class="text-grey">{{ t('alerts.alertSettings.noDestinationsAvailable') }}</q-item-section>
                   </q-item>
                 </template>
               </q-select>
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 round
                 flat
-                title="Refresh latest Destinations"
+                :title="t('alerts.alertSettings.refreshDestinations')"
                 @click="$emit('refresh:destinations')"
                 style="min-width: auto"
               />
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-red-8 q-pt-xs"
               style="font-size: 11px; line-height: 12px"
             >
-              Field is required!
+              {{ t('alerts.alertSettings.fieldRequired') }}
             </div>
           </div>
         </div>
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-red-8 q-pt-xs"
               style="font-size: 11px; line-height: 12px"
             >
-              Field is required!
+              {{ t('alerts.alertSettings.fieldRequired') }}
             </div>
           </div>
         </div>
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-red-8 q-pt-xs"
               style="font-size: 11px; line-height: 12px"
             >
-              Field is required!
+              {{ t('alerts.alertSettings.fieldRequired') }}
             </div>
           </div>
         </div>
@@ -351,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-slot:no-option>
                   <q-item>
-                    <q-item-section class="text-grey">No destinations available</q-item-section>
+                    <q-item-section class="text-grey">{{ t('alerts.alertSettings.noDestinationsAvailable') }}</q-item-section>
                   </q-item>
                 </template>
               </q-select>
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 round
                 flat
-                title="Refresh latest Destinations"
+                :title="t('alerts.alertSettings.refreshDestinations')"
                 @click="$emit('refresh:destinations')"
                 style="min-width: auto"
               />
@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-red-8 q-pt-xs"
               style="font-size: 11px; line-height: 12px"
             >
-              Field is required!
+              {{ t('alerts.alertSettings.fieldRequired') }}
             </div>
           </div>
         </div>

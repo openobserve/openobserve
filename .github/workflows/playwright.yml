@@ -162,6 +162,7 @@ jobs:
                 "logsqueries.matchall.spec.js",
                 "searchpartition.spec.js",
                 "logs-autocomplete-suggestions.spec.js",
+                "logs-sql-autocomplete.spec.js",
               ]
           - testfolder: "Alerts"
             browser: "chrome"
@@ -187,6 +188,7 @@ jobs:
                 "maxquery.spec.js",
                 "dashboard-chartJson.spec.js",
                 "dashboard-promql-suggestions.spec.js",
+                "dashboard-sql-autocomplete.spec.js",
                 "dashboard-share-link.spec.js",
                 "crossLinking.spec.js",
                 "crossLinkMultiStream.spec.js",
@@ -218,6 +220,7 @@ jobs:
                 "dashboard-sankey.spec.js",
                 "dashboard-pie-donut.spec.js",
                 "dashboard-table-chart.spec.js",
+                "dashboard-table-copy-cell.spec.js",
                 "dashboard-metric-camelcase.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
