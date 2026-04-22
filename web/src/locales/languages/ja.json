@@ -386,7 +386,8 @@
     "liveMode": "ライブ",
     "liveModeTooltip": "フィルター/時間の変更時にクエリを自動実行",
     "turnOnLiveMode": "ライブモードを有効にする",
-    "turnOffLiveMode": "ライブモードをオフにする"
+    "turnOffLiveMode": "ライブモードをオフにする",
+    "autoRunEnabled": "自動実行有効"
   },
   "menu": {
     "home": "ホーム",

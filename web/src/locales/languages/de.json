@@ -386,7 +386,8 @@
     "liveMode": "Lebe",
     "liveModeTooltip": "Automatische Ausführung der Abfrage bei Filter-/Zeitänderungen",
     "turnOnLiveMode": "Aktiviere den Live-Modus",
-    "turnOffLiveMode": "Schalten Sie den Live-Modus aus"
+    "turnOffLiveMode": "Schalten Sie den Live-Modus aus",
+    "autoRunEnabled": "Automatischer Lauf aktiviert"
   },
   "menu": {
     "home": "Startseite",

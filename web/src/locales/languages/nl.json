@@ -386,7 +386,8 @@
     "liveMode": "Live",
     "liveModeTooltip": "Query automatisch uitvoeren bij wijzigingen in filter/tijd",
     "turnOnLiveMode": "Live-modus inschakelen",
-    "turnOffLiveMode": "Live-modus uitschakelen"
+    "turnOffLiveMode": "Live-modus uitschakelen",
+    "autoRunEnabled": "Automatisch uitvoeren ingeschakeld"
   },
   "menu": {
     "home": "Home",

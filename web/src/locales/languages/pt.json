@@ -386,7 +386,8 @@
     "liveMode": "Ao vivo",
     "liveModeTooltip": "Consulta de execução automática sobre alterações de filtro/hora",
     "turnOnLiveMode": "Ativar o modo Ao vivo",
-    "turnOffLiveMode": "Desativar o modo ao vivo"
+    "turnOffLiveMode": "Desativar o modo ao vivo",
+    "autoRunEnabled": "Execução automática ativada"
   },
   "menu": {
     "home": "Início",

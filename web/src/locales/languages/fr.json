@@ -386,7 +386,8 @@
     "liveMode": "En direct",
     "liveModeTooltip": "Exécution automatique de la requête sur les changements de filtre/d'heure",
     "turnOnLiveMode": "Activez le mode Live",
-    "turnOffLiveMode": "Désactiver le mode Live"
+    "turnOffLiveMode": "Désactiver le mode Live",
+    "autoRunEnabled": "Exécution automatique activée"
   },
   "menu": {
     "home": "Accueil",
