@@ -1245,9 +1245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? t('search.generateQueryTooltip')
-                    : searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled
-                      ? t('search.liveMode')
-                      : t('search.runQuery')
+                    : t('search.runQuery')
                 "
                 class="q-pa-none tw:h-[30px] element-box-shadow"
                 :class="[
@@ -1279,12 +1277,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     !searchObj.data.stream.selectedStream.length)
                 "
               >
+                <q-icon
+                  v-if="
+                    searchObj.meta.liveMode &&
+                    store.state.zoConfig.auto_query_enabled &&
+                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                  "
+                  name="autorenew"
+                  size="14px"
+                  class="q-mr-xs"
+                />
                 {{
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? t("search.generateQuery")
-                    : searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled
-                      ? t("search.liveMode")
-                      : t("search.runQuery")
+                    : t("search.runQuery")
                 }}
               </q-btn>
               <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
@@ -2683,18 +2689,6 @@ export default defineComponent({
     } = useSearchBar();
     const { loadStreamLists, extractFields } = useStreamFields();
 
-    // Debounced auto-run for live mode when user edits the query in the editor.
-    const debouncedLiveModeQueryEmit = debounce(() => {
-      if (
-        store.state.zoConfig?.auto_query_enabled &&
-        searchObj.meta.liveMode &&
-        searchObj.meta.logsVisualizeToggle === "logs" &&
-        !searchObj.loading &&
-        !searchObj.loadingHistogram
-      ) {
-        emit("searchdata");
-      }
-    }, 500);
 
     const {
       refreshData,
@@ -3065,11 +3059,6 @@ export default defineComponent({
       //   getQueryData(false);
       // }
       searchObj.data.editorValue = value;
-      // Only auto-run for real user edits, not programmatic setValue calls.
-      // Monaco sets e.isFlush=true when setValue() is called programmatically.
-      if (!event?.isFlush) {
-        debouncedLiveModeQueryEmit();
-      }
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
         if (
