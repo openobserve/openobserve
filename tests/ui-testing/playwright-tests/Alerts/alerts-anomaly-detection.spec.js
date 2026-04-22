@@ -2,7 +2,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
-const { getOrgName, createMockDestination, deleteDestination, listAnomalyDetections, triggerAnomalyDetection, getAnomalyHistory } = require('../utils/api-helper.js');
+const { getOrgName, listAnomalyDetections, triggerAnomalyDetection, getAnomalyHistory } = require('../utils/api-helper.js');
 
 test.describe("Anomaly Detection Alerts", () => {
   test.describe.configure({ mode: 'serial' });
@@ -13,43 +13,9 @@ test.describe("Anomaly Detection Alerts", () => {
   const testStreamName = 'e2e_automate'; // Stream created by global setup
   const testAnomalyName = (suffix) => `E2E_Anomaly_${suffix}_${randomValue}`;
 
-  // Prerequisite destination name - ensures Add Alert button is enabled
-  const prerequisiteDestinationName = `e2e_anomaly_prerequisite_${randomValue}`;
-  let prerequisiteDestinationCreated = false;
-
-  // Setup: Create a test destination to ensure Add Alert button is enabled
-  // The Add Alert button is disabled when no destinations exist in the system
-  test.beforeAll(async ({ browser }) => {
-    testLogger.info('Setting up prerequisites - creating test destination');
-
-    if (!process.env.ZO_BASE_URL || !process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD || !process.env.ORGNAME) {
-      testLogger.warn('Skipping prerequisite setup - missing environment variables');
-      return;
-    }
-
-    const context = await browser.newContext();
-    const page = await context.newPage();
-
-    try {
-      // Navigate to base URL first - required for page.evaluate() to make fetch calls
-      // The apiCall helper uses page.evaluate() which needs a valid origin
-      await page.goto(process.env.ZO_BASE_URL);
-      await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
-
-      // Create a prerequisite destination to enable the Add Alert button
-      const createResp = await createMockDestination(page, prerequisiteDestinationName);
-      if (createResp.status === 200) {
-        prerequisiteDestinationCreated = true;
-        testLogger.info('Prerequisite destination created successfully', { name: prerequisiteDestinationName });
-      } else {
-        testLogger.warn('Failed to create prerequisite destination', { status: createResp.status, data: createResp.data });
-      }
-    } catch (error) {
-      testLogger.warn('Error creating prerequisite destination', { error: error.message });
-    } finally {
-      await context.close();
-    }
-  });
+  // Prerequisite template and destination names - ensures Add Alert button is enabled
+  const prerequisiteTemplateName = `e2e_anomaly_template_${randomValue}`;
+  const prerequisiteDestinationName = `e2e_anomaly_dest_${randomValue}`;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -57,18 +23,20 @@ test.describe("Anomaly Detection Alerts", () => {
     await navigateToBase(page);
     pm = new PageManager(page);
 
-    // Navigate to alerts page
-    await page.goto(`${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    // Ensure template and destination exist (same pattern as alerts-e2e-flow.spec.js)
+    // This enables the Add Alert button which is disabled when no destinations exist
+    await pm.alertTemplatesPage.ensureTemplateExists(prerequisiteTemplateName);
+    await pm.alertDestinationsPage.ensureDestinationExists(prerequisiteDestinationName, 'DEMO', prerequisiteTemplateName);
+
+    // Navigate to alerts page and then to anomaly detection tab
+    await pm.commonActions.navigateToAlerts();
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+    // Navigate to anomaly detection tab
+    await pm.anomalyDetectionPage.navigateToAnomalyTab();
 
     // Wait for alerts table to be ready
     await page.locator(pm.anomalyDetectionPage.selectors.alertsTable).first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-
-    // Wait for Add Alert button to be enabled (destinations must exist)
-    const addButtonEnabled = await pm.anomalyDetectionPage.waitForAddAlertButtonEnabled(15000);
-    if (!addButtonEnabled) {
-      testLogger.warn('Add Alert button not enabled - tests may fail. Ensure destinations exist.');
-    }
 
     testLogger.info('Test setup completed', { randomValue });
   });
@@ -135,42 +103,104 @@ test.describe("Anomaly Detection Alerts", () => {
 
       // Close any open menus by pressing Escape
       await page.keyboard.press('Escape');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1000);
 
       // Go to Alerting tab and DISABLE alerting (it's enabled by default with no destination)
       testLogger.info('Disabling alerting to allow save');
 
-      // Go to Alerting tab using POM method
-      await pm.anomalyDetectionPage.clickTab('Alerting');
+      // Wait for tabs to be visible - look for tab container
+      await page.waitForSelector('.alert-v3-tabs', { timeout: 5000 }).catch(() => {});
+
+      // Try to find and click Alerting tab with multiple fallbacks
+      const alertingTabSelectors = [
+        'text="Alerting"',
+        '[class*="tw:cursor-pointer"]:has-text("Alerting")',
+        '.tw\\:cursor-pointer:has-text("Alert")',
+        'div[class*="cursor-pointer"]'
+      ];
+
+      let alertingTab = null;
+      for (const selector of alertingTabSelectors) {
+        const tab = page.locator(selector).filter({ hasText: /alert/i }).first();
+        if (await tab.isVisible({ timeout: 2000 }).catch(() => false)) {
+          alertingTab = tab;
+          testLogger.info(`Found Alerting tab using selector: ${selector}`);
+          break;
+        }
+      }
+
+      if (alertingTab) {
+        await alertingTab.click();
+      } else {
+        testLogger.warn('Could not find Alerting tab, it may already be visible or not exist');
+      }
+      await page.waitForTimeout(1000);
+      testLogger.info('Clicked Alerting tab');
 
       // Take screenshot to see Alerting tab state (only in debug mode)
       if (process.env.DEBUG) {
         await page.screenshot({ path: 'test-logs/anomaly-alerting-tab.png', fullPage: true });
       }
 
-      // Find and toggle off the alert enabled switch - it's a q-toggle
-      const alertToggle = page.locator(pm.anomalyDetectionPage.selectors.alertEnabled);
-      if (await alertToggle.isVisible({ timeout: 3000 }).catch(() => false)) {
-        testLogger.info('Found alert toggle, clicking to disable');
-        await alertToggle.click();
-        await page.waitForTimeout(500);
-        testLogger.info('Alerting toggle clicked');
-      } else {
-        // Try alternative selector for the toggle
-        testLogger.info('Looking for alternative toggle selector');
-        const toggleInner = page.locator(pm.anomalyDetectionPage.selectors.qToggle).filter({ hasText: /enabled/i }).first();
-        if (await toggleInner.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await toggleInner.click();
-          await page.waitForTimeout(500);
-          testLogger.info('Alternative toggle clicked');
+      // Find the alert toggle - it should have data-test="anomaly-alert-enabled"
+      const alertToggle = page.locator('[data-test="anomaly-alert-enabled"]');
+
+      // Wait for toggle to be visible
+      try {
+        await alertToggle.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Check if alerting is currently enabled (toggle label shows "Enabled")
+        let toggleLabel = await alertToggle.locator('.q-toggle__label').textContent().catch(() => '');
+        testLogger.info('Alert toggle state', { toggleLabel });
+
+        if (toggleLabel.toLowerCase().includes('enabled')) {
+          testLogger.info('Alerting is enabled, clicking to disable');
+
+          // Click the toggle
+          await alertToggle.click();
+
+          // Wait for the toggle state to update
+          await page.waitForTimeout(1500);
+
+          // Verify the toggle label changed to "Disabled"
+          toggleLabel = await alertToggle.locator('.q-toggle__label').textContent().catch(() => '');
+          testLogger.info('After clicking toggle', { toggleLabel });
+
+          if (!toggleLabel.toLowerCase().includes('disabled')) {
+            testLogger.warn('Toggle label did not change to Disabled, retrying click');
+            await alertToggle.click();
+            await page.waitForTimeout(1500);
+            toggleLabel = await alertToggle.locator('.q-toggle__label').textContent().catch(() => '');
+            testLogger.info('After second click', { toggleLabel });
+          }
+        } else {
+          testLogger.info('Alerting is already disabled');
+        }
+      } catch (e) {
+        testLogger.warn('Could not find alert toggle with data-test selector, trying alternative');
+        // Try alternative: find toggle with "Enabled" or "Disabled" text
+        const toggleAlt = page.locator('.q-toggle').filter({ hasText: /enabled|disabled/i }).first();
+        if (await toggleAlt.isVisible({ timeout: 2000 }).catch(() => false)) {
+          const label = await toggleAlt.locator('.q-toggle__label').textContent().catch(() => '');
+          if (label.toLowerCase().includes('enabled')) {
+            await toggleAlt.click();
+            await page.waitForTimeout(1500);
+            testLogger.info('Alternative toggle clicked');
+          }
         }
       }
 
-      // Take screenshot to see current state before save (only in debug mode)
-      if (process.env.DEBUG) {
-        testLogger.info('Taking screenshot before save');
-        await page.screenshot({ path: 'test-logs/anomaly-before-save.png', fullPage: true });
+      // Navigate back to Config tab after disabling alerting
+      testLogger.info('Navigating back to Config tab');
+      const configTab = page.locator('[class*="tw:cursor-pointer"]').filter({ hasText: /config/i }).first();
+      if (await configTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await configTab.click();
+        await page.waitForTimeout(1000);
+        testLogger.info('Clicked Config tab');
       }
+
+      // Wait for Vue reactivity and validation to complete
+      await page.waitForTimeout(1500);
 
       // Click save button
       const saveButton = page.locator(pm.anomalyDetectionPage.selectors.saveButton);
@@ -438,18 +468,9 @@ test.describe("Anomaly Detection Alerts", () => {
     }, async ({ page }) => {
       testLogger.info('Creating anomaly with alerting enabled');
 
-      const org = getOrgName();
-      const testDestinationName = `e2e_anomaly_dest_${randomValue}`;
+      // Use the prerequisite destination created in beforeEach
+      const testDestinationName = prerequisiteDestinationName;
 
-      // Step 1: Create a mock destination via API (using httpbin.org for CI/CD)
-      const createDestResp = await createMockDestination(page, testDestinationName);
-      testLogger.info('Create destination response', { status: createDestResp.status });
-
-      if (createDestResp.status !== 200) {
-        testLogger.warn('Failed to create destination, test may fail', { response: createDestResp.data });
-      }
-
-      // Step 2: Create anomaly with alerting enabled
       const anomalyName = testAnomalyName('WithAlerts');
 
       await page.locator(pm.alertsPage.locators.addAlertButton).click();
@@ -478,32 +499,13 @@ test.describe("Anomaly Detection Alerts", () => {
       // Verify destination selector appears
       await expect(page.locator(pm.anomalyDetectionPage.selectors.destination)).toBeVisible({ timeout: 5000 });
 
-      // Refresh destinations to ensure our newly created destination is loaded
-      testLogger.info('Refreshing destinations list');
-      const refreshBtn = page.locator(pm.anomalyDetectionPage.selectors.refreshDestinationsBtn).filter({ has: page.locator('.q-icon') }).first();
-      if (await refreshBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await refreshBtn.click();
-        testLogger.info('Clicked refresh button');
-        await page.waitForTimeout(3000); // Wait for API call and refresh to complete
-      } else {
-        // Try alternative: button with refresh icon
-        const altRefresh = page.locator('button').filter({ has: page.locator('i.q-icon:has-text("refresh")') }).first();
-        if (await altRefresh.isVisible({ timeout: 1000 }).catch(() => false)) {
-          await altRefresh.click();
-          testLogger.info('Clicked alternative refresh button');
-          await page.waitForTimeout(3000);
-        } else {
-          testLogger.warn('Could not find refresh button');
-        }
-      }
-
-      // Select the destination we created
+      // Select the prerequisite destination created in beforeEach
       testLogger.info('Selecting destination', { testDestinationName });
       const destSelect = page.locator(pm.anomalyDetectionPage.selectors.destination);
       await destSelect.click();
       await page.waitForTimeout(1000);
 
-      // Type to filter - use full destination name
+      // Type to filter - use the destination name
       await page.keyboard.type(testDestinationName);
       await page.waitForTimeout(1000);
 
@@ -529,7 +531,7 @@ test.describe("Anomaly Detection Alerts", () => {
       }
 
       if (!destFound) {
-        testLogger.warn('Could not find destination in dropdown - checking if any destinations exist');
+        testLogger.warn('Could not find destination in dropdown');
         // Take screenshot for debugging (only in debug mode)
         if (process.env.DEBUG) {
           await page.screenshot({ path: 'test-logs/anomaly-dest-dropdown.png', fullPage: true });
@@ -544,10 +546,9 @@ test.describe("Anomaly Detection Alerts", () => {
       const destError = page.locator(pm.anomalyDetectionPage.selectors.destinationError);
       const errorVisible = await destError.isVisible({ timeout: 2000 }).catch(() => false);
       if (errorVisible) {
-        testLogger.warn('Destination error still visible - destination may not be selected, skipping save');
-        // Cancel and cleanup
+        testLogger.warn('Destination error still visible - destination may not be selected');
+        // Cancel and skip test
         await pm.anomalyDetectionPage.clickBack();
-        await deleteDestination(page, testDestinationName);
         test.skip(true, 'Could not select destination in dropdown');
         return;
       }
@@ -557,10 +558,6 @@ test.describe("Anomaly Detection Alerts", () => {
       await pm.anomalyDetectionPage.expectAnomalyInList(anomalyName);
 
       testLogger.info('Anomaly with alerting created successfully');
-
-      // Step 3: Cleanup - delete the test destination via API
-      testLogger.info('Cleaning up test destination');
-      await deleteDestination(page, testDestinationName);
     });
 
     test("Refresh destinations list", {
@@ -1062,9 +1059,9 @@ test.describe("Anomaly Detection Alerts", () => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  // Cleanup: Delete all test anomalies and prerequisite destination
+  // Cleanup: Delete all test anomalies
   test.afterAll(async ({ browser }) => {
-    testLogger.info('Running test cleanup - deleting test anomalies and prerequisite destination');
+    testLogger.info('Running test cleanup - deleting test anomalies');
 
     // Verify required env vars are set (auth is handled by api-helper.js)
     if (!process.env.ZO_BASE_URL || !process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD || !process.env.ORGNAME) {
@@ -1085,12 +1082,8 @@ test.describe("Anomaly Detection Alerts", () => {
       await pm.anomalyDetectionPage.cleanupTestAnomalies(`E2E_Anomaly`);
       testLogger.info('Test anomalies cleanup completed');
 
-      // Clean up the prerequisite destination created in beforeAll
-      if (prerequisiteDestinationCreated) {
-        testLogger.info('Cleaning up prerequisite destination', { name: prerequisiteDestinationName });
-        await deleteDestination(page, prerequisiteDestinationName);
-        testLogger.info('Prerequisite destination deleted');
-      }
+      // Note: Template and destination created via UI in beforeEach are not cleaned up here
+      // They may be reused by subsequent test runs or cleaned up by a separate cleanup job
     } catch (error) {
       testLogger.warn('Cleanup failed', { error: error.message });
     } finally {
