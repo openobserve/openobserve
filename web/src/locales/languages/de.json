@@ -124,7 +124,8 @@
     "create": "Erstellen",
     "resources": "Ressourcen",
     "updated_at": "Aktualisiert am",
-    "clearFilter": "Filter löschen"
+    "clearFilter": "Filter löschen",
+    "noMatches": "Keine Treffer"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",

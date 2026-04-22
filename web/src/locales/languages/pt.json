@@ -124,7 +124,8 @@
     "create": "Criar",
     "resources": "Recursos",
     "updated_at": "Atualizado em",
-    "clearFilter": "Filtro claro"
+    "clearFilter": "Filtro claro",
+    "noMatches": "Sem jogos"
   },
   "search": {
     "selectIndex": "Selecione Stream First",

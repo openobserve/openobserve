@@ -124,7 +124,8 @@
     "create": "作成",
     "resources": "リソース",
     "updated_at": "更新日",
-    "clearFilter": "フィルターをクリア"
+    "clearFilter": "フィルターをクリア",
+    "noMatches": "一致なし"
   },
   "search": {
     "metrics": "メトリクス",

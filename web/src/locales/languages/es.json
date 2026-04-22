@@ -124,7 +124,8 @@
     "create": "Crear",
     "resources": "Recursos",
     "updated_at": "Actualizado en",
-    "clearFilter": "Limpiar filtro"
+    "clearFilter": "Limpiar filtro",
+    "noMatches": "No hay coincidencias"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",

@@ -124,7 +124,8 @@
     "redirectingHome": "{geri sayım} saniye içinde eve yönlendiriliyor...",
     "resources": "Kaynaklar",
     "updated_at": "Güncellendi:",
-    "clearFilter": "Filtreyi temizle"
+    "clearFilter": "Filtreyi temizle",
+    "noMatches": "Eşleşme yok"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",

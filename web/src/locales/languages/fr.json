@@ -124,7 +124,8 @@
     "create": "Créez",
     "resources": "Ressources",
     "updated_at": "Mis à jour à",
-    "clearFilter": "Effacer le filtre"
+    "clearFilter": "Effacer le filtre",
+    "noMatches": "Aucune allumette"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",

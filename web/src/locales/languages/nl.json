@@ -124,7 +124,8 @@
     "redirectingHome": "Doorverwijzen naar huis in {countdown} seconden...",
     "resources": "Hulpbronnen",
     "updated_at": "Bijgewerkt op",
-    "clearFilter": "Filter verwijderen"
+    "clearFilter": "Filter verwijderen",
+    "noMatches": "Geen wedstrijden"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",

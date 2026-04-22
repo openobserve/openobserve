@@ -124,7 +124,8 @@
     "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi...",
     "resources": "Risorse",
     "updated_at": "Aggiornato a",
-    "clearFilter": "Cancella filtro"
+    "clearFilter": "Cancella filtro",
+    "noMatches": "Nessuna corrispondenza"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",

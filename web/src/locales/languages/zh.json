@@ -124,7 +124,8 @@
     "create": "创建",
     "resources": "资源",
     "updated_at": "更新于",
-    "clearFilter": "清除过滤器"
+    "clearFilter": "清除过滤器",
+    "noMatches": "没有匹配项"
   },
   "search": {
     "selectIndex": "选择数据流",
