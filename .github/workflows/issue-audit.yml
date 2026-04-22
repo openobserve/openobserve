@@ -240,7 +240,8 @@ The fix has been implemented and proper test coverage exists with the \`@bug-${i
               console.log(`  ✓ Closed issue #${issue.number}`);
             }
 
-      - name: Comment on issues needing tests
+      - name: Analyze PR files for automation needs
+        id: analyze-files
         if: ${{ !inputs.dry_run }}
         uses: actions/github-script@v7
         with:
@@ -248,13 +249,141 @@ The fix has been implemented and proper test coverage exists with the \`@bug-${i
           script: |
             const results = JSON.parse('${{ steps.audit.outputs.results }}');
 
+            // Helper function to categorize a single file
+            function categorizeFile(filename) {
+              const docPatterns = [
+                /\.md$/i, /\.yml$/i, /\.yaml$/i, /\.toml$/i, /\.lock$/i, /\.json$/i,
+                /^LICENSE/i, /^README/i, /^CHANGELOG/i, /^\.gitignore$/,
+                /^\.github\/.*\.md$/
+              ];
+
+              const codePatterns = [
+                /\.rs$/i, /\.js$/i, /\.ts$/i, /\.tsx$/i, /\.vue$/i, /\.go$/i,
+                /\.py$/i, /\.java$/i, /\.cpp$/i, /\.c$/i, /\.h$/i
+              ];
+
+              if (docPatterns.some(pattern => pattern.test(filename))) {
+                return 'documentation';
+              }
+
+              if (codePatterns.some(pattern => pattern.test(filename))) {
+                return 'code';
+              }
+
+              return 'other';
+            }
+
+            // Helper function to analyze PR files
+            async function analyzePR(prNumber) {
+              console.log(`  Fetching files for PR #${prNumber}...`);
+
+              try {
+                const { data: files } = await github.rest.pulls.listFiles({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: prNumber,
+                  per_page: 100
+                });
+
+                console.log(`  Found ${files.length} changed files`);
+
+                const analysis = {
+                  totalFiles: files.length,
+                  totalChanges: 0,
+                  codeFiles: [],
+                  docFiles: [],
+                  otherFiles: [],
+                  summary: {
+                    hasCode: false,
+                    hasDocOnly: false,
+                    isSmallChange: false
+                  }
+                };
+
+                for (const file of files) {
+                  const category = categorizeFile(file.filename);
+                  const changes = file.additions + file.deletions;
+
+                  analysis.totalChanges += changes;
+
+                  const fileInfo = {
+                    filename: file.filename,
+                    additions: file.additions,
+                    deletions: file.deletions,
+                    changes: changes,
+                    status: file.status
+                  };
+
+                  if (category === 'code') {
+                    analysis.codeFiles.push(fileInfo);
+                  } else if (category === 'documentation') {
+                    analysis.docFiles.push(fileInfo);
+                  } else {
+                    analysis.otherFiles.push(fileInfo);
+                  }
+                }
+
+                analysis.summary.hasCode = analysis.codeFiles.length > 0;
+                analysis.summary.hasDocOnly =
+                  analysis.codeFiles.length === 0 &&
+                  analysis.docFiles.length > 0;
+                analysis.summary.isSmallChange = analysis.totalChanges < 5;
+
+                return analysis;
+
+              } catch (error) {
+                console.log(`  Error fetching files: ${error.message}`);
+                return null;
+              }
+            }
+
+            const enrichedResults = [];
+
             for (const item of results.needs_test) {
+              console.log(`\nAnalyzing PR #${item.fixPR.number}: ${item.fixPR.title}`);
+
+              const analysis = await analyzePR(item.fixPR.number);
+
+              if (analysis) {
+                console.log(`  Code files: ${analysis.codeFiles.length}`);
+                console.log(`  Doc files: ${analysis.docFiles.length}`);
+                console.log(`  Total changes: ${analysis.totalChanges} lines`);
+                console.log(`  Needs automation: ${analysis.summary.hasCode ? 'YES' : 'NO'}`);
+
+                enrichedResults.push({
+                  ...item,
+                  fileAnalysis: analysis
+                });
+              } else {
+                console.log(`  Analysis failed, defaulting to 'needs automation'`);
+                enrichedResults.push({
+                  ...item,
+                  fileAnalysis: null
+                });
+              }
+            }
+
+            core.setOutput('enriched_needs_test', JSON.stringify(enrichedResults));
+            core.setOutput('count', enrichedResults.length);
+
+            console.log(`\n=== FILE ANALYSIS COMPLETE ===`);
+            console.log(`Total issues analyzed: ${enrichedResults.length}`);
+
+      - name: Process issues needing tests with smart categorization
+        if: ${{ !inputs.dry_run && steps.analyze-files.outputs.count > 0 }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const enrichedItems = JSON.parse('${{ steps.analyze-files.outputs.enriched_needs_test }}');
+
+            for (const item of enrichedItems) {
               const issue = item.issue;
               const fixPR = item.fixPR;
+              const analysis = item.fileAnalysis;
 
-              console.log(`Commenting on issue #${issue.number}: needs test`);
+              console.log(`\nProcessing issue #${issue.number}: ${issue.title}`);
 
-              // Check if we already posted this comment
               const comments = await github.rest.issues.listComments({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -263,42 +392,139 @@ The fix has been implemented and proper test coverage exists with the \`@bug-${i
 
               const alreadyCommented = comments.data.some(c =>
                 c.body.includes('Issue Audit Workflow') &&
-                c.body.includes('needs test coverage')
+                (c.body.includes('needs test coverage') || c.body.includes('Auto-Closed'))
               );
 
               if (alreadyCommented) {
-                console.log(`  → Already commented, skipping`);
+                console.log(`  Already processed, skipping`);
                 continue;
               }
 
-              const comment = `## ⚠️  Missing Test Coverage
+              let needsAutomation = true;
+              let reasoning = '';
 
-**Status**: This issue has been fixed but lacks E2E test coverage.
+              if (analysis && analysis.summary.hasDocOnly) {
+                needsAutomation = false;
+                reasoning = 'Only documentation/configuration files were changed';
+              } else if (analysis && analysis.summary.isSmallChange && !analysis.summary.hasCode) {
+                needsAutomation = false;
+                reasoning = 'Very small change (<5 lines) with no code files';
+              } else if (!analysis) {
+                needsAutomation = true;
+                reasoning = 'Could not analyze PR files - defaulting to requiring tests';
+              } else {
+                needsAutomation = true;
+                reasoning = 'Code files were changed';
+              }
 
-- ✅ **Fix merged**: PR #${fixPR.number} (${fixPR.url})
-- ❌ **No test found**: Missing \`@bug-${issue.number}\` tag
+              console.log(`  Decision: ${needsAutomation ? 'NEEDS AUTOMATION' : 'DOC ONLY'}`);
+              console.log(`  Reasoning: ${reasoning}`);
 
-**Action needed**:
-Please add an E2E test with proper tags:
-\`\`\`javascript
-test("Test description @bug-${issue.number} @regression", async ({ page }) => {
-  // Test implementation
-});
-\`\`\`
+              if (needsAutomation) {
+                let filesList = '';
+                if (analysis && analysis.codeFiles.length > 0) {
+                  filesList = '\n\n**Changed code files:**\n';
+                  analysis.codeFiles.slice(0, 10).forEach(f => {
+                    filesList += `- \`${f.filename}\` (+${f.additions}/-${f.deletions})\n`;
+                  });
+                  if (analysis.codeFiles.length > 10) {
+                    filesList += `- ... and ${analysis.codeFiles.length - 10} more\n`;
+                  }
+                }
 
-Place the test in \`tests/ui-testing/playwright-tests/RegressionSet/\`
+                const commentLines = [
+                  '## ⚠️  Missing Test Coverage - Automation Required',
+                  '',
+                  '**Status**: This issue has been fixed but lacks E2E test coverage.',
+                  '',
+                  `- ✅ **Fix merged**: PR #${fixPR.number} (${fixPR.url})`,
+                  `- ❌ **No test found**: Missing \`@bug-${issue.number}\` tag`,
+                  `- 🔍 **Analysis**: ${reasoning}`,
+                  filesList,
+                  '',
+                  '**Action needed**:',
+                  'Please add an E2E test with proper tags:',
+                  '```javascript',
+                  `test("Test description @bug-${issue.number} @regression", async ({ page }) => {`,
+                  '  // Test implementation',
+                  '});',
+                  '```',
+                  '',
+                  'Place the test in `tests/ui-testing/playwright-tests/RegressionSet/`',
+                  '',
+                  '---',
+                  `*🤖 Detected by [Issue Audit Workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})*`
+                ];
+                const comment = commentLines.join('\n');
 
----
-*🤖 Detected by [Issue Audit Workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})*`;
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: comment
+                });
 
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                body: comment
-              });
+                try {
+                  await github.rest.issues.addLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    labels: ['Needs Automation']
+                  });
+                  console.log(`  ✓ Added "Needs Automation" label`);
+                } catch (error) {
+                  console.log(`  ⚠️  Could not add label: ${error.message}`);
+                }
 
-              console.log(`  ✓ Posted comment on issue #${issue.number}`);
+                console.log(`  ✓ Posted automation request comment`);
+
+              } else {
+                let filesList = '';
+                if (analysis) {
+                  filesList = '\n\n**Changed files:**\n';
+                  const allFiles = [...analysis.docFiles, ...analysis.otherFiles];
+                  allFiles.slice(0, 10).forEach(f => {
+                    filesList += `- \`${f.filename}\` (+${f.additions}/-${f.deletions})\n`;
+                  });
+                  if (allFiles.length > 10) {
+                    filesList += `- ... and ${allFiles.length - 10} more\n`;
+                  }
+                }
+
+                const commentLines = [
+                  '## ✅ Issue Resolved - Auto-Closed (No Automation Required)',
+                  '',
+                  '**Status**: This issue has been fixed with documentation/configuration changes only.',
+                  '',
+                  `- ✅ **Fix merged**: PR #${fixPR.number} (${fixPR.url})`,
+                  `- ℹ️  **Analysis**: ${reasoning}`,
+                  '- ✓ **No E2E test required** for this type of change',
+                  filesList,
+                  '',
+                  'The fix has been implemented and does not require additional test automation.',
+                  '',
+                  '---',
+                  `*🤖 Automated by [Issue Audit Workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})*`
+                ];
+                const comment = commentLines.join('\n');
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: comment
+                });
+
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  state_reason: 'completed'
+                });
+
+                console.log(`  ✓ Closed issue (doc-only fix)`);
+              }
             }
 
       - name: Generate audit report
@@ -342,13 +568,63 @@ Place the test in \`tests/ui-testing/playwright-tests/RegressionSet/\`
               });
             }
 
-            if (results.needs_test.length > 0) {
-              report += `## ⚠️  Issues Needing Tests (${results.needs_test.length})\n\n`;
-              results.needs_test.forEach(item => {
-                report += `- #${item.issue.number}: ${item.issue.title}\n`;
-                report += `  - Fix: PR #${item.fixPR.number} (merged ${item.fixPR.merged_at})\n`;
-                report += `  - Missing test with @bug-${item.issue.number} tag\n\n`;
+            // Enhanced needs_test section with file analysis
+            const enrichedItems = '${{ steps.analyze-files.outputs.enriched_needs_test }}' !== ''
+              ? JSON.parse('${{ steps.analyze-files.outputs.enriched_needs_test }}')
+              : results.needs_test;
+
+            if (enrichedItems.length > 0) {
+              report += `## ⚠️  Issues Needing Tests - File Analysis (${enrichedItems.length})\n\n`;
+
+              let needsAutomationCount = 0;
+              let docOnlyCount = 0;
+
+              enrichedItems.forEach(item => {
+                const analysis = item.fileAnalysis;
+                const needsAutomation = !analysis ||
+                  !(analysis.summary.hasDocOnly ||
+                    (analysis.summary.isSmallChange && !analysis.summary.hasCode));
+
+                if (needsAutomation) {
+                  needsAutomationCount++;
+                } else {
+                  docOnlyCount++;
+                }
+
+                report += `### #${item.issue.number}: ${item.issue.title}\n`;
+                report += `- **Fix**: PR #${item.fixPR.number} (merged ${item.fixPR.merged_at})\n`;
+                report += `- **Decision**: ${needsAutomation ? '🔴 Needs Automation' : '🟢 Doc-Only (Auto-Close)'}\n`;
+
+                if (analysis) {
+                  report += `- **Files Changed**: ${analysis.totalFiles} (${analysis.codeFiles.length} code, ${analysis.docFiles.length} doc, ${analysis.otherFiles.length} other)\n`;
+                  report += `- **Total Changes**: ${analysis.totalChanges} lines\n`;
+
+                  if (analysis.codeFiles.length > 0) {
+                    report += `- **Code Files**:\n`;
+                    analysis.codeFiles.slice(0, 5).forEach(f => {
+                      report += `  - \`${f.filename}\` (+${f.additions}/-${f.deletions})\n`;
+                    });
+                    if (analysis.codeFiles.length > 5) {
+                      report += `  - ... and ${analysis.codeFiles.length - 5} more\n`;
+                    }
+                  }
+
+                  if (analysis.docFiles.length > 0 && !needsAutomation) {
+                    report += `- **Doc Files**:\n`;
+                    analysis.docFiles.slice(0, 5).forEach(f => {
+                      report += `  - \`${f.filename}\` (+${f.additions}/-${f.deletions})\n`;
+                    });
+                  }
+                } else {
+                  report += `- **Analysis**: Failed (defaulted to needs automation)\n`;
+                }
+
+                report += `\n`;
               });
+
+              report += `\n**Breakdown**:\n`;
+              report += `- 🔴 Needs Automation: ${needsAutomationCount}\n`;
+              report += `- 🟢 Doc-Only (Auto-Close): ${docOnlyCount}\n\n`;
             }
 
             if (results.needs_fix.length > 0) {
