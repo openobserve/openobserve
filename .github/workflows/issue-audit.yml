@@ -103,12 +103,13 @@ jobs:
             const rateLimit = await github.rest.rateLimit.get();
             const remaining = rateLimit.data.rate.remaining;
             const resetTime = new Date(rateLimit.data.rate.reset * 1000).toISOString();
-            const estimatedCalls = issues.length * 5;
+            // Estimate ~20 API calls per issue: timeline pagination (1-5 pages) + PR lookups per cross-reference (2-15)
+            const estimatedCalls = issues.length * 20;
 
             console.log(`\n📊 Rate Limit Status:`);
             console.log(`  Remaining: ${remaining}/${rateLimit.data.rate.limit}`);
             console.log(`  Resets at: ${resetTime}`);
-            console.log(`  Estimated calls needed: ~${estimatedCalls}`);
+            console.log(`  Estimated calls needed: ~${estimatedCalls} (conservative estimate)`);
 
             // Hard limit: exit early if we definitely can't complete
             if (remaining < 50) {
@@ -134,7 +135,8 @@ jobs:
               let fixPR = null;
 
               try {
-                const timeline = await github.paginate(github.rest.issues.listEventsForTimeline, {
+                // Use paginate.iterator for early break to save API calls
+                const timelineIterator = github.paginate.iterator(github.rest.issues.listEventsForTimeline, {
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: issue.number,
@@ -142,38 +144,41 @@ jobs:
                 });
 
                 // Look for "cross-referenced" events from merged PRs
-                for (const event of timeline) {
-                  // cross-referenced event has source.issue with pull_request property for PRs
-                  if (event.event === 'cross-referenced' &&
-                      event.source?.issue?.pull_request) {
-                    const prNumber = event.source.issue.number;
+                outerLoop:
+                for await (const { data: events } of timelineIterator) {
+                  for (const event of events) {
+                    // cross-referenced event has source.issue with pull_request property for PRs
+                    if (event.event === 'cross-referenced' &&
+                        event.source?.issue?.pull_request) {
+                      const prNumber = event.source.issue.number;
 
-                    // Check if the PR is merged
-                    const pr = await github.rest.pulls.get({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      pull_number: prNumber
-                    });
+                      // Check if the PR is merged
+                      const pr = await github.rest.pulls.get({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        pull_number: prNumber
+                      });
 
-                    if (pr.data.merged) {
-                      // Check if PR body mentions this issue with closing keywords
-                      const prBody = (pr.data.body || '').toLowerCase();
-                      const issueRef = `#${issue.number}`;
-                      const closingKeywords = ['closes', 'fixes', 'resolves', 'fixed', 'close', 'resolve'];
+                      if (pr.data.merged) {
+                        // Check if PR body mentions this issue with closing keywords
+                        const prBody = (pr.data.body || '').toLowerCase();
+                        const issueRef = `#${issue.number}`;
+                        const closingKeywords = ['closes', 'fixes', 'resolves', 'fixed', 'close', 'resolve'];
 
-                      if (closingKeywords.some(keyword =>
-                        prBody.includes(`${keyword} ${issueRef}`) ||
-                        prBody.includes(`${keyword}: ${issueRef}`)
-                      )) {
-                        hasFix = true;
-                        fixPR = {
-                          number: pr.data.number,
-                          title: pr.data.title,
-                          url: pr.data.html_url,
-                          merged_at: pr.data.merged_at
-                        };
-                        console.log(`  ✓ Found fix: PR #${fixPR.number}`);
-                        break;
+                        if (closingKeywords.some(keyword =>
+                          prBody.includes(`${keyword} ${issueRef}`) ||
+                          prBody.includes(`${keyword}: ${issueRef}`)
+                        )) {
+                          hasFix = true;
+                          fixPR = {
+                            number: pr.data.number,
+                            title: pr.data.title,
+                            url: pr.data.html_url,
+                            merged_at: pr.data.merged_at
+                          };
+                          console.log(`  ✓ Found fix: PR #${fixPR.number}`);
+                          break outerLoop;
+                        }
                       }
                     }
                   }
@@ -198,14 +203,18 @@ jobs:
                 if (!fs.existsSync(testDir)) {
                   console.log(`  ⚠️  Test directory not found: ${testDir}`);
                 } else {
-                  // Use spawn-style args to avoid shell injection
+                  // Use spawnSync with args array to avoid shell injection
+                  const { spawnSync } = require('child_process');
                   const tag = `@bug-${String(issue.number)}`;
-                  const searchResult = execSync(
-                    `grep -r "${tag}" "${testDir}" --include="*.spec.js" -l 2>/dev/null || true`,
-                    { encoding: 'utf-8', shell: '/bin/sh' }
-                  ).trim();
+                  const result = spawnSync('grep', [
+                    '-r', tag, testDir,
+                    '--include=*.spec.js',
+                    '-l'
+                  ], { encoding: 'utf-8' });
 
-                  if (searchResult) {
+                  const searchResult = (result.stdout || '').trim();
+
+                  if (searchResult && result.status === 0) {
                     hasTest = true;
                     testFile = searchResult.split('\n')[0];
                     console.log(`  ✓ Found test: ${testFile}`);
@@ -284,6 +293,26 @@ jobs:
               const testFile = item.testFile;
 
               console.log(`Processing issue #${issue.number}: ${issue.title}`);
+
+              // Check for existing audit comment to avoid duplicates
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                per_page: 100
+              });
+
+              const alreadyCommented = comments.some(c =>
+                c.body.includes('Issue Audit Workflow') &&
+                (c.body.includes('Ready to Close') ||
+                 c.body.includes('Missing Test Coverage') ||
+                 c.body.includes('Review Needed'))
+              );
+
+              if (alreadyCommented) {
+                console.log(`  Already processed, skipping`);
+                continue;
+              }
 
               // Post comment requesting human confirmation to close
               const commentLines = [
@@ -461,7 +490,11 @@ jobs:
               }
             }
 
-            core.setOutput('enriched_needs_test', JSON.stringify(enrichedResults));
+            // Write to file to avoid env var size limits (~256KB)
+            const fs = require('fs');
+            fs.writeFileSync('enriched-needs-test.json', JSON.stringify(enrichedResults));
+            console.log(`Wrote enriched results to enriched-needs-test.json`);
+
             core.setOutput('count', enrichedResults.length);
 
             console.log(`\n=== FILE ANALYSIS COMPLETE ===`);
@@ -470,12 +503,18 @@ jobs:
       - name: Process issues needing tests with smart categorization
         if: ${{ !inputs.dry_run && steps.analyze-files.outputs.count > 0 }}
         uses: actions/github-script@v7
-        env:
-          ENRICHED_ITEMS_JSON: ${{ steps.analyze-files.outputs.enriched_needs_test }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const enrichedItems = JSON.parse(process.env.ENRICHED_ITEMS_JSON || '[]');
+            // Read from file to avoid env var size limits
+            const fs = require('fs');
+            let enrichedItems = [];
+            try {
+              const data = fs.readFileSync('enriched-needs-test.json', 'utf-8');
+              enrichedItems = JSON.parse(data);
+            } catch (error) {
+              console.log(`Could not read enriched-needs-test.json: ${error.message}`);
+            }
             if (enrichedItems.length === 0) {
               console.log('No enriched items to process');
               return;
@@ -646,14 +685,23 @@ jobs:
         uses: actions/github-script@v7
         env:
           RESULTS_JSON: ${{ steps.audit.outputs.results }}
-          ENRICHED_ITEMS_JSON: ${{ steps.analyze-files.outputs.enriched_needs_test }}
           DRY_RUN: ${{ inputs.dry_run }}
           TEST_MODE: ${{ inputs.test_mode }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const fs = require('fs');
             const defaultResults = '{"ready_to_close":[],"needs_test":[],"needs_fix":[],"needs_both":[]}';
             const results = JSON.parse(process.env.RESULTS_JSON || defaultResults);
+
+            // Read enriched items from file (avoids env var size limits)
+            let enrichedItemsFromFile = [];
+            try {
+              const data = fs.readFileSync('enriched-needs-test.json', 'utf-8');
+              enrichedItemsFromFile = JSON.parse(data);
+            } catch (error) {
+              console.log(`Note: Could not read enriched-needs-test.json: ${error.message}`);
+            }
 
             const dryRun = process.env.DRY_RUN === 'true';
             const testMode = process.env.TEST_MODE || 'all';
@@ -690,9 +738,9 @@ jobs:
               });
             }
 
-            // Enhanced needs_test section with file analysis
-            const enrichedItems = process.env.ENRICHED_ITEMS_JSON && process.env.ENRICHED_ITEMS_JSON !== ''
-              ? JSON.parse(process.env.ENRICHED_ITEMS_JSON)
+            // Enhanced needs_test section with file analysis (read from file, fallback to results)
+            const enrichedItems = enrichedItemsFromFile.length > 0
+              ? enrichedItemsFromFile
               : results.needs_test;
 
             if (enrichedItems.length > 0) {
