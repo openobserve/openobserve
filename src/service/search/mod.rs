@@ -946,6 +946,7 @@ pub async fn search_partition(
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
+    part_num = 3;
     // if the partition number is too large, we limit it to 1000
     if part_num > 1000 {
         part_num = 1000;
@@ -1017,7 +1018,7 @@ pub async fn search_partition(
             .first()
             .map(|(field, _)| {
                 field.as_str() != TIMESTAMP_COL_NAME
-                    && ts_column.as_deref().map_or(true, |ts| field.as_str() != ts)
+                    && (ts_column.as_deref() != Some(field.as_str()))
             })
             .unwrap_or(false)
     {
