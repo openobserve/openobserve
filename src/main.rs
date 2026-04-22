@@ -707,6 +707,8 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     log::info!("Starting {scheme} server at: {haddr}");
 
     // Build the router
+    let ip_source = config::axum::middlewares::resolve_client_ip_source(&cfg.http.real_ip_source);
+    log::info!("HTTP client IP source: {ip_source:?}");
     let app = create_app_router()
         .layer(config::axum::middlewares::AccessLogLayer::new(
             config::axum::middlewares::get_http_access_log_format(),
@@ -714,6 +716,10 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
+        .layer(axum::middleware::from_fn(
+            config::axum::middlewares::extract_real_ip,
+        ))
+        .layer(ip_source.into_extension())
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http());
 
@@ -740,14 +746,17 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
 
         axum_server::bind_rustls(haddr, tls_config)
             .handle(handle)
-            .serve(app.into_make_service())
+            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
             .await?;
     } else {
         // Non-TLS server
         let listener = TcpListener::bind(haddr).await?;
-        axum::serve(listener, app.into_make_service())
-            .with_graceful_shutdown(shutdown_signal())
-            .await?;
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
     }
 
     Ok(())
@@ -775,6 +784,8 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
     log::info!("Starting {scheme} server at: {haddr}");
 
     // Build the router without tracing
+    let ip_source = config::axum::middlewares::resolve_client_ip_source(&cfg.http.real_ip_source);
+    log::info!("HTTP client IP source: {ip_source:?}");
     let app = create_app_router()
         .layer(config::axum::middlewares::AccessLogLayer::new(
             config::axum::middlewares::get_http_access_log_format(),
@@ -782,6 +793,10 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
+        .layer(axum::middleware::from_fn(
+            config::axum::middlewares::extract_real_ip,
+        ))
+        .layer(ip_source.into_extension())
         .layer(CompressionLayer::new());
 
     if cfg.http.tls_enabled {
@@ -807,14 +822,17 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
 
         axum_server::bind_rustls(haddr, tls_config)
             .handle(handle)
-            .serve(app.into_make_service())
+            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
             .await?;
     } else {
         // Non-TLS server
         let listener = TcpListener::bind(haddr).await?;
-        axum::serve(listener, app.into_make_service())
-            .with_graceful_shutdown(shutdown_signal())
-            .await?;
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
     }
 
     Ok(())
@@ -1410,6 +1428,7 @@ async fn init_action_server() -> Result<(), anyhow::Error> {
     log::info!("Starting Action Server {scheme} server at: {haddr}");
 
     // Build the router for action server
+    let ip_source = config::axum::middlewares::resolve_client_ip_source(&cfg.http.real_ip_source);
     let app = create_action_server_router()
         .layer(config::axum::middlewares::AccessLogLayer::new(
             config::axum::middlewares::get_http_access_log_format(),
@@ -1417,6 +1436,10 @@ async fn init_action_server() -> Result<(), anyhow::Error> {
         .layer(config::axum::middlewares::SlowLogLayer::new(
             cfg.limit.http_slow_log_threshold,
         ))
+        .layer(axum::middleware::from_fn(
+            config::axum::middlewares::extract_real_ip,
+        ))
+        .layer(ip_source.into_extension())
         .layer(TraceLayer::new_for_http());
 
     if cfg.http.tls_enabled {
@@ -1442,14 +1465,17 @@ async fn init_action_server() -> Result<(), anyhow::Error> {
 
         axum_server::bind_rustls(haddr, tls_config)
             .handle(handle)
-            .serve(app.into_make_service())
+            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
             .await?;
     } else {
         // Non-TLS server
         let listener = TcpListener::bind(haddr).await?;
-        axum::serve(listener, app.into_make_service())
-            .with_graceful_shutdown(shutdown_signal())
-            .await?;
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
     }
 
     log::info!("HTTP server stopped");

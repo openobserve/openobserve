@@ -750,6 +750,12 @@ pub struct Http {
         help = "Custom access log format, leave empty to use default format, shortcut: common, json"
     )]
     pub access_log_format: String,
+    #[env_config(
+        name = "ZO_HTTP_REAL_IP_SOURCE",
+        default = "",
+        help = "Source used to resolve the real client IP. Supported: ConnectInfo (default, TCP peer), RightmostXForwardedFor, RightmostForwarded, XRealIp..."
+    )]
+    pub real_ip_source: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]

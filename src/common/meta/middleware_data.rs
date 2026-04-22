@@ -24,10 +24,9 @@ use maxminddb::geoip2::city::Location;
 use serde::{Deserialize, Serialize};
 use uaparser::{Parser, UserAgentParser};
 
-use crate::{
-    USER_AGENT_REGEX_FILE,
-    common::{infra::config::MAXMIND_DB_CLIENT, utils::http::parse_ip_addr},
-};
+use config::axum::middlewares::RealIp;
+
+use crate::{USER_AGENT_REGEX_FILE, common::infra::config::MAXMIND_DB_CLIENT};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct GeoInfoData<'a> {
@@ -98,22 +97,15 @@ impl RumExtraData {
         // Now extend the existing hashmap with tags.
         user_agent_hashmap.extend(tags);
         {
-            let headers = request.headers();
-            // Get IP address from headers or connection info
-            let ip_address = headers
-                .get("X-Forwarded-For")
-                .or_else(|| headers.get("Forwarded"))
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("127.0.0.1")
-                .to_string();
+            // Resolved up-chain by the `extract_real_ip` middleware; fall back to
+            // ipv4 loopback so the downstream geo-lookup stays well-defined.
+            let ip = request
+                .extensions()
+                .get::<RealIp>()
+                .map(|r| r.0)
+                .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)));
 
-            let ip = match parse_ip_addr(&ip_address) {
-                Ok((ip, _)) => ip,
-                // Default to ipv4 loopback address
-                Err(_) => IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
-            };
-
-            user_agent_hashmap.insert("ip".into(), ip_address.into());
+            user_agent_hashmap.insert("ip".into(), ip.to_string().into());
 
             let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
             let geo_info = if let Some(client) = maxminddb_client.as_ref() {
