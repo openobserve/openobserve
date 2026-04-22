@@ -358,7 +358,7 @@ export function overlayNewDataOnOldOptions(
               },
               style: {
                 fill: primaryColor ?? "#808080",
-                opacity: 0.05, // 50% transparent
+                opacity: 0.05, // 5% opacity
               },
               silent: true,
               z: 0,

@@ -1124,11 +1124,13 @@ export default defineComponent({
 
               // Capture actual grid pixel rect from the ECharts instance.
               // With containLabel: true, the actual plot area differs from raw grid config.
+              // WARNING: getModel().getComponent() is an ECharts internal API, not public.
+              // Validated against echarts 5.6.0. Revisit if ECharts is upgraded.
               try {
                 const chartInstance = chartRendererRef.value?.chart;
                 if (chartInstance) {
                   const gridModel = chartInstance
-                    .getModel()
+                    ?.getModel()
                     ?.getComponent("grid");
                   const gridRect = gridModel?.coordinateSystem?.getRect();
                   if (gridRect) {
