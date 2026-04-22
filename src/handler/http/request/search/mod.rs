@@ -333,8 +333,9 @@ pub async fn search(
 
     // Handle histogram data for UI
     let mut converted_histogram_query: Option<String> = None;
+    let mut histogram_breakdown_field: Option<String> = None;
     if is_ui_histogram {
-        let histogram_breakdown_field = if !is_multi_stream_search {
+        histogram_breakdown_field = if !is_multi_stream_search {
             if let Some(stream_name) = stream_names.first() {
                 crate::service::search::sql::histogram::resolve_histogram_breakdown_field(
                     &org_id,
@@ -499,6 +500,7 @@ pub async fn search(
         Ok(mut res) => {
             res.set_took(start.elapsed().as_millis() as usize);
             res.converted_histogram_query = converted_histogram_query;
+            res.histogram_breakdown_field = histogram_breakdown_field;
 
             // Check if function error is only query limit default error and only `ui`
             if req.search_type == Some(SearchEventType::UI)
