@@ -728,9 +728,7 @@ export default defineComponent({
     // Times are in microseconds to match resultMetaData; convert to ms downstream.
     const overlayBoundaryInfo = computed(() => {
       const resultMeta = resultMetaData.value?.[0];
-      const queryStart = Number(
-        metadata.value?.queries?.[0]?.startTime ?? 0,
-      );
+      const queryStart = Number(metadata.value?.queries?.[0]?.startTime ?? 0);
       const queryEnd = Number(metadata.value?.queries?.[0]?.endTime ?? 0);
 
       if (!resultMeta?.length) {
@@ -919,6 +917,28 @@ export default defineComponent({
                 }
               : undefined;
             const boundaryInfo = overlayBoundaryInfo.value;
+            // Resolve the primary theme color using the same priority as App.vue:
+            // 1. Vuex tempThemeColors (live preview)
+            // 2. localStorage saved color
+            // 3. Org settings color
+            // 4. Default theme color from store
+            const _themeMode = store.state.theme === "dark" ? "dark" : "light";
+            const primaryColor: string =
+              (_themeMode === "dark"
+                ? store.state.tempThemeColors?.dark
+                : store.state.tempThemeColors?.light) ||
+              window.localStorage.getItem(
+                _themeMode === "dark" ? "customDarkColor" : "customLightColor",
+              ) ||
+              (_themeMode === "dark"
+                ? store.state?.organizationData?.organizationSettings
+                    ?.dark_mode_theme_color
+                : store.state?.organizationData?.organizationSettings
+                    ?.light_mode_theme_color) ||
+              (_themeMode === "dark"
+                ? store.state.defaultThemeColors?.dark
+                : store.state.defaultThemeColors?.light) ||
+              "#3F7994";
             result.options = overlayNewDataOnOldOptions(
               previousOptionsSnapshot,
               result.options,
@@ -927,6 +947,7 @@ export default defineComponent({
               boundaryInfo.queryStart,
               boundaryInfo.queryEnd,
               boundaryInfo.isLTR,
+              primaryColor,
             );
           }
 
@@ -971,6 +992,11 @@ export default defineComponent({
     // Snapshot of old panelData.options taken when streaming starts (for refresh overlay).
     // Immutable once set — each chunk overlays against the same original.
     let previousOptionsSnapshot: any = null;
+
+    // Guard flag to prevent double final render when the stream ends with a
+    // simultaneous data change. Both watch([data,...]) and watch(loading) fire
+    // in the same tick — this ensures only the first one executes the render.
+    let streamEndRenderPending = false;
 
     // Create a throttled version for streaming updates (350ms throttle)
     // Chunks arrive ~300-400ms apart, so 350ms ensures updates every 2-3 chunks
@@ -1134,8 +1160,14 @@ export default defineComponent({
           convertAndOverlayThrottled.cancel();
           hasRenderedFirstDataChunk.value = false; // Reset for next query
 
+          // Claim the final render before awaiting so that watch(loading),
+          // which fires in the same tick, sees the flag and skips its render.
+          streamEndRenderPending = true;
+
           // Final render with FULL data — no overlay needed (new data is complete)
           await convertPanelDataCommon();
+
+          streamEndRenderPending = false;
 
           // Clear streaming state — old snapshot no longer needed
           if (previousOptionsSnapshot) {
@@ -1157,6 +1189,10 @@ export default defineComponent({
         convertPanelDataThrottled.cancel();
         convertAndOverlayThrottled.cancel();
         hasRenderedFirstDataChunk.value = false;
+
+        // If the data watcher's else-branch already claimed the final render
+        // (simultaneous data + loading change in the same tick), skip here.
+        if (streamEndRenderPending) return;
 
         // Final render with complete data — no overlay
         await convertPanelDataCommon();

@@ -33,11 +33,12 @@ function toNumericTime(val: any): number {
  * @param newOptions - Complete options built from new accumulated data (Date objects)
  * @param containerSize - Chart container dimensions for graphic overlay positioning
  * @param boundaryTime - Boundary (µs) separating fresh from stale data. RTL: last
- *   chunk's start_time (fresh is right of boundary). LTR: last chunk's end_time
- *   (fresh is left of boundary).
+ *   chunk's start_time (fresh data is to the RIGHT of boundary). LTR: last chunk's end_time
+ *   (fresh data is to the LEFT of boundary).
  * @param queryStartTime - User-selected query start (µs), used as the left edge anchor.
  * @param queryEndTime - User-selected query end (µs), used as the right edge anchor.
- * @param isLTR - true for LTR streaming (overlay on RIGHT), false for RTL (overlay on LEFT).
+ * @param isLTR - true for LTR streaming (overlay on LEFT/fresh), false for RTL (overlay on RIGHT/fresh).
+ * @param primaryColor - hex color string for the overlay (e.g. '#5156BE'). Falls back to grey if omitted.
  * @returns Merged options with new data overlaid on old
  */
 export function overlayNewDataOnOldOptions(
@@ -48,6 +49,7 @@ export function overlayNewDataOnOldOptions(
   queryStartTime?: number,
   queryEndTime?: number,
   isLTR?: boolean,
+  primaryColor?: string,
 ): any {
   if (!oldOptions?.series?.length) return newOptions;
   if (!newOptions?.series?.length) return oldOptions;
@@ -307,30 +309,28 @@ export function overlayNewDataOnOldOptions(
     if (plotWidth > 0 && plotHeight > 0) {
       // Convert µs → ms for comparison with newMin/newMaxTime.
       const boundaryMs = boundaryTime ? boundaryTime / 1000 : 0;
-      const queryStartMs = queryStartTime
-        ? queryStartTime / 1000
-        : newMinTime;
+      const queryStartMs = queryStartTime ? queryStartTime / 1000 : newMinTime;
       const queryEndMs = queryEndTime ? queryEndTime / 1000 : newMaxTime;
       const totalRange = queryEndMs - queryStartMs;
       const hasValidRange = boundaryMs > 0 && totalRange > 0;
 
       if (hasValidRange) {
-        // Compute the stale fraction (portion awaiting new data) and overlay
-        // it on the correct edge. LTR chunks arrive earliest-first, so stale
-        // is to the RIGHT of boundaryTime. RTL chunks arrive newest-first, so
-        // stale is to the LEFT of boundaryTime.
-        const staleFraction = Math.max(
+        // Compute the fresh fraction (portion where new data has arrived) and
+        // overlay it on that edge. LTR chunks arrive earliest-first, so fresh
+        // data is on the LEFT up to boundaryTime. RTL chunks arrive newest-first,
+        // so fresh data is on the RIGHT from boundaryTime to queryEnd.
+        const freshFraction = Math.max(
           0,
           Math.min(
             1,
-            (isLTR ? queryEndMs - boundaryMs : boundaryMs - queryStartMs) /
+            (isLTR ? boundaryMs - queryStartMs : queryEndMs - boundaryMs) /
               totalRange,
           ),
         );
-        const rawOverlayWidth = staleFraction * plotWidth;
+        const rawOverlayWidth = freshFraction * plotWidth;
         const rawOverlayLeft = isLTR
-          ? plotLeft + plotWidth - rawOverlayWidth
-          : plotLeft;
+          ? plotLeft
+          : plotLeft + plotWidth - rawOverlayWidth;
 
         // Clamp to plot rect so the overlay never bleeds onto y-axis labels
         // (this can happen when _gridRect is stale or when fallback grid
@@ -346,7 +346,7 @@ export function overlayNewDataOnOldOptions(
         );
         const overlayWidth = overlayRight - overlayLeft;
 
-        if (overlayWidth > 1 && staleFraction < 1) {
+        if (overlayWidth > 1 && freshFraction > 0) {
           merged.graphic = [
             {
               type: "rect",
@@ -357,7 +357,8 @@ export function overlayNewDataOnOldOptions(
                 height: plotHeight,
               },
               style: {
-                fill: "rgba(128, 128, 128, 0.15)",
+                fill: primaryColor ?? "#808080",
+                opacity: 0.05, // 50% transparent
               },
               silent: true,
               z: 0,
