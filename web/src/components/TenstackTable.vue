@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           borderless
                           hide-bottom-space
                           clearable
-                          placeholder="Search..."
+                          :placeholder="t('common.search')"
                           @click.stop
                           @keydown.stop
                         >
@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </q-item-section>
                         </q-item>
                         <q-item v-if="getFilteredUniqueValues(header.column.id).length === 0" dense>
-                          <q-item-section class="tw:text-xs text-grey-5">No matches</q-item-section>
+                          <q-item-section class="tw:text-xs text-grey-5">{{ t('common.noMatches') }}</q-item-section>
                         </q-item>
                       </q-list>
 
@@ -484,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <td
-                v-for="(cell, cellIndex) in row.getVisibleCells()"
+                v-for="cell in row.getVisibleCells()"
                 :key="cell.id"
                 class="tw:py-1 tw:px-2 tw:overflow-hidden tw:relative table-cell copy-cell-td"
                 :class="[
@@ -1431,7 +1431,7 @@ const clearColFilter = (colId: string) => {
 const sanitizeCssId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_");
 
 const store = useStore();
-const { isFTSColumn } = useTextHighlighter();
+useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
 
 // ── Dashboard: sticky columns composable ─────────────────────────────────────
@@ -1845,9 +1845,7 @@ const isFunctionErrorOpen = ref(false);
 
 const activeCellActionId = ref("");
 
-const highlightQuery = computed(() => {
-  return props.highlightQuery;
-});
+
 
 const getRowStatusColor = (rowData: any) => {
   const statusInfo = extractStatusFromLog(rowData);

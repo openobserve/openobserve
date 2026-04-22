@@ -124,7 +124,8 @@
     "reset": "Reset",
     "retry": "Retry",
     "resources": "Resources",
-    "clearFilter": "Clear filter"
+    "clearFilter": "Clear filter",
+    "noMatches": "No matches"
   },
   "validation": {
     "required": "This field is required",
