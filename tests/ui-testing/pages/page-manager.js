@@ -74,6 +74,9 @@ import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
 // ===== FUNCTIONS PAGE OBJECTS =====
 const FunctionsPage = require("./functionsPages/functionsPage.js");
 
+// ===== ANOMALY DETECTION PAGE OBJECTS =====
+const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
+
 class PageManager {
   /**
    * @param {import('@playwright/test').Page} page - Playwright page instance
@@ -158,6 +161,9 @@ class PageManager {
 
     // ===== FUNCTIONS PAGE OBJECTS =====
     this.functionsPage = new FunctionsPage(page);
+
+    // ===== ANOMALY DETECTION PAGE OBJECTS =====
+    this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
   }
 }
 
