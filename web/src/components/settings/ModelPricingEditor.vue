@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="model-pricing-editor-back-btn"
         class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius"
-        title="Go Back"
+        :title="t('modelPricing.goBack')"
         @click="goBack"
       >
         <q-icon name="arrow_back_ios_new" size="14px" />
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <q-input
                 v-model="model.name"
-                placeholder="e.g. GPT-4o"
+                :placeholder="t('modelPricing.modelNamePlaceholder')"
                 class="showLabelOnTop"
                 dense
                 borderless
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <q-input
                   v-model="model.match_pattern"
-                  placeholder="e.g. gpt-4.*"
+                  :placeholder="t('modelPricing.matchPatternPlaceholder')"
                   class="showLabelOnTop"
                   dense
                   borderless
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="tier-name-label">{{ t('modelPricing.tierName') }}</span>
                   <q-input
                     v-model="tier.name"
-                    placeholder="e.g. Default"
+                    :placeholder="t('modelPricing.tierNamePlaceholder')"
                     dense borderless
                   />
                 </div>
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="t('modelPricing.usageKeyCol')"
                       dense borderless
                       class="tw:flex-1 tw:min-w-[130px]"
-                      placeholder="e.g. input"
+                      :placeholder="t('modelPricing.usageKeyPlaceholder')"
                     />
                     <q-select
                       v-model="tier.condition.operator"
@@ -264,14 +264,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <q-input
                         :model-value="entry.key"
-                        placeholder="e.g. input"
+                        :placeholder="t('modelPricing.usageKeyPlaceholder')"
                         dense borderless
                         @update:model-value="(val: any) => renamePriceByIndex(tier, entryIdx, val)"
                       />
                       <q-input
                         :model-value="toPerMillion(entry.value)"
                         type="number" :min="0" step="0.01"
-                        placeholder="0.00"
+                        :placeholder="t('modelPricing.pricePlaceholder')"
                         dense borderless
                         @update:model-value="(val: any) => updatePrice(tier, entry.key, fromPerMillion(Number(val)))"
                       >
@@ -297,13 +297,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         v-model="addState[(idx as number)].key"
                         dense borderless
-                        placeholder="Usage key (e.g. input)"
+                        :placeholder="t('modelPricing.addUsageKeyPlaceholder')"
                       />
                       <q-input
                         v-model.number="addState[(idx as number)].value"
                         type="number" :min="0" step="0.01"
                         dense borderless
-                        placeholder="0.00"
+                        :placeholder="t('modelPricing.pricePlaceholder')"
                       >
                         <template #prepend><span class="price-dollar">$</span></template>
                       </q-input>
@@ -421,8 +421,8 @@ const orgIdentifier = computed(
 /** Real-time name validation. */
 const nameError = computed(() => {
   const name = model.value.name;
-  if (!name || !name.trim()) return "Model name is required";
-  if (name.length > 256) return "Model name must be 256 characters or fewer";
+  if (!name || !name.trim()) return t("modelPricing.nameRequired");
+  if (name.length > 256) return t("modelPricing.nameTooLong");
   return "";
 });
 
@@ -439,15 +439,15 @@ function stripInlineFlags(pattern: string): string {
 /** Real-time regex validation — shows error as the user types. */
 const regexError = computed(() => {
   const pattern = model.value.match_pattern;
-  if (!pattern || !pattern.trim()) return "Match pattern is required";
-  if (pattern.length > 512) return "Match pattern must be 512 characters or fewer";
+  if (!pattern || !pattern.trim()) return t("modelPricing.patternRequired");
+  if (pattern.length > 512) return t("modelPricing.patternTooLong");
   try {
     // Strip Rust-specific inline flags before testing with JS RegExp.
     // The backend (Rust regex crate) is the authority; this is a best-effort client check.
     new RegExp(stripInlineFlags(pattern));
     return "";
   } catch (e: any) {
-    return `Invalid regex: ${e.message}`;
+    return t("modelPricing.invalidRegex", { error: e.message });
   }
 });
 
@@ -461,7 +461,7 @@ function createEmptyModel() {
     name: "",
     match_pattern: "",
     enabled: true,
-    tiers: [newTier("Default")],
+    tiers: [newTier(t("modelPricing.tierDefaultName"))],
   };
 }
 
@@ -497,7 +497,7 @@ const operators = [
 
 function addTier() {
   model.value.tiers.push(
-    newTier("Conditional Tier", { usage_key: "input", operator: "gt", value: 200000 })
+    newTier(t("modelPricing.tierConditionalName"), { usage_key: "input", operator: "gt", value: 200000 })
   );
   addState.value.push({ key: "", value: 0 });
 }
@@ -617,8 +617,8 @@ function formatPreviewCost(costPerUnit: number, multiplier: number) {
 }
 
 function validateUsageKey(key: string): string | null {
-  if (/^\d+$/.test(key)) return "Usage key cannot be a pure integer";
-  if (/\s/.test(key)) return "Usage key must not contain spaces";
+  if (/^\d+$/.test(key)) return t("modelPricing.usageKeyPureInteger");
+  if (/\s/.test(key)) return t("modelPricing.usageKeyContainsSpaces");
   return null;
 }
 
@@ -651,7 +651,7 @@ function notifyWarn(message: string) {
  *  403 errors are already handled by the global HTTP interceptor (persistent top banner). */
 function notifyError(prefix: string, e: any) {
   if (e?.response?.status === 403) return;
-  const msg = e?.response?.data?.message || e?.message || "Unknown error";
+  const msg = e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
   q.notify({ type: "negative", message: `${prefix}: ${msg}`, position: "bottom", timeout: 5000 });
 }
 
@@ -663,7 +663,7 @@ async function save() {
   for (let i = 0; i < m.tiers.length; i++) {
     const pending = addState.value[i];
     if (pending && pending.value > 0 && !pending.key.trim()) {
-      notifyWarn(`Tier "${m.tiers[i].name}" has a price without a usage key. Add a usage key (e.g. "input") or use a quick setup template.`);
+      notifyWarn(t("modelPricing.tierPriceMissingKey", { name: m.tiers[i].name }));
       return;
     }
     if (pending && pending.key.trim()) {
@@ -677,7 +677,7 @@ async function save() {
     if (!c) continue;
     const key = (c.usage_key || "").trim();
     if (key && /^\d+$/.test(key)) {
-      notifyWarn(`Tier "${m.tiers[i].name || `#${i + 1}`}": Usage key cannot be a plain number. Use a label like "input" or "output".`);
+      notifyWarn(t("modelPricing.tierUsageKeyPlainNumber", { name: m.tiers[i].name || `#${i + 1}` }));
       return;
     }
   }
@@ -695,7 +695,7 @@ async function save() {
   if (defaultTier) {
     const priceValues = Object.values(defaultTier.prices || {}) as number[];
     if (priceValues.length === 0 || priceValues.every((v: number) => v === 0)) {
-      notifyWarn("Add at least one token price in the default tier.");
+      notifyWarn(t("modelPricing.addDefaultPrice"));
       return;
     }
   }
@@ -729,16 +729,16 @@ async function save() {
       const winner = patternConflicts[0].name;
       q.notify({
         type: "warning",
-        message: `Saved, but this entry is shadowed by "${winner}" which has the same pattern and higher priority. It will never be used for cost calculation unless the other entry is deleted or disabled.`,
+        message: t("modelPricing.saveShadowedWarning", { winner }),
         position: "bottom",
         timeout: 8000,
       });
     } else {
-      q.notify({ type: "positive", message: "Model pricing saved", position: "bottom", timeout: 3000 });
+      q.notify({ type: "positive", message: t("modelPricing.modelPricingSaved"), position: "bottom", timeout: 3000 });
     }
     goBack();
   } catch (e: any) {
-    notifyError("Failed to save", e);
+    notifyError(t("modelPricing.errSave"), e);
   } finally {
     saving.value = false;
   }
@@ -777,7 +777,7 @@ onBeforeMount(async () => {
         }
       }
     } catch (e: any) {
-      notifyError("Failed to load model", e);
+      notifyError(t("modelPricing.errLoadModel"), e);
     }
   }
   resetAddState(model.value.tiers.length);

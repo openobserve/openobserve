@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <span v-if="getSource(props.row) === 'built_in'" class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1">
                   <img :src="ooLogo" class="tw:w-[16px] tw:h-[16px]" alt="OpenObserve" />
-                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Built-in model provided by OpenObserve</q-tooltip>
+                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">{{ t('modelPricing.sourceBuiltIn') }}</q-tooltip>
                 </span>
                 <q-icon
                   v-else-if="getSource(props.row) === 'meta_org' || (getSource(props.row) === 'org' && props.row.org_id !== orgIdentifier)"
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="16px"
                   class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                 >
-                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from global</q-tooltip>
+                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">{{ t('modelPricing.sourceInherited') }}</q-tooltip>
                 </q-icon>
                 <q-icon
                   v-else
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="16px"
                   class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                 >
-                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Custom model</q-tooltip>
+                  <q-tooltip :delay="500" anchor="top middle" self="bottom middle">{{ t('modelPricing.sourceCustom') }}</q-tooltip>
                 </q-icon>
                 <div class="o2-table-cell-content">{{ props.row.name }}</div>
                 <q-tooltip
@@ -260,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="dimension-badge badge-more tw:cursor-pointer"
                     @click.stop="openPricingDialog(props.row)"
                   >
-                    +{{ getOverflowCount(props.row) }} more
+                    +{{ getOverflowCount(props.row) }} {{ t('modelPricing.overflowMore') }}
                     <q-tooltip :delay="400" anchor="top middle" self="bottom middle" class="pricing-overflow-tooltip">
                       <div class="pricing-breakdown-tooltip">
                         <div class="pricing-breakdown-title">{{ props.row.name }}</div>
@@ -292,19 +292,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense unelevated size="sm" round flat
                     :color="props.row.enabled ? 'negative' : 'positive'"
                     :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-                    :title="props.row.enabled ? 'Disable' : 'Enable'"
+                    :title="props.row.enabled ? t('modelPricing.actionDisable') : t('modelPricing.actionEnable')"
                     @click.stop="toggleEnabled(props.row, !props.row.enabled)"
                     data-test="model-pricing-toggle-btn"
                   />
-                  <q-btn padding="sm" unelevated size="sm" round flat icon="edit" title="Edit"
+                  <q-btn padding="sm" unelevated size="sm" round flat icon="edit" :title="t('modelPricing.actionEdit')"
                     @click.stop="openEditor(props.row)" data-test="model-pricing-edit-btn" />
-                  <q-btn padding="sm" unelevated size="sm" round flat :icon="outlinedDelete" title="Delete"
+                  <q-btn padding="sm" unelevated size="sm" round flat :icon="outlinedDelete" :title="t('modelPricing.actionDelete')"
                     @click.stop="confirmDelete(props.row)" data-test="model-pricing-delete-btn" />
-                  <q-btn padding="sm" unelevated size="sm" round flat icon="content_copy" title="Duplicate"
+                  <q-btn padding="sm" unelevated size="sm" round flat icon="content_copy" :title="t('modelPricing.actionDuplicate')"
                     @click.stop="duplicateModel(props.row)" data-test="model-pricing-duplicate-btn" />
                 </template>
                 <template v-else>
-                  <q-btn padding="sm" unelevated size="sm" round flat icon="content_copy" title="Clone to this org"
+                  <q-btn padding="sm" unelevated size="sm" round flat icon="content_copy" :title="t('modelPricing.actionClone')"
                     @click.stop="duplicateModel(props.row)" data-test="model-pricing-clone-btn" />
                 </template>
               </div>
@@ -322,11 +322,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-td :colspan="columns.length" class="shadow-banner-cell">
               <div class="shadow-banner-tree-line"></div>
               <q-icon name="warning_amber" size="13px" class="shadow-banner-icon" />
-              The rules below are shadowed by
+              {{ t('modelPricing.shadowBannerPrefix') }}
               <strong :title="props.row.name">
                 {{ props.row.name.length > 25 ? props.row.name.slice(0, 25) + '…' : props.row.name }}
               </strong>
-              — overridden by a higher-priority rule and won't be used for cost calculations.
+              {{ t('modelPricing.shadowBannerSuffix') }}
             </q-td>
           </q-tr>
           <!-- Child rows -->
@@ -358,16 +358,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="tree-dot-marker" :class="{ 'tree-dot-parent': child.children?.length > 0 }" />
                   <span v-if="getSource(child) === 'built_in'" class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1">
                     <img :src="ooLogo" class="tw:w-[16px] tw:h-[16px]" alt="OpenObserve" />
-                    <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Built-in model provided by OpenObserve</q-tooltip>
+                    <q-tooltip :delay="500" anchor="top middle" self="bottom middle">{{ t('modelPricing.sourceBuiltIn') }}</q-tooltip>
                   </span>
                   <q-icon
                     v-else-if="getSource(child) === 'meta_org' || (getSource(child) === 'org' && child.org_id !== orgIdentifier)"
                     name="corporate_fare" size="16px" class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                   >
-                    <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from global</q-tooltip>
+                    <q-tooltip :delay="500" anchor="top middle" self="bottom middle">{{ t('modelPricing.sourceInherited') }}</q-tooltip>
                   </q-icon>
                   <q-icon v-else name="person" size="16px" class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon">
-                    <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Custom model</q-tooltip>
+                    <q-tooltip :delay="500" anchor="top middle" self="bottom middle">{{ t('modelPricing.sourceCustom') }}</q-tooltip>
                   </q-icon>
                   <div class="o2-table-cell-content tw:opacity-70">{{ child.name }}</div>
                   <q-tooltip v-if="child.name.length > 30" anchor="top middle" self="bottom middle" :delay="500"
@@ -379,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <code class="text-caption pattern-code o2-table-cell-content shadowed-pattern">{{ child.match_pattern }}</code>
                   <q-icon name="warning_amber" size="14px" class="tw:shrink-0 shadowed-icon" color="orange-10">
                     <q-tooltip :delay="300" anchor="top middle" self="bottom middle" style="max-width: 260px; white-space: normal;">
-                      Shadowed by "{{ props.row.name }}" — overridden by a higher-priority rule and won't be used for cost calculations
+                      {{ t('modelPricing.shadowedTooltip', { name: props.row.name }) }}
                     </q-tooltip>
                   </q-icon>
                 </div>
@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="dimension-badge badge-more tw:cursor-pointer"
                       @click.stop="openPricingDialog(child)"
                     >
-                      +{{ getOverflowCount(child) }} more
+                      +{{ getOverflowCount(child) }} {{ t('modelPricing.overflowMore') }}
                       <q-tooltip :delay="400" anchor="top middle" self="bottom middle" class="pricing-overflow-tooltip">
                         <div class="pricing-breakdown-tooltip">
                           <div class="pricing-breakdown-title">{{ child.name }}</div>
@@ -426,17 +426,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-btn dense unelevated size="sm" round flat
                       :color="child.enabled ? 'negative' : 'positive'"
                       :icon="child.enabled ? outlinedPause : outlinedPlayArrow"
-                      :title="child.enabled ? 'Disable' : 'Enable'"
+                      :title="child.enabled ? t('modelPricing.actionDisable') : t('modelPricing.actionEnable')"
                       @click.stop="toggleEnabled(child, !child.enabled)" />
-                    <q-btn padding="sm" unelevated size="sm" round flat icon="edit" title="Edit"
+                    <q-btn padding="sm" unelevated size="sm" round flat icon="edit" :title="t('modelPricing.actionEdit')"
                       @click.stop="openEditor(child)" />
-                    <q-btn padding="sm" unelevated size="sm" round flat :icon="outlinedDelete" title="Delete"
+                    <q-btn padding="sm" unelevated size="sm" round flat :icon="outlinedDelete" :title="t('modelPricing.actionDelete')"
                       @click.stop="confirmDelete(child)" />
-                    <q-btn padding="sm" unelevated size="sm" round flat icon="content_copy" title="Duplicate"
+                    <q-btn padding="sm" unelevated size="sm" round flat icon="content_copy" :title="t('modelPricing.actionDuplicate')"
                       @click.stop="duplicateModel(child)" />
                   </template>
                   <template v-else>
-                    <q-btn padding="sm" unelevated size="sm" round flat icon="content_copy" title="Clone to this org"
+                    <q-btn padding="sm" unelevated size="sm" round flat icon="content_copy" :title="t('modelPricing.actionClone')"
                       @click.stop="duplicateModel(child)" />
                   </template>
                 </div>
@@ -496,7 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Source icon -->
           <span v-if="getSource(pricingDialogRow) === 'built_in'" class="tw:shrink-0 tw:cursor-default tw:inline-flex">
             <img :src="ooLogo" class="tw:w-[18px] tw:h-[18px]" alt="OpenObserve" />
-            <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Built-in model provided by OpenObserve</q-tooltip>
+            <q-tooltip :delay="500" anchor="top middle" self="bottom middle">{{ t('modelPricing.sourceBuiltIn') }}</q-tooltip>
           </span>
           <q-icon
             v-else-if="pricingDialogRow && (getSource(pricingDialogRow) === 'meta_org' || (getSource(pricingDialogRow) === 'org' && pricingDialogRow.org_id !== orgIdentifier))"
@@ -504,7 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="18px"
             class="tw:shrink-0 tw:cursor-default source-icon"
           >
-            <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Inherited from global</q-tooltip>
+            <q-tooltip :delay="500" anchor="top middle" self="bottom middle">{{ t('modelPricing.sourceInherited') }}</q-tooltip>
           </q-icon>
           <q-icon
             v-else
@@ -512,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="18px"
             class="tw:shrink-0 tw:cursor-default source-icon"
           >
-            <q-tooltip :delay="500" anchor="top middle" self="bottom middle">Custom model</q-tooltip>
+            <q-tooltip :delay="500" anchor="top middle" self="bottom middle">{{ t('modelPricing.sourceCustom') }}</q-tooltip>
           </q-icon>
           <div style="font-size: 18px" class="tw:truncate">
             {{ pricingDialogRow?.name }}
@@ -625,11 +625,11 @@ const showTestMatchDialog = ref(false);
 const selectedIds = ref<string[]>([]);
 const selectedTab = ref("all");
 
-const tabOptions = [
-  { label: "All", value: "all" },
-  { label: "Custom", value: "org" },
-  { label: "System", value: "inherited" },
-];
+const tabOptions = computed(() => [
+  { label: t("modelPricing.tabAll"), value: "all" },
+  { label: t("modelPricing.tabCustom"), value: "org" },
+  { label: t("modelPricing.tabSystem"), value: "inherited" },
+]);
 
 function onTabChange() {
   selectedIds.value = [];
@@ -941,7 +941,7 @@ const ooLogo = computed(() =>
  *  403 errors are already handled by the global HTTP interceptor (persistent top banner). */
 function notifyError(prefix: string, e: any) {
   if (e?.response?.status === 403) return;
-  const msg = e?.response?.data?.message || e?.message || "Unknown error";
+  const msg = e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
   q.notify({ type: "negative", message: `${prefix}: ${msg}`, position: "bottom", timeout: 5000 });
 }
 
@@ -951,7 +951,7 @@ async function fetchModels() {
     const res = await modelPricingService.list(orgIdentifier.value);
     models.value = res.data || [];
   } catch (e: any) {
-    notifyError("Failed to load models", e);
+    notifyError(t("modelPricing.errLoadModels"), e);
   } finally {
     loading.value = false;
   }
@@ -979,9 +979,12 @@ async function toggleEnabled(model: any, enabled: boolean) {
     await modelPricingService.update(orgIdentifier.value, model.id, updated);
     await fetchModels(); // refetch to reflect server state
     const displayName = model.name.length > 30 ? model.name.slice(0, 30) + "…" : model.name;
-    q.notify({ type: "positive", message: `Model "${displayName}" ${enabled ? "enabled" : "disabled"}`, position: "bottom", timeout: 3000 });
+    const message = enabled
+      ? t("modelPricing.modelEnabledNotif", { name: displayName })
+      : t("modelPricing.modelDisabledNotif", { name: displayName });
+    q.notify({ type: "positive", message, position: "bottom", timeout: 3000 });
   } catch (e: any) {
-    notifyError("Failed to update", e);
+    notifyError(t("modelPricing.errUpdate"), e);
   }
 }
 
@@ -995,15 +998,15 @@ function duplicateModel(model: any) {
 function confirmDelete(model: any) {
   confirmDialogMeta.value = {
     show: true,
-    title: "Delete Model Pricing",
-    message: `Are you sure you want to delete "${model.name}"?`,
+    title: t("modelPricing.confirmDeleteTitle"),
+    message: t("modelPricing.confirmDeleteMessage", { name: model.name }),
     onConfirm: async () => {
       try {
         await modelPricingService.delete(orgIdentifier.value, model.id);
-        q.notify({ type: "positive", message: "Model pricing deleted", position: "bottom", timeout: 3000 });
+        q.notify({ type: "positive", message: t("modelPricing.modelPricingDeleted"), position: "bottom", timeout: 3000 });
         await fetchModels();
       } catch (e: any) {
-        notifyError("Failed to delete", e);
+        notifyError(t("modelPricing.errDelete"), e);
       }
     },
   };
@@ -1024,10 +1027,10 @@ async function refreshBuiltIn() {
   refreshing.value = true;
   try {
     await modelPricingService.refreshBuiltIn(orgIdentifier.value);
-    q.notify({ type: "positive", message: "Built-in models refreshed", position: "bottom", timeout: 3000 });
+    q.notify({ type: "positive", message: t("modelPricing.builtInRefreshed"), position: "bottom", timeout: 3000 });
     await fetchModels();
   } catch (e: any) {
-    notifyError("Refresh failed", e);
+    notifyError(t("modelPricing.errRefresh"), e);
   } finally {
     refreshing.value = false;
   }
@@ -1058,7 +1061,7 @@ function exportSelected() {
     (m: any) => selectedIds.value.includes(m.id)
   );
   if (selected.length === 0) {
-    q.notify({ type: "warning", message: "No models selected to export", position: "bottom", timeout: 3000 });
+    q.notify({ type: "warning", message: t("modelPricing.noModelsSelected"), position: "bottom", timeout: 3000 });
     return;
   }
   const exportData = selected.map((m: any) => ({
@@ -1084,8 +1087,8 @@ function confirmDeleteSelected() {
   const count = selectedIds.value.length;
   confirmDialogMeta.value = {
     show: true,
-    title: "Delete Selected Models",
-    message: `Are you sure you want to delete ${count} selected model${count !== 1 ? "s" : ""}?`,
+    title: t("modelPricing.confirmDeleteSelectedTitle"),
+    message: t("modelPricing.confirmDeleteSelectedMessage", { count }),
     onConfirm: async () => {
       let successCount = 0;
       for (const id of selectedIds.value) {
@@ -1095,11 +1098,11 @@ function confirmDeleteSelected() {
           await modelPricingService.delete(orgIdentifier.value, id);
           successCount++;
         } catch (e: any) {
-          notifyError(`Failed to delete "${modelName}"`, e);
+          notifyError(t("modelPricing.errDeleteNamed", { name: modelName }), e);
         }
       }
       if (successCount > 0) {
-        q.notify({ type: "positive", message: `Deleted ${successCount} model${successCount !== 1 ? "s" : ""}`, position: "bottom", timeout: 3000 });
+        q.notify({ type: "positive", message: t("modelPricing.deletedModelsNotif", { count: successCount }), position: "bottom", timeout: 3000 });
         selectedIds.value = [];
         await fetchModels();
       }
