@@ -868,22 +868,12 @@ pub struct CellTypeValue {
 #[serde(rename_all = "camelCase")]
 pub struct ConditionalRule {
     pub operator: String,
-    pub threshold: f64,
+    #[schema(value_type = f64)]
+    pub threshold: OrdF64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub text_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bg_color: Option<String>,
-}
-
-// f64 does not implement Hash in Rust's std, so we implement it manually
-// using threshold.to_bits() which gives a stable u64 for any finite value.
-impl std::hash::Hash for ConditionalRule {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.operator.hash(state);
-        self.threshold.to_bits().hash(state);
-        self.text_color.hash(state);
-        self.bg_color.hash(state);
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
