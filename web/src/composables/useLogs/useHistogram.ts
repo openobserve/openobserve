@@ -19,6 +19,18 @@ import { searchState } from "@/composables/useLogs/searchState";
 
 import { INTERVAL_MAP } from "@/utils/logs/constants";
 
+// Severity-aware sort order for stacked histogram breakdown categories.
+// Lower index = bottom of stack (least severe), higher = top (most severe).
+// Categories not in this map fall back to alphabetical order at rank 100.
+// Defined at module scope so it is allocated once, not on every generateHistogramData call.
+const SEVERITY_ORDER: Record<string, number> = {
+  trace: 0, debug: 1, info: 2, success: 3,
+  pending: 4, cancelled: 5,
+  warn: 6, warning: 6,
+  timeout: 7, failure: 8,
+  error: 9, critical: 10, fatal: 11,
+};
+
 import { formatSizeFromMB, histogramDateTimezone } from "@/utils/zincutils";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
@@ -201,15 +213,6 @@ export const useHistogram = () => {
             ...new Set([...breakdownMap.values()].map((r) => r.zo_sql_key)),
           ].sort();
 
-          // Severity-aware sort order: lower index = bottom of stack, higher = top.
-          // Categories not in this map fall back to alphabetical order at rank 100.
-          const SEVERITY_ORDER: Record<string, number> = {
-            trace: 0, debug: 1, info: 2, success: 3,
-            pending: 4, cancelled: 5,
-            warn: 6, warning: 6,
-            timeout: 7, failure: 8,
-            error: 9, critical: 10, fatal: 11,
-          };
 
           const rawCategories = [
             ...new Set([...breakdownMap.values()].map((r) => r.zo_sql_breakdown)),

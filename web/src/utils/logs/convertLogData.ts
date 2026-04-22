@@ -217,8 +217,7 @@ export const convertStackedLogData = (
     };
   });
 
-  const textColor  = isDarkTheme ? "#e0e0e0" : "#222";
-  const rowHoverBg = isDarkTheme ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
+  const textColor = isDarkTheme ? "#e0e0e0" : "#222";
 
   const esc = (s: string) =>
     String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -249,19 +248,12 @@ export const convertStackedLogData = (
         formatter: (tooltipParams: any[]) => {
           if (!tooltipParams?.length) return "";
 
-          // Inject a scoped hover style — avoids inline event handlers which
-          // are blocked by strict CSP and are a code-quality antipattern.
-          let html = `
-            <style>
-              .oo-tt-row:hover { background: ${rowHoverBg}; }
-            </style>
-            <div style="min-width:190px;padding:4px 0;">`;
-
+          let html = `<div style="min-width:190px;padding:4px 0;">`;
           html += `<div style="font-size:11px;font-weight:500;opacity:0.65;padding:0 10px 4px;margin-bottom:0;border-bottom:1px solid rgba(128,128,128,0.15);color:${textColor}">${esc(tooltipParams[0].axisValueLabel)}</div>`;
 
           tooltipParams.forEach((p: any) => {
             html += `
-              <div class="oo-tt-row" style="display:flex;align-items:center;gap:6px;padding:1px 10px;">
+              <div style="display:flex;align-items:center;gap:6px;padding:1px 10px;">
                 ${p.marker}
                 <span style="flex:1;color:${textColor};font-size:12px">${esc(p.seriesName)}</span>
                 <span style="font-weight:600;color:${textColor};min-width:32px;text-align:right;font-size:12px">${esc(formatCount(p.value[1]))}</span>

@@ -1044,6 +1044,7 @@ export default defineComponent({
 
     const applyPinnedFilter = (rawValue: string, action: "include" | "exclude") => {
       const field = pinnedTooltip.value.field;
+      if (!field) return;
       addSearchTerm(field, rawValue, action);
     };
 

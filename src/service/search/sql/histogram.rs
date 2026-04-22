@@ -69,9 +69,14 @@ fn single_stream_histogram_query(
         .ok_or_else(|| anyhow::anyhow!("No stream name found"))?;
     // Build histogram query
     let mut histogram_query = match breakdown_field {
-        Some(field) => format!(
-            "SELECT histogram(_timestamp) AS zo_sql_key, \"{field}\" AS zo_sql_breakdown, count(*) AS zo_sql_num FROM \"{stream_name}\""
-        ),
+        Some(field) => {
+            // Escape any double-quotes inside the field name so it cannot break
+            // identifier quoting and cannot be used as a SQL injection vector.
+            let safe_field = field.replace('"', "\"\"");
+            format!(
+                "SELECT histogram(_timestamp) AS zo_sql_key, \"{safe_field}\" AS zo_sql_breakdown, count(*) AS zo_sql_num FROM \"{stream_name}\""
+            )
+        }
         None => format!(
             "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"{stream_name}\""
         ),
