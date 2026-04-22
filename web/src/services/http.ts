@@ -200,7 +200,15 @@ const http = ({ headers } = {} as any) => {
                     s.includes("@") || /^\d+$/.test(s) || uuidRe.test(s);
                   const resourceNames = resourcePath.filter((s) => !isId(s));
                   if (resourceNames.length > 0) {
-                    resourceHint = ` on "${resourceNames[resourceNames.length - 1]}"`;
+                    // Map known multi-segment paths to friendly names
+                    const joined = resourceNames.join("/");
+                    const friendlyNames: Record<string, string> = {
+                      "llm/models": "LLM Model Pricing",
+                      "llm/models/built-in": "LLM Model Pricing",
+                      "llm/models/refresh-built-in": "LLM Model Pricing",
+                    };
+                    const friendly = friendlyNames[joined];
+                    resourceHint = ` on "${friendly || resourceNames[resourceNames.length - 1]}"`;
                   }
                 }
               } catch {
@@ -208,7 +216,7 @@ const http = ({ headers } = {} as any) => {
               }
               const notifyMessage = backendError
                 ? `Unauthorized Access: ${backendError}`
-                : `Unauthorized Access: You are not authorized to perform this operation${resourceHint}, please contact your administrator.`;
+                : `Unauthorized Access: You are not authorized to perform this operation${resourceHint}. Please contact your administrator.`;
               Notify.create({
                 message: notifyMessage,
                 timeout: 0, // This ensures the notification does not close automatically

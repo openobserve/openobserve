@@ -157,8 +157,6 @@ const defaultObject = {
       } | null,
       traceId: "",
       spanList: [],
-      spansTruncated: false,
-      totalSpanCount: 0,
       isLoadingTraceMeta: false,
       isLoadingTraceDetails: false,
       selectedSpanId: "" as String | null,

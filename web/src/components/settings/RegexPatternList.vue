@@ -7,16 +7,16 @@
             {{ t("regex_patterns.title") }}
           </div>
           <q-input
-                v-model="filterQuery"
-                borderless
-                dense
-                class="q-ml-auto no-border o2-search-input"
-                :placeholder="t('regex_patterns.search')"
-              >
-                <template #prepend>
-                  <q-icon class="o2-search-input-icon"  name="search" />
-                </template>
-              </q-input>
+            v-model="filterQuery"
+            borderless
+            dense
+            class="q-ml-auto no-border o2-search-input"
+            :placeholder="t('regex_patterns.search')"
+          >
+          <template #prepend>
+            <q-icon class="o2-search-input-icon"  name="search" />
+          </template>
+        </q-input>
           <q-btn
             class="o2-secondary-button q-ml-sm tw:h-[36px]"
             no-caps
