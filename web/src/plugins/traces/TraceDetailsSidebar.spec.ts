@@ -39,6 +39,19 @@ vi.mock("@/composables/useTraces", () => ({
   }),
 }));
 
+vi.mock("@/aws-exports", () => ({
+  default: {
+    isEnterprise: "true",
+    isCloud: "false",
+  },
+}));
+
+vi.mock("@/composables/useServiceCorrelation", () => ({
+  useServiceCorrelation: () => ({
+    findRelatedTelemetry: vi.fn().mockResolvedValue(null),
+  }),
+}));
+
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import TraceDetailsSidebar from "@/plugins/traces/TraceDetailsSidebar.vue";
 import i18n from "@/locales";
@@ -919,6 +932,61 @@ describe("TraceDetailsSidebar", async () => {
       expect(Array.isArray(newWrapper.vm.spanLinks)).toBe(true);
 
       newWrapper.unmount();
+    });
+  });
+
+  describe("correlateForMetrics — no data found", () => {
+    let correlationWrapper: any;
+
+    beforeEach(async () => {
+      correlationWrapper = mount(TraceDetailsSidebar, {
+        attachTo: "#app",
+        props: {
+          span: mockSpan,
+          baseTracePosition: mockBaseTracePosition,
+          searchQuery: "",
+          streamName: "default",
+          serviceStreamsEnabled: true,
+        },
+        global: {
+          plugins: [i18n, router],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            "q-resize-observer": true,
+            "q-virtual-scroll": {
+              template: `
+                <div>
+                  <slot name="before"></slot>
+                  <div v-for="(item, index) in items" :key="index">
+                    <slot :item="item" :index="index"></slot>
+                  </div>
+                </div>
+              `,
+              props: ["items"],
+            },
+          },
+        },
+      });
+
+      await correlationWrapper.vm.$nextTick();
+    });
+
+    afterEach(() => {
+      correlationWrapper?.unmount();
+    });
+
+    it("should set correlationError to noLogsFound message when findRelatedTelemetry returns null", async () => {
+      const metricsTab = correlationWrapper.find(
+        '[data-test="trace-details-sidebar-tabs-correlated-metrics"]',
+      );
+      expect(metricsTab.exists()).toBe(true);
+
+      await metricsTab.trigger("click");
+      await flushPromises();
+
+      expect(correlationWrapper.vm.correlationError).toContain("No Logs Found");
     });
   });
 
