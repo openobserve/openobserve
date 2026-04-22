@@ -382,7 +382,11 @@
     "patternNavNext": "Próxima",
     "patternWildcardSampleValues": "Valores de muestra",
     "wildcardSampleValues": "Valores de muestra",
-    "patternZScore": "Puntuación Z: {zScore} (frecuencia promedio: {AvgFrequency})"
+    "patternZScore": "Puntuación Z: {zScore} (frecuencia promedio: {AvgFrequency})",
+    "liveMode": "En vivo",
+    "liveModeTooltip": "Consulta de ejecución automática sobre cambios de filtro/hora",
+    "turnOnLiveMode": "Activa el modo Live",
+    "turnOffLiveMode": "Desactivar el modo Live"
   },
   "menu": {
     "home": "Inicio",

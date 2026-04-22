@@ -382,7 +382,11 @@
     "patternNavNext": "下一步",
     "patternWildcardSampleValues": "样本值",
     "wildcardSampleValues": "样本值",
-    "patternZScore": "Z 分数：{zScore}（平均频率：{avgFrequency}）"
+    "patternZScore": "Z 分数：{zScore}（平均频率：{avgFrequency}）",
+    "liveMode": "直播",
+    "liveModeTooltip": "在过滤器/时间更改时自动运行查询",
+    "turnOnLiveMode": "开启直播模式",
+    "turnOffLiveMode": "关闭直播模式"
   },
   "menu": {
     "home": "主页",
