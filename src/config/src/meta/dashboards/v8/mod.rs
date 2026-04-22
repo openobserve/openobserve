@@ -810,7 +810,7 @@ pub struct Field {
     value: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Config {
     #[serde(rename = "unit")]
