@@ -2240,6 +2240,8 @@
     "editJson": "Modifier le JSON d'alerte",
     "additional_settings": "Réglages supplémentaires",
     "alertNamePlaceholder": "Nom de l'alerte",
+    "nameRequired": "Le nom de l'alerte est requis.",
+    "nameNoSpecialChars": "Le nom de l'alerte ne peut pas contenir ':', '#', '?', '&', '%', des guillemets ou des espaces. Utilisez des underscores (_) à la place.",
     "anomalyNamePlaceholder": "Nom de l'anomalie",
     "folder": "Dossier",
     "selectStreamTypeFirst": "Sélectionnez d'abord un type de flux",

@@ -2240,6 +2240,8 @@
     "editJson": "Alert-JSON bearbeiten",
     "additional_settings": "Zusätzliche Einstellungen",
     "alertNamePlaceholder": "Name der Warnung",
+    "nameRequired": "Alert-Name ist erforderlich.",
+    "nameNoSpecialChars": "Alert-Name darf keine ':', '#', '?', '&', '%', Anführungszeichen oder Leerzeichen enthalten. Verwenden Sie stattdessen Unterstriche (_).",
     "anomalyNamePlaceholder": "Name der Anomalie",
     "folder": "Mappe",
     "selectStreamTypeFirst": "Wählen Sie zuerst einen Stream-Typ",

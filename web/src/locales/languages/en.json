@@ -2613,6 +2613,8 @@
     "editJson": "Edit Alert JSON",
     "additional_settings":"Additional Settings",
     "alertNamePlaceholder": "Alert name",
+    "nameRequired": "Alert name is required.",
+    "nameNoSpecialChars": "Alert name cannot contain ':', '#', '?', '&', '%', quotes or space characters. Use underscores (_) instead.",
     "anomalyNamePlaceholder": "Anomaly name",
     "anomalyName": "Anomaly Name",
     "folder": "Folder",
