@@ -66,6 +66,19 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            // Parse issues with null/empty guard
+            if (!process.env.ISSUES_JSON || process.env.ISSUES_JSON === '[]') {
+              console.log('No bug issues to audit');
+              core.setOutput('results', JSON.stringify({
+                ready_to_close: [],
+                needs_test: [],
+                needs_fix: [],
+                needs_both: []
+              }));
+              core.setOutput('ready_to_close_count', 0);
+              return;
+            }
+
             let issues = JSON.parse(process.env.ISSUES_JSON);
 
             // Apply test mode filter if specified
@@ -86,6 +99,16 @@ jobs:
               needs_both: []           // No fix, no test
             };
 
+            // Check initial rate limit status
+            const rateLimit = await github.rest.rateLimit.get();
+            console.log(`\n📊 Rate Limit Status:`);
+            console.log(`  Remaining: ${rateLimit.data.rate.remaining}/${rateLimit.data.rate.limit}`);
+            console.log(`  Resets at: ${new Date(rateLimit.data.rate.reset * 1000).toISOString()}`);
+
+            if (rateLimit.data.rate.remaining < issues.length * 5) {
+              console.log(`\n⚠️  Warning: Low rate limit. May need to pause during execution.`);
+            }
+
             for (const issue of issues) {
               console.log(`\n=== Auditing Issue #${issue.number}: ${issue.title} ===`);
 
@@ -101,11 +124,14 @@ jobs:
                   per_page: 100
                 });
 
-                // Look for "referenced" events from merged PRs
+                // Look for "cross-referenced" events from merged PRs
                 for (const event of timeline) {
-                  if (event.event === 'referenced' && event.source?.type === 'issue') {
-                    // Check if the referencing PR is merged
+                  // cross-referenced event has source.issue with pull_request property for PRs
+                  if (event.event === 'cross-referenced' &&
+                      event.source?.issue?.pull_request) {
                     const prNumber = event.source.issue.number;
+
+                    // Check if the PR is merged
                     const pr = await github.rest.pulls.get({
                       owner: context.repo.owner,
                       repo: context.repo.repo,
@@ -136,7 +162,12 @@ jobs:
                   }
                 }
               } catch (error) {
-                console.log(`  ⚠️  Error checking PRs: ${error.message}`);
+                if (error.status === 403 && error.message.includes('rate limit')) {
+                  console.log(`  ⚠️  Rate limit exceeded. Workflow may produce incomplete results.`);
+                  console.log(`  ⚠️  Consider running with test_mode to process fewer issues.`);
+                } else {
+                  console.log(`  ⚠️  Error checking PRs: ${error.message}`);
+                }
               }
 
               // 2. Check for test with @bug-{issue#} tag
@@ -183,6 +214,9 @@ jobs:
                 console.log(`  → Category: NEEDS BOTH`);
                 results.needs_both.push(result);
               }
+
+              // Small delay to avoid rate limiting (100ms between issues)
+              await new Promise(resolve => setTimeout(resolve, 100));
             }
 
             // Log summary
