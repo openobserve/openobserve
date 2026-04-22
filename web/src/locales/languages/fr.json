@@ -2866,7 +2866,8 @@
       "type": "Tapez",
       "multiStepAgent": "Agent en plusieurs étapes"
     },
-    "noLogsAvailableForService": "Aucun journal disponible pour ce service"
+    "noLogsAvailableForService": "Aucun journal disponible pour ce service",
+    "spansTruncatedWarning": "Affichage de {count} de {total} spans — la trace est peut-être incomplète. Réduisez la plage de temps ou contactez votre administrateur pour augmenter la limite de durée."
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -3397,7 +3398,15 @@
     "never": "Jamais",
     "typeScore": "Score numérique (par exemple, 0,0 à 1,0)",
     "typeBoolean": "Binaire/Pass-Fail (booléen)",
-    "typeCustom": "Texte catégoriel/personnalisé"
+    "typeCustom": "Texte catégoriel/personnalisé",
+    "bulkDeleteConfirmation": "Êtes-vous sûr de vouloir supprimer {count} modèle (s) ?",
+    "search": "Modèles de recherche",
+    "dimensionsTooltip": "Ajoutez des dimensions d'évaluation (par exemple, précision, pertinence). Tapez et appuyez sur Entrée pour en ajouter des personnalisés.",
+    "tooltipName": "Un nom unique pour ce modèle d'évaluation.",
+    "tooltipDescription": "Description facultative pour expliquer ce que ce modèle évalue.",
+    "tooltipResponseType": "Définit le format de la sortie d'évaluation du LLM : score numérique, réussite ou échec booléen ou texte personnalisé.",
+    "tooltipDimensions": "Critères d'évaluation que le LLM devrait juger. Sélectionnez l'une des valeurs par défaut ou saisissez-en une personnalisée et appuyez sur Entrée.",
+    "tooltipPromptTemplate": "L'invite envoyée au LLM. Utilisez {input}, {output} et {context} comme espaces réservés pour les valeurs dynamiques au moment de l'évaluation."
   },
   "aiToolset": {
     "header": "Ensembles d'outils d'IA",

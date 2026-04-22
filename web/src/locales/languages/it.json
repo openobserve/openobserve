@@ -2875,7 +2875,8 @@
       "type": "Tipo",
       "multiStepAgent": "Agente in più fasi"
     },
-    "noLogsAvailableForService": "Nessun registro disponibile per questo servizio"
+    "noLogsAvailableForService": "Nessun registro disponibile per questo servizio",
+    "spansTruncatedWarning": "Mostra {count} di {total} intervalli: la traccia potrebbe essere incompleta. Restringi l'intervallo di tempo o contatta l'amministratore per aumentare il limite di intervallo."
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -3406,7 +3407,15 @@
     "never": "Mai",
     "typeScore": "Punteggio numerico (ad es. 0,0 - 1,0)",
     "typeBoolean": "Binario/Pass-Fail (booleano)",
-    "typeCustom": "Testo categoriale/personalizzato"
+    "typeCustom": "Testo categoriale/personalizzato",
+    "bulkDeleteConfirmation": "Sei sicuro di voler eliminare {count} template?",
+    "search": "Modelli di ricerca",
+    "dimensionsTooltip": "Aggiungi dimensioni di valutazione (ad esempio precisione, pertinenza). Digita e premi Invio per aggiungerne di personalizzate.",
+    "tooltipName": "Un nome univoco per questo modello di valutazione.",
+    "tooltipDescription": "Descrizione opzionale per spiegare cosa valuta questo modello.",
+    "tooltipResponseType": "Definisce il formato dell'output di valutazione del LLM: punteggio numerico, pass/fail booleano o testo personalizzato.",
+    "tooltipDimensions": "Criteri di valutazione che il LLM dovrebbe giudicare. Seleziona uno dei valori predefiniti o digita uno personalizzato e premi Invio.",
+    "tooltipPromptTemplate": "Il prompt inviato al LLM. Usa {input}, {output} e {context} come segnaposto per i valori dinamici in fase di valutazione."
   },
   "aiToolset": {
     "header": "Set di strumenti AI",

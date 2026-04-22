@@ -69,8 +69,10 @@ vi.mock("@/composables/useSuggestions", () => ({
       popup: { open: vi.fn() },
     }),
     autoCompleteKeywords: ref(["SELECT", "FROM", "WHERE"]),
+    effectiveKeywords: ref([]),
     getSuggestions: vi.fn(),
     updateFieldKeywords: vi.fn(),
+    updateStreamKeywords: vi.fn(),
   }),
 }));
 

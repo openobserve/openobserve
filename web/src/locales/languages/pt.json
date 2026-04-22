@@ -2866,7 +2866,8 @@
       "type": "Tipo",
       "multiStepAgent": "Agente de várias etapas"
     },
-    "noLogsAvailableForService": "Não há registros disponíveis para este serviço"
+    "noLogsAvailableForService": "Não há registros disponíveis para este serviço",
+    "spansTruncatedWarning": "Mostrando {count} de {total} extensões — o rastreamento pode estar incompleto. Limite o intervalo de tempo ou entre em contato com seu administrador para aumentar o limite de intervalo."
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -3397,7 +3398,15 @@
     "never": "Nunca",
     "typeScore": "Pontuação numérica (por exemplo, 0,0 - 1,0)",
     "typeBoolean": "Binário//Falha de aprovação (booleano)",
-    "typeCustom": "Texto categórico/personalizado"
+    "typeCustom": "Texto categórico/personalizado",
+    "bulkDeleteConfirmation": "Tem certeza de que deseja excluir {count} modelo (s)?",
+    "search": "Modelos de pesquisa",
+    "dimensionsTooltip": "Adicione dimensões de avaliação (por exemplo, precisão, relevância). Digite e pressione Enter para adicionar itens personalizados.",
+    "tooltipName": "Um nome exclusivo para esse modelo de avaliação.",
+    "tooltipDescription": "Descrição opcional para explicar o que esse modelo avalia.",
+    "tooltipResponseType": "Define o formato da saída de avaliação do LLM — pontuação numérica, aprovação/reprovação booleana ou texto personalizado.",
+    "tooltipDimensions": "Critérios de avaliação que o LLM deve julgar. Selecione entre os padrões ou digite um personalizado e pressione Enter.",
+    "tooltipPromptTemplate": "O prompt enviado ao LLM. Use {input}, {output} e {context} como espaços reservados para valores dinâmicos no momento da avaliação."
   },
   "aiToolset": {
     "header": "Conjuntos de ferramentas de IA",

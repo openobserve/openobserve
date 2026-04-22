@@ -2864,7 +2864,8 @@
       "type": "Tipo",
       "multiStepAgent": "Agente de varios pasos"
     },
-    "noLogsAvailableForService": "No hay registros disponibles para este servicio"
+    "noLogsAvailableForService": "No hay registros disponibles para este servicio",
+    "spansTruncatedWarning": "Se muestran {count} de intervalos de {total}; es posible que el rastreo esté incompleto. Reduzca el intervalo de tiempo o póngase en contacto con su administrador para aumentar el límite de intervalo."
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -3395,7 +3396,15 @@
     "never": "Nunca",
     "typeScore": "Puntuación numérica (p. ej., 0.0 - 1.0)",
     "typeBoolean": "Binario/Fallo de aprobación (booleano)",
-    "typeCustom": "Texto categórico/personalizado"
+    "typeCustom": "Texto categórico/personalizado",
+    "bulkDeleteConfirmation": "¿Estás seguro de que quieres eliminar las plantillas de {count}?",
+    "search": "Plantillas de búsqueda",
+    "dimensionsTooltip": "Agregue dimensiones de evaluación (por ejemplo, precisión, relevancia). Escriba y presione Entrar para agregar valores personalizados.",
+    "tooltipName": "Un nombre único para esta plantilla de evaluación.",
+    "tooltipDescription": "Descripción opcional para explicar lo que evalúa esta plantilla.",
+    "tooltipResponseType": "Define el formato del resultado de la evaluación del LLM: puntuación numérica, aprobación/rechazo booleano o texto personalizado.",
+    "tooltipDimensions": "Criterios de evaluación que debe juzgar el LLM. Seleccione uno de los valores predeterminados o escriba uno personalizado y pulse Entrar.",
+    "tooltipPromptTemplate": "El mensaje enviado al LLM. Utilice {input}, {output} y {context} como marcadores de posición para los valores dinámicos en el momento de la evaluación."
   },
   "aiToolset": {
     "header": "Conjuntos de herramientas de IA",

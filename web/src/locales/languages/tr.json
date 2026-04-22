@@ -2877,7 +2877,8 @@
       "type": "Tür",
       "multiStepAgent": "Çok adımlı Ajan"
     },
-    "noLogsAvailableForService": "Bu hizmet için günlük yok"
+    "noLogsAvailableForService": "Bu hizmet için günlük yok",
+    "spansTruncatedWarning": "{total} açıklığın {count} gösterilmesi — izleme eksik olabilir. Zaman aralığını daraltın veya süre sınırını artırmak için yöneticinizle iletişime geçin."
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -3408,7 +3409,15 @@
     "never": "Asla",
     "typeScore": "Sayısal Skor (örn. 0.0 - 1.0)",
     "typeBoolean": "İkili/Başarısız Oldu (Boolean)",
-    "typeCustom": "Kategorik/Özel Metin"
+    "typeCustom": "Kategorik/Özel Metin",
+    "bulkDeleteConfirmation": "{count} şablonlarını silmek istediğinizden emin misiniz?",
+    "search": "Arama şablonları",
+    "dimensionsTooltip": "Değerlendirme boyutları ekleyin (örn. doğruluk, alaka düzeyi). Özel olanları eklemek için yazın ve Enter tuşuna basın.",
+    "tooltipName": "Bu değerlendirme şablonu için benzersiz bir ad.",
+    "tooltipDescription": "Bu şablonun neyi değerlendirdiğini açıklamak için isteğe bağlı açıklama.",
+    "tooltipResponseType": "LLM'nin değerlendirme çıktısının biçimini tanımlar - sayısal puan, boole geçi/başarısız veya özel metin.",
+    "tooltipDimensions": "LLM'nin değerlendirmesi gereken değerlendirme kriterleri. Varsayılanlardan birini seçin veya özel bir tane yazın ve Enter tuşuna basın.",
+    "tooltipPromptTemplate": "LLM'ye gönderilen komut istemi. Değerlendirme sırasında dinamik değerler için yer tutucu olarak {input}, {output} ve {context} kullanın."
   },
   "aiToolset": {
     "header": "Yapay Zeka Araç Setleri",

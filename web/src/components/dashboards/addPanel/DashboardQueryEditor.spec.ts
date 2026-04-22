@@ -108,6 +108,7 @@ const createMockDashboardPanelData = () => {
       currentQueryIndex: 0,
       vrlFunctionToggle: false,
       showQueryBar: true,
+      hiddenQueries: [],
     },
     meta: {
       errors: {
@@ -116,6 +117,13 @@ const createMockDashboardPanelData = () => {
       dateTime: {
         start_time: new Date(),
         end_time: new Date(),
+      },
+      stream: {
+        customQueryFields: [],
+        streamResults: [],
+      },
+      streamFields: {
+        groupedFields: [],
       },
     },
   };
@@ -164,9 +172,13 @@ vi.mock("@/composables/useSuggestions", () => ({
   default: vi.fn(() => ({
     autoCompleteKeywords: { value: [] },
     autoCompleteSuggestions: { value: [] },
+    effectiveKeywords: { value: [] },
+    effectiveSuggestions: { value: [] },
     getSuggestions: vi.fn(),
     updateFieldKeywords: vi.fn(),
     updateFunctionKeywords: vi.fn(),
+    updateAllKeywords: vi.fn(),
+    updateStreamKeywords: vi.fn(),
   })),
 }));
 

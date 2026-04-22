@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           editor-id="traces-query-editor"
           class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
           v-model:query="searchObj.data.editorValue"
-          :keywords="autoCompleteKeywords"
+          :keywords="effectiveKeywords"
           :class="
             searchObj.data.editorValue == '' &&
             searchObj.meta.queryEditorPlaceholderFlag
@@ -424,8 +424,10 @@ export default defineComponent({
     const {
       autoCompleteData,
       autoCompleteKeywords,
+      effectiveKeywords,
       getSuggestions,
       updateFieldKeywords,
+      updateStreamKeywords,
     } = useSqlSuggestions();
 
     const importSqlParser = async () => {
@@ -466,6 +468,17 @@ export default defineComponent({
         if (fields.length) updateFieldKeywords(fields);
       },
       { immediate: true, deep: true },
+    );
+
+    // Feed the selected trace stream into FROM autocomplete so typing
+    // "FROM " suggests the stream name.
+    watch(
+      () => searchObj.data.stream.selectedStream,
+      (stream) => {
+        const name = stream?.value;
+        updateStreamKeywords(name ? [{ name }] : []);
+      },
+      { immediate: true },
     );
 
     const updateAutoComplete = (value) => {
@@ -760,6 +773,7 @@ export default defineComponent({
       downloadLogs,
       setEditorValue,
       autoCompleteKeywords,
+      effectiveKeywords,
       updateTimezone,
       dateTimeRef,
       resetFilters,
