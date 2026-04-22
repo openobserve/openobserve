@@ -1577,7 +1577,8 @@
     "configSectionDrilldown": "Detaya inme",
     "configSectionComparison": "Karşılaştırma",
     "configSectionMarkLines": "Çizgileri İşaretle",
-    "configSectionBackground": "Arkaplan"
+    "configSectionBackground": "Arkaplan",
+    "tableFiltering": "Sütun Filtreleme"
   },
   "panel": {
     "header": "Panel",

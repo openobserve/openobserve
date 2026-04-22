@@ -1577,7 +1577,8 @@
     "configSectionDrilldown": "드릴다운",
     "configSectionComparison": "비교",
     "configSectionMarkLines": "마크 라인",
-    "configSectionBackground": "백그라운드"
+    "configSectionBackground": "백그라운드",
+    "tableFiltering": "컬럼 필터링"
   },
   "panel": {
     "header": "패널",

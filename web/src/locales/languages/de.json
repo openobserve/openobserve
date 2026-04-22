@@ -1579,7 +1579,8 @@
     "axisLabelRotateTooltipText": "Drehen Sie den Beschriftungstext auf der X-Achse um einen bestimmten Winkel (in Grad), um die Lesbarkeit zu verbessern, wenn Beschriftungen lang oder überfüllt sind.",
     "axisLabelTruncateTooltipText": "Kürzt die Beschriftungen der X-Achse auf die angegebene Breite (in Pixeln).",
     "axisLabelTooltipNotePrefix": "Hinweis:",
-    "axisLabelTooltipNoteText": " Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt."
+    "axisLabelTooltipNoteText": " Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt.",
+    "tableFiltering": "Filtern von Spalten"
   },
   "panel": {
     "header": "Panel",

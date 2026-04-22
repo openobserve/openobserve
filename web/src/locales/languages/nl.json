@@ -1577,7 +1577,8 @@
     "configSectionDrilldown": "Inzoomen",
     "configSectionComparison": "Vergelijking",
     "configSectionMarkLines": "Lijnen markeren",
-    "configSectionBackground": "Achtergrond"
+    "configSectionBackground": "Achtergrond",
+    "tableFiltering": "Kolomfiltering"
   },
   "panel": {
     "header": "Paneel",

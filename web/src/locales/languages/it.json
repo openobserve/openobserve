@@ -1577,7 +1577,8 @@
     "configSectionDrilldown": "Drilldown",
     "configSectionComparison": "Confronto",
     "configSectionMarkLines": "Segna linee",
-    "configSectionBackground": "Sfondo"
+    "configSectionBackground": "Sfondo",
+    "tableFiltering": "Filtraggio delle colonne"
   },
   "panel": {
     "header": "Pannello",
