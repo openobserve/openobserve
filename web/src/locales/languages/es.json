@@ -1587,7 +1587,18 @@
     "sectionStyling": "Estilismo",
     "textColor": "Texto",
     "bgColor": "Antecedentes",
-    "colorNone": "ninguna"
+    "colorNone": "ninguna",
+    "sectionCellType": "Tipo de celda",
+    "cellTypeText": "Texto",
+    "cellTypeProgressBar": "Barra de progreso",
+    "cellTypeSparkline": "Sparkline",
+    "sectionProgressBar": "Configuración de la barra de progreso",
+    "progressMin": "Mín",
+    "progressMax": "Máx",
+    "progressColor": "Color de barra",
+    "sectionConditionalStyling": "Estilo condicional",
+    "conditionThreshold": "Valor",
+    "conditionAddRule": "+ Añadir regla"
   },
   "panel": {
     "header": "Panel",

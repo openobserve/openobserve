@@ -1587,7 +1587,18 @@
     "sectionStyling": "造型",
     "textColor": "文本",
     "bgColor": "背景",
-    "colorNone": "无"
+    "colorNone": "无",
+    "sectionCellType": "细胞类型",
+    "cellTypeText": "文本",
+    "cellTypeProgressBar": "进度栏",
+    "cellTypeSparkline": "Sparkline",
+    "sectionProgressBar": "进度栏配置",
+    "progressMin": "最小",
+    "progressMax": "马克斯",
+    "progressColor": "条形颜色",
+    "sectionConditionalStyling": "条件样式",
+    "conditionThreshold": "价值",
+    "conditionAddRule": "+ 添加规则"
   },
   "panel": {
     "header": "面板",

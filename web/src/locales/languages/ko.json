@@ -1585,7 +1585,18 @@
     "sectionStyling": "스타일링",
     "textColor": "텍스트",
     "bgColor": "백그라운드",
-    "colorNone": "없음"
+    "colorNone": "없음",
+    "sectionCellType": "셀 유형",
+    "cellTypeText": "텍스트",
+    "cellTypeProgressBar": "진행률 표시줄",
+    "cellTypeSparkline": "스파크라인",
+    "sectionProgressBar": "진행률 표시줄 구성",
+    "progressMin": "최소",
+    "progressMax": "맥스",
+    "progressColor": "바 색상",
+    "sectionConditionalStyling": "조건부 스타일링",
+    "conditionThreshold": "가치",
+    "conditionAddRule": "+ 규칙 추가"
   },
   "panel": {
     "header": "패널",

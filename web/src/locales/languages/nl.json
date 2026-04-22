@@ -1585,7 +1585,18 @@
     "sectionStyling": "Styling",
     "textColor": "Tekst",
     "bgColor": "Achtergrond",
-    "colorNone": "geen"
+    "colorNone": "geen",
+    "sectionCellType": "Celtype",
+    "cellTypeText": "Tekst",
+    "cellTypeProgressBar": "Voortgangsbalk",
+    "cellTypeSparkline": "Sparkline",
+    "sectionProgressBar": "Configuratie van de voortgangsbalk",
+    "progressMin": "Min",
+    "progressMax": "Max",
+    "progressColor": "Kleur van de balk",
+    "sectionConditionalStyling": "Voorwaardelijke styling",
+    "conditionThreshold": "Waarde",
+    "conditionAddRule": "+ Regel toevoegen"
   },
   "panel": {
     "header": "Paneel",

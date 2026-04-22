@@ -1585,7 +1585,18 @@
     "sectionStyling": "Şekillendirme",
     "textColor": "Metin",
     "bgColor": "Arkaplan",
-    "colorNone": "hiçbiri"
+    "colorNone": "hiçbiri",
+    "sectionCellType": "Hücre Tipi",
+    "cellTypeText": "Metin",
+    "cellTypeProgressBar": "İlerleme Çubuğu",
+    "cellTypeSparkline": "Sparkline",
+    "sectionProgressBar": "İlerleme çubuğu yapılandırması",
+    "progressMin": "Min",
+    "progressMax": "maksimum",
+    "progressColor": "Çubuk Rengi",
+    "sectionConditionalStyling": "Koşullu Stil",
+    "conditionThreshold": "Değer",
+    "conditionAddRule": "+ Kural ekle"
   },
   "panel": {
     "header": "Panel",

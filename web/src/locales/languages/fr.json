@@ -1587,7 +1587,18 @@
     "sectionStyling": "Coiffage",
     "textColor": "Texte",
     "bgColor": "Contexte",
-    "colorNone": "aucune"
+    "colorNone": "aucune",
+    "sectionCellType": "Type de cellule",
+    "cellTypeText": "Texte",
+    "cellTypeProgressBar": "Barre de progression",
+    "cellTypeSparkline": "Sparkline",
+    "sectionProgressBar": "Configuration de la barre de progression",
+    "progressMin": "Minimum",
+    "progressMax": "Max",
+    "progressColor": "Couleur de la barre",
+    "sectionConditionalStyling": "Style conditionnel",
+    "conditionThreshold": "Valeur",
+    "conditionAddRule": "+ Ajouter une règle"
   },
   "panel": {
     "header": "Panneau",

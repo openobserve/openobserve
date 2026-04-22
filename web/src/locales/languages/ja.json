@@ -1604,7 +1604,18 @@
     "sectionStyling": "スタイリング",
     "textColor": "[テキスト]",
     "bgColor": "バックグラウンド",
-    "colorNone": "無し"
+    "colorNone": "無し",
+    "sectionCellType": "セルタイプ",
+    "cellTypeText": "[テキスト]",
+    "cellTypeProgressBar": "プログレスバー",
+    "cellTypeSparkline": "スパークライン",
+    "sectionProgressBar": "プログレスバー設定",
+    "progressMin": "最小",
+    "progressMax": "マックス",
+    "progressColor": "バーカラー",
+    "sectionConditionalStyling": "条件付きスタイリング",
+    "conditionThreshold": "価値",
+    "conditionAddRule": "+ ルールを追加"
   },
   "panel": {
     "header": "パネル",
