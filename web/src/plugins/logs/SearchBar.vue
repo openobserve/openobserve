@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="button-group logs-visualize-toggle element-box-shadow">
           <div class="row">
             <div>
-              <q-btn
+              <o-button
                 data-test="logs-logs-toggle"
                 :class="
                   searchObj.meta.logsVisualizeToggle === 'logs'
@@ -33,43 +33,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : ''
                 "
                 @click="onLogsVisualizeToggleUpdate('logs')"
-                no-caps
-                size="sm"
-                icon="search"
-                class="button button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm btn-height-32"
+                size="icon"
+                variant="ghost"
+                class="button button-left tw:rounded-r-none!"
               >
+                <q-icon name="search" size="16px" />
                 <q-tooltip>
                   {{ t("common.search") }}
                 </q-tooltip>
-              </q-btn>
+              </o-button>
             </div>
             <div>
-              <q-btn
+              <o-button
                 data-test="logs-visualize-toggle"
                 :class="[
                   searchObj.meta.logsVisualizeToggle === 'visualize'
                     ? 'selected'
                     : '',
                   'button button-center tw:rounded-none',
-                  'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32',
                 ]"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
-                :disable="isVisualizeDisabled"
-                no-caps
-                size="sm"
-                :icon="outlinedShowChart"
+                :disabled="isVisualizeDisabled"
+                size="icon"
+                variant="ghost"
               >
+                <q-icon :name="outlinedShowChart" size="16px" />
                 <q-tooltip v-if="isVisualizeDisabled">
                   {{ t("search.enableSqlModeOrSelectSingleStream") }}
                 </q-tooltip>
                 <q-tooltip v-else>
                   {{ t("search.visualize") }}
                 </q-tooltip>
-              </q-btn>
+              </o-button>
             </div>
             <div>
               <!-- DEBUG: Build button should render here -->
-              <q-btn
+              <o-button
                 data-test="logs-build-toggle"
                 :class="[
                   searchObj.meta.logsVisualizeToggle === 'build'
@@ -78,36 +77,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   config.isEnterprise == 'true'
                     ? 'button button-center tw:rounded-none'
                     : 'button button-right tw:rounded-l-none!',
-                  'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32',
                 ]"
                 @click="onLogsVisualizeToggleUpdate('build')"
-                no-caps
-                size="sm"
-                icon="construction"
+                size="icon"
+                variant="ghost"
               >
+                <q-icon name="construction" size="16px" />
                 <q-tooltip>
                   {{ t("search.buildQuery") }}
                 </q-tooltip>
-              </q-btn>
+              </o-button>
             </div>
             <div v-if="config.isEnterprise == 'true'">
-              <q-btn
+              <o-button
                 data-test="logs-patterns-toggle"
-                :class="
+                :class="[
                   searchObj.meta.logsVisualizeToggle === 'patterns'
                     ? 'selected'
-                    : ''
-                "
-                class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm btn-height-32"
+                    : '',
+                  'button button-right tw:rounded-l-none!',
+                ]"
                 @click="onLogsVisualizeToggleUpdate('patterns')"
-                no-caps
-                size="sm"
-                icon="pattern"
+                size="icon"
+                variant="ghost"
               >
+                <q-icon name="pattern" size="16px" />
                 <q-tooltip>
                   {{ t("search.showPatternsLabel") }}
                 </q-tooltip>
-              </q-btn>
+              </o-button>
             </div>
           </div>
         </div>
@@ -433,17 +431,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-btn-group>
         <!-- reset filters button - directly on toolbar (hidden when moved to menu) -->
-        <q-btn
+        <o-button
           v-if="!shouldMoveSavedViewToMenu"
           data-test="logs-search-bar-reset-filters-btn"
-          class="group-menu-btn element-box-shadow q-ml-xs"
-          no-caps
-          flat
-          icon="restart_alt"
+          class="group-menu-btn element-box-shadow tw:ms-1"
+          size="icon"
+          variant="ghost"
           @click="resetFilters"
         >
+          <q-icon name="restart_alt" size="16px" />
           <q-tooltip>{{ t("search.resetFilters") }}</q-tooltip>
-        </q-btn>
+        </o-button>
         <!-- this is the button group responsible for showing all the utilities -->
         <q-btn
           data-test="logs-search-bar-utilities-menu-btn"
@@ -2375,6 +2373,7 @@ import { useQuasar, copyToClipboard, is, QTooltip } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
+import OButton from "@/lib/core/Button/Button.vue";
 import useLogs from "@/composables/useLogs";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -2518,6 +2517,7 @@ export default defineComponent({
   components: {
     DateTime,
     ShareButton,
+    OButton,
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
