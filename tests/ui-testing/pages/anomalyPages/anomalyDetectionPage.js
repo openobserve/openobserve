@@ -158,11 +158,29 @@ class AnomalyDetectionPage {
      * @param {string} tabName - Tab name
      */
     async clickTab(tabName) {
-        const tab = this.page.getByText(tabName, { exact: true }).first();
-        if (await tab.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await tab.click();
-            await this.page.waitForTimeout(500);
-            testLogger.info('Clicked tab', { tabName });
+        // Try multiple selectors for tabs
+        const tabSelectors = [
+            `[class*="tw:cursor-pointer"]:has-text("${tabName}")`,
+            `text=${tabName}`,
+            `.q-tab:has-text("${tabName}")`,
+            `button:has-text("${tabName}")`,
+            `div[role="tab"]:has-text("${tabName}")`
+        ];
+
+        let tabFound = false;
+        for (const selector of tabSelectors) {
+            const tab = this.page.locator(selector).first();
+            if (await tab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await tab.click();
+                await this.page.waitForTimeout(1000); // Wait for tab content to load
+                testLogger.info('Clicked tab', { tabName, selector });
+                tabFound = true;
+                break;
+            }
+        }
+
+        if (!tabFound) {
+            console.log(`📝 Warning: Tab "${tabName}" not found with any selector`);
         }
     }
 
@@ -180,18 +198,21 @@ class AnomalyDetectionPage {
      * @param {string} mode - Query mode (builder, sql)
      */
     async selectQueryMode(mode) {
-        const modeTab = this.page.getByRole('tab', { name: mode === 'sql' ? 'SQL Mode' : 'Builder Mode' }).first();
-        if (await modeTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await modeTab.click();
-        } else {
-            // Try alternative selector
-            const altTab = this.page.locator(`.q-tab:has-text("${mode === 'sql' ? 'SQL' : 'Builder'}")`).first();
-            if (await altTab.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await altTab.click();
-            }
-        }
-        await this.page.waitForTimeout(500);
-        testLogger.info('Selected query mode', { mode });
+        const tabLabel = mode === 'sql' ? 'SQL' : 'Builder';
+
+        // The tabs are buttons within the query-mode-tabs container
+        const tabsContainer = this.page.locator('[data-test="anomaly-query-tabs"]');
+        await expect(tabsContainer).toBeVisible({ timeout: 5000 });
+
+        const modeTab = tabsContainer.locator(`button.query-mode-tab:has-text("${tabLabel}")`).first();
+        await expect(modeTab).toBeVisible({ timeout: 3000 });
+        await modeTab.click();
+
+        // Wait longer for SQL mode because Monaco editor takes time to initialize
+        const waitTime = mode === 'sql' ? 3000 : 1000;
+        await this.page.waitForTimeout(waitTime);
+
+        testLogger.info('Selected query mode', { mode, tabLabel });
     }
 
     /**
@@ -199,11 +220,32 @@ class AnomalyDetectionPage {
      * @param {string} sql - SQL query
      */
     async setSqlQuery(sql) {
-        const sqlInput = this.page.locator(this.selectors.customSql);
-        if (await sqlInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await sqlInput.fill(sql);
-            testLogger.info('Set SQL query');
-        }
+        // Monaco editor takes time to initialize, wait up to 10 seconds
+        const sqlEditorContainer = this.page.locator(this.selectors.customSql);
+        await expect(sqlEditorContainer).toBeVisible({ timeout: 10000 });
+
+        // Monaco editor uses a textarea for input - find it within the editor container
+        const monacoTextarea = sqlEditorContainer.locator('textarea').first();
+        await expect(monacoTextarea).toBeVisible({ timeout: 5000 });
+
+        // Click the editor to focus it
+        await sqlEditorContainer.click();
+        await this.page.waitForTimeout(500);
+
+        // Select all and replace with new SQL using keyboard shortcuts
+        await monacoTextarea.focus();
+        await this.page.waitForTimeout(300);
+
+        // Cmd+A (Mac) or Ctrl+A (Win/Linux) to select all
+        const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+        await this.page.keyboard.press(`${modifier}+KeyA`);
+        await this.page.waitForTimeout(200);
+
+        // Type the new SQL
+        await this.page.keyboard.type(sql, { delay: 10 });
+        await this.page.waitForTimeout(500);
+
+        testLogger.info('Set SQL query', { sqlLength: sql.length });
     }
 
     /**
@@ -260,20 +302,44 @@ class AnomalyDetectionPage {
     async disableAlerting() {
         console.log('📝 Disabling alerting to allow save');
 
-        await this.clickTab('Alerting');
-        await this.page.waitForTimeout(1000); // Wait for tab content to load
+        // Try multiple ways to find and click the Alerting tab
+        const tabSelectors = [
+            '[class*="tw:cursor-pointer"]:has-text("Alerting")',
+            'text=Alerting',
+            '.q-tab:has-text("Alerting")',
+            'button:has-text("Alerting")'
+        ];
 
-        // Try multiple selectors
-        const selectors = [
+        let alertingTab = null;
+        for (const selector of tabSelectors) {
+            const tab = this.page.locator(selector).first();
+            if (await tab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                alertingTab = tab;
+                console.log(`📝 Found Alerting tab using selector: ${selector}`);
+                break;
+            }
+        }
+
+        if (!alertingTab) {
+            console.log('📝 Warning: Alerting tab not found');
+            return;
+        }
+
+        await alertingTab.click();
+        console.log('📝 Clicked Alerting tab');
+        await this.page.waitForTimeout(2000); // Wait longer for tab content to load
+
+        // Try multiple selectors for the toggle
+        const toggleSelectors = [
             this.selectors.alertEnabled,
             '[data-test="anomaly-alert-enabled"]',
             '.q-toggle'
         ];
 
         let toggle = null;
-        for (const selector of selectors) {
+        for (const selector of toggleSelectors) {
             const loc = this.page.locator(selector).first();
-            if (await loc.isVisible({ timeout: 2000 }).catch(() => false)) {
+            if (await loc.isVisible({ timeout: 3000 }).catch(() => false)) {
                 toggle = loc;
                 console.log(`📝 Found alerting toggle using: ${selector}`);
                 break;
@@ -285,22 +351,28 @@ class AnomalyDetectionPage {
             return;
         }
 
-        // Check if it's enabled by checking the class or aria-checked
-        const isChecked = await toggle.evaluate(el => {
-            return el.classList.contains('q-toggle--checked') ||
-                   el.getAttribute('aria-checked') === 'true';
-        }).catch(() => false);
+        // Get toggle label to determine state
+        const toggleLabel = await toggle.locator('div.q-toggle__label').textContent().catch(() => '');
+        console.log(`📝 Alert toggle state | {"toggleLabel":"${toggleLabel}"}`);
 
-        console.log(`📝 Alerting toggle state: ${isChecked ? 'enabled' : 'disabled'}`);
-
-        if (isChecked) {
-            console.log('📝 Clicking toggle to disable alerting');
+        if (toggleLabel.toLowerCase().includes('enabled')) {
+            console.log('📝 Alerting is enabled, clicking to disable');
             await toggle.click();
             await this.page.waitForTimeout(1000);
+
+            // Verify it was disabled
+            const newLabel = await toggle.locator('div.q-toggle__label').textContent().catch(() => '');
+            console.log(`📝 After clicking toggle | {"toggleLabel":"${newLabel}"}`);
             testLogger.info('Disabled alerting');
         } else {
             console.log('📝 Alerting already disabled');
         }
+
+        // Navigate back to Config tab
+        console.log('📝 Navigating back to Config tab');
+        await this.clickTab('Detection Config');
+        await this.page.waitForTimeout(1000);
+        console.log('📝 Clicked Config tab');
     }
 
     /**
@@ -356,13 +428,61 @@ class AnomalyDetectionPage {
      * @param {string} value - Value
      */
     async addFilter(field, operator, value) {
-        // Click add filter button
-        const addFilterBtn = this.page.locator('button:has-text("Add Filter")').first();
-        if (await addFilterBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await addFilterBtn.click();
+        // Click add filter button to create a new empty filter row
+        const addFilterBtn = this.page.locator('button:has-text("Add filter"), button:has-text("Add Filter")').first();
+        await expect(addFilterBtn).toBeVisible({ timeout: 5000 });
+        await addFilterBtn.click();
+        await this.page.waitForTimeout(1000);
+
+        // Get the last filter row (the newly added one)
+        // Filter rows are flex containers with field, operator, value, and close button
+        const filterRows = this.page.locator('.tw\\:flex.tw\\:items-center.tw\\:gap-2.tw\\:mb-2');
+        const filterCount = await filterRows.count();
+        const lastFilterRow = filterRows.nth(filterCount - 1);
+
+        // 1. Fill the field select (first q-select in the row)
+        const fieldSelect = lastFilterRow.locator('.filter-field-select, .alert-v3-select').first();
+        await expect(fieldSelect).toBeVisible({ timeout: 3000 });
+        await fieldSelect.click();
+        await this.page.waitForTimeout(500);
+
+        // Type to search for the field
+        await this.page.keyboard.type(field, { delay: 50 });
+        await this.page.waitForTimeout(1000);
+
+        // Click the option that matches
+        const fieldOption = this.page.getByRole('option', { name: field }).first();
+        if (await fieldOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await fieldOption.click();
+        } else {
+            // Fallback: try clicking by text
+            await this.page.locator(`.q-item:has-text("${field}")`).first().click().catch(() => {});
+        }
+        await this.page.waitForTimeout(500);
+
+        // 2. Fill the operator select (second q-select in the row)
+        const operatorSelect = lastFilterRow.locator('.alert-v3-select').nth(1);
+        if (await operatorSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await operatorSelect.click();
+            await this.page.waitForTimeout(500);
+
+            const operatorOption = this.page.getByRole('option', { name: operator }).first();
+            if (await operatorOption.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await operatorOption.click();
+            } else {
+                await this.page.locator(`.q-item:has-text("${operator}")`).first().click().catch(() => {});
+            }
             await this.page.waitForTimeout(500);
         }
-        // Fill filter values - this is simplified, may need adjustment based on actual UI
+
+        // 3. Fill the value input (q-input in the row)
+        const valueInput = lastFilterRow.locator('.alert-v3-input input, input.q-field__native').first();
+        if (await valueInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await valueInput.click();
+            await valueInput.fill(value);
+            await this.page.waitForTimeout(300);
+        }
+
         testLogger.info('Added filter', { field, operator, value });
     }
 
@@ -731,9 +851,13 @@ class AnomalyDetectionPage {
         testLogger.info('Creating anomaly detection config', config);
 
         await this.clickAddAnomaly();
-        await this.fillAnomalyName(name);
+        // Fill fields in correct order (matching fillBasicSetup pattern):
+        // 1. Stream type first (triggers UI loading for stream names)
         await this.selectStreamType(streamType);
+        // 2. Stream name second
         await this.selectStreamName(streamName);
+        // 3. Anomaly name last (after stream selection)
+        await this.fillAnomalyName(name);
 
         // Configure detection (using test-optimized defaults)
         // Use short intervals for faster test execution (1-2 minute detection cycles)
@@ -742,12 +866,16 @@ class AnomalyDetectionPage {
         await this.setScheduleInterval(1, 'minutes');   // Run detection every 1 minute (faster tests)
         await this.setDetectionWindow(1, 'hours');      // Look back 1 hour for anomalies
 
-        // Load sensitivity and configure threshold
-        await this.loadAndConfigureSensitivity();
+        // Note: Skip sensitivity loading as it's optional and not required for anomaly creation
+        // The sensitivity preview can be loaded separately if needed
+        // await this.loadAndConfigureSensitivity();
 
-        // Enable alerting
+        // Enable alerting if destination provided, otherwise disable alerting
         if (destinationName) {
             await this.enableAlerting(destinationName);
+        } else {
+            // Disable alerting to enable save button (alerting is enabled by default)
+            await this.disableAlerting();
         }
 
         await this.saveAnomalyConfig();
@@ -814,14 +942,40 @@ class AnomalyDetectionPage {
         const pauseBtn = this.page.locator(`[data-test="alert-list-${name}-pause-start-alert"]`);
         await expect(pauseBtn).toBeVisible({ timeout: 10000 });
 
-        // Check if it's currently running (has text-negative class)
+        // Check if it's currently running (has text-negative class = red = running)
         const classList = await pauseBtn.getAttribute('class');
+        testLogger.info('Pause button class', { classList });
+
         if (classList && classList.includes('text-negative')) {
+            // Wait for the API response after clicking - API uses /enable endpoint
+            const responsePromise = this.page.waitForResponse(
+                response => response.url().includes('/enable') && response.status() === 200,
+                { timeout: 10000 }
+            ).catch((e) => {
+                testLogger.info('Failed to wait for enable response', { error: e.message });
+                return null;
+            });
+
             await pauseBtn.click();
+            const response = await responsePromise;
+            if (response) {
+                testLogger.info('Pause API response received', { url: response.url(), status: response.status() });
+            }
+
+            // Wait for UI to update
+            await this.page.waitForTimeout(2000);
+
+            // Navigate away and back to refresh the list data
+            await this.page.reload({ waitUntil: 'networkidle' });
             await this.page.waitForTimeout(1000);
+
+            // Navigate back to anomaly tab after reload
+            await this.navigateToAnomalyTab();
+            await this.page.waitForTimeout(1000);
+
             testLogger.info('Paused anomaly detection', { name });
         } else {
-            testLogger.info('Anomaly already paused', { name });
+            testLogger.info('Anomaly already paused or button class unexpected', { classList });
         }
     }
 
@@ -836,8 +990,29 @@ class AnomalyDetectionPage {
         // Check if it's currently paused (has text-positive class)
         const classList = await resumeBtn.getAttribute('class');
         if (classList && classList.includes('text-positive')) {
+            // Wait for the API response after clicking
+            const responsePromise = this.page.waitForResponse(
+                response => response.url().includes('/toggle_state') && response.status() === 200,
+                { timeout: 10000 }
+            ).catch(() => null);
+
             await resumeBtn.click();
+            await responsePromise;
+
+            // Wait for UI to update and refresh the list by navigating away and back
             await this.page.waitForTimeout(1000);
+
+            // Click on a different tab and back to refresh the list
+            const alertsTab = this.page.locator('[data-test="menu-link-\\/alerts-item"]').first();
+            if (await alertsTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await alertsTab.click();
+                await this.page.waitForTimeout(500);
+            }
+
+            // Navigate back to anomaly tab
+            await this.navigateToAnomalyTab();
+            await this.page.waitForTimeout(1000);
+
             testLogger.info('Resumed anomaly detection', { name });
         } else {
             testLogger.info('Anomaly already running', { name });
