@@ -14,13 +14,18 @@
       <div class="tw:flex tw:items-center tw:space-x-4">
         <div class="tw:text-xs tw:font-bold tw:text-[var(--o2-text-secondary)]">
           <template v-if="isTruncated">
-            <span class="tw:text-orange-500">{{ totalSpans }}</span><span class="tw:text-[var(--o2-text-primary)]">/{{ totalSpanCount }}</span>
+            <span class="tw:text-orange-500">{{ totalSpans }}</span
+            ><span class="tw:text-[var(--o2-text-primary)]"
+              >/{{ totalSpanCount }}</span
+            >
           </template>
-          <span v-else class="tw:text-[var(--o2-text-primary)]">{{ totalSpans }}</span>
+          <span v-else class="tw:text-[var(--o2-text-primary)]">{{
+            totalSpans
+          }}</span>
           spans
           <span class="tw:mx-2">•</span>
           <span class="tw:text-[var(--o2-text-primary)]">{{ maxDepth }}</span>
-          max depth
+          depth
         </div>
       </div>
     </div>

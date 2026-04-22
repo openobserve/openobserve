@@ -143,6 +143,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     formatLargeNumber(effectiveSpanList.length)
                   }}</template>
                   {{ t("traces.spansLabel") }}
+                  <q-tooltip
+                    >{{ effectiveSpanList.length }}
+                    {{ t("traces.spansLabel") }}</q-tooltip
+                  >
                 </span>
                 <q-tooltip
                   v-if="searchObj.data.traceDetails.spansTruncated"
@@ -170,6 +174,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span
                   >{{ formatLargeNumber(errorSpansCount) }}
                   {{ t("traces.errorsLabel") }}</span
+                >
+                <q-tooltip
+                  >{{ errorSpansCount }}
+                  {{ t("traces.errorsLabel") }}</q-tooltip
                 >
               </div>
             </div>
