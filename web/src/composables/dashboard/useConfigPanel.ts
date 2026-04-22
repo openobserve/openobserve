@@ -83,7 +83,7 @@ export function useConfigPanel(
   showColorPalette: ComputedRef<boolean>,
   isPivotMode: ComputedRef<boolean>,
 ) {
-  const { t } = useI18n();
+  const { t, tm } = useI18n();
 
   // ── Config options ────────────────────────────────────────────────────────
 
@@ -354,10 +354,7 @@ export function useConfigPanel(
       "field-overrides": {
         label: [
           t("dashboard.configSectionFieldOverrides"),
-          "field overrides",
-          "override config",
-          "override",
-          "column formatting",
+          ...(tm("dashboard.configSectionFieldOverridesAliases") as string[]),
         ],
       },
     },

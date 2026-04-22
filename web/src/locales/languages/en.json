@@ -1513,6 +1513,7 @@
     "cellTypeText": "Text",
     "cellTypeProgressBar": "Progress Bar",
     "cellTypeSparkline": "Sparkline",
+    "configSectionFieldOverridesAliases": ["Field Overrides", "Override Config", "Override", "Column Formatting"],
     "sparklineStyle": "Style",
     "sparklineStyleLine": "Line",
     "sparklineStyleBar": "Bar",

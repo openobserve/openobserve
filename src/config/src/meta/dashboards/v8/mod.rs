@@ -810,7 +810,7 @@ pub struct Field {
     value: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Config {
     #[serde(rename = "unit")]
@@ -863,7 +863,7 @@ pub struct CellTypeValue {
     pub sparkline_style: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema, Default)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct ConditionalRule {
@@ -873,6 +873,17 @@ pub struct ConditionalRule {
     pub text_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bg_color: Option<String>,
+}
+
+// f64 does not implement Hash in Rust's std, so we implement it manually
+// using threshold.to_bits() which gives a stable u64 for any finite value.
+impl std::hash::Hash for ConditionalRule {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.operator.hash(state);
+        self.threshold.to_bits().hash(state);
+        self.text_color.hash(state);
+        self.bg_color.hash(state);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]

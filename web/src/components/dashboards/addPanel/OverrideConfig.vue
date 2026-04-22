@@ -70,14 +70,19 @@ export default defineComponent({
         // This ensures we get exactly what's shown in the table
         const columnNames = new Set<string>();
 
-        // Try to get columns from the actual rendered panelData first
-        // Use a Map so we can carry the isNumeric flag (right-aligned = numeric in table converters)
+        // Try to get columns from the actual rendered panelData first.
+        // Use name-based heuristic for numeric detection: "value" and "value_*"
+        // columns are always numeric in PromQL. Do NOT use col.align — alignment
+        // can be overridden by the user's column formatting config, so a string
+        // column set to right-align would be wrongly treated as numeric.
         const numericColumns = new Set<string>();
         if (props.panelData?.options?.columns) {
           props.panelData.options.columns.forEach((col: any) => {
             if (col.name) {
               columnNames.add(col.name);
-              if (col.align === "right") numericColumns.add(col.name);
+              if (col.name === "value" || col.name?.startsWith("value_")) {
+                numericColumns.add(col.name);
+              }
             }
           });
         } else {
