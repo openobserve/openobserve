@@ -750,6 +750,21 @@ pub struct Http {
         help = "Custom access log format, leave empty to use default format, shortcut: common, json"
     )]
     pub access_log_format: String,
+    #[env_config(
+        name = "ZO_HTTP_REAL_IP_SOURCE",
+        default = "XEnvoyExternalAddress,XRealIp",
+        help = "Comma-separated list of sources to resolve the real client IP; tried in \
+                order, first match wins. TCP peer (ConnectInfo) is always used as the final \
+                fallback. Supported entries: XEnvoyExternalAddress (Envoy/Istio), \
+                XRealIp (nginx, Traefik), RightmostXForwardedFor (nginx/HAProxy/AWS ALB/GCP LB), \
+                RightmostForwarded (RFC 7239), CfConnectingIp (Cloudflare), \
+                TrueClientIp (Akamai/Cloudflare Enterprise), FlyClientIp (Fly.io), \
+                CloudFrontViewerAddress (AWS CloudFront), ConnectInfo (TCP peer). Default \
+                covers the common k8s ingresses. Only list sources whose proxy is actually \
+                in front of this server; clients can spoof any header the server trusts \
+                without an upstream to terminate it."
+    )]
+    pub real_ip_source: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -1424,6 +1439,12 @@ pub struct Common {
         help = "Enable cross-linking feature for drill-down links on log/trace records"
     )]
     pub enable_cross_linking: bool,
+    #[env_config(
+        name = "ZO_AUTO_QUERY_ENABLED",
+        default = false,
+        help = "Enable Live Mode feature in the UI. When true, users can toggle auto-query on filter/time-range changes. When false, the Live Mode toggle is hidden and Run Query button is always shown."
+    )]
+    pub auto_query_enabled: bool,
 }
 
 impl Common {

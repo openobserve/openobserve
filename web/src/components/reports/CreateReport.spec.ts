@@ -82,6 +82,10 @@ vi.mock("@/utils/date", () => ({
   })),
 }));
 
+vi.mock("@/utils/commons", () => ({
+  getFoldersListByType: vi.fn(() => Promise.resolve()),
+}));
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const platform = { is: { desktop: true, mobile: false }, has: { touch: false } };

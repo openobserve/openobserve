@@ -126,6 +126,10 @@ export default defineComponent({
     },
   },
   watch: {
+    content(newVal: string) {
+      this.displayData = newVal;
+      this.refreshData();
+    },
     computedData() {
       this.refreshData();
     },

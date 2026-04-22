@@ -382,7 +382,12 @@
     "patternNavNext": "[次へ]",
     "patternWildcardSampleValues": "サンプル値",
     "wildcardSampleValues": "サンプル値",
-    "patternZScore": "Z スコア:{スコア} (平均周波数:{平均周波数})"
+    "patternZScore": "Z スコア:{スコア} (平均周波数:{平均周波数})",
+    "liveMode": "ライブ",
+    "liveModeTooltip": "フィルター/時間の変更時にクエリを自動実行",
+    "turnOnLiveMode": "ライブモードを有効にする",
+    "turnOffLiveMode": "ライブモードをオフにする",
+    "autoRunEnabled": "自動実行有効"
   },
   "menu": {
     "home": "ホーム",
