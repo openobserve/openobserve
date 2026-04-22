@@ -272,10 +272,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:ml-0.5 tw:shrink-0"
                     @click.stop
                   >
-                    <q-menu :offset="[0, 4]" style="min-width: 160px; max-width: 300px" @click.stop>
-                      <q-list dense separator>
+                    <q-menu
+                      :offset="[0, 4]"
+                      style="min-width: 200px; max-width: 300px"
+                      @click.stop
+                      @before-show="colFilterSearch[header.column.id] = ''"
+                    >
+                      <!-- Search box — always visible at top -->
+                      <div style="padding: 6px 8px; border-bottom: 1px solid rgba(128,128,128,0.2)">
+                        <q-input
+                          v-model="colFilterSearch[header.column.id]"
+                          dense
+                          borderless
+                          hide-bottom-space
+                          clearable
+                          placeholder="Search..."
+                          @click.stop
+                          @keydown.stop
+                        >
+                          <template #prepend>
+                            <q-icon name="search" size="xs" color="grey-5" />
+                          </template>
+                        </q-input>
+                      </div>
+
+                      <!-- Scrollable checkbox list -->
+                      <q-list dense separator style="max-height: 240px; overflow-y: auto">
                         <q-item
-                          v-for="rawVal in getUniqueValuesForColumn(header.column.id)"
+                          v-for="rawVal in getFilteredUniqueValues(header.column.id)"
                           :key="String(rawVal)"
                           dense
                           clickable
@@ -293,11 +317,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ getFilterDisplayValue(header.column.id, rawVal) }}
                           </q-item-section>
                         </q-item>
-                        <q-separator v-if="getUniqueValuesForColumn(header.column.id).length" />
+                        <q-item v-if="getFilteredUniqueValues(header.column.id).length === 0" dense>
+                          <q-item-section class="tw:text-xs text-grey-5">No matches</q-item-section>
+                        </q-item>
+                      </q-list>
+
+                      <!-- Clear filter — always visible at bottom -->
+                      <div style="border-top: 1px solid rgba(128,128,128,0.2)">
                         <q-item dense clickable @click.stop="clearColFilter(header.column.id)">
                           <q-item-section class="tw:text-xs text-grey-6">{{ t('common.clearFilter') }}</q-item-section>
                         </q-item>
-                      </q-list>
+                      </div>
                     </q-menu>
                   </q-btn>
                 </template>
@@ -1093,6 +1123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import {
   ref,
+  reactive,
   shallowRef,
   computed,
   watch,
@@ -1319,6 +1350,7 @@ const sorting = ref<SortingState>([]);
 
 // ── Column filtering ──────────────────────────────────────────────────────────
 const columnFiltersState = ref<ColumnFiltersState>([]);
+const colFilterSearch = reactive<Record<string, string>>({});
 
 const setColumnFilters = (updater: Updater<ColumnFiltersState>) => {
   columnFiltersState.value =
@@ -1346,6 +1378,16 @@ const getUniqueValuesForColumn = (colId: string): any[] => {
   });
   cache.set(colId, vals);
   return vals;
+};
+
+/** Return unique values filtered by the per-column search string. */
+const getFilteredUniqueValues = (colId: string): any[] => {
+  const all = getUniqueValuesForColumn(colId);
+  const q = (colFilterSearch[colId] ?? "").trim().toLowerCase();
+  if (!q) return all;
+  return all.filter((v) =>
+    getFilterDisplayValue(colId, v).toLowerCase().includes(q),
+  );
 };
 
 /** Return the formatted display label for a raw cell value in the filter dropdown. */
