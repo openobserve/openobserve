@@ -290,6 +290,9 @@ pub struct ListReportsParams {
     /// When set to `true` the list will only include reports that have destinations. When set to
     /// `false` the list will only include reports that do not have destinations.
     pub has_destinations: Option<bool>,
+
+    /// When set, only reports whose names contain this substring (case-insensitive) are returned.
+    pub name_substring: Option<String>,
 }
 
 impl ListReportsParams {
@@ -301,6 +304,7 @@ impl ListReportsParams {
             dashboard_snowflake_id: None,
             page_size_and_idx: None,
             has_destinations: None,
+            name_substring: None,
         }
     }
 
@@ -327,6 +331,12 @@ impl ListReportsParams {
         self.page_size_and_idx = Some((page_size, page_idx));
         self
     }
+
+    /// Filter reports by name substring (case-insensitive).
+    pub fn with_name_substring(mut self, name_substring: &str) -> Self {
+        self.name_substring = Some(name_substring.to_string());
+        self
+    }
 }
 
 /// An item in a list of reports which only includes a subset of all the report fields.
@@ -345,6 +355,7 @@ pub struct ReportListFilters {
     pub dashboard: Option<String>,
     pub folder: Option<String>,
     pub destination_less: Option<bool>,
+    pub name_substring: Option<String>,
 }
 
 impl ReportListFilters {
@@ -355,6 +366,7 @@ impl ReportListFilters {
             dashboard_snowflake_id: self.dashboard,
             has_destinations: self.destination_less.map(|v| !v),
             page_size_and_idx: None,
+            name_substring: self.name_substring,
         }
     }
 }
@@ -679,6 +691,7 @@ mod tests {
             dashboard: Some("dashboard_123".to_string()),
             folder: Some("folder_456".to_string()),
             destination_less: Some(true),
+            name_substring: None,
         };
 
         let params = filters.into_params("test_org");

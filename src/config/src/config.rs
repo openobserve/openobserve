@@ -750,6 +750,21 @@ pub struct Http {
         help = "Custom access log format, leave empty to use default format, shortcut: common, json"
     )]
     pub access_log_format: String,
+    #[env_config(
+        name = "ZO_HTTP_REAL_IP_SOURCE",
+        default = "XEnvoyExternalAddress,XRealIp",
+        help = "Comma-separated list of sources to resolve the real client IP; tried in \
+                order, first match wins. TCP peer (ConnectInfo) is always used as the final \
+                fallback. Supported entries: XEnvoyExternalAddress (Envoy/Istio), \
+                XRealIp (nginx, Traefik), RightmostXForwardedFor (nginx/HAProxy/AWS ALB/GCP LB), \
+                RightmostForwarded (RFC 7239), CfConnectingIp (Cloudflare), \
+                TrueClientIp (Akamai/Cloudflare Enterprise), FlyClientIp (Fly.io), \
+                CloudFrontViewerAddress (AWS CloudFront), ConnectInfo (TCP peer). Default \
+                covers the common k8s ingresses. Only list sources whose proxy is actually \
+                in front of this server; clients can spoof any header the server trusts \
+                without an upstream to terminate it."
+    )]
+    pub real_ip_source: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
