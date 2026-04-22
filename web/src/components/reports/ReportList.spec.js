@@ -165,6 +165,7 @@ describe("ReportList Component", () => {
     store.state.selectedOrganization = { identifier: "test-org", name: "Test Org" };
     store.state.userInfo = { email: "test@example.com" };
     store.state.theme = 'light';
+    store.state.organizationData.allReportsListByFolderId = {};
 
     // Setup router mock
     mockRouter = {
@@ -261,6 +262,9 @@ describe("ReportList Component", () => {
       vi.mocked(reports.listByFolderId).mockReturnValueOnce(
         new Promise((resolve) => { resolveList = resolve; })
       );
+
+      // Clear cache so this mount actually calls the API (not served from beforeEach cache)
+      store.state.organizationData.allReportsListByFolderId = {};
 
       const newWrapper = mount(ReportList, {
         global: {
