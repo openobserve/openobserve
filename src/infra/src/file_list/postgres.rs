@@ -1764,6 +1764,32 @@ GROUP BY stream;
             .observe(time);
         Ok(ret.map(|r| r.into()).unwrap_or_default())
     }
+
+    async fn file_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
+        let sql = format!(
+            r#"SELECT 
+SUM(original_size)::BIGINT AS storage_size,
+SUM(index_size)::BIGINT AS index_size
+FROM file_list
+WHERE org_id = $1 AND account = $2
+GROUP BY stream;"#
+        );
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["stats_by_org_account", "file_list"])
+            .inc();
+        let start = std::time::Instant::now();
+        let ret: Option<(i64, i64)> = sqlx::query_as(&sql)
+            .bind(org_id)
+            .bind(account)
+            .fetch_optional(&pool)
+            .await?;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["stats_by_org_account", "file_list"])
+            .observe(time);
+        Ok(ret.unwrap_or_default())
+    }
 }
 
 impl PostgresFileList {

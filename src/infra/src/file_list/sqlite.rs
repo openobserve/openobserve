@@ -1414,6 +1414,23 @@ GROUP BY stream;
             .await?;
         Ok(ret.map(|r| r.into()).unwrap_or_default())
     }
+
+    async fn file_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
+        let sql = format!(
+            r#"SELECT 
+SUM(original_size) AS original_size,
+SUM(index_size) AS index_size
+FROM file_list
+WHERE org_id = $1 AND account = $2;"#
+        );
+        let pool = CLIENT_RO.clone();
+        let ret: Option<(i64, i64)> = sqlx::query_as(&sql)
+            .bind(org_id)
+            .bind(account)
+            .fetch_optional(&pool)
+            .await?;
+        Ok(ret.unwrap_or_default())
+    }
 }
 
 impl SqliteFileList {
