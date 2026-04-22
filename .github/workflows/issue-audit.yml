@@ -189,21 +189,29 @@ jobs:
 
               // 2. Check for test with @bug-{issue#} tag
               const { execSync } = require('child_process');
+              const fs = require('fs');
               let hasTest = false;
               let testFile = null;
 
               try {
-                const searchResult = execSync(
-                  `grep -r "@bug-${issue.number}" tests/ui-testing/playwright-tests/ --include="*.spec.js" -l || true`,
-                  { encoding: 'utf-8' }
-                ).trim();
-
-                if (searchResult) {
-                  hasTest = true;
-                  testFile = searchResult.split('\n')[0];  // Take first match
-                  console.log(`  ✓ Found test: ${testFile}`);
+                const testDir = 'tests/ui-testing/playwright-tests/';
+                if (!fs.existsSync(testDir)) {
+                  console.log(`  ⚠️  Test directory not found: ${testDir}`);
                 } else {
-                  console.log(`  ✗ No test found with @bug-${issue.number}`);
+                  // Use spawn-style args to avoid shell injection
+                  const tag = `@bug-${String(issue.number)}`;
+                  const searchResult = execSync(
+                    `grep -r "${tag}" "${testDir}" --include="*.spec.js" -l 2>/dev/null || true`,
+                    { encoding: 'utf-8', shell: '/bin/sh' }
+                  ).trim();
+
+                  if (searchResult) {
+                    hasTest = true;
+                    testFile = searchResult.split('\n')[0];
+                    console.log(`  ✓ Found test: ${testFile}`);
+                  } else {
+                    console.log(`  ✗ No test found with ${tag}`);
+                  }
                 }
               } catch (error) {
                 console.log(`  ⚠️  Error checking tests: ${error.message}`);
@@ -489,7 +497,9 @@ jobs:
 
               const alreadyCommented = comments.some(c =>
                 c.body.includes('Issue Audit Workflow') &&
-                (c.body.includes('needs test coverage') || c.body.includes('Auto-Closed'))
+                (c.body.includes('Missing Test Coverage') ||
+                 c.body.includes('Review Needed') ||
+                 c.body.includes('Ready to Close'))
               );
 
               if (alreadyCommented) {
@@ -705,7 +715,7 @@ jobs:
 
                 report += `### #${item.issue.number}: ${item.issue.title}\n`;
                 report += `- **Fix**: PR #${item.fixPR.number} (merged ${item.fixPR.merged_at})\n`;
-                report += `- **Decision**: ${needsAutomation ? '🔴 Needs Automation' : '🟢 Doc-Only (Auto-Close)'}\n`;
+                report += `- **Decision**: ${needsAutomation ? '🔴 Needs Automation' : '🟢 Doc-Only (Review Needed)'}\n`;
 
                 if (analysis) {
                   report += `- **Files Changed**: ${analysis.totalFiles} (${analysis.codeFiles.length} code, ${analysis.docFiles.length} doc, ${analysis.otherFiles.length} other)\n`;
@@ -736,7 +746,7 @@ jobs:
 
               report += `\n**Breakdown**:\n`;
               report += `- 🔴 Needs Automation: ${needsAutomationCount}\n`;
-              report += `- 🟢 Doc-Only (Auto-Close): ${docOnlyCount}\n\n`;
+              report += `- 🟢 Doc-Only (Review Needed): ${docOnlyCount}\n\n`;
             }
 
             if (results.needs_fix.length > 0) {
