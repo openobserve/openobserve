@@ -1277,6 +1277,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     !searchObj.data.stream.selectedStream.length)
                 "
               >
+                <q-tooltip
+                  v-if="
+                    searchObj.meta.liveMode &&
+                    store.state.zoConfig.auto_query_enabled &&
+                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                  "
+                >{{ t("search.autoRunEnabled") }}</q-tooltip>
                 <q-icon
                   v-if="
                     searchObj.meta.liveMode &&
@@ -5842,7 +5849,7 @@ export default defineComponent({
   font-weight: 500 !important;
   line-height: 16px !important;
   padding: 0px 0px !important;
-  width: 74px !important;
+  width: 94px !important;
   transition:
     box-shadow 0.3s ease,
     opacity 0.2s ease;
