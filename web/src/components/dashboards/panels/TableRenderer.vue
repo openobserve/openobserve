@@ -134,6 +134,19 @@ export default defineComponent({
     // Component-level cache: colKey → (value → hex). Avoids mutating prop-derived col objects.
     const autoColorCache = new Map<string, Map<string, string>>();
 
+    const evalCondition = (val: number, op: string, threshold: number): boolean => {
+      switch (op) {
+        case "<":  return val < threshold;
+        case ">":  return val > threshold;
+        case "<=": return val <= threshold;
+        case ">=": return val >= threshold;
+        case "=":
+        case "==": return val === threshold;
+        case "!=": return val !== threshold;
+        default:   return false;
+      }
+    };
+
     const cellStyleFn = computed(() => (cell: any): string => {
       const col = (cell.column.columnDef.meta as any)?._col;
       const value = cell.getValue();
@@ -158,7 +171,23 @@ export default defineComponent({
         return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
       }
 
-      // 3) Column-level text / background color override.
+      // 3) Conditional styling rules — first matching rule wins.
+      const conditionalRules = col?.conditionalRules as any[] | undefined;
+      if (conditionalRules?.length) {
+        const numVal = parseFloat(String(value));
+        if (!isNaN(numVal)) {
+          for (const rule of conditionalRules) {
+            if (evalCondition(numVal, rule.operator, rule.threshold)) {
+              const parts: string[] = [];
+              if (rule.bgColor) parts.push(`background-color: ${rule.bgColor}`);
+              if (rule.textColor) parts.push(`color: ${rule.textColor}`);
+              if (parts.length) return parts.join("; ");
+            }
+          }
+        }
+      }
+
+      // 4) Column-level text / background color override.
       const colDef = (cell.column.columnDef.meta as any)?._col;
       if (colDef?.bgColor || colDef?.textColor) {
         const parts: string[] = [];

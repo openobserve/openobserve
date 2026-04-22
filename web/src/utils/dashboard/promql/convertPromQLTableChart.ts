@@ -98,10 +98,22 @@ export class TableConverter implements PromQLChartConverter {
     const config = panelSchema.config || {};
     const tableMode = config.promql_table_mode || "single";
 
-    // Build override maps (color/unit/style) to mimic SQL table behavior
-    const { colorConfigMap, unitConfigMap, styleConfigMap } = parseOverrideConfigs(
+    // Build override maps (color/unit/style/cellType/conditionalRules) to mimic SQL table behavior
+    const { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap } = parseOverrideConfigs(
       panelSchema.config?.override_config,
     );
+
+    const colOverrides = (keyLower: string) => {
+      const cellTypeCfg = cellTypeConfigMap?.[keyLower];
+      const condRules = conditionalRulesMap?.[keyLower];
+      return {
+        ...(cellTypeCfg?.type && cellTypeCfg.type !== "text" ? {
+          cellType: cellTypeCfg.type,
+          ...(cellTypeCfg.progressColor ? { progressColor: cellTypeCfg.progressColor } : {}),
+        } : {}),
+        ...(condRules?.length ? { conditionalRules: condRules } : {}),
+      };
+    };
 
     // Mappings for value text replacements
     const mappings = panelSchema.config?.mappings || [];
@@ -125,6 +137,7 @@ export class TableConverter implements PromQLChartConverter {
           colorMode: colorConfigMap["timestamp"]?.autoColor ? "auto" : undefined,
           ...(tsStyle?.textColor ? { textColor: tsStyle.textColor } : {}),
           ...(tsStyle?.bgColor ? { bgColor: tsStyle.bgColor } : {}),
+          ...colOverrides("timestamp"),
         },
         {
           name: "value",
@@ -142,6 +155,7 @@ export class TableConverter implements PromQLChartConverter {
           colorMode: colorConfigMap["value"]?.autoColor ? "auto" : undefined,
           ...(valStyle?.textColor ? { textColor: valStyle.textColor } : {}),
           ...(valStyle?.bgColor ? { bgColor: valStyle.bgColor } : {}),
+          ...colOverrides("value"),
         },
       ];
     }
@@ -199,6 +213,7 @@ export class TableConverter implements PromQLChartConverter {
           colorMode: colorConfigMap["timestamp"]?.autoColor ? "auto" : undefined,
           ...(tsStyle2?.textColor ? { textColor: tsStyle2.textColor } : {}),
           ...(tsStyle2?.bgColor ? { bgColor: tsStyle2.bgColor } : {}),
+          ...colOverrides("timestamp"),
         },
       ];
 
@@ -223,6 +238,7 @@ export class TableConverter implements PromQLChartConverter {
           colorMode: colorConfigMap[keyLower]?.autoColor ? "auto" : undefined,
           ...(keyStyle?.textColor ? { textColor: keyStyle.textColor } : {}),
           ...(keyStyle?.bgColor ? { bgColor: keyStyle.bgColor } : {}),
+          ...colOverrides(keyLower),
         });
       });
 
@@ -243,6 +259,7 @@ export class TableConverter implements PromQLChartConverter {
         colorMode: colorConfigMap["value"]?.autoColor ? "auto" : undefined,
         ...(valStyle2?.textColor ? { textColor: valStyle2.textColor } : {}),
         ...(valStyle2?.bgColor ? { bgColor: valStyle2.bgColor } : {}),
+        ...colOverrides("value"),
       });
 
       return columns;
@@ -314,6 +331,7 @@ export class TableConverter implements PromQLChartConverter {
         colorMode: colorConfigMap[keyLower]?.autoColor ? "auto" : undefined,
         ...(keyStyle?.textColor ? { textColor: keyStyle.textColor } : {}),
         ...(keyStyle?.bgColor ? { bgColor: keyStyle.bgColor } : {}),
+        ...colOverrides(keyLower),
       };
     });
 
@@ -338,6 +356,7 @@ export class TableConverter implements PromQLChartConverter {
         colorMode: colorConfigMap[colNameLower]?.autoColor ? "auto" : undefined,
         ...(colStyle?.textColor ? { textColor: colStyle.textColor } : {}),
         ...(colStyle?.bgColor ? { bgColor: colStyle.bgColor } : {}),
+        ...colOverrides(colNameLower),
       } as any);
     });
 

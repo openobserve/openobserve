@@ -192,10 +192,24 @@ export interface ColumnStyleConfig {
   bgColor?: string;
 }
 
+export interface ConditionalRule {
+  operator: "<" | ">" | "<=" | ">=" | "=" | "!=";
+  threshold: number;
+  textColor?: string;
+  bgColor?: string;
+}
+
+export interface CellTypeConfig {
+  type: "text" | "progress_bar" | "sparkline";
+  progressColor?: string;
+}
+
 export interface OverrideMaps {
   colorConfigMap: Record<string, ColorConfig>;
   unitConfigMap: Record<string, UnitConfig>;
   styleConfigMap: Record<string, ColumnStyleConfig>;
+  cellTypeConfigMap: Record<string, CellTypeConfig>;
+  conditionalRulesMap: Record<string, ConditionalRule[]>;
 }
 
 /**
@@ -209,8 +223,10 @@ export const parseOverrideConfigs = (
   const colorConfigMap: Record<string, ColorConfig> = {};
   const unitConfigMap: Record<string, UnitConfig> = {};
   const styleConfigMap: Record<string, ColumnStyleConfig> = {};
+  const cellTypeConfigMap: Record<string, CellTypeConfig> = {};
+  const conditionalRulesMap: Record<string, ConditionalRule[]> = {};
 
-  if (!overrideConfigs) return { colorConfigMap, unitConfigMap, styleConfigMap };
+  if (!overrideConfigs) return { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap };
 
   for (const o of overrideConfigs) {
     const alias = o?.field?.value;
@@ -247,11 +263,25 @@ export const parseOverrideConfigs = (
             bgColor: cfg.value,
           };
           break;
+        case "cell_type":
+          cellTypeConfigMap[aliasLower] = {
+            type: cfg.value?.type ?? "text",
+            progressColor: cfg.value?.color ?? "",
+          };
+          break;
+        case "conditional_styles":
+          conditionalRulesMap[aliasLower] = (cfg.rules ?? []).map((r: any) => ({
+            operator: r.operator ?? "<",
+            threshold: typeof r.threshold === "number" ? r.threshold : parseFloat(r.threshold) || 0,
+            textColor: r.textColor ?? "",
+            bgColor: r.bgColor ?? "",
+          }));
+          break;
       }
     }
   }
 
-  return { colorConfigMap, unitConfigMap, styleConfigMap };
+  return { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap };
 };
 
 // ---------------------------------------------------------------------------

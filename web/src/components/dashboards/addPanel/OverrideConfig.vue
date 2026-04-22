@@ -71,10 +71,13 @@ export default defineComponent({
         const columnNames = new Set<string>();
 
         // Try to get columns from the actual rendered panelData first
+        // Use a Map so we can carry the isNumeric flag (right-aligned = numeric in table converters)
+        const numericColumns = new Set<string>();
         if (props.panelData?.options?.columns) {
           props.panelData.options.columns.forEach((col: any) => {
             if (col.name) {
               columnNames.add(col.name);
+              if (col.align === "right") numericColumns.add(col.name);
             }
           });
         } else {
@@ -124,11 +127,19 @@ export default defineComponent({
         columns.value = columnArray.map((columnName) => ({
           alias: columnName,
           label: columnName,
+          // panelData path uses align; fallback uses name heuristic
+          isNumeric:
+            numericColumns.has(columnName) ||
+            columnName === "value" ||
+            columnName.startsWith("value_"),
         }));
       } else {
         const x = dashboardPanelData.data.queries[0].fields.x || [];
         const y = dashboardPanelData.data.queries[0].fields.y || [];
-        columns.value = [...x, ...y];
+        columns.value = [
+          ...x.map((col: any) => ({ ...col, isNumeric: false })),
+          ...y.map((col: any) => ({ ...col, isNumeric: true })),
+        ];
       }
     };
 

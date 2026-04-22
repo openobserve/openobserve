@@ -550,6 +550,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :value="cell.getValue()"
                     />
+                    <!-- Progress bar cell type: value LEFT, bar RIGHT -->
+                    <div
+                      v-else-if="(cell.column.columnDef.meta as any)?._col?.cellType === 'progress_bar'"
+                      class="progress-bar-cell"
+                    >
+                      <span class="progress-bar-label">{{ getCellDisplayValue(cell) }}</span>
+                      <div class="progress-bar-track">
+                        <div
+                          class="progress-bar-fill"
+                          :style="{
+                            width: getProgressBarPct(cell) + '%',
+                            background: (cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)',
+                          }"
+                        />
+                      </div>
+                    </div>
+                    <!-- Sparkline cell type: value LEFT, chart RIGHT -->
+                    <div
+                      v-else-if="(cell.column.columnDef.meta as any)?._col?.cellType === 'sparkline'"
+                      class="sparkline-cell"
+                    >
+                      <span class="sparkline-value">{{ getCellDisplayValue(cell) }}</span>
+                      <svg
+                        width="80"
+                        height="20"
+                        overflow="visible"
+                        style="display: block; flex-shrink: 0"
+                      >
+                        <polyline
+                          :points="getSparklinePoints(cell)"
+                          fill="none"
+                          :stroke="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
+                          stroke-width="1.5"
+                          stroke-linejoin="round"
+                          stroke-linecap="round"
+                        />
+                      </svg>
+                    </div>
                     <!-- Default value with format fn -->
                     <span
                       v-else
@@ -1576,6 +1614,36 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
   return style;
 };
 
+const getProgressBarPct = (cell: any): number => {
+  const col = (cell.column.columnDef.meta as any)?._col;
+  const val = parseFloat(String(cell.getValue()));
+  if (isNaN(val)) return 0;
+  const min = col?.progressMin ?? 0;
+  const max = col?.progressMax ?? 100;
+  if (max === min) return 0;
+  return Math.min(100, Math.max(0, ((val - min) / (max - min)) * 100));
+};
+
+const getSparklinePoints = (cell: any): string => {
+  const allRows = cell.getContext().table.getPrePaginationRowModel().rows;
+  const colId = cell.column.id;
+  const values: number[] = allRows
+    .map((row: any) => parseFloat(String(row.getValue(colId))))
+    .filter((v: number) => !isNaN(v));
+  if (values.length < 2) return "";
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const W = 80, H = 20;
+  return values
+    .map((v: number, i: number) => {
+      const x = (i / (values.length - 1)) * W;
+      const y = H - ((v - min) / range) * (H - 4) - 2;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+};
+
 const getCellDisplayValue = (cell: any): any => {
   const value = cell.getValue();
   const format = (cell.column.columnDef.meta as any)?.format;
@@ -2361,6 +2429,56 @@ defineExpose({
 // Outer wrapper for the table (used for sticky-column CSS scoping via data-sticky-id)
 .my-sticky-virtscroll-table {
   overflow: hidden;
+}
+
+// Progress bar cell type (dashboard table) — value left, bar right
+.progress-bar-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  overflow: hidden;
+
+  .progress-bar-label {
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: inherit;
+  }
+
+  .progress-bar-track {
+    flex: 1;
+    min-width: 32px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(128, 128, 128, 0.15);
+    overflow: hidden;
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      opacity: 0.8;
+      transition: width 0.25s ease;
+    }
+  }
+}
+
+// Sparkline cell type (dashboard table)
+.sparkline-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  min-height: 20px;
+  overflow: hidden;
+
+  .sparkline-value {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: inherit;
+    flex-shrink: 0;
+  }
 }
 
 // Add explicit hover styles for log rows

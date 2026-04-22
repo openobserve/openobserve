@@ -839,6 +839,38 @@ pub enum Config {
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<String>,
     },
+    #[serde(rename = "cell_type")]
+    CellType {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<CellTypeValue>,
+    },
+    #[serde(rename = "conditional_styles")]
+    ConditionalStyles {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        rules: Option<Vec<ConditionalRule>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct CellTypeValue {
+    #[serde(rename = "type")]
+    pub type_field: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct ConditionalRule {
+    pub operator: String,
+    pub threshold: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bg_color: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]

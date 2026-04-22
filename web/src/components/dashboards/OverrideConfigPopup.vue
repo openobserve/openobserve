@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column-formatting-popup" style="padding: 0 10px; min-width: min(680px, 90vw)">
+  <div class="column-formatting-popup" style="padding: 0 10px; min-width: min(720px, 90vw)">
     <!-- Header -->
     <div
       class="flex justify-between items-center q-py-md"
@@ -53,32 +53,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <template v-if="col.field">
-          <!-- ── Value Formatting ── -->
-          <div class="section-label q-mb-xs">{{ t("dashboard.sectionValueFormatting") }}</div>
-          <div class="flex items-start q-gutter-sm q-mb-sm">
-            <q-select
-              v-model="col.unit"
-              :options="unitOptions"
-              :label="t('dashboard.overrideConfigUnitLabel')"
-              dense
-              borderless
-              emit-value
-              map-options
-              input-debounce="0"
-              hide-bottom-space
-              class="o2-custom-select-dashboard"
-              style="min-width: 160px"
-            />
-            <q-input
-              v-if="col.unit === 'custom'"
-              v-model="col.customUnit"
-              :label="t('dashboard.customunitLabel')"
-              dense
-              borderless
-              hide-bottom-space
-              style="min-width: 120px"
-            />
-          </div>
+          <!-- ── Value Formatting (numeric columns only) ── -->
+          <template v-if="isNumericColumn(col.field)">
+            <div class="section-label q-mb-xs">{{ t("dashboard.sectionValueFormatting") }}</div>
+            <div class="flex items-start q-gutter-sm q-mb-sm">
+              <q-select
+                v-model="col.unit"
+                :options="unitOptions"
+                :label="t('dashboard.overrideConfigUnitLabel')"
+                dense
+                borderless
+                emit-value
+                map-options
+                input-debounce="0"
+                hide-bottom-space
+                class="o2-custom-select-dashboard"
+                style="min-width: 160px"
+              />
+              <q-input
+                v-if="col.unit === 'custom'"
+                v-model="col.customUnit"
+                :label="t('dashboard.customunitLabel')"
+                dense
+                borderless
+                hide-bottom-space
+                style="min-width: 120px"
+              />
+            </div>
+          </template>
+
+          <!-- ── Cell Type (numeric columns only) ── -->
+          <template v-if="isNumericColumn(col.field)">
+            <div class="section-label q-mb-xs">{{ t("dashboard.sectionCellType") }}</div>
+            <div class="flex q-mb-sm" style="gap: 4px">
+              <q-btn
+                v-for="ct in cellTypeOptions"
+                :key="ct.value"
+                :icon="ct.icon"
+                :label="ct.label"
+                flat
+                dense
+                no-caps
+                size="sm"
+                :color="col.cellType === ct.value ? 'primary' : 'grey-5'"
+                style="border: 1px solid rgba(128,128,128,0.3); border-radius: 4px; padding: 2px 8px"
+                @click="col.cellType = ct.value"
+              />
+            </div>
+
+            <!-- ── Progress Bar / Sparkline color (shown when a visual cell type is active) ── -->
+            <template v-if="col.cellType === 'progress_bar' || col.cellType === 'sparkline'">
+              <div class="section-label q-mb-xs">{{ t("dashboard.sectionProgressBar") }}</div>
+              <div class="flex items-center q-gutter-sm q-mb-sm flex-wrap">
+                <div class="flex items-center" style="gap: 6px">
+                  <span class="text-caption">{{ t("dashboard.progressColor") }}</span>
+                  <label class="color-swatch-label">
+                    <span
+                      class="color-swatch"
+                      :style="col.progressColor ? { background: col.progressColor } : {}"
+                      :class="{ 'color-swatch--empty': !col.progressColor }"
+                    />
+                    <input
+                      type="color"
+                      class="color-input-hidden"
+                      :value="col.progressColor || '#1976d2'"
+                      @change="(e) => col.progressColor = (e.target as HTMLInputElement).value"
+                    />
+                  </label>
+                  <span v-if="col.progressColor" class="text-caption text-mono">{{ col.progressColor }}</span>
+                  <q-btn v-if="col.progressColor" icon="close" size="xs" flat round dense @click="col.progressColor = ''" />
+                  <span v-else class="text-caption text-grey-5">{{ t("dashboard.colorNone") }}</span>
+                </div>
+              </div>
+            </template>
+          </template>
 
           <!-- ── Alignment ── -->
           <div class="section-label q-mb-xs">{{ t("dashboard.sectionAlignment") }}</div>
@@ -99,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- ── Styling ── -->
           <div class="section-label q-mb-xs">{{ t("dashboard.sectionStyling") }}</div>
-          <div class="flex items-center q-gutter-md q-mb-xs flex-wrap">
+          <div class="flex items-center q-gutter-md q-mb-sm flex-wrap">
             <!-- Text color -->
             <div class="flex items-center" style="gap: 6px">
               <span class="text-caption">{{ t("dashboard.textColor") }}</span>
@@ -150,6 +198,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             />
           </div>
+
+          <!-- ── Conditional Styling (numeric columns only) ── -->
+          <template v-if="isNumericColumn(col.field)">
+          <div class="section-label q-mb-xs">{{ t("dashboard.sectionConditionalStyling") }}</div>
+          <div
+            v-for="(rule, ruleIdx) in col.conditions"
+            :key="ruleIdx"
+            class="flex items-center q-mb-xs flex-wrap"
+            style="gap: 6px; padding: 6px 8px; background: rgba(128,128,128,0.05); border-radius: 4px"
+          >
+            <q-select
+              v-model="rule.operator"
+              :options="conditionOperators"
+              dense
+              borderless
+              emit-value
+              map-options
+              hide-bottom-space
+              style="min-width: 72px; max-width: 72px"
+              class="o2-custom-select-dashboard"
+            />
+            <q-input
+              v-model="rule.threshold"
+              :label="t('dashboard.conditionThreshold')"
+              type="number"
+              dense
+              borderless
+              hide-bottom-space
+              style="min-width: 80px; max-width: 100px"
+            />
+            <!-- Rule text color -->
+            <div class="flex items-center" style="gap: 4px">
+              <span class="text-caption text-grey-6">{{ t("dashboard.textColor") }}</span>
+              <label class="color-swatch-label">
+                <span
+                  class="color-swatch color-swatch--sm"
+                  :style="rule.textColor ? { background: rule.textColor } : {}"
+                  :class="{ 'color-swatch--empty': !rule.textColor }"
+                />
+                <input
+                  type="color"
+                  class="color-input-hidden"
+                  :value="rule.textColor || '#000000'"
+                  @change="(e) => rule.textColor = (e.target as HTMLInputElement).value"
+                />
+              </label>
+              <q-btn v-if="rule.textColor" icon="close" size="xs" flat round dense @click="rule.textColor = ''" />
+            </div>
+            <!-- Rule bg color -->
+            <div class="flex items-center" style="gap: 4px">
+              <span class="text-caption text-grey-6">{{ t("dashboard.bgColor") }}</span>
+              <label class="color-swatch-label">
+                <span
+                  class="color-swatch color-swatch--sm"
+                  :style="rule.bgColor ? { background: rule.bgColor } : {}"
+                  :class="{ 'color-swatch--empty': !rule.bgColor }"
+                />
+                <input
+                  type="color"
+                  class="color-input-hidden"
+                  :value="rule.bgColor || '#ffffff'"
+                  @change="(e) => rule.bgColor = (e.target as HTMLInputElement).value"
+                />
+              </label>
+              <q-btn v-if="rule.bgColor" icon="close" size="xs" flat round dense @click="rule.bgColor = ''" />
+            </div>
+            <q-btn icon="delete_outline" flat dense round size="xs" color="grey-6" @click="col.conditions.splice(ruleIdx, 1)" />
+          </div>
+          <q-btn
+            icon="add"
+            :label="t('dashboard.conditionAddRule')"
+            no-caps
+            flat
+            dense
+            size="sm"
+            class="q-mt-xs q-mb-sm"
+            @click="col.conditions.push({ operator: '<', threshold: '', textColor: '', bgColor: '' })"
+          />
+          </template>
         </template>
       </div>
     </div>
@@ -174,8 +301,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, PropType } from "vue";
+import { defineComponent, ref, computed, watch, PropType } from "vue";
 import { useI18n } from "vue-i18n";
+
+interface ConditionalRuleUI {
+  operator: string;
+  threshold: string;
+  textColor: string;
+  bgColor: string;
+}
 
 interface ColumnOverrideUI {
   field: string;
@@ -185,13 +319,16 @@ interface ColumnOverrideUI {
   textColor: string;
   bgColor: string;
   autoColor: boolean;
+  cellType: string;
+  progressColor: string;
+  conditions: ConditionalRuleUI[];
 }
 
 export default defineComponent({
   name: "OverrideConfigPopup",
   props: {
     columns: {
-      type: Array as PropType<Array<{ label: string; alias: string }>>,
+      type: Array as PropType<Array<{ label: string; alias: string; isNumeric?: boolean }>>,
       required: true,
     },
     overrideConfig: {
@@ -231,15 +368,35 @@ export default defineComponent({
       { value: "right",  icon: "format_align_right",   label: "Right" },
     ];
 
+    const cellTypeOptions = [
+      { value: "text",         icon: "text_fields",  label: t("dashboard.cellTypeText") },
+      { value: "progress_bar", icon: "data_usage",   label: t("dashboard.cellTypeProgressBar") },
+      { value: "sparkline",    icon: "show_chart",   label: t("dashboard.cellTypeSparkline") },
+    ];
+
+    const conditionOperators = [
+      { label: "<",  value: "<" },
+      { label: ">",  value: ">" },
+      { label: "<=", value: "<=" },
+      { label: ">=", value: ">=" },
+      { label: "=",  value: "=" },
+      { label: "!=", value: "!=" },
+    ];
+
     // ── Load existing config into UI state ─────────────────────────────────────
+    const emptyRow = (): ColumnOverrideUI => ({
+      field: "", unit: "", customUnit: "", alignment: "",
+      textColor: "", bgColor: "", autoColor: false,
+      cellType: "text", progressColor: "",
+      conditions: [],
+    });
+
     const loadFromRaw = (raw: any[]): ColumnOverrideUI[] => {
       const byColumn: Record<string, ColumnOverrideUI> = {};
       for (const entry of raw ?? []) {
         const alias = entry?.field?.value;
         if (!alias) continue;
-        if (!byColumn[alias]) {
-          byColumn[alias] = { field: alias, unit: "", customUnit: "", alignment: "", textColor: "", bgColor: "", autoColor: false };
-        }
+        if (!byColumn[alias]) byColumn[alias] = { ...emptyRow(), field: alias };
         for (const cfg of entry?.config ?? []) {
           switch (cfg?.type) {
             case "unit":
@@ -258,6 +415,18 @@ export default defineComponent({
             case "background_color":
               byColumn[alias].bgColor = cfg.value ?? "";
               break;
+            case "cell_type":
+              byColumn[alias].cellType = cfg.value?.type ?? "text";
+              byColumn[alias].progressColor = cfg.value?.color ?? "";
+              break;
+            case "conditional_styles":
+              byColumn[alias].conditions = (cfg.rules ?? []).map((r: any) => ({
+                operator: r.operator ?? "<",
+                threshold: r.threshold != null ? String(r.threshold) : "",
+                textColor: r.textColor ?? "",
+                bgColor: r.bgColor ?? "",
+              }));
+              break;
           }
         }
       }
@@ -268,9 +437,8 @@ export default defineComponent({
       loadFromRaw(props.overrideConfig.overrideConfigs ?? []),
     );
 
-    // If nothing loaded yet, start with one empty row
     if (columnOverrides.value.length === 0) {
-      columnOverrides.value.push({ field: "", unit: "", customUnit: "", alignment: "", textColor: "", bgColor: "", autoColor: false });
+      columnOverrides.value.push(emptyRow());
     }
 
     // ── Column helpers ─────────────────────────────────────────────────────────
@@ -293,14 +461,31 @@ export default defineComponent({
       return allColumnOptions.value.find((o) => o.value === alias)?.label ?? `${alias} (not found)`;
     };
 
-    // ── Mutations ──────────────────────────────────────────────────────────────
-    const addColumn = () => {
-      columnOverrides.value.push({ field: "", unit: "", customUnit: "", alignment: "", textColor: "", bgColor: "", autoColor: false });
+    // ── Numeric column helper ──────────────────────────────────────────────────
+    const isNumericColumn = (field: string): boolean => {
+      if (!field) return false;
+      return props.columns.find((c) => c.alias === field)?.isNumeric ?? false;
     };
 
-    const removeColumn = (idx: number) => {
-      columnOverrides.value.splice(idx, 1);
-    };
+    // Reset numeric-only settings when user switches to a non-numeric column
+    watch(
+      () => columnOverrides.value.map((c) => c.field),
+      (fields, prevFields) => {
+        fields.forEach((field, i) => {
+          if (field !== prevFields?.[i] && !isNumericColumn(field)) {
+            columnOverrides.value[i].unit = "";
+            columnOverrides.value[i].customUnit = "";
+            columnOverrides.value[i].cellType = "text";
+            columnOverrides.value[i].progressColor = "";
+            columnOverrides.value[i].conditions = [];
+          }
+        });
+      },
+    );
+
+    // ── Mutations ──────────────────────────────────────────────────────────────
+    const addColumn = () => columnOverrides.value.push(emptyRow());
+    const removeColumn = (idx: number) => columnOverrides.value.splice(idx, 1);
 
     // ── Serialize to override_config format ────────────────────────────────────
     const toRaw = (cols: ColumnOverrideUI[]): any[] =>
@@ -308,11 +493,35 @@ export default defineComponent({
         .filter((c) => c.field)
         .map((c) => {
           const config: any[] = [];
-          if (c.unit) config.push({ type: "unit", value: { unit: c.unit, customUnit: c.customUnit } });
+          if (c.unit && isNumericColumn(c.field)) config.push({ type: "unit", value: { unit: c.unit, customUnit: c.customUnit } });
           if (c.alignment) config.push({ type: "alignment", value: c.alignment });
           if (c.textColor) config.push({ type: "text_color", value: c.textColor });
           if (c.bgColor) config.push({ type: "background_color", value: c.bgColor });
           if (c.autoColor) config.push({ type: "unique_value_color", autoColor: true });
+
+          if (c.cellType && c.cellType !== "text") {
+            config.push({
+              type: "cell_type",
+              value: {
+                type: c.cellType,
+                color: c.progressColor || "",
+              },
+            });
+          }
+
+          const validConditions = c.conditions.filter((r) => r.threshold !== "" && r.operator);
+          if (validConditions.length) {
+            config.push({
+              type: "conditional_styles",
+              rules: validConditions.map((r) => ({
+                operator: r.operator,
+                threshold: parseFloat(r.threshold),
+                textColor: r.textColor || "",
+                bgColor: r.bgColor || "",
+              })),
+            });
+          }
+
           return { field: { matchBy: "name", value: c.field }, config };
         });
 
@@ -331,9 +540,12 @@ export default defineComponent({
       columnOverrides,
       unitOptions,
       alignOptions,
+      cellTypeOptions,
+      conditionOperators,
       columnOptionsFor,
       availableColumnsToAdd,
       getFieldLabel,
+      isNumericColumn,
       addColumn,
       removeColumn,
       closePopup,
@@ -367,6 +579,11 @@ export default defineComponent({
   border-radius: 4px;
   border: 1px solid rgba(128, 128, 128, 0.4);
   vertical-align: middle;
+
+  &--sm {
+    width: 18px;
+    height: 18px;
+  }
 
   &--empty {
     background: repeating-linear-gradient(

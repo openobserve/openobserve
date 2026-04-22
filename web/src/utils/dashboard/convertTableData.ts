@@ -58,7 +58,7 @@ export const convertTableData = (
   // Build value mapping cache once for all cells
   const valueMappingCache = buildValueMappingCache(panelSchema.config?.mappings);
 
-  const { colorConfigMap, unitConfigMap, styleConfigMap } = parseOverrideConfigs(
+  const { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap } = parseOverrideConfigs(
     panelSchema.config.override_config,
   );
   const fieldNameCache: Record<string, string> = {}; // Cache for case-insensitive lookups
@@ -145,6 +145,17 @@ export const convertTableData = (
       const colStyle = styleConfigMap?.[aliasLower];
       if (colStyle?.textColor) obj["textColor"] = colStyle.textColor;
       if (colStyle?.bgColor) obj["bgColor"] = colStyle.bgColor;
+
+      // cell type (progress bar / sparkline)
+      const cellTypeCfg = cellTypeConfigMap?.[aliasLower];
+      if (cellTypeCfg?.type && cellTypeCfg.type !== "text") {
+        obj["cellType"] = cellTypeCfg.type;
+        if (cellTypeCfg.progressColor) obj["progressColor"] = cellTypeCfg.progressColor;
+      }
+
+      // conditional styling rules
+      const condRules = conditionalRulesMap?.[aliasLower];
+      if (condRules?.length) obj["conditionalRules"] = condRules;
 
       // pass showFieldAsJson flag to renderer
       if (it.showFieldAsJson) {
@@ -377,6 +388,25 @@ export const convertTableData = (
       obj["label"] = it.label || transposeColumnLabel; // Add the label corresponding to each column
       return obj;
     });
+  }
+
+  // Auto-compute progress bar min/max from column data (after final tableRows are set)
+  if (Array.isArray(columns) && Array.isArray(tableRows)) {
+    for (const col of columns as any[]) {
+      if (col.cellType === "progress_bar") {
+        const fieldKey = col.field;
+        const nums = (tableRows as any[])
+          .map((row) => parseFloat(String(row[fieldKey])))
+          .filter((v) => !isNaN(v));
+        if (nums.length > 0) {
+          col.progressMin = 0;
+          col.progressMax = Math.max(...nums);
+        } else {
+          col.progressMin = 0;
+          col.progressMax = 100;
+        }
+      }
+    }
   }
 
   return {

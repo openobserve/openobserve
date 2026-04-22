@@ -351,7 +351,15 @@ export function useConfigPanel(
       "value-transformations": { label: t("dashboard.configSectionValueTransformations") },
     },
     fieldOverrides: {
-      "field-overrides": { label: t("dashboard.configSectionFieldOverrides") },
+      "field-overrides": {
+        label: [
+          t("dashboard.configSectionFieldOverrides"),
+          "field overrides",
+          "override config",
+          "override",
+          "column formatting",
+        ],
+      },
     },
     map: {
       "map-config": {
