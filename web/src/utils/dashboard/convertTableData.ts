@@ -400,8 +400,10 @@ export const convertTableData = (
           .map((row) => parseFloat(String(row[fieldKey])))
           .filter((v) => !isNaN(v));
         if (nums.length > 0) {
+          let max = nums[0];
+          for (const v of nums) if (v > max) max = v;
           col.progressMin = 0;
-          col.progressMax = Math.max(...nums);
+          col.progressMax = max;
         } else {
           col.progressMin = 0;
           col.progressMax = 100;
