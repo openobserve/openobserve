@@ -110,6 +110,7 @@ export class TableConverter implements PromQLChartConverter {
         ...(cellTypeCfg?.type && cellTypeCfg.type !== "text" ? {
           cellType: cellTypeCfg.type,
           ...(cellTypeCfg.progressColor ? { progressColor: cellTypeCfg.progressColor } : {}),
+          ...(cellTypeCfg.sparklineStyle ? { sparklineStyle: cellTypeCfg.sparklineStyle } : {}),
         } : {}),
         ...(condRules?.length ? { conditionalRules: condRules } : {}),
       };

@@ -202,6 +202,7 @@ export interface ConditionalRule {
 export interface CellTypeConfig {
   type: "text" | "progress_bar" | "sparkline";
   progressColor?: string;
+  sparklineStyle?: "line" | "bar";
 }
 
 export interface OverrideMaps {
@@ -267,6 +268,7 @@ export const parseOverrideConfigs = (
           cellTypeConfigMap[aliasLower] = {
             type: cfg.value?.type ?? "text",
             progressColor: cfg.value?.color ?? "",
+            sparklineStyle: cfg.value?.sparklineStyle ?? "line",
           };
           break;
         case "conditional_styles":

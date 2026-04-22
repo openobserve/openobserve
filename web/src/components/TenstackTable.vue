@@ -572,12 +572,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="sparkline-cell"
                     >
                       <span class="sparkline-value">{{ getCellDisplayValue(cell) }}</span>
+                      <!-- Bar sparkline: single vertical bar per row -->
                       <svg
+                        v-if="isSparklineBar(cell)"
+                        width="12"
+                        height="20"
+                        overflow="visible"
+                        style="display: block; flex-shrink: 0"
+                      >
+                        <rect x="1" y="0" width="10" height="20" rx="2"
+                          :fill="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
+                          opacity="0.15"
+                        />
+                        <rect
+                          v-if="getSparklineBar(cell)"
+                          x="1"
+                          :y="getSparklineBar(cell)!.y"
+                          width="10"
+                          :height="getSparklineBar(cell)!.h"
+                          rx="2"
+                          :fill="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
+                        />
+                      </svg>
+                      <!-- Line sparkline: area chart + dot marker -->
+                      <svg
+                        v-else
                         width="80"
                         height="20"
                         overflow="visible"
                         style="display: block; flex-shrink: 0"
                       >
+                        <polygon
+                          :points="getSparklineArea(cell)"
+                          :fill="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
+                          opacity="0.12"
+                        />
                         <polyline
                           :points="getSparklinePoints(cell)"
                           fill="none"
@@ -585,6 +614,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           stroke-width="1.5"
                           stroke-linejoin="round"
                           stroke-linecap="round"
+                        />
+                        <circle
+                          v-if="getSparklineDot(cell)"
+                          :cx="getSparklineDot(cell)!.cx"
+                          :cy="getSparklineDot(cell)!.cy"
+                          r="2.5"
+                          :fill="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
+                          stroke="white"
+                          stroke-width="1"
                         />
                       </svg>
                     </div>
@@ -1625,34 +1663,66 @@ const getProgressBarPct = (cell: any): number => {
   return Math.min(100, Math.max(0, ((val - min) / (max - min)) * 100));
 };
 
-/** Pre-computed sparkline SVG point strings keyed by column field id. Recomputed only when rows change. */
-const sparklineCache = computed((): Map<string, string> => {
-  const cache = new Map<string, string>();
+interface SparklineDot { cx: string; cy: string; }
+interface SparklineBar { y: string; h: string; }
+interface SparklineData {
+  points: string;
+  areaPoints: string;
+  dots: (SparklineDot | null)[];
+  bars: (SparklineBar | null)[];
+}
+
+const _SVG_W = 80, _SVG_H = 20;
+
+/** Pre-computed sparkline data keyed by column field id. Recomputed only when rows change. */
+const sparklineCache = computed((): Map<string, SparklineData> => {
+  const cache = new Map<string, SparklineData>();
   const cols = (props.columns as any[]) ?? [];
   const rows = tableRows.value ?? [];
   for (const col of cols) {
     if (col.cellType !== "sparkline") continue;
     const key = String(col.field ?? col.name);
-    const nums: number[] = [];
-    for (const row of rows) {
+    const rawVals: (number | null)[] = rows.map((row: any) => {
       const v = parseFloat(String((row as any)[key]));
-      if (!isNaN(v)) nums.push(v);
-    }
-    if (nums.length < 2) { cache.set(key, ""); continue; }
+      return isNaN(v) ? null : v;
+    });
+    const nums = rawVals.filter((v): v is number => v !== null);
+    const empty: SparklineData = { points: "", areaPoints: "", dots: rawVals.map(() => null), bars: rawVals.map(() => null) };
+    if (nums.length < 2) { cache.set(key, empty); continue; }
     let mn = nums[0], mx = nums[0];
     for (const v of nums) { if (v < mn) mn = v; if (v > mx) mx = v; }
-    const W = 80, H = 20, range = mx - mn || 1;
-    cache.set(key, nums.map((v, i) => {
-      const x = (i / (nums.length - 1)) * W;
-      const y = H - ((v - mn) / range) * (H - 4) - 2;
+    const range = mx - mn || 1;
+    // Line chart polyline + area polygon
+    const ptArr = nums.map((v, i) => {
+      const x = (i / (nums.length - 1)) * _SVG_W;
+      const y = _SVG_H - ((v - mn) / range) * (_SVG_H - 4) - 2;
       return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(" "));
+    });
+    const points = ptArr.join(" ");
+    const areaPoints = `${points} ${_SVG_W},${_SVG_H} 0,${_SVG_H}`;
+    // Per-row dot + bar
+    let denseIdx = -1;
+    const dots: (SparklineDot | null)[] = [];
+    const bars: (SparklineBar | null)[] = [];
+    for (const v of rawVals) {
+      if (v === null) { dots.push(null); bars.push(null); continue; }
+      denseIdx++;
+      const cx = ((denseIdx / (nums.length - 1)) * _SVG_W).toFixed(1);
+      const cy = (_SVG_H - ((v - mn) / range) * (_SVG_H - 4) - 2).toFixed(1);
+      dots.push({ cx, cy });
+      const barH = Math.max(1, ((v - mn) / range) * (_SVG_H - 2));
+      bars.push({ y: (_SVG_H - barH).toFixed(1), h: barH.toFixed(1) });
+    }
+    cache.set(key, { points, areaPoints, dots, bars });
   }
   return cache;
 });
 
-const getSparklinePoints = (cell: any): string =>
-  sparklineCache.value.get(cell.column.id) ?? "";
+const getSparklinePoints = (cell: any): string => sparklineCache.value.get(cell.column.id)?.points    ?? "";
+const getSparklineArea   = (cell: any): string => sparklineCache.value.get(cell.column.id)?.areaPoints ?? "";
+const getSparklineDot    = (cell: any): SparklineDot | null => sparklineCache.value.get(cell.column.id)?.dots[cell.row.index as number] ?? null;
+const getSparklineBar    = (cell: any): SparklineBar | null => sparklineCache.value.get(cell.column.id)?.bars[cell.row.index as number] ?? null;
+const isSparklineBar     = (cell: any): boolean => (cell.column.columnDef.meta as any)?._col?.sparklineStyle === "bar";
 
 const getCellDisplayValue = (cell: any): any => {
   const value = cell.getValue();

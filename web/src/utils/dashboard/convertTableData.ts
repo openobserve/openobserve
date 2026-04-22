@@ -151,6 +151,7 @@ export const convertTableData = (
       if (cellTypeCfg?.type && cellTypeCfg.type !== "text") {
         obj["cellType"] = cellTypeCfg.type;
         if (cellTypeCfg.progressColor) obj["progressColor"] = cellTypeCfg.progressColor;
+        if (cellTypeCfg.sparklineStyle) obj["sparklineStyle"] = cellTypeCfg.sparklineStyle;
       }
 
       // conditional styling rules

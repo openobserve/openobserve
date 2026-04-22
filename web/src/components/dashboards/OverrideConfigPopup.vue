@@ -125,6 +125,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span v-else class="text-caption text-grey-5">{{ t("dashboard.colorNone") }}</span>
                 </div>
               </div>
+              <!-- ── Sparkline style: Line / Bar ── -->
+              <template v-if="col.cellType === 'sparkline'">
+                <div class="section-label q-mb-xs">{{ t("dashboard.sparklineStyle") }}</div>
+                <div class="flex q-mb-sm" style="gap: 4px">
+                  <q-btn
+                    v-for="s in sparklineStyleOptions"
+                    :key="s.value"
+                    :icon="s.icon"
+                    :label="s.label"
+                    flat dense no-caps size="sm"
+                    :color="(col.sparklineStyle || 'line') === s.value ? 'primary' : 'grey-5'"
+                    style="border: 1px solid rgba(128,128,128,0.3); border-radius: 4px; padding: 2px 8px"
+                    @click="col.sparklineStyle = s.value as 'line' | 'bar'"
+                  />
+                </div>
+              </template>
             </template>
           </template>
 
@@ -321,6 +337,7 @@ interface ColumnOverrideUI {
   autoColor: boolean;
   cellType: string;
   progressColor: string;
+  sparklineStyle: "line" | "bar";
   conditions: ConditionalRuleUI[];
 }
 
@@ -374,6 +391,11 @@ export default defineComponent({
       { value: "sparkline",    icon: "show_chart",   label: t("dashboard.cellTypeSparkline") },
     ];
 
+    const sparklineStyleOptions = [
+      { value: "line", icon: "show_chart", label: t("dashboard.sparklineStyleLine") },
+      { value: "bar",  icon: "bar_chart",  label: t("dashboard.sparklineStyleBar") },
+    ];
+
     const conditionOperators = [
       { label: "<",  value: "<" },
       { label: ">",  value: ">" },
@@ -387,7 +409,7 @@ export default defineComponent({
     const emptyRow = (): ColumnOverrideUI => ({
       field: "", unit: "", customUnit: "", alignment: "",
       textColor: "", bgColor: "", autoColor: false,
-      cellType: "text", progressColor: "",
+      cellType: "text", progressColor: "", sparklineStyle: "line",
       conditions: [],
     });
 
@@ -418,6 +440,7 @@ export default defineComponent({
             case "cell_type":
               byColumn[alias].cellType = cfg.value?.type ?? "text";
               byColumn[alias].progressColor = cfg.value?.color ?? "";
+              byColumn[alias].sparklineStyle = cfg.value?.sparklineStyle ?? "line";
               break;
             case "conditional_styles":
               byColumn[alias].conditions = (cfg.rules ?? []).map((r: any) => ({
@@ -505,6 +528,7 @@ export default defineComponent({
               value: {
                 type: c.cellType,
                 color: c.progressColor || "",
+                sparklineStyle: c.cellType === "sparkline" ? (c.sparklineStyle || "line") : undefined,
               },
             });
           }
@@ -542,6 +566,7 @@ export default defineComponent({
       unitOptions,
       alignOptions,
       cellTypeOptions,
+      sparklineStyleOptions,
       conditionOperators,
       columnOptionsFor,
       availableColumnsToAdd,
