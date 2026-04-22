@@ -1054,24 +1054,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                     "
                   >
-                    <q-btn
-                      data-test="logs-search-bar-refresh-btn"
-                      data-cy="search-bar-visuzlie-hard-refresh-button"
-                      dense
-                      flat
-                      no-caps
-                      :title="t('search.refreshCacheAndRunQuery')"
-                      class="q-pa-sm search-button-dropdown tw:text-[12px]"
-                      v-close-popup
-                      @click="handleRunQueryFn(true)"
-                      :disable="
-                        config.isEnterprise == 'true' &&
-                        !!visualizeSearchRequestTraceIds.length
-                      "
-                    >
-                      <q-icon name="refresh" class="q-mr-xs" />
-                      {{ t("search.refreshCacheAndRunQuery") }}
-                    </q-btn>
+                    <q-list class="tw:min-w-[200px] tw:py-1">
+                      <q-item
+                        data-test="logs-search-bar-refresh-btn"
+                        data-cy="search-bar-visuzlie-hard-refresh-button"
+                        clickable
+                        v-close-popup
+                        @click="handleRunQueryFn(true)"
+                        :disable="
+                          config.isEnterprise == 'true' &&
+                          !!visualizeSearchRequestTraceIds.length
+                        "
+                        class="tw:text-[12px] tw:rounded-md tw:mx-1"
+                      >
+                        <q-item-section avatar class="tw:min-w-0 tw:pr-2">
+                          <q-icon name="refresh" size="16px" />
+                        </q-item-section>
+                        <q-item-section>
+                          {{ t("search.refreshCacheAndRunQuery") }}
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
                   </template>
 
                   <!-- NLP Mode: No additional options -->
@@ -1175,24 +1178,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                     "
                   >
-                    <q-btn
-                      data-test="logs-search-bar-refresh-btn"
-                      data-cy="search-bar-visuzlie-hard-refresh-button"
-                      dense
-                      flat
-                      no-caps
-                      :title="t('search.refreshCacheAndRunQuery')"
-                      class="q-pa-sm search-button-dropdown tw:text-[12px]"
-                      v-close-popup
-                      @click="handleRunQueryFn(true)"
-                      :disable="
-                        config.isEnterprise == 'true' &&
-                        !!visualizeSearchRequestTraceIds.length
-                      "
-                    >
-                      <q-icon name="refresh" class="q-mr-xs" />
-                      {{ t("search.refreshCacheAndRunQuery") }}
-                    </q-btn>
+                    <q-list class="tw:min-w-[200px] tw:py-1">
+                      <q-item
+                        data-test="logs-search-bar-refresh-btn"
+                        data-cy="search-bar-visuzlie-hard-refresh-button"
+                        clickable
+                        v-close-popup
+                        @click="handleRunQueryFn(true)"
+                        :disable="
+                          config.isEnterprise == 'true' &&
+                          !!visualizeSearchRequestTraceIds.length
+                        "
+                        class="tw:text-[12px] tw:rounded-md tw:mx-1"
+                      >
+                        <q-item-section avatar class="tw:min-w-0 tw:pr-2">
+                          <q-icon name="refresh" size="16px" />
+                        </q-item-section>
+                        <q-item-section>
+                          {{ t("search.refreshCacheAndRunQuery") }}
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
                   </template>
 
                   <!-- NL detected, AI bar not open: No additional options -->
@@ -1239,14 +1245,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? t('search.generateQueryTooltip')
-                    : t('search.runQuery')
+                    : searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled
+                      ? t('search.liveMode')
+                      : t('search.runQuery')
                 "
                 class="q-pa-none tw:h-[30px] element-box-shadow"
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
                     : 'o2-run-query-button o2-color-primary',
-                  config.isEnterprise == 'true'
+                  config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled
                     ? 'search-button-enterprise-border-radius'
                     : 'search-button-normal-border-radius',
                 ]"
@@ -1274,16 +1282,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? t("search.generateQuery")
-                    : t("search.runQuery")
+                    : searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled
+                      ? t("search.liveMode")
+                      : t("search.runQuery")
                 }}
               </q-btn>
-              <!-- Dropdown: "Ask AI" state only when NL detected + AI bar not open -->
+              <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
               <q-separator
-                v-if="config.isEnterprise == 'true'"
+                v-if="config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled"
                 class="tw:h-[29px] tw:w-[1px]"
               />
               <q-btn-dropdown
-                v-if="config.isEnterprise == 'true'"
+                v-if="config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled"
                 flat
                 class="tw:h-[29px] search-button-dropdown"
                 :class="[
@@ -1300,35 +1310,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                       ? 'o2-color-primary'
                       : '',
-                  config.isEnterprise == 'true'
+                  config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled
                     ? 'search-button-dropdown-enterprise-border-radius'
                     : 'search-button-normal-border-radius',
                 ]"
                 unelevated
                 dense
               >
-                <!-- SQL Mode / AI bar open: Refresh option -->
+                <!-- SQL Mode / AI bar open: Refresh option + Live Mode toggle -->
                 <template
                   v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
                 >
-                  <q-btn
-                    data-test="logs-search-bar-refresh-btn"
-                    data-cy="search-bar-refresh-button"
-                    dense
-                    flat
-                    no-caps
-                    :title="t('search.refreshCacheAndRunQuery')"
-                    class="q-pa-sm tw:text-[12px]"
-                    v-close-popup
-                    @click="handleRunQueryFn(true)"
-                    :disable="
-                      searchObj.loading == true ||
-                      searchObj.loadingHistogram == true
-                    "
-                  >
-                    <q-icon name="refresh" class="q-mr-xs" />
-                    {{ t("search.refreshCacheAndRunQuery") }}
-                  </q-btn>
+                  <q-list class="tw:min-w-[200px] tw:py-1">
+                    <q-item
+                      v-if="config.isEnterprise == 'true'"
+                      data-test="logs-search-bar-refresh-btn"
+                      data-cy="search-bar-refresh-button"
+                      clickable
+                      v-close-popup
+                      :disable="
+                        searchObj.loading == true ||
+                        searchObj.loadingHistogram == true
+                      "
+                      @click="handleRunQueryFn(true)"
+                      class="tw:text-[12px] tw:rounded-md tw:mx-1"
+                    >
+                      <q-item-section avatar class="tw:min-w-0 tw:pr-2">
+                        <q-icon name="refresh" size="16px" />
+                      </q-item-section>
+                      <q-item-section>
+                        {{ t("search.refreshCacheAndRunQuery") }}
+                      </q-item-section>
+                    </q-item>
+
+                    <q-separator
+                      v-if="
+                        config.isEnterprise == 'true' &&
+                        store.state.zoConfig.auto_query_enabled
+                      "
+                      class="tw:my-1"
+                    />
+
+                    <!-- Live Mode toggle — only when backend flag is enabled -->
+                    <q-item
+                      v-if="store.state.zoConfig.auto_query_enabled"
+                      data-test="logs-search-bar-live-mode-toggle-btn"
+                      clickable
+                      v-close-popup
+                      @click="searchObj.meta.liveMode = !searchObj.meta.liveMode"
+                      class="tw:text-[12px] tw:rounded-md tw:mx-1"
+                    >
+                      <q-item-section avatar class="tw:min-w-0 tw:pr-2">
+                        <q-icon
+                          :name="searchObj.meta.liveMode ? 'flash_on' : 'flash_off'"
+                          size="16px"
+                          :color="searchObj.meta.liveMode ? 'primary' : ''"
+                        />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label class="tw:font-medium">
+                          {{
+                            searchObj.meta.liveMode
+                              ? t("search.turnOffLiveMode")
+                              : t("search.turnOnLiveMode")
+                          }}
+                        </q-item-label>
+                        <q-item-label caption class="tw:text-[11px]">
+                          {{ t("search.liveModeTooltip") }}
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
                 </template>
                 <!-- NL detected, AI bar not open: Empty menu -->
                 <template v-else>

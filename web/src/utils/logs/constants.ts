@@ -149,6 +149,7 @@ export const DEFAULT_LOGS_CONFIG = {
     isActionsEnabled: false,
     resetPlotChart: false,
     clearCache: false,
+    liveMode: false,
   },
   data: {
     query: "" as any,
