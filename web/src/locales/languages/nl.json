@@ -382,7 +382,11 @@
     "patternWildcardSampleValues": "Voorbeeldwaarden",
     "wildcardSampleValues": "Voorbeeldwaarden",
     "patternZScore": "Z-score: {zScore} (gemiddelde frequentie: {avgFrequency})",
-    "createAlertFromPattern": "Creëer een waarschuwing op basis van dit patroon"
+    "createAlertFromPattern": "Creëer een waarschuwing op basis van dit patroon",
+    "liveMode": "Live",
+    "liveModeTooltip": "Query automatisch uitvoeren bij wijzigingen in filter/tijd",
+    "turnOnLiveMode": "Live-modus inschakelen",
+    "turnOffLiveMode": "Live-modus uitschakelen"
   },
   "menu": {
     "home": "Home",

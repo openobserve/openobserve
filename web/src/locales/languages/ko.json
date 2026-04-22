@@ -382,7 +382,11 @@
     "patternWildcardSampleValues": "샘플 값",
     "wildcardSampleValues": "샘플 값",
     "patternZScore": "Z-점수: {z점수} (평균 주파수: {평균 주파수})",
-    "createAlertFromPattern": "이 패턴으로 알림 생성"
+    "createAlertFromPattern": "이 패턴으로 알림 생성",
+    "liveMode": "라이브",
+    "liveModeTooltip": "필터/시간 변경 시 쿼리 자동 실행",
+    "turnOnLiveMode": "라이브 모드 켜기",
+    "turnOffLiveMode": "라이브 모드 끄기"
   },
   "menu": {
     "home": "홈",
