@@ -40,24 +40,14 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: 'bug',  // Only audit bug issues
+              labels: '☢️ Bug',  // Only audit bug issues
               per_page: 100
             });
 
             // Filter out PRs (GitHub API returns both)
-            const allBugIssues = issues.filter(issue => !issue.pull_request);
+            const bugIssues = issues.filter(issue => !issue.pull_request);
 
-            // Filter to only issues older than 2 months (60 days)
-            const twoMonthsAgo = new Date();
-            twoMonthsAgo.setDate(twoMonthsAgo.getDate() - 60);
-
-            const bugIssues = allBugIssues.filter(issue => {
-              const createdAt = new Date(issue.created_at);
-              return createdAt < twoMonthsAgo;
-            });
-
-            console.log(`Found ${allBugIssues.length} total open bug issues`);
-            console.log(`Filtered to ${bugIssues.length} issues older than 2 months (created before ${twoMonthsAgo.toISOString().split('T')[0]})`);
+            console.log(`Found ${bugIssues.length} open bug issues`);
 
             core.setOutput('count', bugIssues.length);
             core.setOutput('issues', JSON.stringify(bugIssues.map(i => ({
