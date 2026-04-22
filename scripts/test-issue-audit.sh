@@ -59,7 +59,8 @@ HAS_TEST=false
 TEST_FILE=""
 
 # Search for @bug-{issue#} tag in test files
-if grep -r "@bug-${TEST_ISSUE}" tests/ui-testing/playwright-tests/ --include="*.spec.js" -l 2>/dev/null | head -1 | read -r found_file; then
+found_file=$(grep -r "@bug-${TEST_ISSUE}" tests/ui-testing/playwright-tests/ --include="*.spec.js" -l 2>/dev/null | head -1)
+if [ -n "$found_file" ]; then
   HAS_TEST=true
   TEST_FILE="$found_file"
   echo "✓ Found test: $TEST_FILE"
