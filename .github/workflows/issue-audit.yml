@@ -60,10 +60,12 @@ jobs:
       - name: Audit each issue for fix + test coverage
         id: audit
         uses: actions/github-script@v7
+        env:
+          ISSUES_JSON: ${{ steps.fetch-issues.outputs.issues }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            let issues = JSON.parse('${{ steps.fetch-issues.outputs.issues }}');
+            let issues = JSON.parse(process.env.ISSUES_JSON);
 
             // Apply test mode filter if specified
             const testMode = '${{ inputs.test_mode }}' || 'all';
@@ -91,7 +93,7 @@ jobs:
               let fixPR = null;
 
               try {
-                const timeline = await github.rest.issues.listEventsForTimeline({
+                const timeline = await github.paginate(github.rest.issues.listEventsForTimeline, {
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: issue.number,
@@ -99,7 +101,7 @@ jobs:
                 });
 
                 // Look for "referenced" events from merged PRs
-                for (const event of timeline.data) {
+                for (const event of timeline) {
                   if (event.event === 'referenced' && event.source?.type === 'issue') {
                     // Check if the referencing PR is merged
                     const prNumber = event.source.issue.number;
@@ -197,10 +199,12 @@ jobs:
       - name: Auto-close issues with fix + test
         if: ${{ steps.audit.outputs.ready_to_close_count > 0 && !inputs.dry_run }}
         uses: actions/github-script@v7
+        env:
+          RESULTS_JSON: ${{ steps.audit.outputs.results }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const results = JSON.parse('${{ steps.audit.outputs.results }}');
+            const results = JSON.parse(process.env.RESULTS_JSON);
 
             for (const item of results.ready_to_close) {
               const issue = item.issue;
@@ -247,10 +251,12 @@ jobs:
         id: analyze-files
         if: ${{ !inputs.dry_run }}
         uses: actions/github-script@v7
+        env:
+          RESULTS_JSON: ${{ steps.audit.outputs.results }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const results = JSON.parse('${{ steps.audit.outputs.results }}');
+            const results = JSON.parse(process.env.RESULTS_JSON);
 
             // Helper function to categorize a single file
             function categorizeFile(filename) {
@@ -281,7 +287,7 @@ jobs:
               console.log(`  Fetching files for PR #${prNumber}...`);
 
               try {
-                const { data: files } = await github.rest.pulls.listFiles({
+                const files = await github.paginate(github.rest.pulls.listFiles, {
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   pull_number: prNumber,
@@ -375,10 +381,12 @@ jobs:
       - name: Process issues needing tests with smart categorization
         if: ${{ !inputs.dry_run && steps.analyze-files.outputs.count > 0 }}
         uses: actions/github-script@v7
+        env:
+          ENRICHED_ITEMS_JSON: ${{ steps.analyze-files.outputs.enriched_needs_test }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const enrichedItems = JSON.parse('${{ steps.analyze-files.outputs.enriched_needs_test }}');
+            const enrichedItems = JSON.parse(process.env.ENRICHED_ITEMS_JSON);
 
             for (const item of enrichedItems) {
               const issue = item.issue;
@@ -387,13 +395,14 @@ jobs:
 
               console.log(`\nProcessing issue #${issue.number}: ${issue.title}`);
 
-              const comments = await github.rest.issues.listComments({
+              const comments = await github.paginate(github.rest.issues.listComments, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: issue.number
+                issue_number: issue.number,
+                per_page: 100
               });
 
-              const alreadyCommented = comments.data.some(c =>
+              const alreadyCommented = comments.some(c =>
                 c.body.includes('Issue Audit Workflow') &&
                 (c.body.includes('needs test coverage') || c.body.includes('Auto-Closed'))
               );
@@ -532,10 +541,13 @@ jobs:
 
       - name: Generate audit report
         uses: actions/github-script@v7
+        env:
+          RESULTS_JSON: ${{ steps.audit.outputs.results }}
+          ENRICHED_ITEMS_JSON: ${{ steps.analyze-files.outputs.enriched_needs_test }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const results = JSON.parse('${{ steps.audit.outputs.results }}');
+            const results = JSON.parse(process.env.RESULTS_JSON);
 
             const dryRun = '${{ inputs.dry_run }}' === 'true';
             const testMode = '${{ inputs.test_mode }}' || 'all';
@@ -572,8 +584,8 @@ jobs:
             }
 
             // Enhanced needs_test section with file analysis
-            const enrichedItems = '${{ steps.analyze-files.outputs.enriched_needs_test }}' !== ''
-              ? JSON.parse('${{ steps.analyze-files.outputs.enriched_needs_test }}')
+            const enrichedItems = process.env.ENRICHED_ITEMS_JSON && process.env.ENRICHED_ITEMS_JSON !== ''
+              ? JSON.parse(process.env.ENRICHED_ITEMS_JSON)
               : results.needs_test;
 
             if (enrichedItems.length > 0) {
