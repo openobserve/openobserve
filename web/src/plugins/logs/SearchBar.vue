@@ -5621,6 +5621,12 @@ export default defineComponent({
           this.searchObj.data.stream.addToFilter = "";
           if (this.queryEditorRef?.setValue)
             this.queryEditorRef.setValue(this.searchObj.data.query);
+          if (
+            this.store.state.zoConfig.auto_query_enabled &&
+            this.searchObj.meta.liveMode
+          ) {
+            this.handleRunQuery();
+          }
         }
       }
     },
@@ -5634,6 +5640,12 @@ export default defineComponent({
       this.searchObj.data.query = newValue;
       this.searchObj.data.stream.removeFilterField = "";
       if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
+      if (
+        this.store.state.zoConfig.auto_query_enabled &&
+        this.searchObj.meta.liveMode
+      ) {
+        this.handleRunQuery();
+      }
     },
     toggleTransformEditor(newVal) {
       if (newVal == false) {

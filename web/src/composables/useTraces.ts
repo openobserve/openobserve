@@ -89,6 +89,7 @@ const defaultObject = {
     >(),
     showErrorOnly: false,
     queryEditorPlaceholderFlag: true,
+    liveMode: false,
     searchMode: "spans" as TraceSearchMode,
     serviceGraphVisualizationType:
       (localStorage.getItem("serviceGraph_visualizationType") as
