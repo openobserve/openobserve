@@ -62,13 +62,14 @@ jobs:
         uses: actions/github-script@v7
         env:
           ISSUES_JSON: ${{ steps.fetch-issues.outputs.issues }}
+          TEST_MODE: ${{ inputs.test_mode }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             let issues = JSON.parse(process.env.ISSUES_JSON);
 
             // Apply test mode filter if specified
-            const testMode = '${{ inputs.test_mode }}' || 'all';
+            const testMode = process.env.TEST_MODE || 'all';
             if (testMode !== 'all' && testMode !== '') {
               const testIssueNumbers = testMode.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
               if (testIssueNumbers.length > 0) {
@@ -544,13 +545,15 @@ jobs:
         env:
           RESULTS_JSON: ${{ steps.audit.outputs.results }}
           ENRICHED_ITEMS_JSON: ${{ steps.analyze-files.outputs.enriched_needs_test }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          TEST_MODE: ${{ inputs.test_mode }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const results = JSON.parse(process.env.RESULTS_JSON);
 
-            const dryRun = '${{ inputs.dry_run }}' === 'true';
-            const testMode = '${{ inputs.test_mode }}' || 'all';
+            const dryRun = process.env.DRY_RUN === 'true';
+            const testMode = process.env.TEST_MODE || 'all';
 
             let report = `# Issue Audit Report\n\n`;
             report += `**Run ID**: ${context.runId}\n`;
