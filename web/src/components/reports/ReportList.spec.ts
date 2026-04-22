@@ -143,6 +143,7 @@ describe("ReportList", () => {
       name: "Test Org",
     };
     store.state.theme = "light";
+    store.state.organizationData.allReportsListByFolderId = {};
 
     const mounted = mountComponent();
     wrapper = mounted.wrapper;
