@@ -50,11 +50,13 @@
 //! let resource_attributes = /* ... */;
 //! let events = /* ... */;
 //!
-//! processor.process_span(
+//! processor.process_span_with_pricing(
 //!     &mut span_attributes,
 //!     &resource_attributes,
 //!     Some("openai"),
 //!     &events,
+//!     &[], // pass org pricing entries here in production
+//!     span_start_nanos, // span.start_time_unix_nano from OTLP payload
 //! );
 //! ```
 //!
@@ -76,7 +78,7 @@
 //! let resource_attrs = HashMap::new();
 //! let events = vec![];
 //!
-//! processor.process_span(&mut span_attrs, &resource_attrs, Some("openai"), &events, None);
+//! processor.process_span_with_pricing(&mut span_attrs, &resource_attrs, Some("openai"), &events, &[], 0);
 //!
 //! // Result: span_attrs now contains:
 //! // - observation_type: "GENERATION"

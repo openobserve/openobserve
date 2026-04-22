@@ -36,14 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tabs-selection-container"
                 :tabs="tabs"
                 v-model:active-tab="activeTab"
-                @update:active-tab="() => loadReports(activeFolderId)"
+                @update:active-tab="() => { invalidateFolderCache(activeFolderId.value); loadReports(activeFolderId.value); }"
               />
             </div>
 
             <!-- Search input -->
             <q-input
               data-test="report-list-search-input"
-              v-model="filterQuery"
+              v-model="dynamicQueryModel"
               borderless
               dense
               class="q-ml-auto no-border o2-search-input tw:h-[36px] tw:w-[150px]"
@@ -391,7 +391,7 @@ import {
 import { useQuasar, date, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, debounce } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
@@ -422,7 +422,18 @@ const reportsTableRows: Ref<any[]> = ref([]);
 const staticReportsList: Ref<any[]> = ref([]);
 const isLoadingReports = ref(false);
 const activeTab = ref("shared");
-const filterQuery = ref("");
+const filterQuery = ref(""); // client-side filter within current folder
+const searchQuery = ref(""); // API search across all folders
+const cachedFolderReports = ref<any[]>([]); // current folder's reports before cross-folder search
+
+const dynamicQueryModel = computed({
+  get() { return searchAcrossFolders.value ? searchQuery.value : filterQuery.value; },
+  set(value: string) {
+    if (searchAcrossFolders.value) searchQuery.value = value;
+    else filterQuery.value = value;
+  },
+});
+
 const selectedReports = ref<any[]>([]);
 const reportListTableRef: Ref<any> = ref(null);
 const reportsStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
@@ -451,18 +462,41 @@ const deleteDialog = ref({
 });
 const confirmBulkDelete = ref<boolean>(false);
 
-const columns: any = ref<QTableProps["columns"]>([
-  { name: "#",               label: "#",                    field: "#",                align: "center", style: "width: 67px;" },
-  { name: "name",            label: t("alerts.name"),       field: "name",             align: "left",   sortable: true },
-  { name: "folder_name",     label: "Folder",               field: "folder_name",      align: "left",   sortable: true, style: "width: 150px" },
-  { name: "owner",           label: t("alerts.owner"),      field: "owner",            align: "center", sortable: true,  style: "width: 150px" },
-  { name: "description",     label: t("alerts.description"),field: "description",      align: "center", sortable: false, style: "width: 300px" },
-  { name: "last_triggered_at", label: t("alerts.lastTriggered"), field: "last_triggered_at", align: "left", sortable: true, style: "width: 150px" },
-  { name: "actions",         label: t("alerts.actions"),    field: "actions",          align: "center", sortable: false, classes: "actions-column" },
-]);
+const columns = computed<QTableProps["columns"]>(() => {
+  const base: any[] = [
+    { name: "#",               label: "#",                    field: "#",                align: "center", style: "width: 67px;" },
+    { name: "name",            label: t("alerts.name"),       field: "name",             align: "left",   sortable: true },
+    { name: "owner",           label: t("alerts.owner"),      field: "owner",            align: "center", sortable: true,  style: "width: 150px" },
+    { name: "description",     label: t("alerts.description"),field: "description",      align: "center", sortable: false, style: "width: 300px" },
+    { name: "last_triggered_at", label: t("alerts.lastTriggered"), field: "last_triggered_at", align: "left", sortable: true, style: "width: 150px" },
+    { name: "actions",         label: t("alerts.actions"),    field: "actions",          align: "center", sortable: false, classes: "actions-column" },
+  ];
+
+  if (searchAcrossFolders.value && searchQuery.value !== "") {
+    base.splice(2, 0, {
+      name: "folder_name",
+      field: "folder_name",
+      label: "Folder",
+      align: "left",
+      sortable: true,
+      style: "width: 150px",
+    });
+  }
+
+  return base;
+});
 
 // ── Load reports ──────────────────────────────────────────────────────────────
-const loadReports = async (folderId: string) => {
+const loadReports = async (folderId: string, nameQuery?: string) => {
+  // Use Vuex cache for folder loads (no nameQuery = normal folder navigation)
+  if (!nameQuery && store.state.organizationData.allReportsListByFolderId?.[folderId]) {
+    const cached = store.state.organizationData.allReportsListByFolderId[folderId];
+    staticReportsList.value = cached;
+    cachedFolderReports.value = cached;
+    filterReports();
+    return;
+  }
+
   isLoadingReports.value = true;
   const dismiss = q.notify({
     spinner: true,
@@ -472,14 +506,15 @@ const loadReports = async (folderId: string) => {
 
   try {
     const folder = searchAcrossFolders.value ? undefined : folderId;
-    // For "cached" tab, tell the backend to return only destination-less reports
     const isCache = activeTab.value === "cached";
     const res = await reports.listByFolderId(
       store.state.selectedOrganization.identifier,
       folder,
       undefined,
       isCache || undefined,
+      nameQuery || undefined,
     );
+
     const mapped = (res.data ?? []).map((report: any, index: number) => ({
       "#": index + 1,
       ...report,
@@ -487,6 +522,23 @@ const loadReports = async (folderId: string) => {
         ? convertUnixToQuasarFormat(report.last_triggered_at)
         : "-",
     }));
+
+    // Always cache the result — even if stale, so navigating back hits the cache
+    if (!nameQuery) {
+      store.dispatch("setAllReportsListByFolderId", {
+        ...store.state.organizationData.allReportsListByFolderId,
+        [folderId]: mapped,
+      });
+    }
+
+    // Race condition guard: don't update UI if user moved to another folder,
+    // but data is already cached above for future use (mirrors AlertList.vue:1574)
+    if (folderId !== activeFolderId.value && !nameQuery) {
+      dismiss();
+      return;
+    }
+
+    if (!nameQuery) cachedFolderReports.value = mapped;
     staticReportsList.value = mapped;
     filterReports();
   } catch (err: any) {
@@ -501,6 +553,20 @@ const loadReports = async (folderId: string) => {
     isLoadingReports.value = false;
     dismiss();
   }
+};
+
+const invalidateFolderCache = (folderId: string) => {
+  const updated = { ...store.state.organizationData.allReportsListByFolderId };
+  delete updated[folderId];
+  store.dispatch("setAllReportsListByFolderId", updated);
+};
+
+const filterReports = () => {
+  reportsTableRows.value = (staticReportsList.value as any[]).map((r: any, i: number) => ({
+    ...r,
+    "#": i + 1,
+  }));
+  resultTotal.value = reportsTableRows.value.length;
 };
 
 onBeforeMount(async () => {
@@ -532,31 +598,52 @@ watch(
 
     if (searchAcrossFolders.value) {
       searchAcrossFolders.value = false;
+      searchQuery.value = "";
       filterQuery.value = "";
     }
 
     await loadReports(newVal);
 
-    if (router.currentRoute.value.query.folder !== newVal) {
+    if (router.currentRoute.value.query.folder !== activeFolderId.value) {
       router.push({
         name: "reports",
         query: {
           ...router.currentRoute.value.query,
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: newVal,
+          folder: activeFolderId.value,
         },
       });
     }
   },
 );
 
-watch(searchAcrossFolders, async (enabled) => {
-  filterQuery.value = "";
+watch(searchAcrossFolders, (enabled) => {
   if (enabled) {
-    // load all folders
-    await loadReports(activeFolderId.value);
+    // Transfer any existing client-side filter into the cross-folder search query
+    searchQuery.value = filterQuery.value;
+    filterQuery.value = "";
+    // No API call — wait for user to type a query
   } else {
-    await loadReports(activeFolderId.value);
+    // Restore the cached folder data without an API call
+    searchQuery.value = "";
+    filterQuery.value = "";
+    staticReportsList.value = cachedFolderReports.value;
+    filterReports();
+  }
+});
+
+const debouncedSearch = debounce(async (query: string) => {
+  await loadReports(activeFolderId.value, query);
+}, 600);
+
+watch(searchQuery, async (newVal) => {
+  if (!searchAcrossFolders.value) return;
+  if (!newVal) {
+    // User cleared the search — restore cached folder data
+    staticReportsList.value = cachedFolderReports.value;
+    filterReports();
+  } else {
+    await debouncedSearch(newVal);
   }
 });
 
@@ -564,10 +651,11 @@ const updateActiveFolderId = (folderId: string) => {
   activeFolderId.value = folderId;
 };
 
-const clearSearch = async () => {
+const clearSearch = () => {
+  searchQuery.value = "";
   filterQuery.value = "";
   searchAcrossFolders.value = false;
-  await loadReports(activeFolderId.value);
+  // watch(searchAcrossFolders) handles the restore
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -583,18 +671,8 @@ const filterData = (rows: any[], terms: any) => {
   return rows.filter((r) => r["name"].toLowerCase().includes(lc));
 };
 
-const filterReports = () => {
-  // Backend already filtered by cache/scheduled via the ?cache= param.
-  // Just re-number rows here.
-  reportsTableRows.value = (staticReportsList.value as any[]).map((r: any, i: number) => ({
-    ...r,
-    "#": i + 1,
-  }));
-  resultTotal.value = reportsTableRows.value.length;
-};
-
 const visibleRows = computed(() => {
-  if (!filterQuery.value) return reportsTableRows.value ?? [];
+  if (!filterQuery.value || searchAcrossFolders.value) return reportsTableRows.value ?? [];
   return filterData(reportsTableRows.value ?? [], filterQuery.value);
 });
 const hasVisibleRows = computed(() => visibleRows.value.length > 0);
@@ -647,6 +725,7 @@ const toggleReportState = (report: any) => {
       staticReportsList.value = staticReportsList.value.map((r: any) =>
         r.report_id === report.report_id ? { ...r, enabled: !r.enabled } : r,
       );
+      invalidateFolderCache(activeFolderId.value);
       filterReports();
       q.notify({
         type: "positive",
@@ -686,6 +765,7 @@ const deleteReport = () => {
       staticReportsList.value = staticReportsList.value.filter(
         (r: any) => r.report_id !== report_id,
       );
+      invalidateFolderCache(activeFolderId.value);
       filterReports();
       q.notify({ type: "positive", message: "Report deleted successfully.", timeout: 3000 });
     })
@@ -733,6 +813,7 @@ const bulkDeleteReports = async () => {
     staticReportsList.value = staticReportsList.value.filter(
       (r: any) => !successfulIds.has(r.report_id),
     );
+    invalidateFolderCache(activeFolderId.value);
     filterReports();
     selectedReports.value = [];
   } catch (error: any) {
@@ -759,11 +840,13 @@ const moveMultipleReports = () => {
   showMoveDialog.value = true;
 };
 
-const onMoveUpdated = async (_fromFolder: string, toFolder: string) => {
+const onMoveUpdated = async (fromFolder: string, toFolder: string) => {
   showMoveDialog.value = false;
   selectedReports.value = [];
   reportIdsToMove.value = [];
-  // Reload: if we moved out of the current folder, remove; otherwise refresh
+  // Invalidate both source and destination folder caches
+  invalidateFolderCache(fromFolder || activeFolderId.value);
+  invalidateFolderCache(toFolder);
   await loadReports(activeFolderId.value);
 };
 </script>

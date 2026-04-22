@@ -46,9 +46,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-card-section>
 
     <q-card-actions class="tw:px-4 tw:pb-4 tw:flex tw:flex-row tw:gap-2">
-      <!-- Documentation Button -->
+      <!-- Deploy Button (ARM template) -->
       <q-btn
-        v-if="integration.documentationUrl"
+        v-if="integration.armTemplate"
+        color="primary"
+        label="Deploy"
+        @click="handleDeploy()"
+        unelevated
+        class="tw:flex-1"
+        :data-test="`azure-${integration.id}-deploy-btn`"
+      />
+      <!-- Documentation Button (shown when no ARM template) -->
+      <q-btn
+        v-else-if="integration.documentationUrl"
         color="primary"
         label="Documentation"
         @click="handleDocumentation()"
@@ -56,6 +66,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex-1"
         :data-test="`azure-${integration.id}-documentation-btn`"
       />
+      <!-- Docs icon button (shown alongside Deploy when both exist) -->
+      <q-btn
+        v-if="integration.armTemplate && integration.documentationUrl"
+        flat
+        dense
+        round
+        size="sm"
+        icon="description"
+        color="primary"
+        @click="handleDocumentation()"
+        :data-test="`azure-${integration.id}-docs-icon-btn`"
+      >
+        <q-tooltip>View Documentation</q-tooltip>
+      </q-btn>
       <!-- Dashboard Button -->
       <q-btn
         outline
@@ -77,7 +101,8 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import type { AzureIntegration } from "@/utils/azureIntegrations";
-import { generateAzureDashboardURL } from "@/utils/azureIntegrations";
+import { generateAzureDashboardURL, generateARMTemplateURL } from "@/utils/azureIntegrations";
+import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 
 export default defineComponent({
@@ -92,6 +117,45 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const router = useRouter();
+
+    let endpoint: any = null;
+    try {
+      endpoint = getEndPoint(getIngestionURL());
+    } catch (e) {
+      console.error("Error getting endpoint:", e);
+    }
+
+    const handleDeploy = () => {
+      if (!props.integration.armTemplate) return;
+
+      if (!endpoint?.url) {
+        q.notify({ type: "negative", message: "Invalid ingestion endpoint. Please check configuration.", timeout: 3000 });
+        return;
+      }
+
+      const organizationId = store.state?.selectedOrganization?.identifier;
+      const email = store.state?.userInfo?.email;
+      const passcode = store.state?.organizationData?.organizationPasscode;
+
+      if (!organizationId || !email || !passcode) {
+        q.notify({ type: "negative", message: "Missing organization credentials. Please refresh the page.", timeout: 3000 });
+        return;
+      }
+
+      const accessKey = btoa(`${email}:${passcode}`);
+      const endpointUrl = `${endpoint.url}/azure/${organizationId}/default/_event_hub`;
+
+      const url = generateARMTemplateURL(props.integration, endpointUrl, accessKey);
+
+      window.open(url, '_blank', 'noopener,noreferrer');
+
+      segment.track("Azure ARM Template Deploy Started", {
+        service: props.integration.name,
+        integration_id: props.integration.id,
+      });
+
+      q.notify({ type: "info", message: `Opening Azure portal to deploy ${props.integration.displayName}`, timeout: 3000 });
+    };
 
     const handleDashboard = () => {
       if (!props.integration.hasDashboard) {
@@ -146,6 +210,7 @@ export default defineComponent({
     };
 
     return {
+      handleDeploy,
       handleDashboard,
       handleDocumentation,
     };
