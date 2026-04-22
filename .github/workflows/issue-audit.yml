@@ -45,7 +45,19 @@ jobs:
             });
 
             // Filter out PRs (GitHub API returns both)
-            const bugIssues = issues.filter(issue => !issue.pull_request);
+            const allBugIssues = issues.filter(issue => !issue.pull_request);
+
+            // Filter to only issues older than 2 months (60 days)
+            const twoMonthsAgo = new Date();
+            twoMonthsAgo.setDate(twoMonthsAgo.getDate() - 60);
+
+            const bugIssues = allBugIssues.filter(issue => {
+              const createdAt = new Date(issue.created_at);
+              return createdAt < twoMonthsAgo;
+            });
+
+            console.log(`Found ${allBugIssues.length} total open bug issues`);
+            console.log(`Filtered to ${bugIssues.length} issues older than 2 months (created before ${twoMonthsAgo.toISOString().split('T')[0]})`);
 
             core.setOutput('count', bugIssues.length);
             core.setOutput('issues', JSON.stringify(bugIssues.map(i => ({
@@ -55,8 +67,6 @@ jobs:
               created_at: i.created_at,
               labels: i.labels.map(l => l.name)
             }))));
-
-            console.log(`Found ${bugIssues.length} open bug issues to audit`);
 
       - name: Audit each issue for fix + test coverage
         id: audit

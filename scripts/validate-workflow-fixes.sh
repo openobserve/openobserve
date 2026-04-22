@@ -13,9 +13,10 @@ echo ""
 # Check 1: No duplicate fs require
 echo "✓ Checking for duplicate fs require..."
 FS_COUNT=$(grep -c "const fs = require('fs')" "$WORKFLOW_FILE" || true)
-if [ "$FS_COUNT" -gt 5 ]; then
-    echo "  ❌ Found $FS_COUNT fs require statements (expected: 5)"
+if [ "$FS_COUNT" -ne 6 ]; then
+    echo "  ❌ Found $FS_COUNT fs require statements (expected: 6)"
     echo "     Each github-script step should have exactly one fs require"
+    echo "     Steps: audit, auto-close, ready-to-close, analyze-files, process-needs-test, generate-report"
     ERRORS=$((ERRORS + 1))
 else
     echo "  ✅ Found $FS_COUNT fs require statements (correct)"
@@ -100,6 +101,15 @@ if grep -q "processedCount % 10 === 0" "$WORKFLOW_FILE"; then
     echo "  ✅ Periodic rate limit checks detected"
 else
     echo "  ❌ No periodic rate limit checks in analyze-files"
+    ERRORS=$((ERRORS + 1))
+fi
+
+# Check 11: Age filter (2 months)
+echo "✓ Checking for 2-month age filter..."
+if grep -q "setDate.*- 60" "$WORKFLOW_FILE" && grep -q "issues older than 2 months" "$WORKFLOW_FILE"; then
+    echo "  ✅ Age filter detected (60 days / 2 months)"
+else
+    echo "  ❌ Age filter not found or incorrect"
     ERRORS=$((ERRORS + 1))
 fi
 
