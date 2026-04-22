@@ -207,6 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="isLoading"
             :disable="isLoading"
             >
+              <q-tooltip v-if="searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled">{{ t("search.autoRunEnabled") }}</q-tooltip>
               <q-icon
                 v-if="searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled"
                 name="autorenew"
@@ -1063,5 +1064,9 @@ export default defineComponent({
 
 .search-button-dropdown-enterprise-border-radius {
   border-radius: 0px 0.375rem 0.375rem 0px !important;
+}
+
+.o2-run-query-button {
+  width: 94px !important;
 }
 </style>

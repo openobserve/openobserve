@@ -214,6 +214,7 @@
     "refreshCacheAndRunQuery": "Refresh Cache & Run Query",
     "liveMode": "Auto",
     "liveModeTooltip": "Auto-run query on filter/time changes",
+    "autoRunEnabled": "Auto run enabled",
     "turnOnLiveMode": "Turn on Auto Run",
     "turnOffLiveMode": "Turn off Auto Run",
     "autoRefresh": "Auto Refresh",
