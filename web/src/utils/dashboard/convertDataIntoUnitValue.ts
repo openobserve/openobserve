@@ -221,20 +221,14 @@ export const getUnitValue = (
     }
     case "default":
     default: {
-      if (isNaN(value)) {
-        return { value: value, unit: "" };
-      }
-      if (value === "") {
-        return { value: "-", unit: "" };
-      }
-      // Use Intl.NumberFormat for comma-separated thousands grouping.
-      // This matches ECharts' default axis label formatting and is more readable
-      // than plain toFixed() for large numbers (e.g. "14,000,000" vs "14000000.00").
-      const formatted = new Intl.NumberFormat("en-US", {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals,
-      }).format(+value);
-      return { value: formatted, unit: "" };
+      return {
+        value: isNaN(value)
+          ? value
+          : value === ""
+            ? "-"
+            : ((+value)?.toFixed(decimals) ?? 0),
+        unit: "",
+      };
     }
   }
 };
