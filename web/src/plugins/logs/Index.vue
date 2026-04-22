@@ -2210,6 +2210,71 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Live mode: when auto_query_enabled is true in zoConfig, live mode is on
+    // by default so queries auto-run on filter or datetime changes (debounced).
+    // Users can toggle it off via the Run Query dropdown.
+    // zoConfig may not be populated yet at mount time; watch for it to arrive.
+    watch(
+      () => store.state.zoConfig?.auto_query_enabled,
+      (enabled) => {
+        if (enabled && !searchObj.meta.liveMode) {
+          searchObj.meta.liveMode = true;
+        }
+      },
+      { immediate: true },
+    );
+
+    // Debounced auto-run triggered by query text changes in live mode.
+    const debouncedAutoRunOnQuery = debounce(() => {
+      if (
+        searchObj.meta.liveMode &&
+        store.state.zoConfig?.auto_query_enabled &&
+        searchObj.meta.logsVisualizeToggle === "logs" &&
+        !searchObj.loading &&
+        !searchObj.loadingHistogram
+      ) {
+        handleRunQuery();
+      }
+    }, 500);
+
+    // Debounced auto-run triggered by datetime changes in live mode.
+    // Only fires when query_on_stream_selection is true (i.e., the existing
+    // updateDateTime path is NOT already auto-running the query).
+    const debouncedAutoRunOnDatetime = debounce(() => {
+      if (
+        searchObj.meta.liveMode &&
+        store.state.zoConfig?.auto_query_enabled &&
+        store.state.zoConfig?.query_on_stream_selection !== false &&
+        searchObj.meta.logsVisualizeToggle === "logs" &&
+        !searchObj.loading &&
+        !searchObj.loadingHistogram
+      ) {
+        handleRunQuery();
+      }
+    }, 500);
+
+    watch(
+      () => searchObj.data.query,
+      (_newVal, _oldVal) => {
+        if (searchObj.shouldIgnoreWatcher) return;
+        debouncedAutoRunOnQuery();
+      },
+    );
+
+    watch(
+      () => [
+        searchObj.data.datetime.type,
+        searchObj.data.datetime.startTime,
+        searchObj.data.datetime.endTime,
+        searchObj.data.datetime.relativeTimePeriod,
+      ],
+      (_newVal, _oldVal) => {
+        if (searchObj.shouldIgnoreWatcher) return;
+        debouncedAutoRunOnDatetime();
+      },
+      { deep: true },
+    );
+
     // Watch AI chat state and adjust splitter to give more space when chat is open
     const originalSplitterValue = ref(searchObj.config.splitterModel);
     watch(
