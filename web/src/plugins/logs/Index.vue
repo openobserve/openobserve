@@ -2224,22 +2224,10 @@ export default defineComponent({
       { immediate: true },
     );
 
-    // Debounced auto-run triggered by query text changes in live mode.
-    const debouncedAutoRunOnQuery = debounce(() => {
-      if (
-        searchObj.meta.liveMode &&
-        store.state.zoConfig?.auto_query_enabled &&
-        searchObj.meta.logsVisualizeToggle === "logs" &&
-        !searchObj.loading &&
-        !searchObj.loadingHistogram
-      ) {
-        handleRunQuery();
-      }
-    }, 500);
-
     // Debounced auto-run triggered by datetime changes in live mode.
     // Only fires when query_on_stream_selection is true (i.e., the existing
     // updateDateTime path is NOT already auto-running the query).
+    // Uses runQueryFn so the histogram is also refreshed.
     const debouncedAutoRunOnDatetime = debounce(() => {
       if (
         searchObj.meta.liveMode &&
@@ -2249,17 +2237,9 @@ export default defineComponent({
         !searchObj.loading &&
         !searchObj.loadingHistogram
       ) {
-        handleRunQuery();
+        runQueryFn();
       }
     }, 500);
-
-    watch(
-      () => searchObj.data.query,
-      (_newVal, _oldVal) => {
-        if (searchObj.shouldIgnoreWatcher) return;
-        debouncedAutoRunOnQuery();
-      },
-    );
 
     watch(
       () => [
