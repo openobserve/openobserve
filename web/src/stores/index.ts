@@ -225,8 +225,6 @@ export default createStore({
     //   state.currentPanelsData = payload;
     // },
     setConfig(state, payload) {
-      payload.auto_query_enabled = true;
-      console.log('1', payload);
       state.zoConfig = payload;
     },
     setFolders(state, payload) {
@@ -439,7 +437,6 @@ export default createStore({
     //   context.commit('setCurrentPanelsData', payload);
     // },
     setConfig(context, payload) {
-      payload.auto_query_enabled = true;
       context.commit("setConfig", payload);
     },
     appTheme(context, payload) {
