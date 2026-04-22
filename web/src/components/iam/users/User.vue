@@ -542,12 +542,12 @@ export default defineComponent({
             let counter = 1;
             currentUserRole.value = "";
             usersState.users = users.map((data: any) => {
-              if (store.state.userInfo.email == data.email) {
-                currentUserRole.value = data.role;
+              if (store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()) {
+                currentUserRole.value = data.role?.toLowerCase();
                 isCurrentUserInternal.value = !data.is_external;
               }
 
-              if (data.email == router.currentRoute.value.query.email) {
+              if (data.email?.toLowerCase() == router.currentRoute.value.query.email?.toString().toLowerCase()) {
                 addUser({ row: data }, true);
               }
 
@@ -557,7 +557,7 @@ export default defineComponent({
                 first_name: data.first_name,
                 last_name: data.last_name,
                 role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
-                enableEdit: store.state.userInfo.email == data.email ? true : false,
+                enableEdit: store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase() ? true : false,
                 enableChangeRole: false,
                 enableDelete: config.isCloud == "true" ? true : false,
                 status: data?.status,
@@ -675,7 +675,7 @@ export default defineComponent({
             user.role?.toLowerCase() !== "root" &&
             (currentUserRole.value == "root" ||
               currentUserRole.value == "admin") &&
-              store.state.userInfo.email !== user.email
+              store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
 
           );
         }

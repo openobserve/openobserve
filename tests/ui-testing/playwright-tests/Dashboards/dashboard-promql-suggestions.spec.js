@@ -35,7 +35,7 @@ const cleanupDashboard = async (page, pm, dashboardName) => {
   const monacoEditor = queryEditor.getByRole('code');
   await monacoEditor.click();
   await page.keyboard.press('Control+a');
-  await page.keyboard.type('up');
+  await page.keyboard.type('cpu_usage{}');
   await page.keyboard.press('Escape'); // dismiss any autocomplete
 
   // Wait for Monaco's debounced model update (500ms default in CodeQueryEditor.vue)
@@ -61,7 +61,7 @@ test.describe.configure({ mode: "parallel" });
  * FEATURE OVERVIEW:
  * Tests autocomplete suggestions in the PromQL query editor:
  * 1. Function suggestions - when typing function names like 'rate', 'avg', 'sum'
- * 2. Metric name suggestions - when typing metric prefixes like 'cpu', 'up'
+ * 2. Metric name suggestions - when typing metric prefixes like 'cpu', 'cpu_usage{}'
  * 3. Label name suggestions - when typing inside curly braces: metric{
  * 4. Label value suggestions - when typing label_name=: metric{label_name=
  *

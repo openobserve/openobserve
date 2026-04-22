@@ -110,7 +110,7 @@ test.describe("ConfigPanel — Table Settings", () => {
     await rowsPerPageInput.fill("25");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Pagination enabled, rows per page set to 25");
-    await expect(page.locator(".q-table__bottom")).toBeVisible();
+    await expect(page.locator('[data-test="dashboard-table-pagination"]')).toBeVisible();
 
     // Re-open config and disable pagination → input hidden again
     await paginationToggle.click();

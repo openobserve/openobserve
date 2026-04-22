@@ -2220,7 +2220,55 @@
     "editJson": "Waarschuwings-JSON bewerken",
     "importedFromPattern": "Waarschuwing vooraf ingevuld op basis van logpatroon",
     "importedFromAnomalyPattern": "Waarschuwing vooraf ingevuld op basis van een abnormaal logpatroon — bekijk de urgentie-instellingen",
-    "additional_settings": "Aanvullende instellingen"
+    "additional_settings": "Aanvullende instellingen",
+    "alertNamePlaceholder": "Naam van de waarschuwing",
+    "anomalyNamePlaceholder": "Anomalienaam",
+    "folder": "Folder",
+    "selectStreamTypeFirst": "Selecteer eerst een streamtype",
+    "previewEmptyState": "Selecteer een streamtype en streamnaam om een voorbeeld te zien",
+    "queryConfig": {
+      "sectionTitle": "Voorwaarden",
+      "openFullEditor": "Volledige editor openen",
+      "groupByTooltip": "Groepeer resultaten op basis van deze velden — waarschuwingstriggers per unieke combinatie",
+      "havingGroups": "Groepen hebben",
+      "havingGroupsTooltip": "Minimumaantal groepen dat aan de bovenstaande voorwaarde moet voldoen om de waarschuwing te activeren.",
+      "addGroupByField": "Groep per veld toevoegen",
+      "noFunctions": "Geen functies",
+      "writeQueryHint": "Schrijf een vraag om aan de slag te gaan",
+      "sqlEditorHint": "Gebruik de volledige open editor om uit te voeren en te valideren"
+    },
+    "anomaly": {
+      "filters": "Filters",
+      "fieldPlaceholder": "Veld",
+      "noFieldsFound": "Geen velden gevonden",
+      "selectStreamFirst": "Selecteer eerst een stream",
+      "addFilter": "Filter toevoegen",
+      "sqlRequired": "SQL is vereist in aangepaste SQL-modus",
+      "detectionResolution": "Resolutie van de detectie",
+      "detectionResolutionTooltip": "Hoe gedetailleerd elk gegevenspunt is. Bijvoorbeeld „\" 5m \"” betekent dat afwijkingen worden gedetecteerd met een resolutie van 5 minuten.”",
+      "checkEvery": "Controleer elke",
+      "checkEveryTooltip": "Hoe vaak de detectieopdracht wordt uitgevoerd. Kan groter zijn dan de steekproefperiode (bijv. monster elke 5 meter, detectie elke 1 uur uitvoeren).",
+      "lookBackWindow": "Kijk terug naar het venster",
+      "lookBackWindowTooltip": "Hoe ver terug elke detectie voert query's uit. Sluit het venster af, zelfs na een lange pauze. De standaardinstelling is om elk interval te controleren.",
+      "retrainEvery": "Elke opnieuw trainen",
+      "retrainEveryTooltip": "Hoe vaak moet het model automatisch worden bijgeschoold. „Nooit” betekent één keer trainen en het model bewaren totdat het handmatig wordt bijgeschoold.",
+      "sensitivityTooltip": "Pas het bereik van de anomaliescore aan om de gevoeligheid te regelen. Punten met scores buiten dit bereik zullen geen waarschuwingen activeren. Gebruik de grafiek om historische gegevens te visualiseren en daarop af te stemmen.",
+      "anomalyScoreRange": "Scorebereik voor afwijkingen:",
+      "loadData": "Gegevens laden",
+      "selectStreamFirstTooltip": "selecteer eerst een stream",
+      "enterSqlFirst": "voer eerst een SQL-query in",
+      "clickLoadDataHint": "Klik op Gegevens laden om een voorbeeld van de tijdreeks te bekijken",
+      "seasonalityWeekly": "uur + dag van de week",
+      "seasonalityDaily": "uur van de dag",
+      "notifications": "Meldingen",
+      "notificationsTooltip": "Indien ingeschakeld, wordt er een melding naar de geselecteerde bestemming gestuurd wanneer een anomalie wordt gedetecteerd.",
+      "enabled": "Ingeschakeld",
+      "disabled": "Uitgeschakeld",
+      "noDestinationsFound": "Geen bestemmingen gevonden",
+      "addNewDestination": "Nieuwe bestemming toevoegen",
+      "destinationRequired": "Er is minstens één bestemming vereist!",
+      "disabledNotificationsInfo": "De detectie van afwijkingen wordt nog steeds uitgevoerd en de resultaten worden naar de _anomalieënstream geschreven. Schakel meldingen in om waarschuwingen te ontvangen wanneer er afwijkingen worden gedetecteerd."
+    }
   },
   "alert_templates": {
     "header": "Sjablonen",
@@ -2829,7 +2877,8 @@
       "type": "Typ",
       "multiStepAgent": "Agent met meerdere stappen"
     },
-    "noLogsAvailableForService": "Geen logboeken beschikbaar voor deze service"
+    "noLogsAvailableForService": "Geen logboeken beschikbaar voor deze service",
+    "spansTruncatedWarning": "Toont {count} van {total} overspanningen — de tracering is mogelijk onvolledig. Beperk de tijdspanne of neem contact op met uw beheerder om de limiet voor het bereik te verhogen."
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -3360,7 +3409,15 @@
     "never": "Nooit",
     "typeScore": "Numerieke score (bijvoorbeeld 0,0 - 1,0)",
     "typeBoolean": "Binair/Pass-Fail (Booleaans)",
-    "typeCustom": "Categorische/aangepaste tekst"
+    "typeCustom": "Categorische/aangepaste tekst",
+    "bulkDeleteConfirmation": "Weet je zeker dat je {count} template (s) wilt verwijderen?",
+    "search": "Sjablonen zoeken",
+    "dimensionsTooltip": "Evaluatiedimensies toevoegen (bijv. nauwkeurigheid, relevantie). Typ en druk op Enter om aangepaste bestanden toe te voegen.",
+    "tooltipName": "Een unieke naam voor dit evaluatiesjabloon.",
+    "tooltipDescription": "Optionele beschrijving om uit te leggen wat dit sjabloon evalueert.",
+    "tooltipResponseType": "Definieert het formaat van de evaluatie-output van de LLM: numerieke score, booleaanse pass/fail of aangepaste tekst.",
+    "tooltipDimensions": "Evaluatiecriteria die de LLM moet beoordelen. Selecteer een van de standaardinstellingen of typ een aangepaste versie en druk op Enter.",
+    "tooltipPromptTemplate": "De prompt die naar de LLM is gestuurd. Gebruik {input}, {output} en {context} als tijdelijke aanduidingen voor dynamische waarden tijdens de evaluatie."
   },
   "aiToolset": {
     "header": "AI-toolsets",

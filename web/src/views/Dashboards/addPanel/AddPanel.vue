@@ -657,9 +657,6 @@ export default defineComponent({
         dashboardPanelData.layout.currentQueryIndex,
       ],
       () => {
-        console.log(
-          "[AddPanel] Stream or query changed, updating context provider",
-        );
         const dashboardProvider = createDashboardsContextProvider(
           route,
           store,

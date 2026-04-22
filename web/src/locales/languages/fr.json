@@ -2222,7 +2222,55 @@
     "updateAnomalyDetection": "Mettre à jour la détection des anomalies :",
     "anomalyCreated": "Configuration de détection des anomalies créée. La formation débutera prochainement.",
     "editJson": "Modifier le JSON d'alerte",
-    "additional_settings": "Réglages supplémentaires"
+    "additional_settings": "Réglages supplémentaires",
+    "alertNamePlaceholder": "Nom de l'alerte",
+    "anomalyNamePlaceholder": "Nom de l'anomalie",
+    "folder": "Dossier",
+    "selectStreamTypeFirst": "Sélectionnez d'abord un type de flux",
+    "previewEmptyState": "Sélectionnez un type de flux et un nom de flux pour voir un aperçu",
+    "queryConfig": {
+      "sectionTitle": "Conditions",
+      "openFullEditor": "Ouvrir l'éditeur complet",
+      "groupByTooltip": "Regroupez les résultats selon ces champs : les alertes sont déclenchées par combinaison unique",
+      "havingGroups": "Avoir des groupes",
+      "havingGroupsTooltip": "Nombre minimum de groupes devant satisfaire à la condition ci-dessus pour déclencher l'alerte.",
+      "addGroupByField": "Ajouter un groupe par champ",
+      "noFunctions": "Aucune fonction",
+      "writeQueryHint": "Rédigez une requête pour commencer",
+      "sqlEditorHint": "Utiliser l'éditeur complet ouvert pour exécuter et valider"
+    },
+    "anomaly": {
+      "filters": "Filtres",
+      "fieldPlaceholder": "Champ",
+      "noFieldsFound": "Aucun champ n'a été trouvé",
+      "selectStreamFirst": "Sélectionnez d'abord un flux",
+      "addFilter": "Ajouter un filtre",
+      "sqlRequired": "Le code SQL est requis en mode SQL personnalisé",
+      "detectionResolution": "Résolution de détection",
+      "detectionResolutionTooltip": "Le degré de précision de chaque point de données. Par exemple, « 5 m » signifie que des anomalies sont détectées à une résolution de 5 minutes.",
+      "checkEvery": "Vérifiez chaque",
+      "checkEveryTooltip": "Fréquence d'exécution de la tâche de détection. Peut être plus longue que la période d'échantillonnage (par exemple, échantillonnage tous les 5 m, exécution de la détection toutes les 1 h).",
+      "lookBackWindow": "Fenêtre Look Back",
+      "lookBackWindowTooltip": "Depuis combien de temps chaque détection exécute les requêtes. Permet de fermer la fenêtre même après une longue pause. La valeur par défaut est Check Every Interval.",
+      "retrainEvery": "Reformer chaque",
+      "retrainEveryTooltip": "À quelle fréquence réentraîner automatiquement le modèle. « Jamais » signifie s'entraîner une seule fois et conserver le modèle jusqu'à ce qu'il soit réentraîné manuellement.",
+      "sensitivityTooltip": "Ajustez la plage de score d'anomalie pour contrôler la sensibilité. Les points dont le score se situe en dehors de cette fourchette ne déclencheront pas d'alerte. Utilisez le graphique pour visualiser les données historiques et ajuster en conséquence.",
+      "anomalyScoreRange": "Plage de scores d'anomalie :",
+      "loadData": "Charger les données",
+      "selectStreamFirstTooltip": "sélectionnez d'abord un flux",
+      "enterSqlFirst": "entrez d'abord une requête SQL",
+      "clickLoadDataHint": "Cliquez sur Charger les données pour prévisualiser la série chronologique",
+      "seasonalityWeekly": "heure + jour de la semaine",
+      "seasonalityDaily": "heure de la journée",
+      "notifications": "Notifications",
+      "notificationsTooltip": "Lorsque cette option est activée, une notification est envoyée à la destination sélectionnée chaque fois qu'une anomalie est détectée.",
+      "enabled": "Activé",
+      "disabled": "Désactivé",
+      "noDestinationsFound": "Aucune destination trouvée",
+      "addNewDestination": "Ajouter une nouvelle destination",
+      "destinationRequired": "Au moins une destination est requise !",
+      "disabledNotificationsInfo": "La détection des anomalies sera toujours exécutée et les résultats seront enregistrés dans le flux _anomalies. Activez les notifications pour recevoir des alertes lorsque des anomalies sont détectées."
+    }
   },
   "alert_templates": {
     "header": "Modèles",
@@ -2818,7 +2866,8 @@
       "type": "Tapez",
       "multiStepAgent": "Agent en plusieurs étapes"
     },
-    "noLogsAvailableForService": "Aucun journal disponible pour ce service"
+    "noLogsAvailableForService": "Aucun journal disponible pour ce service",
+    "spansTruncatedWarning": "Affichage de {count} de {total} spans — la trace est peut-être incomplète. Réduisez la plage de temps ou contactez votre administrateur pour augmenter la limite de durée."
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -3349,7 +3398,15 @@
     "never": "Jamais",
     "typeScore": "Score numérique (par exemple, 0,0 à 1,0)",
     "typeBoolean": "Binaire/Pass-Fail (booléen)",
-    "typeCustom": "Texte catégoriel/personnalisé"
+    "typeCustom": "Texte catégoriel/personnalisé",
+    "bulkDeleteConfirmation": "Êtes-vous sûr de vouloir supprimer {count} modèle (s) ?",
+    "search": "Modèles de recherche",
+    "dimensionsTooltip": "Ajoutez des dimensions d'évaluation (par exemple, précision, pertinence). Tapez et appuyez sur Entrée pour en ajouter des personnalisés.",
+    "tooltipName": "Un nom unique pour ce modèle d'évaluation.",
+    "tooltipDescription": "Description facultative pour expliquer ce que ce modèle évalue.",
+    "tooltipResponseType": "Définit le format de la sortie d'évaluation du LLM : score numérique, réussite ou échec booléen ou texte personnalisé.",
+    "tooltipDimensions": "Critères d'évaluation que le LLM devrait juger. Sélectionnez l'une des valeurs par défaut ou saisissez-en une personnalisée et appuyez sur Entrée.",
+    "tooltipPromptTemplate": "L'invite envoyée au LLM. Utilisez {input}, {output} et {context} comme espaces réservés pour les valeurs dynamiques au moment de l'évaluation."
   },
   "aiToolset": {
     "header": "Ensembles d'outils d'IA",

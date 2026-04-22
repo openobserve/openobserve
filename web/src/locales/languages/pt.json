@@ -2222,7 +2222,55 @@
     "updateAnomalyDetection": "Atualize a detecção de anomalias:",
     "anomalyCreated": "Configuração de detecção de anomalias criada. O treinamento começará em breve.",
     "editJson": "Editar alerta JSON",
-    "additional_settings": "Configurações adicionais"
+    "additional_settings": "Configurações adicionais",
+    "alertNamePlaceholder": "Nome do alerta",
+    "anomalyNamePlaceholder": "Nome da anomalia",
+    "folder": "Pasta",
+    "selectStreamTypeFirst": "Selecione primeiro um tipo de stream",
+    "previewEmptyState": "Selecione o tipo e o nome do stream para ver uma prévia",
+    "queryConfig": {
+      "sectionTitle": "Condições",
+      "openFullEditor": "Abrir editor completo",
+      "groupByTooltip": "Agrupe os resultados por esses campos — acionadores de alerta por combinação exclusiva",
+      "havingGroups": "Ter grupos",
+      "havingGroupsTooltip": "Número mínimo de grupos que devem satisfazer a condição acima para acionar o alerta.",
+      "addGroupByField": "Adicionar grupo por campo",
+      "noFunctions": "Sem funções",
+      "writeQueryHint": "Escreva uma consulta para começar",
+      "sqlEditorHint": "Use o editor aberto e completo para executar e validar"
+    },
+    "anomaly": {
+      "filters": "Filtros",
+      "fieldPlaceholder": "Campo",
+      "noFieldsFound": "Nenhum campo encontrado",
+      "selectStreamFirst": "Selecione um stream primeiro",
+      "addFilter": "Adicionar filtro",
+      "sqlRequired": "O SQL é necessário no modo SQL personalizado",
+      "detectionResolution": "Resolução de detecção",
+      "detectionResolutionTooltip": "Quão granular é cada ponto de dados. Por exemplo, “5m” significa que anomalias são detectadas com resolução de 5 minutos.",
+      "checkEvery": "Verifique cada",
+      "checkEveryTooltip": "Com que frequência o trabalho de detecção é executado. Pode ser maior do que o período de amostragem (por exemplo, amostra a cada 5m, detecção de execução a cada 1h).",
+      "lookBackWindow": "Janela Olhe para trás",
+      "lookBackWindowTooltip": "Há quanto tempo cada detecção executa consultas. Fecha a janela mesmo depois de uma longa pausa. O padrão é Verificar cada intervalo.",
+      "retrainEvery": "Treine novamente cada",
+      "retrainEveryTooltip": "Com que frequência treinar automaticamente o modelo. “Nunca” significa treinar uma vez e manter o modelo até que seja retreinado manualmente.",
+      "sensitivityTooltip": "Ajuste a faixa de pontuação da anomalia para controlar a sensibilidade. Pontos com pontuações fora dessa faixa não acionarão alertas. Use o gráfico para visualizar dados históricos e ajustá-los adequadamente.",
+      "anomalyScoreRange": "Faixa de pontuação de anomalias:",
+      "loadData": "Carregar dados",
+      "selectStreamFirstTooltip": "selecione um stream primeiro",
+      "enterSqlFirst": "insira uma consulta SQL primeiro",
+      "clickLoadDataHint": "Clique em Carregar dados para visualizar a série temporal",
+      "seasonalityWeekly": "hora+ dia da semana",
+      "seasonalityDaily": "hora do dia",
+      "notifications": "Notificações",
+      "notificationsTooltip": "Quando ativada, uma notificação será enviada ao destino selecionado sempre que uma anomalia for detectada.",
+      "enabled": "Ativado",
+      "disabled": "Desativado",
+      "noDestinationsFound": "Nenhum destino encontrado",
+      "addNewDestination": "Adicionar novo destino",
+      "destinationRequired": "É necessário pelo menos um destino!",
+      "disabledNotificationsInfo": "A detecção de anomalias ainda será executada e gravará os resultados no fluxo _anomalies. Ative as notificações para receber alertas quando forem detectadas anomalias."
+    }
   },
   "alert_templates": {
     "header": "Modelos",
@@ -2818,7 +2866,8 @@
       "type": "Tipo",
       "multiStepAgent": "Agente de várias etapas"
     },
-    "noLogsAvailableForService": "Não há registros disponíveis para este serviço"
+    "noLogsAvailableForService": "Não há registros disponíveis para este serviço",
+    "spansTruncatedWarning": "Mostrando {count} de {total} extensões — o rastreamento pode estar incompleto. Limite o intervalo de tempo ou entre em contato com seu administrador para aumentar o limite de intervalo."
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -3349,7 +3398,15 @@
     "never": "Nunca",
     "typeScore": "Pontuação numérica (por exemplo, 0,0 - 1,0)",
     "typeBoolean": "Binário//Falha de aprovação (booleano)",
-    "typeCustom": "Texto categórico/personalizado"
+    "typeCustom": "Texto categórico/personalizado",
+    "bulkDeleteConfirmation": "Tem certeza de que deseja excluir {count} modelo (s)?",
+    "search": "Modelos de pesquisa",
+    "dimensionsTooltip": "Adicione dimensões de avaliação (por exemplo, precisão, relevância). Digite e pressione Enter para adicionar itens personalizados.",
+    "tooltipName": "Um nome exclusivo para esse modelo de avaliação.",
+    "tooltipDescription": "Descrição opcional para explicar o que esse modelo avalia.",
+    "tooltipResponseType": "Define o formato da saída de avaliação do LLM — pontuação numérica, aprovação/reprovação booleana ou texto personalizado.",
+    "tooltipDimensions": "Critérios de avaliação que o LLM deve julgar. Selecione entre os padrões ou digite um personalizado e pressione Enter.",
+    "tooltipPromptTemplate": "O prompt enviado ao LLM. Use {input}, {output} e {context} como espaços reservados para valores dinâmicos no momento da avaliação."
   },
   "aiToolset": {
     "header": "Conjuntos de ferramentas de IA",

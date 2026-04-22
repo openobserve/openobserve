@@ -2222,7 +2222,55 @@
     "updateAnomalyDetection": "更新异常检测：",
     "anomalyCreated": "异常检测配置已创建。培训将很快开始。",
     "editJson": "编辑警报 JSON",
-    "additional_settings": "其他设置"
+    "additional_settings": "其他设置",
+    "alertNamePlaceholder": "警报名称",
+    "anomalyNamePlaceholder": "异常名称",
+    "folder": "文件夹",
+    "selectStreamTypeFirst": "请先选择直播类型",
+    "previewEmptyState": "选择直播类型和直播名称以查看预览",
+    "queryConfig": {
+      "sectionTitle": "条件",
+      "openFullEditor": "打开完整版编辑器",
+      "groupByTooltip": "按这些字段对结果进行分组——每个唯一组合的警报触发器",
+      "havingGroups": "有群组",
+      "havingGroupsTooltip": "必须满足上述条件才能触发警报的最小组数。",
+      "addGroupByField": "按字段添加分组",
+      "noFunctions": "没有函数",
+      "writeQueryHint": "写一个查询开始吧",
+      "sqlEditorHint": "使用打开的完整编辑器运行和验证"
+    },
+    "anomaly": {
+      "filters": "过滤器",
+      "fieldPlaceholder": "字段",
+      "noFieldsFound": "未找到字段",
+      "selectStreamFirst": "先选择一个直播",
+      "addFilter": "添加过滤器",
+      "sqlRequired": "自定义 SQL 模式下需要 SQL",
+      "detectionResolution": "探测分辨率",
+      "detectionResolutionTooltip": "每个数据点的粒度如何。例如，“5m” 表示以 5 分钟的分辨率检测到异常。",
+      "checkEvery": "检查每个",
+      "checkEveryTooltip": "检测任务的运行频率。可以大于采样周期（例如，每 5 分钟采样一次，每 1 小时运行一次检测）。",
+      "lookBackWindow": "向后看窗口",
+      "lookBackWindowTooltip": "每次检测运行查询的时间可以追溯到多久以前。即使停顿了很长时间，也要关闭窗口。默认为 “每隔一段时间都检查”。",
+      "retrainEvery": "对所有人进行重新训练",
+      "retrainEveryTooltip": "自动重新训练模型的频率。“从不” 表示训练一次并保留模型直到手动重新训练。",
+      "sensitivityTooltip": "调整异常分数范围以控制灵敏度。分数超出此范围的分数不会触发警报。使用图表可视化历史数据并进行相应调整。",
+      "anomalyScoreRange": "异常分数范围：",
+      "loadData": "加载数据",
+      "selectStreamFirstTooltip": "先选择一个直播",
+      "enterSqlFirst": "先输入 SQL 查询",
+      "clickLoadDataHint": "单击 “加载数据” 预览时间序列",
+      "seasonalityWeekly": "一小时 + 一周中的某一天",
+      "seasonalityDaily": "一天中的一小时",
+      "notifications": "通知",
+      "notificationsTooltip": "启用后，只要检测到异常，就会向所选目的地发送通知。",
+      "enabled": "已启用",
+      "disabled": "已禁用",
+      "noDestinationsFound": "未找到目的地",
+      "addNewDestination": "添加新目的地",
+      "destinationRequired": "至少需要一个目的地！",
+      "disabledNotificationsInfo": "异常检测仍将运行并将结果写入 _anomalies 流。启用通知以在检测到异常时接收警报。"
+    }
   },
   "alert_templates": {
     "header": "模板",
@@ -2822,7 +2870,8 @@
       "type": "类型",
       "multiStepAgent": "多步代理"
     },
-    "noLogsAvailableForService": "此服务没有可用的日志"
+    "noLogsAvailableForService": "此服务没有可用的日志",
+    "spansTruncatedWarning": "显示 {total} 跨度的 {count} — 跟踪可能不完整。缩小时间范围或联系管理员以增加跨度限制。"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -3353,7 +3402,15 @@
     "never": "永远不要",
     "typeScore": "数字分数（例如，0.0-1.0）",
     "typeBoolean": "二进制/合格失败（布尔值）",
-    "typeCustom": "分类/自定义文本"
+    "typeCustom": "分类/自定义文本",
+    "bulkDeleteConfirmation": "您确定要删除 {count} 个模板吗？",
+    "search": "搜索模板",
+    "dimensionsTooltip": "添加评估维度（例如准确性、相关性）。键入并按 Enter 键添加自定义的。",
+    "tooltipName": "此评估模板的唯一名称。",
+    "tooltipDescription": "可选描述，用于解释此模板的评估内容。",
+    "tooltipResponseType": "定义 LLM 评估输出的格式——数字分数、布尔值通过/失败或自定义文本。",
+    "tooltipDimensions": "法学硕士应判断的评估标准。从默认值中选择或键入自定义值，然后按 Enter。",
+    "tooltipPromptTemplate": "提示已发送到 LLM。在评估时使用 {输入}、{输出} 和 {context} 作为动态值的占位符。"
   },
   "aiToolset": {
     "header": "AI 工具集",
