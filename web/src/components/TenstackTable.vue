@@ -624,7 +624,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :fill="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
                         />
                       </svg>
-                      <!-- Line sparkline: area chart + dot marker -->
+                      <!-- Line sparkline: smooth area chart + dot marker -->
                       <svg
                         v-else
                         width="80"
@@ -632,27 +632,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         overflow="visible"
                         style="display: block; flex-shrink: 0"
                       >
-                        <polygon
-                          :points="getSparklineArea(cell)"
+                        <!-- Filled area under the curve -->
+                        <path
+                          :d="getSparklineArea(cell)"
                           :fill="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
                           opacity="0.12"
                         />
-                        <polyline
-                          :points="getSparklinePoints(cell)"
+                        <!-- Smooth bezier curve line -->
+                        <path
+                          :d="getSparklinePoints(cell)"
                           fill="none"
                           :stroke="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
                           stroke-width="1.5"
-                          stroke-linejoin="round"
                           stroke-linecap="round"
+                          stroke-linejoin="round"
                         />
+                        <!-- Current row's position marker -->
                         <circle
                           v-if="getSparklineDot(cell)"
                           :cx="getSparklineDot(cell)!.cx"
                           :cy="getSparklineDot(cell)!.cy"
-                          r="2.5"
+                          r="3"
                           :fill="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
                           stroke="white"
-                          stroke-width="1"
+                          stroke-width="1.5"
                         />
                       </svg>
                     </div>
@@ -1715,6 +1718,26 @@ interface SparklineData {
 }
 
 const _SVG_W = 80, _SVG_H = 20;
+// Smooth curves look polished at 20 control points; more adds no visible benefit.
+const _SPARKLINE_MAX_PTS = 20;
+
+/**
+ * Build a smooth SVG path using midpoint cubic bezier interpolation.
+ * Each segment uses the segment midpoint as both control points so the curve
+ * passes through every data point and transitions smoothly — the same technique
+ * used by Grafana and D3 sparklines.
+ */
+const buildSparklinePath = (xyPts: [number, number][]): string => {
+  if (xyPts.length < 2) return "";
+  let d = `M ${xyPts[0][0].toFixed(1)},${xyPts[0][1].toFixed(1)}`;
+  for (let i = 1; i < xyPts.length; i++) {
+    const [x1, y1] = xyPts[i - 1];
+    const [x2, y2] = xyPts[i];
+    const mx = ((x1 + x2) / 2).toFixed(1);
+    d += ` C ${mx},${y1.toFixed(1)} ${mx},${y2.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}`;
+  }
+  return d;
+};
 
 /** Pre-computed sparkline data keyed by column field id. Recomputed only when rows change. */
 const sparklineCache = computed((): Map<string, SparklineData> => {
@@ -1734,15 +1757,22 @@ const sparklineCache = computed((): Map<string, SparklineData> => {
     let mn = nums[0], mx = nums[0];
     for (const v of nums) { if (v < mn) mn = v; if (v > mx) mx = v; }
     const range = mx - mn || 1;
-    // Line chart polyline + area polygon
-    const ptArr = nums.map((v, i) => {
-      const x = (i / (nums.length - 1)) * _SVG_W;
-      const y = _SVG_H - ((v - mn) / range) * (_SVG_H - 4) - 2;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    });
-    const points = ptArr.join(" ");
-    const areaPoints = `${points} ${_SVG_W},${_SVG_H} 0,${_SVG_H}`;
-    // Per-row dot + bar
+    // Downsample to _SPARKLINE_MAX_PTS points; use full X coordinate space so
+    // per-row dots (which use exact proportional X) stay aligned with the curve.
+    const step = nums.length > _SPARKLINE_MAX_PTS ? Math.ceil(nums.length / _SPARKLINE_MAX_PTS) : 1;
+    const xyPts: [number, number][] = [];
+    for (let i = 0; i < nums.length; i += step) {
+      xyPts.push([(i / (nums.length - 1)) * _SVG_W, _SVG_H - ((nums[i] - mn) / range) * (_SVG_H - 4) - 2]);
+    }
+    // Always close to the right edge
+    if (xyPts[xyPts.length - 1][0] < _SVG_W - 0.5) {
+      xyPts.push([_SVG_W, _SVG_H - ((nums[nums.length - 1] - mn) / range) * (_SVG_H - 4) - 2]);
+    }
+    const linePath = buildSparklinePath(xyPts);
+    const areaPath = xyPts.length > 1
+      ? `${linePath} L ${_SVG_W},${_SVG_H} L 0,${_SVG_H} Z`
+      : "";
+    // Per-row dot + bar — X always at exact proportional position in full dataset
     let denseIdx = -1;
     const dots: (SparklineDot | null)[] = [];
     const bars: (SparklineBar | null)[] = [];
@@ -1755,7 +1785,7 @@ const sparklineCache = computed((): Map<string, SparklineData> => {
       const barH = Math.max(1, ((v - mn) / range) * (_SVG_H - 2));
       bars.push({ y: (_SVG_H - barH).toFixed(1), h: barH.toFixed(1) });
     }
-    cache.set(key, { points, areaPoints, dots, bars });
+    cache.set(key, { points: linePath, areaPoints: areaPath, dots, bars });
   }
   return cache;
 });
@@ -2582,10 +2612,11 @@ defineExpose({
   }
 }
 
-// Sparkline cell type (dashboard table)
+// Sparkline cell type (dashboard table) — always right-aligned (numeric value)
 .sparkline-cell {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
   width: 100%;
   height: 100%;
