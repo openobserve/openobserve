@@ -3606,6 +3606,13 @@ export default defineComponent({
       fnEditorRef?.value?.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
       searchObj.data.tempFunctionContent = fnValue.function;
+
+      if (
+        store.state.zoConfig?.auto_query_enabled &&
+        searchObj.meta.liveMode
+      ) {
+        emit("searchdata");
+      }
     };
 
     const fnSavedFunctionDialog = () => {
@@ -5625,7 +5632,7 @@ export default defineComponent({
             this.store.state.zoConfig.auto_query_enabled &&
             this.searchObj.meta.liveMode
           ) {
-            this.handleRunQuery();
+            this.$emit("searchdata");
           }
         }
       }
@@ -5644,7 +5651,7 @@ export default defineComponent({
         this.store.state.zoConfig.auto_query_enabled &&
         this.searchObj.meta.liveMode
       ) {
-        this.handleRunQuery();
+        this.$emit("searchdata");
       }
     },
     toggleTransformEditor(newVal) {
@@ -5659,6 +5666,12 @@ export default defineComponent({
     resetFunction(newVal) {
       if (newVal == "" && store && !store?.state?.savedViewFlag) {
         this.resetFunctionContent();
+        if (
+          this.store.state.zoConfig?.auto_query_enabled &&
+          this.searchObj.meta.liveMode
+        ) {
+          this.$emit("searchdata");
+        }
       }
     },
     resetFunctionDefinition(newVal) {

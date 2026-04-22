@@ -866,9 +866,16 @@ export default defineComponent({
           this.searchObj.data.editorValue,
         );
         this.searchObj.data.editorValue = newValue;
+        this.searchObj.data.query = newValue;
         this.searchObj.data.stream.addToFilter = "";
         if (this.queryEditorRef?.setValue)
           this.queryEditorRef.setValue(newValue);
+        if (
+          this.store.state.zoConfig.auto_query_enabled &&
+          this.searchObj.meta.liveMode
+        ) {
+          this.searchData();
+        }
       }
     },
     removeFieldTerm(fieldName: string) {
@@ -878,8 +885,15 @@ export default defineComponent({
         fieldName,
       );
       this.searchObj.data.editorValue = newValue;
+      this.searchObj.data.query = newValue;
       this.searchObj.data.stream.removeFilterField = "";
       if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
+      if (
+        this.store.state.zoConfig.auto_query_enabled &&
+        this.searchObj.meta.liveMode
+      ) {
+        this.searchData();
+      }
     },
     filters() {},
   },
