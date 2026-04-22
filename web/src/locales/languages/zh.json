@@ -2871,7 +2871,8 @@
       "type": "类型",
       "multiStepAgent": "多步代理"
     },
-    "noLogsAvailableForService": "此服务没有可用的日志"
+    "noLogsAvailableForService": "此服务没有可用的日志",
+    "spansTruncatedWarning": "显示 {total} 跨度的 {count} — 跟踪可能不完整。缩小时间范围或联系管理员以增加跨度限制。"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -3402,7 +3403,15 @@
     "never": "永远不要",
     "typeScore": "数字分数（例如，0.0-1.0）",
     "typeBoolean": "二进制/合格失败（布尔值）",
-    "typeCustom": "分类/自定义文本"
+    "typeCustom": "分类/自定义文本",
+    "bulkDeleteConfirmation": "您确定要删除 {count} 个模板吗？",
+    "search": "搜索模板",
+    "dimensionsTooltip": "添加评估维度（例如准确性、相关性）。键入并按 Enter 键添加自定义的。",
+    "tooltipName": "此评估模板的唯一名称。",
+    "tooltipDescription": "可选描述，用于解释此模板的评估内容。",
+    "tooltipResponseType": "定义 LLM 评估输出的格式——数字分数、布尔值通过/失败或自定义文本。",
+    "tooltipDimensions": "法学硕士应判断的评估标准。从默认值中选择或键入自定义值，然后按 Enter。",
+    "tooltipPromptTemplate": "提示已发送到 LLM。在评估时使用 {输入}、{输出} 和 {context} 作为动态值的占位符。"
   },
   "aiToolset": {
     "header": "AI 工具集",

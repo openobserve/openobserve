@@ -2867,7 +2867,8 @@
       "type": "Typ",
       "multiStepAgent": "Mehrstufiger Agent"
     },
-    "noLogsAvailableForService": "Für diesen Dienst sind keine Protokolle verfügbar"
+    "noLogsAvailableForService": "Für diesen Dienst sind keine Protokolle verfügbar",
+    "spansTruncatedWarning": "Es werden {count} der {total} Spannweiten angezeigt — die Spur ist möglicherweise unvollständig. Grenzen Sie den Zeitraum ein oder wenden Sie sich an Ihren Administrator, um das Zeitlimit zu erhöhen."
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -3398,7 +3399,15 @@
     "never": "Niemals",
     "typeScore": "Numerischer Wert (z. B. 0,0 — 1,0)",
     "typeBoolean": "Binär//Pass-Fail (Boolean)",
-    "typeCustom": "Kategorisch//Benutzerdefinierter Text"
+    "typeCustom": "Kategorisch//Benutzerdefinierter Text",
+    "bulkDeleteConfirmation": "Sind Sie sicher, dass Sie {count} Vorlage (n) löschen möchten?",
+    "search": "Vorlagen durchsuchen",
+    "dimensionsTooltip": "Fügen Sie Bewertungsdimensionen hinzu (z. B. Genauigkeit, Relevanz). Geben Sie ein und drücken Sie die Eingabetaste, um benutzerdefinierte hinzuzufügen.",
+    "tooltipName": "Ein eindeutiger Name für diese Bewertungsvorlage.",
+    "tooltipDescription": "Optionale Beschreibung, um zu erklären, was diese Vorlage auswertet.",
+    "tooltipResponseType": "Definiert das Format der Bewertungsausgabe des LLM — numerischer Wert, boolescher Wert bestanden/nicht bestanden oder benutzerdefinierter Text.",
+    "tooltipDimensions": "Bewertungskriterien, die der LLM beurteilen sollte. Wählen Sie eine Standardeinstellung aus oder geben Sie eine benutzerdefinierte ein und drücken Sie die Eingabetaste.",
+    "tooltipPromptTemplate": "Die Aufforderung wurde an das LLM gesendet. Verwenden Sie {input}, {output} und {context} als Platzhalter für dynamische Werte zur Evaluierung."
   },
   "aiToolset": {
     "header": "KI-Toolsets",

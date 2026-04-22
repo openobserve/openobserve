@@ -33,9 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <header
           class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)]"
         >
-          <div
-            class="tw:flex tw:items-center tw:space-x-4 tw:w-[calc(100%-17rem)]!"
-          >
+          <div class="tw:flex tw:items-center tw:space-x-4 tw:w-fit!">
             <!-- Back button -->
             <q-btn
               v-if="mode === 'standalone' && showBackButton"
@@ -54,11 +52,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</q-tooltip>
             </q-btn>
 
-            <div class="tw:flex tw:min-w-0 tw:w-full">
+            <div
+              class="tw:flex tw:min-w-0 tw:w-full tw:gap-[0.625rem]! tw:items-center"
+            >
               <!-- Operation Name -->
               <div
                 data-test="trace-details-operation-name"
-                class="tw:text-base tw:font-semibold tw:leading-tight tw:text-[var(--o2-text-primary)] tw:truncate tw:min-w-0 tw:max-w-[calc(100%-32rem)]!"
+                class="tw:text-base tw:font-semibold tw:leading-tight tw:text-[var(--o2-text-primary)] tw:truncate tw:min-w-0 tw:max-w-[24rem]!"
                 :title="traceTree[0]?.operationName"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
@@ -67,13 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Service, Timestamp, and Trace ID -->
               <div
-                class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:w-[32rem]"
+                class="tw:flex tw:items-center tw:space-x-2 tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:max-w-[32rem]"
               >
-                <span class="tw:pl-[1rem]">{{
-                  formatTimestamp(traceStartTime)
-                }}</span>
-                <span>•</span>
-                <span>
+                <span>{{ formatTimestamp(traceStartTime) }}</span>
+                <div
+                  class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
+                />
+                <span class="tw:mr-[0.25rem]">
                   {{ t("traces.traceId") }}:
                   <span
                     v-if="mode === 'embedded'"
@@ -115,11 +115,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="handleExpandToFullView"
                 />
               </div>
+
+              <div
+                class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
+              />
+              <!-- Span Count Badge -->
+              <div
+                data-test="trace-details-spans-count"
+                class="tw:flex tw:items-center tw:ml-[0rem] tw:space-x-1 tw:px-[0.625rem] tw:py-[0.1rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
+              >
+                <span data-test="span-count-text">
+                  <template v-if="searchObj.data.traceDetails.spansTruncated">
+                    <span
+                      v-if="
+                        searchObj.data.traceDetails.totalSpanCount >
+                        traceSpanLimit
+                      "
+                      >Showing {{ traceSpanLimit }} out of
+                    </span>
+                    <span class="tw:pl-[0.25rem]">{{
+                      formatLargeNumber(
+                        searchObj.data.traceDetails.totalSpanCount,
+                      )
+                    }}</span>
+                  </template>
+                  <template v-else>{{
+                    formatLargeNumber(effectiveSpanList.length)
+                  }}</template>
+                  {{ t("traces.spansLabel") }}
+                </span>
+                <q-tooltip
+                  v-if="searchObj.data.traceDetails.spansTruncated"
+                  anchor="bottom middle"
+                  self="top middle"
+                >
+                  {{
+                    t("traces.spansTruncatedWarning", {
+                      count: effectiveSpanList.length,
+                      total: searchObj.data.traceDetails.totalSpanCount,
+                    })
+                  }}
+                </q-tooltip>
+              </div>
+
+              <div
+                class="tw:bg-[var(--o2-text-3)] tw:py-[0rem] tw:w-[1px] tw:h-[16px]"
+              />
+
+              <!-- Error Count Badge -->
+              <div
+                data-test="trace-details-error-spans-count"
+                class="tw:flex tw:items-center tw:space-x-1 tw:px-[0.625rem] tw:py-[0.1rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)] tw:bg-[var(--o2-error-tag-bg)] tw:mr-[0.85rem]"
+              >
+                <span
+                  >{{ formatLargeNumber(errorSpansCount) }}
+                  {{ t("traces.errorsLabel") }}</span
+                >
+              </div>
             </div>
           </div>
 
           <div
-            class="tw:flex tw:justify-end tw:items-center tw:space-x-3 tw:w-[17rem]!"
+            class="tw:flex tw:justify-end tw:items-center tw:space-x-3 tw:w-fit!"
           >
             <!-- Apply filters button (standalone mode, right side) -->
             <q-btn
@@ -136,33 +193,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <q-tooltip>{{ t("traces.reviewAndApplyFilters") }}</q-tooltip>
             </q-btn>
-
-            <!-- Span Count Badge -->
-            <div
-              data-test="trace-details-spans-count"
-              class="tw:flex tw:items-center tw:space-x-1 tw:px-3 tw:py-1 tw:bg-white tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:bg-[var(--o2-card-bg)]!"
-            >
-              <q-icon name="hub" size="14px" />
-              <span data-test="span-count-text"
-                >{{ formatLargeNumber(effectiveSpanList.length) }}
-                {{ t("traces.spansLabel") }}</span
-              >
-            </div>
-
-            <!-- Error Count Badge -->
-            <div
-              class="tw:flex tw:items-center tw:space-x-1 tw:mr-[0.325rem] tw:px-3 tw:py-1 tw:bg-white tw:border tw:border-[var(--o2-border)] tw:rounded tw:text-[11px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:bg-[var(--o2-card-bg)]!"
-            >
-              <q-icon
-                name="error_outline"
-                size="14px"
-                :color="errorSpansCount > 0 ? 'negative' : undefined"
-              />
-              <span
-                >{{ formatLargeNumber(errorSpansCount) }}
-                {{ t("traces.errorsLabel") }}</span
-              >
-            </div>
 
             <!-- Expand button (embedded mode) -->
             <q-btn
@@ -421,6 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @resize-start="startResize"
                 />
                 <div
+                  ref="traceScrollContainer"
                   class="relative-position trace-content-scroll"
                   :style="{
                     width: isSidebarOpen ? leftWidth + 'px' : '100%',
@@ -455,6 +486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :spanDimensions="spanDimensions"
                         :spanMap="spanMap"
                         :leftWidth="leftWidth"
+                        :scrollContainer="traceScrollContainer"
                         ref="traceTreeRef"
                         class="tw:bg-[var(--o2-card-bg)]!"
                         :search-query="searchQuery"
@@ -572,6 +604,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :spans="flatSpans"
                 :selected-span-id="selectedSpanId"
                 :trace-duration="traceMetadata?.duration_ms || 0"
+                :is-truncated="searchObj.data.traceDetails.spansTruncated"
+                :total-span-count="searchObj.data.traceDetails.totalSpanCount"
                 @span-selected="updateSelectedSpan"
               />
             </div>
@@ -921,6 +955,7 @@ export default defineComponent({
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
     const parentContainer = ref<HTMLElement | null>(null);
+    const traceScrollContainer = ref<HTMLElement | null>(null);
     let parentHeight = ref(0);
     let currentHeight = 0;
     const updateHeight = async () => {
@@ -1035,6 +1070,11 @@ export default defineComponent({
       const sidebarWidthPx = Math.max(remainingWidth * 0.84, 300); // Minimum 300px
       return `${sidebarWidthPx}px`;
     });
+
+    /** Maximum number of spans fetched per trace. Truncation warning is shown when this limit is hit. */
+    const MAX_SPANS_PER_TRACE = 20000;
+
+    const traceSpanLimit = ref(MAX_SPANS_PER_TRACE);
 
     const serviceColorIndex = ref(0);
     const colors = ref(getAllSpanColors());
@@ -1572,15 +1612,34 @@ export default defineComponent({
       };
     };
 
+    const sanitizeTraceId = (id: string): string =>
+      String(id).replace(/['"\\]/g, "");
+
+    const buildTraceCountQuery = (trace: any) => {
+      const req = getDefaultRequest();
+      req.query.from = 0;
+      req.query.size = 1;
+      req.query.start_time = trace.from;
+      req.query.end_time = trace.to;
+      req.query.sql = b64EncodeUnicode(
+        `SELECT COUNT(*) as total FROM "${trace.stream}" WHERE trace_id = '${sanitizeTraceId(trace.trace_id)}'`,
+      ) as string;
+      return req;
+    };
+
     const buildTraceSearchQuery = (trace: any) => {
       const req = getDefaultRequest();
       req.query.from = 0;
-      req.query.size = 2500;
+      // Prefer operator-configured limit from backend config; fall back to the
+      // frontend default. When the backend exposes max_spans_per_trace via /config
+      // it is picked up automatically without any code changes.
+      req.query.size =
+        store.state.zoConfig.max_spans_per_trace ?? MAX_SPANS_PER_TRACE;
       req.query.start_time = trace.from;
       req.query.end_time = trace.to;
 
       req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM "${trace.stream}" WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
+        `SELECT * FROM "${trace.stream}" WHERE trace_id = '${sanitizeTraceId(trace.trace_id)}' ORDER BY start_time`,
       ) as string;
 
       return req;
@@ -1617,7 +1676,7 @@ export default defineComponent({
 
         const req = {
           query: {
-            sql: `SELECT * FROM "_rumdata" WHERE _oo_trace_id = '${traceId}' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
+            sql: `SELECT * FROM "_rumdata" WHERE _oo_trace_id = '${sanitizeTraceId(traceId)}' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
             start_time: startTime - 10000000,
             end_time: endTime + 10000000,
             from: 0,
@@ -1729,14 +1788,27 @@ export default defineComponent({
       try {
         searchObj.data.traceDetails.isLoadingTraceDetails = true;
         searchObj.data.traceDetails.spanList = [];
+        searchObj.data.traceDetails.spansTruncated = false;
+        searchObj.data.traceDetails.totalSpanCount = 0;
         const req = buildTraceSearchQuery(data);
+        const countReq = buildTraceCountQuery(data);
 
-        // Fetch trace spans
+        // Fetch trace spans, total span count, and RUM events in parallel
         const tracePromise = searchService.search(
           {
             org_identifier: router.currentRoute.value.query
               ?.org_identifier as string,
             query: req,
+            page_type: "traces",
+          },
+          "ui",
+        );
+
+        const countPromise = searchService.search(
+          {
+            org_identifier: router.currentRoute.value.query
+              ?.org_identifier as string,
+            query: countReq,
             page_type: "traces",
           },
           "ui",
@@ -1749,9 +1821,9 @@ export default defineComponent({
           req.query.end_time,
         );
 
-        // Wait for both requests to complete
-        Promise.all([tracePromise, rumPromise])
-          .then(([traceRes, rumEvents]) => {
+        // Wait for all requests to complete
+        Promise.all([tracePromise, countPromise, rumPromise])
+          .then(([traceRes, countRes, rumEvents]) => {
             if (!traceRes.data?.hits?.length) {
               showTraceDetailsError();
               return;
@@ -1760,7 +1832,25 @@ export default defineComponent({
             // Combine trace spans and RUM events
             const traceSpans = traceRes.data?.hits || [];
             const rumSpans = formatRumEventsAsSpans(rumEvents);
-
+            const limit =
+              store.state.zoConfig.max_spans_per_trace ?? MAX_SPANS_PER_TRACE;
+            traceSpanLimit.value = limit;
+            const totalFromCount: number =
+              countRes.data?.hits?.[0]?.total ?? traceSpans.length;
+            searchObj.data.traceDetails.totalSpanCount = totalFromCount;
+            searchObj.data.traceDetails.spansTruncated =
+              totalFromCount > traceSpans.length;
+            if (searchObj.data.traceDetails.spansTruncated) {
+              $q.notify({
+                type: "warning",
+                message: t("traces.spansTruncatedWarning", {
+                  count: traceSpans.length,
+                  total: totalFromCount,
+                }),
+                timeout: 0,
+                actions: [{ icon: "close", color: "black", round: false }],
+              });
+            }
             searchObj.data.traceDetails.spanList = [...rumSpans, ...traceSpans];
             updateServiceColors();
             buildTracesTree();
@@ -1928,6 +2018,14 @@ export default defineComponent({
         }
       }
 
+      if (!traceTree.value.length) {
+        console.warn(
+          "buildTracesTree: no root spans found — trace may have missing or malformed span IDs",
+        );
+        showTraceDetailsError();
+        return;
+      }
+
       // Purposely converting to microseconds to avoid floating point precision issues
       // In updateChart method, we are using start and end time to set the time range of trace
       traceTree.value[0].lowestStartTime =
@@ -1956,12 +2054,7 @@ export default defineComponent({
       // After the tree is built, scroll the pre-selected span into view (e.g.
       // when arriving from spans search mode with a span_id in the URL).
       if (selectedSpanId.value) {
-        setTimeout(() => {
-          const el = document.querySelector(
-            `[data-test="trace-tree-span-container-${selectedSpanId.value}"]`,
-          );
-          el?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 300);
+        scrollSpanIntoView(selectedSpanId.value);
       }
     }
 
@@ -2397,6 +2490,12 @@ export default defineComponent({
       showTraceDetails.value = true;
     };
 
+    const scrollSpanIntoView = (spanId: string) => {
+      nextTick(() => {
+        traceTreeRef.value?.scrollToSpan(spanId);
+      });
+    };
+
     const updateSelectedSpan = (
       spanId: string,
       swichToWaterfall: boolean = false,
@@ -2404,8 +2503,11 @@ export default defineComponent({
       showTraceDetails.value = false;
       searchObj.data.traceDetails.showSpanDetails = true;
       searchObj.data.traceDetails.selectedSpanId = spanId;
-      if (swichToWaterfall && activeTab.value !== "waterfall")
+      if (swichToWaterfall && activeTab.value !== "waterfall") {
         activeTab.value = "waterfall";
+      }
+
+      scrollSpanIntoView(spanId);
 
       // Emit event for embedded mode
       if (props.mode === "embedded") {
@@ -2584,7 +2686,7 @@ export default defineComponent({
 
         const req = {
           query: {
-            sql: `SELECT * FROM "${evalPipelineStreamName.value}" WHERE trace_id = '${effectiveTraceId.value}' ORDER BY _timestamp ASC`,
+            sql: `SELECT * FROM "${evalPipelineStreamName.value}" WHERE trace_id = '${sanitizeTraceId(effectiveTraceId.value)}' ORDER BY _timestamp ASC`,
             start_time: effectiveTimeRange.value.from - 60000000,
             end_time: effectiveTimeRange.value.to + 60000000,
             from: 0,
@@ -2688,6 +2790,7 @@ export default defineComponent({
       handleSearchResult,
       searchResults,
       parentContainer,
+      traceScrollContainer,
       parentHeight,
       updateHeight,
       getSpanKind,
@@ -2745,6 +2848,7 @@ export default defineComponent({
       fetchEvalPipeline,
       fetchEvalData,
       formatLargeNumber,
+      traceSpanLimit,
     };
   },
 });

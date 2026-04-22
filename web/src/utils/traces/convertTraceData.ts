@@ -685,6 +685,19 @@ const SERVICE_ICON_RULES: { regex: RegExp; svg: string }[] = [
       `<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>`,
   },
   {
+    // Phone — gRPC, RPC, Thrift, Connect RPC
+    regex: /\bgrpc\b|\brpc\b|thrift|connect/,
+    svg: `<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.86 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>`,
+  },
+  {
+    // Globe — outbound HTTP/REST/API call (span attribute "http", "https", "rest")
+    regex: /\bhttp\b|\bhttps\b|\brest\b/,
+    svg:
+      `<circle cx="12" cy="12" r="10"/>` +
+      `<line x1="2" y1="12" x2="22" y2="12"/>` +
+      `<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>`,
+  },
+  {
     // Wifi — websocket / realtime / streaming
     regex: /websocket|realtime|streaming|socket/,
     svg:
@@ -932,6 +945,31 @@ function getServiceIconSvg(
   borderColor: string,
 ): string {
   return `image://${getServiceIconDataUrl(name, isDark, borderColor)}`;
+}
+
+/**
+ * Returns a `data:image/svg+xml;base64,...` URL for a span's technology icon
+ * (e.g. db_system, messaging_system, rpc_system) by running the value through
+ * SERVICE_ICON_RULES. Unlike getServiceIconDataUrl, this renders a bare 24×24
+ * icon with no circular border — suitable for small inline span badges.
+ * Returns null when no rule matches (i.e. no specific tech is identifiable).
+ */
+export function getSpanTechIconDataUrl(
+  name: string,
+  isDark: boolean,
+): string | null {
+  const iconColor = isDark ? "#e4e7eb" : "#374151";
+  const n = (name || "").toLowerCase().replace(/[-_]/g, " ");
+  const matched = SERVICE_ICON_RULES.find(({ regex }) => regex.test(n));
+  if (!matched) return null;
+
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" ` +
+    `stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
+    matched.svg +
+    `</svg>`;
+
+  return `data:image/svg+xml;base64,${btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))))}`; // eslint-disable-line no-undef
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

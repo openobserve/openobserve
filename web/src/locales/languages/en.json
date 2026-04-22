@@ -1183,6 +1183,8 @@
     "lastUsed": "Last Used",
     "deleteTemplate": "Delete Template",
     "deleteConfirmation": "Are you sure you want to delete \"{name}\"?",
+    "bulkDeleteConfirmation": "Are you sure you want to delete {count} template(s)?",
+    "search": "Search templates",
     "loadFailed": "Failed to load templates",
     "saveRequiredFields": "Please fill in all required fields",
     "updateSuccess": "Template updated successfully",
@@ -1199,7 +1201,13 @@
     "never": "Never",
     "typeScore": "Numeric Score (e.g., 0.0 - 1.0)",
     "typeBoolean": "Binary / Pass-Fail (Boolean)",
-    "typeCustom": "Categorical / Custom Text"
+    "typeCustom": "Categorical / Custom Text",
+    "dimensionsTooltip": "Add evaluation dimensions (e.g. accuracy, relevance). Type and press Enter to add custom ones.",
+    "tooltipName": "A unique name for this evaluation template.",
+    "tooltipDescription": "Optional description to explain what this template evaluates.",
+    "tooltipResponseType": "Defines the format of the LLM's evaluation output — numeric score, boolean pass/fail, or custom text.",
+    "tooltipDimensions": "Evaluation criteria the LLM should judge. Select from defaults or type a custom one and press Enter.",
+    "tooltipPromptTemplate": "The prompt sent to the LLM. Use {input}, {output}, and {context} as placeholders for dynamic values at evaluation time."
   },
   "function": {
     "header": "Functions",
@@ -3073,6 +3081,7 @@
     "tracesFound": "Traces Found",
     "spansTitle": "SPANS",
     "spansFound": "Spans Found",
+    "spansTruncatedWarning": "Showing {count} of {total} spans, trace may be incomplete. Contact your administrator to increase the span limit.",
     "errorTraces": "Error Traces",
     "errorSpans": "Error Spans",
     "error": "ERROR",
