@@ -196,11 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-cy="search-bar-refresh-button"
             dense
             flat
-            :title="
-              searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled
-                ? t('search.liveMode')
-                : t('search.runQuery')
-            "
+            :title="t('search.runQuery')"
             class="q-pa-none o2-run-query-button o2-color-primary tw:h-[30px] element-box-shadow tw:leading-8!"
             :class="
               store.state.zoConfig.auto_query_enabled
@@ -210,11 +206,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="searchData"
             :loading="isLoading"
             :disable="isLoading"
-            >{{
-              searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled
-                ? t("search.liveMode")
-                : t("search.runQuery")
-            }}</q-btn
+            >
+              <q-icon
+                v-if="searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled"
+                name="autorenew"
+                size="14px"
+                class="q-mr-xs"
+              />
+              {{ t("search.runQuery") }}
+            </q-btn
           >
           <!-- Dropdown: shown when live mode feature is enabled -->
           <q-separator
@@ -399,7 +399,6 @@ import {
   onActivated,
   computed,
 } from "vue";
-import { debounce } from "lodash-es";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -480,16 +479,6 @@ export default defineComponent({
     let streamName = "";
     const dateTimeRef = ref(null);
 
-    // Debounced auto-run for live mode when user edits the query in the editor.
-    const debouncedLiveModeQueryEmit = debounce(() => {
-      if (
-        store.state.zoConfig?.auto_query_enabled &&
-        searchObj.meta.liveMode &&
-        !searchObj.loading
-      ) {
-        emit("searchdata");
-      }
-    }, 500);
 
     const { getStream } = useStreams();
 
@@ -573,11 +562,6 @@ export default defineComponent({
 
     const updateQueryValue = async (value: string, event?: any) => {
       updateAutoComplete(value);
-      // Only auto-run for real user edits, not programmatic setValue calls.
-      // Monaco sets e.isFlush=true when setValue() is called programmatically.
-      if (!event?.isFlush) {
-        debouncedLiveModeQueryEmit();
-      }
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
         if (searchObj.data.parsedQuery?.from?.length > 0) {
