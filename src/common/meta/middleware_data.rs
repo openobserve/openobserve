@@ -20,11 +20,10 @@ use std::{
 };
 
 use axum::{body::Body, http::Request, middleware::Next, response::Response};
+use config::axum::middlewares::RealIp;
 use maxminddb::geoip2::city::Location;
 use serde::{Deserialize, Serialize};
 use uaparser::{Parser, UserAgentParser};
-
-use config::axum::middlewares::RealIp;
 
 use crate::{USER_AGENT_REGEX_FILE, common::infra::config::MAXMIND_DB_CLIENT};
 
