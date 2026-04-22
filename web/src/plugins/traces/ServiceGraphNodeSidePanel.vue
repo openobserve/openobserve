@@ -974,6 +974,7 @@ export default defineComponent({
     const metricGroupResources = ref<MetricGroupDefinition[]>([
       { id: "pods", label: "Pods", icon: DeployedCode },
       { id: "nodes", label: "Nodes", icon: "dns" },
+      { id: "network", label: "Network", icon: "wifi" },
       { id: "others", label: "Others", icon: "category" },
     ]);
 

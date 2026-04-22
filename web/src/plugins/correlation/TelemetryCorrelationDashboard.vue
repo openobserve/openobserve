@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Search -->
                 <div
-                  class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                  class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
                 >
                   <q-input
                     v-model="metricSearchText"
@@ -702,7 +702,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Search -->
               <div
-                class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
               >
                 <q-input
                   v-model="metricSearchText"
@@ -1563,7 +1563,9 @@ const applyUnstableDimensionDefaults = (
     const notMatchedKeys: string[] = [];
 
     // For each filter in the stream, check if it maps to an unstable dimension
-    for (const [filterKey, filterValue] of Object.entries(stream.filters ?? {})) {
+    for (const [filterKey, filterValue] of Object.entries(
+      stream.filters ?? {},
+    )) {
       // Look up the semantic dimension ID for this field name
       const dimensionId = fieldToDimensionId.get(filterKey);
 
@@ -1893,7 +1895,9 @@ const applyDimensionChanges = () => {
 
     // For each filter in the stream, find its semantic dimension ID
     // and update with the new value from activeDimensions
-    for (const [filterKey, _filterValue] of Object.entries(stream.filters ?? {})) {
+    for (const [filterKey, _filterValue] of Object.entries(
+      stream.filters ?? {},
+    )) {
       const dimensionId = fieldToDimensionId.get(filterKey);
       if (dimensionId && activeDimensions.value[dimensionId] !== undefined) {
         const newValue = activeDimensions.value[dimensionId];

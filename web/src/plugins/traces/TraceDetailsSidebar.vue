@@ -883,7 +883,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-else-if="correlationError"
-              class="tw:text-base tw:text-red-500"
+              class="tw:text-base tw:text-[0.875rem] tw:font-bold"
             >
               {{ correlationError }}
             </div>
@@ -937,7 +937,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-else-if="correlationError"
-              class="tw:text-base tw:text-red-500"
+              class="tw:text-base tw:text-[0.875rem] tw:font-bold"
             >
               {{ correlationError }}
             </div>
@@ -1900,7 +1900,7 @@ export default defineComponent({
             },
           };
         } else {
-          correlationError.value = t("correlation.noLogsFound");
+          correlationError.value = t("correlation.noDataFound");
         }
       } catch (err: any) {
         console.error("[TraceDetailsSidebar] Correlation failed:", err);
@@ -2177,6 +2177,23 @@ export default defineComponent({
 :deep(.traces-correlated-metrics-container) {
   .q-splitter--vertical .q-splitter__separator {
     height: 100% !important;
+  }
+
+  .q-card {
+    box-shadow: none !important;
+    border: 1px solid var(--o2-border) !important;
+  }
+
+  .card-container {
+    box-shadow: none !important;
+  }
+
+  .dimension-sidebar {
+    padding-left: 0.25rem;
+  }
+
+  .dimension-sidebar-search-container {
+    padding: 0.375rem 0.2rem !important;
   }
 }
 
