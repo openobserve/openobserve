@@ -210,16 +210,19 @@ jobs:
               console.log(`Closing issue #${issue.number}: ${issue.title}`);
 
               // Post closing comment
-              const comment = `## ✅ Issue Resolved - Auto-Closed by Issue Audit
-
-This issue has been automatically closed because:
-- ✅ **Fix merged**: PR #${fixPR.number} (${fixPR.url})
-- ✅ **Test coverage**: \`${testFile}\`
-
-The fix has been implemented and proper test coverage exists with the \`@bug-${issue.number}\` tag.
-
----
-*🤖 Automated by [Issue Audit Workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})*`;
+              const commentLines = [
+                '## ✅ Issue Resolved - Auto-Closed by Issue Audit',
+                '',
+                'This issue has been automatically closed because:',
+                `- ✅ **Fix merged**: PR #${fixPR.number} (${fixPR.url})`,
+                `- ✅ **Test coverage**: \`${testFile}\``,
+                '',
+                `The fix has been implemented and proper test coverage exists with the \`@bug-${issue.number}\` tag.`,
+                '',
+                '---',
+                `*🤖 Automated by [Issue Audit Workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})*`
+              ];
+              const comment = commentLines.join('\n');
 
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
