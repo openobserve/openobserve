@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section avatar class="tw:min-w-0 tw:pr-2">
                   <q-icon
-                    :name="searchObj.meta.liveMode ? 'flash_on' : 'flash_off'"
+                    :name="searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'"
                     size="16px"
                     :color="searchObj.meta.liveMode ? 'primary' : ''"
                   />
