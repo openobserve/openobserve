@@ -52,32 +52,7 @@ pub async fn add(entry: OrgStorageProvider) -> Result<(), anyhow::Error> {
     cluster_coordinator
         .put(OSP_PREFIX, serde_json::to_vec(&entry)?.into(), true, None)
         .await?;
-
-    #[cfg(feature = "enterprise")]
-    {
-        let config = o2_enterprise::enterprise::common::config::get_config();
-        if config.super_cluster.enabled {
-            match o2_enterprise::enterprise::super_cluster::queue::add_sourcemap(entry.clone())
-                .await
-            {
-                Ok(_) => {
-                    log::info!(
-                        "successfully sent sourcemap add notification to super cluster queue for {}/{}",
-                        entry.org,
-                        entry.source_map_file_name
-                    );
-                }
-                Err(e) => {
-                    log::error!(
-                        "error in sending sourcemap add notification to super cluster queue for {}/{} : {e}",
-                        entry.org,
-                        entry.source_map_file_name
-                    );
-                }
-            }
-        }
-    }
-
+    // no need for SC, as org storage is cluster scoped
     Ok(())
 }
 
