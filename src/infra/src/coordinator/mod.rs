@@ -17,6 +17,7 @@ pub mod ai_prompts;
 pub mod alerts;
 pub mod destinations;
 pub mod events;
+pub mod model_pricing;
 pub mod pipelines;
 pub mod service_streams;
 pub mod system_settings;

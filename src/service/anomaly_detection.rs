@@ -783,6 +783,7 @@ pub async fn train_model(org_id: &str, anomaly_id: &str) -> Result<serde_json::V
             "status": "in_progress"
         }))
     }
+
     #[cfg(not(feature = "enterprise"))]
     anyhow::bail!("Anomaly detection is an enterprise feature")
 }
@@ -1096,11 +1097,11 @@ fn combine_detection_fn(function: &str, field: Option<&str>) -> String {
 
 /// Parse interval string like "1h", "30m" into seconds
 fn parse_interval(interval: &str) -> Result<i64> {
-    if let Some(interval) = interval.strip_suffix('h') {
-        let hours: i64 = interval.parse()?;
+    if let Some(stripped) = interval.strip_suffix('h') {
+        let hours: i64 = stripped.parse()?;
         Ok(hours * 3600)
-    } else if let Some(interval) = interval.strip_suffix('m') {
-        let minutes: i64 = interval.parse()?;
+    } else if let Some(stripped) = interval.strip_suffix('m') {
+        let minutes: i64 = stripped.parse()?;
         Ok(minutes * 60)
     } else {
         anyhow::bail!("Invalid interval format. Use '1h' or '30m'");

@@ -28,6 +28,7 @@ use config::meta::{
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter, QueryOrder,
     QuerySelect, RelationTrait, SelectModel, Selector,
+    sea_query::{Expr, Func},
 };
 use serde_json::{Value as Json, json};
 
@@ -421,6 +422,18 @@ impl ListReportsQueryResult {
         }
         if let Some(false) = &params.has_destinations {
             query = query.filter(reports::Column::Destinations.eq(json!([])));
+        }
+        if let Some(name_sub) = &params.name_substring
+            && !name_sub.is_empty()
+        {
+            let pattern = format!("%{}%", name_sub.to_lowercase());
+            query = query.filter(
+                Expr::expr(Func::lower(Expr::col((
+                    reports::Entity,
+                    reports::Column::Name,
+                ))))
+                .like(pattern),
+            );
         }
 
         // Order and paginate results.
