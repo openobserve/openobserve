@@ -966,6 +966,7 @@ export default defineComponent({
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
       try {
+        searchObj.meta.refreshHistogram = true;
         await getQueryData();
         refreshHistogramChart();
         showJobScheduler.value = true;
