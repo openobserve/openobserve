@@ -280,4 +280,166 @@ mod tests {
         let result = detect_histogram_breakdown_field(&fields);
         assert_eq!(result, Some("log_level".to_string()));
     }
+
+    // --- detect_histogram_breakdown_field edge cases ---
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_empty_input() {
+        // No fields at all → no breakdown field
+        let fields: Vec<String> = vec![];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_no_match() {
+        // Fields present but none are in the priority list → no breakdown
+        let fields = vec![
+            "message".to_string(),
+            "timestamp".to_string(),
+            "user_id".to_string(),
+        ];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_only_status() {
+        // status is the lowest-priority field but still detected when it's the only match
+        let fields = vec!["message".to_string(), "status".to_string()];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, Some("status".to_string()));
+    }
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_severity_beats_log_level() {
+        // severity is highest priority; log_level must not win
+        let fields = vec!["log_level".to_string(), "severity".to_string()];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, Some("severity".to_string()));
+    }
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_severity_beats_level() {
+        let fields = vec!["level".to_string(), "severity".to_string()];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, Some("severity".to_string()));
+    }
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_severity_beats_status() {
+        let fields = vec!["status".to_string(), "severity".to_string()];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, Some("severity".to_string()));
+    }
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_log_level_beats_level() {
+        let fields = vec!["level".to_string(), "log_level".to_string()];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, Some("log_level".to_string()));
+    }
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_log_level_beats_status() {
+        let fields = vec!["status".to_string(), "log_level".to_string()];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, Some("log_level".to_string()));
+    }
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_level_beats_status() {
+        let fields = vec!["status".to_string(), "level".to_string()];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, Some("level".to_string()));
+    }
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_case_insensitive() {
+        // Matching is case-insensitive; the returned value is the original schema field name
+        let fields = vec!["MESSAGE".to_string(), "SEVERITY".to_string()];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, Some("SEVERITY".to_string()));
+    }
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_preserves_original_casing() {
+        // The returned string must be the schema field name, not the priority-list key
+        let fields = vec!["Status".to_string()];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, Some("Status".to_string()));
+    }
+
+    #[test]
+    fn test_detect_histogram_breakdown_field_mixed_case_log_level() {
+        let fields = vec!["Log_Level".to_string(), "status".to_string()];
+        let result = detect_histogram_breakdown_field(&fields);
+        assert_eq!(result, Some("Log_Level".to_string()));
+    }
+
+    // --- convert_to_histogram_query with breakdown_field ---
+
+    #[test]
+    fn test_convert_query_with_breakdown_no_where() {
+        // breakdown field present, no WHERE clause in original query
+        let original_query = "SELECT * FROM \"logs\"";
+        let stream_names = vec!["logs".to_string()];
+        let result =
+            convert_to_histogram_query(original_query, &stream_names, false, Some("level"))
+                .unwrap();
+
+        let expected = "SELECT histogram(_timestamp) AS zo_sql_key, \"level\" AS zo_sql_breakdown, count(*) AS zo_sql_num FROM \"logs\" GROUP BY zo_sql_key, zo_sql_breakdown ORDER BY zo_sql_key DESC";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_convert_query_with_breakdown_complex_where() {
+        // breakdown field + WHERE clause are both preserved
+        let original_query =
+            "SELECT * FROM \"api_logs\" WHERE status >= 400 AND level = 'error'";
+        let stream_names = vec!["api_logs".to_string()];
+        let result =
+            convert_to_histogram_query(original_query, &stream_names, false, Some("severity"))
+                .unwrap();
+
+        let expected = "SELECT histogram(_timestamp) AS zo_sql_key, \"severity\" AS zo_sql_breakdown, count(*) AS zo_sql_num FROM \"api_logs\" WHERE status >= 400 AND level = 'error' GROUP BY zo_sql_key, zo_sql_breakdown ORDER BY zo_sql_key DESC";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_convert_query_none_breakdown_preserves_flat_group_by() {
+        // Passing None must produce the original flat GROUP BY (regression guard)
+        let original_query = "SELECT * FROM \"logs\" WHERE level = 'info'";
+        let stream_names = vec!["logs".to_string()];
+        let result =
+            convert_to_histogram_query(original_query, &stream_names, false, None).unwrap();
+
+        // Must NOT contain zo_sql_breakdown
+        assert!(!result.contains("zo_sql_breakdown"));
+        assert!(result.contains("GROUP BY zo_sql_key ORDER BY"));
+    }
+
+    #[test]
+    fn test_convert_query_breakdown_group_by_includes_breakdown_column() {
+        // When breakdown_field is Some, GROUP BY must list both zo_sql_key and zo_sql_breakdown
+        let original_query = "SELECT * FROM \"logs\"";
+        let stream_names = vec!["logs".to_string()];
+        let result =
+            convert_to_histogram_query(original_query, &stream_names, false, Some("severity"))
+                .unwrap();
+
+        assert!(result.contains("GROUP BY zo_sql_key, zo_sql_breakdown"));
+    }
+
+    #[test]
+    fn test_convert_query_breakdown_select_contains_breakdown_alias() {
+        // The SELECT list must contain the aliased breakdown column
+        let original_query = "SELECT * FROM \"logs\"";
+        let stream_names = vec!["logs".to_string()];
+        let result =
+            convert_to_histogram_query(original_query, &stream_names, false, Some("severity"))
+                .unwrap();
+
+        assert!(result.contains("\"severity\" AS zo_sql_breakdown"));
+    }
 }
