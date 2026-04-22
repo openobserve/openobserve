@@ -1370,7 +1370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-bar-live-mode-toggle-btn"
                       clickable
                       v-close-popup
-                      @click="searchObj.meta.liveMode = !searchObj.meta.liveMode"
+                      @click="toggleLiveMode"
                       class="tw:text-[12px] tw:rounded-md tw:mx-1"
                     >
                       <q-item-section avatar class="tw:min-w-0 tw:pr-2">
@@ -3325,6 +3325,13 @@ export default defineComponent({
         store.state.zoConfig.query_on_stream_selection == false
       ) {
         emit("searchdata");
+      } else if (
+        value.valueType === "absolute" &&
+        store.state.zoConfig.auto_query_enabled &&
+        searchObj.meta.liveMode
+      ) {
+        // Live mode: auto-trigger on committed absolute time range change
+        emit("searchdata");
       }
     };
 
@@ -4762,6 +4769,11 @@ export default defineComponent({
       emit("handleQuickModeChange");
     };
 
+    const toggleLiveMode = () => {
+      searchObj.meta.liveMode = !searchObj.meta.liveMode;
+      localStorage.setItem("oo_live_mode_logs", String(searchObj.meta.liveMode));
+    };
+
     const handleHistogramMode = () => {};
 
     const handleRunQueryFn = (clear_cache = false) => {
@@ -5430,6 +5442,7 @@ export default defineComponent({
       shouldMoveSavedViewToMenu,
       shouldMoveSqlToggleToMenu,
       shouldMoveShareToMenu,
+      toggleLiveMode,
     };
   },
   computed: {

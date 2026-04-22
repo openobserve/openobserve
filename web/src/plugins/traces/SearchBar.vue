@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="traces-search-bar-live-mode-toggle-btn"
                 clickable
                 v-close-popup
-                @click="searchObj.meta.liveMode = !searchObj.meta.liveMode"
+                @click="toggleLiveMode"
                 class="tw:text-[12px] tw:rounded-md tw:mx-1"
               >
                 <q-item-section avatar class="tw:min-w-0 tw:pr-2">
@@ -671,6 +671,19 @@ export default defineComponent({
           page: "Search Logs",
         });
       }
+
+      // Live mode: auto-trigger search on any time range change
+      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
+        emit("searchdata");
+      }
+    };
+
+    const toggleLiveMode = () => {
+      searchObj.meta.liveMode = !searchObj.meta.liveMode;
+      localStorage.setItem(
+        "oo_live_mode_traces",
+        String(searchObj.meta.liveMode),
+      );
     };
 
     const updateQuery = () => {
@@ -860,6 +873,7 @@ export default defineComponent({
       serviceGraphLayoutOptions,
       onServiceGraphVisualizationChange,
       onServiceGraphLayoutChange,
+      toggleLiveMode,
     };
   },
   computed: {
