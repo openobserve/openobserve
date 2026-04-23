@@ -2866,7 +2866,8 @@
       "type": "Tipo",
       "multiStepAgent": "Agente de várias etapas"
     },
-    "noLogsAvailableForService": "Não há registros disponíveis para este serviço"
+    "noLogsAvailableForService": "Não há registros disponíveis para este serviço",
+    "spansTruncatedWarning": "Mostrando {count} de {total} extensões — o rastreamento pode estar incompleto. Limite o intervalo de tempo ou entre em contato com seu administrador para aumentar o limite de intervalo."
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",

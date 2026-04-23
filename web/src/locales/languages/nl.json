@@ -2877,7 +2877,8 @@
       "type": "Typ",
       "multiStepAgent": "Agent met meerdere stappen"
     },
-    "noLogsAvailableForService": "Geen logboeken beschikbaar voor deze service"
+    "noLogsAvailableForService": "Geen logboeken beschikbaar voor deze service",
+    "spansTruncatedWarning": "Toont {count} van {total} overspanningen — de tracering is mogelijk onvolledig. Beperk de tijdspanne of neem contact op met uw beheerder om de limiet voor het bereik te verhogen."
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
