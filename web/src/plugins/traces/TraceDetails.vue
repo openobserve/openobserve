@@ -1591,8 +1591,8 @@ export default defineComponent({
     const buildTraceSearchQuery = (trace: any) => {
       const req = getDefaultRequest();
       req.query.from = 0;
-      // Set -1 to get all spans of trace
-      req.query.size = -1;
+      // TODO : Handle this with _search_stream instead of adding size
+      req.query.size = 50000;
       req.query.start_time = trace.from;
       req.query.end_time = trace.to;
 
