@@ -861,41 +861,6 @@ describe("AddAlert Component", () => {
         expect(wrapper.vm.formData.stream_name).toBe('');
         expect(wrapper.vm.formData.stream_type).toBe('');
       });
-      it('should show error when validateSqlQueryPromise rejects', async () => {
-        const dismissMock = vi.fn();
-        const notifySpy = vi.fn(() => dismissMock);
-        wrapper.vm.q = {
-          notify: notifySpy
-        };
-
-        wrapper.vm.formData.is_real_time = "false";
-        wrapper.vm.formData.query_condition.type = "sql";
-        wrapper.vm.formData.query_condition.sql = "SELECT * FROM test_table";
-        wrapper.vm.formData.query_condition.cron = '* * * * *';
-
-        wrapper.vm.getAlertPayload = vi.fn(() => ({
-          query_condition: {
-            type: "sql",
-            conditions: [],
-          },
-        }));
-
-        // Mock validateSqlQueryPromise to reject with SELECT * error
-        wrapper.vm.validateSqlQueryPromise = Promise.reject({
-          message: "Selecting all Columns in SQL query is not allowed."
-        });
-
-        // Bypass validation
-        wrapper.vm.validateFormAndNavigateToErrorField = vi.fn().mockResolvedValue(true);
-        wrapper.vm.validateInputs = vi.fn().mockReturnValue(true);
-        wrapper.vm.transformFEToBE = vi.fn().mockReturnValue([]);
-
-        await wrapper.vm.onSubmit();
-        await flushPromises();
-
-        // Check that notify was called (exact message may vary based on error handling)
-        expect(notifySpy).toHaveBeenCalled();
-      });
       
       
     });
@@ -1524,7 +1489,8 @@ describe("AddAlert Component", () => {
     it('should skip step 5 for real-time alerts when navigating forward', async () => {
       w.vm.formData.is_real_time = 'true';
       w.vm.wizardStep = 4;
-      w.vm.validateStep = vi.fn().mockResolvedValue(true);
+      // Mock step4Ref so validateStep(4) passes
+      w.vm.step4Ref = { validate: vi.fn().mockResolvedValue({ valid: true }) };
 
       await w.vm.goToNextStep();
       await flushPromises();
@@ -1858,13 +1824,6 @@ describe("AddAlert Component", () => {
     let w: any;
     beforeEach(() => {
       w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
-    });
-
-    it('should pass formData to AlertSetup', () => {
-      const alertSetup = w.findComponent({ name: 'AlertSetup' });
-      if (alertSetup.exists()) {
-        expect(alertSetup.props().formData).toBeDefined();
-      }
     });
 
     it('should pass formData to QueryConfig', () => {

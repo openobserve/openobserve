@@ -19,6 +19,7 @@ jobs:
       contents: read
       pull-requests: write
       checks: write
+      packages: write
     if: |
       github.event_name == 'repository_dispatch' &&
       github.event.client_payload.slash_command.args.named.sha != '' &&
@@ -94,6 +95,13 @@ jobs:
         with:
           registry-type: public
 
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 
@@ -107,6 +115,7 @@ jobs:
           context: .
           tags: |
             public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
+            ghcr.io/openobserve/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max

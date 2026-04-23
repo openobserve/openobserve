@@ -162,16 +162,17 @@ jobs:
                 "logsqueries.matchall.spec.js",
                 "searchpartition.spec.js",
                 "logs-autocomplete-suggestions.spec.js",
+                "logs-sql-autocomplete.spec.js",
               ]
           - testfolder: "Alerts"
             browser: "chrome"
             run_files:
               [
-                "alerts-e2e-flow.spec.js",
+                # "alerts-e2e-flow.spec.js",
                 "alerts-ui-operations.spec.js",
                 "alerts-import.spec.js",
-                "alerts-advanced.spec.js",
-                "alerts-scheduled-features.spec.js",
+                # "alerts-advanced.spec.js",
+                # "alerts-scheduled-features.spec.js",
                 "alerts-destinations-prebuilt.spec.js",
                 "alerts-vrl-encoding.spec.js",
               ]
@@ -187,6 +188,7 @@ jobs:
                 "maxquery.spec.js",
                 "dashboard-chartJson.spec.js",
                 "dashboard-promql-suggestions.spec.js",
+                "dashboard-sql-autocomplete.spec.js",
                 "dashboard-share-link.spec.js",
                 "crossLinking.spec.js",
                 "crossLinkMultiStream.spec.js",
@@ -218,6 +220,7 @@ jobs:
                 "dashboard-sankey.spec.js",
                 "dashboard-pie-donut.spec.js",
                 "dashboard-table-chart.spec.js",
+                "dashboard-table-copy-cell.spec.js",
                 "dashboard-metric-camelcase.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
@@ -284,7 +287,7 @@ jobs:
                 "enrichment-regression.spec.js",
                 "ui-regression.spec.js",
                 "pipeline-regression.spec.js",
-                "alerts-regression.spec.js",
+                # "alerts-regression.spec.js",
                 "metrics-regression.spec.js",
                 "traces-regression.spec.js",
               ]

@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             no-caps
             size="sm"
-            class="tw:pl-[0.675rem]! tw:border! tw:border-[var(--o2-border-color)]! tw:rounded! tw:text-[0.7rem]! tw:tracking-[0.05rem]! tw:text-[var(--o2-text-2)]!"
+            class="tw:pl-[0.675rem]! tw:border! tw:border-[var(--o2-primary-btn-bg)]! tw:rounded! tw:text-[0.7rem]! tw:tracking-[0.03rem]! tw:text-[var(--o2-primary-btn-bg)]!"
             label="View Related"
             data-test="service-graph-node-panel-view-related-btn"
           >
@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-menu>
             </q-btn>
           </div>
-          <q-tab-panels v-model="activeTab" animated class="tw:h-full!">
+          <q-tab-panels v-model="activeTab" animated>
             <!-- Operations Tab -->
             <q-tab-panel
               name="operations"
@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else
-                  class="tw:max-h-full tw:overflow-hidden tw:rounded"
+                  class="tw:overflow-hidden tw:rounded"
                   data-test="service-graph-side-panel-operations-table"
                 >
                   <TenstackTable
@@ -417,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else
-                  class="tw:max-h-[20rem] tw:overflow-hidden tw:rounded"
+                  class="tw:overflow-hidden tw:rounded"
                   :data-test="`service-graph-side-panel-${cfg.id}-table`"
                 >
                   <TenstackTable
@@ -772,6 +772,7 @@ export default defineComponent({
     const store = useStore();
     const $q = useQuasar();
     const { t } = useI18n();
+    const router = useRouter();
 
     // RED Charts State
     const dashboardData = ref<any>({});
@@ -1930,9 +1931,23 @@ export default defineComponent({
           if (filterParts) {
             filterQuery = filterParts;
           }
+        } else {
+          $q.notify({
+            type: "warning",
+            message: t("traces.noLogsAvailableForService"),
+            timeout: 3000,
+            position: "bottom",
+          });
+          return;
         }
       } catch {
-        // Fall back to default service_name filter
+        $q.notify({
+          type: "warning",
+          message: t("traces.noLogsAvailableForService"),
+          timeout: 3000,
+          position: "bottom",
+        });
+        return;
       }
 
       const queryParams: any = {

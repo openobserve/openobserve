@@ -24,15 +24,19 @@
 const {
   mockGetSemanticGroups,
   mockCorrelate,
+  mockGetIdentityConfig,
   mockExtractSemanticDimensions,
   mockGenerateCorrelationQueries,
   mockFindMatchingService,
+  mockFilterDimensionsForCorrelation,
 } = vi.hoisted(() => ({
   mockGetSemanticGroups: vi.fn(),
   mockCorrelate: vi.fn(),
+  mockGetIdentityConfig: vi.fn(),
   mockExtractSemanticDimensions: vi.fn(),
   mockGenerateCorrelationQueries: vi.fn(),
   mockFindMatchingService: vi.fn(),
+  mockFilterDimensionsForCorrelation: vi.fn(),
 }));
 
 vi.mock("vuex", () => ({
@@ -47,6 +51,7 @@ vi.mock("@/services/service_streams", () => ({
   default: {
     getSemanticGroups: mockGetSemanticGroups,
     correlate: mockCorrelate,
+    getIdentityConfig: mockGetIdentityConfig,
   },
 }));
 
@@ -54,6 +59,7 @@ vi.mock("@/utils/telemetryCorrelation", () => ({
   extractSemanticDimensions: mockExtractSemanticDimensions,
   generateCorrelationQueries: mockGenerateCorrelationQueries,
   findMatchingService: mockFindMatchingService,
+  filterDimensionsForCorrelation: mockFilterDimensionsForCorrelation,
 }));
 
 // ---------------------------------------------------------------------------
@@ -98,6 +104,12 @@ describe("useServiceCorrelation", () => {
     // clearAllCaches() method exposed by the composable.
     const { clearAllCaches } = useServiceCorrelation();
     clearAllCaches();
+
+    // Set up default mock implementations
+    mockGetIdentityConfig.mockResolvedValue({
+      data: { sets: [], tracked_alias_ids: [] }
+    });
+    mockFilterDimensionsForCorrelation.mockReturnValue({});
   });
 
   // ─── Return value structure ───────────────────────────────────────────────
@@ -285,6 +297,7 @@ describe("useServiceCorrelation", () => {
     it("calls the correlate API and returns a result on success", async () => {
       mockGetSemanticGroups.mockResolvedValue({ data: MOCK_GROUPS });
       mockExtractSemanticDimensions.mockReturnValue({ service_name: "api-service" });
+      mockFilterDimensionsForCorrelation.mockReturnValue({ service_name: "api-service" });
       mockCorrelate.mockResolvedValue({ data: MOCK_CORRELATION_RESPONSE });
       mockGenerateCorrelationQueries.mockReturnValue({ logs: [], traces: [], metrics: [] });
 
@@ -366,6 +379,7 @@ describe("useServiceCorrelation", () => {
     it("includes correlationData in the returned result", async () => {
       mockGetSemanticGroups.mockResolvedValue({ data: MOCK_GROUPS });
       mockExtractSemanticDimensions.mockReturnValue({ service_name: "api-service" });
+      mockFilterDimensionsForCorrelation.mockReturnValue({ service_name: "api-service" });
       mockCorrelate.mockResolvedValue({ data: MOCK_CORRELATION_RESPONSE });
       mockGenerateCorrelationQueries.mockReturnValue({ logs: [], traces: [], metrics: [] });
 

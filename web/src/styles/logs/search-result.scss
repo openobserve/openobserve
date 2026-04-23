@@ -56,7 +56,7 @@
     border: 0.0626rem solid var(--o2-border-color) !important;
     border-radius: 0.25rem !important; // 4px - match select-pagination
     transition: all 0.2s ease;
-    margin-top: 0.4rem; // Match select-pagination vertical alignment
+    margin: 5px 0px; // Match select-pagination vertical alignment
     background: rgba(255, 255, 255, 0.1) !important; // Glassmorphic
     backdrop-filter: blur(10px) !important;
     display: flex !important;

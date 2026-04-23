@@ -41,6 +41,7 @@ const organizationObj = {
   allDashboardData: {},
   allAlertsListByFolderId: {},
   allAlertsListByNames: {},
+  allReportsListByFolderId: {} as Record<string, any[]>,
   allDashboardListHash: {},
   rumToken: {
     rum_token: "",
@@ -95,6 +96,7 @@ export default createStore({
     allRoleLimitsByOrgIdByRole: {},
     modulesToDisplay: {},
     isAiChatEnabled: false,
+    isWebinarBannerVisible: false,
     currentChatTimestamp: null,
     chatUpdated: false,
     // Default theme colors (Default Blue theme)
@@ -186,6 +188,9 @@ export default createStore({
     setAllAlertsListByFolderId(state, payload) {
       state.organizationData.allAlertsListByFolderId = payload;
     },
+    setAllReportsListByFolderId(state, payload) {
+      state.organizationData.allReportsListByFolderId = payload;
+    },
     setAllAlertsListByNames(state, payload) {
       state.organizationData.allAlertsListByNames = payload;
     },
@@ -269,6 +274,9 @@ export default createStore({
     },
     setIsAiChatEnabled(state, payload) {
       state.isAiChatEnabled = payload;
+    },
+    setIsWebinarBannerVisible(state, payload) {
+      state.isWebinarBannerVisible = payload;
     },
     setCurrentChatTimestamp(state, payload) {
       state.currentChatTimestamp = payload;
@@ -386,6 +394,9 @@ export default createStore({
     setAllAlertsListByFolderId(context, payload) {
       context.commit("setAllAlertsListByFolderId", payload);
     },
+    setAllReportsListByFolderId(context, payload) {
+      context.commit("setAllReportsListByFolderId", payload);
+    },
     setAllAlertsListByNames(context, payload) {
       context.commit("setAllAlertsListByNames", payload);
     },
@@ -469,6 +480,9 @@ export default createStore({
     },
     setIsAiChatEnabled(context, payload) {
       context.commit("setIsAiChatEnabled", payload);
+    },
+    setIsWebinarBannerVisible(context, payload) {
+      context.commit("setIsWebinarBannerVisible", payload);
     },
     setCurrentChatTimestamp(context, payload) {
       context.commit("setCurrentChatTimestamp", payload);

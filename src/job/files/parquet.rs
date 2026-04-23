@@ -865,19 +865,35 @@ async fn merge_files(
         let service_streams_config =
             &o2_enterprise::enterprise::common::config::get_config().service_streams;
 
-        // Skip self-reporting streams from _meta organization to avoid processing internal metrics
-        if LOCAL_NODE.is_ingester()
-            && service_streams_config.enabled
+        let valid_stream_type = stream_type == StreamType::Logs
+            || stream_type == StreamType::Metrics
+            || stream_type == StreamType::Traces;
+
+        if service_streams_config.enabled
+            && service_streams_config.node_matches_processing_node(&LOCAL_NODE)
             && org_id != config::META_ORG_ID
-            && (stream_type == StreamType::Logs
-                || stream_type == StreamType::Metrics
-                || stream_type == StreamType::Traces)
+            && valid_stream_type
         {
             // Get stream count for this type (cached, 5-min TTL — counts rarely change).
             let stream_count =
                 crate::service::db::schema::get_stream_count_cached(&org_id, stream_type).await;
 
-            // Check if we should process this file (adaptive per-type sampling)
+            // Get coverage deficit: how many known services are missing streams of this type.
+            // Derived entirely from the in-memory cache — no DB I/O.
+            // Feeds the fast-lane boost in the sampler: 100% incomplete → rate=1 (all streams
+            // active), tapering back to normal as coverage fills in.
+            // Passing (0, 0) when disabled is the documented no-op sentinel for the sampler.
+            let coverage_deficit = if service_streams_config.coverage_catchup_enabled {
+                o2_enterprise::enterprise::service_streams::cache::get_coverage_deficit(
+                    &org_id,
+                    stream_type,
+                )
+                .await
+            } else {
+                (0, 0)
+            };
+
+            // Check if we should process this file (adaptive per-type sampling with fast lane)
             let should_process =
                 o2_enterprise::enterprise::service_streams::sampler::should_process_file(
                     &org_id,
@@ -885,6 +901,7 @@ async fn merge_files(
                     &stream_name,
                     &new_file_key,
                     stream_count,
+                    coverage_deficit,
                 );
 
             if should_process {
@@ -1136,7 +1153,9 @@ async fn queue_services_from_parquet(
     // Create bounded channel for backpressure - drops records if consumer can't keep up
     // ARROW-NATIVE: Channel now sends RecordBatch directly (no HashMap conversion!)
     let (tx, mut rx) = mpsc::channel::<arrow::record_batch::RecordBatch>(
-        o2_enterprise::enterprise::common::config::SS_CHANNEL_CAPACITY,
+        o2_enterprise::enterprise::common::config::get_config()
+            .service_streams
+            .channel_capacity,
     );
 
     // Clone data needed for producer task

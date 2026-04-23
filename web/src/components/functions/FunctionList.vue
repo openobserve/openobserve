@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model:selected="selectedFunctions"
               style="width: 100%"
               :style="hasVisibleRows
-                  ? 'width: 100%; height: calc(100vh - 130px)'
+                  ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)'
                   : 'width: 100%'"
               class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             >

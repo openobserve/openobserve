@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:selected="selectedDestinations"
         class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
         :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
+            ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 87px); overflow-y: auto;'
             : 'width: 100%'"
       >
         <template #no-data>
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #bottom="scope">
           <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-sm">
+            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[300px] tw:mr-sm">
                   {{ resultTotal }} {{ t('alert_destinations.header') }}
                 </div>
             <q-btn

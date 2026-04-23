@@ -177,15 +177,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ formatLargeNumber(value.count) }}
               </div>
             </div>
-
           </q-item>
         </q-list>
       </div>
     </div>
 
-    <!-- View more values -->
+    <!-- View more values / loading more indicator -->
     <div
-      v-if="fieldValues?.hasMore && !fieldValues?.isLoading"
+      v-if="isLoadingMore || (fieldValues?.hasMore && !fieldValues?.isLoading)"
       class="view-more-container q-px-sm q-pt-xs"
     >
       <q-btn
@@ -195,17 +194,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="0.2rem"
         padding="0.1rem 0.3rem"
         class="view-more-btn full-width"
-        @click="emit('load-more-values', fieldName)"
+        :disable="isLoadingMore"
+        @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"
       >
-        View more values
+        <q-spinner-dots v-if="isLoadingMore" color="primary" size="1em" />
+        <span v-else>View more values</span>
       </q-btn>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { watchDebounced } from "@vueuse/core";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -305,9 +306,11 @@ const displayValues = computed(() => {
   return props.fieldValues?.values || [];
 });
 
-// Show search box once original values hit the fetch limit.
+// Show search box whenever there are values to search.
 const showValueSearch = computed(
-  () => cachedValues.value.length >= props.defaultValuesCount,
+  () =>
+    cachedValues.value.length > 0 ||
+    (props.fieldValues?.values?.length ?? 0) > 0,
 );
 
 watchDebounced(
@@ -358,6 +361,28 @@ const clearSelection = () => {
   emit("remove-field-filter", props.fieldName);
 };
 
+const isLoadingMore = ref(false);
+let valuesCountBeforeLoadMore = 0;
+
+const handleLoadMoreClick = () => {
+  valuesCountBeforeLoadMore = props.fieldValues?.values?.length ?? 0;
+  isLoadingMore.value = true;
+  emit("load-more-values", props.fieldName);
+};
+
+// Clear isLoadingMore only once values have actually grown — early
+// streaming chunks can arrive empty yet flip isLoading to false.
+watch(
+  () => props.fieldValues?.values?.length,
+  (newLen) => {
+    if (isLoadingMore.value && (newLen ?? 0) > valuesCountBeforeLoadMore) {
+      nextTick(() => {
+        isLoadingMore.value = false;
+      });
+    }
+  },
+);
+
 /**
  * Returns the Quasar colour token for a value's checkbox.
  * Excluded values (!=) render red ("negative") to visually distinguish them
@@ -378,6 +403,7 @@ const reset = () => {
   valueSearchTerm.value = "";
   cachedValues.value = [];
   filterMode.value = "include";
+  isLoadingMore.value = false;
 };
 
 defineExpose({ reset });

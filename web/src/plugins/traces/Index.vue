@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page
-    class="tracePage tw:h-[calc(100vh-2.25rem)] tw:min-h-[calc(100vh-2.25rem)]! tw:max-h-[calc(100vh-2.25rem)]! tw:overflow-hidden!"
+    class="tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
@@ -203,8 +203,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="traces-search-error-text"
                     class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
-                    <q-icon name="info" color="primary" size="md" />
-                    {{ searchObj.data.errorMsg }}
+                    <SanitizedHtmlRenderer
+                      data-test="traces-search-detail-error-message"
+                      :htmlContent="searchObj?.data?.errorMsg"
+                      class="tw:pt-[1rem]"
+                    />
                   </div>
                   <div
                     v-else-if="!isStreamSelected"
@@ -295,10 +298,11 @@ import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, debounce } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
@@ -665,6 +669,13 @@ function buildSearch() {
         whereClause = durationParseResult;
       }
 
+      // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
+      whereClause = parseSpanKindWhereClause(
+        whereClause,
+        parser,
+        searchObj.data.stream.selectedStream.value,
+      );
+
       whereClause = whereClause
         .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
         .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
@@ -872,6 +883,13 @@ async function getQueryData(
       filter = filterParseResult;
     }
 
+    // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
+    filter = parseSpanKindWhereClause(
+      filter,
+      parser,
+      searchObj.data.stream.selectedStream.value,
+    );
+
     const combinedFilter = filter;
 
     if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
@@ -1000,7 +1018,10 @@ async function getQueryData(
             if ((isPagination && partition === 1) || !appendResult) {
               searchObj.data.queryResults.hits = formattedHits;
             } else {
-              searchObj.data.queryResults.hits.push(...formattedHits);
+              searchObj.data.queryResults.hits = [
+                ...searchObj.data.queryResults.hits,
+                ...formattedHits,
+              ];
             }
             searchObj.data.queryResults.from = queryReq.query.from;
 
@@ -1017,7 +1038,8 @@ async function getQueryData(
           const errData = err?.content || err;
           const { message, trace_id, code, error_detail } = errData ?? {};
 
-          let errorMsg = message || err?.message || "Search request failed";
+          let errorMsg =
+            message || err?.message || "Error while processing request";
           if (code) {
             searchObj.data.errorCode = code;
             const customMessage = logsErrorMessage(code);
@@ -1818,6 +1840,61 @@ watch(moveSplitter, () => {
   }
 });
 
+// Live mode: enable by default when auto_query_enabled flag is on.
+// zoConfig may not be populated yet at mount time; watch for it to arrive.
+watch(
+  () => store.state.zoConfig?.auto_query_enabled,
+  (enabled) => {
+    if (enabled && !searchObj.meta.liveMode) {
+      searchObj.meta.liveMode = true;
+    }
+  },
+  { immediate: true },
+);
+
+// Debounced auto-run on query text changes in live mode.
+const debouncedAutoRunOnQuery = debounce(() => {
+  if (
+    searchObj.meta.liveMode &&
+    store.state.zoConfig?.auto_query_enabled &&
+    !searchObj.loading
+  ) {
+    searchData();
+  }
+}, 500);
+
+// Debounced auto-run on datetime changes in live mode.
+// Traces has no existing auto-run on datetime, so no guard needed.
+const debouncedAutoRunOnDatetime = debounce(() => {
+  if (
+    searchObj.meta.liveMode &&
+    store.state.zoConfig?.auto_query_enabled &&
+    !searchObj.loading
+  ) {
+    searchData();
+  }
+}, 500);
+
+watch(
+  () => searchObj.data.query,
+  () => {
+    debouncedAutoRunOnQuery();
+  },
+);
+
+watch(
+  () => [
+    searchObj.data.datetime.type,
+    searchObj.data.datetime.startTime,
+    searchObj.data.datetime.endTime,
+    searchObj.data.datetime.relativeTimePeriod,
+  ],
+  () => {
+    debouncedAutoRunOnDatetime();
+  },
+  { deep: true },
+);
+
 // watch(
 //   changeStream,
 //   (stream, oldStream) => {
@@ -1969,6 +2046,11 @@ watch(
 
   .q-field__control-container {
     padding-top: 0px !important;
+  }
+
+  .traces-horizontal-splitter .q-splitter__before {
+    z-index: auto;
+    overflow: visible;
   }
 }
 </style>

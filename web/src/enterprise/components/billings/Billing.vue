@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:before>
         <div class="tw:w-full tw:pl-[0.625rem] tw:pb-[0.625rem] ">
-          <div class="card-container" style="min-height: calc(100vh - 125px)">
+          <div class="card-container" style="min-height: calc(100vh - var(--navbar-height) - 87px);">
             <q-tabs
               v-model="billingtab"
               indicator-color="transparent"
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-slot:after>
         <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-          <div class="card-container q-pb-md">
+          <div class="card-container q-pb-md"  style="height: calc(100vh - var(--navbar-height) - 87px);">
             <router-view title=""> </router-view>
           </div>
         </div>
@@ -276,7 +276,6 @@ export default defineComponent({
 
 .card-container {
   overflow-y: auto;
-  max-height: calc(100vh - 125px);
 }
 
 .custom-usage-date-select{

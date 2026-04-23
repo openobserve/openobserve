@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Scrollable content -->
     <div class="tw:flex-1 tw:overflow-y-auto tw:px-4 tw:py-2">
-      <div v-if="activeTab === 'discovery'">
+      <div v-show="activeTab === 'discovery'">
         <ServiceIdentitySetup
           :org-identifier="store.state.selectedOrganization.identifier"
           :semantic-groups="semanticGroups"
@@ -64,19 +64,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div v-if="activeTab === 'services'">
+      <div v-show="activeTab === 'services'">
         <DiscoveredServices @navigate-to-configuration="onTabChange('discovery')" />
       </div>
 
       <OrganizationDeduplicationSettings
-        v-if="activeTab === 'alert-correlation'"
+        v-show="activeTab === 'alert-correlation'"
         :org-id="store.state.selectedOrganization.identifier"
         :config="store.state.organizationSettings?.deduplication_config"
         @saved="onCorrelationSettingsSaved"
       />
 
       <SemanticFieldGroupsConfig
-        v-if="activeTab === 'field-aliases'"
+        v-show="activeTab === 'field-aliases'"
         :semantic-field-groups="semanticGroups"
         :scroll-to-group-id="aliasScrollToGroup"
         @update:semantic-field-groups="onSaveSemanticGroups"

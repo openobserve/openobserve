@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows-per-page-options="perPageOptions.map((opt: any) => opt.value)"
           style="width: 100%"
           :style="!loading && incidents.length > 0
-            ? 'width: 100%; height: calc(100vh - 127px)'
+            ? 'width: 100%; height: calc(100vh  - var(--navbar-height) - 77px)'
             : 'width: 100%'"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           data-test="incident-list-table"

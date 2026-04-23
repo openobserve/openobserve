@@ -17,7 +17,7 @@
           spans
           <span class="tw:mx-2">•</span>
           <span class="tw:text-[var(--o2-text-primary)]">{{ maxDepth }}</span>
-          max depth
+          depth
         </div>
       </div>
     </div>

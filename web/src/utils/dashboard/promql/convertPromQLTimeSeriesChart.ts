@@ -114,7 +114,6 @@ export class TimeSeriesConverter implements PromQLChartConverter {
           showSymbol: config?.show_symbol ?? false,
 
           // Styling
-          zlevel: 2,
           itemStyle: {
             color: seriesColor,
           },
@@ -127,6 +126,14 @@ export class TimeSeriesConverter implements PromQLChartConverter {
             silent: true,
             animation: false,
             data: this.getMarkLineData(panelSchema),
+            zlevel: 2,
+            lineStyle: {
+              shadowColor: store.state.theme === "light"
+                ? "rgba(255, 255, 255, 0.7)"
+                : "rgba(0, 0, 0, 0.7)",
+              shadowBlur: 2,
+              width: 2,
+            },
           },
         });
 

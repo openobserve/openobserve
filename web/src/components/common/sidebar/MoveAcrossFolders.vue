@@ -180,6 +180,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             return "alert_ids"
           case "pipelines":
             return "pipeline_ids"
+          case "reports":
+            return "report_ids"
           default:
             return "alert_ids"
         }
