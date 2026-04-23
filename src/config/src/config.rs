@@ -1563,6 +1563,8 @@ pub struct Limit {
     pub query_partition_by_secs: usize,
     #[env_config(name = "ZO_QUERY_PARTITION_MAX_NUM", default = 100)] // max number of partitions
     pub query_partition_max_num: usize,
+    #[env_config(name = "ZO_DISABLE_PARTITIONS_FOR_NON_TS_ORDER_BY", default = false)]
+    pub disable_partitions_for_non_ts_order_by: bool,
     // Default Config: Run Query Recommendation Analysis for last one hour for every hour
     #[env_config(name = "ZO_QUERY_RECOMMENDATION_DURATION", default = 3600000000)] // microseconds
     pub query_recommendation_duration: i64,
