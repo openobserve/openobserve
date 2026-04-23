@@ -1,4 +1,4 @@
-<!-- eslint-disable no-prototype-builtins -->
+﻿<!-- eslint-disable no-prototype-builtins -->
 <!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             flat
-            no-caps
             :label="t(`ingestion.resetRUMTokenLabel`)"
             @click="showRUMUpdateDialogFn"
           />
@@ -42,7 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             flat
-            no-caps
             :label="t(`ingestion.generateRUMTokenLabel`)"
             @click="generateRUMToken"
           />
@@ -51,7 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             flat
-            no-caps
             :label="t(`ingestion.resetTokenBtnLabel`)"
             @click="showUpdateDialogFn"
           />
@@ -96,9 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="confirmRUMUpdate"
           />
         </div>
-        <q-tabs v-model="ingestTabType" horizontal align="left" class="q-ml-md">
-          <q-route-tab
-            default
+        <OTabs v-model="ingestTabType" horizontal align="left" class="q-ml-md">
+          <ORouteTab
             name="recommended"
             :to="{
               name: 'recommended',
@@ -107,9 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               },
             }"
             :label="t('ingestion.recommendedLabel')"
-            content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             name="custom"
             :to="{
               name: 'custom',
@@ -118,9 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               },
             }"
             :label="t('ingestion.customLabel')"
-            content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             name="server"
             :to="{
               name: 'servers',
@@ -129,9 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               },
             }"
             :label="t('ingestion.serverLabel')"
-            content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             name="database"
             :to="{
               name: 'databases',
@@ -140,10 +133,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               },
             }"
             :label="t('ingestion.databaseLabel')"
-            content-class="tab_content"
           />
 
-          <q-route-tab
+          <ORouteTab
             name="security"
             :to="{
               name: 'security',
@@ -152,10 +144,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               },
             }"
             :label="t('ingestion.securityLabel')"
-            content-class="tab_content"
           />
 
-          <q-route-tab
+          <ORouteTab
             name="devops"
             :to="{
               name: 'devops',
@@ -164,10 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               },
             }"
             :label="t('ingestion.devopsLabel')"
-            content-class="tab_content"
           />
 
-          <q-route-tab
+          <ORouteTab
             name="networking"
             :to="{
               name: 'networking',
@@ -176,9 +166,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               },
             }"
             :label="t('ingestion.networkingLabel')"
-            content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             name="message-queues"
             :to="{
               name: 'message-queues',
@@ -187,9 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               },
             }"
             :label="t('ingestion.messageQueuesLabel')"
-            content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             name="languages"
             :to="{
               name: 'languages',
@@ -198,9 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               },
             }"
             :label="t('ingestion.languagesLabel')"
-            content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             name="others"
             :to="{
               name: 'others',
@@ -209,9 +196,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               },
             }"
             :label="t('ingestion.otherLabel')"
-            content-class="tab_content"
           />
-        </q-tabs>
+        </OTabs>
       </div>
     </div>
     <div class="tw:h-[calc(100vh - var(--navbar-height) - 100px)] tw:overflow-hidden">
@@ -227,6 +213,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onMounted, onUpdated, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -241,7 +229,7 @@ import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 
-export default defineComponent({
+export defineComponent({
   name: "PageIngestion",
   components: { ConfirmDialog },
   setup() {

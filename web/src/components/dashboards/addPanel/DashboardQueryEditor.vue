@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -42,19 +42,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
           style="max-width: 600px; overflow: hidden"
         >
-          <q-tabs
+          <OTabs
             v-model="dashboardPanelData.layout.currentQueryIndex"
-            narrow-indicator
             dense
-            inline-label
-            outside-arrows
             mobile-arrows
             @click.stop
             data-test="dashboard-panel-query-tab"
           >
-            <q-tab
-              no-caps
-              :ripple="false"
+            <OTab
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
@@ -94,8 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="cursor: pointer"
                 :data-test="`dashboard-panel-query-tab-remove-${index}`"
               />
-            </q-tab>
-          </q-tabs>
+            </OTab>
+          </OTabs>
           <!-- <div v-if="promqlMode" class="query-tabs-container">
                     <div v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" class="query-tab" :class="{ 'active': index === activeTab }" @click="handleActiveTab(index)">
                         <div class="tab-label">{{ 'Query ' + (index + 1) }}</div>
@@ -251,7 +246,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </q-select>
                     <q-btn
-                      no-caps
                       padding="xs"
                       class=""
                       size="sm"
@@ -283,6 +277,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
 // @ts-nocheck
 import {
   defineComponent,

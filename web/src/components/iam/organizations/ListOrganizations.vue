@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -41,7 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               class="q-ml-sm o2-primary-button tw:h-[36px]"
               flat
-              no-caps
               :label="t(`organization.add`)"
               @click="addOrganization"
               data-test="Add Organization"
@@ -135,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 // @ts-nocheck
 import { defineComponent, ref, watch, onMounted, onBeforeMount, onUpdated, computed } from "vue";
 import { useStore } from "vuex";

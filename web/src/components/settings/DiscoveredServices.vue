@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-body1 text-negative">{{ error }}</div>
       <q-btn
         data-test="retry-discovered-services-btn"
-        flat no-caps dense
+        flat dense
         icon="refresh"
         @click="loadServices"
       >{{ t('settings.correlation.retry') }}</q-btn>
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <q-btn
         data-test="refresh-discovered-services-btn"
-        flat no-caps dense
+        flat dense
         icon="refresh"
         @click="loadServices(true)"
         :loading="refreshing"
@@ -411,6 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";

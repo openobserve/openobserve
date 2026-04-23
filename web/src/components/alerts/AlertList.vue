@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -117,7 +117,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'compact-icon-btn'
                 : '',
             ]"
-            no-caps
             flat
             :label="isCompactToolbar ? undefined : t(`dashboard.import`)"
             icon="file_upload"
@@ -132,7 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="alert-list-add-alert-btn"
             class="q-ml-sm o2-primary-button tw:h-[36px]"
-            no-caps
             flat
             :disable="!destinations.length || !templates.length"
             :title="!destinations.length ? t('alerts.noDestinations') : ''"
@@ -564,7 +562,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           label="Create Template"
                           size="md"
                           color="primary"
-                          no-caps
                           style="border-radius: 4px"
                           @click="routeTo('alertTemplates')"
                         />
@@ -584,7 +581,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           label="Create Destination"
                           size="md"
                           color="primary"
-                          no-caps
                           style="border-radius: 4px"
                           @click="routeTo('alertDestinations')"
                         />
@@ -635,7 +631,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? 'o2-secondary-button-dark'
                           : 'o2-secondary-button-light'
                       "
-                      no-caps
                       dense
                       @click="moveMultipleAlerts"
                     >
@@ -651,7 +646,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? 'o2-secondary-button-dark'
                           : 'o2-secondary-button-light'
                       "
-                      no-caps
                       dense
                       @click="multipleExportAlert"
                     >
@@ -667,7 +661,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? 'o2-secondary-button-dark'
                           : 'o2-secondary-button-light'
                       "
-                      no-caps
                       dense
                       @click="bulkToggleAlerts('pause')"
                     >
@@ -678,7 +671,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
                       class="tw:flex items-center no-border o2-secondary-button tw:h-[36px] q-mr-sm tw:w-[200px]"
-                      no-caps
                       dense
                       style="width: 170px"
                       @click="bulkToggleAlerts('resume')"
@@ -695,7 +687,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? 'o2-secondary-button-dark'
                           : 'o2-secondary-button-light'
                       "
-                      no-caps
                       dense
                       @click="openBulkDeleteDialog"
                     >
@@ -839,7 +830,6 @@ persistent>
                   class="o2-secondary-button tw:h-[36px]"
                   :label="t('alerts.cancel')"
                   text-color="light-text"
-                  no-caps
                 />
                 <q-btn
                   data-test="clone-alert-submit-btn"
@@ -847,7 +837,6 @@ persistent>
                   class="o2-primary-button tw:h-[36px] q-ml-md"
                   type="submit"
                   :disable="isSubmitting"
-                  no-caps
                 />
               </div>
             </q-form>
@@ -891,6 +880,7 @@ persistent>
 </template>
 
 <script lang="ts">
+
 import {
   defineComponent,
   ref,
@@ -3047,11 +3037,11 @@ export default defineComponent({
 
   // Customize app-tabs for view mode switching
   ::v-deep .app-tabs {
-    .q-tabs {
+    .o-tabs {
       min-height: 36px;
     }
 
-    .q-tab {
+    .o-tab {
       padding: 0 20px;
       min-height: 36px;
       text-transform: none;

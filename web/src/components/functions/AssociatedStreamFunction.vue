@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -190,7 +190,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       color="secondary"
                       class="q-ml-md q-mb-xs text-bold no-border"
                       @click="addFunctionInProgress = true"
-                      no-caps
                       >Associate Function</q-btn
                     >
                   </div>
@@ -206,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       No functions found
                     </div>
                     <!-- <div>
-                    <q-btn @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
+                    <q-btn @click="addFunctionInProgress = true">Associate Function</q-btn>
                   </div> -->
                   </div>
                 </template>
@@ -239,7 +238,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-ml-md q-mb-xs text-bold no-border"
           padding="sm lg"
           color="secondary"
-          no-caps
           :label="t(`logStream.refreshStats`)"
           @click="getLogStream"
         />
@@ -278,6 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 import {
   defineComponent,
   ref,

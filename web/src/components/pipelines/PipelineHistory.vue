@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex items-center">
             <q-btn
-              no-caps
               padding="xs"
               outline
               icon="arrow_back_ios_new"
@@ -551,7 +550,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-actions class="pipeline-error-actions">
           <q-btn
             flat
-            no-caps
             label="Close"
             class="o2-secondary-button tw:h-[36px]"
             @click="closeErrorDialog"
@@ -563,6 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+
 import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";

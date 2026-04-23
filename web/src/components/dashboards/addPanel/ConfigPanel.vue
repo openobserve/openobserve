@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -155,7 +155,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             />
             <q-btn
-              no-caps
               padding="xs"
               size="sm"
               flat
@@ -221,7 +220,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="cursor: pointer; padding: 0px 5px"
                 :label="t('common.set')"
                 class="el-border"
-                no-caps
                 data-test="dashboard-config-set-panel-time"
               />
             </div>
@@ -517,25 +515,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="font-weight: 600"
         >
           {{ t("dashboard.query") }}
-          <q-tabs
+          <OTabs
             v-model="dashboardPanelData.layout.currentQueryIndex"
-            narrow-indicator
             dense
-            inline-label
-            outside-arrows
             mobile-arrows
             data-test="dashboard-config-query-tab"
           >
-            <q-tab
-              no-caps
+            <OTab
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
               :label="`${t('dashboard.queryLabel')} ${Number(index) + 1}`"
               :data-test="`dashboard-config-query-tab-${index}`"
             >
-            </q-tab>
-          </q-tabs>
+            </OTab>
+          </OTabs>
         </div>
 
         <CommonAutoComplete
@@ -1491,7 +1485,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <q-btn
-            no-caps
             padding="xs"
             size="sm"
             flat
@@ -1524,7 +1517,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <q-btn
-            no-caps
             padding="xs"
             size="sm"
             flat
@@ -1557,7 +1549,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <q-btn
-            no-caps
             padding="xs"
             size="sm"
             flat
@@ -1590,7 +1581,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <q-btn
-            no-caps
             padding="xs"
             size="sm"
             flat
@@ -1630,7 +1620,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.configSectionValueTransformations") }}
           <q-btn
-            no-caps
             padding="xs"
             size="sm"
             flat
@@ -1673,7 +1662,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.configSectionFieldOverrides") }}
           <q-btn
-            no-caps
             padding="xs"
             size="sm"
             flat
@@ -2288,7 +2276,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.drilldown") }}
           <q-btn
-            no-caps
             padding="xs"
             size="sm"
             flat
@@ -2338,7 +2325,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.comparisonAgainst") }}
           <q-btn
-            no-caps
             padding="xs"
             size="sm"
             flat
@@ -2392,7 +2378,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="cursor: pointer; padding: 0px 5px"
           :label="t('dashboard.addButton')"
           class="el-border"
-          no-caps
           data-test="dashboard-addpanel-config-time-shift-add-btn"
         />
       </div>
@@ -2418,7 +2403,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.markLines") }}
           <q-btn
-            no-caps
             padding="xs"
             size="sm"
             flat
@@ -2467,6 +2451,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { computed, defineComponent, inject, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -56,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'o2-secondary-button-light'
             "
             flat
-            no-caps
             :label="t('common.refresh')"
             @click="loadTemplates"
           />
@@ -66,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="eval-template-list-add-btn"
             class="q-ml-sm o2-primary-button tw:h-[36px]"
             flat
-            no-caps
             :label="t('evalTemplate.newTemplate')"
             @click="goToCreate"
           />
@@ -205,7 +203,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'o2-secondary-button-dark'
                       : 'o2-secondary-button-light'
                   "
-                  no-caps
                   dense
                   @click="openBulkDeleteDialog"
                 >
