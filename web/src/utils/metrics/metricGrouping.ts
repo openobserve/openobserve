@@ -220,19 +220,10 @@ export const K8S_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
     defaultMetrics: [
       { streamName: "k8s_node_cpu_usage" },
       { streamName: "k8s_node_memory_rss" },
+      { streamName: "k8s_node_network_io" },
     ],
   },
-  {
-    id: "network",
-    label: "Network",
-    icon: "wifi",
-    defaultMetrics: [
-      { streamName: "k8s_pod_network_io", filters: { direction: "receive" } },
-      { streamName: "k8s_pod_network_io", filters: { direction: "transmit" } },
-      { streamName: "k8s_node_network_io", filters: { direction: "receive" } },
-      { streamName: "k8s_node_network_io", filters: { direction: "transmit" } },
-    ],
-  },
+  { id: "network", label: "Network", icon: "wifi" },
   { id: "others", label: "Others", icon: "category" },
 ];
 

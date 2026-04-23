@@ -28,7 +28,9 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
-  getServiceIconDataUrl: vi.fn().mockReturnValue("data:image/svg+xml;base64,ICON"),
+  getServiceIconDataUrl: vi
+    .fn()
+    .mockReturnValue("data:image/svg+xml;base64,ICON"),
 }));
 
 vi.mock("@/composables/useTraces", () => ({
@@ -264,9 +266,9 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should call getServiceIconDataUrl with the span service name", () => {
       expect(
-        vi.mocked(getServiceIconDataUrl).mock.calls.some(
-          (call) => call[0] === mockSpan.service_name,
-        ),
+        vi
+          .mocked(getServiceIconDataUrl)
+          .mock.calls.some((call) => call[0] === mockSpan.service_name),
       ).toBe(true);
     });
   });
@@ -442,7 +444,9 @@ describe("TraceDetailsSidebar", async () => {
         '[data-test="trace-details-sidebar-attributes-table"]',
       );
       expect(attributesTable.exists()).toBe(true);
-      expect(attributesTable.text()).toContain("dev2-openobserve-alertmanager-1");
+      expect(attributesTable.text()).toContain(
+        "dev2-openobserve-alertmanager-1",
+      );
     });
   });
 
@@ -977,7 +981,7 @@ describe("TraceDetailsSidebar", async () => {
       correlationWrapper?.unmount();
     });
 
-    it("should set correlationError to noLogsFound message when findRelatedTelemetry returns null", async () => {
+    it("should set correlationError to noDataFound message when findRelatedTelemetry returns null", async () => {
       const metricsTab = correlationWrapper.find(
         '[data-test="trace-details-sidebar-tabs-correlated-metrics"]',
       );
