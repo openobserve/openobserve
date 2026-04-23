@@ -470,7 +470,7 @@ pub async fn handle_stripe_event(headers: HeaderMap, payload: axum::body::Bytes)
     get,
     path = "/{org_id}/ai/usage",
     context_path = "/api",
-    tag = "Ai",
+    tag = "AI",
     operation_id = "GetAiUsage",
     summary = "Get AI credit usage for an organization",
     description = "Returns current AI credit usage, mode, and remaining credits.",

@@ -87,10 +87,13 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   }),
 }));
 
+// Shared ref so tests can toggle chartData to truthy/falsy
+const mockChartData = ref(undefined as any);
+
 // Mock usePanelEditor composable
 vi.mock("./composables/usePanelEditor", () => ({
   usePanelEditor: vi.fn(() => ({
-    chartData: ref(undefined),
+    chartData: mockChartData,
     errorData: reactive({ errors: [] }),
     metaData: ref(null),
     seriesData: ref([]),
@@ -188,6 +191,7 @@ vi.mock("@/components/dashboards/addPanel/DashboardErrors.vue", () => ({
 vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
   default: {
     name: "PanelSchemaRenderer",
+    props: ["searchType"],
     template: '<div class="panel-renderer-mock">PanelSchemaRenderer</div>',
   },
 }));
@@ -228,6 +232,7 @@ describe("PanelEditor.vue", () => {
       wrapper.unmount();
     }
     vi.clearAllMocks();
+    mockChartData.value = undefined;
   });
 
   describe("Component Initialization", () => {
@@ -1247,6 +1252,79 @@ describe("PanelEditor.vue", () => {
       });
 
       expect(wrapper.props("isUiHistogram")).toBe(false);
+    });
+  });
+
+  describe("searchType computed", () => {
+    const mountGlobalOptions = {
+      plugins: [i18n, Quasar],
+      stubs: {
+        QSeparator: true,
+        QSplitter: {
+          template:
+            '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
+        },
+        QIcon: true,
+        QBtn: true,
+        QTooltip: true,
+        QAvatar: true,
+        QDialog: true,
+      },
+    };
+
+    // PanelSchemaRenderer only renders when chartData is truthy
+    beforeEach(() => {
+      mockChartData.value = {};
+    });
+
+    it('should pass searchType "dashboards" to PanelSchemaRenderer when pageType is "dashboard"', () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "dashboard" },
+        global: mountGlobalOptions,
+      });
+
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      expect(renderer.props("searchType")).toBe("dashboards");
+    });
+
+    it('should pass searchType "ui" to PanelSchemaRenderer when pageType is "metrics"', () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "metrics" },
+        global: mountGlobalOptions,
+      });
+
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      expect(renderer.props("searchType")).toBe("ui");
+    });
+
+    it('should pass searchType "ui" to PanelSchemaRenderer when pageType is "logs"', () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "logs" },
+        global: mountGlobalOptions,
+      });
+
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      expect(renderer.props("searchType")).toBe("ui");
+    });
+
+    it('should pass searchType "dashboards" to PanelSchemaRenderer when pageType is "build"', () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "build" },
+        global: mountGlobalOptions,
+      });
+
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      expect(renderer.props("searchType")).toBe("dashboards");
+    });
+
+    it('should default searchType to "dashboards" for unknown pageType', () => {
+      wrapper = shallowMount(PanelEditor, {
+        props: { pageType: "unknown" as any },
+        global: mountGlobalOptions,
+      });
+
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      expect(renderer.props("searchType")).toBe("dashboards");
     });
   });
 });

@@ -16,7 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div ref="multiWindowContainerRef" class="step-compare-with-past" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw:px-3 tw:py-4" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
+    <div class="step-content" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
+      <div class="section-header">
+        <div class="section-header-accent" />
+        <span class="section-header-title">{{ t('alerts.steps.compareWithPast') }}</span>
+      </div>
+      <div class="tw:px-3 tw:pb-2">
       <!-- Alert set for header -->
       <div class="multi-window-text tw:flex tw:items-center tw:gap-2 q-py-sm q-mt-md">
         <span>{{ t('alerts.compareWithPast.alertSetFor') }}</span>
@@ -183,29 +188,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-btn>
 
-        <!-- Go to View Editor Button with Info Icon - shows when comparison windows are added -->
-        <div v-if="localMultiTimeRange.length > 0" class="tw:flex tw:items-center tw:gap-2">
-          <q-btn
-            data-test="go-to-view-editor-btn"
-            :label="t('alerts.compareWithPast.goToConditions')"
-            size="md"
-            class="o2-secondary-button"
-            style="font-size: 14px;"
-            no-caps
-            @click="handleGoToSqlEditor"
-          >
-          <q-tooltip
-              ref="goToConditionsTooltipRef"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="300px"
-              :offset="[0, 8]"
-            >
-              {{ t('alerts.compareWithPast.goToConditionsTooltip') }}
-            </q-tooltip>
-        </q-btn>
-        </div>
       </div>
+      </div><!-- end tw:px-3 tw:py-2 -->
     </div>
   </div>
 </template>
@@ -253,13 +237,12 @@ export default defineComponent({
       default: "custom",
     },
   },
-  emits: ["update:multiTimeRange", "goToSqlEditor"],
+  emits: ["update:multiTimeRange"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
 
     const multiWindowContainerRef = ref<HTMLElement | null>(null);
-    const goToConditionsTooltipRef = ref<any>(null);
     const localMultiTimeRange = ref<TimeShiftPicker[]>([...(props.multiTimeRange || [])]);
 
     // Watch for prop changes
@@ -277,10 +260,8 @@ export default defineComponent({
     });
 
     const comparisonDisabledTooltip = computed(() => {
-      if (props.selectedTab === "custom") {
-        return "Please switch to SQL mode in conditions step to enable comparison windows";
-      } else if (props.selectedTab === "promql") {
-        return "Please switch to SQL mode in conditions step to enable comparison windows";
+      if (props.selectedTab !== "sql") {
+        return t('alerts.compareWithPast.comparisonDisabledTooltip');
       }
       return "";
     });
@@ -346,23 +327,10 @@ export default defineComponent({
       }
     };
 
-    const goToSqlEditor = () => {
-      emit("goToSqlEditor");
-    };
-
-    const handleGoToSqlEditor = () => {
-      // Hide the tooltip before navigating
-      if (goToConditionsTooltipRef.value) {
-        goToConditionsTooltipRef.value.hide();
-      }
-      goToSqlEditor();
-    };
-
     return {
       t,
       store,
       multiWindowContainerRef,
-      goToConditionsTooltipRef,
       localMultiTimeRange,
       addTimeShift,
       removeTimeShift,
@@ -371,8 +339,6 @@ export default defineComponent({
       convertMinutesToDisplayValue,
       isComparisonDisabled,
       comparisonDisabledTooltip,
-      goToSqlEditor,
-      handleGoToSqlEditor,
     };
   },
 });
@@ -398,6 +364,9 @@ export default defineComponent({
       background-color: #212121;
       border: 1px solid #343434;
     }
+    .section-header { border-bottom: 1px solid #343434; }
+    .section-header-title { color: #e0e0e0; }
+    .section-header-accent { background: var(--q-primary); }
   }
 
   &.light-mode {
@@ -405,7 +374,28 @@ export default defineComponent({
       background-color: #ffffff;
       border: 1px solid #e6e6e6;
     }
+    .section-header { border-bottom: 1px solid #eeeeee; }
+    .section-header-title { color: #374151; }
+    .section-header-accent { background: var(--q-primary); }
   }
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 10px 12px;
+}
+.section-header-accent {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+.section-header-title {
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .dark-mode-multi-window .multi-window-text {
@@ -440,7 +430,7 @@ export default defineComponent({
 
 .reference-window-container {
   min-height: 110px;
-  border-left: 6px solid #6832CC !important;
+  // border-left: 6px solid #6832CC !important;
 }
 
 .dark-mode-multi-window .multi-window-container {
@@ -455,7 +445,7 @@ export default defineComponent({
 
 .multi-window-container {
   min-height: 110px;
-  border-left: 6px solid #32CCCC !important;
+  // border-left: 6px solid #32CCCC !important;
 }
 
 .running-text {

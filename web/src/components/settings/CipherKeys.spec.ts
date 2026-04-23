@@ -655,7 +655,7 @@ describe("CipherKeys", () => {
           name: "actions",
           field: "actions",
           label: expect.any(String), // t("cipherKey.actions")
-          align: "left",
+          align: "center",
           sortable: false,
           classes: "actions-column"
         },

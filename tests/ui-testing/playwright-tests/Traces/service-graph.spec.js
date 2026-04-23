@@ -310,18 +310,18 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     testLogger.info('Switched back to Tree View successfully');
   });
 
-  test("P1: Show telemetry correlation dialog from node panel", {
-    tag: ['@serviceGraph', '@traces', '@functional', '@P1', '@all']
+  test("P1: Show telemetry correlation from node panel via Metrics tab", {
+    tag: ['@enterprise', '@serviceGraph', '@traces', '@functional', '@P1', '@all']
   }, async ({ page }) => {
     const pm = new PageManager(page);
-    testLogger.info('=== Testing telemetry correlation ===');
+    testLogger.info('=== Testing telemetry correlation via Metrics tab ===');
 
     // Step 1: API validation — confirm api-gateway exists in topology
     const node = await pm.serviceGraphPage.findNodeByLabel('api-gateway');
     expect(node).toBeTruthy();
     testLogger.info('API confirmed api-gateway exists for telemetry test');
 
-    // Step 2: UI — open side panel and click Show Telemetry
+    // Step 2: UI — open side panel and click Metrics tab
     await pm.serviceGraphPage.navigateToServiceGraphUrl();
     await pm.serviceGraphPage.expectServiceGraphPageVisible();
 
@@ -329,51 +329,30 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     await pm.serviceGraphPage.expectSidePanelVisible();
     testLogger.info('Side panel opened for api-gateway');
 
-    // clickShowTelemetryAndWait() waits for the loading spinner to finish,
-    // then returns true if the dialog opened, false if it didn't (error path).
-    const dialogOpened = await pm.serviceGraphPage.clickShowTelemetryAndWait();
-    testLogger.info(`Show Telemetry result: dialogOpened=${dialogOpened}`);
+    // Click Metrics tab and wait for correlation data to load
+    const metricsLoaded = await pm.serviceGraphPage.clickMetricsTabAndWait();
+    testLogger.info(`Metrics tab result: metricsLoaded=${metricsLoaded}`);
 
-    if (dialogOpened) {
-      // Happy path: service registry had the service, correlation dialog opened
-      testLogger.info('Correlation dialog opened — validating tabs');
+    if (metricsLoaded) {
+      // Happy path: metrics correlation dashboard rendered
+      testLogger.info('Metrics correlation dashboard rendered successfully');
 
-      const tabs = await pm.serviceGraphPage.getCorrelationTabs();
-      testLogger.info(`Correlation tabs: ${tabs.join(', ')}`);
-
-      // At minimum, Traces tab should be present
-      const hasTracesTab = tabs.some(t => t.toLowerCase().includes('traces'));
-      expect(hasTracesTab).toBeTruthy();
-      testLogger.info('Traces tab found in correlation dialog');
-
-      await pm.serviceGraphPage.closeCorrelationDialog();
-      testLogger.info('Correlation dialog closed');
+      await pm.serviceGraphPage.expectMetricsDashboardVisible();
+      testLogger.info('Metrics dashboard visible in side panel');
     } else {
-      // Expected fallback: service registry is empty because trace data hasn't
-      // been compacted from WAL to parquet yet (service discovery only runs
-      // during parquet compaction, not during ingestion).
-      // The UI shows a Quasar notification toast with the error message.
-      testLogger.info('Dialog did not open — verifying error notification');
+      // Expected fallback: no metrics data available or correlation failed
+      // Check for error or empty state
+      testLogger.info('Metrics dashboard did not load — checking for error/empty state');
 
-      const notification = page.locator('.q-notification');
-      await expect(notification).toBeVisible({ timeout: 5000 });
+      const hasError = await pm.serviceGraphPage.isMetricsErrorVisible();
+      const hasEmpty = await pm.serviceGraphPage.isMetricsEmptyVisible();
 
-      const notificationText = await notification.textContent();
-      testLogger.info(`Notification text: ${notificationText}`);
-
-      // The Vue component sets: 'Service not found in service registry.'
-      // or 'No correlated streams found.' or 'Service Discovery is an enterprise feature.'
-      const expectedMessages = [
-        'service not found',
-        'no correlated streams',
-        'enterprise feature',
-      ];
-      const hasExpectedMessage = expectedMessages.some(msg =>
-        notificationText.toLowerCase().includes(msg)
-      );
-      expect(hasExpectedMessage).toBeTruthy();
-      testLogger.info('Error notification displayed with expected message — UI wiring validated');
+      expect(hasError || hasEmpty).toBeTruthy();
+      testLogger.info(`Metrics tab fallback state: error=${hasError}, empty=${hasEmpty}`);
     }
+
+    await pm.serviceGraphPage.closeSidePanel();
+    testLogger.info('Side panel closed');
   });
 
   test("P1: Refresh button reloads graph data", {
@@ -424,7 +403,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     await pm.serviceGraphPage.expectServiceGraphPageVisible();
 
     // Verify the search input retains the filter text
-    const inputValue = await page.locator('input[placeholder="Search services..."]').inputValue();
+    const inputValue = await pm.serviceGraphPage.getSearchInputValue();
     expect(inputValue).toBe('api-gateway');
     testLogger.info('Search input retains filter text');
 
@@ -436,7 +415,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     await pm.serviceGraphPage.expectServiceGraphPageVisible();
 
     // Verify search box is empty
-    const clearedValue = await page.locator('input[placeholder="Search services..."]').inputValue();
+    const clearedValue = await pm.serviceGraphPage.getSearchInputValue();
     expect(clearedValue).toBe('');
     testLogger.info('Search cleared and graph restored');
   });
@@ -504,16 +483,34 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     const pm = new PageManager(page);
     testLogger.info('=== Verifying edge case: circular dependencies ===');
 
-    const result = await pm.serviceGraphPage.getTopologyViaAPI();
-    const data = result.data?.nodes ? result.data : result.data?.data;
-    const nodes = data?.nodes || [];
-    const edges = data?.edges || [];
-    const nodeLabels = nodes.map(n => n.label || n.id);
-
-    // Verify at least some circular dependency services exist as nodes
+    // The service graph daemon processes traces in batches. Circular dependency
+    // services (service-a/b/c) may not appear in the first topology snapshot.
+    // Poll the API until they appear or timeout.
+    // NOTE: Edge case services may take longer to appear than production services.
+    // Use a longer timeout to allow the daemon to process all ingested traces.
     const circularServices = ['service-a', 'service-b', 'service-c'];
-    const foundCircularNodes = circularServices.filter(svc => nodeLabels.includes(svc));
-    testLogger.info(`Circular dependency services found: ${foundCircularNodes.join(', ') || 'none'}`);
+    const maxWaitMs = 120000;
+    const pollIntervalMs = 10000;
+    const startTime = Date.now();
+    let foundCircularNodes = [];
+    let nodes = [];
+    let edges = [];
+
+    while (Date.now() - startTime < maxWaitMs) {
+      const result = await pm.serviceGraphPage.getTopologyViaAPI();
+      const data = result.data?.nodes ? result.data : result.data?.data;
+      nodes = data?.nodes || [];
+      edges = data?.edges || [];
+      const nodeLabels = nodes.map(n => n.label || n.id);
+
+      foundCircularNodes = circularServices.filter(svc => nodeLabels.includes(svc));
+      testLogger.info(`Poll: ${nodes.length} nodes, ${edges.length} edges, circular services: ${foundCircularNodes.join(', ') || 'none'}`);
+
+      if (foundCircularNodes.length >= 1) break;
+      await page.waitForTimeout(pollIntervalMs);
+    }
+
+    testLogger.info(`Circular dependency services found: ${foundCircularNodes.join(', ') || 'none'} (after ${Date.now() - startTime}ms)`);
     expect(foundCircularNodes.length).toBeGreaterThanOrEqual(1);
 
     // Check edges for circular pattern (a→b, b→c, c→a)

@@ -14,6 +14,9 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub kind: String,
     pub data: String,
+    /// When `true` this row is an internally auto-provisioned key (e.g. the
+    /// per-org DEK for envelope encryption) and is hidden from the public API.
+    pub is_system: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

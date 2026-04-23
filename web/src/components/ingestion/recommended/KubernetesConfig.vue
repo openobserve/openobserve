@@ -1,6 +1,6 @@
 <!-- eslint-disable no-useless-escape -->
 <template>
-  <div class="q-pa-md kubernetes-config-section">
+  <div class="q-pa-md kubernetes-config-section tw:pb-lg">
     <!-- Quick Install Section -->
     <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
       <div class="tw:flex tw:items-start tw:gap-3">
@@ -140,7 +140,7 @@ Make changes accordingly to the above URL.
 
     <br />
     <hr />
-    <div class="text-subtitle1 q-pl-xs q-mt-md">
+    <div class="text-subtitle1 q-pl-xs q-mt-md q-mb-lg">
       Once you have installed the OpenObserve collector, it will:
       <ul class="tw:list-disc tw:ml-5">
         <li>Collect metrics from your Kubernetes cluster</li>

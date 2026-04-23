@@ -61,6 +61,14 @@ pub struct FieldAlias {
     ///
     /// Note: Field names can overlap with other groups. First-defined group wins.
     pub fields: Vec<String>,
+
+    /// When true, this alias is a workload-type dimension used to build identity sets.
+    /// Aliases with this flag are grouped by their `group` field to form `IdentitySet`
+    /// entries with `distinguish_by` populated from those alias IDs.
+    /// Aliases without this flag (HTTP, Database, System, etc.) are never used as
+    /// identity set discriminators.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub is_workload_type: bool,
 }
 
 impl FieldAlias {
@@ -72,6 +80,7 @@ impl FieldAlias {
             display: display.into(),
             group: None,
             fields,
+            is_workload_type: false,
         }
     }
 
@@ -88,6 +97,7 @@ impl FieldAlias {
             display: display.into(),
             group: Some(group.into()),
             fields,
+            is_workload_type: false,
         }
     }
 
@@ -210,7 +220,18 @@ pub struct ServiceIdentityConfig {
 }
 
 impl ServiceIdentityConfig {
-    pub fn default_config() -> Self {
+    /// Returns an empty config used as a bootstrap fallback.
+    ///
+    /// Identity sets and tracked alias IDs are not hardcoded here. Instead:
+    /// - `tracked_alias_ids` is sourced from `O2_SERVICE_STREAMS_TRACKED_ALIAS_IDS` (enterprise env
+    ///   config) and populated by `get_service_identity_config()` at load time.
+    /// - `sets` are derived dynamically from semantic field groups where `is_workload_type=true`,
+    ///   grouped by their `group` field, by the auto-configure path in
+    ///   `get_service_identity_config()`.
+    ///
+    /// If `tracked_alias_ids` resolves to empty (env var unset or explicitly `""`), service
+    /// streams processing treats the feature as disabled for that org.
+    pub fn new_default() -> Self {
         Self {
             sets: vec![],
             tracked_alias_ids: vec![],
@@ -382,8 +403,6 @@ mod tests {
         assert!(err.contains("duplicate"));
     }
 
-    // ========== ServiceIdentityConfig::validate() Tests ==========
-
     #[test]
     fn test_service_identity_config_validate_ok() {
         let cfg = ServiceIdentityConfig {
@@ -444,8 +463,6 @@ mod tests {
         let err = cfg.validate().unwrap_err();
         assert!(err.contains("duplicate set id"));
     }
-
-    // ========== ServiceIdentityConfig::resolve_best_set() Tests ==========
 
     #[test]
     fn test_resolve_best_set_picks_highest_coverage() {

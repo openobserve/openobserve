@@ -212,13 +212,13 @@ describe("useManagementRoutes", () => {
     });
 
     it("should have correct path for each base child route", () => {
-      const expectedPaths = ["general", "organization", "alert_destinations", "templates"];
-      const actualPaths = routes[0].children.slice(0, 4).map((child: any) => child.path);
+      const expectedPaths = ["general", "organization", "alert_destinations", "model_pricing", "model_pricing/edit", "templates"];
+      const actualPaths = routes[0].children.slice(0, 6).map((child: any) => child.path);
       expect(actualPaths).toEqual(expectedPaths);
     });
 
     it("should have unique names for each base child route", () => {
-      const names = routes[0].children.slice(0, 4).map((child: any) => child.name);
+      const names = routes[0].children.slice(0, 6).map((child: any) => child.name);
       const uniqueNames = [...new Set(names)];
       expect(names).toHaveLength(uniqueNames.length);
     });
@@ -350,9 +350,9 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have exactly 12 children routes when enterprise is enabled", () => {
+    it("should have exactly 15 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(12); // 4 base + 8 enterprise (query_management, cipherKeys, pipelineDestinations, nodes, domainManagement, regexPatterns, correlationSettings, license)
+      expect(routes[0].children).toHaveLength(15); // 6 base + 9 enterprise (query_management, cipherKeys, aiToolsets, pipelineDestinations, nodes, domainManagement, regexPatterns, correlationSettings, license)
     });
   });
 
@@ -403,9 +403,9 @@ describe("useManagementRoutes", () => {
       expect(orgMgmtRoute.component).toBeDefined();
     });
 
-    it("should have exactly 5 children routes when cloud is enabled", () => {
+    it("should have exactly 7 children routes when cloud is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(5); // 4 base + 1 cloud
+      expect(routes[0].children).toHaveLength(7); // 6 base + 1 cloud
     });
   });
 
@@ -420,9 +420,9 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 13 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 16 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(13); // 4 base + 8 enterprise + 1 cloud
+      expect(routes[0].children).toHaveLength(16); // 6 base + 9 enterprise + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
@@ -502,63 +502,63 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(4); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes
     });
 
     it("should handle isCloud as string 'false'", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(4); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes
     });
 
     it("should handle isEnterprise as undefined", () => {
       (config as any).isEnterprise = undefined;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(4); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes
     });
 
     it("should handle isCloud as undefined", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(4); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes
     });
 
     it("should handle both config values as undefined", () => {
       (config as any).isEnterprise = undefined;
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(4); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes
     });
 
     it("should handle isEnterprise as non-string truthy value", () => {
       (config as any).isEnterprise = true;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(4); // Only base routes, since comparison is with "true"
+      expect(routes[0].children).toHaveLength(6); // Only base routes, since config comparison is strict "true"
     });
 
     it("should handle isCloud as non-string truthy value", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = true;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(4); // Only base routes, since comparison is with "true"
+      expect(routes[0].children).toHaveLength(6); // Only base routes, since config comparison is strict "true"
     });
 
     it("should handle empty string for isEnterprise", () => {
       config.isEnterprise = "";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(4); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes
     });
 
     it("should handle empty string for isCloud", () => {
       config.isEnterprise = "false";
       config.isCloud = "";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(4); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes
     });
 
     it("should return the same structure on multiple calls", () => {

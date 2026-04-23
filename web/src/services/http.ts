@@ -21,9 +21,74 @@ import { Notify } from "quasar";
 import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
 
 // Shared refresh state — ensures only one dex_refresh request is in-flight
-// at a time across all axios instances. All concurrent 401s wait on the same
-// Promise and retry once it resolves.
+// at a time across all axios instances and streaming fetch requests. All
+// concurrent 401s wait on the same Promise and retry once it resolves.
 let refreshPromise: Promise<void> | null = null;
+
+// Exported so streaming (fetch-based) requests that bypass the axios interceptor
+// can participate in the same token-refresh flow.
+export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
+  // Avoid infinite loops for auth endpoints
+  if (
+    requestUrl.includes("/config/dex_login") ||
+    requestUrl.includes("/config/dex_refresh") ||
+    requestUrl.includes("/auth/login")
+  ) {
+    return Promise.reject(new Error("Cannot refresh: auth endpoint"));
+  }
+
+  if (config.isCloud == "true") {
+    store.dispatch("logout");
+    useLocalCurrentUser("", true);
+    useLocalUserInfo("", true);
+    sessionStorage.clear();
+    window.location.reload();
+    return Promise.reject(new Error("Cloud environment: direct logout"));
+  }
+
+  if (
+    config.isEnterprise == "true" &&
+    (store.state as any).zoConfig.sso_enabled
+  ) {
+    if (!refreshPromise) {
+      const refreshInstance = axios.create({
+        withCredentials: true,
+        baseURL: store.state.API_ENDPOINT,
+      });
+      refreshPromise = refreshInstance
+        .get("/config/dex_refresh")
+        .then((res) => {
+          if (res.status !== 200) {
+            return Promise.reject(new Error("Refresh returned non-200"));
+          }
+        })
+        .catch(() => {
+          return refreshInstance
+            .get("/config/logout")
+            .finally(() => {
+              store.dispatch("logout");
+              useLocalCurrentUser("", true);
+              useLocalUserInfo("", true);
+              sessionStorage.clear();
+              window.location.reload();
+            })
+            .then(() => Promise.reject(new Error("Refresh failed")));
+        })
+        .finally(() => {
+          refreshPromise = null;
+        });
+    }
+    return refreshPromise;
+  }
+
+  // Not enterprise SSO — standard logout
+  store.dispatch("logout");
+  useLocalCurrentUser("", true);
+  useLocalUserInfo("", true);
+  sessionStorage.clear();
+  window.location.reload();
+  return Promise.reject(new Error("Not SSO: cannot refresh"));
+};
 
 const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
@@ -48,14 +113,14 @@ const http = ({ headers } = {} as any) => {
         switch (error.response.status) {
           case 400:
             console.log(
-              JSON.stringify(error.response.data["error"] || "Bad Request")
+              JSON.stringify(error.response.data["error"] || "Bad Request"),
             );
             break;
           case 401:
             console.log(
               JSON.stringify(
-                error.response.data["error"] || "Invalid credentials"
-              )
+                error.response.data["error"] || "Invalid credentials",
+              ),
             );
             if (
               config.isCloud == "true" &&
@@ -67,48 +132,16 @@ const http = ({ headers } = {} as any) => {
               sessionStorage.clear();
               window.location.reload();
             }
-            // Check if the failing request is not the login or refresh token request
+            // Delegate to the shared refresh helper — it owns the URL exclusion
+            // checks and the logout-on-failure path. Retry the original request
+            // once the token is refreshed.
             else if (
               config.isEnterprise == "true" &&
-              (store.state as any).zoConfig.sso_enabled &&
-              !error.config.url.includes("/config/dex_login") &&
-              !error.config.url.includes("/config/dex_refresh") &&
-              !error.config.url.includes("/auth/login")
+              (store.state as any).zoConfig.sso_enabled
             ) {
-              // If no refresh is in-flight, start one. All concurrent 401s
-              // share the same Promise so only a single /config/dex_refresh
-              // request is made.
-              if (!refreshPromise) {
-                refreshPromise = instance
-                  .get("/config/dex_refresh", {})
-                  .then((res) => {
-                    if (res.status !== 200) {
-                      return Promise.reject(
-                        new Error("Refresh returned non-200"),
-                      );
-                    }
-                  })
-                  .catch((refreshError) => {
-                    return instance
-                      .get("/config/logout", {})
-                      .finally(() => {
-                        store.dispatch("logout");
-                        useLocalCurrentUser("", true);
-                        useLocalUserInfo("", true);
-                        sessionStorage.clear();
-                        window.location.reload();
-                      })
-                      .then(() => Promise.reject(refreshError));
-                  })
-                  .finally(() => {
-                    refreshPromise = null;
-                  });
-              }
-
-              // Wait for the shared refresh, then retry the original request
-              return refreshPromise.then(() =>
-                instance.request(error.config),
-              );
+              return attemptTokenRefresh(error.config.url)
+                .then(() => instance.request(error.config))
+                .catch(() => Promise.reject(error));
             } else {
               if (!error.request.responseURL.includes("/login")) {
                 store.dispatch("logout");
@@ -167,7 +200,15 @@ const http = ({ headers } = {} as any) => {
                     s.includes("@") || /^\d+$/.test(s) || uuidRe.test(s);
                   const resourceNames = resourcePath.filter((s) => !isId(s));
                   if (resourceNames.length > 0) {
-                    resourceHint = ` on "${resourceNames[resourceNames.length - 1]}"`;
+                    // Map known multi-segment paths to friendly names
+                    const joined = resourceNames.join("/");
+                    const friendlyNames: Record<string, string> = {
+                      "llm/models": "LLM Model Pricing",
+                      "llm/models/built-in": "LLM Model Pricing",
+                      "llm/models/refresh-built-in": "LLM Model Pricing",
+                    };
+                    const friendly = friendlyNames[joined];
+                    resourceHint = ` on "${friendly || resourceNames[resourceNames.length - 1]}"`;
                   }
                 }
               } catch {
@@ -175,7 +216,7 @@ const http = ({ headers } = {} as any) => {
               }
               const notifyMessage = backendError
                 ? `Unauthorized Access: ${backendError}`
-                : `Unauthorized Access: You are not authorized to perform this operation${resourceHint}, please contact your administrator.`;
+                : `Unauthorized Access: You are not authorized to perform this operation${resourceHint}. Please contact your administrator.`;
               Notify.create({
                 message: notifyMessage,
                 timeout: 0, // This ensures the notification does not close automatically
@@ -192,20 +233,20 @@ const http = ({ headers } = {} as any) => {
             }
             console.log(
               JSON.stringify(
-                error.response.data["error"] || "Unauthorized Access"
-              )
+                error.response.data["error"] || "Unauthorized Access",
+              ),
             );
             break;
           case 404:
             console.log(
-              JSON.stringify(error.response.data["error"] || "Not Found")
+              JSON.stringify(error.response.data["error"] || "Not Found"),
             );
             break;
           case 500:
             console.log(
               JSON.stringify(
-                error.response.data["error"] || "Invalid ServerError"
-              )
+                error.response.data["error"] || "Invalid ServerError",
+              ),
             );
             break;
           default:
@@ -213,7 +254,7 @@ const http = ({ headers } = {} as any) => {
         }
       }
       return Promise.reject(error);
-    }
+    },
   );
 
   return instance;

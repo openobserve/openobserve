@@ -180,7 +180,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
           <!-- Wrap Content Button -->
           <q-btn
-            v-if="searchObj.meta.logsVisualizeToggle === 'logs' || searchObj.meta.logsVisualizeToggle === 'patterns'"
+            v-if="
+              searchObj.meta.logsVisualizeToggle === 'logs' ||
+              searchObj.meta.logsVisualizeToggle === 'patterns'
+            "
             data-test="logs-search-result-wrap-table-content-btn"
             icon="wrap_text"
             flat
@@ -207,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'histogram-container--hidden',
         ]"
         v-if="
+          searchObj.meta.logsVisualizeToggle !== 'patterns' &&
           searchObj.data?.histogram?.errorMsg == '' &&
           searchObj.data.histogram.errorCode != -1
         "
@@ -268,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'histogram-container--hidden',
         ]"
         v-else-if="
+          searchObj.meta.logsVisualizeToggle !== 'patterns' &&
           searchObj.data.histogram?.errorMsg != '' &&
           searchObj.meta.showHistogram &&
           searchObj.data.histogram.errorCode != -1
@@ -517,6 +522,7 @@ export default defineComponent({
     ),
     SanitizedHtmlRenderer,
     TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
+    JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
     EqualIcon,
     NotEqualIcon,
     TelemetryCorrelationDashboard,
@@ -1323,7 +1329,7 @@ export default defineComponent({
         name: "searchJobInspector",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          trace_id: traceId
+          trace_id: traceId,
         },
       });
     };

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       v-show="hasResults || loading"
       data-test="traces-table-wrapper"
-      class="column tw:h-auto!"
+      class="column tw:h-auto! traces-table-container"
     >
       <!-- Table scroll area: no overflow here — parent handles unified scroll -->
       <div
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :hide-search-term-actions="false"
               :hide-ai="true"
-              @copy="copyToClipboard"
+              @copy="copyToClipboard(column.id, row[column.id])"
               @add-search-term="addSearchTerm"
               @send-to-ai-chat="sendToAiChat"
             />
@@ -203,12 +203,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { copyToClipboard as qCopyToClipboard } from "quasar";
 import TenstackTable from "@/components/TenstackTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
-import useTraces from "@/composables/useTraces";
+import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
+import { useTracesTableColumns } from "@/plugins/traces/composables/useTracesTableColumns";
 import TraceTimestampCell from "./TraceTimestampCell.vue";
 import TraceServiceCell from "./TraceServiceCell.vue";
 import TraceLatencyCell from "./TraceLatencyCell.vue";
@@ -227,6 +228,7 @@ import {
 } from "../../../utils/zincutils";
 import { useStore } from "vuex";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 
 interface Props {
   hits: any[];
@@ -278,7 +280,12 @@ const emit = defineEmits<{
   "send-to-ai-chat": [value: string];
 }>();
 
-const copyToClipboard = (value: any) => qCopyToClipboard(String(value));
+const copyToClipboard = (field: string, value: any) =>
+  qCopyToClipboard(
+    field === "span_kind"
+      ? (SPAN_KIND_MAP[String(value)] ?? String(value))
+      : String(value),
+  );
 
 const addSearchTerm = (
   field: string,
@@ -290,7 +297,11 @@ const addSearchTerm = (
     const isOp = action === "include" ? "is" : "is not";
     searchObj.data.stream.addToFilter = `${field} ${isOp} null`;
   } else {
-    searchObj.data.stream.addToFilter = `${field} ${operator} '${String(fieldValue).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+    const displayValue =
+      field === "span_kind"
+        ? (SPAN_KIND_MAP[String(fieldValue)] ?? String(fieldValue))
+        : String(fieldValue);
+    searchObj.data.stream.addToFilter = `${field} ${operator} '${displayValue.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
   }
 };
 
@@ -299,6 +310,13 @@ const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 const rowsPerPageOptions = [10, 25, 50, 100];
 
 const { searchObj, updatedLocalLogFilterField } = useTraces();
+const { buildColumns } = useTracesTableColumns();
+
+onMounted(() => {
+  if (!searchObj.data.resultGrid.columns.length) {
+    searchObj.data.resultGrid.columns = buildColumns(false, "traces", DEFAULT_TRACE_COLUMNS.traces);
+  }
+});
 
 // const rebuildColumns = () => {
 //   buildColumns(
@@ -371,4 +389,10 @@ const totalPages = computed(() =>
 
 <style lang="scss" scoped>
 @import "@/styles/pagination.scss";
+
+:deep(.traces-table-container) {
+  .table-container {
+    border-radius: 0 !important;
+  }
+}
 </style>

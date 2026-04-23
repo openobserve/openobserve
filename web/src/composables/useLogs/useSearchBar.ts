@@ -384,7 +384,14 @@ export const useSearchBar = () => {
           errorMsg: "",
           errorDetail: "",
         };
-        extractFields();
+        await extractFields();
+        // In live mode, auto-run the query after fields are loaded
+        if (
+          store.state.zoConfig.auto_query_enabled &&
+          searchObj.meta.liveMode
+        ) {
+          await handleQueryData();
+        }
       }
     } catch (e: any) {
       console.info("Error while getting stream data:", e);

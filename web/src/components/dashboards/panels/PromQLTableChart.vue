@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Override bottom slot to add legend filter alongside native pagination -->
         <!-- When legend footer is not shown, TableRenderer's default pagination will be used -->
         <template #bottom="scope" v-if="showLegendFooter">
-          <div class="row items-center full-width">
+          <div class="row items-center full-width" data-test="dashboard-table-pagination">
             <div class="row items-center q-gutter-xs">
               <q-select
                 v-model="selectedLegend"
