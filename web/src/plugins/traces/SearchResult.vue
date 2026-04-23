@@ -55,12 +55,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           color="primary"
           icon="timeline"
           :label="t('volumeInsights.insightsButtonLabel')"
-          class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold! tw:mr-[0.5rem]"
+          class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
           @click.stop="openUnifiedAnalysisDashboard"
           data-test="insights-button"
         >
           <q-tooltip>{{ t("volumeInsights.analyzeTooltipTraces") }}</q-tooltip>
         </q-btn>
+        <ORefreshButton
+          :last-run-at="searchObj.meta.lastRunAt"
+          :loading="searchObj.loading"
+          :disabled="searchObj.loading"
+          @click="$emit('run-query')"
+          class="tw:ml-2"
+        />
 
         <q-space />
         <!-- Pagination -->
@@ -159,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineAsyncComponent, defineComponent, ref } from "vue";
+import { computed, defineAsyncComponent, defineComponent, ref, watch } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -168,10 +175,12 @@ import useTraces from "../../composables/useTraces";
 import { useRouter } from "vue-router";
 import TracesSearchResultList from "./components/TracesSearchResultList.vue";
 import { formatLargeNumber } from "../../utils/zincutils";
+import ORefreshButton from "@/lib/core/RefreshButton/RefreshButton.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
+    ORefreshButton,
     TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
@@ -185,6 +194,7 @@ export default defineComponent({
     "search:timeboxed",
     "get:traceDetails",
     "metrics:filters-updated",
+    "run-query",
   ],
   methods: {
     closeColumn(col: any) {
@@ -214,6 +224,15 @@ export default defineComponent({
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();
     const metricsDashboardRef: any = ref(null);
+
+    watch(
+      () => searchObj.loading,
+      (loading, wasLoading) => {
+        if (wasLoading && !loading && searchObj.searchApplied) {
+          searchObj.meta.lastRunAt = Date.now();
+        }
+      },
+    );
 
     const expandRowDetail = (props: any) => {
       let from: number;
