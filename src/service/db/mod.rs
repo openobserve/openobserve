@@ -21,7 +21,6 @@ use {
     infra::errors::Error, o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
-pub mod ai_prompts;
 pub mod alerts;
 pub mod backfill;
 pub mod compact;
@@ -37,6 +36,8 @@ pub mod kv;
 pub mod license;
 pub mod metas;
 pub mod metrics;
+pub mod model_pricing;
+pub mod model_pricing_sync;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
 pub mod org_users;
@@ -49,6 +50,8 @@ pub mod saved_view;
 pub mod scheduler;
 pub mod schema;
 pub mod search_job;
+#[cfg(feature = "enterprise")]
+pub mod service_graph;
 pub mod session;
 pub mod short_url;
 pub mod sourcemaps;

@@ -80,7 +80,7 @@ import { useStore } from "vuex";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import { getImageURL } from "@/utils/zincutils";
-import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
+import { validateDashboardJson } from "@/utils/dashboard/dashboardValidator";
 
 export default defineComponent({
   name: "DashboardJsonEditor",

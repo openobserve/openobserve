@@ -73,14 +73,12 @@ where
         let start = Instant::now();
         let start_time = crate::utils::time::now_micros();
 
-        // Extract request info before moving req
+        // Real IP was resolved up-chain by the `extract_real_ip` middleware.
         let remote_addr = req
-            .headers()
-            .get("X-Forwarded-For")
-            .or_else(|| req.headers().get("Forwarded"))
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("-")
-            .to_string();
+            .extensions()
+            .get::<super::RealIp>()
+            .map(|ip| ip.0.to_string())
+            .unwrap_or_else(|| "-".to_string());
 
         let path = req
             .uri()

@@ -1170,9 +1170,9 @@ describe("configUtils", () => {
       expect(shouldShowNoValueReplacement(data, false)).toBe(false);
     });
 
-    it("should return true for table chart in non-promql mode", () => {
+    it("should return false for table chart in non-promql mode", () => {
       const data = { data: { type: "table" } };
-      expect(shouldShowNoValueReplacement(data, false)).toBe(true);
+      expect(shouldShowNoValueReplacement(data, false)).toBe(false);
     });
   });
 

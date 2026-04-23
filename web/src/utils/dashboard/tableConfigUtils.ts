@@ -21,10 +21,7 @@
  * when new config options are added.
  */
 
-import {
-  formatUnitValue,
-  getUnitValue,
-} from "./convertDataIntoUnitValue";
+import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
@@ -121,8 +118,7 @@ export const parseTimestampValue = (
     const hasOffsetOrZ =
       /[+-]\d{2}(:?\d{2})?$/.test(value) || value.endsWith("Z");
 
-    const isoString =
-      iso8601WithT && !hasOffsetOrZ ? `${value}Z` : value;
+    const isoString = iso8601WithT && !hasOffsetOrZ ? `${value}Z` : value;
     timestamp = new Date(isoString).getTime();
 
     if (isNaN(timestamp)) {
@@ -156,9 +152,11 @@ export const detectTimestampFields = (
 
   for (const field of fields) {
     if (field?.functionName === "histogram") {
-      if (!field.treatAsNonTimestamp) {
-        result.add(field.alias);
-      }
+      // Histogram fields always produce datetime values; format them as
+      // timestamps regardless of the treatAsNonTimestamp flag so that values
+      // like "2026-02-09T18:00:00" are always shown in timezone-aware
+      // "YYYY-MM-DD HH:mm:ss" format.
+      result.add(field.alias);
     } else {
       const sample = tableRows
         ?.slice(0, Math.min(20, tableRows.length))
@@ -241,8 +239,7 @@ export const formatNumericValue = (
   decimals: number,
   missingValue?: string,
 ): string => {
-  if (val === null || val === undefined)
-    return String(missingValue ?? "");
+  if (val === null || val === undefined) return String(missingValue ?? "");
 
   const mapped = lookupValueMapping(val, valueMappingCache);
   if (mapped != null) return mapped;

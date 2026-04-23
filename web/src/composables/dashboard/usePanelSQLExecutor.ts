@@ -17,6 +17,10 @@ import { markRaw, toRaw, nextTick } from "vue";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
 import logsUtils from "@/composables/useLogs/logsUtils";
+import {
+  detectChunkingDirection,
+  shouldPrependChunk,
+} from "@/utils/dashboard/chunkingDirection";
 
 const adjustTimestampByTimeRangeGap = (
   timestamp: number,
@@ -349,6 +353,8 @@ export const usePanelSQLExecutor = (ctx: {
             // Use HTTP2/streaming for multi-query (time-shift) queries
             // Track the current query index being processed
             let currentQueryIndexInStream: number | null = null;
+            // Track chunking direction per query index
+            const chunkingLeftToRight: Map<number, boolean> = new Map();
 
             const payload: any = {
               queryReq: {
@@ -403,6 +409,27 @@ export const usePanelSQLExecutor = (ctx: {
                     state.resultMetaData[queryIndex] = [];
                   }
 
+                  // Detect chunking direction from first metadata entry
+                  if (state.resultMetaData[queryIndex].length === 0) {
+                    const metaContent = {
+                      ...(response?.content ?? {}),
+                      ...(response?.content?.results ?? {}),
+                    };
+                    const direction = detectChunkingDirection(
+                      metaContent?.time_offset?.start_time ?? 0,
+                      metaContent?.time_offset?.end_time ?? 0,
+                      state.metadata?.queries?.[queryIndex]?.startTime ??
+                        state.metadata?.queries?.[0]?.startTime ??
+                        0,
+                      state.metadata?.queries?.[queryIndex]?.endTime ??
+                        state.metadata?.queries?.[0]?.endTime ??
+                        0,
+                    );
+                    if (direction !== null) {
+                      chunkingLeftToRight.set(queryIndex, direction);
+                    }
+                  }
+
                   // Push metadata for each partition
                   state.resultMetaData[queryIndex].push({
                     ...(response?.content ?? {}),
@@ -444,21 +471,22 @@ export const usePanelSQLExecutor = (ctx: {
                     if (streaming_aggs) {
                       state.data[queryIndex] = markRaw([...hits]);
                     }
-                    // Otherwise, append/prepend based on order_by (multiple partitions)
+                    // Otherwise, append/prepend based on chunking direction and order_by
                     else {
-                      const orderBy =
+                      const orderAsc =
                         state.resultMetaData[
                           queryIndex
-                        ]?.order_by?.toLowerCase();
+                        ]?.order_by?.toLowerCase() === "asc";
+                      const isLTR =
+                        chunkingLeftToRight.get(queryIndex) ?? false;
+                      const shouldPrepend = shouldPrependChunk(isLTR, orderAsc);
 
-                      if (orderBy === "asc") {
-                        // For ascending order, prepend new data at start
+                      if (shouldPrepend) {
                         state.data[queryIndex] = markRaw([
                           ...hits,
                           ...toRaw(state.data[queryIndex] ?? []),
                         ]);
                       } else {
-                        // For descending order, append new data at end
                         state.data[queryIndex] = markRaw([
                           ...toRaw(state.data[queryIndex] ?? []),
                           ...hits,
@@ -588,7 +616,21 @@ export const usePanelSQLExecutor = (ctx: {
             state.data[currentQueryIndex] = markRaw(
               searchResponse.value.hits ?? [],
             );
-            state.resultMetaData[currentQueryIndex] = [searchResponse.value]; // Wrap in array
+            // In Logs→Visualize path, searchResponse is a single combined chunk
+            // (not streaming). Override time_offset with the user's actual
+            // selected range so fillMissingValues detects direction / builds
+            // fill bounds correctly. searchResponse.time_offset from Index.vue
+            // may carry a partition boundary (e.g. last page's range), which
+            // would make RTL detection fill only the last partition's slice.
+            state.resultMetaData[currentQueryIndex] = [
+              {
+                ...searchResponse.value,
+                time_offset: {
+                  start_time: Number(startISOTimestamp),
+                  end_time: Number(endISOTimestamp),
+                },
+              },
+            ];
 
             // Wait for annotations to complete
             if (annotationsPromise) {

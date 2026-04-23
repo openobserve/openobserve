@@ -170,7 +170,7 @@ export const shouldShowNoValueReplacement = (
   promqlMode: boolean,
 ): boolean => {
   return (
-    ["area", "line", "area-stacked", "bar", "stacked", "table"].includes(
+    ["area", "line", "area-stacked", "bar", "stacked"].includes(
       dashboardPanelData.data.type,
     ) && !promqlMode
   );

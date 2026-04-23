@@ -632,6 +632,14 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
+        // LLM Model Pricing
+        .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))
+        // NOTE: named routes MUST be registered before {model_id} to avoid being matched as a model ID
+        .route("/{org_id}/llm/models/built-in", get(model_pricing::get_built_in))
+        .route("/{org_id}/llm/models/refresh-built-in", post(model_pricing::refresh_built_in))
+        .route("/{org_id}/llm/models/test", post(model_pricing::test_model_match))
+        .route("/{org_id}/llm/models/{model_id}", get(model_pricing::get).put(model_pricing::update).delete(model_pricing::delete))
+
         // Metrics
         .route("/{org_id}/ingest/metrics/_json", post(metrics::ingest::json))
 
@@ -694,6 +702,14 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/dashboards/{dashboard_id}/annotations", get(dashboards::timed_annotations::get_annotations).post(dashboards::timed_annotations::create_annotations).delete(dashboards::timed_annotations::delete_annotations))
         .route("/{org_id}/dashboards/{dashboard_id}/annotations/{timed_annotation_id}", put(dashboards::timed_annotations::update_annotations))
         .route("/{org_id}/dashboards/{dashboard_id}/annotations/panels/{timed_annotation_id}", delete(dashboards::timed_annotations::delete_annotation_panels))
+
+        // Reports (v2) — /bulk and /move must precede /{report_id} to avoid route conflicts
+        .route("/v2/{org_id}/reports", get(dashboards::reports::list_reports_v2).post(dashboards::reports::create_report_v2))
+        .route("/v2/{org_id}/reports/bulk", delete(dashboards::reports::delete_report_bulk_v2))
+        .route("/v2/{org_id}/reports/move", patch(dashboards::reports::move_reports))
+        .route("/v2/{org_id}/reports/{report_id}", get(dashboards::reports::get_report_v2).put(dashboards::reports::update_report_v2).delete(dashboards::reports::delete_report_v2))
+        .route("/v2/{org_id}/reports/{report_id}/enable", patch(dashboards::reports::enable_report_v2))
+        .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 
         // Folders (v2)
         .route("/v2/{org_id}/folders/{folder_type}", get(folders::list_folders).post(folders::create_folder))

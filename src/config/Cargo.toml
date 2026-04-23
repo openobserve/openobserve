@@ -11,6 +11,7 @@ gxhash = ["dep:gxhash"]
 vortex = ["dep:vortex"]
 
 [dependencies]
+aes-siv.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
 arc-swap.workspace = true
@@ -23,6 +24,7 @@ async-fs.workspace = true
 aws-config.workspace = true
 aws-sdk-sns.workspace = true
 axum.workspace = true
+axum-client-ip.workspace = true
 base64.workspace = true
 bitvec.workspace = true
 bytes.workspace = true
@@ -46,6 +48,7 @@ itoa = "1.0"
 ryu = "1.0"
 indexmap.workspace = true
 itertools.workspace = true
+jsonschema.workspace = true
 lettre.workspace = true
 log.workspace = true
 md5.workspace = true

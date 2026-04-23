@@ -792,7 +792,7 @@ pub async fn generate_invitation(
 
         org_invites::add_many(
             &invites.role.to_string(),
-            user_email,
+            &user_email.to_lowercase(),
             org_id,
             expires_at,
             invites.invites.clone(),
@@ -839,7 +839,7 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
 
     use crate::service::db::org_users::get_cached_user_org;
 
-    let invite = org_invites::get_by_token_user(invite_token, user_email)
+    let invite = org_invites::get_by_token_user(invite_token, &user_email.to_lowercase())
         .await
         .map_err(|e| {
             log::info!("error getting invite token for email {user_email} : {e}");
@@ -897,13 +897,17 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
         Some(format!("rum{}", generate_random_string(16))),
     )
     .await
-    .map_err(|_| anyhow::anyhow!("Failed to add user to org"))?;
+    .map_err(|e| anyhow::anyhow!("Failed to add user to org : {e}"))?;
 
     // Add to OFGA
     o2_openfga::authorizer::authz::add_user_to_org(&org_id, user_email, &invite.role).await;
 
-    if let Err(e) =
-        org_invites::update_invite_status(invite_token, user_email, OrgInviteStatus::Accepted).await
+    if let Err(e) = org_invites::update_invite_status(
+        invite_token,
+        &user_email.to_lowercase(),
+        OrgInviteStatus::Accepted,
+    )
+    .await
     {
         log::error!("Error updating the invite status in the db: {e}");
     }
@@ -925,7 +929,7 @@ pub async fn decline_invitation(
     user_email: &str,
     token: &str,
 ) -> Result<Vec<InvitationRecord>, anyhow::Error> {
-    let invite = org_invites::get_by_token_user(token, user_email)
+    let invite = org_invites::get_by_token_user(token, &user_email.to_lowercase())
         .await
         .map_err(|e| {
             log::info!("error getting invite token for email {user_email} : {e}");
@@ -938,8 +942,12 @@ pub async fn decline_invitation(
         return Err(anyhow::anyhow!("Invalid token"));
     }
 
-    if let Err(e) =
-        org_invites::update_invite_status(token, user_email, OrgInviteStatus::Rejected).await
+    if let Err(e) = org_invites::update_invite_status(
+        token,
+        &user_email.to_lowercase(),
+        OrgInviteStatus::Rejected,
+    )
+    .await
     {
         log::error!("Error updating the invite status in the db: {e}");
         return Err(anyhow::anyhow!("Error updating status"));

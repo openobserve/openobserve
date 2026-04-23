@@ -215,13 +215,25 @@ export default class ChartTypeSelector {
       timeout: 10000,
     });
 
-    // Wait for table to have data (non-empty tbody)
+    // Wait for table to have headers and data rows with content.
+    // Quasar q-table renders data rows inside .q-virtual-scroll__content
+    // or plain tbody depending on virtual scroll mode.
     await this.page.waitForFunction(
       () => {
         const table = document.querySelector(
           '[data-test="dashboard-panel-table"]'
         );
-        const rows = table?.querySelectorAll("tbody tr");
+        if (!table) return false;
+
+        // Check headers are present
+        const headers = table.querySelectorAll("thead tr th");
+        if (!headers || headers.length === 0) return false;
+
+        // Check data rows (virtual scroll or plain tbody)
+        const virtualContent = table.querySelector(".q-virtual-scroll__content");
+        const rows = virtualContent
+          ? virtualContent.querySelectorAll("tr")
+          : table.querySelectorAll("tbody tr");
         return (
           rows &&
           rows.length > 0 &&

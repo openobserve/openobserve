@@ -108,6 +108,15 @@ export function createSeriesBuilders(deps: SeriesDeps) {
       silent: true,
       animation: false,
       data: getMarkLineData(panelSchema),
+      lineStyle: {
+        color: "#8B5A2B",
+        type: [8, 4],
+        width: 2,
+        shadowColor: store.state.theme === "light"
+          ? "rgba(255, 255, 255, 0.7)"
+          : "rgba(0, 0, 0, 0.7)",
+        shadowBlur: 2,
+      },
     };
   };
 
@@ -119,7 +128,10 @@ export function createSeriesBuilders(deps: SeriesDeps) {
       silent: false,
       animation: false,
       data: markLines,
+      z: 10,
+      zlevel: 1,
     };
+    
   };
 
   const getSeriesMarkArea = () => {
@@ -201,7 +213,6 @@ export function createSeriesBuilders(deps: SeriesDeps) {
         ) ?? null,
       data: seriesData,
       ...seriesConfig,
-      zlevel: 2,
     };
   };
 

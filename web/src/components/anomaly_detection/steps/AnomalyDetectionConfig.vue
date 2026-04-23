@@ -19,18 +19,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="step-anomaly-config"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="step-content card-container tw:px-3 tw:py-4">
+    <div class="step-content tw:px-3 tw:py-4">
       <q-form ref="formRef" @submit.prevent>
         <!-- Query Mode Tabs -->
-        <div class="tw:mb-4 tw:flex tw:items-center tw:justify-between">
-          <div class="flex items-center app-tabs-container tw:h-[36px] tw:w-fit">
-            <AppTabs
-              data-test="anomaly-query-tabs"
-              :tabs="queryTabOptions"
-              class="tabs-selection-container"
-              :active-tab="config.query_mode === 'custom_sql' ? 'custom_sql' : 'filters'"
-              @update:active-tab="config.query_mode = $event"
-            />
+        <div class="tw:mb-4">
+          <div class="query-mode-tabs" data-test="anomaly-query-tabs">
+            <button
+              v-for="tab in queryTabOptions"
+              :key="tab.value"
+              type="button"
+              class="query-mode-tab"
+              :class="{ active: (config.query_mode === 'custom_sql' ? 'custom_sql' : 'filters') === tab.value }"
+              @click="config.query_mode = tab.value"
+            >
+              {{ tab.label }}
+            </button>
           </div>
         </div>
 
@@ -41,9 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div
             class="tw:font-semibold flex items-center"
-            style="width: 190px; min-height: 36px; padding-top: 4px"
+            style="width: 178px; min-height: 36px;"
           >
-            Filters
+            {{ t('alerts.anomaly.filters') }}
           </div>
           <div style="width: calc(100% - 190px)">
             <div
@@ -57,9 +60,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 borderless
                 use-input
+                fill-input
+                hide-selected
                 input-debounce="200"
-                :placeholder="filter.field ? '' : 'Field'"
-                style="width: 160px; background: none"
+                :placeholder="filter.field ? '' : t('alerts.anomaly.fieldPlaceholder')"
+                class="alert-v3-select filter-field-select"
+                style="width: 200px"
                 :loading="loadingFields"
                 @filter="filterFieldOptions"
               >
@@ -68,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-item-section class="text-grey">
                       {{
                         config.stream_name
-                          ? "No fields found"
-                          : "Select a stream first"
+                          ? t('alerts.anomaly.noFieldsFound')
+                          : t('alerts.anomaly.selectStreamFirst')
                       }}
                     </q-item-section>
                   </q-item>
@@ -80,15 +86,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="filterOperators"
                 dense
                 borderless
-                style="width: 110px; background: none"
+                class="alert-v3-select"
+                style="width: 110px"
               />
               <q-input
                 v-if="operatorNeedsValue(filter.operator)"
                 v-model="filter.value"
                 dense
                 borderless
-                placeholder="Value"
-                style="flex: 1; background: none"
+                :placeholder="t('alerts.placeholders.value')"
+                class="alert-v3-input"
+                style=" max-width: 160px"
               />
               <q-btn
                 flat
@@ -103,10 +111,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               no-caps
               dense
-              icon="add"
-              label="Add filter"
-              color="primary"
+              :label="t('alerts.anomaly.addFilter')"
+              class="o2-secondary-button q-mt-sm"
               size="sm"
+              style="width: 110px;"
               @click="addFilter"
             />
           </div>
@@ -137,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :show-auto-complete="true"
                 :disable-ai="!config.stream_name"
                 :disable-ai-reason="
-                  !config.stream_name ? 'Select a stream first' : ''
+                  !config.stream_name ? t('alerts.anomaly.selectStreamFirst') : ''
                 "
                 editor-height="100%"
                 data-test="anomaly-custom-sql"
@@ -149,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-red-8 q-pt-xs"
               style="font-size: 11px; line-height: 12px"
             >
-              SQL is required in custom SQL mode
+              {{ t('alerts.anomaly.sqlRequired') }}
             </div>
             <div
               v-if="hasTimestampAlias"
@@ -175,68 +183,126 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Detection Function (filters mode only) -->
+        <!-- Row: Detection Function + Detection Resolution (filters mode) -->
         <div
           v-if="config.query_mode === 'filters'"
-          class="flex items-start alert-settings-row"
+          class="alert-settings-row paired-row"
         >
-          <div
-            class="tw:font-semibold flex items-center"
-            style="width: 190px; height: 36px"
-          >
-            {{ t("alerts.detectionFunction") }}
-            <span class="text-negative tw:ml-1">*</span>
+          <!-- Detection Function -->
+          <div class="paired-col">
+            <div class="paired-col-label tw:font-semibold">
+              {{ t("alerts.detectionFunction") }}
+              <span class="text-negative tw:ml-1">*</span>
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <q-select
+                v-model="config.detection_function"
+                :options="detectionFunctions"
+                dense
+                borderless
+                hide-bottom-space
+                :rules="[(v) => !!v || 'Detection function is required']"
+                data-test="anomaly-detection-function"
+                class="alert-v3-select"
+                style="width: 110px"
+                @update:model-value="onDetectionFunctionChange"
+              />
+              <q-select
+                v-if="
+                  config.detection_function &&
+                  config.detection_function !== 'count'
+                "
+                v-model="config.detection_function_field"
+                :options="filteredDetectionFields"
+                dense
+                borderless
+                use-input
+                input-debounce="200"
+                :placeholder="config.detection_function_field ? '' : t('alerts.anomaly.fieldPlaceholder')"
+                :loading="loadingFields"
+                :rules="[(v) => !!v || 'Field is required']"
+                hide-bottom-space
+                data-test="anomaly-detection-function-field"
+                class="alert-v3-select"
+                style="width: 140px"
+                @filter="filterDetectionFieldOptions"
+              >
+                <template #no-option>
+                  <q-item>
+                    <q-item-section class="text-grey">
+                      {{
+                        config.stream_name
+                          ? t('alerts.anomaly.noFieldsFound')
+                          : t('alerts.anomaly.selectStreamFirst')
+                      }}
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+            </div>
           </div>
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <q-select
-              v-model="config.detection_function"
-              :options="detectionFunctions"
-              dense
-              borderless
-              hide-bottom-space
-              :rules="[(v) => !!v || 'Detection function is required']"
-              data-test="anomaly-detection-function"
-              class="detection-fn-select"
-              style="width: 110px; background: none"
-              @update:model-value="onDetectionFunctionChange"
-            />
-            <q-select
-              v-if="
-                config.detection_function &&
-                config.detection_function !== 'count'
-              "
-              v-model="config.detection_function_field"
-              :options="filteredDetectionFields"
-              dense
-              borderless
-              use-input
-              input-debounce="200"
-              :placeholder="config.detection_function_field ? '' : 'Field'"
-              :loading="loadingFields"
-              :rules="[(v) => !!v || 'Field is required']"
-              hide-bottom-space
-              data-test="anomaly-detection-function-field"
-              class="detection-fn-select"
-              style="width: 180px; background: none"
-              @filter="filterDetectionFieldOptions"
-            >
-              <template #no-option>
-                <q-item>
-                  <q-item-section class="text-grey">
-                    {{
-                      config.stream_name
-                        ? "No fields found"
-                        : "Select a stream first"
-                    }}
-                  </q-item-section>
-                </q-item>
-              </template>
-            </q-select>
+          <!-- Detection Resolution -->
+          <div class="paired-col">
+            <div class="paired-col-label tw:font-semibold">
+              {{ t('alerts.anomaly.detectionResolution') }} <span class="text-negative tw:ml-1">*</span>
+              <q-icon
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
+              >
+                <q-tooltip anchor="center right" self="center left" max-width="300px">
+                  <span style="font-size: 14px">{{ t('alerts.anomaly.detectionResolutionTooltip') }}</span>
+                </q-tooltip>
+              </q-icon>
+            </div>
+            <div>
+              <div class="tw:flex tw:items-center tw:gap-0">
+                <q-input
+                  v-model.number="config.histogram_interval_value"
+                  type="number"
+                  dense
+                  borderless
+                  min="1"
+                  class="alert-v3-input"
+                  style="width: 87px"
+                  data-test="anomaly-histogram-interval-value"
+                />
+                <q-select
+                  v-model="config.histogram_interval_unit"
+                  :options="intervalUnits"
+                  option-label="label"
+                  option-value="value"
+                  emit-value
+                  map-options
+                  dense
+                  borderless
+                  class="alert-v3-select"
+                  style="min-width: 100px"
+                  data-test="anomaly-histogram-interval-unit"
+                />
+              </div>
+              <div
+                v-if="
+                  !config.histogram_interval_value ||
+                  config.histogram_interval_value < 1
+                "
+                class="text-red-8 q-pt-xs"
+                style="font-size: 11px; line-height: 12px"
+              >
+                Field is required!
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Detection Resolution -->
-        <div class="flex items-start alert-settings-row">
+        <!-- Detection Resolution alone (custom_sql mode) -->
+        <div
+          v-else
+          class="flex items-start alert-settings-row"
+        >
           <div
             class="tw:font-semibold flex items-center"
             style="width: 190px; height: 36px"
@@ -250,31 +316,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
               "
             >
-              <q-tooltip
-                anchor="center right"
-                self="center left"
-                max-width="300px"
-              >
-                <span style="font-size: 14px">
-                  How granular each data point is. E.g. "5m" means anomalies are
-                  detected at 5-minute resolution.
-                </span>
+              <q-tooltip anchor="center right" self="center left" max-width="300px">
+                <span style="font-size: 14px">{{ t('alerts.anomaly.detectionResolutionTooltip') }}</span>
               </q-tooltip>
             </q-icon>
           </div>
           <div>
-            <div class="flex items-center" style="width: fit-content">
-              <div style="width: 87px; margin-left: 0 !important">
-                <q-input
-                  v-model.number="config.histogram_interval_value"
-                  type="number"
-                  dense
-                  borderless
-                  min="1"
-                  style="background: none"
-                  data-test="anomaly-histogram-interval-value"
-                />
-              </div>
+            <div class="tw:flex tw:items-center tw:gap-0">
+              <q-input
+                v-model.number="config.histogram_interval_value"
+                type="number"
+                dense
+                borderless
+                min="1"
+                class="alert-v3-input"
+                style="width: 87px"
+                data-test="anomaly-histogram-interval-value"
+              />
               <q-select
                 v-model="config.histogram_interval_unit"
                 :options="intervalUnits"
@@ -284,7 +342,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 map-options
                 dense
                 borderless
-                style="min-width: 100px; background: none"
+                class="alert-v3-select"
+                style="min-width: 100px"
                 data-test="anomaly-histogram-interval-unit"
               />
             </div>
@@ -301,224 +360,190 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Check Every (schedule interval) -->
-        <div class="flex items-start alert-settings-row">
-          <div
-            class="tw:font-semibold flex items-center"
-            style="width: 190px; height: 36px"
-          >
-            Check Every <span class="text-negative tw:ml-1">*</span>
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-              "
-            >
-              <q-tooltip
-                anchor="center right"
-                self="center left"
-                max-width="300px"
+        <!-- Row: Check Every + Look Back Window -->
+        <div class="alert-settings-row paired-row">
+          <!-- Check Every -->
+          <div class="paired-col">
+            <div class="paired-col-label tw:font-semibold">
+              {{ t('alerts.anomaly.checkEvery') }} <span class="text-negative tw:ml-1">*</span>
+              <q-icon
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
               >
-                <span style="font-size: 14px">
-                  How often the detection job runs. Can be larger than the
-                  sample period (e.g. sample every 5m, run detection every 1h).
-                </span>
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div>
-            <div class="flex items-center" style="width: fit-content">
-              <div style="width: 87px; margin-left: 0 !important">
+                <q-tooltip anchor="center right" self="center left" max-width="300px">
+                  <span style="font-size: 14px">{{ t('alerts.anomaly.checkEveryTooltip') }}</span>
+                </q-tooltip>
+              </q-icon>
+            </div>
+            <div>
+              <div class="tw:flex tw:items-center tw:gap-0">
                 <q-input
                   v-model.number="config.schedule_interval_value"
                   type="number"
                   dense
                   borderless
                   min="1"
-                  style="background: none"
+                  class="alert-v3-input"
+                  style="width: 87px"
                   data-test="anomaly-schedule-interval-value"
                 />
+                <q-select
+                  v-model="config.schedule_interval_unit"
+                  :options="intervalUnits"
+                  option-label="label"
+                  option-value="value"
+                  emit-value
+                  map-options
+                  dense
+                  borderless
+                  class="alert-v3-select"
+                  style="min-width: 100px"
+                  data-test="anomaly-schedule-interval-unit"
+                />
               </div>
-              <q-select
-                v-model="config.schedule_interval_unit"
-                :options="intervalUnits"
-                option-label="label"
-                option-value="value"
-                emit-value
-                map-options
-                dense
-                borderless
-                style="min-width: 100px; background: none"
-                data-test="anomaly-schedule-interval-unit"
-              />
-            </div>
-            <div
-              v-if="
-                !config.schedule_interval_value ||
-                config.schedule_interval_value < 1
-              "
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
-            >
-              Field is required!
-            </div>
-          </div>
-        </div>
-
-        <!-- Look Back Window (detection_window) -->
-        <div class="flex items-start alert-settings-row">
-          <div
-            class="tw:font-semibold flex items-center"
-            style="width: 190px; height: 36px"
-          >
-            Look Back Window <span class="text-negative tw:ml-1">*</span>
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-              "
-            >
-              <q-tooltip
-                anchor="center right"
-                self="center left"
-                max-width="300px"
+              <div
+                v-if="
+                  !config.schedule_interval_value ||
+                  config.schedule_interval_value < 1
+                "
+                class="text-red-8 q-pt-xs"
+                style="font-size: 11px; line-height: 12px"
               >
-                <span style="font-size: 14px">
-                  How far back each detection run queries. Caps the window even
-                  after a long pause. Defaults to Check Every interval.
-                </span>
-              </q-tooltip>
-            </q-icon>
+                Field is required!
+              </div>
+            </div>
           </div>
-          <div>
-            <div class="flex items-center" style="width: fit-content">
-              <div style="width: 87px; margin-left: 0 !important">
+          <!-- Look Back Window -->
+          <div class="paired-col">
+            <div class="paired-col-label tw:font-semibold">
+              {{ t('alerts.anomaly.lookBackWindow') }} <span class="text-negative tw:ml-1">*</span>
+              <q-icon
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
+              >
+                <q-tooltip anchor="center right" self="center left" max-width="300px">
+                  <span style="font-size: 14px">{{ t('alerts.anomaly.lookBackWindowTooltip') }}</span>
+                </q-tooltip>
+              </q-icon>
+            </div>
+            <div>
+              <div class="tw:flex tw:items-center tw:gap-0">
                 <q-input
                   v-model.number="config.detection_window_value"
                   type="number"
                   dense
                   borderless
                   min="1"
-                  style="background: none"
+                  class="alert-v3-input"
+                  style="width: 87px"
                   data-test="anomaly-detection-window-value"
                 />
+                <q-select
+                  v-model="config.detection_window_unit"
+                  :options="intervalUnits"
+                  option-label="label"
+                  option-value="value"
+                  emit-value
+                  map-options
+                  dense
+                  borderless
+                  class="alert-v3-select"
+                  style="min-width: 100px"
+                  data-test="anomaly-detection-window-unit"
+                />
               </div>
-              <q-select
-                v-model="config.detection_window_unit"
-                :options="intervalUnits"
-                option-label="label"
-                option-value="value"
-                emit-value
-                map-options
+              <div
+                v-if="
+                  !config.detection_window_value ||
+                  config.detection_window_value < 1
+                "
+                class="text-red-8 q-pt-xs"
+                style="font-size: 11px; line-height: 12px"
+                data-test="anomaly-detection-window-error"
+              >
+                Field is required!
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row: Training Window + Retrain Every -->
+        <div class="alert-settings-row paired-row">
+          <!-- Training Window -->
+          <div class="paired-col">
+            <div class="paired-col-label tw:font-semibold">
+              {{ t("alerts.trainingWindow") }}
+              <span class="text-negative tw:ml-1">*</span>
+              <q-icon
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
+              >
+                <q-tooltip anchor="center right" self="center left" max-width="300px">
+                  <span style="font-size: 14px">
+                    How many days of historical data to use for training. Min 1
+                    day. Seasonality is auto-detected: &lt;7 days → hour-of-day;
+                    ≥7 days → hour-of-day + day-of-week.
+                  </span>
+                </q-tooltip>
+              </q-icon>
+            </div>
+            <div class="tw:flex tw:flex-col">
+              <q-input
+                v-model.number="config.training_window_days"
+                type="number"
                 dense
                 borderless
-                style="min-width: 100px; background: none"
-                data-test="anomaly-detection-window-unit"
+                hide-bottom-space
+                :min="1"
+                :rules="[(v) => v >= 1 || 'Minimum 1 day']"
+                data-test="anomaly-training-window"
+                class="alert-v3-input"
+                style="width: 87px"
               />
-            </div>
-            <div
-              v-if="
-                !config.detection_window_value ||
-                config.detection_window_value < 1
-              "
-              class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px"
-              data-test="anomaly-detection-window-error"
-            >
-              Field is required!
-            </div>
-          </div>
-        </div>
-
-        <!-- Training Window -->
-        <div class="flex items-start alert-settings-row">
-          <div
-            class="tw:font-semibold flex items-center"
-            style="width: 190px; height: 36px"
-          >
-            {{ t("alerts.trainingWindow") }}
-            <span class="text-negative tw:ml-1">*</span>
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-              "
-            >
-              <q-tooltip
-                anchor="center right"
-                self="center left"
-                max-width="300px"
+              <span
+                class="static-text text-caption"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
               >
-                <span style="font-size: 14px">
-                  How many days of historical data to use for training. Min 1
-                  day. Seasonality is auto-detected: &lt;7 days → hour-of-day;
-                  ≥7 days → hour-of-day + day-of-week.
-                </span>
-              </q-tooltip>
-            </q-icon>
+                days (seasonality:
+                {{
+                  config.training_window_days >= 7
+                    ? t('alerts.anomaly.seasonalityWeekly')
+                    : t('alerts.anomaly.seasonalityDaily')
+                }})
+              </span>
+            </div>
           </div>
-          <div class="tw:flex tw:flex-col" style="width: calc(100% - 190px)">
-            <q-input
-              v-model.number="config.training_window_days"
-              type="number"
-              dense
-              borderless
-              hide-bottom-space
-              :min="1"
-              :rules="[(v) => v >= 1 || 'Minimum 1 day']"
-              data-test="anomaly-training-window"
-              style="width: 87px"
-            />
-            <span
-              class="text-caption tw:mt-1"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-              "
-            >
-              days (seasonality:
-              {{
-                config.training_window_days >= 7
-                  ? "hour + day-of-week"
-                  : "hour-of-day"
-              }})
-            </span>
-          </div>
-        </div>
-
-        <!-- Retrain interval -->
-        <div class="flex items-start alert-settings-row">
-          <div
-            class="tw:font-semibold flex items-center"
-            style="width: 190px; height: 36px"
-          >
-            Retrain Every
-            <q-icon
-              name="info"
-              size="17px"
-              class="q-ml-xs cursor-pointer"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-              "
-            >
-              <q-tooltip
-                anchor="center right"
-                self="center left"
-                max-width="300px"
+          <!-- Retrain Every -->
+          <div class="paired-col">
+            <div class="paired-col-label tw:font-semibold">
+              {{ t('alerts.anomaly.retrainEvery') }}
+              <q-icon
+                name="info"
+                size="17px"
+                class="q-ml-xs cursor-pointer"
+                :class="
+                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                "
               >
-                <span style="font-size: 14px"
-                  >How often to automatically retrain the model. "Never" means
-                  train once and keep the model until manually retrained.</span
-                >
-              </q-tooltip>
-            </q-icon>
-          </div>
-          <div style="width: calc(100% - 190px)">
+                <q-tooltip anchor="center right" self="center left" max-width="300px">
+                  <span style="font-size: 14px">{{ t('alerts.anomaly.retrainEveryTooltip') }}</span>
+                </q-tooltip>
+              </q-icon>
+            </div>
             <q-select
               v-model="config.retrain_interval_days"
               :options="retrainIntervalOptions"
@@ -529,7 +554,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               borderless
               data-test="anomaly-retrain-interval"
-              style="max-width: 200px; background: none"
+              class="alert-v3-select"
+              style="max-width: 200px"
             />
           </div>
         </div>
@@ -540,7 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:font-semibold flex items-center"
             style="width: 190px; padding-top: 4px"
           >
-            Sensitivity
+            {{ t('alerts.sensitivity') }}
             <q-icon
               name="info"
               size="17px"
@@ -554,12 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 self="center left"
                 max-width="300px"
               >
-                <span style="font-size: 14px"
-                  >Adjust the anomaly score range to control sensitivity. Points
-                  with scores outside this range will not trigger alerts. Use
-                  the chart to visualize historical data and tune
-                  accordingly.</span
-                >
+                <span style="font-size: 14px">{{ t('alerts.anomaly.sensitivityTooltip') }}</span>
               </q-tooltip>
             </q-icon>
           </div>
@@ -569,9 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Header row: range labels + load button -->
               <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <span class="text-caption text-grey-6"
-                    >Anomaly Score Range:</span
-                  >
+                  <span class="text-caption text-grey-6">{{ t('alerts.anomaly.anomalyScoreRange') }}</span>
                   <span
                     class="tw:font-semibold text-caption"
                     data-test="anomaly-threshold-range-label"
@@ -580,29 +599,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </div>
                 <q-btn
-                  flat
-                  dense
                   no-caps
-                  size="sm"
-                  icon="refresh"
+                  dense
                   :disable="
                     !config.stream_name ||
                     (config.query_mode === 'custom_sql' && !config.custom_sql)
                   "
-                  class="text-caption"
+                  class="o2-secondary-button"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  :label="t('alerts.anomaly.loadData')"
+                  size="sm"
                   data-test="anomaly-sensitivity-load-btn"
                   @click="loadPreview"
                 >
-                  <q-tooltip v-if="!config.stream_name"
-                    >Select a stream first</q-tooltip
-                  >
-                  <q-tooltip
-                    v-else-if="
-                      config.query_mode === 'custom_sql' && !config.custom_sql
-                    "
-                    >Enter a SQL query first</q-tooltip
-                  >
-                  <span v-else class="q-ml-xs">Load Data</span>
+                  <q-tooltip v-if="!config.stream_name">{{ t('alerts.anomaly.selectStreamFirstTooltip') }}</q-tooltip>
+                  <q-tooltip v-else-if="config.query_mode === 'custom_sql' && !config.custom_sql">{{ t('alerts.anomaly.enterSqlFirst') }}</q-tooltip>
                 </q-btn>
               </div>
 
@@ -627,8 +638,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <span class="text-caption">{{
                       !config.stream_name
-                        ? "Select a stream first"
-                        : "Click Load Data to preview the time series"
+                        ? t('alerts.anomaly.selectStreamFirst')
+                        : t('alerts.anomaly.clickLoadDataHint')
                     }}</span>
                   </div>
                   <PanelSchemaRenderer
@@ -638,9 +649,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :selectedTimeObj="previewTimeObj"
                     :variablesData="{}"
                     :forceLoad="true"
-                    searchType="UI"
+                    searchType="ui"
                     style="height: 180px; width: 100%"
                     data-test="anomaly-sensitivity-chart"
+                    @series-data-update="onSeriesDataUpdate"
                   />
                 </div>
 
@@ -649,6 +661,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="sensitivity-slider-col tw:flex tw:flex-col tw:items-center"
                 >
                   <q-range
+                    ref="sliderRef"
                     v-model="thresholdRange"
                     :min="0"
                     :max="100"
@@ -674,7 +687,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch, type PropType } from "vue";
+import { computed, defineComponent, nextTick, ref, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import streamService from "@/services/stream";
@@ -684,13 +697,12 @@ import {
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import QueryEditor from "@/components/QueryEditor.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
 
-  components: { QueryEditor, AppTabs, PanelSchemaRenderer },
+  components: { QueryEditor, PanelSchemaRenderer },
 
   props: {
     config: {
@@ -1058,6 +1070,10 @@ export default defineComponent({
           custom_chart_options: {
             tooltip: { appendToBody: true, confine: false },
           },
+          mark_line: [
+            { name: "max threshold", type: "yAxis", value: String(thresholdRange.value.max) },
+            { name: "min threshold", type: "yAxis", value: String(thresholdRange.value.min) },
+          ],
         },
         queryType: "sql",
         queries: [
@@ -1073,7 +1089,7 @@ export default defineComponent({
                 {
                   alias: "time_bucket",
                   column: "time_bucket",
-                  label: "time_bucket",
+                  label: "",
                   color: null,
                 },
               ],
@@ -1081,7 +1097,7 @@ export default defineComponent({
                 {
                   alias: "value",
                   column: "value",
-                  label: "value",
+                  label: "",
                   color: "#5960b2",
                 },
               ],
@@ -1110,6 +1126,8 @@ export default defineComponent({
       };
       previewKey.value++;
       previewActive.value = true;
+      previewHasData.value = false; // reset until new data arrives
+      seriesDataMax.value = null;
     };
 
     // Auto-refresh when Look Back Window, Detection Resolution, filters, or
@@ -1140,7 +1158,7 @@ export default defineComponent({
     // ── Sensitivity slider ──────────────────────────────────────────────────
     const thresholdRange = ref<{ min: number; max: number }>({
       min: props.config.threshold_min ?? 0,
-      max: props.config.threshold ?? 97,
+      max: props.config.threshold ?? 100,
     });
 
     const onThresholdRangeChange = (val: { min: number; max: number }) => {
@@ -1154,11 +1172,57 @@ export default defineComponent({
       ([max, min]) => {
         thresholdRange.value = {
           min: (min as number) ?? 0,
-          max: (max as number) ?? 97,
+          max: (max as number) ?? 100,
         };
       },
     );
 
+    const previewHasData = ref(false);
+    const seriesDataMax = ref<number | null>(null);
+
+    const onSeriesDataUpdate = (data: any) => {
+      const series = data?.options?.series ?? data?.series ?? [];
+      previewHasData.value = series.some(
+        (s: any) => Array.isArray(s.data) && s.data.length > 0,
+      );
+
+      // Find the max y value across all series so we can convert the 0-100
+      // slider percentages into actual y-axis values for the mark lines.
+      let max = -Infinity;
+      for (const s of series) {
+        if (!Array.isArray(s.data)) continue;
+        for (const point of s.data) {
+          // Points can be [x, y], plain number, or { value: [x, y] / y }
+          let raw: any = point;
+          if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) raw = raw.value;
+          const v: any = Array.isArray(raw) ? raw[1] : raw;
+          if (typeof v === "number" && isFinite(v) && v > max) max = v;
+        }
+      }
+      if (isFinite(max) && max !== seriesDataMax.value) {
+        seriesDataMax.value = max;
+      }
+    };
+
+    const updateMarkLines = (maxPct: number, minPct: number) => {
+      if (!previewPanelSchema.value) return;
+      const yMax = seriesDataMax.value;
+      // If data is loaded, map 0-100% → actual y values; otherwise fall back to raw %
+      const toValue = (pct: number) => yMax !== null ? (pct / 100) * yMax : pct;
+      previewPanelSchema.value.config.mark_line = [
+        { name: "", type: "yAxis", value: String(toValue(maxPct)) },
+        { name: "", type: "yAxis", value: String(toValue(minPct)) },
+      ];
+    };
+
+    // Keep mark_line in sync with slider — update the schema config in-place
+    // so PanelSchemaRenderer re-renders the lines without a full chart reload.
+    watch(thresholdRange, ({ max, min }) => updateMarkLines(max, min), { deep: true });
+
+    // Re-apply mark lines once data max is known after chart loads.
+    watch(seriesDataMax, () => {
+      updateMarkLines(thresholdRange.value.max, thresholdRange.value.min);
+    });
 
     return {
       t,
@@ -1188,6 +1252,8 @@ export default defineComponent({
       previewPanelSchema,
       previewTimeObj,
       loadPreview,
+      previewHasData,
+      onSeriesDataUpdate,
     };
   },
 });
@@ -1201,6 +1267,7 @@ export default defineComponent({
     border-radius: 8px;
     height: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
   }
 
   &.dark-mode {
@@ -1219,29 +1286,43 @@ export default defineComponent({
 }
 
 .alert-settings-row {
-  margin-bottom: 24px !important;
+  margin-bottom: 16px !important;
   padding-bottom: 0 !important;
 }
 
-// Detection function dropdowns — prevent text wrapping and cursor overflow
-.detection-fn-select {
-  :deep(.q-field__control) {
-    height: 36px;
-    min-height: 36px;
-  }
-  :deep(.q-field__native),
-  :deep(.q-field__input) {
-    white-space: nowrap;
+.filter-field-select {
+  :deep(.q-field__native span) {
     overflow: hidden;
     text-overflow: ellipsis;
-    padding-top: 0;
-    padding-bottom: 0;
-    line-height: 36px;
+    white-space: nowrap;
   }
-  :deep(.q-field__marginal) {
-    height: 36px;
+  :deep(.q-field__input) {
+    text-overflow: ellipsis;
   }
 }
+
+.paired-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.paired-col {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.paired-col-label {
+  width: 170px;
+  min-width: 170px;
+  min-height: 32px;
+  line-height: 1.4;
+  font-size: inherit;
+}
+
 
 // Monaco SQL editor wrapper
 .custom-sql-editor-wrapper {
@@ -1286,7 +1367,11 @@ export default defineComponent({
 }
 
 .sensitivity-range-slider {
-  height: 180px;
+  // Chart is 180px. With containLabel:true and top/bottom 3% margins (~5px
+  // each), the y-axis label at top takes ~15px and the x-axis time labels at
+  // bottom take ~25px, leaving the data area at ~top:20px, height:130px.
+  margin-top: 14px;
+  height: 145px !important;
 
   --slider-accent: color-mix(
     in srgb,

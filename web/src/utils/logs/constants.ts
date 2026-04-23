@@ -149,6 +149,7 @@ export const DEFAULT_LOGS_CONFIG = {
     isActionsEnabled: false,
     resetPlotChart: false,
     clearCache: false,
+    liveMode: localStorage.getItem("oo_live_mode_logs") === "true",
   },
   data: {
     query: "" as any,
@@ -204,6 +205,8 @@ export const DEFAULT_LOGS_CONFIG = {
     histogram: {
       xData: [],
       yData: [],
+      breakdownField: null,
+      breakdownSeries: null,
       chartParams: {
         title: "",
         unparsed_x_data: [],

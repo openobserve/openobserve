@@ -61,9 +61,10 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
   // Helper function to extract column name from table header (removes sort icon text)
   function extractColumnName(headerText) {
-    // Remove sorting icon text (arrow_upward, arrow_downward) from column name
-    // Table headers look like: "__name__arrow_upward" or "environmentarrow_downward"
-    return headerText.replace(/arrow_upward|arrow_downward/g, '').trim();
+    // Remove sorting icon text from column name.
+    // Quasar table used: arrow_upward, arrow_downward
+    // TanStack table uses: unfold_more, unfold_less, arrow_upward, arrow_downward
+    return headerText.replace(/unfold_more|unfold_less|arrow_upward|arrow_downward/g, '').trim();
   }
 
   // Helper function to set up a table chart with data
@@ -292,7 +293,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Column Order popup has title section');
 
     // Verify description text is present
-    const descriptionText = columnOrderPopup.locator('.text-caption');
+    const descriptionText = columnOrderPopup.locator('.text-caption').first();
     await expect(descriptionText).toBeVisible();
     testLogger.info('Column Order popup has description text');
 
