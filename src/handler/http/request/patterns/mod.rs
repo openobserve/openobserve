@@ -18,12 +18,15 @@ use axum::{
     response::{IntoResponse, Response},
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-
-#[cfg(feature = "enterprise")]
-use crate::handler::http::request::search::utils::{
-    StreamPermissionResourceType, check_stream_permissions,
+use {
+    crate::handler::http::request::search::utils::{
+        StreamPermissionResourceType, check_stream_permissions,
+    },
+    crate::service::search::streaming,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
+    tokio::sync::mpsc,
 };
+
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::extractors::Headers,
@@ -91,45 +94,31 @@ pub async fn extract_patterns(
 
     #[cfg(feature = "enterprise")]
     {
-        use tokio::sync::mpsc;
-
-        use crate::service::search::streaming;
-
         let trace_id = config::ider::generate_trace_id();
 
         // Store body bytes for auditing
         let body_bytes = body.clone();
 
         log::info!(
-            "[PATTERNS trace_id {}] Pattern extraction requested for {}/{}",
-            trace_id,
-            org_id,
-            stream_name
+            "[PATTERNS trace_id {trace_id}] Pattern extraction requested for {org_id}/{stream_name}"
         );
 
         // Parse the request body
         let mut req: config::meta::search::Request = match config::utils::json::from_slice(&body) {
             Ok(v) => v,
             Err(e) => {
-                log::error!(
-                    "[PATTERNS trace_id {}] Failed to parse request body: {}",
-                    trace_id,
-                    e
-                );
+                log::error!("[PATTERNS trace_id {trace_id}] Failed to parse request body: {e}");
                 return MetaHttpResponse::bad_request(format!("Invalid request body: {e}"));
             }
         };
 
         // Create audit context
-        #[cfg(feature = "enterprise")]
         let audit_ctx = Some(crate::common::meta::search::AuditContext {
             method: parts.method.to_string(),
             path: parts.uri.path().to_string(),
             query_params: parts.uri.query().unwrap_or("").to_string(),
             body: String::from_utf8_lossy(&body_bytes).to_string(),
         });
-        #[cfg(not(feature = "enterprise"))]
-        let audit_ctx = None;
 
         // Create a channel to receive search results
         let (tx, mut rx) = mpsc::channel(100);
@@ -139,22 +128,17 @@ pub async fn extract_patterns(
             Ok(names) => names,
             Err(e) => {
                 log::error!(
-                    "[PATTERNS trace_id {}] Failed to resolve stream names from SQL: {}",
-                    trace_id,
-                    e
+                    "[PATTERNS trace_id {trace_id}] Failed to resolve stream names from SQL: {e}"
                 );
                 return MetaHttpResponse::bad_request(format!("Invalid SQL query: {e}"));
             }
         };
 
         log::info!(
-            "[PATTERNS trace_id {}] Resolved stream names from SQL: {:?}",
-            trace_id,
-            stream_names
+            "[PATTERNS trace_id {trace_id}] Resolved stream names from SQL: {stream_names:?}",
         );
 
         // Check permissions for each stream (same as _search API)
-        #[cfg(feature = "enterprise")]
         for stream_name_check in stream_names.iter() {
             if let Some(res) = check_stream_permissions(
                 stream_name_check,
@@ -166,10 +150,7 @@ pub async fn extract_patterns(
             .await
             {
                 log::warn!(
-                    "[PATTERNS trace_id {}] Unauthorized access attempt by user {} for stream {}",
-                    trace_id,
-                    user_id,
-                    stream_name_check
+                    "[PATTERNS trace_id {trace_id}] Unauthorized access attempt by user {user_id} for stream {stream_name_check}"
                 );
                 return res;
             }
@@ -190,21 +171,18 @@ pub async fn extract_patterns(
         // Set default sampling ratio for pattern extraction if not explicitly provided
         // Pattern extraction benefits from sampling to improve performance on large datasets
         if req.query.sampling_ratio.is_none() {
-            let o2_cfg = get_o2_config();
-            let default_ratio = o2_cfg.common.query_default_sampling_ratio / 100.0;
+            let sampling_ratio = get_o2_config().common.query_default_sampling_ratio;
+            let default_ratio = sampling_ratio / 100.0;
             if default_ratio > 0.0 && default_ratio <= 1.0 {
                 req.query.sampling_ratio = Some(default_ratio);
                 log::info!(
-                    "[PATTERNS trace_id {}] Applied default sampling_ratio for pattern extraction: {}%",
-                    trace_id,
-                    o2_cfg.common.query_default_sampling_ratio
+                    "[PATTERNS trace_id {trace_id}] Applied default sampling_ratio for pattern extraction: {sampling_ratio}%",
                 );
             }
         }
 
         log::info!(
-            "[PATTERNS trace_id {}] Query configuration - size: {}, sampling_ratio: {:?}",
-            trace_id,
+            "[PATTERNS trace_id {trace_id}] Query configuration - size: {}, sampling_ratio: {:?}",
             req.query.size,
             req.query.sampling_ratio
         );
@@ -215,14 +193,11 @@ pub async fn extract_patterns(
         }
 
         // Spawn the search task with pattern extraction enabled
-        let org_id_clone = org_id.clone();
-        let user_id_clone = user_id.clone();
         let trace_id_clone = trace_id.clone();
-
         tokio::spawn(async move {
             streaming::process_search_stream_request(
-                org_id_clone,
-                user_id_clone,
+                org_id,
+                user_id,
                 trace_id_clone,
                 req,
                 config::meta::stream::StreamType::Logs,
@@ -245,18 +220,11 @@ pub async fn extract_patterns(
 
         while let Some(result) = rx.recv().await {
             response_count += 1;
-            log::debug!(
-                "[PATTERNS trace_id {}] Received response #{}",
-                trace_id,
-                response_count
-            );
+            log::debug!("[PATTERNS trace_id {trace_id}] Received response #{response_count}");
 
             match result {
                 Ok(config::meta::search::StreamResponses::PatternExtractionResult { patterns }) => {
-                    log::info!(
-                        "[PATTERNS trace_id {}] Received pattern extraction result",
-                        trace_id
-                    );
+                    log::info!("[PATTERNS trace_id {trace_id}] Received pattern extraction result",);
                     patterns_result = Some(patterns);
                     break; // We only need the patterns
                 }
@@ -266,9 +234,7 @@ pub async fn extract_patterns(
                 }
                 Err(e) => {
                     log::error!(
-                        "[PATTERNS trace_id {}] Error during pattern extraction: {}",
-                        trace_id,
-                        e
+                        "[PATTERNS trace_id {trace_id}] Error during pattern extraction: {e}",
                     );
                     return MetaHttpResponse::internal_error(format!(
                         "Pattern extraction failed: {e}"
@@ -278,22 +244,14 @@ pub async fn extract_patterns(
         }
 
         log::info!(
-            "[PATTERNS trace_id {}] Channel closed after {} responses",
-            trace_id,
-            response_count
+            "[PATTERNS trace_id {trace_id}] Channel closed after {response_count} responses"
         );
 
         if let Some(patterns) = patterns_result {
-            log::info!(
-                "[PATTERNS trace_id {}] Successfully extracted patterns",
-                trace_id
-            );
+            log::info!("[PATTERNS trace_id {trace_id}] Successfully extracted patterns",);
             MetaHttpResponse::json(patterns)
         } else {
-            log::warn!(
-                "[PATTERNS trace_id {}] No patterns were extracted",
-                trace_id
-            );
+            log::warn!("[PATTERNS trace_id {trace_id}] No patterns were extracted",);
             MetaHttpResponse::json(serde_json::json!({
                 "patterns": [],
                 "statistics": {

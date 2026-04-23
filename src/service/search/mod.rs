@@ -946,9 +946,11 @@ pub async fn search_partition(
     if part_num * cfg.limit.query_partition_by_secs < total_secs {
         part_num += 1;
     }
-    // if the partition number is too large, we limit it to 1000
-    if part_num > 1000 {
-        part_num = 1000;
+
+    // if the partition number is too large, we limit it to ENV ZO_QUERY_PARTITION_MAX_NUM
+    let max_partition_num = cfg.limit.query_partition_max_num.max(1);
+    if part_num > max_partition_num {
+        part_num = max_partition_num;
     }
 
     log::info!(
@@ -1008,6 +1010,25 @@ pub async fn search_partition(
             }
         })
         .unwrap_or(OrderBy::Desc);
+
+    if cfg.limit.disable_partitions_for_non_ts_order_by
+        && !is_aggregate
+        && !is_histogram
+        && sql
+            .order_by
+            .first()
+            .map(|(field, _)| {
+                field.as_str() != TIMESTAMP_COL_NAME
+                    && (ts_column.as_deref() != Some(field.as_str()))
+            })
+            .unwrap_or(false)
+    {
+        log::info!(
+            "[trace_id {trace_id}] search_partition: ORDER BY on non-timestamp column, disabling partitioning"
+        );
+        resp.partitions = vec![[req.start_time, req.end_time]];
+        return Ok(resp);
+    }
 
     log::debug!(
         "[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}",

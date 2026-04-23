@@ -531,15 +531,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     config_watcher::run();
 
-    #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() && get_o2_config().ai.enabled {
-        tokio::task::spawn(async move {
-            o2_enterprise::enterprise::ai::agent::prompt::prompts::load_system_prompt()
-                .await
-                .expect("load system prompt failed");
-        });
-    }
-
     // Initialize slot-based admission ledger on querier nodes
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_querier() && get_o2_config().work_group.max_nodes_per_query > 0 {

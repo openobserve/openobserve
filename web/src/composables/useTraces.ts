@@ -89,6 +89,7 @@ const defaultObject = {
     >(),
     showErrorOnly: false,
     queryEditorPlaceholderFlag: true,
+    liveMode: localStorage.getItem("oo_live_mode_traces") === "true",
     searchMode: "spans" as TraceSearchMode,
     serviceGraphVisualizationType:
       (localStorage.getItem("serviceGraph_visualizationType") as
@@ -157,8 +158,6 @@ const defaultObject = {
       } | null,
       traceId: "",
       spanList: [],
-      spansTruncated: false,
-      totalSpanCount: 0,
       isLoadingTraceMeta: false,
       isLoadingTraceDetails: false,
       selectedSpanId: "" as String | null,
