@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div>
     <q-btn
       :style="{
@@ -12,7 +12,6 @@
       class="date-time-button"
       :class="changeStyle ? computedClass : ''"
       outline
-      no-caps
       :disable="isFirstEntry"
       @click="picker.showMenu = !picker.showMenu"
     />
@@ -23,11 +22,11 @@
       self="top left"
       no-route-dismiss
     >
-      <q-tab-panels
+      <OTabPanels
         class="tw:flex tw:justify-between"
         v-model="picker.activeTab"
       >
-        <q-tab-panel name="relative" class="q-pa-none">
+        <OTabPanel name="relative">
           <div class="date-time-table relative column">
             <div
               class="relative-row q-px-md q-py-sm"
@@ -84,13 +83,15 @@
               </div>
             </div>
           </div>
-        </q-tab-panel>
-      </q-tab-panels>
+        </OTabPanel>
+      </OTabPanels>
     </q-menu>
   </div>
 </template>
 
 <script setup>
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { ref, reactive, watch, computed } from "vue";
 import { useStore } from "vuex";
 

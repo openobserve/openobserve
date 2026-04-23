@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -159,7 +159,6 @@ size="xs" class="warning" />{{
     <div class="header-menu">
       <!-- UPGRADE TO ENTERPRISE BUTTON: Shows for non-enterprise users -->
       <q-btn
-        no-caps
         flat
         dense
         class="upgrade-enterprise-btn q-px-sm q-mx-xs"
@@ -182,7 +181,6 @@ size="16px" class="q-mr-xs" />
         round
         flat
         dense
-        :ripple="false"
         data-test="ingestion-quota-warning-icon"
       >
         <div class="row items-center no-wrap">
@@ -201,10 +199,8 @@ size="16px" class="q-mr-xs" />
       <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel -->
       <q-btn
         v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-        :ripple="false"
         @click="toggleAIChat"
         data-test="menu-link-ai-item"
-        no-caps
         :borderless="true"
         flat
         dense
@@ -224,7 +220,6 @@ size="16px" class="q-mr-xs" />
         <q-btn
           style="max-width: 250px"
           dense
-          no-caps
           flat
           class="tw:text-ellipsis tw:overflow-hidden"
         >
@@ -352,7 +347,6 @@ size="16px" class="q-mr-xs" />
         round
         flat
         dense
-        :ripple="false"
         @click="openSlack"
         data-test="menu-link-slack-item"
       >
@@ -369,7 +363,7 @@ class="header-icon"
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
       <q-btn round flat
-dense :ripple="false" data-test="menu-link-help-item">
+dense data-test="menu-link-help-item">
         <div class="row items-center no-wrap">
           <q-icon name="help_outline" class="header-icon"></q-icon>
           <q-tooltip anchor="top middle" self="bottom middle">
@@ -437,7 +431,6 @@ dense :ripple="false" data-test="menu-link-help-item">
         round
         flat
         dense
-        :ripple="false"
         @click="router.push({ name: 'settings' })"
       >
         <div class="row items-center no-wrap">
@@ -453,7 +446,6 @@ dense :ripple="false" data-test="menu-link-help-item">
         round
         flat
         dense
-        :ripple="false"
         data-test="header-my-account-profile-icon"
       >
         <div class="row items-center no-wrap">
@@ -614,6 +606,7 @@ name="exit_to_app" class="padding-none" />
 </template>
 
 <script lang="ts">
+
 import { defineComponent, PropType, computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";

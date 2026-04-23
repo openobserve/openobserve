@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -44,7 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="pipeline-destination-list-add-btn"
             class="o2-primary-button q-ml-sm tw:h-[36px]"
-            no-caps
             flat
             :label="t(`alert_destinations.add`)"
             @click="editDestination(null)"
@@ -121,7 +120,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'o2-secondary-button-dark'
                   : 'o2-secondary-button-light'
               "
-              no-caps
               dense
               @click="openBulkDeleteDialog"
             >
@@ -190,6 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts">
+
 import {
   ref,
   onBeforeMount,

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="condition">
     <q-select
       v-if="conditionIndex !== 0"
@@ -16,7 +16,6 @@
       <q-btn
         square
         icon-right="arrow_drop_down"
-        no-caps
         dense
         :no-wrap="true"
         color="primary"
@@ -47,30 +46,30 @@
           <div style="height: 100%">
             <div class="q-pa-xs" style="height: 100%">
               <div class="q-gutter-xs" style="height: 100%">
-                <q-tabs v-model="condition.type" dense>
-                  <q-tab
+                <OTabs v-model="condition.type" dense>
+                  <OTab
                     dense
                     name="list"
                     :label="t('common.list')"
                     style="width: auto"
                     :data-test="`dashboard-add-condition-list-${conditionIndex}`"
-                  ></q-tab>
-                  <q-tab
+                  ></OTab>
+                  <OTab
                     dense
                     name="condition"
                     :label="t('common.condition')"
                     style="width: auto"
                     :data-test="`dashboard-add-condition-condition-${conditionIndex}`"
-                  ></q-tab>
-                </q-tabs>
+                  ></OTab>
+                </OTabs>
                 <q-separator></q-separator>
-                <q-tab-panels
+                <OTabPanels
                   v-model="condition.type"
                   dense
                   animated
                   style="height: 100%"
                 >
-                  <q-tab-panel dense name="condition" class="q-pa-none">
+                  <OTabPanel dense name="condition">
                     <div class="flex column" style="height: 220px">
                       <q-select
                         dense
@@ -95,8 +94,8 @@
                         searchRegex="(?:^|[^$])\$?(\w+)"
                       ></CommonAutoComplete>
                     </div>
-                  </q-tab-panel>
-                  <q-tab-panel dense name="list" class="q-pa-none">
+                  </OTabPanel>
+                  <OTabPanel dense name="list">
                     <q-select
                       dense
                       borderless
@@ -150,8 +149,8 @@
                         </q-item>
                       </template>
                     </q-select>
-                  </q-tab-panel>
-                </q-tab-panels>
+                  </OTabPanel>
+                </OTabPanels>
               </div>
             </div>
           </div>
@@ -169,6 +168,10 @@
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";

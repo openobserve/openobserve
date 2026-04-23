@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -96,7 +96,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             class="o2-secondary-button tw:h-[36px]"
             flat
-            no-caps
             label="Apply Filters"
             @click="applyFilters"
             :loading="isLoading"
@@ -109,7 +108,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             class="o2-secondary-button tw:h-[36px]"
             flat
-            no-caps
             label="Upload Source Maps"
             @click="navigateToUpload"
           />
@@ -245,7 +243,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             v-close-popup
             unelevated
-            no-caps
             class="q-mr-sm o2-secondary-button"
             data-test="cancel-button"
           >
@@ -254,7 +251,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             v-close-popup
             unelevated
-            no-caps
             class="o2-primary-button"
             @click="deleteSourceMap"
             data-test="confirm-button"
@@ -268,6 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+
 import { ref, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";

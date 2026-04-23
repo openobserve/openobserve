@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]">
           <div class="tw:flex tw:items-center">
             <q-btn
-              no-caps
               padding="xs"
               outline
               icon="arrow_back_ios_new"
@@ -84,7 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               label="Clear Filters"
               outline
-              no-caps
               padding="xs sm"
               :class="
                 store.state.theme === 'dark'
@@ -375,6 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useQuasar, date } from "quasar";

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -51,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               class="q-ml-sm o2-primary-button tw:h-[36px]"
               flat
-              no-caps
               :label="t(`user.add`)"
               @click="addRoutePush({})"
               data-test="add-basic-user"
@@ -179,7 +178,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'o2-secondary-button-dark'
                     : 'o2-secondary-button-light'
                 "
-                no-caps
                 dense
                 @click="openBulkDeleteDialog"
               >
@@ -237,14 +235,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated
-            no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
             v-close-popup="true"
             unelevated
-            no-caps
             class="no-border"
             color="primary"
             @click="deleteUser"
@@ -263,14 +259,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated
-            no-caps class="q-mr-sm o2-secondary-button">
+          <q-btn v-close-popup="true" unelevated class="q-mr-sm o2-secondary-button">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
             v-close-popup="true"
             unelevated
-            no-caps
             class="o2-primary-button"
             @click="revokeInvite"
           >
@@ -288,14 +282,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated
-            no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated class="q-mr-sm">
             Cancel
           </q-btn>
           <q-btn
             v-close-popup="true"
             unelevated
-            no-caps
             class="no-border"
             color="primary"
             @click="bulkDeleteUsers"
@@ -309,6 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";

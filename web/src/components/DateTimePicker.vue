@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="datetimeBtn"
     data-cy="date-time-button"
     outline
-    no-caps
     :label="displayValue"
     icon="schedule"
     icon-right="arrow_drop_down"
@@ -54,8 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
       </div>
       <q-separator />
-      <q-tab-panels v-model="data.selectedDate.tab" animated>
-        <q-tab-panel name="relative" class="q-pa-none">
+      <OTabPanels v-model="data.selectedDate.tab" animated>
+        <OTabPanel name="relative">
           <div class="date-time-table relative column">
             <div
               class="relative-row q-px-md q-py-sm"
@@ -113,8 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-        </q-tab-panel>
-        <q-tab-panel name="absolute" class="q-pa-none">
+        </OTabPanel>
+        <OTabPanel name="absolute">
           <div class="date-time-table">
             <div class="flex justify-center q-pa-none">
               <q-date
@@ -198,13 +197,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </tr>
             </table>
           </div>
-        </q-tab-panel>
-      </q-tab-panels>
+        </OTabPanel>
+      </OTabPanels>
     </q-menu>
   </q-btn>
 </template>
 
 <script lang="ts">
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { ref, defineComponent, reactive, watch, computed } from "vue";
 import { getImageURL } from "../utils/zincutils";
 import { isEqual } from "lodash-es";

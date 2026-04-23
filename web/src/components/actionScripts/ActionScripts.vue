@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -41,7 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="action-list-add-btn"
                   class="q-ml-sm o2-primary-button tw:h-[36px]"
                   flat
-                  no-caps
                   :label="t(`actions.add`)"
                   @click="showAddUpdateFn({})"
                 />
@@ -137,7 +136,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? 'o2-secondary-button-dark'
                         : 'o2-secondary-button-light'
                     "
-                    no-caps
                     dense
                     @click="openBulkDeleteDialog"
                   >
@@ -268,7 +266,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('alerts.cancel')"
                   text-color="light-text"
                   padding="sm md"
-                  no-caps
                 />
                 <q-btn
                   data-test="clone-action-submit-btn"
@@ -278,7 +275,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   padding="sm xl"
                   type="submit"
                   :disable="isSubmitting"
-                  no-caps
                 />
               </div>
             </q-form>
@@ -290,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 import {
   defineComponent,
   ref,
@@ -937,18 +934,18 @@ export default defineComponent({
 
 <style lang="scss">
 .alerts-tabs {
-  .q-tabs {
+  .o-tabs {
     &--vertical {
       margin: 1.5rem 1rem 0 0;
 
-      .q-tab {
+      .o-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
 
         &__content.tab_content {
-          .q-tab {
+          .o-tab {
             &__icon + &__label {
               padding-left: 0.875rem;
               font-weight: 600;

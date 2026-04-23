@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <div style="width: 60vw; height: calc(100vh - 59px);" :class="store.state.theme === 'dark' ? 'tw:bg-[#1F1F1F] dark-regex-patterns' : 'tw:bg-white light-regex-patterns'">
         <div class="tw:flex tw:items-center no-wrap tw:justify-between tw:px-4 tw:py-2">
         <div class="tw:flex tw:items-center">
@@ -234,7 +234,6 @@
                       class="o2-primary-button tw:h-[28px]"
                       flat
                       dense
-                      no-caps
                       @click="testStringOutput">
                       <span class="tw:text-[12px]">Test Input</span>
                     </q-btn>
@@ -333,7 +332,7 @@
 
               <!-- remove or add pattern button  -->
                <div class="tw:mb-4">
-                <q-btn @click="handleAddOrRemovePattern" borderless no-caps class="q-mr-md o2-secondary-button tw:h-[36px] no-border">
+                <q-btn @click="handleAddOrRemovePattern" borderless class="q-mr-md o2-secondary-button tw:h-[36px] no-border">
                   <q-icon class="tw:mr-1" :name="checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'delete' : 'add'"></q-icon>
                   <span>
                     {{ checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'Remove Pattern' : 'Add Pattern' }}
@@ -368,7 +367,6 @@
               label="Cancel"
               class="q-mr-md o2-secondary-button tw:h-[36px] no-border"
               padding="sm md"
-              no-caps
               data-test="associated-regex-patterns-cancel-btn"
             />
             <q-btn
@@ -377,7 +375,6 @@
               class="q-pa-none o2-primary-button tw:h-[34px] element-box-shadow"
               padding="sm xl"
               type="submit"
-              no-caps
               dense
               flat
               @click="updateRegexPattern"
@@ -398,6 +395,7 @@
 </template>
 
 <script lang="ts">
+
 import { defineComponent, nextTick, onMounted, onBeforeUnmount, PropType, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import regexPatternsService from '@/services/regex_pattern';
