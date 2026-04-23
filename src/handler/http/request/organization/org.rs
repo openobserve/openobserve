@@ -214,7 +214,7 @@ pub async fn all_organizations(
         let billing_info = all_billing_info.get(&org.identifier);
         let contract_end_date = billing_info.and_then(|(subscription, end_date, _)| {
             if *subscription == SubscriptionType::ExternalContract {
-                Some(*end_date)
+                *end_date
             } else {
                 None
             }
@@ -655,8 +655,8 @@ pub async fn create_external_contract(
     billing.subscription_type = SubscriptionType::ExternalContract;
     billing.customer_id = Some("custom".to_string());
     billing.subscription_id = Some(svix_ksuid::Ksuid::new(None, None).to_string());
-    billing.end_date = req.end_date;
-    billing.expiry_notified_checkpoint = i16::MAX;
+    billing.end_date = Some(req.end_date);
+    billing.expiry_notified_stage = None;
 
     match o2_enterprise::enterprise::cloud::update_customer_billing(billing).await {
         Ok(_) => MetaHttpResponse::json(serde_json::json!({"status": "ok"})),
@@ -710,15 +710,19 @@ pub async fn extend_external_contract(
         }
     };
 
-    if req.new_end_date <= billing.end_date {
+    let now = chrono::Utc::now().timestamp_micros();
+    if req.new_end_date <= now {
+        return MetaHttpResponse::bad_request("new_end_date must be in the future");
+    }
+    if billing.end_date.is_some_and(|current| req.new_end_date <= current) {
         return MetaHttpResponse::bad_request(
             "new_end_date must be after the current contract end date",
         );
     }
 
-    billing.end_date = req.new_end_date;
-    // Reset expiry notifications so warnings are sent again for the new end date
-    billing.expiry_notified_checkpoint = i16::MAX;
+    billing.end_date = Some(req.new_end_date);
+    // Reset expiry notifications so warnings fire again for the new window.
+    billing.expiry_notified_stage = None;
 
     match o2_enterprise::enterprise::cloud::update_customer_billing(billing).await {
         Ok(_) => MetaHttpResponse::json(serde_json::json!({"status": "ok"})),

@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="toggleExtendTrialDialog(props.row)"
             ></q-btn>
             <q-btn
-              v-if="props.row.billing_provider !== 'no_op'"
+              v-if="props.row.billing_provider === '-'"
               label="Add Contract"
               class="q-ml-xs text-capitalize"
               unelevated

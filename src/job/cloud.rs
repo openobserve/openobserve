@@ -44,9 +44,12 @@ const TRIAL_QUOTA_FLUSH_INTERVAL: u64 = 10;
 /// Interval for external contract expiry checks (1 hour).
 const EXTERNAL_CONTRACT_CHECK_INTERVAL: u64 = 3600;
 
-/// Day thresholds for expiry warning emails, in descending order.
-/// The checkpoint stored is the threshold value itself (e.g. 30 means "30-day warning sent").
-const EXPIRY_WARNING_DAYS: &[i16] = &[30, 7, 1];
+/// (days-remaining threshold, stage stored after the warning fires).
+/// Walked in descending-urgency order so we send at most one warning per tick.
+const EXPIRY_WARNING_STAGES: &[(i64, o2_enterprise::enterprise::cloud::billings::ExpiryNotificationStage)] = {
+    use o2_enterprise::enterprise::cloud::billings::ExpiryNotificationStage::*;
+    &[(30, ThirtyDay), (7, SevenDay), (1, OneDay)]
+};
 
 pub fn start() {
     tokio::spawn(async move { run_no_ingestion_period().await });
@@ -390,14 +393,14 @@ async fn check_external_contract_expiry() {
             continue;
         }
 
-        if cb.end_date <= 0 {
+        let Some(end_date) = cb.end_date else {
             continue;
-        }
+        };
 
         let org_id = &cb.org_id;
 
         // Check if contract has expired
-        if cb.end_date <= now {
+        if end_date <= now {
             log::info!(
                 "[EXT_CONTRACT] External contract expired for org {org_id}, reverting to Free tier"
             );
@@ -412,18 +415,17 @@ async fn check_external_contract_expiry() {
         }
 
         // Check if we need to send expiry warnings
-        let days_remaining = (cb.end_date - now) / day_micros;
+        let days_remaining = (end_date - now) / day_micros;
 
-        // Find the highest (most urgent) warning threshold that applies
-        let pending_checkpoint = EXPIRY_WARNING_DAYS
-            .iter()
-            .find(|&&threshold| {
-                days_remaining <= threshold as i64 && cb.expiry_notified_checkpoint > threshold
-            })
-            .copied();
+        // Walk thresholds in descending-urgency order; send the first warning whose
+        // threshold is reached and hasn't been sent yet.
+        let pending_stage = EXPIRY_WARNING_STAGES.iter().find(|(threshold, stage)| {
+            days_remaining <= *threshold
+                && cb.expiry_notified_stage.is_none_or(|s| s < *stage)
+        });
 
-        let checkpoint = match pending_checkpoint {
-            Some(cp) => cp,
+        let stage = match pending_stage {
+            Some((_, s)) => *s,
             None => continue,
         };
 
@@ -451,7 +453,7 @@ async fn check_external_contract_expiry() {
         match crate::service::alerts::alert::send_email_notification(&subject, &email, body).await {
             Ok(_) => {
                 log::info!(
-                    "[EXT_CONTRACT] Sent {checkpoint}-day expiry warning to {} for org={org_id}",
+                    "[EXT_CONTRACT] Sent {stage:?} expiry warning to {} for org={org_id}",
                     admin.email
                 );
             }
@@ -471,13 +473,13 @@ async fn check_external_contract_expiry() {
         )
         .await;
 
-        // Update the checkpoint so we don't resend
+        // Advance the stored stage so we don't resend.
         let mut updated_billing = cb.clone();
-        updated_billing.expiry_notified_checkpoint = checkpoint;
+        updated_billing.expiry_notified_stage = Some(stage);
         if let Err(e) =
             o2_enterprise::enterprise::cloud::update_customer_billing(updated_billing).await
         {
-            log::error!("[EXT_CONTRACT] Failed to update expiry checkpoint for org={org_id}: {e}");
+            log::error!("[EXT_CONTRACT] Failed to update expiry stage for org={org_id}: {e}");
         }
     }
 }
@@ -511,10 +513,12 @@ fn build_external_contract_expiry_email(
          account manager if you'd like to renew."
     };
 
+    let display_name_esc = html_escape(display_name);
+    let org_id_esc = html_escape(org_id);
     let body = format!(
         "<html><body>\
         <h2>External Contract Expiry Notice</h2>\
-        <p><strong>Organization:</strong> {display_name} ({org_id})</p>\
+        <p><strong>Organization:</strong> {display_name_esc} ({org_id_esc})</p>\
         <p>{message}</p>\
         <p><strong>Days remaining:</strong> {days_remaining}</p>\
         <p>After expiry, your organization will revert to the Free tier.</p>\
@@ -522,4 +526,10 @@ fn build_external_contract_expiry_email(
     );
 
     (subject, body)
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
