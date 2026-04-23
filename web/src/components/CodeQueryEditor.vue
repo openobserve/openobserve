@@ -102,7 +102,7 @@ export default defineComponent({
     },
     suggestions: {
       type: Array,
-      default: () => [],
+      default: null,
     },
     debounceTime: {
       type: Number,
@@ -365,10 +365,10 @@ export default defineComponent({
     });
 
     const suggestions = computed(() => {
-      if (props.language === "sql" && !props.suggestions?.length) {
+      if (props.language === "sql" && props.suggestions == null) {
         return defaultSuggestions;
       }
-      return props.suggestions;
+      return props.suggestions ?? [];
     });
 
     /**

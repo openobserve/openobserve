@@ -246,9 +246,9 @@ describe("CodeQueryEditor", () => {
       expect(wrapper.props("suggestions")).toEqual(suggestions);
     });
 
-    it("should have empty suggestions array as default", () => {
+    it("should have null suggestions as default", () => {
       const wrapper = createWrapper({ suggestions: undefined });
-      expect(wrapper.props("suggestions")).toEqual([]);
+      expect(wrapper.props("suggestions")).toBeNull();
     });
 
     it("should accept debounceTime prop", () => {
@@ -556,6 +556,85 @@ describe("CodeQueryEditor", () => {
       expect(mockEditorObj.addCommand).toHaveBeenCalled();
       const firstCall = mockEditorObj.addCommand.mock.calls[0];
       expect(firstCall[2]).toBe("ctrlenter");
+    });
+  });
+
+  // Tests for the bug fix: suggestions=[] must not fall back to defaultSuggestions.
+  // When a parent passes an explicit empty array (e.g. effectiveSuggestions during
+  // value context), the Monaco provider must return no function suggestions.
+  describe("suggestions prop — function suggestions gated by null vs []", () => {
+    let getElementByIdSpy: ReturnType<typeof vi.spyOn>;
+
+    afterEach(() => {
+      getElementByIdSpy?.mockRestore();
+    });
+
+    const mountAndWait = async (props: any = {}) => {
+      vi.clearAllMocks();
+      const fakeEl = document.createElement("div");
+      getElementByIdSpy = vi
+        .spyOn(document, "getElementById")
+        .mockReturnValue(fakeEl);
+      const wrapper = mount(CodeQueryEditor, {
+        props: { editorId: "test-editor", query: "SELECT * FROM logs", ...props },
+        global: { plugins: [store] },
+      });
+      await vi.waitFor(
+        () => { expect(mockEditorObj.addCommand).toHaveBeenCalled(); },
+        { timeout: 3000 },
+      );
+      return wrapper;
+    };
+
+    const captureProvideCompletionItems = async () => {
+      const monacoApi = await import("monaco-editor/esm/vs/editor/editor.api");
+      const calls = vi.mocked(monacoApi.languages.registerCompletionItemProvider).mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      return calls[calls.length - 1][1].provideCompletionItems as Function;
+    };
+
+    const callProvider = (fn: Function, text = "") => {
+      const mockModel = {
+        getValueInRange: vi.fn(() => text),
+        getWordUntilPosition: vi.fn(() => ({ word: "", startColumn: 1, endColumn: 1 })),
+      };
+      return fn(mockModel, { lineNumber: 1, column: 1 });
+    };
+
+    const hasFunctionSuggestion = (result: any) =>
+      result.suggestions.some(
+        (s: any) =>
+          typeof s.label === "string" &&
+          (s.label.startsWith("match_all") || s.label.startsWith("fuzzy_match")),
+      );
+
+    it("includes function suggestions when suggestions prop is null (default)", async () => {
+      await mountAndWait({ suggestions: null });
+      const fn = await captureProvideCompletionItems();
+      const result = callProvider(fn);
+      expect(hasFunctionSuggestion(result)).toBe(true);
+    });
+
+    it("includes no function suggestions when suggestions prop is [] (explicit empty)", async () => {
+      await mountAndWait({ suggestions: [] });
+      const fn = await captureProvideCompletionItems();
+      const result = callProvider(fn);
+      expect(hasFunctionSuggestion(result)).toBe(false);
+    });
+
+    it("includes provided suggestions when suggestions prop has items", async () => {
+      const customSuggestion = {
+        label: (_kw: string) => `custom_fn('${_kw}')`,
+        kind: "Text",
+        insertText: (_kw: string) => `custom_fn('${_kw}')`,
+      };
+      await mountAndWait({ suggestions: [customSuggestion] });
+      const fn = await captureProvideCompletionItems();
+      const result = callProvider(fn, "SELECT");
+      const found = result.suggestions.some(
+        (s: any) => typeof s.label === "string" && s.label.startsWith("custom_fn"),
+      );
+      expect(found).toBe(true);
     });
   });
 });
