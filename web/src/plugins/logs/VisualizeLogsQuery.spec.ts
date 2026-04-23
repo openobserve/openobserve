@@ -1858,7 +1858,15 @@ describe("VisualizeLogsQuery Component", () => {
         { name: "vrl_field", type: "Utf8" },
       ];
 
-      const chartTypes = ["table", "line", "bar", "area", "scatter", "h-bar"];
+      const chartTypes = [
+        "table",
+        "line",
+        "bar",
+        "area",
+        "scatter",
+        "h-bar",
+        "stacked",
+      ];
 
       if (typeof wrapper.vm.handleChartTypeChange === "function") {
         chartTypes.forEach((chartType) => {

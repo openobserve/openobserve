@@ -245,6 +245,8 @@ pub struct Response {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub converted_histogram_query: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub histogram_breakdown_field: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_histogram_eligible: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query_index: Option<usize>,
@@ -423,6 +425,7 @@ impl Response {
             order_by: None,
             order_by_metadata: Vec::new(),
             converted_histogram_query: None,
+            histogram_breakdown_field: None,
             is_histogram_eligible: None,
             query_index: None,
             peak_memory_usage: None,

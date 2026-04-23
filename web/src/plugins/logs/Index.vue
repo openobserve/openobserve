@@ -811,8 +811,22 @@ export default defineComponent({
       clearAllTimeouts();
       try {
         if (searchObj) {
-          // Turn off all loaders before saving view
-          let savedSearchObj = JSON.parse(JSON.stringify(searchObj));
+          // Serialize breakdownSeries Map as entries array before JSON cloning
+          const breakdownSeries = searchObj.data?.histogram?.breakdownSeries;
+          const serializableSearchObj = {
+            ...searchObj,
+            data: {
+              ...searchObj.data,
+              histogram: {
+                ...searchObj.data?.histogram,
+                breakdownSeries:
+                  breakdownSeries instanceof Map
+                    ? [...breakdownSeries.entries()]
+                    : null,
+              },
+            },
+          };
+          let savedSearchObj = JSON.parse(JSON.stringify(serializableSearchObj));
           savedSearchObj.loading = false;
           savedSearchObj.loadingHistogram = false;
           savedSearchObj.loadingCounter = false;
@@ -1792,6 +1806,7 @@ export default defineComponent({
                       "bar",
                       "h-bar",
                       "line",
+                      "stacked",
                       "scatter",
                       "table",
                     ];
@@ -2535,6 +2550,32 @@ export default defineComponent({
       });
     };
 
+    const detectHistogramBreakdownField = (): string | null => {
+      const selectedStreamFields =
+        (searchObj.data.stream?.selectedStreamFields ?? []) as Array<{
+          name?: string | null;
+        }>;
+      const fieldNameMap = new Map<string, string>();
+
+      selectedStreamFields.forEach((field) => {
+        const fieldName = field.name?.toLowerCase();
+        if (fieldName && !fieldNameMap.has(fieldName)) {
+          fieldNameMap.set(fieldName, field.name ?? fieldName);
+        }
+      });
+
+      // Keep this order aligned with backend histogram breakdown detection in
+      // `src/service/search/sql/histogram.rs`.
+      const prioritizedFields = ["severity", "log_level", "level", "status"];
+      for (const fieldName of prioritizedFields) {
+        if (fieldNameMap.has(fieldName)) {
+          return fieldNameMap.get(fieldName) ?? null;
+        }
+      }
+
+      return null;
+    };
+
     // Helper function to copy dashboardPanelData while preserving stream info
     const copyDashboardDataToVisualize = async () => {
       // Extract and assign stream info BEFORE copying
@@ -2737,19 +2778,32 @@ export default defineComponent({
         /* Populate fields & axes */
         // For histogram queries, we need to modify the extractedFields to match the actual query structure
         let fieldsForVisualization = extractedFields;
+        const histogramBreakdownField = shouldUseHistogramQuery.value
+          ? detectHistogramBreakdownField()
+          : null;
+        let shouldAutoSelectChartTypeForFields = autoSelectChartType;
         if (shouldUseHistogramQuery.value) {
           // For histogram query, override the extracted fields to match the histogram structure
           fieldsForVisualization = {
-            group_by: ["zo_sql_key"], // histogram field is grouped by zo_sql_key
-            projections: ["zo_sql_key", "zo_sql_num"], // histogram returns zo_sql_key and zo_sql_num
+            group_by: histogramBreakdownField
+              ? ["zo_sql_key", "zo_sql_breakdown"]
+              : ["zo_sql_key"], // histogram field is grouped by zo_sql_key
+            projections: histogramBreakdownField
+              ? ["zo_sql_key", "zo_sql_breakdown", "zo_sql_num"]
+              : ["zo_sql_key", "zo_sql_num"], // histogram returns zo_sql_key and zo_sql_num
             timeseries_field: "zo_sql_key", // zo_sql_key is the time field in histogram
           };
+
+          if (histogramBreakdownField && autoSelectChartType) {
+            dashboardPanelData.data.type = "stacked";
+            shouldAutoSelectChartTypeForFields = false;
+          }
         }
 
         // Use the refactored functions
         await setCustomQueryFields(
           fieldsForVisualization,
-          autoSelectChartType,
+          shouldAutoSelectChartTypeForFields,
           signal,
         );
 
