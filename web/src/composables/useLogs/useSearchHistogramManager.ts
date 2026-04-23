@@ -227,6 +227,11 @@ export const useSearchHistogramManager = () => {
     searchObj.data.queryResults.result_cache_ratio +=
       response.content.results.result_cache_ratio;
 
+    if (response.content.results.histogram_breakdown_field) {
+      searchObj.data.queryResults.histogram_breakdown_field =
+        response.content.results.histogram_breakdown_field;
+    }
+
     (async () => {
       try {
         // generateHistogramData would need to be passed in or imported
