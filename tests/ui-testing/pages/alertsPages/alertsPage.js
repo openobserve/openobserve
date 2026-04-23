@@ -67,6 +67,7 @@ export class AlertsPage {
             streamNameDropdown: '[data-test="add-alert-stream-name-select-dropdown"]',
             realtimeAlertRadio: '[data-test="add-alert-realtime-alert-radio"]',
             scheduledAlertRadio: '[data-test="add-alert-scheduled-alert-radio"]',
+            alertTypeDropdown: '.alert-v3-field',
 
             // Step 2: Query/Conditions selectors
             queryTabsContainer: '[data-test="step2-query-tabs"]',
@@ -2135,27 +2136,54 @@ export class AlertsPage {
     }
 
     /**
+     * Select an alert type from the dropdown (v3 UI) or radio buttons (v2 UI).
+     * Tries the v3 q-select dropdown first, falls back to radio buttons.
+     */
+    async selectAlertTypeFromDropdown(optionLabel) {
+        // v3 UI: q-select dropdown next to "Alert Type" label
+        const dropdown = this.page.locator(this.locators.alertTypeDropdown);
+        const dropdownVisible = await dropdown.first().isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (dropdownVisible) {
+            await dropdown.first().click();
+            await this.page.waitForTimeout(300);
+            const option = this.page.getByRole('option', { name: optionLabel });
+            await option.waitFor({ state: 'visible', timeout: 5000 });
+            await option.click();
+            testLogger.info(`Selected alert type: ${optionLabel} (dropdown)`);
+            return;
+        }
+
+        // v2 fallback: radio buttons
+        const selector = optionLabel.toLowerCase().includes('real')
+            ? this.locators.realtimeAlertRadio
+            : this.locators.scheduledAlertRadio;
+        await this.page.locator(selector).click();
+        testLogger.info(`Selected alert type: ${optionLabel} (radio)`);
+    }
+
+    /**
      * Select scheduled alert type
      */
     async selectScheduledAlertType() {
-        await this.page.locator(this.locators.scheduledAlertRadio).click();
-        testLogger.info('Selected scheduled alert type');
+        await this.selectAlertTypeFromDropdown('Scheduled');
     }
 
     /**
      * Select real-time alert type
      */
     async selectRealtimeAlertType() {
-        const realtimeRadio = this.page.locator(this.locators.realtimeAlertRadio);
-        await expect(realtimeRadio).toBeVisible({ timeout: 5000 });
-        await realtimeRadio.click();
-        testLogger.info('Selected real-time alert type');
+        await this.selectAlertTypeFromDropdown('Real-time');
     }
 
     /**
-     * Expect real-time alert radio button to be visible
+     * Expect real-time alert type option to be available
      */
     async expectRealtimeRadioVisible(timeout = 5000) {
+        // v3: check dropdown exists; v2: check radio button
+        const dropdown = this.page.locator(this.locators.alertTypeDropdown);
+        const dropdownVisible = await dropdown.first().isVisible({ timeout: 2000 }).catch(() => false);
+        if (dropdownVisible) return;
         await expect(this.page.locator(this.locators.realtimeAlertRadio)).toBeVisible({ timeout });
     }
 
@@ -2240,8 +2268,15 @@ export class AlertsPage {
      * Click the Continue button to advance wizard steps
      */
     async clickContinueButton() {
-        await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        // v3 UI uses a single-page tabbed form — no Continue button
+        const continueBtn = this.page.getByRole('button', { name: 'Continue' });
+        const visible = await continueBtn.isVisible({ timeout: 2000 }).catch(() => false);
+        if (visible) {
+            await continueBtn.click();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        } else {
+            testLogger.info('Continue button not found (v3 single-page form) — skipping');
+        }
     }
 
     /**

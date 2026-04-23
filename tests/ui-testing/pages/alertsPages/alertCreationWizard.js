@@ -20,6 +20,44 @@ export class AlertCreationWizard {
     }
 
     /**
+     * Click Continue if the wizard stepper is present (v2). No-op on v3 single-page form.
+     */
+    async clickContinueIfPresent() {
+        const continueBtn = this.page.getByRole('button', { name: 'Continue' });
+        const visible = await continueBtn.isVisible({ timeout: 2000 }).catch(() => false);
+        if (visible) {
+            await continueBtn.click();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        }
+    }
+
+    /**
+     * Select alert type from the v3 dropdown or v2 radio buttons.
+     */
+    async selectAlertType(type = 'realtime') {
+        const label = type === 'scheduled' ? 'Scheduled' : 'Real-time';
+        const dropdown = this.page.locator(this.locators.alertTypeDropdown);
+        const dropdownVisible = await dropdown.first().isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (dropdownVisible) {
+            await dropdown.first().click();
+            await this.page.waitForTimeout(300);
+            const option = this.page.getByRole('option', { name: label });
+            await option.waitFor({ state: 'visible', timeout: 5000 });
+            await option.click();
+            testLogger.info(`Selected alert type: ${label} (dropdown)`);
+            return;
+        }
+
+        const selector = type === 'scheduled'
+            ? this.locators.scheduledAlertRadio
+            : this.locators.realtimeAlertRadio;
+        await expect(this.page.locator(selector)).toBeVisible({ timeout: 5000 });
+        await this.page.locator(selector).click();
+        testLogger.info(`Selected alert type: ${label} (radio)`);
+    }
+
+    /**
      * Select a stream from the stream name dropdown using keyboard filtering.
      * The dropdown uses Quasar virtual scroll which only renders visible items.
      * Typing the stream name triggers QSelect's built-in filter to narrow results.
@@ -103,11 +141,10 @@ export class AlertCreationWizard {
 
         await this.selectStreamByName(streamName);
 
-        await expect(this.page.locator(this.locators.realtimeAlertRadio)).toBeVisible({ timeout: 5000 });
-        await this.page.locator(this.locators.realtimeAlertRadio).click();
+        await this.selectAlertType('realtime');
 
         // ==================== STEP 2: CONDITIONS ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
@@ -145,7 +182,7 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.conditionValueInput).first().locator('input').fill(value);
 
         // ==================== STEP 4: ALERT SETTINGS ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
@@ -188,7 +225,7 @@ export class AlertCreationWizard {
         await this.page.keyboard.press('Escape');
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
 
@@ -227,11 +264,10 @@ export class AlertCreationWizard {
 
         await this.selectStreamByName(streamName);
 
-        await expect(this.page.locator(this.locators.realtimeAlertRadio)).toBeVisible({ timeout: 5000 });
-        await this.page.locator(this.locators.realtimeAlertRadio).click();
+        await this.selectAlertType('realtime');
 
         // ==================== STEP 2: CONDITIONS ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
@@ -264,7 +300,7 @@ export class AlertCreationWizard {
         await this.page.locator(this.locators.conditionValueInput).first().locator('input').fill('test');
 
         // ==================== STEP 4: ALERT SETTINGS ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
@@ -301,7 +337,7 @@ export class AlertCreationWizard {
         await this.page.keyboard.press('Escape');
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
 
@@ -344,11 +380,10 @@ export class AlertCreationWizard {
 
         await this.selectStreamByName(streamName);
 
-        await expect(this.page.locator(this.locators.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
-        await this.page.locator(this.locators.scheduledAlertRadio).click();
+        await this.selectAlertType('scheduled');
 
         // ==================== STEP 2: CONDITIONS (SQL) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
@@ -387,7 +422,7 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(1000);
 
         // ==================== STEP 3: COMPARE WITH PAST ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
@@ -401,7 +436,7 @@ export class AlertCreationWizard {
         }
 
         // ==================== STEP 4: ALERT SETTINGS ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
@@ -446,12 +481,12 @@ export class AlertCreationWizard {
         await this.page.keyboard.press('Escape');
 
         // ==================== STEP 5: DEDUPLICATION (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
 
@@ -494,11 +529,11 @@ export class AlertCreationWizard {
         await this.selectStreamByName(streamName);
 
         // Select Real-time alert type
-        await this.page.locator(this.locators.realtimeAlertRadio).click();
+        await this.selectAlertType('realtime');
         testLogger.info('Alert setup complete');
 
         // ==================== STEP 2: CONDITIONS (Multiple) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 2: Conditions');
@@ -584,7 +619,7 @@ export class AlertCreationWizard {
         testLogger.info('Verified AND operator between conditions');
 
         // ==================== STEP 4: ALERT SETTINGS ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 4: Alert Settings');
@@ -627,7 +662,7 @@ export class AlertCreationWizard {
         testLogger.info('Selected destination', { destinationName });
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
 
@@ -684,12 +719,11 @@ export class AlertCreationWizard {
         testLogger.info('Selected stream name', { streamName });
 
         // Select Scheduled alert type
-        await expect(this.page.locator(this.locators.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
-        await this.page.locator(this.locators.scheduledAlertRadio).click();
+        await this.selectAlertType('scheduled');
         testLogger.info('Selected scheduled alert type');
 
         // ==================== STEP 2: CONDITIONS (SQL) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 2: Conditions');
@@ -734,13 +768,13 @@ export class AlertCreationWizard {
         testLogger.info('Closed SQL Editor dialog');
 
         // ==================== STEP 3: COMPARE WITH PAST (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 3: Compare with Past (skipping)');
 
         // ==================== STEP 4: ALERT SETTINGS ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 4: Alert Settings');
@@ -792,7 +826,7 @@ export class AlertCreationWizard {
         testLogger.info('Selected destination', { destinationName });
 
         // ==================== STEP 5: DEDUPLICATION ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 5: Deduplication');
@@ -838,7 +872,7 @@ export class AlertCreationWizard {
         }
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         testLogger.info('Navigated to Step 6: Advanced (skipping)');
@@ -878,10 +912,10 @@ export class AlertCreationWizard {
         await this.selectStreamByName(streamName);
 
         // Select real-time alert type
-        await this.page.locator(this.locators.realtimeAlertRadio).click();
+        await this.selectAlertType('realtime');
 
         // Navigate to Step 2: Conditions
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
@@ -1079,12 +1113,11 @@ export class AlertCreationWizard {
         testLogger.info('Selected stream name', { streamName });
 
         // Select Scheduled alert type
-        await expect(this.page.locator(this.locators.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
-        await this.page.locator(this.locators.scheduledAlertRadio).click();
+        await this.selectAlertType('scheduled');
         testLogger.info('Selected scheduled alert type');
 
         // ==================== STEP 2: CONDITIONS (SQL) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 2: Conditions');
@@ -1141,7 +1174,7 @@ export class AlertCreationWizard {
         testLogger.info('Closed SQL Editor dialog');
 
         // ==================== STEP 3: COMPARE WITH PAST ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 3: Compare with Past');
@@ -1159,7 +1192,7 @@ export class AlertCreationWizard {
         }
 
         // ==================== STEP 4: ALERT SETTINGS ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 4: Alert Settings');
@@ -1222,7 +1255,7 @@ export class AlertCreationWizard {
         testLogger.info('Selected destination', { destinationName });
 
         // ==================== STEP 5: DEDUPLICATION ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 5: Deduplication');
@@ -1262,7 +1295,7 @@ export class AlertCreationWizard {
         testLogger.info('Set dedup time window', { minutes: timeWindowMinutes });
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         testLogger.info('Navigated to Step 6: Advanced (skipping)');
@@ -1309,12 +1342,11 @@ export class AlertCreationWizard {
         await this.selectStreamByName(streamName);
 
         // Select Scheduled alert type
-        await expect(this.page.locator(this.locators.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
-        await this.page.locator(this.locators.scheduledAlertRadio).click();
+        await this.selectAlertType('scheduled');
         testLogger.info('Step 1 complete: Setup');
 
         // ==================== STEP 2: CONDITIONS + AGGREGATION ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 15000 })
             .catch(() => testLogger.debug('networkidle timeout at Step 2 — continuing'));
         await this.page.waitForTimeout(1000);
@@ -1402,13 +1434,13 @@ export class AlertCreationWizard {
         testLogger.info('Configured aggregation threshold');
 
         // ==================== STEP 3: COMPARE WITH PAST (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 15000 })
             .catch(() => testLogger.debug('networkidle timeout at Step 3 — continuing'));
         await this.page.waitForTimeout(1000);
 
         // ==================== STEP 4: ALERT SETTINGS ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 15000 })
             .catch(() => testLogger.debug('networkidle timeout at Step 4 — continuing'));
         await this.page.waitForTimeout(1000);
@@ -1455,13 +1487,13 @@ export class AlertCreationWizard {
         testLogger.info('Configured alert settings');
 
         // ==================== STEP 5: DEDUPLICATION (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 15000 })
             .catch(() => testLogger.debug('networkidle timeout at Step 5 — continuing'));
         await this.page.waitForTimeout(500);
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 15000 })
             .catch(() => testLogger.debug('networkidle timeout at Step 6 — continuing'));
         await this.page.waitForTimeout(500);
@@ -1536,12 +1568,11 @@ export class AlertCreationWizard {
         testLogger.info('Selected metrics stream name', { metricsStreamName });
 
         // Select Scheduled alert type
-        await expect(this.page.locator(this.locators.scheduledAlertRadio)).toBeVisible({ timeout: 5000 });
-        await this.page.locator(this.locators.scheduledAlertRadio).click();
+        await this.selectAlertType('scheduled');
         testLogger.info('Selected scheduled alert type');
 
         // ==================== STEP 2: CONDITIONS (PromQL) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 2: Conditions');
@@ -1614,13 +1645,13 @@ export class AlertCreationWizard {
         testLogger.info('Set PromQL condition value', { value: conditionValue });
 
         // ==================== STEP 3: COMPARE WITH PAST (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 3: Compare with Past (skipping)');
 
         // ==================== STEP 4: ALERT SETTINGS ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
         testLogger.info('Navigated to Step 4: Alert Settings');
@@ -1676,13 +1707,13 @@ export class AlertCreationWizard {
         testLogger.info('Selected destination', { destinationName });
 
         // ==================== STEP 5: DEDUPLICATION (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         testLogger.info('Navigated to Step 5: Deduplication (skipping)');
 
         // ==================== STEP 6: ADVANCED (Skip) ====================
-        await this.page.getByRole('button', { name: 'Continue' }).click();
+        await this.clickContinueIfPresent();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(500);
         testLogger.info('Navigated to Step 6: Advanced (skipping)');
