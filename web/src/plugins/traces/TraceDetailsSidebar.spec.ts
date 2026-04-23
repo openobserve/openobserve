@@ -986,7 +986,7 @@ describe("TraceDetailsSidebar", async () => {
       await metricsTab.trigger("click");
       await flushPromises();
 
-      expect(correlationWrapper.vm.correlationError).toContain("No Logs Found");
+      expect(correlationWrapper.vm.correlationError).toContain("No Data Found");
     });
   });
 
