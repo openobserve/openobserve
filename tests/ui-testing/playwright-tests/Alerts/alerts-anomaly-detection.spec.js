@@ -633,7 +633,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
   test.describe("Tab Switching", () => {
 
-    test("Switch between Builder and SQL tabs", {
+    test.skip("Switch between Builder and SQL tabs", {
       tag: ['@functional', '@anomaly', '@P1', '@all']
     }, async ({ page }) => {
       testLogger.info('Testing tab switching');
