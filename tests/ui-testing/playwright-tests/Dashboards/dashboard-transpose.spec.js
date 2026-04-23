@@ -127,7 +127,7 @@ test.describe("dashboard UI testcases", () => {
         '[data-test="dashboard-panel-table"] thead tr th',
         (headerCells) =>
           headerCells.map((cell) =>
-            cell.textContent.trim().replace(/^arrow_upward/, "").replace(/content_copy/g, '').trim()
+            cell.textContent.trim().replace(/arrow_upward|arrow_downward|unfold_more/g, "").replace(/content_copy/g, '').trim()
           )
       );
 

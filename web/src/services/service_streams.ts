@@ -47,7 +47,7 @@ export interface FieldAlias {
 export interface StreamInfo {
   stream_name: string;
   stream_type: string;
-  filters: Record<string, string>; // actual field names resolved per-stream by backend
+  filters?: Record<string, string>; // omitted by backend when empty (skip_serializing_if)
 }
 
 export interface RelatedStreams {

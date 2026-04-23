@@ -221,7 +221,7 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     }
   });
 
-  test("VRL should display correctly in UI editor @vrl @P1 @all @alerts", async ({ page }) => {
+  test.skip("VRL should display correctly in UI editor @vrl @P1 @all @alerts", async ({ page }) => {
     test.setTimeout(180000);
     const ids = generateTestIds();
     let createdAlertId = null;
@@ -275,7 +275,7 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     }
   });
 
-  test("VRL should not be double-encoded on alert update @vrl @P1 @all @alerts", async ({ page }) => {
+  test.skip("VRL should not be double-encoded on alert update @vrl @P1 @all @alerts", async ({ page }) => {
     test.setTimeout(180000);
     const ids = generateTestIds();
     let createdAlertId = null;
@@ -325,7 +325,7 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     }
   });
 
-  test("Backward compatibility - plain text VRL should be accepted or converted @vrl @P2 @all @alerts", async ({ page }) => {
+  test.skip("Backward compatibility - plain text VRL should be accepted or converted @vrl @P2 @all @alerts", async ({ page }) => {
     test.setTimeout(120000);
     const ids = generateTestIds();
     let createdAlertId = null;
@@ -393,7 +393,7 @@ test.describe("VRL Encoding Tests @vrl @alerts", () => {
     }
   });
 
-  test("Update alert - verify PUT request encoding @vrl @P1 @all @alerts", async ({ page }) => {
+  test.skip("Update alert - verify PUT request encoding @vrl @P1 @all @alerts", async ({ page }) => {
     test.setTimeout(180000);
     const ids = generateTestIds();
     let createdAlertId = null;

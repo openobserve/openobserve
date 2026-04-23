@@ -73,7 +73,7 @@
     </div>
     <q-btn
       :disable="!isAgree || isSubmitting"
-      class="tw:w-full tw:h-[40px] tw:bg-[#6B76E3] tw:text-white tw:font-semibold  tw:mt-4"
+      class="tw:w-full tw:h-[40px] tw:bg-[#6B76E3] tw:text-white tw:font-semibold  tw:mt-4 o2-primary-button"
       label="Start your 14-day Trial"
       no-caps
       :loading="isSubmitting"

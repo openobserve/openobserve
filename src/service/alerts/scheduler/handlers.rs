@@ -1364,8 +1364,10 @@ async fn handle_report_triggers(
         ..trigger.clone()
     };
 
-    let mut report = match db::dashboards::reports::get_by_id(conn, report_id).await {
-        Ok(report) => report,
+    let (_report_folder, mut report) = match db::dashboards::reports::get_by_id(conn, report_id)
+        .await
+    {
+        Ok((folder, report)) => (folder, report),
         Err(e) => {
             log::error!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Error getting report: org: {org_id}, report name: {report_id}, error: {e}"
@@ -1429,9 +1431,13 @@ async fn handle_report_triggers(
                 trigger.org
             );
             report.enabled = false;
-            if let Err(e) =
-                crate::service::dashboards::reports::enable(&report.org_id, &report.name, false)
-                    .await
+            if let Err(e) = crate::service::dashboards::reports::enable(
+                &report.org_id,
+                &_report_folder.folder_id,
+                &report.name,
+                false,
+            )
+            .await
             {
                 log::error!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause report due to trial expiry: {}/{} : {e}",

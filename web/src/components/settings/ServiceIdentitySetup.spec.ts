@@ -273,14 +273,27 @@ describe("ServiceIdentitySetup", () => {
     });
 
     it("should emit navigate-to-services when the services link is clicked in the workload section", async () => {
-      // Make availableGroups non-empty so the workload detection section renders
+      // Make availableGroups non-empty with dimension analytics so the workload detection section renders
       vi.mocked(serviceStreamsService.getDimensionAnalytics).mockResolvedValueOnce({
         data: {
           org_id: "test-org",
           total_dimensions: 1,
-          by_cardinality: {},
+          by_cardinality: {
+            "k8s-namespace": 5,
+          },
           recommended_priority_dimensions: [],
-          dimensions: [],
+          dimensions: [
+            {
+              dimension_name: "k8s-namespace",
+              cardinality: 5,
+              service_count: 3,
+              cardinality_class: "Low",
+              first_seen: 1640995200,
+              last_updated: 1640995200,
+              sample_values: {},
+              value_children: {},
+            },
+          ],
           available_groups: [
             {
               group_id: "k8s-namespace",

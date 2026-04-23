@@ -50,6 +50,7 @@ const store = createStore({
     savedViewDialog: false,
     regionInfo: [],
     zoConfig: {
+      service_account_enabled: true,
       sql_mode: false,
       sql_reserved_keywords: [
         "all",
@@ -132,6 +133,7 @@ const store = createStore({
       isDataIngested: false,
       allDashboardData: {},
       foldersByType: [],
+      allReportsListByFolderId: {},
     },
     alertListFilters: {
       searchQuery: "",
@@ -191,6 +193,9 @@ const store = createStore({
     },
     setAllAlertsListByFolderId(state, payload) {
       state.organizationData.allAlertsListByFolderId = payload;
+    },
+    setAllReportsListByFolderId(state, payload) {
+      state.organizationData.allReportsListByFolderId = payload;
     },
     setAllAlertsListByNames(state, payload) {
       state.organizationData.allAlertsListByNames = payload;
@@ -408,6 +413,9 @@ const store = createStore({
     },
     setAllAlertsListByFolderId(context, payload) {
       context.commit("setAllAlertsListByFolderId", payload);
+    },
+    setAllReportsListByFolderId(context, payload) {
+      context.commit("setAllReportsListByFolderId", payload);
     },
     setAllAlertsListByNames(context, payload) {
       context.commit("setAllAlertsListByNames", payload);

@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :removed-roles="removedRoles"
       />
       <GroupServiceAccounts
-        v-if="config.isCloud == 'false'"
+        v-if="store.state.zoConfig.service_account_enabled"
         v-show="activeTab === 'serviceAccounts'"
         :groupUsers="groupDetails.users"
         :activeTab="activeTab"
@@ -95,7 +95,6 @@ import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import GroupServiceAccounts from "./GroupServiceAccounts.vue";
-import config from "@/aws-exports";
 
 onBeforeMount(() => {
   getGroupDetails();
@@ -136,7 +135,7 @@ const tabs = [
   },
 ];
 
-if (config.isCloud == "false") {
+if (store.state.zoConfig.service_account_enabled) {
   tabs.push({
     value: "serviceAccounts",
     label: "Service Accounts",

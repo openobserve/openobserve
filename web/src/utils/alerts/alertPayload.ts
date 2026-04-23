@@ -14,6 +14,7 @@ export interface PayloadFormData {
   is_real_time: boolean | string;
   trigger_condition: {
     threshold: number | string;
+    operator: string;
     period: number | string;
     frequency: number | string;
     silence: number | string;
@@ -82,6 +83,17 @@ export const getAlertPayload = (
   });
 
   payload.trigger_condition.threshold = parseInt(formData.trigger_condition.threshold as any);
+
+  // If aggregation is enabled in custom (builder) mode but no group-by fields are set,
+  // the "Having groups" row is hidden — force threshold to >= 1 so no stale value leaks into the payload.
+  if (
+    isAggregationEnabled.value &&
+    getSelectedTab.value === "custom" &&
+    !(formData.query_condition?.aggregation?.group_by || []).filter((g: string) => g?.trim()).length
+  ) {
+    payload.trigger_condition.threshold = 1;
+    payload.trigger_condition.operator = ">=";
+  }
 
   payload.trigger_condition.period = parseInt(formData.trigger_condition.period as any);
 

@@ -152,10 +152,10 @@ describe("QueryEditorDialog - initial state", () => {
     expect((w.vm as any).vrlFunctionContent).toBe(".level = upcase(.level)");
   });
 
-  it("filteredFields initialized from props.columns", async () => {
-    const w = await mountComp();
+  it("functionOptions initialized from props.savedFunctions", async () => {
+    const w = await mountComp({ savedFunctions: [{ name: "fn1" }, { name: "fn2" }] });
     await flushPromises();
-    expect((w.vm as any).filteredFields).toHaveLength(2);
+    expect((w.vm as any).functionOptions).toHaveLength(2);
   });
 
   it("isFullScreen defaults to false", async () => {
@@ -227,49 +227,28 @@ describe("QueryEditorDialog - updateVrlFunction", () => {
   });
 });
 
-describe("QueryEditorDialog - filterFields", () => {
-  it("resets to all columns when val is empty", async () => {
-    const w = await mountComp();
-    (w.vm as any).filteredFields = [];
-    (w.vm as any).filterFields("", (fn: any) => fn());
-    expect((w.vm as any).filteredFields).toHaveLength(2);
+describe("QueryEditorDialog - filterFunctionOptions", () => {
+  it("resets to all functions when val is empty", async () => {
+    const w = await mountComp({ savedFunctions: [{ name: "fn1" }, { name: "fn2" }] });
+    (w.vm as any).functionOptions = [];
+    (w.vm as any).filterFunctionOptions("", (fn: any) => fn());
+    expect((w.vm as any).functionOptions).toHaveLength(2);
   });
 
-  it("filters columns case-insensitively", async () => {
-    const w = await mountComp();
-    (w.vm as any).filterFields("HOS", (fn: any) => fn());
-    expect((w.vm as any).filteredFields).toHaveLength(1);
-    expect((w.vm as any).filteredFields[0].label).toBe("host");
+  it("filters functions case-insensitively", async () => {
+    const w = await mountComp({ savedFunctions: [{ name: "myFunc" }, { name: "otherFn" }] });
+    (w.vm as any).filterFunctionOptions("MY", (fn: any) => fn());
+    expect((w.vm as any).functionOptions).toHaveLength(1);
+    expect((w.vm as any).functionOptions[0].name).toBe("myFunc");
   });
 
   it("returns empty array when no match", async () => {
-    const w = await mountComp();
-    (w.vm as any).filterFields("xyz_not_exist", (fn: any) => fn());
-    expect((w.vm as any).filteredFields).toHaveLength(0);
+    const w = await mountComp({ savedFunctions: [{ name: "fn1" }] });
+    (w.vm as any).filterFunctionOptions("xyz_not_exist", (fn: any) => fn());
+    expect((w.vm as any).functionOptions).toHaveLength(0);
   });
 });
 
-describe("QueryEditorDialog - onColumnSelect", () => {
-  it("appends column value to localSqlQuery in sql mode", async () => {
-    const w = await mountComp({ sqlQuery: "SELECT" });
-    (w.vm as any).localTab = "sql";
-    (w.vm as any).onColumnSelect({ label: "host", value: "host" });
-    expect((w.vm as any).localSqlQuery).toContain("host");
-  });
-
-  it("appends column value to localPromqlQuery in promql mode", async () => {
-    const w = await mountComp({ promqlQuery: "rate(" });
-    (w.vm as any).localTab = "promql";
-    (w.vm as any).onColumnSelect({ label: "host", value: "host" });
-    expect((w.vm as any).localPromqlQuery).toContain("host");
-  });
-
-  it("clears selectedColumn after selection", async () => {
-    const w = await mountComp();
-    (w.vm as any).onColumnSelect({ label: "host", value: "host" });
-    expect((w.vm as any).selectedColumn).toEqual({ label: "", value: "" });
-  });
-});
 
 describe("QueryEditorDialog - onFunctionSelect", () => {
   it("sets vrlFunctionContent from function.function", async () => {
@@ -366,13 +345,13 @@ describe("QueryEditorDialog - prop watchers", () => {
     expect((w.vm as any).vrlFunctionContent).toBe(".level = downcase(.level)");
   });
 
-  it("updates filteredFields when columns prop changes", async () => {
-    const w = await mountComp({ columns: [] });
+  it("updates functionOptions when savedFunctions prop changes", async () => {
+    const w = await mountComp({ savedFunctions: [] });
     await flushPromises();
-    await w.setProps({ columns: [{ label: "region", value: "region" }] });
+    await w.setProps({ savedFunctions: [{ name: "newFn" }] });
     await flushPromises();
-    expect((w.vm as any).filteredFields).toHaveLength(1);
-    expect((w.vm as any).filteredFields[0].label).toBe("region");
+    expect((w.vm as any).functionOptions).toHaveLength(1);
+    expect((w.vm as any).functionOptions[0].name).toBe("newFn");
   });
 });
 

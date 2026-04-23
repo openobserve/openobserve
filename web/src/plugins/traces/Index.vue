@@ -298,7 +298,7 @@ import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, debounce } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
@@ -1018,7 +1018,10 @@ async function getQueryData(
             if ((isPagination && partition === 1) || !appendResult) {
               searchObj.data.queryResults.hits = formattedHits;
             } else {
-              searchObj.data.queryResults.hits.push(...formattedHits);
+              searchObj.data.queryResults.hits = [
+                ...searchObj.data.queryResults.hits,
+                ...formattedHits,
+              ];
             }
             searchObj.data.queryResults.from = queryReq.query.from;
 
@@ -1836,6 +1839,61 @@ watch(moveSplitter, () => {
     searchObj.meta.showFields = searchObj.config.splitterModel > 0;
   }
 });
+
+// Live mode: enable by default when auto_query_enabled flag is on.
+// zoConfig may not be populated yet at mount time; watch for it to arrive.
+watch(
+  () => store.state.zoConfig?.auto_query_enabled,
+  (enabled) => {
+    if (enabled && !searchObj.meta.liveMode) {
+      searchObj.meta.liveMode = true;
+    }
+  },
+  { immediate: true },
+);
+
+// Debounced auto-run on query text changes in live mode.
+const debouncedAutoRunOnQuery = debounce(() => {
+  if (
+    searchObj.meta.liveMode &&
+    store.state.zoConfig?.auto_query_enabled &&
+    !searchObj.loading
+  ) {
+    searchData();
+  }
+}, 500);
+
+// Debounced auto-run on datetime changes in live mode.
+// Traces has no existing auto-run on datetime, so no guard needed.
+const debouncedAutoRunOnDatetime = debounce(() => {
+  if (
+    searchObj.meta.liveMode &&
+    store.state.zoConfig?.auto_query_enabled &&
+    !searchObj.loading
+  ) {
+    searchData();
+  }
+}, 500);
+
+watch(
+  () => searchObj.data.query,
+  () => {
+    debouncedAutoRunOnQuery();
+  },
+);
+
+watch(
+  () => [
+    searchObj.data.datetime.type,
+    searchObj.data.datetime.startTime,
+    searchObj.data.datetime.endTime,
+    searchObj.data.datetime.relativeTimePeriod,
+  ],
+  () => {
+    debouncedAutoRunOnDatetime();
+  },
+  { deep: true },
+);
 
 // watch(
 //   changeStream,
