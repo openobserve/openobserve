@@ -139,7 +139,7 @@ import { getImageURL } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import BillingService from "@/services/billings";
 
-export defineComponent({
+export default defineComponent({
   name: "PageIngestion",
   components: { ConfirmDialog, Usage, AppTabs },
   setup() {
