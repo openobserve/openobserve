@@ -123,6 +123,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("volumeInsights.analyzeTooltipLogs") }}
             </q-tooltip>
           </q-btn>
+          <ORefreshButton
+            :last-run-at="searchObj.meta.lastRunAt"
+            :loading="searchObj.loading || searchObj.loadingHistogram"
+            :disabled="searchObj.loading || searchObj.loadingHistogram"
+            @click="$emit('run-query')"
+            class="tw:ml-2"
+          />
         </div>
 
         <div class="col-4 text-right q-pr-sm q-gutter-xs pagination-block">
@@ -512,10 +519,12 @@ import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrel
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import config from "@/aws-exports";
+import ORefreshButton from "@/lib/core/RefreshButton/RefreshButton.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
+    ORefreshButton,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -545,6 +554,7 @@ export default defineComponent({
     "update:recordsPerPage",
     "update:columnSizes",
     "sendToAiChat",
+    "run-query",
   ],
   props: {
     expandedLogs: {
@@ -1337,6 +1347,15 @@ export default defineComponent({
     const resetPlotChart = computed(() => {
       return searchObj.meta.resetPlotChart;
     });
+
+    watch(
+      () => searchObj.loading,
+      (loading, wasLoading) => {
+        if (wasLoading && !loading && searchObj.meta.searchApplied) {
+          searchObj.meta.lastRunAt = Date.now();
+        }
+      },
+    );
 
     watch(resetPlotChart, (newVal) => {
       if (newVal) {
