@@ -34,6 +34,7 @@ static CACHE: Lazy<RwLock<HashMap<String, Option<OrgStorageProvider>>>> =
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ProviderType {
     AwsCredentials,
+    AwsRoleArn,
     GcpCredentials,
     AzureCredentials,
 }
@@ -85,6 +86,7 @@ impl From<String> for ProviderType {
             "aws_credentials" => Self::AwsCredentials,
             "gcp_credentials" => Self::GcpCredentials,
             "azure_credentials" => Self::AzureCredentials,
+            "AwsRoleArn" => Self::AwsRoleArn,
             _ => Self::AwsCredentials,
         }
     }
@@ -94,6 +96,7 @@ impl std::fmt::Display for ProviderType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AwsCredentials => write!(f, "aws_credentials"),
+            Self::AwsRoleArn => write!(f, "AwsRoleArn"),
             Self::AzureCredentials => write!(f, "azure_credentials"),
             Self::GcpCredentials => write!(f, "gcp_credentials"),
         }

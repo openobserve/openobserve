@@ -1,9 +1,10 @@
 use infra::table::org_storage_providers::{
-    AwsCredentials, AzureCredentials, GcpCredentials, OrgStorageProvider, ProviderType,
+    AwsCredentials, AwsRoleArn, AzureCredentials, GcpCredentials, OrgStorageProvider, ProviderType,
 };
 use object_store::ObjectStore;
 
 use super::db::org_storage_providers;
+use crate::service::org_storage_providers::utils::_merge_aws_role_arn;
 mod aws_role_utils;
 mod utils;
 
@@ -21,6 +22,11 @@ pub(super) async fn get_provider(
         ProviderType::AwsCredentials => {
             let creds: AwsCredentials = serde_json::from_str(data)?;
             let store = get_aws(creds)?;
+            ret = Box::new(store);
+        }
+        ProviderType::AwsRoleArn => {
+            let creds: AwsRoleArn = serde_json::from_str(data)?;
+            let store = aws_role_utils::get_aws_from_role(creds).await?;
             ret = Box::new(store);
         }
         ProviderType::GcpCredentials => {
@@ -87,6 +93,9 @@ pub async fn get_redacted_config(
                 creds.secret_key = redact(&creds.secret_key);
                 config.data = serde_json::to_string(&creds).unwrap();
             }
+            ProviderType::AwsRoleArn => {
+                // nothing to redact here
+            }
             ProviderType::GcpCredentials => {
                 let mut creds: GcpCredentials = serde_json::from_str(&config.data)?;
                 creds.access_key = redact(&creds.access_key);
@@ -128,5 +137,6 @@ pub fn merge_configs(
         ProviderType::AwsCredentials => _merge_aws_credentials(existing, new),
         ProviderType::GcpCredentials => _merge_gcp_credentials(existing, new),
         ProviderType::AzureCredentials => _merge_azure_credentials(existing, new),
+        ProviderType::AwsRoleArn => _merge_aws_role_arn(existing, new),
     }
 }

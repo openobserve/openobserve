@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use config::get_config;
-use infra::table::org_storage_providers::{AwsCredentials, AzureCredentials, GcpCredentials};
+use infra::table::org_storage_providers::{
+    AwsCredentials, AwsRoleArn, AzureCredentials, GcpCredentials,
+};
 use object_store::{ObjectStore, ObjectStoreExt};
 
 const TEST_FILE: &str = "o2_test/check.txt";
@@ -141,5 +143,12 @@ pub fn _merge_azure_credentials(existing: &str, new: &str) -> Result<String, any
     let new: AzureCredentials = serde_json::from_str(new)?;
     existing.access_key = new.access_key;
     existing.secret_key = new.secret_key;
+    Ok(serde_json::to_string(&existing)?)
+}
+
+pub fn _merge_aws_role_arn(existing: &str, new: &str) -> Result<String, anyhow::Error> {
+    let mut existing: AwsRoleArn = serde_json::from_str(existing)?;
+    let new: AwsRoleArn = serde_json::from_str(new)?;
+    existing.role_arn = new.role_arn;
     Ok(serde_json::to_string(&existing)?)
 }
