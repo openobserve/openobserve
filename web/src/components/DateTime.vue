@@ -362,6 +362,7 @@ import { useRouter } from "vue-router";
 import { toZonedTime } from "date-fns-tz";
 
 export default defineComponent({
+  components: { OTabPanels, OTabPanel },
   props: {
     defaultType: {
       type: String,

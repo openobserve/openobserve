@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -92,6 +92,7 @@ import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "CustomPage",
+  components: { OTabs, ORouteTab },
   props: {
     currOrgIdentifier: {
       type: String,

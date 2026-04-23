@@ -211,6 +211,8 @@ export default defineComponent({
       ConfirmDialog,
       AddFolder,
       MoveDashboardToAnotherFolder,
+      OTabs,
+      OTab,
     },
     props: {
       type: {

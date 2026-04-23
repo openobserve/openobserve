@@ -90,6 +90,8 @@ export default defineComponent({
   components: {
     AddTab,
     ConfirmDialog,
+    OTabs,
+    OTab,
   },
   props: {
     dashboardData: {
