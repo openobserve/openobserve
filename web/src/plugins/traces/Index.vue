@@ -397,10 +397,13 @@ const selectedStreamName = computed(
 watch(
   selectedStreamName,
   (streamName) => {
+    // Skip transient empty values that occur during org-switch / stream reload
+    // so the saved selection is not erased before new streams have loaded.
+    if (!streamName) return;
     setPersistedStreamSelection(
       store,
       STREAM_SELECTION_STORAGE_KEYS.traces,
-      streamName || null,
+      streamName,
     );
   },
 );
@@ -538,13 +541,20 @@ function loadStreamLists() {
         }
       });
 
-      if (
-        !foundPriorityMatch &&
-        !queryParams.stream &&
-        persistenceEnabled &&
-        searchObj.data.stream.streamLists.length
-      ) {
-        selectedStreamItemObj = searchObj.data.stream.streamLists[0];
+      if (!foundPriorityMatch && !queryParams.stream) {
+        if (persistenceEnabled && searchObj.data.stream.streamLists.length) {
+          // Persistence on: use first available stream as fallback.
+          selectedStreamItemObj = searchObj.data.stream.streamLists[0];
+        } else if (!persistenceEnabled) {
+          // Original behavior: select the stream with the most recently ingested data.
+          let lastUpdatedStreamTime = 0;
+          searchObj.data.streamResults.list.forEach((item: any) => {
+            if (item.stats.doc_time_max >= lastUpdatedStreamTime) {
+              lastUpdatedStreamTime = item.stats.doc_time_max;
+              selectedStreamItemObj = { label: item.name, value: item.name };
+            }
+          });
+        }
       }
 
       if (selectedStreamItemObj.label != undefined) {

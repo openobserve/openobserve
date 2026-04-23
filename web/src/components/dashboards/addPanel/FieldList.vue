@@ -902,21 +902,16 @@ export default defineComponent({
                 STREAM_SELECTION_STORAGE_KEYS.metrics,
               )
             : null;
-          // Check if selected stream for current query exists in index options
-          // If not, set the first index option as the selected stream
+          // Check if selected stream for current query exists in index options.
+          // If not, fall back to: persisted stream (when enabled) → first stream
+          // (original behavior preserved regardless of the persistence flag).
           if (
             dashboardPanelData.meta.stream.streamResults.find(
-              (it: any) =>
-                it.name == selectedStreamForCurrentQuery,
+              (it: any) => it.name == selectedStreamForCurrentQuery,
             )
           ) {
             dashboardPanelData.data.queries[currentIndex].fields.stream =
               selectedStreamForCurrentQuery;
-          } else if (
-            dashboardPanelDataPageKey === "metrics" &&
-            !persistedSelectionEnabled
-          ) {
-            dashboardPanelData.data.queries[currentIndex].fields.stream = "";
           } else {
             const fallbackStream =
               persistedStream &&
@@ -941,10 +936,13 @@ export default defineComponent({
         if (dashboardPanelDataPageKey !== "metrics") {
           return;
         }
+        // Skip transient empty values that occur during org-switch / stream reload
+        // so the saved selection is not erased before new streams have loaded.
+        if (!streamName) return;
         setPersistedStreamSelection(
           store,
           STREAM_SELECTION_STORAGE_KEYS.metrics,
-          streamName || null,
+          streamName,
         );
       },
     );

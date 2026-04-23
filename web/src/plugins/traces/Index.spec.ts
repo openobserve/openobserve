@@ -576,7 +576,9 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should restore persisted stream selection when available", async () => {
-      localStorage.setItem("o2_last_stream_traces", "test-stream");
+      // Storage keys are org-scoped: base key + "_" + org identifier.
+      // The test store's org identifier is "default" (see helpers/store.ts).
+      localStorage.setItem("o2_last_stream_traces_default", "test-stream");
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -603,8 +605,28 @@ describe("Index.vue (Main Traces Page)", () => {
       );
     });
 
-    it("should not auto select stream when persistence is disabled", async () => {
+    it("should select stream by doc_time_max when persistence is disabled (original behavior)", async () => {
       store.state.zoConfig.persist_last_selected_stream = false;
+
+      // Provide streams with distinct doc_time_max so the winner is unambiguous.
+      const recentStream = {
+        name: "recent-stream",
+        storage_type: "s3",
+        stream_type: "traces",
+        stats: { doc_time_max: 9999999999999, doc_time_min: 1000, doc_num: 100, file_num: 1, storage_size: 1024, compressed_size: 512 },
+        schema: [],
+        settings: { partition_keys: {}, full_text_search_keys: [], max_query_range: 0 },
+      };
+      const olderStream = {
+        name: "older-stream",
+        storage_type: "s3",
+        stream_type: "traces",
+        stats: { doc_time_max: 1000000000000, doc_time_min: 1000, doc_num: 50, file_num: 1, storage_size: 512, compressed_size: 256 },
+        schema: [],
+        settings: { partition_keys: {}, full_text_search_keys: [], max_query_range: 0 },
+      };
+      mockGetStreams.mockResolvedValueOnce({ list: [olderStream, recentStream] });
+
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -623,9 +645,81 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
       await vi.waitFor(
         () => {
-          expect(mockSearchObj.data.stream.selectedStream.value).toBeFalsy();
+          // Stream with the highest doc_time_max must be auto-selected,
+          // preserving the original behavior that existed before this feature.
+          expect(mockSearchObj.data.stream.selectedStream.value).toBe(
+            "recent-stream",
+          );
         },
         { timeout: 2000 },
+      );
+    });
+
+    it("should not restore a stream persisted under a different organization", async () => {
+      // Persist a stream for a different org — must not bleed into org "default".
+      localStorage.setItem("o2_last_stream_traces_other-org", "secret-stream");
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+      await vi.waitFor(
+        () => {
+          // Falls back to first stream, not the cross-org persisted value.
+          expect(mockSearchObj.data.stream.selectedStream.value).toBe(
+            mockStreamList.list[0].name,
+          );
+        },
+        { timeout: 2000 },
+      );
+    });
+
+    it("should persist stream selection under org-scoped key", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      // Wait until loadStreamLists sets a stream.
+      await vi.waitFor(
+        () => {
+          expect(mockSearchObj.data.stream.selectedStream.value).toBeTruthy();
+        },
+        { timeout: 2000 },
+      );
+
+      // Flush any pending microtasks so the watcher has a chance to fire.
+      await flushPromises();
+
+      // The watcher inside Index.vue writes the selected stream under the
+      // org-scoped key: `<base-key>_<org-identifier>`.
+      const expectedKey = `o2_last_stream_traces_${store.state.selectedOrganization.identifier}`;
+      expect(localStorage.getItem(expectedKey)).toBe(
+        mockSearchObj.data.stream.selectedStream.value,
       );
     });
 

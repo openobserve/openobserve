@@ -839,6 +839,15 @@ export const useStreamFields = () => {
           selectedStream = [persistedStream];
         } else if (persistenceEnabled && searchObj.data.stream.streamLists[0]) {
           selectedStream = [searchObj.data.stream.streamLists[0].value];
+        } else if (!persistenceEnabled) {
+          // Original behavior: select the stream with the most recently ingested data.
+          let lastUpdatedStreamTime = 0;
+          for (const item of searchObj.data.streamResults.list) {
+            if (item.stats.doc_time_max >= lastUpdatedStreamTime) {
+              lastUpdatedStreamTime = item.stats.doc_time_max;
+              selectedStream = [item.name];
+            }
+          }
         }
         if (
           (store.state.zoConfig.query_on_stream_selection == false ||

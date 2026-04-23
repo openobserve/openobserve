@@ -634,10 +634,14 @@ export default defineComponent({
     watch(
       () => searchObj.data.stream.selectedStream,
       (selectedStreams: string[]) => {
+        const stream = selectedStreams?.[0];
+        // Skip transient empty values that occur during org-switch / stream reload
+        // so the saved selection is not erased before new streams have loaded.
+        if (!stream) return;
         setPersistedStreamSelection(
           store,
           STREAM_SELECTION_STORAGE_KEYS.logs,
-          selectedStreams?.[0] || null,
+          stream,
         );
       },
       { deep: true },
