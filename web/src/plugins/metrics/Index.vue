@@ -64,28 +64,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
             class="dashboard-icons tw:mx-2"
           >
-            <q-btn
-              v-if="
+            <OButton
+  variant="destructive"
+  size="sm"
+  v-if="
                 config.isEnterprise == 'true' && searchRequestTraceIds.length
               "
-              class="tw:text-xs tw:font-bold no-border"
-              data-test="metrics-cancel"
-              padding="xs lg"
-              color="negative"
-              no-caps
-              :label="t('panel.cancel')"
-              @click="cancelAddPanelQuery"
-            />
-            <q-btn
-              v-else
-              class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
-              data-test="metrics-apply"
-              :loading="disable"
-              :disable="disable"
-              no-caps
-              :label="t('metrics.runQuery')"
-              @click="runQuery"
-            />
+  data-test="metrics-cancel"
+  @click="cancelAddPanelQuery"
+  class="tw:text-xs tw:font-bold">{{ t('panel.cancel') }}</OButton>
+            <OButton
+  v-else
+  data-test="metrics-apply"
+  :loading="disable"
+  @click="runQuery"
+  :disabled="disable"
+  class="q-pa-none tw:h-[30px] element-box-shadow">{{ t('metrics.runQuery') }}</OButton>
           </div>
         </div>
       </div>
@@ -147,6 +141,7 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
@@ -162,7 +157,8 @@ export default defineComponent({
     AddToDashboard,
     AutoRefreshInterval,
     PanelEditor,
-  },
+    OButton,
+},
   setup(props) {
     provide("dashboardPanelDataPageKey", "metrics");
 

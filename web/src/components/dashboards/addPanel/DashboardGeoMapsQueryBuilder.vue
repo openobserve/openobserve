@@ -66,60 +66,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              color="primary"
-              dense
-              size="sm"
-              :label="latitudeLabel"
-              class="q-pl-sm"
-              :data-test="`dashboard-latitude-item-${latitudeLabel}`"
-            >
-              <q-menu
-                class="field-function-menu-popup"
-                :data-test="`dashboard-latitude-item-${latitudeLabel}-menu`"
-              >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.latitude.isDerived
-                        ? 'auto'
-                        : '771px',
-                  }"
-                >
-                  <DynamicFunctionPopUp
-                    v-model="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.latitude
-                    "
-                    :allowAggregation="false"
-                    :customQuery="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery
-                    "
-                    :chartType="dashboardPanelData.data.type"
-                  />
-                </div>
-              </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
-              :data-test="`dashboard-latitude-item-${latitudeLabel}-remove`"
-              @click="removeLatitude()"
-              icon="close"
-            />
+            <OMenu>
+<template #default="{ toggle, close }">
+
+  <OButton
+  size="sm"
+  :data-test="`dashboard-latitude-item-${latitudeLabel}`"
+  class="q-pl-sm"
+  @click="toggle">
+    {{ latitudeLabel }}
+  
+      <template #icon-right><ChevronDown class="tw:w-4 tw:h-4" /></template>
+  </OButton>
+  </template>
+<template #content>
+  <div
+                    style="padding: 3px 16px 16px 16px"
+                    :style="{
+                      width:
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.latitude.isDerived
+                          ? 'auto'
+                          : '771px',
+                    }"
+                  >
+                    <DynamicFunctionPopUp
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.latitude
+                      "
+                      :allowAggregation="false"
+                      :customQuery="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery
+                      "
+                      :chartType="dashboardPanelData.data.type"
+                    />
+                  </div>
+  </template>
+</OMenu>
+            <OButton
+  size="icon"
+  style="height: 100%"
+  :data-test="`dashboard-latitude-item-${latitudeLabel}-remove`"
+  @click="removeLatitude()">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </q-btn-group>
         <div
@@ -185,60 +183,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              color="primary"
-              size="sm"
-              :label="longitudeLabel"
-              :data-test="`dashboard-longitude-item-${longitudeLabel}`"
-              class="q-pl-sm"
-            >
-              <q-menu
-                class="field-function-menu-popup"
-                :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
-              >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.longitude.isDerived
-                        ? 'auto'
-                        : '771px',
-                  }"
-                >
-                  <DynamicFunctionPopUp
-                    v-model="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.longitude
-                    "
-                    :allowAggregation="false"
-                    :customQuery="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery
-                    "
-                    :chartType="dashboardPanelData.data.type"
-                  />
-                </div>
-              </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
-              :data-test="`dashboard-longitude-item-${longitudeLabel}-remove`"
-              @click="removeLongitude()"
-              icon="close"
-            />
+            <OMenu>
+<template #default="{ toggle, close }">
+
+  <OButton
+  size="sm"
+  :data-test="`dashboard-longitude-item-${longitudeLabel}`"
+  class="q-pl-sm"
+  @click="toggle">
+    {{ longitudeLabel }}
+  
+      <template #icon-right><ChevronDown class="tw:w-4 tw:h-4" /></template>
+  </OButton>
+  </template>
+<template #content>
+  <div
+                    style="padding: 3px 16px 16px 16px"
+                    :style="{
+                      width:
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.longitude.isDerived
+                          ? 'auto'
+                          : '771px',
+                    }"
+                  >
+                    <DynamicFunctionPopUp
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.longitude
+                      "
+                      :allowAggregation="false"
+                      :customQuery="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery
+                      "
+                      :chartType="dashboardPanelData.data.type"
+                    />
+                  </div>
+  </template>
+</OMenu>
+            <OButton
+  size="icon"
+  style="height: 100%"
+  :data-test="`dashboard-longitude-item-${longitudeLabel}-remove`"
+  @click="removeLongitude()">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </q-btn-group>
         <div
@@ -304,60 +300,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              color="primary"
-              size="sm"
-              :label="weightLabel"
-              :data-test="`dashboard-weight-item-${weightLabel}`"
-              class="q-pl-sm"
-            >
-              <q-menu
-                class="field-function-menu-popup"
-                :data-test="`dashboard-weight-item-${weightLabel}-menu`"
-              >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.weight.isDerived
-                        ? 'auto'
-                        : '771px',
-                  }"
-                >
-                  <DynamicFunctionPopUp
-                    v-model="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.weight
-                    "
-                    :allowAggregation="true"
-                    :customQuery="
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery
-                    "
-                    :chartType="dashboardPanelData.data.type"
-                  />
-                </div>
-              </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
-              :data-test="`dashboard-weight-item-${weightLabel}-remove`"
-              @click="removeWeight()"
-              icon="close"
-            />
+            <OMenu>
+<template #default="{ toggle, close }">
+
+  <OButton
+  size="sm"
+  :data-test="`dashboard-weight-item-${weightLabel}`"
+  class="q-pl-sm"
+  @click="toggle">
+    {{ weightLabel }}
+  
+      <template #icon-right><ChevronDown class="tw:w-4 tw:h-4" /></template>
+  </OButton>
+  </template>
+<template #content>
+  <div
+                    style="padding: 3px 16px 16px 16px"
+                    :style="{
+                      width:
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.weight.isDerived
+                          ? 'auto'
+                          : '771px',
+                    }"
+                  >
+                    <DynamicFunctionPopUp
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.weight
+                      "
+                      :allowAggregation="true"
+                      :customQuery="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery
+                      "
+                      :chartType="dashboardPanelData.data.type"
+                    />
+                  </div>
+  </template>
+</OMenu>
+            <OButton
+  size="icon"
+  style="height: 100%"
+  :data-test="`dashboard-weight-item-${weightLabel}-remove`"
+  @click="removeWeight()">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </q-btn-group>
         <div
@@ -395,13 +389,19 @@ import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOpti
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { ChevronDown } from "lucide-vue-next";
 export default defineComponent({
   name: "DashboardGeoMapsQueryBuilder",
   components: {
     DashboardFiltersOption,
     DynamicFunctionPopUp,
     DashboardJoinsOption,
-  },
+    OButton,
+    ChevronDown,
+},
   props: ["dashboardData"],
   setup(props) {
     const { t } = useI18n();

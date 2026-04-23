@@ -48,68 +48,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-input>
                 <!-- Full buttons visible at wide widths -->
                 <template v-if="!shouldCollapseToolbar">
-                  <q-btn
-                      data-test="pipeline-list-history-btn"
-                      class="q-ml-sm o2-secondary-button tw:h-[36px]"
-                      :class="
-                          store.state.theme === 'dark'
-                          ? 'o2-secondary-button-dark'
-                          : 'o2-secondary-button-light'
-                      "
-                      no-caps
-                      flat
-                      :label="t(`pipeline.history`)"
-                      @click="goToPipelineHistory"
-                  />
-                  <q-btn
-                      v-if="config.isEnterprise == 'true'"
-                      data-test="pipeline-list-backfill-btn"
-                      class="q-ml-sm o2-secondary-button tw:h-[36px]"
-                      :class="
-                          store.state.theme === 'dark'
-                          ? 'o2-secondary-button-dark'
-                          : 'o2-secondary-button-light'
-                      "
-                      no-caps
-                      flat
-                      :label="t('pipeline.backfill')"
-                      @click="goToBackfillJobs"
-                  />
-                  <q-btn
-                    data-test="pipeline-list-import-pipeline-btn"
-                    class="q-ml-sm o2-secondary-button tw:h-[36px]"
-                    no-caps
-                    flat
-                    :label="t(`pipeline.import`)"
-                    @click="routeToImportPipeline"
-                  />
+                  <OButton
+  variant="secondary"
+  data-test="pipeline-list-history-btn"
+  @click="goToPipelineHistory"
+  class="q-ml-sm">{{ t(`pipeline.history`) }}</OButton>
+                  <OButton
+  variant="secondary"
+  v-if="config.isEnterprise == 'true'"
+  data-test="pipeline-list-backfill-btn"
+  @click="goToBackfillJobs"
+  class="q-ml-sm">{{ t('pipeline.backfill') }}</OButton>
+                  <OButton
+  variant="secondary"
+  data-test="pipeline-list-import-pipeline-btn"
+  @click="routeToImportPipeline"
+  class="q-ml-sm">{{ t(`pipeline.import`) }}</OButton>
                 </template>
 
-                <q-btn
-                  data-test="pipeline-list-add-pipeline-btn"
-                  class="q-ml-sm o2-primary-button tw:h-[36px]"
-                  flat
-                  no-caps
-                  :label="t(`pipeline.addPipeline`)"
-                  @click="routeToAddPipeline"
-                />
+                <OButton
+  data-test="pipeline-list-add-pipeline-btn"
+  @click="routeToAddPipeline"
+  class="q-ml-sm">{{ t(`pipeline.addPipeline`) }}</OButton>
 
                 <!-- Overflow menu at narrow widths — after New Pipeline -->
-                <q-btn
-                  v-if="shouldCollapseToolbar"
-                  class="q-ml-sm tw:h-[36px] el-border el-border-radius"
-                  style="padding: 0 0.5rem"
-                  icon="menu"
-                  flat
-                  no-caps
-                  data-test="pipeline-list-overflow-menu-btn"
-                >
-                  <q-menu>
+                <OMenu v-if="shouldCollapseToolbar">
+<template #default="{ toggle, close }">
+
+                  <OButton
+  variant="outline"
+  style="padding: 0 0.5rem"
+  data-test="pipeline-list-overflow-menu-btn"
+  class="q-ml-sm el-border-radius"
+  @click="toggle">
+  <template #icon-left><Menu class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                  </template>
+<template #content="{ close }">
                     <q-list>
                       <q-item
                         clickable
-                        v-close-popup
-                        @click="goToPipelineHistory"
+                        @click="goToPipelineHistory(); close()"
                         data-test="pipeline-list-menu-history-btn"
                       >
                         <q-item-section>
@@ -119,8 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-item
                         v-if="config.isEnterprise == 'true'"
                         clickable
-                        v-close-popup
-                        @click="goToBackfillJobs"
+                        @click="goToBackfillJobs(); close()"
                         data-test="pipeline-list-menu-backfill-btn"
                       >
                         <q-item-section>
@@ -129,8 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-item>
                       <q-item
                         clickable
-                        v-close-popup
-                        @click="routeToImportPipeline"
+                        @click="routeToImportPipeline(); close()"
                         data-test="pipeline-list-menu-import-btn"
                       >
                         <q-item-section>
@@ -138,8 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </q-item-section>
                       </q-item>
                     </q-list>
-                  </q-menu>
-                </q-btn>
+                  </template>
+                </OMenu>
               </div>
         </div>
       </div>
@@ -178,16 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </q-td>
                 <q-td v-if="activeTab == 'scheduled'" auto-width>
-                  <q-btn
-                    dense
-                    flat
-                    size="xs"
-                    :icon="
-                      expandedRow != props.row.pipeline_id
-                        ? 'expand_more'
-                        : 'expand_less'
-                    "
-                  />
+                  <OButton variant="ghost" size="icon" />
                 </q-td>
                 <q-td v-for="col in filterColumns()" :key="col.name" :props="props">
                   <template v-if="col.name !== 'actions'">
@@ -196,63 +164,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-else>
                     <!-- Actions Buttons -->
                     <div class="tw:flex tw:items-center actions-container">
-                      <q-btn
-                        :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
-                        dense
-                        unelevated
-                        size="sm"
-                        :color="props.row.enabled ? 'negative' : 'positive'"
-                        :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-                        round
-                        flat
-                        :title="
+                      <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
+  :title="
                           props.row.enabled ? t('alerts.pause') : t('alerts.start')
                         "
-                        @click.stop="togglePipeline(props.row)"
-                      >
-                      </q-btn>
-                      <q-btn
-                        :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
-                        padding="sm"
-                        unelevated
-                        size="sm"
-                        round
-                        flat
-                        icon="edit"
-                        :title="t('pipeline.edit')"
-                        @click.stop="editPipeline(props.row)"
-                      >
-                      </q-btn>
-                      <q-btn
-                        :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
-                        padding="sm"
-                        unelevated
-                        size="sm"
-                        round
-                        flat
-                        :icon="outlinedVisibility"
-                        :title="t('pipeline.view')"
-                      >
-                        <q-tooltip position="bottom">
+  @click.stop="togglePipeline(props.row)" />
+                      <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
+  :title="t('pipeline.edit')"
+  @click.stop="editPipeline(props.row)">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                      <OButton
+  variant="ghost"
+  size="sm"
+  :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
+  :title="t('pipeline.view')">
+  <template #icon-left><Eye class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip position="bottom">
                           <PipelineView :pipeline="props.row" />
                         </q-tooltip>
-                      </q-btn>
-                      <q-btn
-                        :icon="outlinedMoreVert"
-                        unelevated
-                        size="sm"
-                        round
-                        flat
-                        @click.stop
-                        :data-test="`pipeline-list-${props.row.name}-more-options`"
-                      >
-                        <q-menu>
+</OButton>
+                      <OMenu @click.stop>
+<template #default="{ toggle, close }">
+
+                        <OButton
+  variant="ghost"
+  size="sm"
+  :data-test="`pipeline-list-${props.row.name}-more-options`"
+  @click.stop="toggle">
+  <template #icon-left><MoreVertical class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                        </template>
+<template #content="{ close }">
                           <q-list style="min-width: 100px">
                             <q-item
                               class="flex items-center"
                               clickable
-                              v-close-popup
-                              @click="exportPipeline(props.row)"
+                              @click="exportPipeline(props.row); close()"
                             >
                               <q-item-section dense avatar>
                                 <q-icon size="16px" name="download" />
@@ -264,8 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               v-if="props.row.source.source_type === 'scheduled' && config.isEnterprise == 'true'"
                               class="flex items-center"
                               clickable
-                              v-close-popup
-                              @click="openBackfillDialog(props.row)"
+                              @click="openBackfillDialog(props.row); close()"
                             >
                               <q-item-section dense avatar>
                                 <q-icon size="16px" name="refresh" />
@@ -276,8 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <q-item
                               class="flex items-center"
                               clickable
-                              v-close-popup
-                              @click="openDeleteDialog(props.row)"
+                              @click="openDeleteDialog(props.row); close()"
                             >
                               <q-item-section dense avatar>
                                 <q-icon size="16px" :name="outlinedDelete" />
@@ -289,8 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               v-if="props.row.last_error"
                               class="flex items-center"
                               clickable
-                              v-close-popup
-                              @click="showErrorDialog(props.row)"
+                              @click="showErrorDialog(props.row); close()"
                             >
                               <q-item-section dense avatar>
                                 <q-icon size="16px" name="error" color="negative" />
@@ -303,8 +254,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </q-item-section>
                             </q-item>
                           </q-list>
-                        </q-menu>
-                      </q-btn>
+                        </template>
+                      </OMenu>
                     </div>
                   </template>
                 </q-td>
@@ -369,54 +320,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
                       {{ resultTotal }} {{ t('pipeline.header') }}
                     </div>
-                <q-btn
-                  v-if="selectedPipelines.length > 0"
-                  data-test="pipeline-list-export-pipelines-btn"
-                  class="flex  q-mr-sm items-center no-border o2-secondary-button tw:h-[36px]"
-                  no-caps
-                  dense
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  @click="exportBulkPipelines"
-                >
-                  <q-icon name="download" size="16px" />
+                <OButton
+  variant="secondary"
+  v-if="selectedPipelines.length > 0"
+  data-test="pipeline-list-export-pipelines-btn"
+  @click="exportBulkPipelines"
+  class="flex q-mr-sm items-center">
+  <q-icon name="download" size="16px" />
                   <span class="tw:ml-2">{{ t('pipeline_list.export') }}</span>
-                </q-btn>
-                <q-btn
-                  v-if="selectedPipelines.length > 0"
-                  data-test="pipeline-list-pause-pipelines-btn"
-                  class="flex q-mr-sm items-center no-border o2-secondary-button tw:h-[36px]"
-                  no-caps
-                  dense
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  @click="bulkTogglePipelines('pause')"
-                >
-                  <q-icon name="pause" size="16px" />
+</OButton>
+                <OButton
+  variant="secondary"
+  v-if="selectedPipelines.length > 0"
+  data-test="pipeline-list-pause-pipelines-btn"
+  @click="bulkTogglePipelines('pause')"
+  class="flex q-mr-sm items-center">
+  <q-icon name="pause" size="16px" />
                   <span class="tw:ml-2">{{ t('pipeline_list.pause') }}</span>
-                </q-btn>
-                <q-btn
-                  v-if="selectedPipelines.length > 0"
-                  data-test="pipeline-list-resume-pipelines-btn"
-                  class="flex q-mr-sm items-center no-border o2-secondary-button tw:h-[36px] tw:w-[180px]"
-                  no-caps
-                  dense
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  @click="bulkTogglePipelines('resume')"
-                >
-                  <q-icon name="play_arrow" size="16px" />
+</OButton>
+                <OButton
+  variant="secondary"
+  v-if="selectedPipelines.length > 0"
+  data-test="pipeline-list-resume-pipelines-btn"
+  @click="bulkTogglePipelines('resume')"
+  class="flex q-mr-sm items-center tw:w-[180px]">
+  <q-icon name="play_arrow" size="16px" />
                   <span class="tw:ml-2">{{ t('pipeline_list.resume') }}</span>
-                </q-btn>
-                <q-btn
-                  v-if="selectedPipelines.length > 0"
-                  data-test="pipeline-list-delete-pipelines-btn"
-                  class="flex q-mr-sm items-center no-border o2-secondary-button tw:h-[36px]"
-                  no-caps
-                  dense
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  @click="openBulkDeleteDialog"
-                >
-                  <q-icon name="delete" size="16px" />
+</OButton>
+                <OButton
+  variant="secondary"
+  v-if="selectedPipelines.length > 0"
+  data-test="pipeline-list-delete-pipelines-btn"
+  @click="openBulkDeleteDialog"
+  class="flex q-mr-sm items-center">
+  <q-icon name="delete" size="16px" />
                   <span class="tw:ml-2">Delete</span>
-                </q-btn>
+</OButton>
                 <QTablePagination
                   :scope="scope"
                   :position="'bottom'"
@@ -508,14 +447,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ errorDialog.data && new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString() }}
           </div>
         </div>
-        <q-btn
-          icon="close"
-          flat
-          round
-          dense
-          @click="closeErrorDialog"
-          class="close-btn"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  @click="closeErrorDialog"
+  class="close-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </q-card-section>
 
       <q-separator />
@@ -553,14 +491,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions class="pipeline-error-actions">
-        <q-btn
-          flat
-          no-caps
-          :label="t('pipeline_list.close')"
-          class="o2-secondary-button tw:h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          @click="closeErrorDialog"
-        />
+        <OButton variant="secondary" @click="closeErrorDialog">{{ t('pipeline_list.close') }}</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -604,6 +535,10 @@ import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDia
 
 import { filter, update } from "lodash-es";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { Eye, Menu, MoreVertical, Pencil } from "lucide-vue-next";
 interface Column {
   name: string;
   field: string;

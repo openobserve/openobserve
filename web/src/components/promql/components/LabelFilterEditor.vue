@@ -11,149 +11,147 @@
           class="label-filter-item"
         >
           <q-btn-group>
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              :no-wrap="true"
-              color="primary"
-              size="sm"
-              :label="computedLabel(label)"
-              class="q-pl-sm"
-              :data-test="`promql-label-filter-${index}`"
-            >
-              <q-menu class="q-pa-md">
-                <div style="width: 350px">
-                  <!-- Label Selection -->
-                  <q-select
-                    v-model="label.label"
-                    :options="filteredLabelOptions"
-                    label="Label"
-                    dense
-                    borderless
-                    stack-label
-                    hide-bottom-space
-                    class="label-filter-label-select showLabelOnTop tw:normal-case! q-mb-sm"
-                    input-class="tw:normal-case!"
-                    use-input
-                    fill-input
-                    hide-selected
-                    input-debounce="300"
-                    :loading="loadingLabels"
-                    clearable
-                    @filter="(val, update) => filterLabels(val, update, index)"
-                    data-test="promql-label-select"
-                  >
-                    <template v-slot:no-option>
-                      <q-item>
-                        <q-item-section class="text-grey">
-                          {{
-                            loadingLabels
-                              ? "Loading labels..."
-                              : "No labels found"
-                          }}
-                        </q-item-section>
-                      </q-item>
-                    </template>
-                  </q-select>
+            <OMenu contentStyle="padding: 1rem">
+<template #default="{ toggle, close }">
 
-                  <!-- Operator Selection -->
-                  <q-select
-                    v-model="label.op"
-                    :options="operatorOptions"
-                    label="Operator"
-                    dense
-                    borderless
-                    stack-label
-                    hide-bottom-space
-                    class="label-filter-operator-select showLabelOnTop q-mb-sm"
-                    input-class="tw:normal-case!"
-                    data-test="promql-operator-select"
-                  />
+  <OButton
+  size="sm"
+  :no-wrap="true"
+  :data-test="`promql-label-filter-${index}`"
+  class="q-pl-sm"
+  @click="toggle">
+    {{ computedLabel(label) }}
+  
+      <template #icon-right><ChevronDown class="tw:w-4 tw:h-4" /></template>
+  </OButton>
+  </template>
+<template #content>
+  <div style="width: 350px">
+                    <!-- Label Selection -->
+                    <q-select
+                      v-model="label.label"
+                      :options="filteredLabelOptions"
+                      label="Label"
+                      dense
+                      borderless
+                      stack-label
+                      hide-bottom-space
+                      class="label-filter-label-select showLabelOnTop tw:normal-case! q-mb-sm"
+                      input-class="tw:normal-case!"
+                      use-input
+                      fill-input
+                      hide-selected
+                      input-debounce="300"
+                      :loading="loadingLabels"
+                      clearable
+                      @filter="(val, update) => filterLabels(val, update, index)"
+                      data-test="promql-label-select"
+                    >
+                      <template v-slot:no-option>
+                        <q-item>
+                          <q-item-section class="text-grey">
+                            {{
+                              loadingLabels
+                                ? "Loading labels..."
+                                : "No labels found"
+                            }}
+                          </q-item-section>
+                        </q-item>
+                      </template>
+                    </q-select>
 
-                  <!-- Value Selection -->
-                  <q-select
-                    v-model="label.value"
-                    :options="getLabelValueOptions(label.label)"
-                    label="Value"
-                    dense
-                    borderless
-                    stack-label
-                    hide-bottom-space
-                    class="label-filter-value-select showLabelOnTop"
-                    input-class="tw:normal-case!"
-                    use-input
-                    fill-input
-                    hide-selected
-                    input-debounce="300"
-                    emit-value
-                    map-options
-                    option-value="value"
-                    option-label="label"
-                    @filter="
-                      (val, update) =>
-                        filterLabelValues(val, update, label.label)
-                    "
-                    :disable="!label.label"
-                    clearable
-                    data-test="promql-value-select"
-                  >
-                    <template v-slot:no-option>
-                      <q-item>
-                        <q-item-section class="text-grey">
-                          {{
-                            !label.label
-                              ? "Select a label first"
-                              : "No values found"
-                          }}
-                        </q-item-section>
-                      </q-item>
-                    </template>
-                    <template v-slot:option="scope">
-                      <q-item v-bind="scope.itemProps">
-                        <q-item-section>
-                          <q-item-label>{{ scope.opt.label }}</q-item-label>
-                          <q-item-label
-                            v-if="scope.opt.isVariable"
-                            caption
-                            class="text-grey-7"
-                          >
-                            Variable
-                          </q-item-label>
-                        </q-item-section>
-                      </q-item>
-                    </template>
-                    <template v-slot:hint>
-                      {{ getOperatorHint(label.op) }}
-                    </template>
-                  </q-select>
-                </div>
-              </q-menu>
-            </q-btn>
-            <q-btn
-              size="xs"
-              dense
-              @click="removeLabel(index)"
-              icon="close"
-              :data-test="`promql-label-filter-remove-${index}`"
-            />
+                    <!-- Operator Selection -->
+                    <q-select
+                      v-model="label.op"
+                      :options="operatorOptions"
+                      label="Operator"
+                      dense
+                      borderless
+                      stack-label
+                      hide-bottom-space
+                      class="label-filter-operator-select showLabelOnTop q-mb-sm"
+                      input-class="tw:normal-case!"
+                      data-test="promql-operator-select"
+                    />
+
+                    <!-- Value Selection -->
+                    <q-select
+                      v-model="label.value"
+                      :options="getLabelValueOptions(label.label)"
+                      label="Value"
+                      dense
+                      borderless
+                      stack-label
+                      hide-bottom-space
+                      class="label-filter-value-select showLabelOnTop"
+                      input-class="tw:normal-case!"
+                      use-input
+                      fill-input
+                      hide-selected
+                      input-debounce="300"
+                      emit-value
+                      map-options
+                      option-value="value"
+                      option-label="label"
+                      @filter="
+                        (val, update) =>
+                          filterLabelValues(val, update, label.label)
+                      "
+                      :disable="!label.label"
+                      clearable
+                      data-test="promql-value-select"
+                    >
+                      <template v-slot:no-option>
+                        <q-item>
+                          <q-item-section class="text-grey">
+                            {{
+                              !label.label
+                                ? "Select a label first"
+                                : "No values found"
+                            }}
+                          </q-item-section>
+                        </q-item>
+                      </template>
+                      <template v-slot:option="scope">
+                        <q-item v-bind="scope.itemProps">
+                          <q-item-section>
+                            <q-item-label>{{ scope.opt.label }}</q-item-label>
+                            <q-item-label
+                              v-if="scope.opt.isVariable"
+                              caption
+                              class="text-grey-7"
+                            >
+                              Variable
+                            </q-item-label>
+                          </q-item-section>
+                        </q-item>
+                      </template>
+                      <template v-slot:hint>
+                        {{ getOperatorHint(label.op) }}
+                      </template>
+                    </q-select>
+                  </div>
+  </template>
+</OMenu>
+            <OButton
+  size="icon"
+  @click="removeLabel(index)"
+  :data-test="`promql-label-filter-remove-${index}`">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </q-btn-group>
         </div>
 
         <!-- Add Button -->
-        <q-btn
-          flat
-          dense
-          icon="add"
-          size="sm"
-          color="primary"
-          @click="addLabel"
-          class="add-filter-btn"
-          data-test="promql-add-label-filter"
-        >
-          <q-tooltip>Add label filter</q-tooltip>
-        </q-btn>
+        <OButton
+  variant="ghost"
+  size="sm"
+  @click="addLabel"
+  data-test="promql-add-label-filter"
+  class="add-filter-btn">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Add label filter</q-tooltip>
+</OButton>
       </div>
     </div>
   </div>
@@ -165,6 +163,10 @@ import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { ChevronDown, Plus } from "lucide-vue-next";
 const props = defineProps<{
   labels: QueryBuilderLabelFilter[];
   metric?: string;

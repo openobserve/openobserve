@@ -19,20 +19,17 @@
             {{ computedLabel }}
           </span>
           <!-- Toggle AND/OR button -->
-          <q-btn
-            data-test="alert-conditions-toggle-operator-btn"
-            flat
-            dense
-            round
-            size="sm"
-            icon="restart_alt"
-            class="tw:h-[26px] tw:flex-shrink-0 operator-toggle-btn"
-            @click="toggleOperator"
-          >
-            <q-tooltip>
+          <OButton
+  variant="ghost"
+  size="sm"
+  data-test="alert-conditions-toggle-operator-btn"
+  @click="toggleOperator"
+  class="tw:h-[26px] tw:flex-shrink-0 operator-toggle-btn">
+  <template #icon-left><RefreshCcw class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>
               Toggle between and/or
             </q-tooltip>
-          </q-btn>
+</OButton>
         </template>
       </div>
         <div
@@ -119,6 +116,12 @@
   </template>
   
   <script setup lang="ts">
+import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/Button.vue";
+import { RefreshCcw } from "lucide-vue-next";
   const props = defineProps({
         condition: {
         type: Object,
@@ -168,12 +171,9 @@
     },
     });
 
-import { ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
-import { useStore } from "vuex";
 
-  var triggerOperators: any = ref([
+
+var triggerOperators: any = ref([
   "=",
   "!=",
   ">=",

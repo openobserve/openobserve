@@ -102,17 +102,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             content-class="tab_content"
           />
         </q-tabs>
-        <!-- <q-btn
-              data-test="logs-search-field-list-collapse-btn"
-              :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
-              :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
-              :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-              color="primary"
-              size="sm"
-              dense
-              round
-              @click="collapseSidebar"
-            /> -->
+        <!-- <OButton
+  size="icon"
+  data-test="logs-search-field-list-collapse-btn"
+  :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+  @click="collapseSidebar"
+  :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'" /> -->
           </div>
         </div>
 
@@ -143,9 +138,12 @@ import { getImageURL } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import BillingService from "@/services/billings";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog, Usage, AppTabs },
+  components: { ConfirmDialog, Usage, AppTabs,
+    OButton,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();

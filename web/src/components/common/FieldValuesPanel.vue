@@ -49,61 +49,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ selectedValues.length }} selected
         </span>
         <span v-else class="selection-hint">Select to filter</span>
-        <q-btn
-          v-if="selectedValues.length > 0"
-          flat
-          round
-          dense
-          size="0.2rem"
-          padding="0.1rem"
-          title="Clear selection"
-          class="selection-clear-btn"
-          @click="clearSelection"
-          data-test="field-values-panel-clear-selection-btn"
-        >
-          <q-icon name="close" size="0.6rem" />
-        </q-btn>
+        <OButton
+  variant="ghost"
+  size="sm"
+  v-if="selectedValues.length > 0"
+  title="Clear selection"
+  @click="clearSelection"
+  data-test="field-values-panel-clear-selection-btn"
+  class="selection-clear-btn"><q-icon name="close" size="0.6rem" /></OButton>
       </div>
       <div
         class="filter-mode-toggle"
         data-test="field-values-panel-filter-mode-toggle"
       >
-        <q-btn
-          flat
-          dense
-          no-caps
-          size="xs"
-          padding="0.1rem 0.35rem"
-          :class="[
+        <OButton
+  variant="ghost"
+  size="sm"
+  title="Include mode (=)"
+  @click="filterMode = 'include'"
+  data-test="field-values-panel-include-mode-btn"
+  :class="[
             'filter-mode-btn',
             filterMode === 'include' ? 'filter-mode-btn--active-include' : '',
-          ]"
-          title="Include mode (=)"
-          @click="filterMode = 'include'"
-          data-test="field-values-panel-include-mode-btn"
-        >
-          <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
+          ]">
+  <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
             <EqualIcon />
           </q-icon>
-        </q-btn>
-        <q-btn
-          flat
-          dense
-          no-caps
-          size="xs"
-          padding="0.1rem 0.35rem"
-          :class="[
+</OButton>
+        <OButton
+  variant="ghost"
+  size="sm"
+  title="Exclude mode (≠)"
+  @click="filterMode = 'exclude'"
+  data-test="field-values-panel-exclude-mode-btn"
+  :class="[
             'filter-mode-btn',
             filterMode === 'exclude' ? 'filter-mode-btn--active-exclude' : '',
-          ]"
-          title="Exclude mode (≠)"
-          @click="filterMode = 'exclude'"
-          data-test="field-values-panel-exclude-mode-btn"
-        >
-          <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
+          ]">
+  <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
             <NotEqualIcon />
           </q-icon>
-        </q-btn>
+</OButton>
       </div>
     </div>
 
@@ -187,20 +173,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="isLoadingMore || (fieldValues?.hasMore && !fieldValues?.isLoading)"
       class="view-more-container q-px-sm q-pt-xs"
     >
-      <q-btn
-        flat
-        no-caps
-        dense
-        size="0.2rem"
-        padding="0.1rem 0.3rem"
-        class="view-more-btn full-width"
-        :disable="isLoadingMore"
-        @click="handleLoadMoreClick"
-        :data-test="`log-search-subfield-load-more-${fieldName}`"
-      >
-        <q-spinner-dots v-if="isLoadingMore" color="primary" size="1em" />
+      <OButton
+  variant="ghost"
+  size="sm"
+  @click="handleLoadMoreClick"
+  :data-test="`log-search-subfield-load-more-${fieldName}`"
+  :disabled="isLoadingMore"
+  class="view-more-btn full-width">
+  <q-spinner-dots v-if="isLoadingMore" color="primary" size="1em" />
         <span v-else>View more values</span>
-      </q-btn>
+</OButton>
     </div>
   </div>
 </template>
@@ -212,6 +194,7 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { formatLargeNumber } from "@/utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
 interface FieldValues {
   isLoading: boolean;
   values: { key: string; count: number; label?: string }[];

@@ -127,25 +127,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="flex justify-end q-px-lg q-py-lg full-width tw:bg-[var(--q-card-background)]"
           >
-            <q-btn
-              v-close-popup
-              class="q-mr-md o2-secondary-button tw:h-[36px]"
-              :label="t('alerts.cancel')"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              @click="$emit('cancel:hideform')"
-              data-test="add-template-cancel-btn"
-            />
-            <q-btn
-              class="o2-primary-button no-border tw:h-[36px]"
-              :label="t('alerts.save')"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-              @click="saveTemplate"
-              data-test="add-template-submit-btn"
-            />
+            <OButton
+  variant="secondary"
+  v-close-popup
+  @click="$emit('cancel:hideform')"
+  data-test="add-template-cancel-btn"
+  class="q-mr-md">{{ t('alerts.cancel') }}</OButton>
+            <OButton @click="saveTemplate" data-test="add-template-submit-btn">{{ t('alerts.save') }}</OButton>
           </div>
         </div>
       </template>
@@ -231,6 +219,7 @@ import {
   getTemplateValidationErrorMessage,
 } from "@/utils/templates/validation";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
 

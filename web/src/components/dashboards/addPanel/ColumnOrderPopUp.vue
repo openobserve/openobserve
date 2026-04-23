@@ -28,16 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center q-table__title q-mr-md">
         <span>{{ t("dashboard.columnOrder") }}</span>
       </div>
-      <q-btn
-        icon="close"
-        class="q-ml-xs"
-        unelevated
-        size="sm"
-        round
-        outline
-        @click.stop="cancelEdit"
-        data-test="dashboard-column-order-cancel"
-      />
+      <OButton
+  variant="outline"
+  size="icon"
+  @click.stop="cancelEdit"
+  data-test="dashboard-column-order-cancel"
+  class="q-ml-xs">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
     </div>
 
     <!-- Content -->
@@ -90,30 +88,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Actions -->
             <div class="column-actions">
-              <q-btn
-                flat
-                dense
-                round
-                size="sm"
-                icon="arrow_upward"
-                :disable="index === 0"
-                @click="moveColumnUp(index)"
-                :data-test="`column-order-move-up-${index}`"
-              >
-                <q-tooltip>{{ t("dashboard.moveUp") }}</q-tooltip>
-              </q-btn>
-              <q-btn
-                flat
-                dense
-                round
-                size="sm"
-                icon="arrow_downward"
-                :disable="index === editColumnOrder.length - 1"
-                @click="moveColumnDown(index)"
-                :data-test="`column-order-move-down-${index}`"
-              >
-                <q-tooltip>{{ t("dashboard.moveDown") }}</q-tooltip>
-              </q-btn>
+              <OButton
+  variant="ghost"
+  size="sm"
+  @click="moveColumnUp(index)"
+  :data-test="`column-order-move-up-${index}`"
+  :disabled="index === 0">
+  <template #icon-left><ArrowUp class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("dashboard.moveUp") }}</q-tooltip>
+</OButton>
+              <OButton
+  variant="ghost"
+  size="sm"
+  @click="moveColumnDown(index)"
+  :data-test="`column-order-move-down-${index}`"
+  :disabled="index === editColumnOrder.length - 1">
+  <template #icon-left><ArrowDown class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("dashboard.moveDown") }}</q-tooltip>
+</OButton>
             </div>
           </div>
       </draggable>
@@ -121,20 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Footer -->
     <div class="sticky-footer q-pa-md">
-      <q-btn
-        :label="t('common.cancel')"
-        outline
-        no-caps
-        @click.stop="cancelEdit"
-        data-test="dashboard-column-order-cancel-btn"
-      />
-      <q-btn
-        :label="t('common.save')"
-        color="primary"
-        no-caps
-        @click.stop="saveEdit"
-        data-test="dashboard-column-order-save-btn"
-      />
+      <OButton
+  variant="outline"
+  @click.stop="cancelEdit"
+  data-test="dashboard-column-order-cancel-btn">{{ t('common.cancel') }}</OButton>
+      <OButton @click.stop="saveEdit" data-test="dashboard-column-order-save-btn">{{ t('common.save') }}</OButton>
     </div>
   </q-card>
 </template>
@@ -144,11 +127,17 @@ import { defineComponent, ref, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext } from "vue-draggable-next";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ArrowDown, ArrowUp } from "lucide-vue-next";
 export default defineComponent({
   name: "ColumnOrderPopUp",
   components: {
     draggable: VueDraggableNext as any,
-  },
+    OButton,
+    ArrowUp,
+    ArrowDown,
+},
   props: {
     columnOrder: {
       type: Array as () => string[],

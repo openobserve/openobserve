@@ -53,11 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
 import { defineAsyncComponent } from "vue";
+import { useStore } from "vuex";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
-import { useStore } from "vuex";
-import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
 export default defineComponent({
   components: {

@@ -341,16 +341,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:bg-amber-300'
                 "
               >
-                <q-btn
-                  :icon="isFunctionErrorOpen ? 'expand_more' : 'chevron_right'"
-                  dense
-                  size="xs"
-                  flat
-                  class="q-mr-xs"
-                  data-test="table-row-expand-menu"
-                  @click.capture.stop="expandFunctionError"
-                ></q-btn
-                ><b>
+                <OButton
+  variant="ghost"
+  size="icon"
+  data-test="table-row-expand-menu"
+  @click.capture.stop="expandFunctionError"
+  class="q-mr-xs" /><b>
                   <q-icon name="warning" size="15px"></q-icon>
                   {{ t("search.functionErrorLabel") }}</b
                 >
@@ -474,31 +470,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ]"
                   >
                     <!-- Copy button LEFT (right-aligned) -->
-                    <q-btn
-                      v-if="
+                    <OButton
+  variant="ghost"
+  size="icon"
+  v-if="
                         enableCellCopy &&
                         (cell.column.columnDef.meta as any)?.align ===
                           'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
-                      :icon="
-                        isCellCopied(idx as number, cell.column.id)
-                          ? 'check'
-                          : 'content_copy'
-                      "
-                      dense
-                      size="xs"
-                      no-caps
-                      flat
-                      class="copy-btn q-mr-xs"
-                      @click.stop="
+  @click.stop="
                         copyCellContent(
                           getCellDisplayValue(cell),
                           idx as number,
                           cell.column.id,
                         )
                       "
-                    />
+  class="copy-btn q-mr-xs" />
                     <!-- JSON field inline renderer -->
                     <JsonFieldRenderer
                       v-if="
@@ -519,31 +507,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ getCellDisplayValue(cell) }}
                     </span>
                     <!-- Copy button RIGHT (left/center-aligned) -->
-                    <q-btn
-                      v-if="
+                    <OButton
+  variant="ghost"
+  size="icon"
+  v-if="
                         enableCellCopy &&
                         (cell.column.columnDef.meta as any)?.align !==
                           'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
-                      :icon="
-                        isCellCopied(idx as number, cell.column.id)
-                          ? 'check'
-                          : 'content_copy'
-                      "
-                      dense
-                      size="xs"
-                      no-caps
-                      flat
-                      class="copy-btn q-ml-xs"
-                      @click.stop="
+  @click.stop="
                         copyCellContent(
                           getCellDisplayValue(cell),
                           idx as number,
                           cell.column.id,
                         )
                       "
-                    />
+  class="copy-btn q-ml-xs" />
                   </div>
                 </template>
               </td>
@@ -725,20 +705,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : '',
                     ]"
                   >
-                    <q-btn
-                      v-if="enableRowExpand && cellIndex == 0"
-                      :icon="
-                        expandedRowIndices.has(virtualRow.index)
-                          ? 'expand_more'
-                          : 'chevron_right'
-                      "
-                      dense
-                      size="xs"
-                      flat
-                      class="q-mr-xs"
-                      data-test="table-row-expand-menu"
-                      @click.capture.stop="handleExpandRow(virtualRow.index)"
-                    ></q-btn>
+                    <OButton
+  variant="ghost"
+  size="icon"
+  v-if="enableRowExpand && cellIndex == 0"
+  data-test="table-row-expand-menu"
+  @click.capture.stop="handleExpandRow(virtualRow.index)"
+  class="q-mr-xs" />
                     <slot
                       name="cell-actions"
                       :row="cell.row.original"
@@ -766,31 +739,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <!-- Dashboard: copy button LEFT (right-aligned columns) -->
-                        <q-btn
-                          v-if="
+                        <OButton
+  variant="ghost"
+  size="icon"
+  v-if="
                             enableCellCopy &&
                             (cell.column.columnDef.meta as any)?.align ===
                               'right' &&
                             shouldShowCopyButton(cell.getValue())
                           "
-                          :icon="
-                            isCellCopied(virtualRow.index, cell.column.id)
-                              ? 'check'
-                              : 'content_copy'
-                          "
-                          dense
-                          size="xs"
-                          no-caps
-                          flat
-                          class="copy-btn q-mr-xs"
-                          @click.stop="
+  @click.stop="
                             copyCellContent(
                               getCellDisplayValue(cell),
                               virtualRow.index,
                               cell.column.id,
                             )
                           "
-                        />
+  class="copy-btn q-mr-xs" />
                         <!-- Dashboard: JSON field inline renderer -->
                         <JsonFieldRenderer
                           v-if="
@@ -850,31 +815,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                         />
                         <!-- Dashboard: copy button RIGHT (left/center-aligned) -->
-                        <q-btn
-                          v-if="
+                        <OButton
+  variant="ghost"
+  size="icon"
+  v-if="
                             enableCellCopy &&
                             (cell.column.columnDef.meta as any)?.align !==
                               'right' &&
                             shouldShowCopyButton(cell.getValue())
                           "
-                          :icon="
-                            isCellCopied(virtualRow.index, cell.column.id)
-                              ? 'check'
-                              : 'content_copy'
-                          "
-                          dense
-                          size="xs"
-                          no-caps
-                          flat
-                          class="copy-btn q-ml-xs"
-                          @click.stop="
+  @click.stop="
                             copyCellContent(
                               getCellDisplayValue(cell),
                               virtualRow.index,
                               cell.column.id,
                             )
                           "
-                        />
+  class="copy-btn q-ml-xs" />
                       </template>
                     </template>
                   </div>
@@ -1008,6 +965,7 @@ import {
 } from "@/utils/dashboard/constants";
 import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export interface StreamField {
   name: string;
   isSchemaField: boolean;

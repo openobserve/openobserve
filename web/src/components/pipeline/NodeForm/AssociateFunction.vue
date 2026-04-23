@@ -23,8 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between">
       {{ t("pipeline.associateFunction") }}
       <div>
-          <q-btn v-close-popup="true" round flat icon="cancel" >
-          </q-btn>
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
     </div>
     <q-separator />
@@ -163,40 +167,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-start full-width"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
-        <q-btn
-            v-if="pipelineObj.isEditNode && !createNewFunction"
-            data-test="associate-function-delete-btn"
-            class="o2-secondary-button tw:h-[36px] q-mr-md"
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            no-caps
-            @click="openDeleteDialog"
-          >
-          <q-icon name="delete" class="q-mr-xs" />
+        <OButton
+  variant="secondary"
+  v-if="pipelineObj.isEditNode && !createNewFunction"
+  data-test="associate-function-delete-btn"
+  @click="openDeleteDialog"
+  class="q-mr-md">
+  <q-icon name="delete" class="q-mr-xs" />
           {{ t('pipeline.deleteNode') }}
-        </q-btn>
-          <q-btn
-            v-if="!createNewFunction"
-            data-test="associate-function-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            no-caps
-            @click="openCancelDialog"
-          />
-          <q-btn
-            v-if="!createNewFunction"
-            data-test="associate-function-save-btn"
-            :label="
+</OButton>
+          <OButton
+  variant="secondary"
+  v-if="!createNewFunction"
+  data-test="associate-function-cancel-btn"
+  @click="openCancelDialog">{{ t('alerts.cancel') }}</OButton>
+          <OButton
+  v-if="!createNewFunction"
+  data-test="associate-function-save-btn"
+  type="submit"
+  class="q-ml-md">
+  {{ 
               createNewFunction ? t('alerts.createFunction') : t('alerts.save')
-            "
-            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            no-caps
-            type="submit"
-          />
+             }}
+</OButton>
         </div>
       </q-form>
     </div>
@@ -226,6 +219,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
 interface RouteCondition {
   column: string;
   operator: string;

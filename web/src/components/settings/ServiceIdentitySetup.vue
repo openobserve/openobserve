@@ -172,7 +172,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("settings.correlation.fieldMappingDialogHelp") }}
               </div>
             </div>
-            <q-btn flat round dense icon="close" v-close-popup />
+            <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup>
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </q-card-section>
 
           <q-separator />
@@ -189,17 +194,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-separator />
 
           <q-card-actions align="right" class="tw:px-4 tw:py-3">
-            <q-btn
-              flat no-caps
-              :label="t('common.cancel')"
-              v-close-popup
-            />
-            <q-btn
-              unelevated no-caps color="primary"
-              :label="t('common.save')"
-              :loading="savingFieldMappings"
-              @click="saveFieldMappings"
-            />
+            <OButton variant="ghost" v-close-popup>{{ t('common.cancel') }}</OButton>
+            <OButton
+  variant="ghost"
+  :loading="savingFieldMappings"
+  @click="saveFieldMappings">{{ t('common.save') }}</OButton>
           </q-card-actions>
         </q-card>
       </q-dialog>
@@ -226,14 +225,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="tw:text-sm tw:font-medium" :class="store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-7'">
             No fields configured yet
           </span>
-          <q-btn
-            no-caps dense size="sm" icon="add"
-            :label="t('settings.correlation.addField')"
-            class="o2-secondary-button tw:h-[28px] tw:mt-1"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            data-test="service-identity-add-distinguish-btn"
-            @click="addingToEnv = activeEnvironment"
-          />
+          <OButton
+  variant="secondary"
+  size="sm"
+  data-test="service-identity-add-distinguish-btn"
+  @click="addingToEnv = activeEnvironment"
+  class="tw:h-[28px] tw:mt-1">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  {{ t('settings.correlation.addField') }}
+</OButton>
         </div>
 
         <!-- All configured env groups -->
@@ -274,11 +274,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-tooltip v-if="getFieldCardinalityTooltip(fieldId)" anchor="top middle" self="bottom middle" class="tw:text-xs">
                   {{ getFieldCardinalityTooltip(fieldId) }}
                 </q-tooltip>
-                <q-btn
-                  flat round dense size="xs" icon="cancel"
-                  :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-6'"
-                  @click="removeFieldByIdFromEnv(envKey, fieldId)"
-                />
+                <OButton
+  variant="ghost"
+  size="icon"
+  @click="removeFieldByIdFromEnv(envKey, fieldId)">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </div>
 
               <!-- Inline add select for this group -->
@@ -319,22 +320,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-item>
                   </template>
                 </q-select>
-                <q-btn flat round dense icon="close" size="sm" color="grey-6" @click="addingToEnv = ''; addFieldValue = ''" />
+                <OButton
+  variant="ghost"
+  size="icon"
+  @click="addingToEnv = ''; addFieldValue = ''">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </template>
 
               <!-- + Add field button -->
-              <q-btn
-                v-else-if="(setDistinguishBy[envKey] ?? []).filter(Boolean).length < 5"
-                flat no-caps dense size="sm"
-                :label="t('settings.correlation.addField')"
-                class="o2-secondary-button tw:h-[28px]"
-                :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                @click="addingToEnv = envKey"
-              >
-                <q-tooltip anchor="top middle" self="bottom middle" class="tw:text-xs tw:max-w-[240px]">
+              <OButton
+  variant="secondary"
+  size="sm"
+  v-else-if="(setDistinguishBy[envKey] ?? []).filter(Boolean).length < 5"
+  @click="addingToEnv = envKey"
+  class="tw:h-[28px]">
+  {{ t('settings.correlation.addField') }}
+  <q-tooltip anchor="top middle" self="bottom middle" class="tw:text-xs tw:max-w-[240px]">
                   {{ t("settings.correlation.addFieldTooltip") }}
                 </q-tooltip>
-              </q-btn>
+</OButton>
 
             </div>
           </template>
@@ -380,32 +385,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-item>
                 </template>
               </q-select>
-              <q-btn flat round dense icon="close" size="sm" color="grey-6" @click="addingToEnv = ''; addFieldValue = ''" />
+              <OButton
+  variant="ghost"
+  size="icon"
+  @click="addingToEnv = ''; addFieldValue = ''">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
             </div>
           </template>
 
           <!-- Add group + Save — bottom row -->
           <div v-if="!addingToEnv" class="tw:flex tw:items-center tw:justify-between tw:mt-2">
-            <q-btn
-              flat no-caps dense size="sm"
-              :label="t('settings.correlation.addGroup')"
-              class="o2-secondary-button tw:h-[28px]"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              @click="addingToEnv = generateGroupId()"
-            >
-              <q-tooltip anchor="top middle" self="bottom middle" class="tw:text-xs tw:max-w-[240px]">
+            <OButton
+  variant="secondary"
+  size="sm"
+  @click="addingToEnv = generateGroupId()"
+  class="tw:h-[28px]">
+  {{ t('settings.correlation.addGroup') }}
+  <q-tooltip anchor="top middle" self="bottom middle" class="tw:text-xs tw:max-w-[240px]">
                 {{ t("settings.correlation.addGroupTooltip") }}
               </q-tooltip>
-            </q-btn>
-            <q-btn
-              no-caps dense
-              :label="t('settings.correlation.saveIdentityConfig')"
-              :loading="saving"
-              :disable="saving || !isDirty"
-              class="o2-primary-button tw:h-[32px]"
-              data-test="service-identity-save-btn"
-              @click="saveConfig"
-            />
+</OButton>
+            <OButton
+  :loading="saving"
+  data-test="service-identity-save-btn"
+  @click="saveConfig"
+  :disabled="saving || !isDirty"
+  class="tw:h-[32px]">{{ t('settings.correlation.saveIdentityConfig') }}</OButton>
           </div>
         </div>
       </div>
@@ -475,11 +481,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:bg-white tw:text-grey-8 tw:shadow-sm'"
                 >
                   <span>{{ alias.label }}</span>
-                  <q-btn
-                    flat round dense size="xs" icon="cancel"
-                    :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-6'"
-                    @click="trackedAliasIds = trackedAliasIds.filter(id => id !== alias.id)"
-                  />
+                  <OButton
+  variant="ghost"
+  size="icon"
+  @click="trackedAliasIds = trackedAliasIds.filter(id => id !== alias.id)">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
                 </div>
                 <!-- Inline add select -->
                 <template v-if="addingTrackedAlias">
@@ -496,27 +503,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="min-width: 220px"
                     @update:model-value="onAddTrackedAlias($event)"
                   />
-                  <q-btn flat round dense icon="close" size="sm" color="grey-6" @click="addingTrackedAlias = false; addTrackedAliasValue = ''" />
+                  <OButton
+  variant="ghost"
+  size="icon"
+  @click="addingTrackedAlias = false; addTrackedAliasValue = ''">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
                 </template>
                 <!-- Add field button -->
-                <q-btn
-                  v-else
-                  flat no-caps dense size="sm"
-                  label="Add field"
-                  class="o2-secondary-button tw:h-[28px]"
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  @click="addingTrackedAlias = true"
-                />
+                <OButton
+  variant="secondary"
+  size="sm"
+  v-else
+  @click="addingTrackedAlias = true"
+  class="tw:h-[28px]">Add field</OButton>
               </div>
               <div class="tw:flex tw:justify-end tw:mt-3">
-                <q-btn
-                  no-caps dense
-                  :label="t('settings.correlation.saveIdentityConfig')"
-                  :loading="saving"
-                  :disable="saving || !isDirty"
-                  class="o2-primary-button tw:h-[32px]"
-                  @click="saveConfig"
-                />
+                <OButton
+  :loading="saving"
+  @click="saveConfig"
+  :disabled="saving || !isDirty"
+  class="tw:h-[32px]">{{ t('settings.correlation.saveIdentityConfig') }}</OButton>
               </div>
             </div>
           </div>
@@ -599,12 +606,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block"
                     :class="{ 'tw:bg-blue-500': st === 'logs', 'tw:bg-orange-500': st === 'traces', 'tw:bg-green-500': st === 'metrics' }"
                   /></span></span>
-                <span
+                <OMenu
                   v-if="card.values.length > 5"
-                  class="dim-stat-pill tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity"
-                  :class="store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-6'"
-                >+{{ card.values.length - 5 }}
-                  <q-menu anchor="bottom left" self="top left">
+                  anchor="bottom left"
+                  self="top left"
+                >
+                  <template #default="{ toggle, close }">
+                  <span
+                    class="dim-stat-pill tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity"
+                    :class="store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-6'"
+                    @click.stop="toggle"
+                  >+{{ card.values.length - 5 }}</span>
+                  </template>
+                  <template #content="{ close }">
                     <div class="tw:p-2 tw:flex tw:flex-wrap tw:gap-1 tw:max-w-[280px] tw:max-h-[200px] tw:overflow-y-auto"
                       :class="store.state.theme === 'dark' ? 'tw:bg-grey-10' : ''"
                     >
@@ -614,16 +628,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
                         :class="store.state.theme === 'dark' ? card.theme.pillDark : card.theme.pillLight"
                         :title="val"
-                        v-close-popup
-                        @click.stop="openInsightDialogByIdx(val, idx)"
+                        @click.stop="openInsightDialogByIdx(val, idx); close()"
                       ><span class="tw:truncate">{{ val }}</span><span v-if="card.dim" class="tw:inline-flex tw:gap-0.5 tw:ml-0.5 tw:shrink-0"><span
                           v-for="st in getValueStreamTypes(card.dim.group_id, val)" :key="st"
                           class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block"
                           :class="{ 'tw:bg-blue-500': st === 'logs', 'tw:bg-orange-500': st === 'traces', 'tw:bg-green-500': st === 'metrics' }"
                         /></span></span>
                     </div>
-                  </q-menu>
-                </span>
+                  </template>
+                </OMenu>
               </div>
             </div>
           </template>
@@ -670,15 +683,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             — covers {{ activeEnvCoverage ?? '–' }}% of your telemetry.
           </div>
           <div class="tw:shrink-0 tw:flex tw:items-center tw:gap-1">
-            <q-btn
-              no-caps dense flat size="sm" class="o2-secondary-button"
-              label="Apply"
-              @click="applySuggestion"
-            />
-            <q-btn flat round dense icon="cancel" size="xs"
-              class="tw:opacity-40 hover:tw:opacity-100"
-              @click="dismissSuggestion"
-            />
+            <OButton
+  variant="secondary"
+  size="sm"
+  @click="applySuggestion">Apply</OButton>
+            <OButton
+  variant="ghost"
+  size="icon"
+  @click="dismissSuggestion"
+  class="tw:opacity-40 hover:tw:opacity-100">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </div>
 
@@ -725,7 +740,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
               </div>
-              <q-btn v-close-popup round flat dense icon="cancel" size="sm" />
+              <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup>
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
             </q-card-section>
 
             <!-- Content area — flex column so dimension columns fill remaining height -->
@@ -865,7 +885,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span v-if="popupPrimaryValue" class="text-subtitle2 text-grey">: {{ popupPrimaryValue }}</span>
             </div>
             <q-space />
-            <q-btn icon="close" flat round dense v-close-popup />
+            <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup>
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </q-card-section>
 
           <q-card-section class="tw:flex tw:flex-col tw:gap-4 tw:p-0 tw:border-t">
@@ -1012,6 +1037,10 @@ import type {
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { Plus } from "lucide-vue-next";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DetectedEnvironment {

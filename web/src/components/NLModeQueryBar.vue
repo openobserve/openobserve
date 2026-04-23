@@ -45,25 +45,21 @@
         <!-- Action Buttons (always present) -->
         <div class="tw:flex tw:gap-2 tw:ml-auto">
           <!-- Main Action Button: Run Query / Ask AI -->
-          <q-btn
-            :data-test="`${dataTestPrefix}-action-btn`"
-            dense
-            flat
-            no-caps
-            :title="isAIMode ? aiButtonTooltip : normalButtonTooltip"
-            :class="buttonClasses"
-            :color="isAIMode ? 'primary' : undefined"
-            :loading="loading"
-            :disable="disabled || (isAIMode && isGenerating)"
-            @click="handleButtonClick"
-          >
-            <q-icon
+          <OButton
+  variant="ghost"
+  :data-test="`${dataTestPrefix}-action-btn`"
+  :title="isAIMode ? aiButtonTooltip : normalButtonTooltip"
+  :loading="loading"
+  @click="handleButtonClick"
+  :disabled="disabled || (isAIMode && isGenerating)"
+  :class="buttonClasses">
+  <q-icon
               v-if="showIcon"
               :name="isAIMode ? 'auto_awesome' : 'search'"
               class="q-mr-xs"
             />
             {{ isAIMode ? aiButtonLabel : normalButtonLabel }}
-          </q-btn>
+</OButton>
 
           <!-- Dropdown (optional - for enterprise features) -->
           <template v-if="showDropdown">
@@ -76,19 +72,16 @@
             >
               <!-- Normal Mode: Refresh option -->
               <template v-if="!isAIMode">
-                <q-btn
-                  dense
-                  flat
-                  no-caps
-                  :title="t('search.refreshCacheAndRunQuery')"
-                  class="q-pa-sm tw:text-[12px]"
-                  v-close-popup
-                  @click="$emit('refresh')"
-                  :disable="disabled"
-                >
-                  <q-icon name="refresh" class="q-mr-xs" />
+                <OButton
+  variant="ghost"
+  :title="t('search.refreshCacheAndRunQuery')"
+  v-close-popup
+  @click="$emit('refresh')"
+  :disabled="disabled"
+  class="q-pa-sm tw:text-[12px]">
+  <q-icon name="refresh" class="q-mr-xs" />
                   {{ t('search.refreshCacheAndRunQuery') }}
-                </q-btn>
+</OButton>
               </template>
 
               <!-- AI Mode: Custom actions (slot) -->
@@ -164,6 +157,7 @@ import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
 import { getImageURL } from '@/utils/zincutils';
 import config from '@/aws-exports';
 
+import OButton from "@/lib/core/Button/Button.vue";
 interface Props {
   // Query props
   language: 'sql' | 'promql' | 'vrl' | 'javascript';

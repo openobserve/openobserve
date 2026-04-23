@@ -19,42 +19,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
       <div class="col">
         <div class="flex">
-          <q-btn
-            no-caps
-            padding="xs"
-            outline
-            @click="goBack()"
-            icon="arrow_back_ios_new"
-            class="el-border"
-          />
+          <OButton
+  variant="outline"
+  size="icon"
+  @click="goBack()">
+  <template #icon-left><ArrowLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
           <div class="text-h6 q-ml-md">
             {{ t("dashboard.importDashboard") }}
           </div>
         </div>
       </div>
       <div class="flex justify-center">
-        <q-btn
-          class="q-mr-md o2-secondary-button"
-          no-caps
-          :label="t('dashboard.communityDashboard')"
-          @click="goToCommunityDashboards"
-          data-test="dashboard-panel-tutorial-btn"
-        ></q-btn>
-        <q-btn
-          v-close-popup
-          class="text-bold q-mr-md o2-secondary-button"
-          :label="t('function.cancel')"
-          no-caps
-          @click="goBack()"
-        />
-        <q-btn
-          :disable="!!isLoading"
-          class="text-bold o2-primary-button"
-          :label="t('dashboard.import')"
-          type="submit"
-          no-caps
-          @click="importDashboard"
-        />
+        <OButton
+  variant="secondary"
+  @click="goToCommunityDashboards"
+  data-test="dashboard-panel-tutorial-btn"
+  class="q-mr-md">{{ t('dashboard.communityDashboard') }}</OButton>
+        <OButton
+  variant="secondary"
+  v-close-popup
+  @click="goBack()"
+  class="text-bold q-mr-md">{{ t('function.cancel') }}</OButton>
+        <OButton
+  type="submit"
+  @click="importDashboard"
+  :disabled="!!isLoading"
+  class="text-bold">{{ t('dashboard.import') }}</OButton>
       </div>
     </div>
     </div>
@@ -319,8 +310,11 @@ import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.v
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { defineAsyncComponent } from "vue";
-const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import stream from "@/services/stream.js";
+import OButton from "@/lib/core/Button/Button.vue";
+import { ArrowLeft } from "lucide-vue-next";
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+
 export default defineComponent({
   name: "Import Dashboard",
   props: ["dashboardId"],
@@ -873,7 +867,10 @@ export default defineComponent({
       streamTypes,
     };
   },
-  components: { SelectFolderDropdown, AppTabs, QueryEditor },
+  components: { SelectFolderDropdown, AppTabs, QueryEditor,
+    OButton,
+    ArrowLeft,
+},
 });
 </script>
 

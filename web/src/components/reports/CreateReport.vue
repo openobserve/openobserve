@@ -510,19 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <q-stepper-navigation>
-                  <q-btn
-                    data-test="add-report-step1-continue-btn"
-                    @click="step = 2"
-                    class="o2-primary-button tw:h-[36px]"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-primary-button-dark'
-                        : 'o2-primary-button-light'
-                    "
-                    flat
-                    no-caps
-                    :label="'Continue'"
-                  />
+                  <OButton data-test="add-report-step1-continue-btn" @click="step = 2">{{ 'Continue' }}</OButton>
                 </q-stepper-navigation>
               </q-step>
 
@@ -559,21 +547,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="visual in frequencyTabs"
                       :key="visual.value"
                     >
-                      <q-btn
-                        :data-test="`add-report-schedule-frequency-${visual.value}-btn`"
-                        :color="
-                          visual.value === frequency.type ? 'primary' : ''
-                        "
-                        :flat="visual.value === frequency.type ? false : true"
-                        dense
-                        no-caps
-                        size="12px"
-                        class="q-px-lg visual-selection-btn"
-                        style="padding-top: 4px; padding-bottom: 4px"
-                        @click="frequency.type = visual.value"
-                      >
-                        {{ visual.label }}</q-btn
-                      >
+                      <OButton
+  :data-test="`add-report-schedule-frequency-${visual.value}-btn`"
+  :flat="visual.value === frequency.type ? false : true"
+  style="padding-top: 4px; padding-bottom: 4px"
+  @click="frequency.type = visual.value"
+  class="q-px-lg visual-selection-btn">{{ visual.label }}</OButton>
                     </template>
                   </div>
 
@@ -682,23 +661,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-for="visual in timeTabs"
                           :key="visual.value"
                         >
-                          <q-btn
-                            :data-test="`add-report-schedule-${visual.value}-btn`"
-                            :color="
-                              visual.value === selectedTimeTab ? 'primary' : ''
-                            "
-                            :flat="
+                          <OButton
+  :data-test="`add-report-schedule-${visual.value}-btn`"
+  :flat="
                               visual.value === selectedTimeTab ? false : true
                             "
-                            dense
-                            no-caps
-                            size="12px"
-                            class="q-px-md visual-selection-btn"
-                            style="padding-top: 4px; padding-bottom: 4px"
-                            @click="selectedTimeTab = visual.value"
-                          >
-                            {{ visual.label }}</q-btn
-                          >
+  style="padding-top: 4px; padding-bottom: 4px"
+  @click="selectedTimeTab = visual.value"
+  class="q-px-md visual-selection-btn">{{ visual.label }}</OButton>
                         </template>
                       </div>
                       <q-icon
@@ -806,12 +776,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   mask="DD-MM-YYYY"
                                 >
                                   <div class="row items-center justify-end">
-                                    <q-btn
-                                      v-close-popup="true"
-                                      label="Close"
-                                      color="primary"
-                                      flat
-                                    />
+                                    <OButton variant="ghost" v-close-popup="true">Close</OButton>
                                   </div>
                                 </q-date>
                               </q-popup-proxy>
@@ -845,12 +810,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                                 <q-time v-model="scheduling.time">
                                   <div class="row items-center justify-end">
-                                    <q-btn
-                                      v-close-popup="true"
-                                      label="Close"
-                                      color="primary"
-                                      flat
-                                    />
+                                    <OButton variant="ghost" v-close-popup="true">Close</OButton>
                                   </div>
                                 </q-time>
                               </q-popup-proxy>
@@ -891,33 +851,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <q-stepper-navigation>
-                  <q-btn
-                    data-test="add-report-step2-back-btn"
-                    flat
-                    @click="step = 1"
-                    class="o2-secondary-button tw:h-[36px] q-ml-sm"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    :label="'Back'"
-                    no-caps
-                  />
-                  <q-btn
-                    v-if="!isCachedReport"
-                    data-test="add-report-step2-continue-btn"
-                    @click="step = 3"
-                    class="o2-primary-button tw:h-[36px] q-ml-md"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-primary-button-dark'
-                        : 'o2-primary-button-light'
-                    "
-                    flat
-                    no-caps
-                    :label="'Continue'"
-                  />
+                  <OButton
+  variant="secondary"
+  data-test="add-report-step2-back-btn"
+  @click="step = 1"
+  class="q-ml-sm">{{ 'Back' }}</OButton>
+                  <OButton
+  v-if="!isCachedReport"
+  data-test="add-report-step2-continue-btn"
+  @click="step = 3"
+  class="q-ml-md">{{ 'Continue' }}</OButton>
                 </q-stepper-navigation>
               </q-step>
 
@@ -1017,19 +960,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <q-stepper-navigation>
-                  <q-btn
-                    data-test="add-report-step3-back-btn"
-                    flat
-                    @click="step = 2"
-                    class="o2-secondary-button tw:h-[36px] q-ml-sm"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    :label="'Back'"
-                    no-caps
-                  />
+                  <OButton
+  variant="secondary"
+  data-test="add-report-step3-back-btn"
+  @click="step = 2"
+  class="q-ml-sm">{{ 'Back' }}</OButton>
                 </q-stepper-navigation>
               </q-step>
             </q-stepper>
@@ -1048,23 +983,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'rgb(240 240 240) 0px -4px 7px 0px',
       }"
     >
-      <q-btn
-        data-test="add-report-cancel-btn"
-        class="q-mr-md o2-secondary-button tw:h-[36px]"
-        :label="t('alerts.cancel')"
-        no-caps
-        flat
-        @click="openCancelDialog"
-      />
-      <q-btn
-        data-test="add-report-save-btn"
-        class="o2-primary-button no-border tw:h-[36px]"
-        :label="t('alerts.save')"
-        type="submit"
-        no-caps
-        flat
-        @click="saveReport"
-      />
+      <OButton
+  variant="secondary"
+  data-test="add-report-cancel-btn"
+  @click="openCancelDialog"
+  class="q-mr-md">{{ t('alerts.cancel') }}</OButton>
+      <OButton
+  data-test="add-report-save-btn"
+  type="submit"
+  @click="saveReport">{{ t('alerts.save') }}</OButton>
     </div>
   </div>
   <ConfirmDialog
@@ -1106,6 +1033,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import SelectFolderDropdown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import { getFoldersListByType } from "@/utils/commons";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const props = defineProps({
   report: {
     type: Object,

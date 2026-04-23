@@ -70,20 +70,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:gap-3">
 
               <!-- AI button -->
-              <q-btn
-                v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                :ripple="false"
-                @click="toggleAIChat"
-                data-test="menu-link-ai-item"
-                no-caps flat dense
-                class="ai-hover-btn"
-                :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-                style="border-radius: 50%; width: 32px; height: 32px;"
-                @mouseenter="isHovered = true"
-                @mouseleave="isHovered = false"
-              >
-                <img :src="getBtnLogo" style="width: 18px; height: 18px;" />
-              </q-btn>
+              <OButton
+  variant="ghost"
+  v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+  @click="toggleAIChat"
+  data-test="menu-link-ai-item"
+  style="border-radius: 50%; width: 32px; height: 32px;"
+  @mouseenter="isHovered = true"
+  @mouseleave="isHovered = false"
+  class="ai-hover-btn" :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"><img :src="getBtnLogo" style="width: 18px; height: 18px;" /></OButton>
             </div>
           </div>
 
@@ -132,17 +127,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <q-tooltip :delay="400" class="tw:text-[12px]">{{ sqlEditorMaximized ? 'show VRL editor' : 'hide VRL editor' }}</q-tooltip>
                         </q-toggle>
-                        <q-btn
-                          data-test="alert-run-query-btn"
-                          no-caps
-                          unelevated
-                          color="primary"
-                          class="run-query-btn"
-                          :disable="localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''"
-                          @click="localTab === 'sql' ? runSqlQuery() : runPromqlQuery()"
-                        >
-                          <span class="tw:text-xs tw:font-semibold">{{ t('alerts.runQuery') }}</span>
-                        </q-btn>
+                        <OButton
+  variant="ghost"
+  data-test="alert-run-query-btn"
+  @click="localTab === 'sql' ? runSqlQuery() : runPromqlQuery()"
+  :disabled="localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''"
+  class="run-query-btn"><span class="tw:text-xs tw:font-semibold">{{ t('alerts.runQuery') }}</span></OButton>
                       </div>
                     </div>
 
@@ -256,17 +246,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                       </q-select>
                       <!-- Apply VRL -->
-                      <q-btn
-                        data-test="alert-apply-vrl-btn"
-                        no-caps
-                        unelevated
-                        color="primary"
-                        class="run-query-btn"
-                        :disable="vrlFunctionContent == ''"
-                        @click="runTestFunction"
-                      >
-                        <span class="tw:text-xs tw:font-semibold">{{ t('alerts.applyVRL') }}</span>
-                      </q-btn>
+                      <OButton
+  variant="ghost"
+  data-test="alert-apply-vrl-btn"
+  @click="runTestFunction"
+  :disabled="vrlFunctionContent == ''"
+  class="run-query-btn"><span class="tw:text-xs tw:font-semibold">{{ t('alerts.applyVRL') }}</span></OButton>
                     </div>
                   </div>
 
@@ -449,7 +434,6 @@ import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import searchService from "@/services/search";
 import { defineAsyncComponent } from "vue";
-const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
@@ -461,6 +445,8 @@ import { getParser as getParserUtil, type SqlUtilsContext } from "@/utils/alerts
 import useParser from "@/composables/useParser";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
+import OButton from "@/lib/core/Button/Button.vue";
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 const props = defineProps({
   modelValue: {

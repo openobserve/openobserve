@@ -4,6 +4,11 @@
    ============================================================ */
 
 @theme inline {
+  /* ---- Menu -------------------------------------------------- */
+  --color-menu-bg:          var(--color-surface-overlay);
+  --color-menu-border:      var(--color-border-default);
+  --shadow-menu:            var(--shadow-md);
+
   /* ---- Button ------------------------------------------------ */
 
   /* primary */

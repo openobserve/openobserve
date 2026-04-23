@@ -31,14 +31,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         :rules="[(val: any) => !!val || 'Secret is required']"
       />
-      <q-btn data-test="add-cipher-key-openobserve-secret-input-cancel" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.local != ''" @click="isUpdate = false" size="sm" color="primary" :label="t('common.cancel')" />
+      <OButton
+  size="sm"
+  data-test="add-cipher-key-openobserve-secret-input-cancel"
+  v-if="formData.isUpdate && formData.key.store.local != ''"
+  @click="isUpdate = false"
+  class="q-mt-sm">{{ t('common.cancel') }}</OButton>
     </div>
     <div v-else>
       <label class="row q-field q-mb-md">
         <b>{{ t('cipherKey.secret') }}</b>
       </label>
       <pre class="pre-text">{{ formData.key.store.local }}</pre>
-      <q-btn data-test="add-cipher-key-openobserve-secret-input-update" @click="isUpdate = true" size="sm" color="primary" :label="t('common.update')" />
+      <OButton
+  size="sm"
+  data-test="add-cipher-key-openobserve-secret-input-update"
+  @click="isUpdate = true">{{ t('common.update') }}</OButton>
     </div>
   </div>
 </template>
@@ -47,7 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "AddOpenobserveType",
   props: {
     formData: {

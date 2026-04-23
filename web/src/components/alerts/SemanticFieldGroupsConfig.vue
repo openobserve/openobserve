@@ -58,47 +58,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-select>
       </div>
       <div class="col-12 col-md-8 flex items-center justify-end q-gutter-sm">
-        <q-btn
-          data-test="correlation-semanticfieldgroup-export-json-btn"
-          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          no-caps
-          flat
-          :label="t('correlation.exportToJson')"
-          :disable="localGroups.length === 0"
-          @click="exportGroups"
-        />
-        <q-btn
-          data-test="correlation-semanticfieldgroup-import-json-btn"
-          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          no-caps
-          flat
-          :label="t('correlation.importFromJson')"
-          @click="navigateToImport"
-        />
-        <q-btn
-          data-test="correlation-semanticfieldgroup-add-custom-group-btn"
-          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          no-caps
-          flat
-          color="primary"
-          :label="t('correlation.addCustomGroup')"
-          @click="addGroup"
-        />
+        <OButton
+  variant="secondary"
+  data-test="correlation-semanticfieldgroup-export-json-btn"
+  @click="exportGroups"
+  :disabled="localGroups.length === 0"
+  class="text-bold tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!">{{ t('correlation.exportToJson') }}</OButton>
+        <OButton
+  variant="secondary"
+  data-test="correlation-semanticfieldgroup-import-json-btn"
+  @click="navigateToImport"
+  class="text-bold tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!">{{ t('correlation.importFromJson') }}</OButton>
+        <OButton
+  variant="secondary"
+  data-test="correlation-semanticfieldgroup-add-custom-group-btn"
+  @click="addGroup"
+  class="text-bold tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!">{{ t('correlation.addCustomGroup') }}</OButton>
       </div>
     </div>
 
@@ -188,6 +163,7 @@ import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const store = useStore();
 const { t } = useI18n();
 

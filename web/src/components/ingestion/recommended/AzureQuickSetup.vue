@@ -31,34 +31,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </p>
 
             <div class="tw:flex tw:gap-2 tw:mt-4">
-              <q-btn
-                color="primary"
-                unelevated
-                @click="handleDeployFunction"
-                data-test="azure-quick-setup-deploy-btn"
-              >
-                <q-icon name="open_in_new" left size="sm" />
+              <OButton
+  variant="ghost"
+  @click="handleDeployFunction"
+  data-test="azure-quick-setup-deploy-btn">
+  <q-icon name="open_in_new" left size="sm" />
                 View Setup Guide
-              </q-btn>
-              <q-btn
-                color="primary"
-                outline
-                @click="handleAddDashboard"
-                :loading="addingDashboard"
-                data-test="azure-quick-setup-add-dashboard-btn"
-              >
-                <q-icon name="dashboard" left size="sm" />
+</OButton>
+              <OButton
+  variant="outline"
+  @click="handleAddDashboard"
+  :loading="addingDashboard"
+  data-test="azure-quick-setup-add-dashboard-btn">
+  <q-icon name="dashboard" left size="sm" />
                 Add Dashboard
-              </q-btn>
-              <q-btn
-                flat
-                color="primary"
-                @click="showDetails = !showDetails"
-                data-test="azure-quick-setup-details-btn"
-              >
-                <q-icon :name="showDetails ? 'expand_less' : 'expand_more'" left size="sm" />
+</OButton>
+              <OButton
+  variant="ghost"
+  @click="showDetails = !showDetails"
+  data-test="azure-quick-setup-details-btn">
+  <q-icon :name="showDetails ? 'expand_less' : 'expand_more'" left size="sm" />
                 {{ showDetails ? 'Hide' : 'View' }} Details
-              </q-btn>
+</OButton>
             </div>
           </div>
         </div>
@@ -157,7 +151,11 @@ import { azureIntegrations } from "@/utils/azureIntegrations";
 import dashboardsService from "@/services/dashboards";
 import segment from "@/services/segment_analytics";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "AzureQuickSetup",
   setup() {
     const store = useStore();

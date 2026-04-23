@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
-            v-close-popup="true"
-            round
-            flat
-            icon="cancel"
-            data-test="dashboard-add-cancel"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true"
+  data-test="dashboard-add-cancel">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
     </q-card-section>
@@ -81,26 +81,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div class="flex justify-start q-mt-sm">
-          <q-btn
-            v-close-popup="true"
-            :label="t('dashboard.cancel')"
-            no-caps
-            flat
-            class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            data-test="dashboard-add-cancel"
-          />
-          <q-btn
-            data-test="dashboard-add-submit"
-            :disable="dashboardData.name.trim() === ''"
-            :loading="onSubmit.isLoading.value"
-            :label="t('dashboard.save')"
-            flat
-            class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            type="submit"
-            no-caps
-          />
+          <OButton
+  variant="secondary"
+  v-close-popup="true"
+  data-test="dashboard-add-cancel">{{ t('dashboard.cancel') }}</OButton>
+          <OButton
+  data-test="dashboard-add-submit"
+  :loading="onSubmit.isLoading.value"
+  type="submit"
+  :disabled="dashboardData.name.trim() === ''"
+  class="q-ml-md">{{ t('dashboard.save') }}</OButton>
         </div>
       </q-form>
     </q-card-section>
@@ -121,6 +111,7 @@ import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const defaultValue = () => {
   return {
     id: "",
@@ -267,7 +258,9 @@ export default defineComponent({
       });
     },
   },
-  components: { SelectFolderDropdown },
+  components: { SelectFolderDropdown,
+    OButton,
+},
 });
 </script>
 <style lang="scss">

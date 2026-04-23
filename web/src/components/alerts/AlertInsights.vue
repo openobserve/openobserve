@@ -23,15 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="insights-header flex justify-between items-center"
         >
           <div class="flex items-center">
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              icon="arrow_back_ios_new"
-              class="hideOnPrintMode el-border"
-              @click="goBack"
-              data-test="alert-insights-back-btn"
-            />
+            <OButton
+  variant="outline"
+  size="icon"
+  @click="goBack"
+  data-test="alert-insights-back-btn"
+  class="hideOnPrintMode">
+  <template #icon-left><ArrowLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
             <div class="q-table__title tw:font-[600] q-ml-sm">{{ t("alerts.insights.title") }}</div>
           </div>
 
@@ -51,16 +50,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-insights-datetime"
             />
 
-            <q-btn
-              icon="refresh"
-              @click="refreshDashboard"
-              :loading="isLoading"
-              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
-              size="sm"
-              data-test="alert-insights-refresh-btn"
-            >
-              <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
-            </q-btn>
+            <OButton
+  variant="outline"
+  size="sm"
+  @click="refreshDashboard"
+  :loading="isLoading"
+  data-test="alert-insights-refresh-btn"
+  class="q-mr-xs download-logs-btn q-px-sm element-box-shadow">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+</OButton>
           </div>
         </div>
 
@@ -153,17 +152,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Clear All Filters -->
-          <q-btn
-            v-if="hasActiveFilters"
-            flat
-            dense
-            size="sm"
-            class="clear-filters-btn"
-            :label="t('alerts.insights.filters.clearAll')"
-            icon="clear"
-            @click="clearAllFilters"
-            data-test="clear-all-filters-btn"
-          />
+          <OButton
+  variant="ghost"
+  size="sm"
+  v-if="hasActiveFilters"
+  @click="clearAllFilters"
+  data-test="clear-all-filters-btn"
+  class="clear-filters-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+  {{ t('alerts.insights.filters.clearAll') }}
+</OButton>
         </div>
       </div>
     </div>
@@ -179,54 +177,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("alerts.insights.actions.actionsFor") }} <strong>{{ selectedAlertForAction }}</strong></span
       >
 
-      <q-btn
-        flat
-        dense
-        color="primary"
-        icon="settings"
-        :label="t('alerts.insights.actions.configureDedup')"
-        @click="openDedupConfig"
-        data-test="configure-dedup-btn"
-      >
-        <q-tooltip>{{ t("alerts.insights.actions.configureDedupTooltip") }}</q-tooltip>
-      </q-btn>
+      <OButton
+  variant="ghost"
+  @click="openDedupConfig"
+  data-test="configure-dedup-btn">
+  <template #icon-left><Settings class="tw:w-4 tw:h-4" /></template>
+  {{ t('alerts.insights.actions.configureDedup') }}
+  <q-tooltip>{{ t("alerts.insights.actions.configureDedupTooltip") }}</q-tooltip>
+</OButton>
 
-      <q-btn
-        flat
-        dense
-        color="primary"
-        icon="edit"
-        :label="t('alerts.insights.actions.editAlert')"
-        @click="editAlert"
-        data-test="edit-alert-btn"
-      >
-        <q-tooltip>{{ t("alerts.insights.actions.editAlertTooltip") }}</q-tooltip>
-      </q-btn>
+      <OButton
+  variant="ghost"
+  @click="editAlert"
+  data-test="edit-alert-btn">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+  {{ t('alerts.insights.actions.editAlert') }}
+  <q-tooltip>{{ t("alerts.insights.actions.editAlertTooltip") }}</q-tooltip>
+</OButton>
 
-      <q-btn
-        flat
-        dense
-        color="primary"
-        icon="history"
-        :label="t('alerts.insights.actions.viewHistory')"
-        @click="viewHistory"
-        data-test="view-history-btn"
-      >
-        <q-tooltip>{{ t("alerts.insights.actions.viewHistoryTooltip") }}</q-tooltip>
-      </q-btn>
+      <OButton
+  variant="ghost"
+  @click="viewHistory"
+  data-test="view-history-btn">
+  <template #icon-left><History class="tw:w-4 tw:h-4" /></template>
+  {{ t('alerts.insights.actions.viewHistory') }}
+  <q-tooltip>{{ t("alerts.insights.actions.viewHistoryTooltip") }}</q-tooltip>
+</OButton>
 
       <q-space />
 
-      <q-btn
-        flat
-        dense
-        round
-        icon="close"
-        @click="selectedAlertForAction = null"
-        data-test="close-actions-btn"
-      >
-        <q-tooltip>Close actions</q-tooltip>
-      </q-btn>
+      <OButton
+  variant="ghost"
+  @click="selectedAlertForAction = null"
+  data-test="close-actions-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Close actions</q-tooltip>
+</OButton>
     </div>
 
     <!-- Dashboard Content -->
@@ -296,6 +282,9 @@ import insightsConfig from "@/utils/alerts/insights-metrics.json";
 import config from "@/aws-exports";
 import alertsService from "@/services/alerts";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ArrowLeft, History, Pencil, RefreshCw, Settings } from "lucide-vue-next";
 const router = useRouter();
 const route = useRoute();
 const store = useStore();

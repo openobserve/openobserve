@@ -5,40 +5,33 @@
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"
   >
-    <q-btn
-      class="q-mx-xs"
-      size="0.375rem"
-      @click.prevent.stop="copyLogToClipboard(row[column.id])"
-      title="Copy"
-      round
-      icon="content_copy"
-    />
-    <q-btn
-      v-if="isStreamField && !hideSearchTermActions"
-      class="q-mr-xs"
-      size="0.375rem"
-      @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'include')"
-      :data-test="`log-details-include-field-${row[column.id]}`"
-      title="Include Term"
-      round
-    >
-      <q-icon style="height: 8px; width: 8px">
+    <OButton
+  size="icon"
+  @click.prevent.stop="copyLogToClipboard(row[column.id])"
+  title="Copy"
+  class="q-mx-xs">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+</OButton>
+    <OButton
+  v-if="isStreamField && !hideSearchTermActions"
+  @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'include')"
+  :data-test="`log-details-include-field-${row[column.id]}`"
+  title="Include Term"
+  class="q-mr-xs">
+  <q-icon style="height: 8px; width: 8px">
         <EqualIcon></EqualIcon>
       </q-icon>
-    </q-btn>
-    <q-btn
-      v-if="isStreamField && !hideSearchTermActions"
-      size="0.375rem"
-      @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'exclude')"
-      title="Exclude Term"
-      :data-test="`log-details-exclude-field-${row[column.id]}`"
-      round
-      class="q-mr-xs"
-    >
-      <q-icon style="height: 8px; width: 8px">
+</OButton>
+    <OButton
+  v-if="isStreamField && !hideSearchTermActions"
+  @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'exclude')"
+  title="Exclude Term"
+  :data-test="`log-details-exclude-field-${row[column.id]}`"
+  class="q-mr-xs">
+  <q-icon style="height: 8px; width: 8px">
         <NotEqualIcon></NotEqualIcon>
       </q-icon>
-    </q-btn>
+</OButton>
     <!-- o2 ai context add button in the cell actions when user adds a interesting field to the table 
      then we show some options there we need this  -->
     <O2AIContextAddBtn
@@ -60,6 +53,9 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Copy } from "lucide-vue-next";
 const props = defineProps({
   column: {
     type: Object,

@@ -39,17 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Open Full Editor (SQL/PromQL tabs) -->
-        <q-btn
-          v-if="localTab !== 'custom'"
-          data-test="step2-view-editor-btn"
-          size="sm"
-          flat
-          no-caps
-          class="o2-secondary-button"
-          @click="viewSqlEditor = true"
-        >
-        {{ t('alerts.queryConfig.openFullEditor') }}
-      </q-btn>
+        <OButton
+  variant="secondary"
+  size="sm"
+  v-if="localTab !== 'custom'"
+  data-test="step2-view-editor-btn"
+  @click="viewSqlEditor = true">{{ t('alerts.queryConfig.openFullEditor') }}</OButton>
       </div>
 
       <!-- Custom Query Builder -->
@@ -203,28 +198,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="min-width: 120px; max-width: 180px;"
                         @update:model-value="onLogGroupByChange"
                       />
-                      <q-btn
-                        icon="close"
-                        size="xs"
-                        flat
-                        round
-                        dense
-                        class="tw:text-gray-400 hover:tw:text-red-500"
-                        @click="deleteLogGroupByColumn(index)"
-                      />
+                      <OButton
+  variant="ghost"
+  size="icon"
+  @click="deleteLogGroupByColumn(index)"
+  class="tw:text-gray-400 hover:tw:text-red-500">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
                     </div>
                   </template>
-                  <q-btn
-                    icon="add"
-                    size="xs"
-                    flat
-                    round
-                    dense
-                    color="primary"
-                    @click="addLogGroupByColumn"
-                  >
-                    <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
-                  </q-btn>
+                  <OButton
+  variant="ghost"
+  size="sm"
+  @click="addLogGroupByColumn">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
+</OButton>
                 </div>
               </div>
 
@@ -409,28 +398,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="min-width: 120px; max-width: 180px;"
                         @update:model-value="emitAggregationUpdate"
                       />
-                      <q-btn
-                        icon="close"
-                        size="xs"
-                        flat
-                        round
-                        dense
-                        class="tw:text-gray-400 hover:tw:text-red-500"
-                        @click="deleteGroupByColumn(index)"
-                      />
+                      <OButton
+  variant="ghost"
+  size="icon"
+  @click="deleteGroupByColumn(index)"
+  class="tw:text-gray-400 hover:tw:text-red-500">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
                     </div>
                   </template>
-                  <q-btn
-                    icon="add"
-                    size="xs"
-                    flat
-                    round
-                    dense
-                    color="primary"
-                    @click="addGroupByColumn"
-                  >
-                    <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
-                  </q-btn>
+                  <OButton
+  variant="ghost"
+  size="sm"
+  @click="addGroupByColumn">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
+</OButton>
                 </div>
               </div>
 
@@ -1039,12 +1022,15 @@ import { b64EncodeUnicode, getUUID, convertMinutesToCron, getCronIntervalDiffere
 import hljs from "highlight.js/lib/core";
 import sql from "highlight.js/lib/languages/sql";
 
-hljs.registerLanguage("sql", sql);
-
 import useSqlSuggestions from "@/composables/useSuggestions";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
+import OButton from "@/lib/core/Button/Button.vue";
+import { Plus } from "lucide-vue-next";
+hljs.registerLanguage("sql", sql);
+
+
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue")
@@ -1061,7 +1047,9 @@ export default defineComponent({
     QueryEditorDialog,
     CustomConfirmDialog,
     UnifiedQueryEditor,
-  },
+    OButton,
+    Plus,
+},
   props: {
     tab: {
       type: String,

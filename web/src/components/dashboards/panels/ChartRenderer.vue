@@ -41,36 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 // Find the index of the nearest value in a sorted array
 // used in timeseries hovering across all charts to find nearest dataindex
-function findNearestIndex(sortedArray: any, target: any) {
-  let left = 0;
-  let right = sortedArray.length - 1;
-  let nearestIndex = -1;
-
-  while (left <= right) {
-    const mid = Math.floor((left + right) / 2);
-
-    if (sortedArray[mid][0] === target) {
-      return mid; // Found the target at index mid
-    }
-
-    if (
-      nearestIndex === -1 ||
-      Math.abs(sortedArray[mid][0] - target) <
-        Math.abs(sortedArray[nearestIndex][0] - target)
-    ) {
-      nearestIndex = mid; // Update nearestIndex if current element is closer to the target
-    }
-
-    if (sortedArray[mid][0] < target) {
-      left = mid + 1; // Target is in the right half
-    } else {
-      right = mid - 1; // Target is in the left half
-    }
-  }
-
-  return nearestIndex; // Return the index of the nearest value
-}
-
 import { throttle } from "lodash-es";
 import {
   defineComponent,
@@ -137,6 +107,36 @@ import type {
   MarkLineComponentOption,
   MarkAreaComponentOption,
 } from "echarts/components";
+function findNearestIndex(sortedArray: any, target: any) {
+  let left = 0;
+  let right = sortedArray.length - 1;
+  let nearestIndex = -1;
+
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+
+    if (sortedArray[mid][0] === target) {
+      return mid; // Found the target at index mid
+    }
+
+    if (
+      nearestIndex === -1 ||
+      Math.abs(sortedArray[mid][0] - target) <
+        Math.abs(sortedArray[nearestIndex][0] - target)
+    ) {
+      nearestIndex = mid; // Update nearestIndex if current element is closer to the target
+    }
+
+    if (sortedArray[mid][0] < target) {
+      left = mid + 1; // Target is in the right half
+    } else {
+      right = mid - 1; // Target is in the left half
+    }
+  }
+
+  return nearestIndex; // Return the index of the nearest value
+}
+
 
 type ECOption = ComposeOption<
   | BarSeriesOption

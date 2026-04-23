@@ -54,15 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="expand-indicator q-mt-sm">
-          <q-btn
-            flat
-            dense
-            color="primary"
-            size="sm"
-            @click="isExpanded = true"
-          >
-            ...expand ({{ contentStats.remainingChars }} more characters)
-          </q-btn>
+          <OButton
+  variant="ghost"
+  size="sm"
+  @click="isExpanded = true">...expand ({{ contentStats.remainingChars }} more characters)</OButton>
         </div>
       </div>
 
@@ -91,15 +86,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div v-if="contentStats.shouldTruncate" class="collapse-btn q-mt-sm">
-          <q-btn
-            flat
-            dense
-            color="primary"
-            size="sm"
-            @click="isExpanded = false"
-          >
-            Collapse
-          </q-btn>
+          <OButton
+  variant="ghost"
+  size="sm"
+  @click="isExpanded = false">Collapse</OButton>
         </div>
       </div>
     </div>
@@ -109,6 +99,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import VueJsonPretty from 'vue-json-pretty';
+
+import OButton from "@/lib/core/Button/Button.vue";
 import 'vue-json-pretty/lib/styles.css';
 
 const INITIAL_LINE_LIMIT = 15;

@@ -21,20 +21,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:mb-[0.625rem]">
         <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]">
           <div class="tw:flex tw:items-center">
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              icon="arrow_back_ios_new"
-              class="hideOnPrintMode"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              @click="goBack"
-              data-test="backfill-jobs-back-btn"
-            />
+            <OButton
+  variant="outline"
+  size="icon"
+  @click="goBack"
+  data-test="backfill-jobs-back-btn"
+  class="hideOnPrintMode">
+  <template #icon-left><ArrowLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
             <div class="q-table__title tw:font-[600] q-ml-sm">
               Backfill Jobs
             </div>
@@ -81,30 +75,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="pipeline-filter"
               />
             </div>
-            <q-btn
-              label="Clear Filters"
-              outline
-              no-caps
-              padding="xs sm"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              @click="clearFilters"
-              data-test="clear-filters-btn"
-            />
-            <q-btn
-              icon="refresh"
-              flat
-              round
-              dense
-              @click="refreshJobs"
-              :loading="loading"
-              data-test="refresh-btn"
-            >
-              <q-tooltip>Refresh</q-tooltip>
-            </q-btn>
+            <OButton
+  variant="outline"
+  size="sm"
+  @click="clearFilters"
+  data-test="clear-filters-btn">Clear Filters</OButton>
+            <OButton
+  variant="ghost"
+  @click="refreshJobs"
+  :loading="loading"
+  data-test="refresh-btn">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Refresh</q-tooltip>
+</OButton>
           </div>
         </div>
       </div>
@@ -195,86 +178,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:body-cell-actions="props">
             <q-td :props="props">
               <div class="tw:flex tw:items-center tw:justify-center">
-                <q-btn
-                  v-if="canPauseJob(props.row)"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  :icon="outlinedPause"
-                  color="negative"
-                  round
-                  flat
-                  @click="confirmPauseJob(props.row)"
-                  data-test="pause-job-btn"
-                >
-                  <q-tooltip>Pause Job</q-tooltip>
-                </q-btn>
-                <q-btn
-                  v-if="canResumeJob(props.row)"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  :icon="outlinedPlayArrow"
-                  color="positive"
-                  round
-                  flat
-                  @click="confirmResumeJob(props.row)"
-                  data-test="resume-job-btn"
-                >
-                  <q-tooltip>Resume Job</q-tooltip>
-                </q-btn>
-                <q-btn
-                  v-if="canEditJob(props.row.status)"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  icon="edit"
-                  round
-                  flat
-                  @click="editJob(props.row)"
-                  data-test="edit-job-btn"
-                >
-                  <q-tooltip>Edit Job</q-tooltip>
-                </q-btn>
-                <q-btn
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  :icon="outlinedVisibility"
-                  round
-                  flat
-                  @click="viewJob(props.row)"
-                  data-test="view-job-btn"
-                >
-                  <q-tooltip>View Details</q-tooltip>
-                </q-btn>
-                <q-btn
-                  v-if="canDeleteJob(props.row.status)"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  :icon="outlinedDelete"
-                  round
-                  flat
-                  @click="confirmDeleteJob(props.row)"
-                  data-test="delete-job-btn"
-                >
-                  <q-tooltip>Delete Job</q-tooltip>
-                </q-btn>
-                <q-btn
-                  v-if="props.row.error"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  icon="error"
-                  round
-                  flat
-                  color="negative"
-                  @click="showErrorDialog(props.row)"
-                  data-test="error-indicator-btn"
-                >
-                  <q-tooltip>Error: {{ props.row.error }}</q-tooltip>
-                </q-btn>
+                <OButton
+  variant="destructive"
+  size="sm"
+  v-if="canPauseJob(props.row)"
+  @click="confirmPauseJob(props.row)"
+  data-test="pause-job-btn">
+  <template #icon-left><Pause class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Pause Job</q-tooltip>
+</OButton>
+                <OButton
+  variant="ghost"
+  size="sm"
+  v-if="canResumeJob(props.row)"
+  @click="confirmResumeJob(props.row)"
+  data-test="resume-job-btn">
+  <template #icon-left><Play class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Resume Job</q-tooltip>
+</OButton>
+                <OButton
+  variant="ghost"
+  size="sm"
+  v-if="canEditJob(props.row.status)"
+  @click="editJob(props.row)"
+  data-test="edit-job-btn">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Edit Job</q-tooltip>
+</OButton>
+                <OButton
+  variant="ghost"
+  size="sm"
+  @click="viewJob(props.row)"
+  data-test="view-job-btn">
+  <template #icon-left><Eye class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>View Details</q-tooltip>
+</OButton>
+                <OButton
+  variant="ghost"
+  size="sm"
+  v-if="canDeleteJob(props.row.status)"
+  @click="confirmDeleteJob(props.row)"
+  data-test="delete-job-btn">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Delete Job</q-tooltip>
+</OButton>
+                <OButton
+  variant="destructive"
+  size="sm"
+  v-if="props.row.error"
+  @click="showErrorDialog(props.row)"
+  data-test="error-indicator-btn">
+  <template #icon-left><CircleAlert class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Error: {{ props.row.error }}</q-tooltip>
+</OButton>
               </div>
             </q-td>
           </template>
@@ -333,7 +289,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Backfill Job Error
           </div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup>
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </q-card-section>
 
         <q-separator />
@@ -358,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <OButton variant="ghost" v-close-popup>Close</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -393,6 +354,9 @@ import {
   outlinedVisibility,
 } from "@quasar/extras/material-icons-outlined";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ArrowLeft, CircleAlert, Eye, Pause, Pencil, Play, RefreshCw, Trash2 } from "lucide-vue-next";
 const router = useRouter();
 const $q = useQuasar();
 const store = useStore();

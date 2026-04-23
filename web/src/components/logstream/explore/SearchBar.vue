@@ -18,17 +18,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="logs-search-bar-component" id="searchBarComponent">
     <div class="row flex justify-end align-center">
       <div class="col-auto q-my-xs">
-        <q-btn
-          class="q-mr-sm download-logs-btn q-px-sm"
-          size="sm"
-          :disabled="
+        <OButton
+  size="icon"
+  :disabled="
             queryData.queryResults.hasOwnProperty('hits') &&
             !queryData.queryResults.hits.length
           "
-          icon="download"
-          :title="t('search.exportLogs')"
-          @click="downloadLogs"
-        ></q-btn>
+  :title="t('search.exportLogs')"
+  @click="downloadLogs"
+  class="q-mr-sm download-logs-btn q-px-sm">
+  <template #icon-left><Download class="tw:w-4 tw:h-4" /></template>
+</OButton>
         <div
           class="float-left"
           v-show="queryData.streamType !== 'enrichment_tables'"
@@ -46,16 +46,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="search-time q-pl-sm float-left q-mr-sm">
-          <q-btn
-            data-test="logs-search-bar-refresh-btn"
-            data-cy="search-bar-refresh-button"
-            dense
-            flat
-            :title="t('search.runQuery')"
-            class="q-pa-none search-button"
-            @click="searchData"
-            >{{ t("search.runQuery") }}</q-btn
-          >
+          <OButton
+  variant="ghost"
+  data-test="logs-search-bar-refresh-btn"
+  data-cy="search-bar-refresh-button"
+  :title="t('search.runQuery')"
+  @click="searchData"
+  class="q-pa-none search-button">{{ t("search.runQuery") }}</OButton>
         </div>
       </div>
     </div>
@@ -85,6 +82,9 @@ import DateTime from "@/components/DateTime.vue";
 import useLogs from "@/composables/useLogs";
 import type { IDateTime } from "@/ts/interfaces";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Download } from "lucide-vue-next";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -113,7 +113,9 @@ export default defineComponent({
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
-  },
+    OButton,
+    Download,
+},
   emits: ["searchdata", "update-query", "change:date-time"],
   methods: {
     searchData() {

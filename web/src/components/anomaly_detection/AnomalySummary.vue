@@ -32,19 +32,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-show="showScrollToBottom" class="scroll-to-bottom-container">
-      <q-btn
-        round
-        flat
-        icon="arrow_downward"
-        class="scroll-to-bottom-btn"
-        size="sm"
-        data-test="anomaly-summary-scroll-btn"
-        @click="scrollToBottom"
-      >
-        <q-tooltip anchor="top middle" self="bottom middle">
+      <OButton
+  variant="ghost"
+  size="sm"
+  data-test="anomaly-summary-scroll-btn"
+  @click="scrollToBottom"
+  class="scroll-to-bottom-btn">
+  <template #icon-left><ArrowDown class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip anchor="top middle" self="bottom middle">
           Scroll to bottom
         </q-tooltip>
-      </q-btn>
+</OButton>
     </div>
   </div>
 </template>
@@ -53,6 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, nextTick, watch, onMounted } from 'vue';
 import { generateAnomalySummary } from '@/utils/alerts/anomalySummaryGenerator';
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ArrowDown } from "lucide-vue-next";
 const props = defineProps<{
   config: any;
   destinations: any[];

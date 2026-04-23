@@ -95,24 +95,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Splitter separator -->
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
-            <q-btn
-              color="primary"
-              size="sm"
-              :icon="
-                dashboardPanelData.layout.showFieldList
-                  ? 'chevron_left'
-                  : 'chevron_right'
-              "
-              dense
-              round
-              :class="
+            <OButton
+  size="icon"
+  style="top: 14px; z-index: 100"
+  @click.stop="collapseFieldList"
+  :class="
                 dashboardPanelData.layout.showFieldList
                   ? 'splitter-icon-collapse'
                   : 'splitter-icon-expand'
-              "
-              style="top: 14px; z-index: 100"
-              @click.stop="collapseFieldList"
-            />
+              " />
           </template>
 
           <!-- Main content area (after slot) -->
@@ -216,19 +207,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
 
                     <!-- Add to Dashboard button (metrics/logs/build mode) -->
-                    <q-btn
-                      v-if="resolvedConfig.showAddToDashboardButton"
-                      size="md"
-                      class="no-border q-ml-sm"
-                      no-caps
-                      dense
-                      color="primary"
-                      style="padding: 2px 4px"
-                      @click="emit('addToDashboard')"
-                      :title="t('search.addToDashboard')"
-                    >
-                      {{ t("search.addToDashboard") }}
-                    </q-btn>
+                    <OButton
+  v-if="resolvedConfig.showAddToDashboardButton"
+  style="padding: 2px 4px"
+  @click="emit('addToDashboard')"
+  :title="t('search.addToDashboard')"
+  class="q-ml-sm">{{ t("search.addToDashboard") }}</OButton>
                   </div>
 
                   <!-- Chart Area -->
@@ -457,19 +441,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Custom chart splitter separator -->
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
-            <q-btn
-              color="primary"
-              size="sm"
-              :icon="
-                dashboardPanelData.layout.showFieldList
-                  ? 'chevron_left'
-                  : 'chevron_right'
-              "
-              dense
-              round
-              style="top: 14px; z-index: 100"
-              @click="collapseFieldList"
-            />
+            <OButton
+  size="icon"
+  style="top: 14px; z-index: 100"
+  @click="collapseFieldList" />
           </template>
 
           <!-- Custom chart content area -->
@@ -509,16 +484,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             z-index: 10;
                           "
                         >
-                          <q-btn
-                            unelevated
-                            color="primary"
-                            icon="bar_chart"
-                            label="Example Charts"
-                            @click="showCustomChartTypeSelector = true"
-                            data-test="custom-chart-type-selector-btn"
-                            no-caps
-                            size="md"
-                          />
+                          <OButton
+  variant="ghost"
+  @click="showCustomChartTypeSelector = true"
+  data-test="custom-chart-type-selector-btn">
+  <template #icon-left><BarChart2 class="tw:w-4 tw:h-4" /></template>
+  Example Charts
+</OButton>
                           <q-dialog v-model="showCustomChartTypeSelector">
                             <CustomChartTypeSelector
                               @select="handleChartTypeSelection"
@@ -670,6 +642,9 @@ import DashboardErrorsComponent from "@/components/dashboards/addPanel/Dashboard
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { BarChart2 } from "lucide-vue-next";
 // Async component imports for code splitting
 const ConfigPanel = defineAsyncComponent(
   () => import("@/components/dashboards/addPanel/ConfigPanel.vue"),

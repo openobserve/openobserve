@@ -36,24 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p class="text-grey-7">
           Please start the registration process from AWS Marketplace.
         </p>
-        <q-btn
-          color="primary"
-          label="Go to Dashboard"
-          @click="goToDashboard"
-          class="q-mt-lg"
-        />
+        <OButton @click="goToDashboard" class="q-mt-lg">Go to Dashboard</OButton>
       </div>
 
       <!-- Error State -->
       <div v-else-if="state === 'error'" class="text-center">
         <q-icon name="error" size="80px" color="negative" />
         <h5 class="q-mt-md">{{ errorMessage }}</h5>
-        <q-btn
-          color="primary"
-          label="Try Again"
-          @click="resetAndRetry"
-          class="q-mt-lg"
-        />
+        <OButton @click="resetAndRetry" class="q-mt-lg">Try Again</OButton>
       </div>
 
       <!-- Org Selection/Creation -->
@@ -80,14 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mb-md"
                 :rules="[(val) => !!val || 'Organization name is required']"
               />
-              <q-btn
-                color="primary"
-                label="Create & Link"
-                @click="createNewOrgWithAws"
-                :loading="isProcessing"
-                :disable="!newOrgName"
-                class="full-width"
-              />
+              <OButton
+  @click="createNewOrgWithAws"
+  :loading="isProcessing"
+  :disabled="!newOrgName"
+  class="full-width">Create & Link</OButton>
             </q-card-section>
           </q-card>
 
@@ -113,14 +100,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 class="q-mb-md"
               />
-              <q-btn
-                color="primary"
-                label="Link AWS Billing"
-                @click="linkToExistingOrg"
-                :loading="isProcessing"
-                :disable="!selectedOrg"
-                class="full-width"
-              />
+              <OButton
+  @click="linkToExistingOrg"
+  :loading="isProcessing"
+  :disabled="!selectedOrg"
+  class="full-width">Link AWS Billing</OButton>
             </q-card-section>
           </q-card>
         </div>
@@ -151,13 +135,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p class="text-grey-7">
           Your AWS Marketplace subscription is now active.
         </p>
-        <q-btn
-          color="primary"
-          label="Go to Dashboard"
-          @click="goToDashboard"
-          class="q-mt-lg"
-          size="lg"
-        />
+        <OButton
+  size="lg"
+  @click="goToDashboard"
+  class="q-mt-lg">Go to Dashboard</OButton>
       </div>
 
       <!-- Payment Failed State -->
@@ -168,12 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           There was an issue with your AWS Marketplace payment. Please check
           your AWS account or contact AWS support.
         </p>
-        <q-btn
-          color="primary"
-          label="Contact Support"
-          href="mailto:support@openobserve.ai"
-          class="q-mt-lg"
-        />
+        <OButton href="mailto:support@openobserve.ai" class="q-mt-lg">Contact Support</OButton>
       </div>
     </div>
   </div>
@@ -188,6 +164,7 @@ import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import awsMarketplace from "@/services/awsMarketplace";
 import organizationsService from "@/services/organizations";
 
+import OButton from "@/lib/core/Button/Button.vue";
 type SetupState =
   | "select_org"
   | "no_token"
@@ -198,6 +175,9 @@ type SetupState =
   | "error";
 
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "AwsMarketplaceSetup",
   setup() {
     const store = useStore();

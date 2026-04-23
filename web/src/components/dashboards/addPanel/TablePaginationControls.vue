@@ -39,46 +39,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Navigation arrows: only when pagination is enabled -->
     <template v-if="showPagination">
-      <q-btn
-        v-if="pagesNumber > 1"
-        icon="first_page"
-        color="grey-8"
-        round
-        dense
-        flat
-        :disable="isFirstPage"
-        @click="$emit('firstPage')"
-      />
-      <q-btn
-        v-if="pagesNumber > 1"
-        icon="chevron_left"
-        color="grey-8"
-        round
-        dense
-        flat
-        :disable="isFirstPage"
-        @click="$emit('prevPage')"
-      />
-      <q-btn
-        v-if="pagesNumber > 1"
-        icon="chevron_right"
-        color="grey-8"
-        round
-        dense
-        flat
-        :disable="isLastPage"
-        @click="$emit('nextPage')"
-      />
-      <q-btn
-        v-if="pagesNumber > 1"
-        icon="last_page"
-        color="grey-8"
-        round
-        dense
-        flat
-        :disable="isLastPage"
-        @click="$emit('lastPage')"
-      />
+      <OButton
+  variant="ghost"
+  size="icon"
+  v-if="pagesNumber > 1"
+  @click="$emit('firstPage')"
+  :disabled="isFirstPage">
+  <template #icon-left><ChevronsLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
+      <OButton
+  variant="ghost"
+  size="icon"
+  v-if="pagesNumber > 1"
+  @click="$emit('prevPage')"
+  :disabled="isFirstPage">
+  <template #icon-left><ChevronLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
+      <OButton
+  variant="ghost"
+  size="icon"
+  v-if="pagesNumber > 1"
+  @click="$emit('nextPage')"
+  :disabled="isLastPage">
+  <template #icon-left><ChevronRight class="tw:w-4 tw:h-4" /></template>
+</OButton>
+      <OButton
+  variant="ghost"
+  size="icon"
+  v-if="pagesNumber > 1"
+  @click="$emit('lastPage')"
+  :disabled="isLastPage">
+  <template #icon-left><ChevronsRight class="tw:w-4 tw:h-4" /></template>
+</OButton>
     </template>
   </div>
 </template>
@@ -86,8 +78,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
+
+import OButton from "@/lib/core/Button/Button.vue";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-vue-next";
 export default defineComponent({
-  name: "TablePaginationControls",
+  components: {
+    OButton,
+    ChevronsLeft,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsRight,
+  },
+
+name: "TablePaginationControls",
   props: {
     showPagination: {
       type: Boolean,

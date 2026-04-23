@@ -24,9 +24,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true"
-round flat
-icon="cancel" />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
     </q-card-section>
@@ -100,6 +103,7 @@ import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -107,6 +111,9 @@ const defaultValue: any = () => {
 };
 
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "SearchDetail",
   props: {
     modelValue: {

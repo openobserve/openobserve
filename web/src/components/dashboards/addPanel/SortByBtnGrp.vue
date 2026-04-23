@@ -1,35 +1,29 @@
 <template>
   Sort By:
   <q-btn-group class="el-border">
-    <q-btn
-      :class="[!fieldObj.sortBy ? 'selected' : '', 'tw:px-2.5', 'el-border']"
-      @click="updateSortOption(null)"
-      icon="block"
-      size="sm"
-      data-test="dashboard-sort-by-item-clear"
-    />
-    <q-btn
-      :class="[
+    <OButton
+  size="icon"
+  @click="updateSortOption(null)"
+  data-test="dashboard-sort-by-item-clear"
+  :class="[!fieldObj.sortBy ? 'selected' : '', 'tw:px-2.5', 'el-border']">
+  <template #icon-left><Ban class="tw:w-4 tw:h-4" /></template>
+</OButton>
+    <OButton
+  @click="updateSortOption('ASC')"
+  data-test="dashboard-sort-by-item-asc"
+  :class="[
         fieldObj.sortBy === 'ASC' ? 'selected' : '',
         'tw:px-2',
         'custom-border',
-      ]"
-      @click="updateSortOption('ASC')"
-      data-test="dashboard-sort-by-item-asc"
-    >
-      <AscSort />
-    </q-btn>
-    <q-btn
-      :class="[
+      ]"><AscSort /></OButton>
+    <OButton
+  @click="updateSortOption('DESC')"
+  data-test="dashboard-sort-by-item-desc"
+  :class="[
         fieldObj.sortBy === 'DESC' ? 'selected' : '',
         'tw:px-2.5',
         'el-border',
-      ]"
-      @click="updateSortOption('DESC')"
-      data-test="dashboard-sort-by-item-desc"
-    >
-      <DescSort />
-    </q-btn>
+      ]"><DescSort /></OButton>
   </q-btn-group>
 </template>
 
@@ -40,9 +34,15 @@ import AscSort from "@/components/icons/AscSort.vue";
 import DescSort from "@/components/icons/DescSort.vue";
 import { inject } from "vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Ban } from "lucide-vue-next";
 export default defineComponent({
   name: "SortByBtnGrp",
-  components: { AscSort, DescSort },
+  components: { AscSort, DescSort,
+    OButton,
+    Ban,
+},
   props: {
     fieldObj: {
       type: Object,

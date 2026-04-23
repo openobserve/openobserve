@@ -13,15 +13,12 @@
     </div>
 
     <div class="flex justify-center q-mt-lg">
-      <q-btn
-        data-test="sso-login-btn"
-        class="text-bold no-border"
-        padding="sm lg"
-        color="primary"
-        no-caps
-        style="width: 400px"
-      >
-        <div
+      <OButton
+  size="sm"
+  data-test="sso-login-btn"
+  style="width: 400px"
+  class="text-bold">
+  <div
           data-test="sso-login-btn"
           class="flex items-center justify-center full-width text-center relative"
         >
@@ -32,7 +29,7 @@
           />
           <span class="text-center"> Login with SSO</span>
         </div>
-      </q-btn>
+</OButton>
     </div>
 
     <div class="q-mb-md q-mt-lg text-center">
@@ -72,18 +69,14 @@
           />
 
           <div class="q-mt-lg q-mb-xl">
-            <q-btn
-              data-cy="login-sign-in"
-              unelevated
-              class="full-width text-bold no-border"
-              color="primary"
-              type="submit"
-              padding="sm lg"
-              :label="t('login.signIn')"
-              :loading="isSubmitting"
-              no-caps
-              @click="onSignIn()"
-            />
+            <OButton
+  variant="ghost"
+  size="sm"
+  data-cy="login-sign-in"
+  type="submit"
+  :loading="isSubmitting"
+  @click="onSignIn()"
+  class="full-width text-bold">{{ t('login.signIn') }}</OButton>
           </div>
         </q-form>
       </div>
@@ -97,6 +90,7 @@ import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const store = useStore();
 
 const { t } = useI18n();

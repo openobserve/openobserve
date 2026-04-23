@@ -108,29 +108,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="tw:flex tw:items-center tw:gap-3">
           <!-- Refresh button (shown when percentile changes on duration tab) -->
-          <q-btn
-            v-if="showRefreshButton"
-            dense
-            no-caps
-            color="primary"
-            icon="refresh"
-            @click="refreshAfterPercentileChange"
-            data-test="percentile-refresh-button"
-            class="tw:px-[0.5rem]!"
-          >
-            <q-tooltip>{{ t("latencyInsights.refreshTooltip") }}</q-tooltip>
-          </q-btn>
+          <OButton
+  v-if="showRefreshButton"
+  @click="refreshAfterPercentileChange"
+  data-test="percentile-refresh-button"
+  class="tw:px-[0.5rem]!">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("latencyInsights.refreshTooltip") }}</q-tooltip>
+</OButton>
 
-          <q-btn
-            flat
-            round
-            dense
-            size="sm"
-            :icon="outlinedClose"
-            @click="isOpen = false"
-            data-test="analysis-dashboard-close"
-            class="traces-analysis-close-btn"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  @click="isOpen = false"
+  data-test="analysis-dashboard-close"
+  class="traces-analysis-close-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </q-card-section>
 
@@ -255,25 +249,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- SEPARATOR: Collapse/Expand Button -->
           <template #separator>
-            <q-btn
-              data-test="dimension-selector-collapse-btn"
-              :icon="showDimensionSelector ? 'chevron_left' : 'chevron_right'"
-              :title="
+            <OButton
+  size="icon"
+  data-test="dimension-selector-collapse-btn"
+  :title="
                 showDimensionSelector
                   ? 'Collapse Dimensions'
                   : 'Expand Dimensions'
               "
-              :class="
+  @click="toggleDimensionSelector"
+  :class="
                 showDimensionSelector
                   ? 'splitter-icon-expand'
                   : 'splitter-icon-collapse'
-              "
-              color="primary"
-              size="sm"
-              dense
-              round
-              @click="toggleDimensionSelector"
-            />
+              " />
           </template>
 
           <!-- RIGHT: Dashboard Charts -->
@@ -319,13 +308,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("latencyInsights.failedToLoad") }}
                   </div>
                   <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
-                  <q-btn
-                    outline
-                    color="primary"
-                    :label="t('latencyInsights.retryButton')"
-                    class="tw:mt-4"
-                    @click="loadAnalysis"
-                  />
+                  <OButton
+  variant="outline"
+  @click="loadAnalysis"
+  class="tw:mt-4">{{ t('latencyInsights.retryButton') }}</OButton>
                 </div>
 
                 <!-- Dashboard -->
@@ -372,6 +358,9 @@ import {
 } from "@/composables/useDimensionSelector";
 import { outlinedClose } from "@quasar/extras/material-icons-outlined";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { RefreshCw } from "lucide-vue-next";
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );

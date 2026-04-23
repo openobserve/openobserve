@@ -22,15 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-between full-width tw:h-[68px] tw:px-2 tw:py-3"
         >
           <div class="flex items-center">
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              icon="arrow_back_ios_new"
-              class="hideOnPrintMode el-border"
-              @click="goBack"
-              data-test="alert-history-back-btn"
-            />
+            <OButton
+  variant="outline"
+  size="icon"
+  @click="goBack"
+  data-test="alert-history-back-btn"
+  class="hideOnPrintMode">
+  <template #icon-left><ArrowLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
             <div
               class="q-table__title tw:font-[600] q-ml-sm tw:flex tw:items-center tw:gap-2"
               data-test="pipeline-history-title"
@@ -100,28 +99,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item>
               </template>
             </q-select>
-            <q-btn
-              icon="search"
-              flat
-              dense
-              @click="manualSearch"
-              data-test="pipeline-history-manual-search-btn"
-              :disable="loading"
-              class="q-mr-sm download-logs-btn q-px-sm q-py-sm element-box-shadow el-border"
-            >
-              <q-tooltip>{{ t("common.search") || "Search" }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              icon="refresh"
-              flat
-              dense
-              @click="refreshData"
-              class="download-logs-btn q-px-sm q-py-sm element-box-shadow el-border"
-              data-test="pipeline-history-refresh-btn"
-              :loading="loading"
-            >
-              <q-tooltip>{{ t("common.refresh") || "Refresh" }}</q-tooltip>
-            </q-btn>
+            <OButton
+  variant="outline"
+  @click="manualSearch"
+  data-test="pipeline-history-manual-search-btn"
+  :disabled="loading"
+  class="q-mr-sm download-logs-btn q-px-sm q-py-sm element-box-shadow">
+  <template #icon-left><Search class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("common.search") || "Search" }}</q-tooltip>
+</OButton>
+            <OButton
+  variant="outline"
+  @click="refreshData"
+  data-test="pipeline-history-refresh-btn"
+  :loading="loading"
+  class="download-logs-btn q-px-sm q-py-sm element-box-shadow">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("common.refresh") || "Refresh" }}</q-tooltip>
+</OButton>
           </div>
         </div>
       </div>
@@ -275,7 +270,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-xs bg-primary text-white">
           <div class="text-h6">Pipeline Execution Details</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup>
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </q-card-section>
 
         <q-separator />
@@ -508,7 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
 
         <q-card-actions align="right" class="q-pa-md">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <OButton variant="ghost" v-close-popup>Close</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -528,14 +528,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
             </div>
           </div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
-            @click="closeErrorDialog"
-            class="close-btn"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  @click="closeErrorDialog"
+  class="close-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </q-card-section>
 
         <q-separator />
@@ -549,13 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-card-section>
         <q-card-actions class="pipeline-error-actions">
-          <q-btn
-            flat
-            no-caps
-            label="Close"
-            class="o2-secondary-button tw:h-[36px]"
-            @click="closeErrorDialog"
-          />
+          <OButton variant="secondary" @click="closeErrorDialog">Close</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -574,6 +567,9 @@ import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import NoData from "@/components/shared/grid/NoData.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ArrowLeft, RefreshCw, Search } from "lucide-vue-next";
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();

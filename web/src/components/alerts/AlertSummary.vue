@@ -29,18 +29,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-show="showScrollToBottom"
       class="scroll-to-bottom-container"
     >
-      <q-btn
-        round
-        flat
-        icon="arrow_downward"
-        class="scroll-to-bottom-btn"
-        @click="scrollToBottomSmooth"
-        size="sm"
-      >
-        <q-tooltip anchor="top middle" self="bottom middle">
+      <OButton
+  variant="ghost"
+  size="sm"
+  @click="scrollToBottomSmooth"
+  class="scroll-to-bottom-btn">
+  <template #icon-left><ArrowDown class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip anchor="top middle" self="bottom middle">
           Scroll to bottom
         </q-tooltip>
-      </q-btn>
+</OButton>
     </div>
   </div>
 </template>
@@ -51,6 +49,9 @@ import { useI18n } from 'vue-i18n';
 import DOMPurify from 'dompurify';
 import { generateAlertSummary } from '@/utils/alerts/alertSummaryGenerator';
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ArrowDown } from "lucide-vue-next";
 const { t } = useI18n();
 
 const props = defineProps({

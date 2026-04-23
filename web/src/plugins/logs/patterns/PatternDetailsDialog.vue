@@ -41,13 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="col-auto">
-            <q-btn
-              v-close-popup="true"
-              round
-              flat
-              icon="cancel"
-              data-test="close-pattern-dialog"
-            />
+            <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true"
+  data-test="close-pattern-dialog">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </div>
       </q-card-section>
@@ -280,15 +280,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="tw:px-[0.625rem] tw:py-[0.375rem]">
         <div class="row items-center no-wrap justify-between">
           <div class="col-auto">
-            <q-btn
-              data-test="pattern-detail-previous-btn"
-              class="o2-secondary-button tw:h-[36px]"
-              no-caps
-              :disabled="selectedPattern.index === 0"
-              @click="$emit('navigate', false, true)"
-              icon="navigate_before"
-              :label="t('search.patternNavPrevious')"
-            />
+            <OButton
+  variant="secondary"
+  data-test="pattern-detail-previous-btn"
+  :disabled="selectedPattern.index === 0"
+  @click="$emit('navigate', false, true)">
+  <template #icon-left><ChevronLeft class="tw:w-4 tw:h-4" /></template>
+  {{ t('search.patternNavPrevious') }}
+</OButton>
           </div>
           <div class="col-auto text-center">
             <span class="text-caption text-grey-7">
@@ -296,15 +295,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
           <div class="col-auto">
-            <q-btn
-              data-test="pattern-detail-next-btn"
-              class="o2-secondary-button tw:h-[36px]"
-              no-caps
-              :disabled="selectedPattern.index >= totalPatterns - 1"
-              @click="$emit('navigate', true, false)"
-              icon-right="navigate_next"
-              :label="t('search.patternNavNext')"
-            />
+            <OButton
+  variant="secondary"
+  data-test="pattern-detail-next-btn"
+  :disabled="selectedPattern.index >= totalPatterns - 1"
+  @click="$emit('navigate', true, false)">
+  {{ t('search.patternNavNext') }}
+  <template #icon-right><ChevronRight class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </div>
       </q-card-section>
@@ -323,6 +321,9 @@ import {
   anomalyExplanation,
 } from "@/composables/useLogs/useTemplateTokenizer";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 const props = defineProps<{
   modelValue: boolean;
   selectedPattern: { pattern: any; index: number } | null;

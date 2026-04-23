@@ -22,15 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex justify-between items-center">
         <div class="text-bold text-h6">Resource Details</div>
-        <q-btn
-          flat
-          dense
-          round
-          icon="close"
-          data-test="close-drawer-btn"
-          @click="closeDrawer"
-          class="hover:tw:text-[var(--o2-primary-btn-bg)]"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  data-test="close-drawer-btn"
+  @click="closeDrawer"
+  class="hover:tw:text-[var(--o2-primary-btn-bg)]">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </div>
     </div>
 
@@ -145,26 +144,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Session Context
           </div>
           <div class="row q-gutter-sm">
-            <q-btn
-              outline
-              no-caps
-              color="primary"
-              label="View Session Replay"
-              icon="play_circle"
-              data-test="view-session-replay-btn"
-              @click="viewSessionReplay"
-              class="tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! hover:tw:bg-[var(--o2-hover-accent)]!"
-            />
-            <q-btn
-              flat
-              no-caps
-              color="primary"
-              label="View All Session Events"
-              icon="list"
-              data-test="view-session-events-btn"
-              @click="viewSessionEvents"
-              class="tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! hover:tw:bg-[var(--o2-hover-accent)]!"
-            />
+            <OButton
+  variant="outline"
+  data-test="view-session-replay-btn"
+  @click="viewSessionReplay"
+  class="tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! hover:tw:bg-[var(--o2-hover-accent)]!">
+  <template #icon-left><PlayCircle class="tw:w-4 tw:h-4" /></template>
+  View Session Replay
+</OButton>
+            <OButton
+  variant="ghost"
+  data-test="view-session-events-btn"
+  @click="viewSessionEvents"
+  class="tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! hover:tw:bg-[var(--o2-hover-accent)]!">View All Session Events</OButton>
           </div>
         </div>
       </template>
@@ -179,6 +171,9 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { PlayCircle } from "lucide-vue-next";
 const props = defineProps({
   modelValue: {
     type: Boolean,

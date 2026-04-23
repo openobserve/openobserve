@@ -75,8 +75,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="cancel" >
-          </q-btn>
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
     </q-card-section>
@@ -324,19 +328,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
                       </template>
                     </q-input>
-                    <q-btn
-                      v-if="isSchemaUDSEnabled"
-                      data-test="schema-add-fields-title"
-                      @click="openDialog"
-                      no-caps
-                      :disable="isDialogOpen"
-                      class="o2-secondary-button tw:h-[36px] tw:w-[32px] q-my-sm tw:min-w-[32px]!"
-                      flat
-                      @click.stop="openDialog"
-                      title="Add Field(s)"
-                    >
-                    <q-icon name="add" size="xs" />
-                    </q-btn>
+                    <OButton
+  variant="secondary"
+  v-if="isSchemaUDSEnabled"
+  data-test="schema-add-fields-title"
+  @click="openDialog"
+  @click.stop="openDialog"
+  title="Add Field(s)"
+  :disabled="isDialogOpen"
+  class="tw:w-[32px] q-my-sm tw:min-w-[32px]!"><q-icon name="add" size="xs" /></OButton>
                   </div>
                 </div>
 
@@ -350,16 +350,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tw:flex tw:justify-between tw:items-center">
                       <div class="text-h6">Add Field(s)</div>
                       <div>
-                        <q-btn
-                          data-test="add-stream-cancel-btn"
-                          icon="close"
-                          class="text-bold q-mr-md"
-                          text-color="light-text"
-                          no-caps
-                          dense
-                          flat
-                          @click="closeDialog"
-                        />
+                        <OButton
+  variant="ghost"
+  size="icon"
+  data-test="add-stream-cancel-btn"
+  text-color="light-text"
+  @click="closeDialog"
+  class="text-bold q-mr-md">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
                       </div>
                     </div>
                   </q-card-section>
@@ -928,26 +927,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="activeMainTab === 'llmEvaluation'"
                 class="flex items-center justify-end"
               >
-                <q-btn
-                  v-close-popup="true"
-                  data-test="schema-cancel-button"
-                  class="q-ml-md o2-secondary-button tw:h-[36px]"
-                  :label="t('logStream.cancel')"
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  no-caps
-                  flat
-                  @click="llmEvalFormDirty = false"
-                />
-                <q-btn
-                  v-bind:disable="!llmEvalFormDirty"
-                  data-test="schema-update-settings-button"
-                  :label="t('logStream.updateSettings')"
-                  class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-                  :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-                  no-caps
-                  flat
-                  @click="llmEvalSettingsRef?.save()"
-                />
+                <OButton
+  variant="secondary"
+  v-close-popup="true"
+  data-test="schema-cancel-button"
+  @click="llmEvalFormDirty = false"
+  class="q-ml-md">{{ t('logStream.cancel') }}</OButton>
+                <OButton
+  v-bind:disable="!llmEvalFormDirty"
+  data-test="schema-update-settings-button"
+  @click="llmEvalSettingsRef?.save()"
+  class="q-ml-md">{{ t('logStream.updateSettings') }}</OButton>
               </div>
 
               <div
@@ -961,16 +951,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ><strong> {{ selectedFields.length }}</strong> fields
                     selected</span
                   >
-                  <q-btn
-                    v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
-                    data-test="schema-add-field-button"
-                    class=" no-border q-mr-md o2-secondary-button tw:h-[36px]"
-                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                    no-caps
-                    v-bind:disable="!selectedFields.length"
-                    @click="updateDefinedSchemaFields"
-                  >
-                    <span class="flex items-center justify-start q-mr-sm">
+                  <OButton
+  variant="secondary"
+  v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
+  data-test="schema-add-field-button"
+  v-bind:disable="!selectedFields.length"
+  @click="updateDefinedSchemaFields"
+  class="q-mr-md">
+  <span class="flex items-center justify-start q-mr-sm">
                       <q-icon size="14px" :name="outlinedPerson" />
                       <q-icon size="14px" :name="outlinedSchema" />
                     </span>
@@ -979,49 +967,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? t("logStream.removeSchemaField")
                         : t("logStream.addSchemaField")
                     }}
-                  </q-btn>
-                  <q-btn
-                    v-if="activeMainTab != 'configuration' && activeMainTab != 'crossLinking'"
-                    v-bind:disable="
+</OButton>
+                  <OButton
+  variant="secondary"
+  v-if="activeMainTab != 'configuration' && activeMainTab != 'crossLinking'"
+  v-bind:disable="
                       !selectedFields.length && !selectedDateFields.length
                     "
-                    data-test="schema-delete-button"
-                    class="text-bold btn-delete o2-secondary-button tw:h-[36px]"
-                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                    no-caps
-                    flat
-                    @click="
+  data-test="schema-delete-button"
+  @click="
                       activeMainTab == 'schemaSettings'
                         ? (confirmQueryModeChangeDialog = true)
                         : (confirmDeleteDatesDialog = true)
                     "
-                  >
-                    <span class="flex items-center tw:gap-1">
+  class="text-bold btn-delete">
+  <span class="flex items-center tw:gap-1">
                       <q-icon size="14px" :name="outlinedDelete" />
                       {{ t("logStream.delete") }}
                     </span>
-                  </q-btn>
+</OButton>
                 </div>
                 <div class="flex justify-end">
-                  <q-btn
-                    v-close-popup="true"
-                    data-test="schema-cancel-button"
-                    class="q-ml-md o2-secondary-button tw:h-[36px]"
-                    :label="t('logStream.cancel')"
-                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                    no-caps
-                    flat
-                  />
-                  <q-btn
-                    v-bind:disable="!formDirtyFlag"
-                    data-test="schema-update-settings-button"
-                    :label="t('logStream.updateSettings')"
-                    class=" no-border q-ml-md o2-primary-button tw:h-[36px"
-                    :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-                    type="submit"
-                    no-caps
-                    flat
-                  />
+                  <OButton
+  variant="secondary"
+  v-close-popup="true"
+  data-test="schema-cancel-button"
+  class="q-ml-md">{{ t('logStream.cancel') }}</OButton>
+                  <OButton
+  v-bind:disable="!formDirtyFlag"
+  data-test="schema-update-settings-button"
+  type="submit"
+  class="q-ml-md tw:h-[36px">{{ t('logStream.updateSettings') }}</OButton>
                 </div>
               </div>
             </div>
@@ -1105,6 +1081,7 @@ import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -1134,7 +1111,8 @@ export default defineComponent({
     PerformanceFieldsDialog,
     LlmEvaluationSettings,
     CrossLinkManager,
-  },
+    OButton,
+},
   setup({ modelValue }) {
     type PatternAssociation = {
       field: string;

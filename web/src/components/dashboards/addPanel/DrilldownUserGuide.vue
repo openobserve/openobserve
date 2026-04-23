@@ -1,18 +1,16 @@
 <template>
   <div ref="userGuideBtnRef">
-    <q-btn
-      no-caps
-      @click="onUserGuideClick"
-      padding="xs"
-      class="q-ml-md"
-      flat
-      icon="help_outline"
-      data-test="dashboard-drilldown-help-btn"
-    >
-      <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
+    <OButton
+  variant="ghost"
+  size="sm"
+  @click="onUserGuideClick"
+  data-test="dashboard-drilldown-help-btn"
+  class="q-ml-md">
+  <template #icon-left><HelpCircle class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
         User Guide
       </q-tooltip>
-    </q-btn>
+</OButton>
   </div>
   <div
     class="user-guide scroll o2-input"
@@ -151,7 +149,14 @@
 import { ref } from "vue";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { HelpCircle } from "lucide-vue-next";
 export default {
+  components: {
+    OButton,
+    HelpCircle,
+  },
   name: "DrilldownUserGuide",
   setup() {
     const store = useStore();

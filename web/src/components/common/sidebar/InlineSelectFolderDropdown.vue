@@ -29,16 +29,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :disable="disable"
       @update:model-value="$emit('update:modelValue', $event)"
     />
-    <q-btn
-      v-if="!disable"
-      flat
-      dense
-      icon="add"
-      size="xs"
-      class="tw:rounded tw:shrink-0 add-folder-btn"
-      title="Add Folder"
-      @click="showDialog = true"
-    />
+    <OButton
+  variant="ghost"
+  size="icon"
+  v-if="!disable"
+  title="Add Folder"
+  @click="showDialog = true"
+  class="tw:rounded tw:shrink-0 add-folder-btn">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
     <q-dialog
       v-model="showDialog"
       position="right"
@@ -61,9 +60,15 @@ import { useStore } from "vuex";
 import AddFolder from "./AddFolder.vue";
 import { getFoldersListByType } from "@/utils/commons";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus } from "lucide-vue-next";
 export default defineComponent({
   name: "InlineSelectFolderDropdown",
-  components: { AddFolder },
+  components: { AddFolder,
+    OButton,
+    Plus,
+},
   emits: ["update:modelValue"],
   props: {
     modelValue: {

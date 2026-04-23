@@ -53,24 +53,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </q-input>
               </div>
-              <q-btn
-                data-test="log-stream-refresh-stats-btn"
-                class="q-ml-sm o2-secondary-button tw:h-[36px]"
-                flat
-                no-caps
-                @click="getLogStream(true)"
-              >
-                <span>{{ t(`logStream.refreshStats`) }}</span>
-              </q-btn>
-              <q-btn
-                v-if="isSchemaUDSEnabled"
-                data-test="log-stream-add-stream-btn"
-                class="q-ml-sm o2-primary-button tw:h-[36px]"
-                flat
-                no-caps
-                :label="t(`logStream.add`)"
-                @click="addStream"
-              />
+              <OButton
+  variant="secondary"
+  data-test="log-stream-refresh-stats-btn"
+  @click="getLogStream(true)"
+  class="q-ml-sm"><span>{{ t(`logStream.refreshStats`) }}</span></OButton>
+              <OButton
+  v-if="isSchemaUDSEnabled"
+  data-test="log-stream-add-stream-btn"
+  @click="addStream"
+  class="q-ml-sm">{{ t(`logStream.add`) }}</OButton>
             </div>
           </div>
         </div>
@@ -111,39 +103,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #body-cell-actions="props">
               <q-td :props="props">
-                <q-btn
-                  :title="t('logStream.explore')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  @click="exploreStream(props)"
-                  icon="search"
-                >
-              </q-btn>
-                <q-btn
-                  :title="t('logStream.schemaHeader')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  @click="listSchema(props)"
-                  icon="list_alt"
-                >
-              </q-btn>
-                <q-btn
-                  :title="t('logStream.delete')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  @click="confirmDeleteAction(props)"
-                  :icon="outlinedDelete"
-                >
-              </q-btn>
+                <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('logStream.explore')"
+  @click="exploreStream(props)">
+  <template #icon-left><Search class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('logStream.schemaHeader')"
+  @click="listSchema(props)">
+  <template #icon-left><ClipboardList class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('logStream.delete')"
+  @click="confirmDeleteAction(props)">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </q-td>
             </template>
             <template v-slot:pagination="scope">
@@ -151,32 +131,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
               <div class="q-btn-group row no-wrap inline q-ml-md">
-                <q-btn
-                  icon="chevron_left"
-                  color="grey-8"
-                  round
-                  dense
-                  flat
-                  size="sm"
-                  class="q-px-sm"
-                  :disable="scope.isFirstPage"
-                  @click="scope.prevPage"
-                />
+                <OButton
+  variant="ghost"
+  size="icon"
+  @click="scope.prevPage"
+  :disabled="scope.isFirstPage"
+  class="q-px-sm">
+  <template #icon-left><ChevronLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
                 <hr
                   class="q-separator q-separator--vertical"
                   aria-orientation="vertical"
                 />
-                <q-btn
-                  icon="chevron_right"
-                  color="grey-8"
-                  round
-                  dense
-                  flat
-                  size="sm"
-                  class="q-px-sm"
-                  :disable="scope.isLastPage"
-                  @click="scope.nextPage"
-                />
+                <OButton
+  variant="ghost"
+  size="icon"
+  @click="scope.nextPage"
+  :disabled="scope.isLastPage"
+  class="q-px-sm">
+  <template #icon-left><ChevronRight class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </div>
               </div>
 
@@ -211,18 +185,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
                 <div class="q-table__separator tw:flex tw:items-center tw:w-full text-bold tw:text-[14px]">
                   {{scope.pagination.rowsNumber}} Stream(s)
-                  <q-btn
-                  v-if="selected.length > 0"
-                  class="o2-secondary-button tw:h-[36px] tw:ml-4"
-                  no-caps
-                  flat
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  :disable="isDeleting"
-                  @click="confirmBatchDeleteAction"
-                >
-                  <q-icon name="delete" size="16px" />
+                  <OButton
+  variant="secondary"
+  v-if="selected.length > 0"
+  @click="confirmBatchDeleteAction"
+  :disabled="isDeleting"
+  class="tw:ml-4">
+  <q-icon name="delete" size="16px" />
                   <span class="tw:ml-2">{{ isDeleting ? 'Deleting...' : 'Delete' }}</span>
-              </q-btn>
+</OButton>
                 </div>
                 <QTablePagination
                   :scope="scope"
@@ -275,19 +246,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           </div>
         <q-card-actions class="confirmActionsLogStream">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
-            {{ t("logStream.cancel") }}
-          </q-btn>
-          <q-btn
-            v-close-popup="true"
-            unelevated
-            no-caps
-            class="no-border"
-            color="primary"
-            @click="deleteStream"
-          >
-            {{ t("logStream.ok") }}
-          </q-btn>
+          <OButton
+  variant="ghost"
+  v-close-popup="true"
+  class="q-mr-sm">{{ t("logStream.cancel") }}</OButton>
+          <OButton
+  variant="ghost"
+  v-close-popup="true"
+  @click="deleteStream">{{ t("logStream.ok") }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -304,19 +270,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           </div>
         <q-card-actions class="confirmActionsLogStream">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
-            {{ t("logStream.cancel") }}
-          </q-btn>
-          <q-btn
-            v-close-popup="true"
-            unelevated
-            no-caps
-            class="no-border"
-            color="primary"
-            @click="deleteBatchStream"
-          >
-            {{ t("logStream.ok") }}
-          </q-btn>
+          <OButton
+  variant="ghost"
+  v-close-popup="true"
+  class="q-mr-sm">{{ t("logStream.cancel") }}</OButton>
+          <OButton
+  variant="ghost"
+  v-close-popup="true"
+  @click="deleteBatchStream">{{ t("logStream.ok") }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -355,9 +316,20 @@ import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+
+import OButton from "@/lib/core/Button/Button.vue";
+import { ChevronLeft, ChevronRight, ClipboardList, Search, Trash2 } from "lucide-vue-next";
 export default defineComponent({
-  name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, AddStream, AppTabs, },
+
+name: "PageLogStream",
+  components: { QTablePagination, SchemaIndex, NoData, AddStream, AppTabs,
+    OButton,
+    Search,
+    ClipboardList,
+    Trash2,
+    ChevronLeft,
+    ChevronRight,
+},
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();

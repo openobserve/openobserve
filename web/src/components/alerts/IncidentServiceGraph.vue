@@ -17,16 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="incident-service-graph" style="height: calc(100vh - 202px); position: relative;">
     <!-- Info Icon Button -->
-    <q-btn
-      v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      round
-      flat
-      icon="info_outline"
-      size="sm"
-      class="info-icon-btn"
-      :class="isDarkMode ? 'tw-text-gray-400 hover:tw-text-gray-200' : 'tw-text-gray-500 hover:tw-text-gray-700'"
-    >
-      <q-tooltip
+    <OButton
+  variant="ghost"
+  size="sm"
+  v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
+  class="info-icon-btn" :class="isDarkMode ? 'tw-text-gray-400 hover:tw-text-gray-200' : 'tw-text-gray-500 hover:tw-text-gray-700'">
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
         :delay="200"
         anchor="bottom left"
         self="top right"
@@ -50,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </q-tooltip>
-    </q-btn>
+</OButton>
 
     <!-- Loading State -->
     <div
@@ -99,12 +96,17 @@ import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Info } from "lucide-vue-next";
 export default defineComponent({
   name: "IncidentServiceGraph",
   components: {
     ChartRenderer,
     DropzoneBackground,
-  },
+    OButton,
+    Info,
+},
   props: {
     topologyContext: {
       type: Object as () => { nodes: AlertNode[]; edges: any[] } | null,

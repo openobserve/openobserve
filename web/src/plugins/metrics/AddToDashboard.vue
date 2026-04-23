@@ -9,13 +9,13 @@
             </div>
           </div>
           <div class="col-auto">
-            <q-btn
-              v-close-popup="true"
-              data-test="metrics-schema-cancel"
-              round
-              flat
-              icon="cancel"
-            />
+            <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true"
+  data-test="metrics-schema-cancel">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </div>
       </q-card-section>
@@ -56,36 +56,16 @@
           />
 
           <div class="flex justify-start q-mt-sm">
-            <q-btn
-              v-close-popup="true"
-              data-test="metrics-schema-cancel-button"
-              class="o2-secondary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              :label="t('metrics.cancel')"
-              flat
-              dense
-              no-caps
-            />
-            <q-btn
-              data-test="metrics-schema-update-settings-button"
-              :label="t('metrics.add')"
-              class="o2-primary-button tw:h-[36px] q-ml-md"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-primary-button-dark'
-                  : 'o2-primary-button-light'
-              "
-              flat
-              dense
-              type="submit"
-              no-caps
-              :loading="onSubmit.isLoading.value"
-              :disable="!panelTitle.trim()"
-            />
+            <OButton
+  variant="secondary"
+  v-close-popup="true"
+  data-test="metrics-schema-cancel-button">{{ t('metrics.cancel') }}</OButton>
+            <OButton
+  data-test="metrics-schema-update-settings-button"
+  type="submit"
+  :loading="onSubmit.isLoading.value"
+  :disabled="!panelTitle.trim()"
+  class="q-ml-md">{{ t('metrics.add') }}</OButton>
           </div>
         </q-form>
       </q-card-section>
@@ -108,13 +88,15 @@ import { useRouter } from "vue-router";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "AddToDashboard",
   components: {
     SelectFolderDropdown,
     SelectDashboardDropdown,
     SelectTabDropdown,
-  },
+    OButton,
+},
   props: {
     dashboardPanelData: {
       type: Object,

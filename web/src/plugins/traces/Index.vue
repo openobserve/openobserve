@@ -101,27 +101,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #separator>
-                <q-btn
-                  data-test="logs-search-field-list-collapse-btn"
-                  :icon="
-                    searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
-                  "
-                  :title="
+                <OButton
+  size="icon"
+  data-test="logs-search-field-list-collapse-btn"
+  :title="
                     searchObj.meta.showFields
                       ? t('traces.collapseFields')
                       : t('traces.openFields')
                   "
-                  :class="
+  @click="collapseFieldList"
+  :class="
                     searchObj.meta.showFields
                       ? 'splitter-icon-collapse'
                       : 'splitter-icon-expand'
-                  "
-                  color="primary"
-                  size="sm"
-                  dense
-                  round
-                  @click="collapseFieldList"
-                />
+                  " />
               </template>
               <template #after>
                 <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
@@ -140,17 +133,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:text-[1.3rem] q-pt-lg"
                       >
                         {{ t("traces.errorRetrievingTraces") }}
-                        <q-btn
-                          v-if="
+                        <OButton
+  variant="secondary"
+  size="sm"
+  v-if="
                             searchObj.data.errorDetail ||
                             searchObj?.data?.errorMsg
                           "
-                          @click="toggleErrorDetails"
-                          size="sm"
-                          class="o2-secondary-button q-ml-sm"
-                          data-test="traces-search-error-details-btn"
-                          >{{ t("search.histogramErrorBtnLabel") }}</q-btn
-                        >
+  @click="toggleErrorDetails"
+  data-test="traces-search-error-details-btn"
+  class="q-ml-sm">{{ t("search.histogramErrorBtnLabel") }}</OButton>
                       </div>
                       <!-- Collapsible error detail — shown below results when toggled -->
                       <div class="text-center">
@@ -175,18 +167,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="traces-search-error-20003"
                         v-if="parseInt(searchObj.data.errorCode) == 20003"
                       >
-                        <q-btn
-                          no-caps
-                          unelevated
-                          size="sm"
-                          bg-secondary
-                          class="no-border bg-secondary text-white"
-                          :to="
+                        <OButton
+  variant="ghost"
+  size="sm"
+  bg-secondary
+  :to="
                             '/streams?dialog=' +
                             searchObj.data.stream.selectedStream.label
                           "
-                          >Click here</q-btn
-                        >
+  class="bg-secondary text-white">Click here</OButton>
                         {{ t("traces.configureFullTextSearch") }}
                       </div>
                       <q-item-label>{{
@@ -309,6 +298,7 @@ import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
 const SearchResult = defineAsyncComponent(() => import("./SearchResult.vue"));

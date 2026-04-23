@@ -29,14 +29,13 @@
         <div
           class="field_overlay tw:bg-[var(--o2-hover-accent)] tw:absolute tw:right-0! tw:h-full tw:top-0 tw:flex! tw:items-center! tw:rounded"
         >
-          <q-btn
-            :data-test="`log-search-index-list-filter-${row.name}-field-btn`"
-            :icon="outlinedAdd"
-            size="0.4rem"
-            class="tw:mx-[0.375rem]!"
-            @click.stop="addSearchTerm(`${row.name}=''`)"
-            round
-          />
+          <OButton
+  size="icon"
+  :data-test="`log-search-index-list-filter-${row.name}-field-btn`"
+  @click.stop="addSearchTerm(`${row.name}=''`)"
+  class="tw:mx-[0.375rem]!">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
           <q-icon
             :data-test="`log-search-index-list-add-${row.name}-field-btn`"
             v-if="showVisibilityToggle && !isFieldSelected"
@@ -83,40 +82,34 @@
                 {{ formatDuration(percentiles[p.key]) }}
               </span>
               <div class="tw:flex">
-                <q-btn
-                  :data-test="`log-search-subfield-list-equal-${row.name}-field-btn`"
-                  size="0.3rem"
-                  round
-                  :title="`duration >= ${formatDuration(percentiles[p.key])}`"
-                  @click.stop="
+                <OButton
+  :data-test="`log-search-subfield-list-equal-${row.name}-field-btn`"
+  :title="`duration >= ${formatDuration(percentiles[p.key])}`"
+  @click.stop="
                     addSearchTerm(
                       `duration>='${formatTimeWithSuffix(percentiles[p.key])}'`,
                     )
                   "
-                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
-                >
-                  <q-icon
+  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!">
+  <q-icon
                     :name="outlinedArrowForwardIos"
                     class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
                   />
-                </q-btn>
-                <q-btn
-                  :data-test="`log-search-subfield-list-not-equal-${row.name}-field-btn`"
-                  size="0.3rem"
-                  round
-                  :title="`duration <= ${formatDuration(percentiles[p.key])}`"
-                  @click.stop="
+</OButton>
+                <OButton
+  :data-test="`log-search-subfield-list-not-equal-${row.name}-field-btn`"
+  :title="`duration <= ${formatDuration(percentiles[p.key])}`"
+  @click.stop="
                     addSearchTerm(
                       `duration<='${formatTimeWithSuffix(percentiles[p.key])}'`,
                     )
                   "
-                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.625rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
-                >
-                  <q-icon
+  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.625rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!">
+  <q-icon
                     :name="outlinedArrowBackIos"
                     class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
                   />
-                </q-btn>
+</OButton>
               </div>
             </div>
           </template>
@@ -189,6 +182,9 @@ import {
   parseSpanKindWhereClause,
 } from "@/utils/traces/constants";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus } from "lucide-vue-next";
 const props = defineProps({
   row: {
     type: Object,

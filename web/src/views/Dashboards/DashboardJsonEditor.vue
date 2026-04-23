@@ -50,25 +50,19 @@
     <q-space></q-space>
 
     <q-card-actions align="right" class="q-pa-md">
-      <q-btn
-        flat
-        :label="t('common.cancel')"
-        color="primary"
-        class="q-ml-sm o2-secondary-button tw:h-[36px]"
-        v-close-popup
-        data-test="json-editor-cancel"
-      />
-      <q-btn
-        class="q-ml-sm o2-primary-button tw:h-[36px]"
-        no-caps
-        :label="t('common.save')"
-        :loading="saveJsonLoading"
-        :disable="
+      <OButton
+  variant="secondary"
+  v-close-popup
+  data-test="json-editor-cancel"
+  class="q-ml-sm">{{ t('common.cancel') }}</OButton>
+      <OButton
+  :loading="saveJsonLoading"
+  @click="saveChanges"
+  data-test="json-editor-save"
+  :disabled="
           !isValidJson || validationErrors.length > 0 || saveJsonLoading
         "
-        @click="saveChanges"
-        data-test="json-editor-save"
-      />
+  class="q-ml-sm">{{ t('common.save') }}</OButton>
     </q-card-actions>
   </q-card>
 </template>
@@ -78,15 +72,17 @@ import { defineComponent, ref, onMounted, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { defineAsyncComponent } from "vue";
-const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import { getImageURL } from "@/utils/zincutils";
 import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
+import OButton from "@/lib/core/Button/Button.vue";
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 export default defineComponent({
   name: "DashboardJsonEditor",
   components: {
     QueryEditor,
-  },
+    OButton,
+},
   props: {
     dashboardData: {
       type: Object,

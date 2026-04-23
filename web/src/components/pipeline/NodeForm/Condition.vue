@@ -23,8 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between ">
       {{ t("pipeline.conditionTitle") }}
       <div>
-          <q-btn round flat icon="cancel" @click="openCancelDialog">
-          </q-btn>
+          <OButton
+  variant="ghost"
+  size="icon"
+  @click="openCancelDialog">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
     </div>
     <q-separator />
@@ -97,39 +101,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-start full-width"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
-        <q-btn
-          v-if="pipelineObj.isEditNode"
-            data-test="add-condition-delete-btn"
-            class="o2-secondary-button tw:h-[36px] q-mr-md"
-            color="negative"
-            flat
-            type="button"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            no-caps
-            @click="openDeleteDialog"
-          >
-          <q-icon name="delete" class="q-mr-xs" />
+        <OButton
+  variant="destructive"
+  v-if="pipelineObj.isEditNode"
+  data-test="add-condition-delete-btn"
+  type="button"
+  @click="openDeleteDialog"
+  class="q-mr-md">
+  <q-icon name="delete" class="q-mr-xs" />
           {{ t('pipeline.deleteNode') }}
-        </q-btn>
-          <q-btn
-            data-test="add-condition-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            flat
-            type="button"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            no-caps
-            @click="openCancelDialog"
-          />
-          <q-btn
-            data-test="add-condition-save-btn"
-            :label="t('alerts.save')"
-            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            no-caps
-            type="submit"
-          />
+</OButton>
+          <OButton
+  variant="secondary"
+  data-test="add-condition-cancel-btn"
+  type="button"
+  @click="openCancelDialog">{{ t('alerts.cancel') }}</OButton>
+          <OButton
+  data-test="add-condition-save-btn"
+  type="submit"
+  class="q-ml-md">{{ t('alerts.save') }}</OButton>
         </div>
       </q-form>
     </div>
@@ -179,6 +169,7 @@ import {
   type V2Group,
 } from "@/utils/alerts/alertDataTransforms";
 
+import OButton from "@/lib/core/Button/Button.vue";
 
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),

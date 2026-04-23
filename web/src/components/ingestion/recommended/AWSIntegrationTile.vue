@@ -25,20 +25,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tile-name tw:font-semibold tw:text-base">
           {{ integration.displayName }}
         </div>
-        <q-btn
-          v-if="integration.documentationUrl"
-          flat
-          dense
-          round
-          size="sm"
-          icon="description"
-          color="primary"
-          @click="handleDocumentation()"
-          class="docs-btn"
-          :data-test="`aws-${integration.id}-docs-btn`"
-        >
-          <q-tooltip>View Documentation</q-tooltip>
-        </q-btn>
+        <OButton
+  variant="ghost"
+  size="sm"
+  v-if="integration.documentationUrl"
+  @click="handleDocumentation()"
+  :data-test="`aws-${integration.id}-docs-btn`"
+  class="docs-btn">
+  <template #icon-left><FileText class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>View Documentation</q-tooltip>
+</OButton>
       </div>
       <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3">
         {{ integration.description }}
@@ -47,35 +43,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-card-actions class="tw:px-4 tw:pb-4 tw:flex tw:flex-row tw:gap-2">
       <!-- Add Source Button -->
-      <q-btn
-        v-if="hasCloudFormation"
-        color="primary"
-        label="Add Source"
-        @click="handleAddSource()"
-        unelevated
-        class="tw:flex-1"
-        :data-test="`aws-${integration.id}-add-source-btn`"
-      />
+      <OButton
+  variant="ghost"
+  v-if="hasCloudFormation"
+  @click="handleAddSource()"
+  :data-test="`aws-${integration.id}-add-source-btn`"
+  class="tw:flex-1">Add Source</OButton>
       <!-- Documentation Button (only shown if no CloudFormation) -->
-      <q-btn
-        v-else-if="integration.documentationUrl"
-        color="primary"
-        label="Documentation"
-        @click="handleDocumentation()"
-        unelevated
-        class="tw:flex-1"
-        :data-test="`aws-${integration.id}-documentation-btn`"
-      />
+      <OButton
+  variant="ghost"
+  v-else-if="integration.documentationUrl"
+  @click="handleDocumentation()"
+  :data-test="`aws-${integration.id}-documentation-btn`"
+  class="tw:flex-1">Documentation</OButton>
       <!-- Add Dashboard Button -->
-      <q-btn
-        outline
-        color="primary"
-        label="Add Dashboard"
-        @click="handleAddDashboard"
-        :disable="!integration.hasDashboard || !integration.dashboardGithubUrl"
-        class="tw:flex-1"
-        :data-test="`aws-${integration.id}-add-dashboard-btn`"
-      />
+      <OButton
+  variant="outline"
+  @click="handleAddDashboard"
+  :data-test="`aws-${integration.id}-add-dashboard-btn`"
+  :disabled="!integration.hasDashboard || !integration.dashboardGithubUrl"
+  class="tw:flex-1">Add Dashboard</OButton>
     </q-card-actions>
 
     <!-- Unified Integration Method Selection Dialog -->
@@ -139,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="Cancel" color="primary" v-close-popup />
+          <OButton variant="ghost" v-close-popup>Cancel</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -150,7 +137,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">{{ selectedComponentTitle }}</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup>
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </q-card-section>
 
         <q-card-section>
@@ -178,7 +170,14 @@ import dashboardsService from "@/services/dashboards";
 import WindowsConfig from "./WindowsConfig.vue";
 import LinuxConfig from "./LinuxConfig.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { FileText } from "lucide-vue-next";
 export default defineComponent({
+  components: {
+    OButton,
+    FileText,
+  },
   name: "AWSIntegrationTile",
   props: {
     integration: {

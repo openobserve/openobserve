@@ -23,17 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :id="editorId"
     />
     <!-- AI Icon Button -->
-    <q-btn
-      v-if="showAiIcon && !disableAi"
-      round
-      flat
-      size="sm"
-      class="ai-icon-button"
-      :class="nlpMode ? 'ai-icon-active' : ''"
-      @click="toggleNlpMode"
-      data-test="query-editor-ai-icon-btn"
-    >
-      <q-icon size="20px">
+    <OButton
+  variant="ghost"
+  size="sm"
+  v-if="showAiIcon && !disableAi"
+  @click="toggleNlpMode"
+  data-test="query-editor-ai-icon-btn"
+  class="ai-icon-button" :class="nlpMode ? 'ai-icon-active' : ''">
+  <q-icon size="20px">
         <img :src="aiIcon" alt="AI" class="ai-icon-img" />
       </q-icon>
       <q-tooltip>
@@ -42,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           t(nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel")
         }}
       </q-tooltip>
-    </q-btn>
+</OButton>
   </div>
 </template>
 
@@ -62,6 +59,15 @@ import {
 
 // Lazy load Monaco Editor - only loaded when this component is rendered
 // This reduces initial bundle size by ~3.1MB
+import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
+import { useStore } from "vuex";
+import { debounce } from "quasar";
+import searchState from "@/composables/useLogs/searchState";
+import { useNLQuery } from "@/composables/useNLQuery";
+import { useI18n } from "vue-i18n";
+import useNotifications from "@/composables/useNotifications";
+import { getImageURL } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/Button.vue";
 let monaco: any = null;
 const loadMonaco = async () => {
   if (!monaco) {
@@ -71,17 +77,12 @@ const loadMonaco = async () => {
   return monaco;
 };
 
-import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
-import { useStore } from "vuex";
-import { debounce } from "quasar";
-import searchState from "@/composables/useLogs/searchState";
-import { useNLQuery } from "@/composables/useNLQuery";
-import { useI18n } from "vue-i18n";
-import useNotifications from "@/composables/useNotifications";
-import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
+  components: {
+    OButton,
+  },
   inheritAttrs: false,
   props: {
     editorId: {

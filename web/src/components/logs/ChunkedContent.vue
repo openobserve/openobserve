@@ -46,17 +46,15 @@ Usage:
       v-if="shouldShowLoadMore"
       class="load-more-container tw-mt-2 tw-flex tw-items-center tw-gap-3"
     >
-      <q-btn
-        :data-test="`load-more-btn-${fieldKey}`"
-        size="sm"
-        no-caps
-        outline
-        color="primary"
-        icon="expand_more"
-        :label="`Load more (${chunkInfo.loadedSizeKB}KB / ${chunkInfo.totalSizeKB}KB)`"
-        @click="handleLoadMore"
-        class="load-more-btn"
-      />
+      <OButton
+  variant="outline"
+  size="sm"
+  :data-test="`load-more-btn-${fieldKey}`"
+  @click="handleLoadMore"
+  class="load-more-btn">
+  <template #icon-left><ChevronDown class="tw:w-4 tw:h-4" /></template>
+  {{ `Load more (${chunkInfo.loadedSizeKB}KB / ${chunkInfo.totalSizeKB}KB)` }}
+</OButton>
       <span class="tw-text-sm tw-font-medium" style="color: var(--q-primary)">
         Showing chunk {{ chunkInfo.currentChunk }} of {{ chunkInfo.totalChunks }}
       </span>
@@ -69,6 +67,9 @@ import { computed, onMounted, watch } from "vue";
 import { useChunkedContent } from "@/composables/useChunkedContent";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ChevronDown } from "lucide-vue-next";
 export interface ChunkedContentProps {
   data: any;
   fieldKey: string; // Unique key to identify this field's chunk state

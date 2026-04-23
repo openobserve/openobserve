@@ -15,193 +15,189 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn
-    id="date-time-button"
-    ref="datetimeBtn"
-    data-cy="date-time-button"
-    outline
-    no-caps
-    :label="displayValue"
-    icon="schedule"
-    icon-right="arrow_drop_down"
-    class="date-time-button"
-    color=""
-  >
-    <q-menu
-      no-route-dismiss
-      id="date-time-menu"
-      class="date-time-dialog"
-      anchor="bottom left"
-      self="top left"
-    >
-      <div class="flex justify-evenly q-py-sm">
-        <q-btn
-          class="tab-button no-border"
-          color="primary"
-          :flat="data.selectedDate.tab !== 'relative'"
-          @click="data.selectedDate.tab = 'relative'"
-        >
-          {{ t("common.datetimeRelative") }}
-        </q-btn>
-        <q-separator vertical inset />
-        <q-btn
-          class="tab-button no-border"
-          color="primary"
-          :flat="data.selectedDate.tab !== 'absolute'"
-          @click="data.selectedDate.tab = 'absolute'"
-        >
-          {{ t("common.datetimeAbsolute") }}
-        </q-btn>
-      </div>
-      <q-separator />
-      <q-tab-panels v-model="data.selectedDate.tab" animated>
-        <q-tab-panel name="relative" class="q-pa-none">
-          <div class="date-time-table relative column">
-            <div
-              class="relative-row q-px-md q-py-sm"
-              v-for="(period, index) in relativePeriods"
-              :key="'date_' + index"
-            >
-              <div class="relative-period-name">
-                {{ period.value }}
-              </div>
+  <OMenu anchor="bottom left" self="top left">
+<template #default="{ toggle, close }">
+
+  <OButton
+  variant="outline"
+  id="date-time-button"
+  ref="datetimeBtn"
+  data-cy="date-time-button"
+  class="date-time-button"
+  @click="toggle">
+    <template #icon-left><Clock class="tw:w-4 tw:h-4" /></template>
+      {{ displayValue }}
+  
+      <template #icon-right><ChevronDown class="tw:w-4 tw:h-4" /></template>
+  </OButton>
+  </template>
+<template #content>
+  <div class="flex justify-evenly q-py-sm">
+          <q-btn
+            class="tab-button no-border"
+            color="primary"
+            :flat="data.selectedDate.tab !== 'relative'"
+            @click="data.selectedDate.tab = 'relative'"
+          >
+            {{ t("common.datetimeRelative") }}
+          </q-btn>
+          <q-separator vertical inset />
+          <q-btn
+            class="tab-button no-border"
+            color="primary"
+            :flat="data.selectedDate.tab !== 'absolute'"
+            @click="data.selectedDate.tab = 'absolute'"
+          >
+            {{ t("common.datetimeAbsolute") }}
+          </q-btn>
+        </div>
+        <q-separator />
+        <q-tab-panels v-model="data.selectedDate.tab" animated>
+          <q-tab-panel name="relative" class="q-pa-none">
+            <div class="date-time-table relative column">
               <div
-                v-for="(item, item_index) in (relativeDates as any)[period.value]"
-                :key="item"
+                class="relative-row q-px-md q-py-sm"
+                v-for="(period, index) in relativePeriods"
+                :key="'date_' + index"
               >
-                <q-btn
-                  :class="
-                    data.selectedDate.tab == 'relative' &&
-                    data.selectedDate.relative.period.value == period.value &&
-                    data.selectedDate.relative.value == item
-                      ? 'rp-selector-selected'
-                      : `rp-selector ${data.selectedDate.relative.period.value}`
-                  "
-                  :label="item"
-                  outline
-                  dense
-                  flat
-                  @click="setRelativeDate(period, item)"
-                  :key="'period_' + item_index"
+                <div class="relative-period-name">
+                  {{ period.value }}
+                </div>
+                <div
+                  v-for="(item, item_index) in (relativeDates as any)[period.value]"
+                  :key="item"
+                >
+                  <q-btn
+                    :class="
+                      data.selectedDate.tab == 'relative' &&
+                      data.selectedDate.relative.period.value == period.value &&
+                      data.selectedDate.relative.value == item
+                        ? 'rp-selector-selected'
+                        : `rp-selector ${data.selectedDate.relative.period.value}`
+                    "
+                    :label="item"
+                    outline
+                    dense
+                    flat
+                    @click="setRelativeDate(period, item)"
+                    :key="'period_' + item_index"
+                  />
+                </div>
+              </div>
+
+              <div class="relative-row q-px-md q-py-sm">
+                <div class="relative-period-name">Custom</div>
+
+                <div class="row q-gutter-sm">
+                  <div class="col">
+                    <q-input
+                      v-model="data.selectedDate.relative.value"
+                      type="number"
+                      dense
+                      filled
+                      min="1"
+                      @change="calculateMaxValue"
+                    ></q-input>
+                  </div>
+                  <div class="col">
+                    <q-select
+                      v-model="data.selectedDate.relative.period"
+                      :options="relativePeriods"
+                      dense
+                      filled
+                      @update:modelValue="onCustomPeriodSelect"
+                    ></q-select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </q-tab-panel>
+          <q-tab-panel name="absolute" class="q-pa-none">
+            <div class="date-time-table">
+              <div class="flex justify-center q-pa-none">
+                <q-date
+                  v-model="data.selectedDate.absolute.date"
+                  class="absolute-calendar"
+                  range
+                  :locale="{
+                    daysShort: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
+                  }"
                 />
               </div>
-            </div>
+              <div class="notePara">{{ t("common.datetimeMessage") }}</div>
+              <q-separator class="q-my-sm" />
 
-            <div class="relative-row q-px-md q-py-sm">
-              <div class="relative-period-name">Custom</div>
-
-              <div class="row q-gutter-sm">
-                <div class="col">
-                  <q-input
-                    v-model="data.selectedDate.relative.value"
-                    type="number"
-                    dense
-                    filled
-                    min="1"
-                    @change="calculateMaxValue"
-                  ></q-input>
-                </div>
-                <div class="col">
-                  <q-select
-                    v-model="data.selectedDate.relative.period"
-                    :options="relativePeriods"
-                    dense
-                    filled
-                    @update:modelValue="onCustomPeriodSelect"
-                  ></q-select>
-                </div>
-              </div>
-            </div>
-          </div>
-        </q-tab-panel>
-        <q-tab-panel name="absolute" class="q-pa-none">
-          <div class="date-time-table">
-            <div class="flex justify-center q-pa-none">
-              <q-date
-                v-model="data.selectedDate.absolute.date"
-                class="absolute-calendar"
-                range
-                :locale="{
-                  daysShort: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
-                }"
-              />
-            </div>
-            <div class="notePara">{{ t("common.datetimeMessage") }}</div>
-            <q-separator class="q-my-sm" />
-
-            <table class="q-px-md startEndTime">
-              <tr>
-                <td class="label">{{ t("common.startTime") }}</td>
-                <td class="label">{{ t("common.endTime") }}</td>
-              </tr>
-              <tr>
-                <td>
-                  <q-input
-                    v-model="data.selectedDate.absolute.startTime"
-                    dense
-                    filled
-                    mask="time"
-                    :rules="['time']"
-                  >
-                    <template #append>
-                      <q-icon name="access_time" class="cursor-pointer">
-                        <q-popup-proxy
-                          transition-show="scale"
-                          transition-hide="scale"
-                        >
-                          <q-time
-                            v-model="data.selectedDate.absolute.startTime"
+              <table class="q-px-md startEndTime">
+                <tr>
+                  <td class="label">{{ t("common.startTime") }}</td>
+                  <td class="label">{{ t("common.endTime") }}</td>
+                </tr>
+                <tr>
+                  <td>
+                    <q-input
+                      v-model="data.selectedDate.absolute.startTime"
+                      dense
+                      filled
+                      mask="time"
+                      :rules="['time']"
+                    >
+                      <template #append>
+                        <q-icon name="access_time" class="cursor-pointer">
+                          <q-popup-proxy
+                            transition-show="scale"
+                            transition-hide="scale"
                           >
-                            <div class="row items-center justify-end">
-                              <q-btn
-                                v-close-popup="true"
-                                :label="t('common.close')"
-                                color="primary"
-                                flat
-                              />
-                            </div>
-                          </q-time>
-                        </q-popup-proxy>
-                      </q-icon>
-                    </template>
-                  </q-input>
-                </td>
-                <td>
-                  <q-input
-                    v-model="data.selectedDate.absolute.endTime"
-                    dense
-                    filled
-                    mask="time"
-                    :rules="['time']"
-                  >
-                    <template #append>
-                      <q-icon name="access_time" class="cursor-pointer">
-                        <q-popup-proxy
-                          transition-show="scale"
-                          transition-hide="scale"
-                        >
-                          <q-time v-model="data.selectedDate.absolute.endTime">
-                            <div class="row items-center justify-end">
-                              <q-btn
-                                v-close-popup="true"
-                                :label="t('common.close')"
-                                color="primary"
-                                flat
-                              />
-                            </div>
-                          </q-time>
-                        </q-popup-proxy>
-                      </q-icon>
-                    </template>
-                  </q-input>
-                </td>
-              </tr>
-            </table>
-          </div>
-        </q-tab-panel>
-      </q-tab-panels>
-    </q-menu>
-  </q-btn>
+                            <q-time
+                              v-model="data.selectedDate.absolute.startTime"
+                            >
+                              <div class="row items-center justify-end">
+                                <q-btn
+                                  :label="t('common.close')"
+                                  color="primary"
+                                  flat
+                                />
+                              </div>
+                            </q-time>
+                          </q-popup-proxy>
+                        </q-icon>
+                      </template>
+                    </q-input>
+                  </td>
+                  <td>
+                    <q-input
+                      v-model="data.selectedDate.absolute.endTime"
+                      dense
+                      filled
+                      mask="time"
+                      :rules="['time']"
+                    >
+                      <template #append>
+                        <q-icon name="access_time" class="cursor-pointer">
+                          <q-popup-proxy
+                            transition-show="scale"
+                            transition-hide="scale"
+                          >
+                            <q-time v-model="data.selectedDate.absolute.endTime">
+                              <div class="row items-center justify-end">
+                                <q-btn
+                                  :label="t('common.close')"
+                                  color="primary"
+                                  flat
+                                />
+                              </div>
+                            </q-time>
+                          </q-popup-proxy>
+                        </q-icon>
+                      </template>
+                    </q-input>
+                  </td>
+                </tr>
+              </table>
+            </div>
+          </q-tab-panel>
+        </q-tab-panels>
+  </template>
+</OMenu>
 </template>
 
 <script lang="ts">
@@ -210,7 +206,16 @@ import { getImageURL } from "../utils/zincutils";
 import { isEqual } from "lodash-es";
 import { useI18n } from "vue-i18n";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { ChevronDown, Clock } from "lucide-vue-next";
 export default defineComponent({
+  components: {
+    OButton,
+    Clock,
+    ChevronDown,
+  },
   name: "DateTimePicker",
   props: {
     modelValue: {

@@ -150,14 +150,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
             </q-input>
-            <q-btn flat round dense icon="delete" size="sm" @click="removeHeader(idx)" />
+            <OButton
+  variant="ghost"
+  size="icon"
+  @click="removeHeader(idx)">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
-          <q-btn
-            flat no-caps size="sm"
-            icon="add" :label="t('aiToolset.addHeader')"
-            class="tw:mb-4"
-            @click="addHeader"
-          />
+          <OButton
+  variant="ghost"
+  size="sm"
+  @click="addHeader"
+  class="tw:mb-4">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  {{ t('aiToolset.addHeader') }}
+</OButton>
         </template>
 
         <!-- CLI fields -->
@@ -253,9 +260,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
             </q-input>
-            <q-btn flat round dense icon="delete" size="sm" @click="removeEnvVar(idx)" />
+            <OButton
+  variant="ghost"
+  size="icon"
+  @click="removeEnvVar(idx)">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
-          <q-btn flat no-caps size="sm" icon="add" :label="t('aiToolset.addEnvVar')" class="tw:mb-4" @click="addEnvVar" />
+          <OButton
+  variant="ghost"
+  size="sm"
+  @click="addEnvVar"
+  class="tw:mb-4">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  {{ t('aiToolset.addEnvVar') }}
+</OButton>
 
           <!-- Credential files -->
           <div class="tw:mb-2 text-subtitle2">{{ t("aiToolset.credentialFiles") }}</div>
@@ -271,7 +290,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 hint="e.g. KUBECONFIG"
                 borderless dense class="o2-input tw:w-48"
               />
-              <q-btn flat round dense icon="delete" size="sm" :title="t('common.delete')" @click="removeCredFile(idx)" />
+              <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('common.delete')"
+  @click="removeCredFile(idx)">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
             </div>
             <div class="tw:text-xs tw:text-gray-500 tw:mb-1">{{ t("aiToolset.credContentHint") }}</div>
             <query-editor
@@ -281,7 +306,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model:query="cred.value"
             />
           </div>
-          <q-btn flat no-caps size="sm" icon="add" :label="t('aiToolset.addCredFile')" class="tw:mb-4" @click="addCredFile" />
+          <OButton
+  variant="ghost"
+  size="sm"
+  @click="addCredFile"
+  class="tw:mb-4">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  {{ t('aiToolset.addCredFile') }}
+</OButton>
         </template>
 
         <!-- Skill fields -->
@@ -310,24 +342,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-t-[1px] tw:sticky tw:bottom-0 tw:bg-white dark:tw:bg-[#1a1a1a]"
       >
-        <q-btn
-          data-test="ai-toolset-save-btn"
-          :label="isEditing ? t('common.update') : t('common.save')"
-          class="o2-primary-button tw:h-[36px]"
-          no-caps
-          flat
-          type="submit"
-          :loading="saving"
-        />
-        <q-btn
-          data-test="ai-toolset-cancel-btn"
-          :label="t('common.cancel')"
-          class="o2-secondary-button tw:h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          no-caps
-          flat
-          @click="$emit('cancel:hideform')"
-        />
+        <OButton
+  data-test="ai-toolset-save-btn"
+  type="submit"
+  :loading="saving">{{ isEditing ? t('common.update') : t('common.save') }}</OButton>
+        <OButton
+  variant="secondary"
+  data-test="ai-toolset-cancel-btn"
+  @click="$emit('cancel:hideform')">{{ t('common.cancel') }}</OButton>
       </div>
     </q-form>
   </q-page>
@@ -342,13 +364,20 @@ import { useI18n } from "vue-i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import type { ToolsetKind } from "@/services/ai_toolsets";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus, Trash2 } from "lucide-vue-next";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
 
 export default defineComponent({
   name: "AddAiToolset",
-  components: { QueryEditor },
+  components: { QueryEditor,
+    OButton,
+    Trash2,
+    Plus,
+},
   emits: ["cancel:hideform"],
   setup(_, { emit }) {
     const store = useStore();

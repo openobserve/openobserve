@@ -54,32 +54,29 @@ self="top right" max-width="220px">
             </div>
           </q-tooltip>
         </q-icon>
-        <q-btn
-          v-if="!viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel"
-          icon="fullscreen"
-          flat
-          size="sm"
-          padding="1px"
-          @click="onPanelModifyClick('ViewPanel')"
-          :title="t('panel.fullScreen')"
-          data-test="dashboard-panel-fullscreen-btn"
-        />
-        <q-btn
-          v-if="dependentAdHocVariable"
-          :icon="outlinedWarning"
-          flat
-          size="xs"
-          padding="2px"
-          @click="showViewPanel = true"
-          data-test="dashboard-panel-dependent-adhoc-variable-btn"
-        >
-          <q-tooltip anchor="bottom right"
+        <OButton
+  variant="ghost"
+  size="icon"
+  v-if="!viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel"
+  @click="onPanelModifyClick('ViewPanel')"
+  :title="t('panel.fullScreen')"
+  data-test="dashboard-panel-fullscreen-btn">
+  <template #icon-left><Maximize class="tw:w-4 tw:h-4" /></template>
+</OButton>
+        <OButton
+  variant="ghost"
+  size="sm"
+  v-if="dependentAdHocVariable"
+  @click="showViewPanel = true"
+  data-test="dashboard-panel-dependent-adhoc-variable-btn">
+  <template #icon-left><TriangleAlert class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip anchor="bottom right"
 self="top right" max-width="220px">
             Some dynamic variables are not applied because the field is not
             present in the query's stream. Open Query Inspector to see all the
             details of the variables and queries executed to render this panel
           </q-tooltip>
-        </q-btn>
+</OButton>
         <!-- show error here -->
         <PanelErrorButtons
           :error="errorData"
@@ -91,38 +88,33 @@ self="top right" max-width="220px">
           :lastTriggeredAt="lastTriggeredAt"
           :viewOnly="viewOnly"
         />
-        <q-btn
-          v-if="!viewOnly && !simplifiedPanelView"
-          icon="refresh"
-          flat
-          size="sm"
-          padding="1px"
-          @click="() => onRefreshPanel(false)"
-          :title="t('panel.refreshPanel')"
-          data-test="dashboard-panel-refresh-panel-btn"
-          :color="variablesDataUpdated ? 'warning' : ''"
-          :disable="isPanelLoading"
-        >
-          <q-tooltip>
+        <OButton
+  variant="ghost"
+  size="sm"
+  v-if="!viewOnly && !simplifiedPanelView"
+  @click="() => onRefreshPanel(false)"
+  :title="t('panel.refreshPanel')"
+  data-test="dashboard-panel-refresh-panel-btn"
+  :disabled="isPanelLoading">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>
             {{
               variablesDataUpdated
                 ? t("panel.refreshToApplyVariables")
                 : t("panel.refresh")
             }}
           </q-tooltip>
-        </q-btn>
+</OButton>
         <!-- Direct delete icon (shown when simplifiedPanelView is true) -->
-        <q-btn
-          v-if="!viewOnly && simplifiedPanelView"
-          icon="close"
-          flat
-          dense
-          size="sm"
-          padding="xs"
-          @click="onPanelModifyClick('DeletePanel')"
-          :title="t('panel.deletePanel')"
-          :data-test="`dashboard-delete-panel-${props.data.title}-btn`"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  v-if="!viewOnly && simplifiedPanelView"
+  @click="onPanelModifyClick('DeletePanel')"
+  :title="t('panel.deletePanel')"
+  :data-test="`dashboard-delete-panel-${props.data.title}-btn`">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
 
         <!-- Dropdown menu (shown when simplifiedPanelView is false) -->
         <q-btn-dropdown
@@ -449,6 +441,9 @@ import shortURL from "@/services/short_url";
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Maximize, RefreshCw, TriangleAlert } from "lucide-vue-next";
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
 });
@@ -505,7 +500,11 @@ export default defineComponent({
     ShowLegendsPopup: defineAsyncComponent(() => {
       return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
     }),
-  },
+    OButton,
+    Maximize,
+    TriangleAlert,
+    RefreshCw,
+},
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();

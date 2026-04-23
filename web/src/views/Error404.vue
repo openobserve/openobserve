@@ -44,24 +44,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
 
       <div class="error-404-actions">
-        <q-btn
-          data-test="error-404-go-home-btn"
-          unelevated
-          no-caps
-          color="primary"
-          :label="t('common.goHome')"
-          to="/"
-          class="error-404-home-btn"
-        />
-        <q-btn
-          data-test="error-404-go-back-btn"
-          flat
-          no-caps
-          color="primary"
-          :label="t('common.goBack')"
-          class="error-404-back-btn"
-          @click="goBack"
-        />
+        <OButton
+  variant="ghost"
+  data-test="error-404-go-home-btn"
+  to="/"
+  class="error-404-home-btn">{{ t('common.goHome') }}</OButton>
+        <OButton
+  variant="ghost"
+  data-test="error-404-go-back-btn"
+  @click="goBack"
+  class="error-404-back-btn">{{ t('common.goBack') }}</OButton>
       </div>
 
       <p class="error-404-redirect">
@@ -76,6 +68,7 @@ import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const { t } = useI18n();
 const router = useRouter();
 const countdown = ref(10);

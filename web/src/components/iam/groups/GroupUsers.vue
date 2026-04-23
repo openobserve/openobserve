@@ -39,19 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template v-for="visual in usersDisplayOptions" :key="visual.value">
-              <q-btn
-                :data-test="`iam-users-selection-show-${visual.value}-btn`"
-                :color="visual.value === usersDisplay ? 'primary' : ''"
-                :flat="visual.value === usersDisplay ? false : true"
-                dense
-                no-caps
-                size="11px"
-                class="q-px-md visual-selection-btn"
-                @click="updateUserTable(visual.value)"
-                style="height: 30px;"
-              >
-                {{ visual.label }}</q-btn
-              >
+              <OButton
+  :data-test="`iam-users-selection-show-${visual.value}-btn`"
+  :flat="visual.value === usersDisplay ? false : true"
+  @click="updateUserTable(visual.value)"
+  style="height: 30px;"
+  class="q-px-md visual-selection-btn">{{ visual.label }}</OButton>
             </template>
           </div>
         </div>
@@ -174,6 +167,8 @@ import type { Ref } from "vue";
 import { ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+
+import OButton from "@/lib/core/Button/Button.vue";
 // show selected users in the table
 // Add is_selected to the user object
 const props = defineProps({

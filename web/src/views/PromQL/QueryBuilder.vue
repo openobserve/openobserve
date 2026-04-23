@@ -44,26 +44,18 @@
         </q-card>
 
         <div class="q-mt-md row q-gutter-sm">
-          <q-btn
-            color="primary"
-            label="Copy Query"
-            icon="content_copy"
-            @click="copyQuery"
-            :disable="!generatedQuery"
-          />
-          <q-btn
-            color="secondary"
-            label="Clear All"
-            icon="clear"
-            @click="clearQuery"
-          />
-          <q-btn
-            color="positive"
-            label="Test Query"
-            icon="play_arrow"
-            @click="testQuery"
-            :disable="!generatedQuery"
-          />
+          <OButton @click="copyQuery" :disabled="!generatedQuery">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+  Copy Query
+</OButton>
+          <OButton @click="clearQuery">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+  Clear All
+</OButton>
+          <OButton @click="testQuery" :disabled="!generatedQuery">
+  <template #icon-left><Play class="tw:w-4 tw:h-4" /></template>
+  Test Query
+</OButton>
         </div>
       </q-card-section>
 
@@ -89,6 +81,9 @@ import MetricSelector from "@/components/promql/components/MetricSelector.vue";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Copy, Play } from "lucide-vue-next";
 const $q = useQuasar();
 
 // State

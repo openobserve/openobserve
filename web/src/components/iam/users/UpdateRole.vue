@@ -25,7 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- <div>({{ orgMemberData.first_name }}: {{ orgMemberData.email }})</div> -->
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="cancel" />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
     </q-card-section>
@@ -74,23 +79,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div class="flex justify-center q-mt-lg">
-          <q-btn
-            v-close-popup="true"
-            class="q-mb-md text-bold no-border"
-            :label="t('user.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            color="accent"
-            no-caps
-          />
-          <q-btn
-            :label="t('user.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
-            type="submit"
-            no-caps
-          />
+          <OButton
+  size="sm"
+  v-close-popup="true"
+  text-color="light-text"
+  class="q-mb-md text-bold">{{ t('user.cancel') }}</OButton>
+          <OButton
+  size="sm"
+  type="submit"
+  class="q-mb-md text-bold q-ml-md">{{ t('user.save') }}</OButton>
         </div>
       </q-form>
     </q-card-section>
@@ -106,6 +103,7 @@ import { getImageURL } from "@/utils/zincutils";
 
 import organizationsService from "@/services/organizations";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -117,6 +115,9 @@ const defaultValue: any = () => {
 let callOrgMember: any;
 
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "ComponentUpdateUser",
   props: {
     modelValue: {

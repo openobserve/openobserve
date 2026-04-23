@@ -35,22 +35,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="tw:flex tw:items-center tw:space-x-4 tw:w-fit!">
             <!-- Back button -->
-            <q-btn
-              v-if="mode === 'standalone' && showBackButton"
-              data-test="trace-details-back-btn"
-              class="tw:px-1! tw:mr-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
-              size="xs"
-              flat
-              dense
-              @click="handleBackOrClose"
-            >
-              <q-icon class="tw:text-[1.1rem]!" name="arrow_back" />
+            <OButton
+  variant="ghost"
+  size="sm"
+  v-if="mode === 'standalone' && showBackButton"
+  data-test="trace-details-back-btn"
+  @click="handleBackOrClose"
+  class="tw:px-1! tw:mr-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]">
+  <q-icon class="tw:text-[1.1rem]!" name="arrow_back" />
               <q-tooltip>{{
                 areFiltersAdded
                   ? t("traces.applyPendingFilters")
                   : t("traces.backToTraces")
               }}</q-tooltip>
-            </q-btn>
+</OButton>
 
             <div
               class="tw:flex tw:min-w-0 tw:w-full tw:gap-[0.625rem]! tw:items-center"
@@ -159,32 +157,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:flex tw:justify-end tw:items-center tw:space-x-3 tw:w-fit!"
           >
             <!-- Apply filters button (standalone mode, right side) -->
-            <q-btn
-              v-if="mode === 'standalone' && areFiltersAdded"
-              data-test="trace-details-apply-filters-btn-right"
-              class="tw:px-2! tw:mr-[0.625rem]! tw:ml-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:border-1! tw:border-solid! tw:border-[var(--o2-theme-color)]! tw:text-[var(--o2-theme-color)]! tw:tracking-[0.03rem]"
-              size="xs"
-              icon="filter_alt"
-              no-caps
-              @click="openFilterPopover"
-            >
-              <span class="tw:text-[0.75rem] tw:pl-[0.25rem]"
+            <OButton
+  size="sm"
+  v-if="mode === 'standalone' && areFiltersAdded"
+  data-test="trace-details-apply-filters-btn-right"
+  @click="openFilterPopover"
+  class="tw:px-2! tw:mr-[0.625rem]! tw:ml-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:border-1! tw:border-solid! tw:border-[var(--o2-theme-color)]! tw:text-[var(--o2-theme-color)]! tw:tracking-[0.03rem]">
+  <template #icon-left><Filter class="tw:w-4 tw:h-4" /></template>
+  <span class="tw:text-[0.75rem] tw:pl-[0.25rem]"
                 >{{ t("traces.viewFilters") }}
               </span>
               <q-tooltip>{{ t("traces.reviewAndApplyFilters") }}</q-tooltip>
-            </q-btn>
+</OButton>
 
             <!-- Expand button (embedded mode) -->
-            <q-btn
-              v-if="mode === 'embedded' && showExpandButton"
-              data-test="trace-details-expand-btn"
-              class="tw:px-1! tw:ml-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
-              size="xs"
-              icon="open_in_new"
-              @click="handleExpandToFullView"
-            >
-              <q-tooltip>{{ t("traces.openInTraces") }}</q-tooltip>
-            </q-btn>
+            <OButton
+  size="sm"
+  v-if="mode === 'embedded' && showExpandButton"
+  data-test="trace-details-expand-btn"
+  @click="handleExpandToFullView"
+  class="tw:px-1! tw:ml-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]">
+  <template #icon-left><ExternalLink class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("traces.openInTraces") }}</q-tooltip>
+</OButton>
 
             <!-- Share button (standalone mode) -->
             <share-button
@@ -195,16 +190,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <!-- Close button -->
-            <q-btn
-              v-if="mode === 'standalone' && showCloseButton"
-              data-test="trace-details-close-btn"
-              class="tw:px-1! tw:mx-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]"
-              size="xs"
-              icon="close"
-              @click="handleBackOrClose"
-            >
-              <q-tooltip>{{ t("common.cancel") }}</q-tooltip>
-            </q-btn>
+            <OButton
+  size="sm"
+  v-if="mode === 'standalone' && showCloseButton"
+  data-test="trace-details-close-btn"
+  @click="handleBackOrClose"
+  class="tw:px-1! tw:mx-[0.325rem]! hover:tw:bg-slate-200 tw:rounded tw:text-[var(--o2-text-secondary)]">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("common.cancel") }}</q-tooltip>
+</OButton>
           </div>
         </header>
       </div>
@@ -261,33 +255,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="counter-total">{{ searchResults }}</span>
                 </div>
                 <div class="navigation-buttons">
-                  <q-btn
-                    data-test="trace-details-search-prev-btn"
-                    :disable="!searchResults || currentIndex === 0"
-                    flat
-                    dense
-                    icon="keyboard_arrow_up"
-                    size="sm"
-                    class="nav-btn"
-                    @click="prevMatch"
-                  >
-                    <q-tooltip>{{ t("traces.previousMatch") }}</q-tooltip>
-                  </q-btn>
+                  <OButton
+  variant="ghost"
+  size="sm"
+  data-test="trace-details-search-prev-btn"
+  @click="prevMatch"
+  :disabled="!searchResults || currentIndex === 0"
+  class="nav-btn">
+  <template #icon-left><ChevronUp class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("traces.previousMatch") }}</q-tooltip>
+</OButton>
                   <div class="button-separator"></div>
-                  <q-btn
-                    data-test="trace-details-search-next-btn"
-                    :disable="
+                  <OButton
+  variant="ghost"
+  size="sm"
+  data-test="trace-details-search-next-btn"
+  @click="nextMatch"
+  :disabled="
                       !searchResults || currentIndex + 1 === searchResults
                     "
-                    flat
-                    dense
-                    icon="keyboard_arrow_down"
-                    size="sm"
-                    class="nav-btn"
-                    @click="nextMatch"
-                  >
-                    <q-tooltip>{{ t("traces.nextMatch") }}</q-tooltip>
-                  </q-btn>
+  class="nav-btn">
+  <template #icon-left><ChevronDown class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("traces.nextMatch") }}</q-tooltip>
+</OButton>
                 </div>
               </div>
             </div>
@@ -360,42 +350,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </q-select>
-              <q-btn
-                data-test="trace-details-view-logs-btn"
-                v-close-popup="true"
-                class="o2-secondary-button text-bold tw:px-[0.5rem]! tw:py-0! traces-view-logs-btn tw:border! tw:border-l-0! tw:border-solid! tw:border-[var(--o2-border-color)]!"
-                :label="
+              <OButton
+  variant="secondary"
+  size="sm"
+  data-test="trace-details-view-logs-btn"
+  v-close-popup="true"
+  :title="t('traces.viewLogs')"
+  @click="redirectToLogs"
+  class="text-bold tw:px-[0.5rem]! tw:py-0! traces-view-logs-btn tw:border! tw:border-l-0! tw:border-solid! tw:border-[var(--o2-border-color)]!">
+  <template #icon-left><Search class="tw:w-4 tw:h-4" /></template>
+  {{ 
                   searchObj.meta.redirectedFromLogs
                     ? t('traces.backToLogs')
                     : t('traces.viewLogs')
-                "
-                padding="sm sm"
-                size="sm"
-                no-caps
-                outline
-                icon="search"
-                flat
-                dense
-                unelevated
-                :title="t('traces.viewLogs')"
-                @click="redirectToLogs"
-              />
-              <q-btn
-                v-if="hasRumSessionId"
-                data-test="trace-details-view-session-replay-btn"
-                v-close-popup="true"
-                class="traces-view-session-replay-btn text-bold q-ml-md tw-text-[16px]! tw:border! tw:border-solid tw:border-[var(--o2-theme-color)]!"
-                :label="t('rum.playSessionReplay')"
-                padding="sm sm"
-                size="sm"
-                no-caps
-                flat
-                color="primary"
-                outline
-                dense
-                :icon="outlinedPlayCircle"
-                @click="redirectToSessionReplay"
-              />
+                 }}
+</OButton>
+              <OButton
+  variant="outline"
+  size="sm"
+  v-if="hasRumSessionId"
+  data-test="trace-details-view-session-replay-btn"
+  v-close-popup="true"
+  @click="redirectToSessionReplay"
+  class="traces-view-session-replay-btn text-bold q-ml-md tw-text-[16px]! tw:border! tw:border-solid tw:border-[var(--o2-theme-color)]!">
+  <template #icon-left><PlayCircle class="tw:w-4 tw:h-4" /></template>
+  {{ t('rum.playSessionReplay') }}
+</OButton>
             </div>
           </div>
         </div>
@@ -701,7 +681,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("traces.traceFilters") }}
           </div>
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup>
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </q-card-section>
 
         <q-card-section class="tw:flex-1 tw:p-4 tw:flex tw:flex-col">
@@ -720,20 +705,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align="right"
           class="tw:border-t tw:border-[var(--o2-border)] tw:p-4 tw:bg-[var(--o2-card-bg)]"
         >
-          <q-btn
-            flat
-            :label="t('common.cancel')"
-            color="primary"
-            v-close-popup
-            class="tw:normal-case"
-          />
-          <q-btn
-            unelevated
-            color="primary"
-            :label="t('traces.showTraces')"
-            @click="applyAndViewTraces"
-            class="tw:normal-case"
-          />
+          <OButton
+  variant="ghost"
+  v-close-popup
+  class="tw:normal-case">{{ t('common.cancel') }}</OButton>
+          <OButton
+  variant="ghost"
+  @click="applyAndViewTraces"
+  class="tw:normal-case">{{ t('traces.showTraces') }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -804,6 +783,9 @@ import {
 import AppTabs from "@/components/common/AppTabs.vue";
 import pipelineService from "@/services/pipelines";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ChevronDown, ChevronUp, ExternalLink, Filter, PlayCircle, Search } from "lucide-vue-next";
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(
   () => import("@/components/traces/FlameGraphView.vue"),
@@ -900,7 +882,14 @@ export default defineComponent({
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
-  },
+    OButton,
+    Filter,
+    ExternalLink,
+    ChevronUp,
+    ChevronDown,
+    Search,
+    PlayCircle,
+},
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],
   setup(props, { emit }) {

@@ -53,20 +53,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Actions Column: Delete -->
       <div class="actions-column">
         <div class="flex justify-end">
-          <q-btn
-            data-test="semantic-group-remove-group-btn"
-            flat
-            round
-            dense
-            :color="isProtected ? 'grey-5' : 'negative'"
-            icon="delete"
-            :disable="isProtected"
-            @click="!isProtected && emit('delete')"
-          >
-            <q-tooltip>
+          <OButton
+  variant="ghost"
+  data-test="semantic-group-remove-group-btn"
+  @click="!isProtected && emit('delete')"
+  :disabled="isProtected">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>
               {{ isProtected ? t("correlation.serviceGroupProtected") : t("correlation.removeSemanticGroup") }}
             </q-tooltip>
-          </q-btn>
+</OButton>
         </div>
       </div>
     </div>
@@ -78,6 +74,9 @@ import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import TagInput from "./TagInput.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Trash2 } from "lucide-vue-next";
 const { t } = useI18n();
 
 interface SemanticGroup {

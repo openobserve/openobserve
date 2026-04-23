@@ -24,9 +24,14 @@
             </template>
           </q-input>
         </div>
-        <q-btn icon="close" flat round dense v-close-popup="true"
-          class="tw:text-[var(--o2-text-muted)] hover:tw:text-[var(--o2-text-primary)]"
-          data-test="query-inspector-close-btn" />
+        <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true"
+  data-test="query-inspector-close-btn"
+  class="tw:text-[var(--o2-text-muted)] hover:tw:text-[var(--o2-text-primary)]">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </div>
     </div>
 
@@ -63,11 +68,14 @@
                 <label
                   class="tw:text-xs tw:font-bold tw:tracking-wider">Original
                   Query</label>
-                <q-btn flat dense no-caps color="primary" size="sm" class="tw:rounded-md tw:px-2"
-                  @click="copyText(query.originalQuery)">
-                  <q-icon name="content_copy" size="14px" class="tw:mr-2" />
+                <OButton
+  variant="ghost"
+  size="sm"
+  @click="copyText(query.originalQuery)"
+  class="tw:rounded-md tw:px-2">
+  <q-icon name="content_copy" size="14px" class="tw:mr-2" />
                   Copy
-                </q-btn>
+</OButton>
               </div>
               <div class="tw:relative tw:group">
                 <div
@@ -86,11 +94,14 @@
                 <label
                   class="tw:text-xs tw:font-bold tw:tracking-wider">Executed
                   Query</label>
-                <q-btn flat dense no-caps color="primary" size="sm" class="tw:rounded-md tw:px-2"
-                  @click="copyText(query.query)">
-                  <q-icon name="content_copy" size="14px" class="tw:mr-2" />
+                <OButton
+  variant="ghost"
+  size="sm"
+  @click="copyText(query.query)"
+  class="tw:rounded-md tw:px-2">
+  <q-icon name="content_copy" size="14px" class="tw:mr-2" />
                   Copy
-                </q-btn>
+</OButton>
               </div>
               <div class="tw:relative tw:group">
                 <div
@@ -199,7 +210,11 @@ import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "QueryInspector",
   props: {
     metaData: {

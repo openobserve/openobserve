@@ -28,14 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-h6" data-test="dialog-title">
             Edit Backfill Job
           </div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
-            v-close-popup
-            data-test="close-dialog-btn"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup
+  data-test="close-dialog-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </q-card-section>
 
@@ -154,21 +153,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Form Actions -->
           <div class="flex justify-end tw-gap-2 q-mt-md">
-            <q-btn
-              flat
-              label="Cancel"
-              color="grey-8"
-              @click="onCancel"
-              data-test="cancel-btn"
-            />
-            <q-btn
-              type="submit"
-              label="Update Job"
-              color="primary"
-              :loading="loading"
-              :disable="loading"
-              data-test="update-btn"
-            />
+            <OButton
+  variant="ghost"
+  @click="onCancel"
+  data-test="cancel-btn">Cancel</OButton>
+            <OButton
+  type="submit"
+  :loading="loading"
+  data-test="update-btn"
+  :disabled="loading">Update Job</OButton>
           </div>
         </q-form>
       </q-card-section>
@@ -183,6 +176,7 @@ import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
 interface Props {
   modelValue: boolean;
   job: BackfillJob | null;

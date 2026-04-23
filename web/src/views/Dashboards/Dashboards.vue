@@ -111,19 +111,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-list>
               </q-btn-dropdown>
               <!-- new dashboard button -->
-              <q-btn
-                class="q-ml-sm o2-primary-button tw:h-[36px]"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-primary-button-dark'
-                    : 'o2-primary-button-light'
-                "
-                no-caps
-                flat
-                data-test="dashboard-new"
-                :label="t(`dashboard.add`)"
-                @click="addDashboard"
-              />
+              <OButton
+  data-test="dashboard-new"
+  @click="addDashboard"
+  class="q-ml-sm">{{ t(`dashboard.add`) }}</OButton>
         </div>
       </div>
      </div>
@@ -156,21 +147,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.folderLabel") }}
               <div>
-                <q-btn
-                  class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-secondary-button-dark'
-                      : 'o2-secondary-button-light'
-                  "
-                  no-caps
-                  flat
-                  @click.stop="addFolder"
-                  data-test="dashboard-new-folder-btn"
-                  title="Add Folder"
-                >
-                  <q-icon name="add" size="xs" />
-                </q-btn>
+                <OButton
+  variant="secondary"
+  @click.stop="addFolder"
+  data-test="dashboard-new-folder-btn"
+  title="Add Folder"
+  class="text-bold tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"><q-icon name="add" size="xs" /></OButton>
               </div>
             </div>
             <q-separator class="tw:mb-1 tw:mt-[3px]" size="2px"></q-separator>
@@ -227,27 +209,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     tab.name
                   }}</span>
                   <div class="hover-actions">
-                    <q-btn
+                    <OMenu
                       v-if="
                         index ||
                         (folderSearchQuery?.length > 0 &&
                           index == 0 &&
                           tab.folderId.toLowerCase() != 'default')
                       "
-                      dense
-                      flat
-                      no-caps
-                      icon="more_vert"
-                      style="cursor: pointer; justify-self: end; height: 0.5rem"
-                      size="sm"
-                      data-test="dashboard-more-icon"
                     >
-                      <q-menu>
+                      <template #default="{ toggle, close }">
+                      <OButton
+  variant="ghost"
+  size="sm"
+  style="cursor: pointer; justify-self: end; height: 0.5rem"
+  data-test="dashboard-more-icon"
+  @click.stop="toggle">
+  <template #icon-left><MoreVertical class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                      </template>
+                      <template #content="{ close }">
                         <q-list dense>
                           <q-item
-                            v-close-popup
                             clickable
-                            @click.stop="editFolder(tab.folderId)"
+                            @click.stop="editFolder(tab.folderId); close()"
                             data-test="dashboard-edit-folder-icon"
                           >
                             <q-item-section avatar>
@@ -258,9 +242,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </q-item-section>
                           </q-item>
                           <q-item
-                            v-close-popup
                             clickable
-                            @click.stop="showDeleteFolderDialogFn(tab.folderId)"
+                            @click.stop="showDeleteFolderDialogFn(tab.folderId); close()"
                             data-test="dashboard-delete-folder-icon"
                           >
                             <q-item-section avatar>
@@ -271,8 +254,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </q-item-section>
                           </q-item>
                         </q-list>
-                      </q-menu>
-                    </q-btn>
+                      </template>
+                    </OMenu>
                   </div>
                 </div>
                 <q-separator />
@@ -391,47 +374,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- add delete icon in actions column -->
             <template #body-cell-actions="props">
               <q-td :props="props">
-                <q-btn
-                  v-if="props.row.actions == 'true'"
-                  :title="t('dashboard.move_to_another_folder')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :icon="outlinedDriveFileMove"
-                  @click.stop="showMoveDashboardPanel(props.row)"
-                  data-test="dashboard-move-to-another-folder"
-                >
-              </q-btn>
-                <q-btn
-                  v-if="props.row.actions == 'true'"
-                  :title="t('dashboard.duplicate')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  icon="content_copy"
-                  @click.stop="
+                <OButton
+  variant="ghost"
+  size="icon"
+  v-if="props.row.actions == 'true'"
+  :title="t('dashboard.move_to_another_folder')"
+  @click.stop="showMoveDashboardPanel(props.row)"
+  data-test="dashboard-move-to-another-folder">
+  <template #icon-left><FolderInput class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                <OButton
+  variant="ghost"
+  size="icon"
+  v-if="props.row.actions == 'true'"
+  :title="t('dashboard.duplicate')"
+  @click.stop="
                     duplicateDashboard(props.row.id, props.row.folder_id)
                   "
-                  data-test="dashboard-duplicate"
-                >
-              </q-btn>
-                <q-btn
-                  v-if="props.row.actions == 'true'"
-                  :title="t('dashboard.delete')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  :icon="outlinedDelete"
-                  data-test="dashboard-delete"
-                  flat
-                  @click.stop="showDeleteDialogFn(props)"
-                >
-              </q-btn>
+  data-test="dashboard-duplicate">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                <OButton
+  variant="ghost"
+  size="icon"
+  v-if="props.row.actions == 'true'"
+  :title="t('dashboard.delete')"
+  data-test="dashboard-delete"
+  @click.stop="showDeleteDialogFn(props)">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </q-td>
             </template>
             <template #bottom="scope">
@@ -442,48 +413,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ resultTotal }} {{ t("dashboard.header") }}
                 </div>
                 <div class="bottom-btn-dashboard-list">
-                  <q-btn
-                    v-if="selected.length > 0"
-                    data-test="dashboard-list-move-across-folders-btn"
-                    class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    @click="moveMultipleDashboards"
-                  >
-                    <q-icon :name="outlinedDriveFileMove" size="16px" />
+                  <OButton
+  variant="secondary"
+  v-if="selected.length > 0"
+  data-test="dashboard-list-move-across-folders-btn"
+  @click="moveMultipleDashboards"
+  class="flex items-center q-mr-sm">
+  <q-icon :name="outlinedDriveFileMove" size="16px" />
                     <span class="tw:ml-2">Move</span>
-                  </q-btn>
-                  <q-btn
-                    v-if="selected.length > 0"
-                    data-test="dashboard-list-export-dashboards-btn"
-                    class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    @click="multipleExportDashboard"
-                  >
-                    <q-icon name="download" size="16px" />
+</OButton>
+                  <OButton
+  variant="secondary"
+  v-if="selected.length > 0"
+  data-test="dashboard-list-export-dashboards-btn"
+  @click="multipleExportDashboard"
+  class="flex items-center q-mr-sm">
+  <q-icon name="download" size="16px" />
                     <span class="tw:ml-2">Export</span>
-                  </q-btn>
-                  <q-btn
-                    v-if="selected.length > 0"
-                    data-test="dashboard-list-delete-dashboards-btn"
-                    class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    @click="openBulkDeleteDialog"
-                  >
-                    <q-icon name="delete" size="16px" />
+</OButton>
+                  <OButton
+  variant="secondary"
+  v-if="selected.length > 0"
+  data-test="dashboard-list-delete-dashboards-btn"
+  @click="openBulkDeleteDialog"
+  class="flex items-center q-mr-sm">
+  <q-icon name="delete" size="16px" />
                     <span class="tw:ml-2">Delete</span>
-                  </q-btn>
+</OButton>
                 </div>
                 <QTablePagination
                   :scope="scope"
@@ -632,6 +588,10 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { Copy, FolderInput, MoreVertical, Trash2 } from "lucide-vue-next";
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
 });
@@ -654,7 +614,13 @@ export default defineComponent({
     ConfirmDialog,
     AddFolder,
     MoveDashboardToAnotherFolder,
-  },
+    OButton,
+    OMenu,
+    MoreVertical,
+    FolderInput,
+    Copy,
+    Trash2,
+},
   setup() {
     const store = useStore();
     const { t } = useI18n();

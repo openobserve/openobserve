@@ -110,34 +110,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Import button -->
-          <q-btn
-            :class="[
+          <OButton
+  variant="ghost"
+  @click="importAlert"
+  data-test="alert-import"
+  :class="[
               'q-ml-sm o2-secondary-button tw:h-[36px]',
               isCompactToolbar
                 ? 'compact-icon-btn'
                 : '',
-            ]"
-            no-caps
-            flat
-            :label="isCompactToolbar ? undefined : t(`dashboard.import`)"
-            icon="file_upload"
-            @click="importAlert"
-            data-test="alert-import"
-          >
-            <q-tooltip v-if="isCompactToolbar">
+            ]">
+  <template #icon-left><FileUp class="tw:w-4 tw:h-4" /></template>
+  {{ isCompactToolbar ? undefined : t(`dashboard.import`) }}
+  <q-tooltip v-if="isCompactToolbar">
               {{ t("dashboard.import") }}
             </q-tooltip>
-          </q-btn>
+</OButton>
           <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
-          <q-btn
-            data-test="alert-list-add-alert-btn"
-            class="q-ml-sm o2-primary-button tw:h-[36px]"
-            no-caps
-            flat
-            :disable="!destinations.length || !templates.length"
-            :title="!destinations.length ? t('alerts.noDestinations') : ''"
-            :label="t(`alerts.add`)"
-            @click="
+          <OButton
+  data-test="alert-list-add-alert-btn"
+  :title="!destinations.length ? t('alerts.noDestinations') : ''"
+  @click="
               activeTab === 'anomalyDetection'
                 ? router.push({
                     name: 'addAnomalyDetection',
@@ -150,7 +143,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   })
                 : showAddUpdateFn({})
             "
-          />
+  :disabled="!destinations.length || !templates.length"
+  class="q-ml-sm">{{ t(`alerts.add`) }}</OButton>
         </div>
       </div>
     </div>
@@ -382,73 +376,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               color="secondary"
                             />
                           </div>
-                          <q-btn
-                            v-else
-                            :data-test="`alert-list-${props.row.name}-pause-start-alert`"
-                            class="q-ml-xs material-symbols-outlined"
-                            padding="sm"
-                            unelevated
-                            size="sm"
-                            :color="props.row.enabled ? 'negative' : 'positive'"
-                            :icon="
-                              props.row.enabled
-                                ? outlinedPause
-                                : outlinedPlayArrow
-                            "
-                            round
-                            flat
-                            :title="
+                          <OButton
+  variant="ghost"
+  size="icon"
+  v-else
+  :data-test="`alert-list-${props.row.name}-pause-start-alert`"
+  :title="
                               props.row.enabled
                                 ? t('alerts.pause')
                                 : t('alerts.start')
                             "
-                            @click.stop="toggleAlertState(props.row)"
-                          >
-                          </q-btn>
-                          <q-btn
-                            :data-test="`alert-list-${props.row.name}-update-alert`"
-                            unelevated
-                            size="sm"
-                            round
-                            flat
-                            :title="t('alerts.edit')"
-                            @click.stop="editAlert(props.row)"
-                            icon="edit"
-                          >
-                          </q-btn>
-                          <q-btn
-                            icon="content_copy"
-                            :title="t('alerts.clone')"
-                            unelevated
-                            size="sm"
-                            round
-                            flat
-                            @click.stop="duplicateAlert(props.row)"
-                            :data-test="`alert-list-${props.row.name}-clone-alert`"
-                          >
-                          </q-btn>
-                          <q-btn
-                            :icon="outlinedMoreVert"
-                            unelevated
-                            size="sm"
-                            round
-                            flat
-                            @click.stop="openMenu($event, props.row)"
-                            :data-test="`alert-list-${props.row.name}-more-options`"
-                          >
-                            <q-menu>
+  @click.stop="toggleAlertState(props.row)"
+  class="q-ml-xs material-symbols-outlined" />
+                          <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`alert-list-${props.row.name}-update-alert`"
+  :title="t('alerts.edit')"
+  @click.stop="editAlert(props.row)">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                          <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('alerts.clone')"
+  @click.stop="duplicateAlert(props.row)"
+  :data-test="`alert-list-${props.row.name}-clone-alert`">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                          <OMenu @click.stop>
+<template #default="{ toggle, close }">
+
+                            <OButton
+  variant="ghost"
+  size="sm"
+  :data-test="`alert-list-${props.row.name}-more-options`"
+  @click.stop="toggle">
+  <template #icon-left><MoreVertical class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                            </template>
+<template #content="{ close }">
                               <q-list style="min-width: 100px">
                                 <q-item
                                   class="flex items-center"
                                   clickable
-                                  v-close-popup
-                                  @click="moveAlertToAnotherFolder(props.row)"
+                                  @click="moveAlertToAnotherFolder(props.row); close()"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon
-                                      size="16px"
-                                      :name="outlinedDriveFileMove"
-                                    />
+                                    <q-icon size="16px" :name="outlinedDriveFileMove" />
                                   </q-item-section>
                                   <q-item-section>Move</q-item-section>
                                 </q-item>
@@ -456,25 +431,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <q-item
                                   class="flex items-center justify-center"
                                   clickable
-                                  v-close-popup
-                                  @click="showDeleteDialogFn(props)"
+                                  @click="showDeleteDialogFn(props); close()"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon
-                                      size="16px"
-                                      :name="outlinedDelete"
-                                    />
+                                    <q-icon size="16px" :name="outlinedDelete" />
                                   </q-item-section>
-                                  <q-item-section>{{
-                                    t("alerts.delete")
-                                  }}</q-item-section>
+                                  <q-item-section>{{ t("alerts.delete") }}</q-item-section>
                                 </q-item>
                                 <q-separator />
                                 <q-item
                                   class="flex items-center justify-center"
                                   clickable
-                                  v-close-popup
-                                  @click="exportAlert(props.row)"
+                                  @click="exportAlert(props.row); close()"
                                 >
                                   <q-item-section dense avatar>
                                     <q-icon size="16px" name="download" />
@@ -482,31 +450,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   <q-item-section>Export</q-item-section>
                                 </q-item>
                                 <q-separator />
-                                <!-- Anomaly Detection: Trigger Detection + Re-train (always available) -->
                                 <template v-if="props.row.type === 'anomaly'">
                                   <q-item
                                     class="flex items-center justify-center"
                                     clickable
-                                    v-close-popup
                                     :data-test="`alert-list-${props.row.name}-trigger-detection`"
-                                    @click="triggerAlert(props.row)"
+                                    @click="triggerAlert(props.row); close()"
                                   >
                                     <q-item-section dense avatar>
-                                      <q-icon
-                                        size="16px"
-                                        :name="symOutlinedSoundSampler"
-                                      />
+                                      <q-icon size="16px" :name="symOutlinedSoundSampler" />
                                     </q-item-section>
-                                    <q-item-section
-                                      >Trigger Detection</q-item-section
-                                    >
+                                    <q-item-section>Trigger Detection</q-item-section>
                                   </q-item>
                                   <q-item
                                     class="flex items-center justify-center"
                                     clickable
-                                    v-close-popup
                                     :data-test="`alert-list-${props.row.name}-retrain-anomaly`"
-                                    @click="retrainAnomaly(props.row)"
+                                    @click="retrainAnomaly(props.row); close()"
                                   >
                                     <q-item-section dense avatar>
                                       <q-icon size="16px" name="replay" />
@@ -514,27 +474,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     <q-item-section>Re-train</q-item-section>
                                   </q-item>
                                 </template>
-                                <!-- Regular alerts: existing Trigger Alert item -->
                                 <q-item
                                   v-else
                                   class="flex items-center justify-center"
                                   clickable
-                                  v-close-popup
-                                  @click="triggerAlert(props.row)"
+                                  @click="triggerAlert(props.row); close()"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon
-                                      size="16px"
-                                      :name="symOutlinedSoundSampler"
-                                    />
+                                    <q-icon size="16px" :name="symOutlinedSoundSampler" />
                                   </q-item-section>
-                                  <q-item-section>{{
-                                    t("alerts.triggerAlert")
-                                  }}</q-item-section>
+                                  <q-item-section>{{ t("alerts.triggerAlert") }}</q-item-section>
                                 </q-item>
                               </q-list>
-                            </q-menu>
-                          </q-btn>
+                            </template>
+                          </OMenu>
                         </div>
                       </template>
                       <template v-else>
@@ -558,16 +511,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           To create an Alert, you'll need to have at least one
                           Destination and one Template in place
                         </div>
-                        <q-btn
-                          data-test="alert-list-create-template-btn"
-                          class="q-mt-md"
-                          label="Create Template"
-                          size="md"
-                          color="primary"
-                          no-caps
-                          style="border-radius: 4px"
-                          @click="routeTo('alertTemplates')"
-                        />
+                        <OButton
+  data-test="alert-list-create-template-btn"
+  style="border-radius: 4px"
+  @click="routeTo('alertTemplates')"
+  class="q-mt-md">Create Template</OButton>
                       </template>
                       <template v-if="!destinations.length && templates.length">
                         <div
@@ -578,16 +526,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           yet. To create an Alert, you'll need to have at least
                           one Destination and one Template in place
                         </div>
-                        <q-btn
-                          data-test="alert-list-create-destination-btn"
-                          class="q-mt-md"
-                          label="Create Destination"
-                          size="md"
-                          color="primary"
-                          no-caps
-                          style="border-radius: 4px"
-                          @click="routeTo('alertDestinations')"
-                        />
+                        <OButton
+  data-test="alert-list-create-destination-btn"
+  style="border-radius: 4px"
+  @click="routeTo('alertDestinations')"
+  class="q-mt-md">Create Destination</OButton>
                       </template>
                     </div>
                   </div>
@@ -626,82 +569,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ resultTotal }} {{ t("alerts.header") }}
                     </div>
 
-                    <q-btn
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-move-across-folders-btn"
-                      class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'o2-secondary-button-dark'
-                          : 'o2-secondary-button-light'
-                      "
-                      no-caps
-                      dense
-                      @click="moveMultipleAlerts"
-                    >
-                      <q-icon :name="outlinedDriveFileMove" size="16px" />
+                    <OButton
+  variant="secondary"
+  v-if="selectedAlerts.length > 0"
+  data-test="alert-list-move-across-folders-btn"
+  @click="moveMultipleAlerts"
+  class="flex items-center q-mr-sm">
+  <q-icon :name="outlinedDriveFileMove" size="16px" />
                       <span class="tw:ml-2">Move</span>
-                    </q-btn>
-                    <q-btn
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-export-alerts-btn"
-                      class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'o2-secondary-button-dark'
-                          : 'o2-secondary-button-light'
-                      "
-                      no-caps
-                      dense
-                      @click="multipleExportAlert"
-                    >
-                      <q-icon name="download" size="16px" />
+</OButton>
+                    <OButton
+  variant="secondary"
+  v-if="selectedAlerts.length > 0"
+  data-test="alert-list-export-alerts-btn"
+  @click="multipleExportAlert"
+  class="flex items-center q-mr-sm">
+  <q-icon name="download" size="16px" />
                       <span class="tw:ml-2">Export</span>
-                    </q-btn>
-                    <q-btn
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-pause-alerts-btn"
-                      class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'o2-secondary-button-dark'
-                          : 'o2-secondary-button-light'
-                      "
-                      no-caps
-                      dense
-                      @click="bulkToggleAlerts('pause')"
-                    >
-                      <q-icon name="pause" size="16px" />
+</OButton>
+                    <OButton
+  variant="secondary"
+  v-if="selectedAlerts.length > 0"
+  data-test="alert-list-pause-alerts-btn"
+  @click="bulkToggleAlerts('pause')"
+  class="flex items-center q-mr-sm">
+  <q-icon name="pause" size="16px" />
                       <span class="tw:ml-2">Pause</span>
-                    </q-btn>
-                    <q-btn
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-unpause-alerts-btn"
-                      class="tw:flex items-center no-border o2-secondary-button tw:h-[36px] q-mr-sm tw:w-[200px]"
-                      no-caps
-                      dense
-                      style="width: 170px"
-                      @click="bulkToggleAlerts('resume')"
-                    >
-                      <q-icon name="play_arrow" size="16px" />
+</OButton>
+                    <OButton
+  variant="secondary"
+  v-if="selectedAlerts.length > 0"
+  data-test="alert-list-unpause-alerts-btn"
+  style="width: 170px"
+  @click="bulkToggleAlerts('resume')"
+  class="tw:flex items-center q-mr-sm tw:w-[200px]">
+  <q-icon name="play_arrow" size="16px" />
                       <span class="tw:ml-2">Resume</span>
-                    </q-btn>
-                    <q-btn
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-delete-alerts-btn"
-                      class="tw:flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px] tw:ml-sm"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'o2-secondary-button-dark'
-                          : 'o2-secondary-button-light'
-                      "
-                      no-caps
-                      dense
-                      @click="openBulkDeleteDialog"
-                    >
-                      <q-icon name="delete" size="16px" />
+</OButton>
+                    <OButton
+  variant="secondary"
+  v-if="selectedAlerts.length > 0"
+  data-test="alert-list-delete-alerts-btn"
+  @click="openBulkDeleteDialog"
+  class="tw:flex items-center q-mr-sm tw:ml-sm">
+  <q-icon name="delete" size="16px" />
                       <span class="tw:ml-2">Delete</span>
-                    </q-btn>
+</OButton>
                     <QTablePagination
                       :scope="scope"
                       :position="'bottom'"
@@ -833,22 +746,16 @@ persistent>
                 />
               </div>
               <div class="flex justify-end q-mt-sm">
-                <q-btn
-                  data-test="clone-alert-cancel-btn"
-                  v-close-popup="true"
-                  class="o2-secondary-button tw:h-[36px]"
-                  :label="t('alerts.cancel')"
-                  text-color="light-text"
-                  no-caps
-                />
-                <q-btn
-                  data-test="clone-alert-submit-btn"
-                  :label="t('alerts.save')"
-                  class="o2-primary-button tw:h-[36px] q-ml-md"
-                  type="submit"
-                  :disable="isSubmitting"
-                  no-caps
-                />
+                <OButton
+  variant="secondary"
+  data-test="clone-alert-cancel-btn"
+  v-close-popup="true"
+  text-color="light-text">{{ t('alerts.cancel') }}</OButton>
+                <OButton
+  data-test="clone-alert-submit-btn"
+  type="submit"
+  :disabled="isSubmitting"
+  class="q-ml-md">{{ t('alerts.save') }}</OButton>
               </div>
             </q-form>
           </q-card-section>
@@ -947,11 +854,16 @@ import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
+
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
 // import alertList from "./alerts";
 
+import { Copy, FileUp, MoreVertical, Pencil } from "lucide-vue-next";
 export default defineComponent({
   name: "AlertList",
   components: {
+    OMenu,
     QTablePagination,
     AddAlert: defineAsyncComponent(
       () => import("@/components/alerts/AddAlert.vue"),
@@ -966,7 +878,12 @@ export default defineComponent({
     SelectFolderDropDown,
     AlertHistoryDrawer,
     O2AIContextAddBtn,
-  },
+    OButton,
+    FileUp,
+    Pencil,
+    Copy,
+    MoreVertical,
+},
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",

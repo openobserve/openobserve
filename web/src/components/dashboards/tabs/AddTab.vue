@@ -35,13 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
-            v-close-popup="true"
-            round
-            flat
-            icon="cancel"
-            data-test="dashboard-tab-cancel"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true"
+  data-test="dashboard-tab-cancel">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
     </q-card-section>
@@ -61,25 +61,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div class="flex justify-start">
-          <q-btn
-            v-close-popup="true"
-            :label="t('dashboard.cancel')"
-            class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            flat
-            data-test="dashboard-add-cancel"
-          />
-          <q-btn
-            :disable="tabData.name.trim() === ''"
-            :loading="onSubmit.isLoading.value"
-            :label="t('dashboard.save')"
-            class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            borderless
-            type="submit"
-            data-test="dashboard-add-tab-submit"
-          />
+          <OButton
+  variant="secondary"
+  v-close-popup="true"
+  data-test="dashboard-add-cancel">{{ t('dashboard.cancel') }}</OButton>
+          <OButton
+  :loading="onSubmit.isLoading.value"
+  type="submit"
+  data-test="dashboard-add-tab-submit"
+  :disabled="tabData.name.trim() === ''"
+  class="q-ml-md">{{ t('dashboard.save') }}</OButton>
         </div>
       </q-form>
     </q-card-section>
@@ -96,6 +87,7 @@ import { useRoute } from "vue-router";
 import { editTab } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const defaultValue = () => {
   return {
     name: "",
@@ -104,6 +96,9 @@ const defaultValue = () => {
 };
 
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "AddTab",
   props: {
     tabId: {

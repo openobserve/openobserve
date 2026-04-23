@@ -46,15 +46,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="badge-value">{{ props.error.version }}</span>
         </span>
       </div>
-      <q-btn
-        unelevated
-        no-caps
-        label="Upload Source Maps"
-        icon="cloud_upload"
-        class="o2-primary-button tw:my-2"
-        size="sm"
-        @click="navigateToUpload"
-      />
+      <OButton
+  size="sm"
+  @click="navigateToUpload"
+  class="tw:my-2">
+  <template #icon-left><CloudUpload class="tw:w-4 tw:h-4" /></template>
+  Upload Source Maps
+</OButton>
     </div>
 
     <!-- Pretty formatted view -->
@@ -248,6 +246,9 @@ import {
   setCachedTranslation,
 } from "@/utils/stackTraceCache";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { CloudUpload } from "lucide-vue-next";
 const store = useStore();
 const router = useRouter();
 

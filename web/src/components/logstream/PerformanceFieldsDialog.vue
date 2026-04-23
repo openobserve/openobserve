@@ -71,8 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right" class="q-pt-none q-pb-md q-px-md">
-        <q-btn flat label="Skip" class="o2-secondary-button" @click="$emit('skip')" />
-        <q-btn unelevated label="Add Fields" class="o2-primary-button" @click="$emit('add-fields')" />
+        <OButton variant="secondary" @click="$emit('skip')">Skip</OButton>
+        <OButton @click="$emit('add-fields')">Add Fields</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -82,12 +82,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed, PropType } from "vue";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export interface PerformanceField {
   name: string;
   type: string;
 }
 
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "PerformanceFieldsDialog",
   props: {
     modelValue: {

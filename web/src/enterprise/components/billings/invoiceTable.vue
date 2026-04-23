@@ -29,18 +29,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #no-data><NoData /></template>
     <template #body-cell-actions="props">
       <q-td :props="props">
-        <q-btn
-          :href="props.row.pdf"
-          target="_blank"
-          :title="t('billing.downloadInvoice')"
-          class="q-ml-xs"
-          padding="sm"
-          unelevated
-          size="sm"
-          round
-          flat
-          icon="download"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  :href="props.row.pdf"
+  target="_blank"
+  :title="t('billing.downloadInvoice')"
+  class="q-ml-xs">
+  <template #icon-left><Download class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </q-td>
     </template>
             <template v-slot:header="props">
@@ -81,12 +78,17 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import BillingService from "@/services/billings";
 import { getImageURL } from "@/utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Download } from "lucide-vue-next";
 export default defineComponent({
   name: "InvoiceHistory",
   components: {
     NoData,
     QTablePagination,
-  },
+    OButton,
+    Download,
+},
   props: [],
   setup(props) {
     const { t } = useI18n();

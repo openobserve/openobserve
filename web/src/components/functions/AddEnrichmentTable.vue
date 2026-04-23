@@ -238,23 +238,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</pre>
 
           <div class="flex justify-start q-mt-md">
-            <q-btn
-              v-close-popup
-              class="q-mr-md o2-secondary-button tw:h-[36px]"
-              :label="t('function.cancel')"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              @click="$emit('cancel:hideform')"
-            />
-            <q-btn
-              class="o2-primary-button no-border tw:h-[36px]"
-              :label="t('function.save')"
-              type="submit"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            />
+            <OButton
+  variant="secondary"
+  v-close-popup
+  @click="$emit('cancel:hideform')"
+  class="q-mr-md">{{ t('function.cancel') }}</OButton>
+            <OButton type="submit">{{ t('function.save') }}</OButton>
           </div>
         </q-form>
       </div>
@@ -271,6 +260,7 @@ import { useQuasar } from "quasar";
 import segment from "../../services/segment_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -283,6 +273,9 @@ const defaultValue: any = () => {
 };
 
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "AddEnrichmentTable",
   props: {
     modelValue: {

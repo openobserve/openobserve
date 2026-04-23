@@ -23,13 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-body1 text-bold">Add Dashboard from Gallery</div>
           </div>
           <div class="col-auto">
-            <q-btn
-              v-close-popup
-              round
-              flat
-              icon="cancel"
-              data-test="add-dashboard-github-close"
-            />
+            <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup
+  data-test="add-dashboard-github-close">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </div>
       </q-card-section>
@@ -45,8 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else-if="error" class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:text-center">
           <q-icon name="error_outline" size="3em" color="negative" class="tw:mb-2" />
           <div class="text-negative">{{ error }}</div>
-          <q-btn flat dense label="Retry" @click="loadDashboards" class="o2-primary-button tw:h-[36px] tw:mt-4"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'" />
+          <OButton @click="loadDashboards" class="tw:mt-4">Retry</OButton>
         </div>
 
         <!-- Dashboard List -->
@@ -90,12 +89,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-card-section class="q-py-sm dashboard-footer-section">
         <div class="flex justify-end q-gutter-x-sm">
-          <q-btn flat dense label="Cancel" v-close-popup data-test="add-dashboard-github-cancel"
-            class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'" />
-          <q-btn flat dense :label="`Next (${selectedDashboards.length})`" :disable="selectedDashboards.length === 0"
-            @click="handleNext" data-test="add-dashboard-github-next" class="o2-primary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'" />
+          <OButton
+  variant="secondary"
+  v-close-popup
+  data-test="add-dashboard-github-cancel">Cancel</OButton>
+          <OButton
+  @click="handleNext"
+  data-test="add-dashboard-github-next"
+  :disabled="selectedDashboards.length === 0">{{ `Next (${selectedDashboards.length})` }}</OButton>
         </div>
       </q-card-section>
     </q-card>
@@ -115,20 +116,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-if="selectedFolderObj">{{ selectedFolderObj.label }}</span>
               </template>
             </q-select>
-            <q-btn flat dense @click="showAddFolderDialog = true" data-test="add-dashboard-github-add-folder"
-              title="Add New Folder" class="tw:bg-gray-100 hover:tw:bg-gray-200 tw:rounded-lg"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'">
-              <q-icon name="add" size="sm" />
-            </q-btn>
+            <OButton
+  variant="ghost"
+  @click="showAddFolderDialog = true"
+  data-test="add-dashboard-github-add-folder"
+  title="Add New Folder"
+  class="tw:bg-gray-100 hover:tw:bg-gray-200 tw:rounded-lg"><q-icon name="add" size="sm" /></OButton>
           </div>
         </q-card-section>
 
         <q-card-actions align="right" class="q-px-md q-pb-md">
-          <q-btn flat dense label="Back" @click="showFolderSelection = false" class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'" />
-          <q-btn flat dense label="Add Dashboard" :disable="!selectedFolderObj" @click="confirmAdd" :loading="importing"
-            data-test="add-dashboard-github-confirm" class="o2-primary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'" />
+          <OButton variant="secondary" @click="showFolderSelection = false">Back</OButton>
+          <OButton
+  @click="confirmAdd"
+  :loading="importing"
+  data-test="add-dashboard-github-confirm"
+  :disabled="!selectedFolderObj">Add Dashboard</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -150,6 +153,7 @@ import { useQuasar } from 'quasar';
 import dashboardsService from '@/services/dashboards';
 import AddFolder from '@/components/dashboards/AddFolder.vue';
 
+import OButton from "@/lib/core/Button/Button.vue";
 interface GitHubDashboard {
   name: string;
   displayName: string;
@@ -160,7 +164,9 @@ interface GitHubDashboard {
 
 export default defineComponent({
   name: 'AddDashboardFromGitHub',
-  components: { AddFolder },
+  components: { AddFolder,
+    OButton,
+},
   props: {
     modelValue: {
       type: Boolean,

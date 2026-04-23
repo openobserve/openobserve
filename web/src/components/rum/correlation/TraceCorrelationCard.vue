@@ -39,16 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="col-3 text-grey-7">Trace ID:</div>
           <div class="col-9 row items-center no-wrap">
             <code class="trace-id-text">{{ formatTraceId(traceId) }}</code>
-            <q-btn
-              flat
-              dense
-              size="sm"
-              icon="content_copy"
-              class="q-ml-xs hover:tw:text-[var(--o2-primary-btn-bg)]"
-              @click="copyTraceId"
-            >
-              <q-tooltip>Copy Trace ID</q-tooltip>
-            </q-btn>
+            <OButton
+  variant="ghost"
+  size="sm"
+  @click="copyTraceId"
+  class="q-ml-xs hover:tw:text-[var(--o2-primary-btn-bg)]">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Copy Trace ID</q-tooltip>
+</OButton>
           </div>
         </div>
 
@@ -157,30 +155,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Action Buttons -->
         <div class="row q-gutter-sm">
-          <q-btn
-            outline
-            no-caps
-            color="primary"
-            label="View Trace Details"
-            icon="timeline"
-            :disable="!hasBackendTrace"
-            @click="viewTraceDetails"
-            class="col tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! hover:tw:bg-[var(--o2-hover-accent)]!"
-          >
-            <q-tooltip v-if="!hasBackendTrace">
+          <OButton
+  variant="outline"
+  @click="viewTraceDetails"
+  :disabled="!hasBackendTrace"
+  class="col tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! hover:tw:bg-[var(--o2-hover-accent)]!">
+  <template #icon-left><Activity class="tw:w-4 tw:h-4" /></template>
+  View Trace Details
+  <q-tooltip v-if="!hasBackendTrace">
               Backend trace data not yet available. Trace data may take up to 30
               seconds to be ingested.
             </q-tooltip>
-          </q-btn>
-          <q-btn
-            flat
-            no-caps
-            color="primary"
-            label="Refresh"
-            icon="refresh"
-            @click="refreshTraceData"
-            class="tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! hover:tw:bg-[var(--o2-hover-accent)]!"
-          />
+</OButton>
+          <OButton
+  variant="ghost"
+  @click="refreshTraceData"
+  class="tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! hover:tw:bg-[var(--o2-hover-accent)]!">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  Refresh
+</OButton>
         </div>
 
         <!-- Missing trace notice -->
@@ -207,6 +200,9 @@ import { useQuasar, copyToClipboard } from "quasar";
 import { useRouter } from "vue-router";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Activity, Copy, RefreshCw } from "lucide-vue-next";
 const props = defineProps({
   traceId: {
     type: String,

@@ -38,17 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mr-sm"
                 @on:date-change="updateDateChange"
               />
-              <q-btn
-                data-test="metrics-explorer-run-query-button"
-                data-cy="metrics-explorer-run-query-button"
-                dense
-                :title="t('metrics.runQuery')"
-                class="q-pa-none tw:mr-none! o2-run-query-button o2-color-primary tw:h-[33px] element-box-shadow"
-                @click="runQuery"
-                no-caps
-              >
-                {{ t("metrics.runQuery") }}
-              </q-btn>
+              <OButton
+  data-test="metrics-explorer-run-query-button"
+  data-cy="metrics-explorer-run-query-button"
+  :title="t('metrics.runQuery')"
+  @click="runQuery"
+  class="q-pa-none tw:mr-none! o2-run-query-button o2-color-primary tw:h-[33px] element-box-shadow">{{ t("metrics.runQuery") }}</OButton>
             </div>
           </div>
           <div class="tw:pb-[0.375rem] tw:px-[0.375rem]">
@@ -140,14 +135,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div></div>
               </div>
             </div>
-            <q-btn
-              class="bg-primary rounded text-white"
-              no-caps
-              :title="t('common.getStartedRUM')"
-              @click="getStarted"
-            >
-              {{ t("common.getStarted") }}
-            </q-btn>
+            <OButton
+  :title="t('common.getStartedRUM')"
+  @click="getStarted"
+  class="bg-primary rounded text-white">{{ t("common.getStarted") }}</OButton>
           </div>
         </div>
       </div>
@@ -189,6 +180,7 @@ import {
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 
+import OButton from "@/lib/core/Button/Button.vue";
 interface Session {
   timestamp: string;
   type: string;

@@ -24,34 +24,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span>
         Variable
       </span>
-          <q-btn
-          style="color: #A0A0A0;"
-              no-caps
-              padding="xs"
-              class=""
-              size="sm"
-              flat
-              icon="info_outline"
-            >
-              <q-tooltip>
+          <OButton
+  variant="ghost"
+  size="sm"
+  style="color: #A0A0A0;">
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>
               Variables are used to pass data from the alert to the destination.
             </q-tooltip>
-          </q-btn>
+</OButton>
         </div>
     <template v-if="!variables.length">
       <div class="flex justify-between items-center tw:ml-auto">
 
-        <q-btn
-          data-test="alert-variables-add-btn"
-          size="sm"
-          class="text-bold no-border o2-secondary-button tw:h-[36px]"
-          flat
-          no-caps
-          @click="addVariable"
-        >
-        <q-icon name="add" />
+        <OButton
+  variant="secondary"
+  size="sm"
+  data-test="alert-variables-add-btn"
+  @click="addVariable"
+  class="text-bold">
+  <q-icon name="add" />
         <span>Add Variable</span>
-      </q-btn>
+</OButton>
       </div>
     </template>
     <template v-else>
@@ -86,33 +80,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="col-2 q-ml-none">
-          <q-btn
-            data-test="alert-variables-delete-variable-btn"
-            :icon="outlinedDelete"
-            class="q-ml-xs iconHoverBtn"
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            :title="t('alert_templates.edit')"
-            @click="removeVariable(variable)"
-          />
-          <q-btn
-            data-test="alert-variables-add-variable-btn"
-            v-if="index === variables.length - 1"
-            icon="add"
-            class="q-ml-xs iconHoverBtn"
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            :title="t('alert_templates.edit')"
-            @click="addVariable"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  data-test="alert-variables-delete-variable-btn"
+  :title="t('alert_templates.edit')"
+  @click="removeVariable(variable)"
+  class="q-ml-xs iconHoverBtn" :class="store.state?.theme === 'dark' ? 'icon-dark' : ''">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
+          <OButton
+  variant="ghost"
+  size="icon"
+  data-test="alert-variables-add-variable-btn"
+  v-if="index === variables.length - 1"
+  :title="t('alert_templates.edit')"
+  @click="addVariable"
+  class="q-ml-xs iconHoverBtn" :class="store.state?.theme === 'dark' ? 'icon-dark' : ''">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
     </template>
@@ -124,6 +110,9 @@ import { useI18n } from "vue-i18n";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Info, Plus, Trash2 } from "lucide-vue-next";
 const props = defineProps({
   variables: {
     type: Array,

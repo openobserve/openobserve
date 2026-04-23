@@ -480,30 +480,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="col-2 headers-btns">
-                <q-btn
-                  :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                  icon="delete"
-                  class="q-ml-xs iconHoverBtn el-border el-border-radius"
-                  :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                  padding="sm"
-                  dense
-                  flat
-                  :title="t('alert_templates.edit')"
-                  @click="deleteApiHeader(header)"
-                />
-                <q-btn
-                  data-test="add-destination-add-header-btn"
-                  v-if="index === apiHeaders.length - 1"
-                  icon="add"
-                  :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                  class="q-ml-xs iconHoverBtn el-border el-border-radius"
-                  padding="sm"
-                  size="sm"
-                  dense
-                  flat
-                  :title="t('alert_templates.edit')"
-                  @click="addApiHeader()"
-                />
+                <OButton
+  variant="outline"
+  size="icon"
+  :data-test="`add-destination-header-${header['key']}-delete-btn`"
+  :title="t('alert_templates.edit')"
+  @click="deleteApiHeader(header)"
+  class="q-ml-xs iconHoverBtn el-border-radius" :class="store.state?.theme === 'dark' ? 'icon-dark' : ''">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                <OButton
+  variant="outline"
+  size="icon"
+  data-test="add-destination-add-header-btn"
+  v-if="index === apiHeaders.length - 1"
+  :title="t('alert_templates.edit')"
+  @click="addApiHeader()"
+  class="q-ml-xs iconHoverBtn el-border-radius" :class="store.state?.theme === 'dark' ? 'icon-dark' : ''">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </div>
             </div>
           </div>
@@ -571,74 +566,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Form buttons -->
       <div class="flex justify-start q-mb-md">
         <div v-if="step === 1">
-          <q-btn
-            data-test="step1-cancel-btn"
-            class="o2-secondary-button tw:h-[36px] q-mr-sm"
-            :label="t('alerts.cancel')"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
-            @click="$emit('cancel')"
-          />
-          <q-btn
-            data-test="step1-continue-btn"
-            @click="nextStep"
-            :disable="!canProceedStep1"
-            label="Continue"
-            class="no-border o2-primary-button tw:h-[36px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            flat
-            no-caps
-          />
+          <OButton
+  variant="secondary"
+  data-test="step1-cancel-btn"
+  @click="$emit('cancel')"
+  class="q-mr-sm">{{ t('alerts.cancel') }}</OButton>
+          <OButton
+  data-test="step1-continue-btn"
+  @click="nextStep"
+  :disabled="!canProceedStep1">Continue</OButton>
         </div>
         <div v-if="step > 1">
-          <q-btn
-            data-test="step3-back-btn"
-            @click="prevStep"
-            label="Back"
-            class="o2-secondary-button tw:h-[36px] q-mr-sm"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            flat
-            no-caps
-          />
-          <q-btn
-            data-test="add-destination-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
-            @click="$emit('cancel')"
-          />
-          <q-btn
-            data-test="add-destination-submit-btn"
-            :label="t('alerts.save')"
-            class="no-border q-ml-sm o2-primary-button tw:h-[36px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            flat
-            type="submit"
-            no-caps
-          />
+          <OButton
+  variant="secondary"
+  data-test="step3-back-btn"
+  @click="prevStep"
+  class="q-mr-sm">Back</OButton>
+          <OButton
+  variant="secondary"
+  data-test="add-destination-cancel-btn"
+  @click="$emit('cancel')">{{ t('alerts.cancel') }}</OButton>
+          <OButton
+  data-test="add-destination-submit-btn"
+  type="submit"
+  class="q-ml-sm">{{ t('alerts.save') }}</OButton>
         </div>
       </div>
     </q-form>
@@ -655,6 +606,9 @@ import { useQuasar } from "quasar";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus, Trash2 } from "lucide-vue-next";
 // Props
 const props = defineProps<{
   destination?: DestinationData | null;

@@ -17,18 +17,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div :class="isCompact ? '' : 'q-pl-sm float-left'">
     <!-- Compact mode: Simple toggle button with dropdown menu -->
-    <q-btn
-      v-if="isCompact"
-      data-test="logs-search-bar-refresh-interval-btn"
-      flat
-      dense
-      no-caps
-      :class="[
+    <OMenu v-if="isCompact">
+<template #default="{ toggle, close }">
+
+      <OButton
+  variant="ghost"
+  data-test="logs-search-bar-refresh-interval-btn"
+  :class="[
         'compact-refresh-btn',
         isAnimating ? 'active-refresh-btn' : ''
       ]"
-    >
-      <q-icon
+  @click="toggle">
+  <q-icon
         name="update"
         :class="[
           isAnimating ? 'rotating-icon' : '',
@@ -39,9 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
         {{ t('search.autoRefresh') }}: {{ selectedLabel }}
       </q-tooltip>
-
-      <!-- Dropdown menu for interval selection -->
-      <q-menu content-style="z-index: 10001">
+</OButton>
+      </template>
+<template #content="{ close }">
         <div class="row">
           <div class="col col-12 q-pa-sm" style="text-align: center; width: 300px">
             <q-btn
@@ -53,8 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'no-border full-width ' +
                 (modelValue.toString() === '0' ? 'selected' : '')
               "
-              v-close-popup="true"
-              @click="onItemClick({ label: t('common.off'), value: 0 })"
+              @click="onItemClick({ label: t('common.off'), value: 0 }); close()"
             >
               {{ t("common.off") }}
             </q-btn>
@@ -77,8 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'no-border ' +
                   (Number(modelValue) === item.value ? 'selected' : ''),
               ]"
-              @click="onItemClick(item)"
-              v-close-popup="true"
+              @click="onItemClick(item); close()"
               :disable="item.disabled"
             >
               <q-tooltip
@@ -94,8 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
           </div>
         </div>
-      </q-menu>
-    </q-btn>
+      </template>
+    </OMenu>
 
     <!-- Full mode: Dropdown with label -->
     <q-btn-dropdown
@@ -121,20 +119,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div class="row">
         <div class="col col-12 q-pa-sm" style="text-align: center; width: 300px">
-          <q-btn
-            data-test="logs-search-off-refresh-interval"
-            no-caps
-            :flat="modelValue.toString() !== '0'"
-            size="md"
-            :class="
+          <OButton
+  data-test="logs-search-off-refresh-interval"
+  :flat="modelValue.toString() !== '0'"
+  v-close-popup="true"
+  @click="onItemClick({ label: t('common.off'), value: 0 })"
+  :class="
               'no-border full-width ' +
               (modelValue.toString() === '0' ? 'selected' : '')
-            "
-            v-close-popup="true"
-            @click="onItemClick({ label: t('common.off'), value: 0 })"
-          >
-            {{ t("common.off") }}
-          </q-btn>
+            ">{{ t("common.off") }}</OButton>
         </div>
       </div>
       <q-separator />
@@ -145,20 +138,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="col col-4 q-pa-sm"
           style="text-align: center"
         >
-          <q-btn
-            :data-test="`logs-search-bar-refresh-time-${item.value}`"
-            no-caps
-            :flat="Number(modelValue) !== item.value"
-            size="md"
-            :class="[
+          <OButton
+  :data-test="`logs-search-bar-refresh-time-${item.value}`"
+  :flat="Number(modelValue) !== item.value"
+  @click="onItemClick(item)"
+  v-close-popup="true"
+  :disabled="item.disabled"
+  :class="[
               'no-border ' +
                 (Number(modelValue) === item.value ? 'selected' : ''),
-            ]"
-            @click="onItemClick(item)"
-            v-close-popup="true"
-            :disable="item.disabled"
-          >
-            <q-tooltip
+            ]">
+  <q-tooltip
               v-if="item.disabled"
               style="z-index: 10001; font-size: 14px"
               anchor="center right"
@@ -168,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ minRangeRestrictionMessageVal }}
             </q-tooltip>
             {{ item.label }}
-          </q-btn>
+</OButton>
         </div>
       </div>
     </q-btn-dropdown>
@@ -190,7 +180,13 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { generateDurationLabel } from "../utils/date";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
 export default defineComponent({
+  components: {
+    OButton,
+    OMenu,
+  },
   name: "AutoRefreshInterval",
   props: {
     modelValue: {

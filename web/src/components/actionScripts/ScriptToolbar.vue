@@ -69,36 +69,28 @@
       </q-form>
     </div>
     <div class="add-script-actions flex justify-center">
-      <q-btn
-        data-test="add-script-fullscreen-btn"
-        v-close-popup="true"
-        class="text-bold tw:border-primary add-script-fullscreen-btn"
-        :label="t('common.fullscreen')"
-        :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
-        padding="sm"
-        no-caps
-        icon="fullscreen"
-        @click="handleFullScreen"
-      />
-      <q-btn
-        data-test="add-script-save-btn"
-        :label="t('actions.save')"
-        class="text-bold no-border tw:ml-[12px] add-script-save-btn"
-        color="secondary"
-        padding="sm md"
-        type="submit"
-        no-caps
-        @click="onSave"
-      />
-      <q-btn
-        data-test="add-script-cancel-btn"
-        class="cancel-btn text-bold tw:ml-[12px] tw:border-3 tw:border-red-600 add-script-cancel-btn"
-        :label="t('common.cancel')"
-        text-color="negative"
-        padding="sm md"
-        no-caps
-        @click="emit('cancel')"
-      />
+      <OButton
+  size="sm"
+  data-test="add-script-fullscreen-btn"
+  v-close-popup="true"
+  :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
+  @click="handleFullScreen"
+  class="text-bold tw:border-primary add-script-fullscreen-btn">
+  <template #icon-left><Maximize class="tw:w-4 tw:h-4" /></template>
+  {{ t('common.fullscreen') }}
+</OButton>
+      <OButton
+  size="sm"
+  data-test="add-script-save-btn"
+  type="submit"
+  @click="onSave"
+  class="text-bold tw:ml-[12px] add-script-save-btn">{{ t('actions.save') }}</OButton>
+      <OButton
+  size="sm"
+  data-test="add-script-cancel-btn"
+  text-color="negative"
+  @click="emit('cancel')"
+  class="cancel-btn text-bold tw:ml-[12px] tw:border-3 tw:border-red-600 add-script-cancel-btn">{{ t('common.cancel') }}</OButton>
     </div>
   </div>
 </template>
@@ -116,6 +108,9 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Maximize } from "lucide-vue-next";
 const { t } = useI18n();
 
 const q = useQuasar();

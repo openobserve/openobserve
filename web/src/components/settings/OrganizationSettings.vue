@@ -98,24 +98,16 @@
     </template>
 
     <div class="flex justify-start q-mt-md">
-      <q-btn
-        data-test="add-alert-cancel-btn"
-        v-close-popup="true"
-        class="q-mr-md o2-secondary-button tw:h-[36px]"
-        :label="t('alerts.cancel')"
-        no-caps
-        flat
-        @click="$emit('cancel:hideform')"
-      />
-      <q-btn
-        data-test="add-alert-submit-btn"
-        :label="t('alerts.save')"
-        class="o2-primary-button no-border tw:h-[36px]"
-        type="submit"
-        no-caps
-        flat
-        @click="saveOrgSettings"
-      />
+      <OButton
+  variant="secondary"
+  data-test="add-alert-cancel-btn"
+  v-close-popup="true"
+  @click="$emit('cancel:hideform')"
+  class="q-mr-md">{{ t('alerts.cancel') }}</OButton>
+      <OButton
+  data-test="add-alert-submit-btn"
+  type="submit"
+  @click="saveOrgSettings">{{ t('alerts.save') }}</OButton>
     </div>
     </div>
   </div>
@@ -130,6 +122,7 @@ import { useQuasar } from "quasar";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import config from "@/aws-exports";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const { t } = useI18n();
 
 const store = useStore();

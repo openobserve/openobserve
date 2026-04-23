@@ -66,16 +66,11 @@ size="xs" />
                 : expandGroupRowsFieldCount[props.row.group]
             }})
           </div>
-          <q-btn
-            v-if="expandGroupRowsFieldCount[props.row.group] > 0"
-            :icon="
-              expandGroupRows[props.row.group] ? 'expand_more' : 'chevron_right'
-            "
-            dense
-            size="xs"
-            flat
-            class="q-pa-none"
-          ></q-btn>
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-if="expandGroupRowsFieldCount[props.row.group] > 0"
+  class="q-pa-none" />
         </q-td>
       </q-tr>
 
@@ -227,6 +222,7 @@ import FieldRow from "./FieldRow.vue";
 import FieldExpansion from "./FieldExpansion.vue";
 import FieldListPagination from "./FieldListPagination.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const { t } = useI18n();
 
 interface Props {

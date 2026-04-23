@@ -18,16 +18,11 @@
               {{ t('about.installation_id') }}: <strong>{{ licenseData.installation_id || 'N/A' }}</strong>
             </div>
             <div class="q-mt-md text-body2" v-html="DOMPurify.sanitize(t('about.contact_admin_license'))"></div>
-            <q-btn
-              data-test="no-license-get-license-btn"
-              color="primary"
-              no-caps
-              :label="t('about.get_license')"
-              @click="redirectToGetLicense"
-              class="q-ml-sm q-mt-sm"
-              size="sm"
-              borderless
-            />
+            <OButton
+  size="sm"
+  data-test="no-license-get-license-btn"
+  @click="redirectToGetLicense"
+  class="q-ml-sm q-mt-sm">{{ t('about.get_license') }}</OButton>
           </q-card-section>
         </q-card>
 
@@ -49,14 +44,11 @@
                 <span class="text-body2">{{ t('about.license_auto_filled') }}</span>
               </div>
             </div>
-            <q-btn
-              data-test="no-license-update-btn"
-              color="primary"
-              :label="t('about.update_license')"
-              @click="updateLicense"
-              :loading="updating"
-              :disable="!licenseKey.trim()"
-            />
+            <OButton
+  data-test="no-license-update-btn"
+  @click="updateLicense"
+  :loading="updating"
+  :disabled="!licenseKey.trim()">{{ t('about.update_license') }}</OButton>
           </q-card-section>
         </q-card>
       </div>
@@ -100,16 +92,14 @@
                   <td>
                     <div class="row items-center q-gutter-sm">
                       <span>{{ getMaskedLicenseKey() }}</span>
-                      <q-btn
-                        flat
-                        round
-                        dense
-                        icon="visibility"
-                        size="sm"
-                        @click="showLicenseKeyModal = true"
-                        class="q-ml-sm"
-                        data-test="show-license-key-btn"
-                      />
+                      <OButton
+  variant="ghost"
+  size="icon"
+  @click="showLicenseKeyModal = true"
+  data-test="show-license-key-btn"
+  class="q-ml-sm">
+  <template #icon-left><Eye class="tw:w-4 tw:h-4" /></template>
+</OButton>
                     </div>
                   </td>
                 </tr>
@@ -128,20 +118,8 @@
               </tbody>
             </q-markup-table>
             <div class="tw:mt-3 tw:flex tw:gap-3">
-              <q-btn
-                no-caps
-                :label="t('about.request_new_license')"
-                class="o2-primary-button"
-                @click="redirectToGetLicense"
-                data-test="request-new-license-btn"
-              />
-              <q-btn
-                data-test="add-license-key-btn"
-                no-caps
-                class="o2-primary-button"
-                :label="t('about.add_new_license_key')"
-                @click="showUpdateFormAndFocus"
-              />
+              <OButton @click="redirectToGetLicense" data-test="request-new-license-btn">{{ t('about.request_new_license') }}</OButton>
+              <OButton data-test="add-license-key-btn" @click="showUpdateFormAndFocus">{{ t('about.add_new_license_key') }}</OButton>
             </div>
           </q-card-section>
         </q-card>
@@ -165,22 +143,15 @@
                 </div>
               </div>
               <div class="row q-gutter-sm">
-                <q-btn
-                  data-test="cancel-update-license-btn"
-                  no-caps
-                  :label="t('common.cancel')"
-                  class="o2-secondary-button"
-                  @click="showUpdateForm = false; licenseKey = ''"
-                />
-                <q-btn
-                  data-test="confirm-update-license-btn"
-                  color="primary"
-                  no-caps
-                  :label="t('about.update_license')"
-                  @click="updateLicense"
-                  :loading="updating"
-                  :disable="!licenseKey.trim()"
-                />
+                <OButton
+  variant="secondary"
+  data-test="cancel-update-license-btn"
+  @click="showUpdateForm = false; licenseKey = ''">{{ t('common.cancel') }}</OButton>
+                <OButton
+  data-test="confirm-update-license-btn"
+  @click="updateLicense"
+  :loading="updating"
+  :disabled="!licenseKey.trim()">{{ t('about.update_license') }}</OButton>
               </div>
             </q-card-section>
           </q-card>
@@ -282,7 +253,12 @@
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">{{ t('about.license_key') }}</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup>
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </q-card-section>
 
         <q-card-section>
@@ -300,21 +276,14 @@
         </q-card-section>
 
         <q-card-actions align="right" class="q-pt-none">
-          <q-btn
-            data-test="license-cancel-btn"
-            no-caps
-            :label="t('common.cancel')"
-            class="o2-secondary-button"
-            v-close-popup
-              />
-          <q-btn
-            data-test="license-copy-key-btn"
-            color="primary"
-            :label="t('about.copy_key')"
-            no-caps
-            @click="copyLicenseKey"
-            :disable="!licenseData.key"
-          />
+          <OButton
+  variant="secondary"
+  data-test="license-cancel-btn"
+  v-close-popup>{{ t('common.cancel') }}</OButton>
+          <OButton
+  data-test="license-copy-key-btn"
+  @click="copyLicenseKey"
+  :disabled="!licenseData.key">{{ t('about.copy_key') }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -330,6 +299,9 @@ import { useStore } from "vuex";
 import DOMPurify from 'dompurify';
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Eye } from "lucide-vue-next";
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue")
 );
@@ -339,7 +311,9 @@ export default defineComponent({
   components: {
     LicensePeriod,
     RenderDashboardCharts,
-  },
+    OButton,
+    Eye,
+},
   setup() {
     const $q = useQuasar();
     const { t } = useI18n();

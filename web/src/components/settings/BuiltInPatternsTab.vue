@@ -49,15 +49,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="col-12 col-md-2">
-          <q-btn
-            :label="t('regex_patterns.refresh')"
-            icon="refresh"
-            flat
-            class="o2-secondary-button tw:w-[120px]"
-            @click="refreshPatterns"
-            :loading="loading"
-            data-test="built-in-pattern-refresh-btn"
-          />
+          <OButton
+  variant="secondary"
+  @click="refreshPatterns"
+  :loading="loading"
+  data-test="built-in-pattern-refresh-btn"
+  class="tw:w-[120px]">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  {{ t('regex_patterns.refresh') }}
+</OButton>
         </div>
       </div>
     </div>
@@ -72,13 +72,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="error" class="text-center q-pa-xl">
       <q-icon name="error" size="50px" color="negative" />
       <div class="q-mt-md text-negative">{{ error }}</div>
-      <q-btn
-        flat
-        color="primary"
-        :label="t('regex_patterns.try_again')"
-        @click="fetchPatterns"
-        class="q-mt-md"
-      />
+      <OButton
+  variant="ghost"
+  @click="fetchPatterns"
+  class="q-mt-md">{{ t('regex_patterns.try_again') }}</OButton>
     </div>
 
     <!-- Patterns List -->
@@ -135,16 +132,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item-section>
 
             <q-item-section side>
-              <q-btn
-                flat
-                round
-                dense
-                icon="more_vert"
-                @click="previewPattern(pattern)"
-                :data-test="`pattern-preview-${index}`"
-              >
-                <q-tooltip>{{ t('regex_patterns.preview') }}</q-tooltip>
-              </q-btn>
+              <OButton
+  variant="ghost"
+  @click="previewPattern(pattern)"
+  :data-test="`pattern-preview-${index}`">
+  <template #icon-left><MoreVertical class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t('regex_patterns.preview') }}</q-tooltip>
+</OButton>
             </q-item-section>
           </q-item>
 
@@ -222,13 +216,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
 
         <q-card-actions align="right">
-          <q-btn flat :label="t('regex_patterns.close')" color="primary" v-close-popup />
-          <q-btn
-            :label="t('regex_patterns.import_this_pattern')"
-            color="primary"
-            @click="importSinglePattern"
-            data-test="import-single-pattern-btn"
-          />
+          <OButton variant="ghost" v-close-popup>{{ t('regex_patterns.close') }}</OButton>
+          <OButton @click="importSinglePattern" data-test="import-single-pattern-btn">{{ t('regex_patterns.import_this_pattern') }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -243,6 +232,9 @@ import { useQuasar } from "quasar";
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { MoreVertical, RefreshCw } from "lucide-vue-next";
 interface PatternExample {
   Valid: string[];
   Invalid: string[];
@@ -260,6 +252,11 @@ interface BuiltInPattern {
 }
 
 export default defineComponent({
+  components: {
+    OButton,
+    RefreshCw,
+    MoreVertical,
+  },
   name: "BuiltInPatternsTab",
   emits: ["import-patterns"],
   setup(props, { emit }) {

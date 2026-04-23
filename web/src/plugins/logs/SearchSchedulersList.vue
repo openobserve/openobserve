@@ -25,16 +25,10 @@
         </div>
         <div class="flex items-center q-py-sm q-pr-md">
           <div>
-            <q-btn
-              :label="t('search_scheduler_job.get_jobs')"
-              @click="fetchSearchHistory"
-              class="q-ml-md o2-primary-button tw:h-[36px] tw:rounded-md"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-              no-caps
-              flat
-              dense
-              :disable="isLoading"
-            />
+            <OButton
+  @click="fetchSearchHistory"
+  :disabled="isLoading"
+  class="q-ml-md tw:rounded-md">{{ t('search_scheduler_job.get_jobs') }}</OButton>
           </div>
         </div>
       </div>
@@ -62,17 +56,10 @@
                 @click="triggerExpand(props)"
               >
                 <q-td>
-                  <q-btn
-                    data-test="search-scheduler-expand-btn"
-                    dense
-                    flat
-                    size="xs"
-                    :icon="
-                      expandedRow != props.row.trace_id
-                        ? 'expand_more'
-                        : 'expand_less'
-                    "
-                  />
+                  <OButton
+  variant="ghost"
+  size="icon"
+  data-test="search-scheduler-expand-btn" />
                 </q-td>
 
                 <q-td
@@ -101,70 +88,54 @@
                     </div>
                   </template>
                   <template v-else>
-                    <q-btn
-                      data-test="search-scheduler-cancel-btn"
-                      icon="cancel"
-                      :title="t('search_scheduler_job.cancel')"
-                      class="q-ml-xs"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      :disable="
+                    <OButton
+  variant="ghost"
+  size="icon"
+  data-test="search-scheduler-cancel-btn"
+  :title="t('search_scheduler_job.cancel')"
+  @click="confirmCancelJob(props.row)"
+  :disabled="
                         props.row.status_code !== 0 &&
                         props.row.status_code !== 1
                       "
-                      color="gray"
-                      @click="confirmCancelJob(props.row)"
-                    ></q-btn>
+  class="q-ml-xs">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
 
-                    <q-btn
-                      data-test="search-scheduler-delete-btn"
-                      icon="delete"
-                      :title="t('search_scheduler_job.delete')"
-                      class="q-ml-xs"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      color="red"
-                      flat
-                      @click="confirmDeleteJob(props.row)"
-                    ></q-btn>
-                    <q-btn
-                      data-test="search-scheduler-restart-btn"
-                      icon="refresh"
-                      :title="t('search_scheduler_job.restart')"
-                      class="q-ml-xs"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      color="orange"
-                      flat
-                      :disable="
+                    <OButton
+  variant="destructive"
+  size="icon"
+  data-test="search-scheduler-delete-btn"
+  :title="t('search_scheduler_job.delete')"
+  @click="confirmDeleteJob(props.row)"
+  class="q-ml-xs">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                    <OButton
+  variant="ghost"
+  size="icon"
+  data-test="search-scheduler-restart-btn"
+  :title="t('search_scheduler_job.restart')"
+  @click="retrySearchJob(props.row)"
+  :disabled="
                         props.row.status_code !== 2 &&
                         props.row.status_code !== 3
                       "
-                      @click="retrySearchJob(props.row)"
-                    ></q-btn>
-                    <q-btn
-                      data-test="search-scheduler-explore-btn"
-                      icon="search"
-                      :title="t('search_scheduler_job.explore')"
-                      class="q-ml-xs"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      :disable="
+  class="q-ml-xs">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                    <OButton
+  variant="ghost"
+  size="icon"
+  data-test="search-scheduler-explore-btn"
+  :title="t('search_scheduler_job.explore')"
+  @click="fetchSearchResults(props.row)"
+  :disabled="
                         props.row.status_code == 0 || props.row.status_code == 3
                       "
-                      flat
-                      color="green"
-                      @click="fetchSearchResults(props.row)"
-                    ></q-btn>
+  class="q-ml-xs">
+  <template #icon-left><Search class="tw:w-4 tw:h-4" /></template>
+</OButton>
                   </template>
                 </q-td>
               </q-tr>
@@ -185,36 +156,35 @@
                         <strong
                           >{{ t('search_scheduler_job.sql_query') }} :
                           <span>
-                            <q-btn
-                              @click.stop="
+                            <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="
                                 copyToClipboard(props.row.sql, 'SQL Query')
                               "
-                              data-test="search-scheduler-copy-sql-btn"
-                              size="xs"
-                              dense
-                              flat
-                              icon="content_copy"
-                              class="copy-btn-sql tw:ml-2 tw:py-2 tw:px-2" /></span
+  data-test="search-scheduler-copy-sql-btn"
+  class="copy-btn-sql tw:ml-2 tw:py-2 tw:px-2">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+</OButton></span
                         ></strong>
-                        <q-btn
-                          @click.stop="fetchSearchResults(props.row)"
-                          data-test="search-scheduler-go-to-logs-btn"
-                          size="xs"
-                          :label="t('search_scheduler_job.logs')"
-                          dense
-                          class="copy-btn tw:py-2 tw:mx-2 tw:px-2"
-                          icon="search"
-                          flat
-                          style="
+                        <OButton
+  variant="ghost"
+  size="sm"
+  @click.stop="fetchSearchResults(props.row)"
+  data-test="search-scheduler-go-to-logs-btn"
+  style="
                             color: #f2452f;
                             border: #f2452f 1px solid;
                             font-weight: bolder;
                           "
-                          :disable="
+  :disabled="
                             props.row.status_code == 0 ||
                             props.row.status_code == 3
                           "
-                        />
+  class="copy-btn tw:py-2 tw:mx-2 tw:px-2">
+  <template #icon-left><Search class="tw:w-4 tw:h-4" /></template>
+  {{ t('search_scheduler_job.logs') }}
+</OButton>
                       </div>
                       <div class="tw:flex tw:items-start tw:justify-center">
                         <div class="scrollable-content expanded-sql">
@@ -232,18 +202,18 @@
                         <strong
                           >{{ t('search_scheduler_job.function_definition') }} :
                           <span>
-                            <q-btn
-                              @click.stop="
+                            <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="
                                 copyToClipboard(
                                   props.row.function,
                                   'Function Defination',
                                 )
                               "
-                              size="xs"
-                              dense
-                              flat
-                              icon="content_copy"
-                              class="copy-btn-function tw:ml-2 tw:py-2 tw:px-2" /></span
+  class="copy-btn-function tw:ml-2 tw:py-2 tw:px-2">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+</OButton></span
                         ></strong>
                       </div>
 
@@ -382,6 +352,9 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import JsonPreview from "./JsonPreview.vue";
 import config from "@/aws-exports";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Copy, RefreshCw, Search, Trash2 } from "lucide-vue-next";
 export default defineComponent({
   name: "SearchSchedulersList",
   components: {
@@ -395,7 +368,12 @@ export default defineComponent({
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
-  },
+    OButton,
+    Trash2,
+    RefreshCw,
+    Search,
+    Copy,
+},
   props: {
     isClicked: {
       type: Boolean,

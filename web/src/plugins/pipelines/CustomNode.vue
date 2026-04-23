@@ -27,6 +27,9 @@ import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constant
 
 import config from "@/aws-exports";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Trash2 } from "lucide-vue-next";
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
@@ -532,18 +535,16 @@ function getIcon(data, ioType) {
 
       <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
 
-        <q-btn
-          flat
-          round
-          dense
-          icon="delete"
-          size="0.6em"
-          @click.stop="deleteNode(id)"
-          class="node-action-btn delete-btn"
-          :data-test="`pipeline-node-${io_type}-delete-btn`"
-          @mouseenter="handleDeleteTooltipEnter"
-          @mouseleave="handleDeleteTooltipLeave"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="deleteNode(id)"
+  :data-test="`pipeline-node-${io_type}-delete-btn`"
+  @mouseenter="handleDeleteTooltipEnter"
+  @mouseleave="handleDeleteTooltipLeave"
+  class="node-action-btn delete-btn">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
           <div class="tooltip-arrow delete-arrow"></div>
@@ -612,18 +613,16 @@ function getIcon(data, ioType) {
       </div>
       <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
         
-        <q-btn
-          flat
-          round
-          dense
-          icon="delete"
-          size="0.6em"
-          @click.stop="deleteNode(id)"
-          class="node-action-btn delete-btn"
-          :data-test="`pipeline-node-${io_type}-delete-btn`"
-          @mouseenter="handleDeleteTooltipEnter"
-          @mouseleave="handleDeleteTooltipLeave"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="deleteNode(id)"
+  :data-test="`pipeline-node-${io_type}-delete-btn`"
+  @mouseenter="handleDeleteTooltipEnter"
+  @mouseleave="handleDeleteTooltipLeave"
+  class="node-action-btn delete-btn">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
           <div class="tooltip-arrow delete-arrow"></div>
@@ -678,18 +677,16 @@ function getIcon(data, ioType) {
       </div>
       <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
         
-        <q-btn
-          flat
-          round
-          dense
-          icon="delete"
-          size="0.6em"
-          @click.stop="deleteNode(id)"
-          class="node-action-btn delete-btn"
-          :data-test="`pipeline-node-${io_type}-delete-btn`"
-          @mouseenter="handleDeleteTooltipEnter"
-          @mouseleave="handleDeleteTooltipLeave"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="deleteNode(id)"
+  :data-test="`pipeline-node-${io_type}-delete-btn`"
+  @mouseenter="handleDeleteTooltipEnter"
+  @mouseleave="handleDeleteTooltipLeave"
+  class="node-action-btn delete-btn">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
           <div class="tooltip-arrow delete-arrow"></div>
@@ -745,18 +742,16 @@ function getIcon(data, ioType) {
 
       <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
         
-        <q-btn
-          flat
-          round
-          dense
-          icon="delete"
-          size="0.6em"
-          @click.stop="deleteNode(id)"
-          class="node-action-btn delete-btn"
-          :data-test="`pipeline-node-${io_type}-delete-btn`"
-          @mouseenter="handleDeleteTooltipEnter"
-          @mouseleave="handleDeleteTooltipLeave"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="deleteNode(id)"
+  :data-test="`pipeline-node-${io_type}-delete-btn`"
+  @mouseenter="handleDeleteTooltipEnter"
+  @mouseleave="handleDeleteTooltipLeave"
+  class="node-action-btn delete-btn">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
           <div class="tooltip-arrow delete-arrow"></div>
@@ -810,18 +805,16 @@ function getIcon(data, ioType) {
 
       <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
         
-        <q-btn
-          flat
-          round
-          dense
-          icon="delete"
-          size="0.6em"
-          @click.stop="deleteNode(id)"
-          class="node-action-btn delete-btn"
-          :data-test="`pipeline-node-${io_type}-delete-btn`"
-          @mouseenter="handleDeleteTooltipEnter"
-          @mouseleave="handleDeleteTooltipLeave"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="deleteNode(id)"
+  :data-test="`pipeline-node-${io_type}-delete-btn`"
+  @mouseenter="handleDeleteTooltipEnter"
+  @mouseleave="handleDeleteTooltipLeave"
+  class="node-action-btn delete-btn">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
           <div class="tooltip-arrow delete-arrow"></div>
@@ -897,18 +890,16 @@ function getIcon(data, ioType) {
       </div>
 
       <div v-show="showButtons" class="node-action-buttons" :data-test="`pipeline-node-${io_type}-actions`" :style="{ '--node-color': getNodeColor(io_type) }" @mouseenter="handleActionButtonsEnter" @mouseleave="handleActionButtonsLeave">
-        <q-btn
-          flat
-          round
-          dense
-          icon="delete"
-          size="0.6em"
-          @click.stop="deleteNode(id)"
-          class="node-action-btn delete-btn"
-          :data-test="`pipeline-node-${io_type}-delete-btn`"
-          @mouseenter="handleDeleteTooltipEnter"
-          @mouseleave="handleDeleteTooltipLeave"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="deleteNode(id)"
+  :data-test="`pipeline-node-${io_type}-delete-btn`"
+  @mouseenter="handleDeleteTooltipEnter"
+  @mouseleave="handleDeleteTooltipLeave"
+  class="node-action-btn delete-btn">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
           <div class="tooltip-arrow delete-arrow"></div>

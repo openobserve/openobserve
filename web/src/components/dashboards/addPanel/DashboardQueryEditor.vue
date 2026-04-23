@@ -105,15 +105,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                 </div> -->
         </div>
-        <q-btn
-          v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
-          round
-          flat
-          @click.stop="addTab"
-          icon="add"
-          style="margin-right: 10px"
-          data-test="`dashboard-panel-query-tab-add`"
-        ></q-btn>
+        <OButton
+  variant="ghost"
+  size="icon"
+  v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+  @click.stop="addTab"
+  style="margin-right: 10px"
+  data-test="`dashboard-panel-query-tab-add`">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </div>
       <div style="display: flex; gap: 4px; flex-shrink: 0">
         <q-toggle
@@ -250,16 +250,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </q-item>
                       </template>
                     </q-select>
-                    <q-btn
-                      no-caps
-                      padding="xs"
-                      class=""
-                      size="sm"
-                      flat
-                      icon="info_outline"
-                      data-test="dashboard-addpanel-config-drilldown-info"
-                    >
-                      <q-tooltip
+                    <OButton
+  variant="ghost"
+  size="sm"
+  data-test="dashboard-addpanel-config-drilldown-info">
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
                         class="bg-grey-8"
                         anchor="bottom middle"
                         self="top right"
@@ -267,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("dashboard.vrlExtractionTooltip") }}
                       </q-tooltip>
-                    </q-btn>
+</OButton>
                   </div>
                 </div>
               </div>
@@ -309,13 +305,19 @@ import useFunctions from "@/composables/useFunctions";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Info, Plus } from "lucide-vue-next";
 export default defineComponent({
   name: "DashboardQueryEditor",
   components: {
     ConfirmDialog,
     QueryTypeSelector,
     UnifiedQueryEditor,
-  },
+    OButton,
+    Plus,
+    Info,
+},
   emits: ["searchdata", "run-query"],
   methods: {
     searchData() {

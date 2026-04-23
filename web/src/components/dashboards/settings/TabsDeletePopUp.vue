@@ -72,27 +72,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-card-actions class="confirmActions">
         <div class="button-container">
-          <q-btn
-            v-close-popup="true"
-            unelevated
-            no-caps
-            class="q-mr-sm"
-            @click="onCancel"
-            data-test="cancel-button"
-          >
-            {{ t("confirmDialog.cancel") }}
-          </q-btn>
-          <q-btn
-            v-close-popup="true"
-            unelevated
-            no-caps
-            class="no-border"
-            color="primary"
-            @click="onConfirm"
-            data-test="confirm-button"
-          >
-            {{ t("confirmDialog.ok") }}
-          </q-btn>
+          <OButton
+  variant="ghost"
+  v-close-popup="true"
+  @click="onCancel"
+  data-test="cancel-button"
+  class="q-mr-sm">{{ t("confirmDialog.cancel") }}</OButton>
+          <OButton
+  variant="ghost"
+  v-close-popup="true"
+  @click="onConfirm"
+  data-test="confirm-button">{{ t("confirmDialog.ok") }}</OButton>
         </div>
       </q-card-actions>
     </q-card>
@@ -104,7 +94,11 @@ import { onMounted } from "vue";
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "TabsDeletePopUp",
   emits: ["update:ok", "update:cancel"],
   props: ["tabId", "dashboardData"],

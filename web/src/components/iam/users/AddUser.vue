@@ -258,25 +258,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <div class="flex justify-start tw:mt-6">
-            <q-btn
-              v-close-popup
-              class="q-mr-md o2-secondary-button tw:h-[36px]"
-              :label="t('user.cancel')"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              @click="$emit('cancel:hideform')"
-              data-test="cancel-user-button"
-            />
-            <q-btn
-              class="o2-primary-button no-border tw:h-[36px]"
-              :label="t('user.save')"
-              type="submit"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-              data-test="save-user-button"
-            />
+            <OButton
+  variant="secondary"
+  v-close-popup
+  @click="$emit('cancel:hideform')"
+  data-test="cancel-user-button"
+  class="q-mr-md">{{ t('user.cancel') }}</OButton>
+            <OButton type="submit" data-test="save-user-button">{{ t('user.save') }}</OButton>
           </div>
         </q-form>
       </div>
@@ -293,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="Ok" color="primary" @click="signout" />
+        <OButton variant="ghost" @click="signout">Ok</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -315,6 +303,7 @@ import {
 import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -331,6 +320,9 @@ const defaultValue: any = () => {
 };
 
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "ComponentAddUpdateUser",
   props: {
     modelValue: {

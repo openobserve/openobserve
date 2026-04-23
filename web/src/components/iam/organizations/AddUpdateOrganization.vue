@@ -83,38 +83,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
 
           <div class="flex justify-start tw:mt-6">
-            <q-btn
-              v-close-popup="true"
-              class="q-mr-md o2-secondary-button tw:h-[36px]"
-              :label="t('organization.cancel')"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              @click="router.replace({ name: 'organizations' })"
-              data-test="cancel-organizations-modal"
-            />
-            <q-btn
-              :disable="organizationData.name === '' && !proPlanRequired"
-              :label="t('organization.save')"
-              class="o2-primary-button no-border tw:h-[36px]"
-              type="submit"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-              data-test="add-org"
-            />
+            <OButton
+  variant="secondary"
+  v-close-popup="true"
+  @click="router.replace({ name: 'organizations' })"
+  data-test="cancel-organizations-modal"
+  class="q-mr-md">{{ t('organization.cancel') }}</OButton>
+            <OButton
+  type="submit"
+  data-test="add-org"
+  :disabled="organizationData.name === '' && !proPlanRequired">{{ t('organization.save') }}</OButton>
           </div>
 
           <div class="flex justify-center q-mt-lg" v-if="proPlanRequired">
-            <q-btn
-              class="q-mb-md text-bold no-border q-ml-md"
-              :label="t('organization.proceed_subscription')"
-              text-color="light-text"
-              padding="sm xl"
-              color="secondary"
-              no-caps
-              @click="completeSubscriptionProcess"
-            />
+            <OButton
+  size="sm"
+  text-color="light-text"
+  @click="completeSubscriptionProcess"
+  class="q-mb-md text-bold q-ml-md">{{ t('organization.proceed_subscription') }}</OButton>
           </div>
         </q-form>
       </div>
@@ -132,6 +118,7 @@ import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
 import { useQuasar } from "quasar";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const defaultValue = () => {
   return {
     id: "",
@@ -142,6 +129,9 @@ const defaultValue = () => {
 let callOrganization: Promise<{ data: any }>;
 
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "ComponentAddUpdateUser",
   props: {
     modelValue: {

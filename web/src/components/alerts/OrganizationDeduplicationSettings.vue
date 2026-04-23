@@ -26,16 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
           {{ t('alerts.correlation.semanticFieldNote') }}
         </div>
-        <q-btn
-          data-test="dedup-settings-refresh-btn"
-          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          flat
-          dense
-          color="primary"
-          :label="t('common.refresh')"
-          @click="loadConfig"
-        />
+        <OButton
+  variant="secondary"
+  data-test="dedup-settings-refresh-btn"
+  @click="loadConfig"
+  class="text-bold tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!">{{ t('common.refresh') }}</OButton>
       </div>
 
       <q-separator class="tw:mb-6" />
@@ -155,13 +150,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Sticky footer with buttons -->
     <div class="tw:flex tw:justify-end tw:gap-3 tw:pt-4 tw:pb-2 tw:border-t tw:border-gray-200 dark:tw:border-gray-700 tw:bg-inherit tw:sticky tw:bottom-0">
-      <q-btn :label="t('alerts.correlation.cancelButton')" @click="$emit('cancel')" class="o2-secondary-button" />
-      <q-btn
-        :label="t('alerts.correlation.saveButton')"
-        @click="saveSettings"
-        :loading="saving"
-        class="o2-primary-button"
-      />
+      <OButton variant="secondary" @click="$emit('cancel')">{{ t('alerts.correlation.cancelButton') }}</OButton>
+      <OButton @click="saveSettings" :loading="saving">{{ t('alerts.correlation.saveButton') }}</OButton>
     </div>
   </div>
 </template>
@@ -175,6 +165,7 @@ import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import alertsService from "@/services/alerts";
 import GroupHeader from "@/components/common/GroupHeader.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const store = useStore();
 const $q = useQuasar();
 const { t } = useI18n();

@@ -73,33 +73,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
         <div class="flex justify-center q-mt-lg">
-          <q-btn
-            ref="closeBtn"
-            v-close-popup="true"
-            :label="t('dashboard.cancel')"
-            class="o2-secondary-button tw:h-[36px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            flat
-            data-test="dashboard-general-setting-cancel-btn"
-          />
-          <q-btn
-            :disable="dashboardData.title.trim() === ''"
-            :label="t('dashboard.save')"
-            class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            flat
-            type="submit"
-            :loading="saveDashboardApi.isLoading.value"
-            data-test="dashboard-general-setting-save-btn"
-          />
+          <OButton
+  variant="secondary"
+  ref="closeBtn"
+  v-close-popup="true"
+  data-test="dashboard-general-setting-cancel-btn">{{ t('dashboard.cancel') }}</OButton>
+          <OButton
+  type="submit"
+  :loading="saveDashboardApi.isLoading.value"
+  data-test="dashboard-general-setting-save-btn"
+  :disabled="dashboardData.title.trim() === ''"
+  class="q-ml-md">{{ t('dashboard.save') }}</OButton>
         </div>
       </q-form>
     </div>
@@ -118,12 +102,14 @@ import { useLoading } from "@/composables/useLoading";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import useNotifications from "@/composables/useNotifications";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "GeneralSettings",
   components: {
     DashboardHeader,
     DateTimePickerDashboard,
-  },
+    OButton,
+},
   emits: ["save"],
   setup(props, { emit }) {
     const store: any = useStore();

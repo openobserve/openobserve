@@ -4,21 +4,20 @@
       {{ t('logStream.fields') }}
     </div>
     <template v-if="!fields.length">
-      <q-btn
-        data-test="add-stream-add-field-btn"
-        color="primary"
-        class="q-mt-sm text-bold add-field"
-        :label="t('logStream.addField')"
-        size="sm"
-        icon="add"
-        style="
+      <OButton
+  size="sm"
+  data-test="add-stream-add-field-btn"
+  style="
           border-radius: 4px;
           text-transform: capitalize;
           background: #f2f2f2 !important;
           color: #000 !important;
         "
-        @click="addApiHeader"
-      />
+  @click="addApiHeader"
+  class="q-mt-sm text-bold add-field">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  {{ t('logStream.addField') }}
+</OButton>
     </template>
     <template v-else>
       <div
@@ -120,35 +119,28 @@
           class="q-ml-none "
           style="margin-bottom: 8px;"
         >
-          <q-btn
-            data-test="add-stream-add-field-btn"
-            v-if="index === fields.length - 1"
-            icon="add"
-            class="q-ml-xs "
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            flat
-            :disable="field.name === '' ||  (fields.length === 1 && field.name == '' )"
-            :title="t('alert_templates.edit')"
-            @click="addApiHeader()"
-            style="min-width: auto;border: 1px solid #5960B2; color: #5960B2;"
-          />
-          <q-btn
-            data-test="add-stream-delete-field-btn"
-            :icon="outlinedDelete"
-            class="q-ml-xs "
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            flat
-            
-            :title="t('alert_templates.edit')"
-            @click="deleteApiHeader(field, index)"
-            style="min-width: auto; border: 1px solid #F2452F; color: #F2452F;"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  data-test="add-stream-add-field-btn"
+  v-if="index === fields.length - 1"
+  :title="t('alert_templates.edit')"
+  @click="addApiHeader()"
+  style="min-width: auto;border: 1px solid #5960B2; color: #5960B2;"
+  :disabled="field.name === '' ||  (fields.length === 1 && field.name == '' )"
+  class="q-ml-xs" :class="store.state?.theme === 'dark' ? 'icon-dark' : ''">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
+          <OButton
+  variant="ghost"
+  size="icon"
+  data-test="add-stream-delete-field-btn"
+  :title="t('alert_templates.edit')"
+  @click="deleteApiHeader(field, index)"
+  style="min-width: auto; border: 1px solid #F2452F; color: #F2452F;"
+  class="q-ml-xs" :class="store.state?.theme === 'dark' ? 'icon-dark' : ''">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
     </template>
@@ -161,6 +153,9 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import { ref } from "vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus, Trash2 } from "lucide-vue-next";
 defineProps({
   fields: {
     type: Array,

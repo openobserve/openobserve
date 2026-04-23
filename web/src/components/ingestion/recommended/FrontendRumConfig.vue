@@ -56,6 +56,8 @@ import { getImageURL, getIngestionURL, maskText } from "../../../utils/zincutils
 import CopyContent from "../../CopyContent.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
+import { openobserveRum } from '@openobserve/browser-rum';
+import { openobserveLogs } from '@openobserve/browser-logs';
 export default defineComponent({
   name: "rum-web-page",
   components: {
@@ -82,8 +84,6 @@ export default defineComponent({
     );
     const rumToken = ref("");
     const defaultConfig = `
-import { openobserveRum } from '@openobserve/browser-rum';
-import { openobserveLogs } from '@openobserve/browser-logs';
 
 const options = {
   clientToken: '<OPENOBSERVE_CLIENT_TOKEN>',

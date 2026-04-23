@@ -27,12 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="col-auto">
-        <q-btn
-          v-close-popup="true"
-          round
-          flat
-          :icon="'img:' + getImageURL('images/common/close_icon.svg')"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true" />
       </div>
     </div>
     <q-separator></q-separator>
@@ -87,24 +85,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="flex justify-center q-mt-lg">
-        <q-btn
-          ref="closeBtn"
-          v-close-popup="true"
-          class="o2-secondary-button tw:h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          flat
-          :label="t('dashboard.cancel')"
-          data-test="panel-layout-settings-cancel"
-        />
-        <q-btn
-          :label="t('dashboard.save')"
-          class="o2-primary-button tw:h-[36px] q-ml-md"
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          padding="sm xl"
-          type="submit"
-          no-caps
-          data-test="panel-layout-settings-save"
-        />
+        <OButton
+  variant="secondary"
+  ref="closeBtn"
+  v-close-popup="true"
+  data-test="panel-layout-settings-cancel">{{ t('dashboard.cancel') }}</OButton>
+        <OButton
+  size="sm"
+  type="submit"
+  data-test="panel-layout-settings-save"
+  class="q-ml-md">{{ t('dashboard.save') }}</OButton>
       </div>
     </q-form>
   </div>
@@ -117,9 +107,12 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: {},
+  components: {
+    OButton,
+},
   props: {
     layout: {
       type: Object,

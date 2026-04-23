@@ -36,23 +36,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
-          <q-btn
-            class="o2-secondary-button q-ml-sm tw:h-[36px]"
-            no-caps
-            flat
-            :label="t(`dashboard.import`)"
-            @click="importDestination"
-            data-test="destination-import"
-          />
-          <q-btn
-            data-test="alert-destination-list-add-alert-btn"
-            class="o2-primary-button q-ml-sm tw:h-[36px]"
-            no-caps
-            flat
-            :disable="!templates.length"
-            :label="t(`alert_destinations.add`)"
-            @click="editDestination(null)"
-          />
+          <OButton
+  variant="secondary"
+  @click="importDestination"
+  data-test="destination-import"
+  class="q-ml-sm">{{ t(`dashboard.import`) }}</OButton>
+          <OButton
+  data-test="alert-destination-list-add-alert-btn"
+  @click="editDestination(null)"
+  :disabled="!templates.length"
+  class="q-ml-sm">{{ t(`alert_destinations.add`) }}</OButton>
           </div>
       </div>
       <q-table
@@ -81,15 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   an Alert, you'll need to have at least one Destination and one
                   Template in place
                 </div>
-                <q-btn
-                  class="q-mt-md"
-                  label="Create Template"
-                  size="md"
-                  color="primary"
-                  no-caps
-                  style="border-radius: 4px"
-                  @click="routeTo('alertTemplates')"
-                />
+                <OButton
+  style="border-radius: 4px"
+  @click="routeTo('alertTemplates')"
+  class="q-mt-md">Create Template</OButton>
               </template>
             </div>
           </div>
@@ -100,42 +88,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
-              <q-btn
-                data-test="destination-export"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                title="Export Destination"
-                icon="download"
-                @click.stop="exportDestination(props.row)"
-              >
-              </q-btn>
-              <q-btn
-                :data-test="`alert-destination-list-${props.row.name}-update-destination`"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                icon="edit"
-                :title="t('alert_destinations.edit')"
-                @click="editDestination(props.row)"
-              >
-              </q-btn>
-              <q-btn
-                :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                :icon="outlinedDelete"
-                :title="t('alert_destinations.delete')"
-                @click="conformDeleteDestination(props.row)"
-              >
-              </q-btn>
+              <OButton
+  variant="ghost"
+  size="icon"
+  data-test="destination-export"
+  title="Export Destination"
+  @click.stop="exportDestination(props.row)">
+  <template #icon-left><Download class="tw:w-4 tw:h-4" /></template>
+</OButton>
+              <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`alert-destination-list-${props.row.name}-update-destination`"
+  :title="t('alert_destinations.edit')"
+  @click="editDestination(props.row)">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
+              <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
+  :title="t('alert_destinations.delete')"
+  @click="conformDeleteDestination(props.row)">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
             </div>
           </q-td>
         </template>
@@ -186,22 +162,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[300px] tw:mr-sm">
                   {{ resultTotal }} {{ t('alert_destinations.header') }}
                 </div>
-            <q-btn
-              v-if="selectedDestinations.length > 0"
-              data-test="destination-list-delete-destinations-btn"
-              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              no-caps
-              dense
-              @click="openBulkDeleteDialog"
-            >
-              <q-icon name="delete" size="16px" />
+            <OButton
+  variant="secondary"
+  v-if="selectedDestinations.length > 0"
+  data-test="destination-list-delete-destinations-btn"
+  @click="openBulkDeleteDialog"
+  class="flex items-center q-mr-sm">
+  <q-icon name="delete" size="16px" />
               <span class="tw:ml-2">Delete</span>
-            </q-btn>
+</OButton>
           <QTablePagination
             :scope="scope"
             :position="'bottom'"
@@ -302,6 +271,9 @@ import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Download, Pencil, Trash2 } from "lucide-vue-next";
 interface ConformDelete {
   visible: boolean;
   data: any;
@@ -314,7 +286,11 @@ export default defineComponent({
     ConfirmDialog,
     QTablePagination,
     ImportDestination,
-  },
+    OButton,
+    Download,
+    Pencil,
+    Trash2,
+},
   setup() {
     const qTable = ref();
     const store = useStore();

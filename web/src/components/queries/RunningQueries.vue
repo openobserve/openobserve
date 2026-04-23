@@ -32,18 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="running-queries-query-type-tabs"
           >
             <template v-for="visual in runningQueryTypes" :key="visual.value">
-              <q-btn
-                :color="visual.value === selectedQueryTypeTab ? 'primary' : ''"
-                :flat="visual.value === selectedQueryTypeTab ? false : true"
-                dense
-                emit-value
-                no-caps
-                class="query-management-query-tab-selection-btn"
-                style="height: 30px; margin: 0 0px; padding: 4px 12px"
-                @click="onChangeQueryTab(visual.value as 'summary' | 'all')"
-              >
-                {{ visual.label }}</q-btn
-              >
+              <OButton
+  :flat="visual.value === selectedQueryTypeTab ? false : true"
+  emit-value
+  style="height: 30px; margin: 0 0px; padding: 4px 12px"
+  @click="onChangeQueryTab(visual.value as 'summary' | 'all')"
+  class="query-management-query-tab-selection-btn">{{ visual.label }}</OButton>
             </template>
           </div>
           <div class=" o2-select-input o2-input">
@@ -90,15 +84,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="running-queries-search-input"
           ></q-select>
           </div>
-          <q-btn
-            data-test="running-queries-refresh-btn"
-            class="q-ml-sm text-bold no-border o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme == 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            no-caps
-            :label="t(`queries.refreshQuery`)"
-            @click="refreshData"
-          />
+          <OButton
+  variant="secondary"
+  data-test="running-queries-refresh-btn"
+  @click="refreshData"
+  class="q-ml-sm text-bold">{{ t(`queries.refreshQuery`) }}</OButton>
         </div>
       </div>
     </div>
@@ -110,17 +100,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="running-queries-search-type-tabs"
         >
           <template v-for="visual in searchTypes" :key="visual">
-            <q-btn
-              :color="visual === selectedSearchType ? 'primary' : ''"
-              :flat="visual === selectedSearchType ? false : true"
-              dense
-              no-caps
-              class="query-management-query-tab-selection-btn"
-              style="height: 30px; margin: 0 0px; padding: 4px 12px"
-              @click="onChangeSearchType(visual)"
-            >
-              {{ searchTypeLabels[visual] ?? visual }}</q-btn
-            >
+            <OButton
+  :flat="visual === selectedSearchType ? false : true"
+  style="height: 30px; margin: 0 0px; padding: 4px 12px"
+  @click="onChangeSearchType(visual)"
+  class="query-management-query-tab-selection-btn">{{ searchTypeLabels[visual] ?? visual }}</OButton>
           </template>
         </div>
       </div>
@@ -195,9 +179,12 @@ import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { getDuration } from "@/utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "RunningQueries",
-  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList },
+  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList,
+    OButton,
+},
   setup() {
     const store = useStore();
     const schemaData = ref({});

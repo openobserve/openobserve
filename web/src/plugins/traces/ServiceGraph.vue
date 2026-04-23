@@ -191,13 +191,10 @@
                 <div class="text-h6 q-mt-md tw:text-[var(--o2-text-primary)]">
                   {{ error }}
                 </div>
-                <q-btn
-                  outline
-                  color="primary"
-                  label="Retry"
-                  @click="loadServiceGraph"
-                  class="q-mt-md"
-                />
+                <OButton
+  variant="outline"
+  @click="loadServiceGraph"
+  class="q-mt-md">Retry</OButton>
               </div>
             </div>
             <div
@@ -267,20 +264,11 @@
       </q-card-section>
       <q-separator />
       <q-card-actions align="right">
-        <q-btn
-          flat
-          dense
-          no-caps
-          label="Close"
-          color="primary"
-          v-close-popup
-          class="o2-secondary-button tw:h-[2rem]"
-        />
-        <q-btn
-          label="Reset"
-          @click="resetSettings"
-          class="o2-primary-button tw:h-[2rem]"
-        />
+        <OButton
+  variant="secondary"
+  v-close-popup
+  class="tw:h-[2rem]">Close</OButton>
+        <OButton @click="resetSettings" class="tw:h-[2rem]">Reset</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -319,12 +307,14 @@ import {
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "ServiceGraph",
   components: {
     ChartRenderer,
     ServiceGraphSidePanel,
-  },
+    OButton,
+},
   emits: ["view-traces"],
   setup(props, { emit }) {
     const store = useStore();

@@ -27,13 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-else class="sidebar-header-expanded">
       <div class="expanded-title">{{ title }}</div>
-      <q-btn
-        square
-        icon="unfold_less"
-        class="collapse-button rotate-90 el-border"
-        @click="toggleSidebar"
-        data-test="dashboard-sidebar-collapse-btn"
-      />
+      <OButton
+  variant="outline"
+  size="icon"
+  @click="toggleSidebar"
+  data-test="dashboard-sidebar-collapse-btn"
+  class="collapse-button rotate-90">
+  <template #icon-left><FoldVertical class="tw:w-4 tw:h-4" /></template>
+</OButton>
     </div>
     <q-separator style="margin-top: -1px; flex-shrink: 0;" />
     <div class="sidebar-content scroll" v-if="isOpen">
@@ -45,7 +46,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { FoldVertical } from "lucide-vue-next";
 export default defineComponent({
+  components: {
+    OButton,
+    FoldVertical,
+  },
   props: {
     title: {
       type: String,

@@ -56,23 +56,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-tab>
     </q-tabs>
-    <q-btn
-      v-if="!viewOnly"
-      v-show="isHovered"
-      class="text-bold no-border q-ml-xs"
-      no-caps
-      no-outline
-      rounded
-      icon="add"
-      padding="xs"
-      @click="
+    <OButton
+  size="sm"
+  v-if="!viewOnly"
+  v-show="isHovered"
+  no-outline
+  rounded
+  @click="
         () => {
           showAddTabDialog = true;
         }
       "
-      data-test="dashboard-tab-add-btn"
-      ><q-tooltip>Add Tab</q-tooltip></q-btn
-    >
+  data-test="dashboard-tab-add-btn"
+  class="text-bold q-ml-xs">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Add Tab</q-tooltip>
+</OButton>
     <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>
       <AddTab
         :dashboard-id="dashboardData?.dashboardId"
@@ -89,12 +88,17 @@ import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useRoute } from "vue-router";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus } from "lucide-vue-next";
 export default defineComponent({
   name: "TabList",
   components: {
     AddTab,
     ConfirmDialog,
-  },
+    OButton,
+    Plus,
+},
   props: {
     dashboardData: {
       required: true,

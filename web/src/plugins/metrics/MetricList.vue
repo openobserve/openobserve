@@ -124,16 +124,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ props.row.name }}
                         </div>
                         <div class="field_overlay">
-                          <q-btn
-                            :data-test="`metrics-list-add-${props.row.name}-label-btn`"
-                            :icon="outlinedAdd"
-                            size="0.4rem"
-                            class="q-mr-none"
-                            @click.stop="
+                          <OButton
+  size="icon"
+  :data-test="`metrics-list-add-${props.row.name}-label-btn`"
+  @click.stop="
                               addValueToEditor(props.row.name, '', '=')
                             "
-                            round
-                          />
+  class="q-mr-none">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
                         </div>
                       </div>
                     </template>
@@ -205,40 +204,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       : 'text-black'
                                   "
                                 >
-                                  <q-btn
-                                    class="q-mr-xs"
-                                    size="6px"
-                                    title="Include Term"
-                                    round
-                                    @click="
+                                  <OButton
+  title="Include Term"
+  @click="
                                       addValueToEditor(
                                         props.row.name,
                                         value.key,
                                         '=',
                                       )
                                     "
-                                  >
-                                    <q-icon>
+  class="q-mr-xs">
+  <q-icon>
                                       <EqualIcon></EqualIcon>
                                     </q-icon>
-                                  </q-btn>
-                                  <q-btn
-                                    class="q-mr-xs"
-                                    size="6px"
-                                    title="Include Term"
-                                    round
-                                    @click="
+</OButton>
+                                  <OButton
+  title="Include Term"
+  @click="
                                       addValueToEditor(
                                         props.row.name,
                                         value.key,
                                         '!=',
                                       )
                                     "
-                                  >
-                                    <q-icon>
+  class="q-mr-xs">
+  <q-icon>
                                       <NotEqualIcon></NotEqualIcon>
                                     </q-icon>
-                                  </q-btn>
+</OButton>
                                 </div>
                               </q-item>
                             </q-list>
@@ -299,10 +292,16 @@ import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus } from "lucide-vue-next";
 export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label", "update:modelValue"],
-  components: { EqualIcon, NotEqualIcon },
+  components: { EqualIcon, NotEqualIcon,
+    OButton,
+    Plus,
+},
   props: ["modelValue", "metricsList"],
   setup(props, { emit }) {
     const store = useStore();

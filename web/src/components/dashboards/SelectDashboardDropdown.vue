@@ -38,21 +38,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-select>
 
-    <q-btn
-      class="q-mb-md add-folder-btn q-ml-xs"
-      data-test="dashboard-dashboard-new-add"
-      style="width: 40px"
-      :style="computedStyle"
-      no-caps
-      dense
-      @click="
+    <OButton
+  data-test="dashboard-dashboard-new-add"
+  style="width: 40px"
+  :style="computedStyle"
+  @click="
         () => {
           showAddDashboardDialog = true;
         }
       "
-    >
-      <q-icon name="add" size="xs" />
-    </q-btn>
+  class="q-mb-md add-folder-btn q-ml-xs"><q-icon name="add" size="xs" /></OButton>
   </div>
   <!-- add dashboard -->
   <q-dialog
@@ -79,9 +74,12 @@ import { getAllDashboardsByFolderId, getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";
 import { useLoading } from "@/composables/useLoading";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "SelectDashboardDropdown",
-  components: { AddDashboard },
+  components: { AddDashboard,
+    OButton,
+},
   emits: ["dashboard-selected", "dashboard-list-updated"],
   props: {
     folderId: {

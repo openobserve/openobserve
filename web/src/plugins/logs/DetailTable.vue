@@ -28,13 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
-            v-close-popup="true"
-            round
-            flat
-            icon="cancel"
-            data-test="close-dialog"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true"
+  data-test="close-dialog">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
     </q-card-section>
@@ -194,16 +194,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="
                               toggleIncludeSearchTerm(props.row.field, props.row.value, 'include')
                             "
-                            ><q-btn
-                              title="Add to search query"
-                              size="6px"
-                              round
-                              class="q-mr-sm pointer"
-                            >
-                              <q-icon color="currentColor">
+                            ><OButton title="Add to search query" class="q-mr-sm pointer">
+  <q-icon color="currentColor">
                                 <EqualIcon></EqualIcon>
-                              </q-icon> </q-btn
-                            >{{ t("common.includeSearchTerm") }}</q-item-label
+                              </q-icon>
+</OButton>{{ t("common.includeSearchTerm") }}</q-item-label
                           >
                         </q-item-section>
                       </q-item>
@@ -224,16 +219,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="
                               toggleExcludeSearchTerm(props.row.field, props.row.value, 'exclude')
                             "
-                            ><q-btn
-                              title="Add to search query"
-                              size="6px"
-                              round
-                              class="q-mr-sm pointer"
-                            >
-                              <q-icon color="currentColor">
+                            ><OButton title="Add to search query" class="q-mr-sm pointer">
+  <q-icon color="currentColor">
                                 <NotEqualIcon></NotEqualIcon>
-                              </q-icon> </q-btn
-                            >{{ t("common.excludeSearchTerm") }}</q-item-label
+                              </q-icon>
+</OButton>{{ t("common.excludeSearchTerm") }}</q-item-label
                           >
                         </q-item-section>
                       </q-item>
@@ -251,16 +241,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             data-test="log-details-include-field-btn"
                             @click="addFieldToTable(props.row.field.toString())"
-                            ><q-btn
-                              title="Add to table"
-                              size="6px"
-                              round
-                              class="q-mr-sm pointer"
-                            >
-                              <q-icon
+                            ><OButton title="Add to table" class="q-mr-sm pointer">
+  <q-icon
                                 color="currentColor"
-                                name="visibility" /></q-btn
-                            >{{ t("common.addFieldToTable") }}</q-item-label
+                                name="visibility" />
+</OButton>{{ t("common.addFieldToTable") }}</q-item-label
                           >
                         </q-item-section>
                       </q-item>
@@ -269,16 +254,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             data-test="log-details-include-field-btn"
                             @click="addFieldToTable(props.row.field.toString())"
-                            ><q-btn
-                              title="Remove from table "
-                              size="6px"
-                              round
-                              class="q-mr-sm pointer"
-                            >
-                              <q-icon
+                            ><OButton title="Remove from table " class="q-mr-sm pointer">
+  <q-icon
                                 color="currentColor"
-                                name="visibility_off" /></q-btn
-                            >{{
+                                name="visibility_off" />
+</OButton>{{
                               t("common.removeFieldFromTable")
                             }}</q-item-label
                           >
@@ -296,12 +276,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <q-item-section>
                             <q-item-label>
-                              <q-btn
-                                icon="open_in_new"
-                                size="6px"
-                                round
-                                class="q-mr-sm pointer"
-                              />{{ crossLink.name }}
+                              <OButton size="icon" class="q-mr-sm pointer">
+  <template #icon-left><ExternalLink class="tw:w-4 tw:h-4" /></template>
+</OButton>{{ crossLink.name }}
                             </q-item-label>
                           </q-item-section>
                         </q-item>
@@ -446,15 +423,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap justify-between">
         <div class="col-1">
-          <q-btn
-            data-test="log-detail-previous-detail-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            no-caps
-            :disabled="currentIndex <= 0"
-            @click="$emit('showPrevDetail', false, true)"
-            icon="navigate_before"
-            :label="t('common.previous')"
-          />
+          <OButton
+  variant="secondary"
+  data-test="log-detail-previous-detail-btn"
+  :disabled="currentIndex <= 0"
+  @click="$emit('showPrevDetail', false, true)">
+  <template #icon-left><ChevronLeft class="tw:w-4 tw:h-4" /></template>
+  {{ t('common.previous') }}
+</OButton>
         </div>
         <div
           v-show="
@@ -476,27 +452,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></q-select>
           </div>
           <div class="">
-            <q-btn
-              data-test="logs-detail-table-search-around-btn"
-              class="o2-secondary-button tw:h-[36px]"
-              text-color="light-text"
-              no-caps
-              flat
-              :label="t('common.searchAround')"
-              @click="searchTimeBoxed(rowData, Number(selectedRelativeValue))"
-            />
+            <OButton
+  variant="secondary"
+  data-test="logs-detail-table-search-around-btn"
+  text-color="light-text"
+  @click="searchTimeBoxed(rowData, Number(selectedRelativeValue))">{{ t('common.searchAround') }}</OButton>
           </div>
         </div>
         <div class="col-1 items-end" style="display: contents;">
-          <q-btn
-            data-test="log-detail-next-detail-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            text-color="light-text"
-            :disabled="currentIndex >= totalLength - 1"
-            @click="$emit('showNextDetail', true, false)"
-            icon-right="navigate_next"
-            :label="t('common.next')"
-          />
+          <OButton
+  variant="secondary"
+  data-test="log-detail-next-detail-btn"
+  text-color="light-text"
+  :disabled="currentIndex >= totalLength - 1"
+  @click="$emit('showNextDetail', true, false)">
+  {{ t('common.next') }}
+  <template #icon-right><ChevronRight class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
     </q-card-section>
@@ -523,6 +495,9 @@ import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrel
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-vue-next";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -531,7 +506,12 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable },
+  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable,
+    OButton,
+    ExternalLink,
+    ChevronLeft,
+    ChevronRight,
+},
   emits: [
     "showPrevDetail",
     "showNextDetail",

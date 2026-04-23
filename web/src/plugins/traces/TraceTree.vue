@@ -132,22 +132,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="absolute view-logs-container"
                   :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
                 >
-                  <q-btn
-                    class="q-mx-xs view-span-logs"
-                    :class="
-                      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'
-                    "
-                    size="0.625rem"
-                    icon="search"
-                    dense
-                    no-caps
-                    :title="t('traces.viewLogs')"
-                    @click.stop="
+                  <OButton
+  size="icon"
+  :title="t('traces.viewLogs')"
+  @click.stop="
                       viewSpanLogs((spans as any[])[virtualRow.index])
                     "
-                    :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
-                  >
-                  </q-btn>
+  :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
+  class="q-mx-xs view-span-logs" :class="
+                      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'
+                    ">
+  <template #icon-left><Search class="tw:w-4 tw:h-4" /></template>
+</OButton>
                 </div>
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
@@ -423,6 +419,9 @@ import { getKindIcon } from "@/composables/traces/useTraceProcessing";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { useRouter } from "vue-router";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Search } from "lucide-vue-next";
 export default defineComponent({
   name: "TraceTree",
   inheritAttrs: false,
@@ -811,7 +810,10 @@ export default defineComponent({
       ancestorSiblingMap,
     };
   },
-  components: { SpanBlock, SpanKindBadge },
+  components: { SpanBlock, SpanKindBadge,
+    OButton,
+    Search,
+},
 });
 </script>
 

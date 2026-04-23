@@ -21,21 +21,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       conditions)
     </div>
     <template v-if="!fields.length">
-      <q-btn
-        data-test="alert-conditions-add-btn"
-        color="primary"
-        class="q-mt-sm text-bold add-field"
-        label="Add Condition"
-        size="sm"
-        icon="add"
-        style="
+      <OButton
+  size="sm"
+  data-test="alert-conditions-add-btn"
+  style="
           border-radius: 4px;
           text-transform: capitalize;
           background: #f2f2f2 !important;
           color: #000 !important;
         "
-        @click="addApiHeader"
-      />
+  @click="addApiHeader"
+  class="q-mt-sm text-bold add-field">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  Add Condition
+</OButton>
     </template>
     <template v-else>
       <div
@@ -115,35 +114,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-ml-none alerts-condition-action"
           style="margin-bottom: 12px"
         >
-          <q-btn
-            data-test="alert-conditions-delete-condition-btn"
-            :icon="outlinedDelete"
-            class="q-ml-xs iconHoverBtn"
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            :title="t('alert_templates.edit')"
-            @click="deleteApiHeader(field)"
-            style="min-width: auto"
-          />
-          <q-btn
-            data-test="alert-conditions-add-condition-btn"
-            v-if="index === fields.length - 1"
-            icon="add"
-            class="q-ml-xs iconHoverBtn"
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            :title="t('alert_templates.edit')"
-            @click="addApiHeader()"
-            style="min-width: auto"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  data-test="alert-conditions-delete-condition-btn"
+  :title="t('alert_templates.edit')"
+  @click="deleteApiHeader(field)"
+  style="min-width: auto"
+  class="q-ml-xs iconHoverBtn" :class="store.state?.theme === 'dark' ? 'icon-dark' : ''">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
+          <OButton
+  variant="ghost"
+  size="icon"
+  data-test="alert-conditions-add-condition-btn"
+  v-if="index === fields.length - 1"
+  :title="t('alert_templates.edit')"
+  @click="addApiHeader()"
+  style="min-width: auto"
+  class="q-ml-xs iconHoverBtn" :class="store.state?.theme === 'dark' ? 'icon-dark' : ''">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
     </template>
@@ -156,6 +147,9 @@ import { useI18n } from "vue-i18n";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus, Trash2 } from "lucide-vue-next";
 const props = defineProps({
   fields: {
     type: Array,

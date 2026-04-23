@@ -94,18 +94,15 @@
         <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
           <span class="tw:font-bold">Having</span>
 
-          <q-btn
-            dense
-            outline
-            icon="add"
-            label="Add"
-            padding="xs sm"
-            class="el-border"
-            no-caps
-            @click="toggleHavingFilter"
-            v-if="!isHavingFilterVisible()"
-            data-test="dynamic-function-popup-having-add-btn"
-          />
+          <OButton
+  variant="outline"
+  size="sm"
+  @click="toggleHavingFilter"
+  v-if="!isHavingFilterVisible()"
+  data-test="dynamic-function-popup-having-add-btn">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  Add
+</OButton>
         </div>
 
         <div
@@ -132,13 +129,13 @@
             data-test="dynamic-function-popup-having-value"
           />
 
-          <q-btn
-            dense
-            flat
-            icon="close"
-            @click="cancelHavingFilter"
-            data-test="dynamic-function-popup-having-cancel-btn"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  @click="cancelHavingFilter"
+  data-test="dynamic-function-popup-having-cancel-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
       <div v-if="chartType === 'table'" class="q-mt-sm q-mb-sm">
@@ -170,9 +167,16 @@ import SelectFunction from "./SelectFunction.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+
+import OButton from "@/lib/core/Button/Button.vue";
+import { Plus } from "lucide-vue-next";
 export default {
-  name: "DynamicFunctionPopUp",
-  components: { RawQueryBuilder, SelectFunction, SortByBtnGrp },
+
+name: "DynamicFunctionPopUp",
+  components: { RawQueryBuilder, SelectFunction, SortByBtnGrp,
+    OButton,
+    Plus,
+},
   props: {
     modelValue: {
       type: Object,

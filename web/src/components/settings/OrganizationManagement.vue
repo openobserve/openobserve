@@ -35,17 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn
-              :label="t('settings.extendTrial')"
-              class="q-ml-xs text-capitalize"
-              unelevated
-              dense
-              size="sm"
-              padding="xs"
-              text-color="primary"
-              data-test="otg-management-extend-trial-btn"
-              @click.stop="toggleExtendTrialDialog(props.row)"
-            ></q-btn>
+            <OButton
+  variant="ghost"
+  size="sm"
+  text-color="primary"
+  data-test="otg-management-extend-trial-btn"
+  @click.stop="toggleExtendTrialDialog(props.row)"
+  class="q-ml-xs text-capitalize">{{ t('settings.extendTrial') }}</OButton>
           </q-td>
         </template>
         <template #top="scope">
@@ -94,7 +90,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-weight-bold" :title="extendTrialDataRow.name">Extend Trial for {{ extendTrialDataRow.name }}</span>
             <span class="text-subtitle2 flex">Set the new trial extension period.</span>
           </q-toolbar-title>
-          <q-btn flat round dense icon="close" v-close-popup />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup>
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </q-toolbar>
 
         <q-card-section>
@@ -118,22 +119,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-card-section>
         <q-card-actions align="right" class="text-primary q-mt-md">
-          <q-btn
-            v-close-popup
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('common.cancel')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          />
-          <q-btn
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="`Extend trial by ${extendedTrial} week(s)`"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            @click.stop="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
-          />
+          <OButton
+  variant="secondary"
+  v-close-popup
+  class="q-mr-md">{{ t('common.cancel') }}</OButton>
+          <OButton @click.stop="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)">{{ `Extend trial by ${extendedTrial} week(s)` }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -157,12 +147,15 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OrganizationServices from "@/services/organizations";
+
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "PageAlerts",
   components: {
     NoData,
     QTablePagination,
-  },
+    OButton,
+},
   setup() {
     const qTable = ref();
     const store = useStore();

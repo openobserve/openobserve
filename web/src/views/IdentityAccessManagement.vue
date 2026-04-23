@@ -20,17 +20,12 @@
         </div>
       </template>
       <template #separator>
-          <q-btn
-            data-test="logs-search-field-list-collapse-btn"
-            :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
-            :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
-            :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-            color="primary"
-            size="sm"
-            dense
-            round
-            @click="collapseSidebar"
-          />
+          <OButton
+  size="icon"
+  data-test="logs-search-field-list-collapse-btn"
+  :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+  @click="collapseSidebar"
+  :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'" />
       </template>
       <template v-slot:after>
         <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
@@ -53,6 +48,7 @@ import { useRouter } from "vue-router";
 import { nextTick } from "vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const store = useStore();
 const { t } = useI18n();
 

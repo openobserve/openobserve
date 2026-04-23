@@ -24,17 +24,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span>Start by adding your first dashboard panel</span>
     </div>
     <div class="flex justify-center" v-if="!viewOnly">
-      <q-btn
-        :label="t('panel.add')"
-        stack
-        padding="md"
-        outline
-        icon="insert_drive_file"
-        @click="$emit('update:Panel')"
-        data-test="dashboard-if-no-panel-add-panel-btn"
-        class="el-border"
-      >
-      </q-btn>
+      <OButton
+  variant="outline"
+  size="sm"
+  stack
+  @click="$emit('update:Panel')"
+  data-test="dashboard-if-no-panel-add-panel-btn">
+  <template #icon-left><File class="tw:w-4 tw:h-4" /></template>
+  {{ t('panel.add') }}
+</OButton>
     </div>
   </div>
 </template>
@@ -43,7 +41,14 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../../utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { File } from "lucide-vue-next";
 export default defineComponent({
+  components: {
+    OButton,
+    File,
+  },
   name: "NoPanel",
   props: ["Panel", "viewOnly"],
   emits: ["update:Panel"],

@@ -42,14 +42,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="ellipsis">{{ span.operation_name }}</span>
       </div>
 
-      <q-btn
-        dense
-        icon="cancel"
-        class="align-right no-border q-pa-xs"
-        size="xs"
-        @click="closeSidebar"
-        data-test="trace-details-sidebar-header-close-btn"
-      ></q-btn>
+      <OButton
+  size="icon"
+  @click="closeSidebar"
+  data-test="trace-details-sidebar-header-close-btn"
+  class="align-right q-pa-xs">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
     </div>
     <div
       class="trace-details-toolbar-container"
@@ -147,19 +146,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-chip>
 
           <!-- View Logs Button -->
-          <q-btn
-            v-if="parentMode === 'standalone'"
-            class="view-logs-btn o2-secondary-button"
-            dense
-            unelevated
-            no-caps
-            size="sm"
-            :title="t('traces.viewLogs')"
-            @click.stop="viewSpanLogs"
-            data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
-          >
-            View Logs
-          </q-btn>
+          <OButton
+  variant="secondary"
+  size="sm"
+  v-if="parentMode === 'standalone'"
+  :title="t('traces.viewLogs')"
+  @click.stop="viewSpanLogs"
+  data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
+  class="view-logs-btn">View Logs</OButton>
         </div>
       </div>
 
@@ -316,26 +310,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div>Input</div>
                 <div class="flex items-center gap-xs">
-                  <q-btn
-                    outline
-                    class="q-px-sm q-ml-sm"
-                    size="sm"
-                    no-caps
-                    :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
-                    :title="
+                  <OButton
+  variant="outline"
+  size="icon"
+  :title="
                       isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
                     "
-                    @click="toggleFullscreen"
-                  />
-                  <q-btn
-                    flat
-                    dense
-                    size="sm"
-                    icon="content_copy"
-                    title="Copy input"
-                    @click="copyContent(span.llm_input, 'input')"
-                    :disable="!hasContent(span.llm_input)"
-                  />
+  @click="toggleFullscreen"
+  class="q-px-sm q-ml-sm" />
+                  <OButton
+  variant="ghost"
+  size="icon"
+  title="Copy input"
+  @click="copyContent(span.llm_input, 'input')"
+  :disabled="!hasContent(span.llm_input)">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+</OButton>
                 </div>
               </div>
               <div class="llm-content-box">
@@ -360,26 +350,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div>Output</div>
                 <div class="flex items-center gap-xs">
-                  <q-btn
-                    outline
-                    class="q-px-sm q-ml-sm"
-                    size="sm"
-                    no-caps
-                    :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
-                    :title="
+                  <OButton
+  variant="outline"
+  size="icon"
+  :title="
                       isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
                     "
-                    @click="toggleFullscreen"
-                  />
-                  <q-btn
-                    flat
-                    dense
-                    size="sm"
-                    icon="content_copy"
-                    title="Copy output"
-                    @click="copyContent(span.llm_output, 'output')"
-                    :disable="!hasContent(span.llm_output)"
-                  />
+  @click="toggleFullscreen"
+  class="q-px-sm q-ml-sm" />
+                  <OButton
+  variant="ghost"
+  size="icon"
+  title="Copy output"
+  @click="copyContent(span.llm_output, 'output')"
+  :disabled="!hasContent(span.llm_output)">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+</OButton>
                 </div>
               </div>
               <div class="llm-content-box">
@@ -473,18 +459,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section>
                   <q-item-label>
-                    <q-btn
-                      size="0.375rem"
-                      round
-                      class="tw:mr-[0.25rem]! pointer"
-                    >
-                      <q-icon
+                    <OButton class="tw:mr-[0.25rem]! pointer">
+  <q-icon
                         color="currentColor"
                         class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
                       >
                         <component :is="action.iconComponent" />
                       </q-icon>
-                    </q-btn>
+</OButton>
                     <span class="tw:text-[0.85rem]!">{{
                       $t("traces.applyAndSearch")
                     }}</span>
@@ -534,18 +516,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <q-item-section>
                       <q-item-label>
-                        <q-btn
-                          size="0.375rem"
-                          round
-                          class="tw:mr-[0.25rem]! pointer"
-                        >
-                          <q-icon
+                        <OButton class="tw:mr-[0.25rem]! pointer">
+  <q-icon
                             color="currentColor"
                             class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
                           >
                             <component :is="action.iconComponent" />
                           </q-icon>
-                        </q-btn>
+</OButton>
                         <span class="tw:text-[0.85rem]!">{{
                           $t("traces.applyAndSearch")
                         }}</span>
@@ -662,20 +640,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="cursor: pointer"
               >
                 <div class="flex row items-center no-wrap">
-                  <q-btn
-                    v-if="column.name === '@timestamp'"
-                    :icon="
-                      expandedEvents[props.rowIndex.toString()]
-                        ? 'expand_more'
-                        : 'chevron_right'
-                    "
-                    dense
-                    size="xs"
-                    flat
-                    class="q-mr-xs"
-                    @click.stop="expandEvent(props.rowIndex)"
-                    :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${props.rowIndex}`"
-                  ></q-btn>
+                  <OButton
+  variant="ghost"
+  size="icon"
+  v-if="column.name === '@timestamp'"
+  @click.stop="expandEvent(props.rowIndex)"
+  :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${props.rowIndex}`"
+  class="q-mr-xs" />
                   <span
                     v-if="column.name !== '@timestamp'"
                     v-html="
@@ -722,23 +693,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="exception-field">
                     <div class="stacktrace-header">
                       <span class="exception-label">Stacktrace:</span>
-                      <q-btn
-                        v-if="
+                      <OButton
+  variant="ghost"
+  size="sm"
+  v-if="
                           props.row['exception.stacktrace'] &&
                           props.row['exception.stacktrace'].trim()
                         "
-                        flat
-                        dense
-                        size="xs"
-                        icon="content_copy"
-                        class="copy-btn"
-                        @click.stop="
+  @click.stop="
                           copyStackTrace(props.row['exception.stacktrace'])
                         "
-                        title="Copy stacktrace"
-                      >
-                        <q-tooltip>Copy stacktrace</q-tooltip>
-                      </q-btn>
+  title="Copy stacktrace"
+  class="copy-btn">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Copy stacktrace</q-tooltip>
+</OButton>
                     </div>
                     <div
                       v-if="
@@ -988,6 +957,9 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import AttributeValueCell from "@/components/AttributeValueCell.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Copy } from "lucide-vue-next";
 export default defineComponent({
   name: "TraceDetailsSidebar",
   props: {
@@ -1028,7 +1000,9 @@ export default defineComponent({
     EqualIcon,
     NotEqualIcon,
     AttributeValueCell,
-  },
+    OButton,
+    Copy,
+},
   emits: [
     "close",
     "view-logs",

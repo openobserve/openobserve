@@ -23,16 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Header bar -->
     <div class="card-container tw:mb-2 tw:shrink-0">
       <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[64px]">
-        <q-btn
-          data-test="eval-template-editor-back-btn"
-          no-caps
-          padding="xs"
-          outline
-          icon="arrow_back_ios_new"
-          size="sm"
-          class="el-border"
-          @click="cancel"
-        />
+        <OButton
+  variant="outline"
+  size="icon"
+  data-test="eval-template-editor-back-btn"
+  @click="cancel">
+  <template #icon-left><ArrowLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
         <span class="q-table__title tw:font-[600]" data-test="eval-template-editor-title">
           {{ isEdit ? t("evalTemplate.editTemplate") : t("evalTemplate.createTemplate") }}
         </span>
@@ -154,24 +151,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
     >
-      <q-btn
-        data-test="eval-template-editor-cancel-btn"
-        class="o2-secondary-button tw:h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-        :label="t('common.cancel')"
-        no-caps
-        flat
-        @click="cancel"
-      />
-      <q-btn
-        data-test="eval-template-editor-save-btn"
-        class="o2-primary-button tw:h-[36px]"
-        :label="isEdit ? t('common.update') : t('common.save')"
-        no-caps
-        flat
-        :loading="saving"
-        @click="saveTemplate"
-      />
+      <OButton
+  variant="secondary"
+  data-test="eval-template-editor-cancel-btn"
+  @click="cancel">{{ t('common.cancel') }}</OButton>
+      <OButton
+  data-test="eval-template-editor-save-btn"
+  :loading="saving"
+  @click="saveTemplate">{{ isEdit ? t('common.update') : t('common.save') }}</OButton>
     </div>
   </div>
 </template>
@@ -184,6 +171,9 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { evalTemplateService } from "@/services/eval-template.service";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ArrowLeft } from "lucide-vue-next";
 const { t } = useI18n();
 const q = useQuasar();
 const store = useStore();

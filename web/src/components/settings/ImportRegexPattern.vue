@@ -173,48 +173,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
         <div class="col">
           <div class="flex">
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              @click="arrowBackFn"
-              icon="arrow_back_ios_new"
-              data-test="regex-pattern-import-back-btn"
-            />
+            <OButton
+  variant="outline"
+  size="icon"
+  @click="arrowBackFn"
+  data-test="regex-pattern-import-back-btn">
+  <template #icon-left><ArrowLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
             <div class="text-h6 q-ml-md">
               {{ t("regex_patterns.import_title") }}
             </div>
           </div>
         </div>
         <div class="flex justify-center">
-          <q-btn
-            v-close-popup
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('function.cancel')"
-            no-caps
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            @click="arrowBackFn"
-            data-test="regex-pattern-import-cancel-btn"
-          />
-          <q-btn
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('dashboard.import')"
-            type="submit"
-            no-caps
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            @click="handleImportClick"
-            data-test="regex-pattern-import-json-btn"
-          />
+          <OButton
+  variant="secondary"
+  v-close-popup
+  @click="arrowBackFn"
+  data-test="regex-pattern-import-cancel-btn"
+  class="q-mr-md">{{ t('function.cancel') }}</OButton>
+          <OButton
+  type="submit"
+  @click="handleImportClick"
+  data-test="regex-pattern-import-json-btn">{{ t('dashboard.import') }}</OButton>
         </div>
       </div>
     </div>
@@ -262,6 +243,9 @@ import axios from "axios";
 
 import regexPatternsService from "@/services/regex_pattern";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ArrowLeft } from "lucide-vue-next";
 export default defineComponent({
   name: "ImportRegexPattern",
   props: {
@@ -603,7 +587,9 @@ export default defineComponent({
     BuiltInPatternsTab: defineAsyncComponent(
       () => import("@/components/settings/BuiltInPatternsTab.vue"),
     ),
-  },
+    OButton,
+    ArrowLeft,
+},
 });
 </script>
 

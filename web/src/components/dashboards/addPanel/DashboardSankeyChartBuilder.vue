@@ -66,64 +66,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              color="primary"
-              dense
-              size="sm"
-              :label="sourceLabel"
-              class="q-pl-sm"
-              :data-test="`dashboard-source-item-${sourceLabel}`"
-            >
-              <q-menu
-                class="field-function-menu-popup"
-                :data-test="`dashboard-source-item-${sourceLabel}-menu`"
-              >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.source.isDerived
-                        ? 'auto'
-                        : '771px',
-                  }"
-                >
-                  <div>
-                    <div class="q-mr-xs q-mb-sm">
-                      <DynamicFunctionPopUp
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.source
-                        "
-                        :allowAggregation="false"
-                        :customQuery="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery
-                        "
-                        :chartType="dashboardPanelData.data.type"
-                      />
+            <OMenu>
+<template #default="{ toggle, close }">
+
+  <OButton
+  size="sm"
+  :data-test="`dashboard-source-item-${sourceLabel}`"
+  class="q-pl-sm"
+  @click="toggle">
+    {{ sourceLabel }}
+  
+      <template #icon-right><ChevronDown class="tw:w-4 tw:h-4" /></template>
+  </OButton>
+  </template>
+<template #content>
+  <div
+                    style="padding: 3px 16px 16px 16px"
+                    :style="{
+                      width:
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.source.isDerived
+                          ? 'auto'
+                          : '771px',
+                    }"
+                  >
+                    <div>
+                      <div class="q-mr-xs q-mb-sm">
+                        <DynamicFunctionPopUp
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.source
+                          "
+                          :allowAggregation="false"
+                          :customQuery="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].customQuery
+                          "
+                          :chartType="dashboardPanelData.data.type"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
-              :data-test="`dashboard-source-item-${sourceLabel}-remove`"
-              @click="removeSource()"
-              icon="close"
-            />
+  </template>
+</OMenu>
+            <OButton
+  size="icon"
+  style="height: 100%"
+  :data-test="`dashboard-source-item-${sourceLabel}-remove`"
+  @click="removeSource()">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </q-btn-group>
         <div
@@ -189,64 +187,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              color="primary"
-              size="sm"
-              :label="targetLabel"
-              :data-test="`dashboard-target-item-${targetLabel}`"
-              class="q-pl-sm"
-            >
-              <q-menu
-                class="field-function-menu-popup"
-                :data-test="`dashboard-target-item-${targetLabel}-menu`"
-              >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.target.isDerived
-                        ? 'auto'
-                        : '771px',
-                  }"
-                >
-                  <div>
-                    <div class="q-mr-xs q-mb-sm">
-                      <DynamicFunctionPopUp
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.target
-                        "
-                        :allowAggregation="false"
-                        :customQuery="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery
-                        "
-                        :chartType="dashboardPanelData.data.type"
-                      />
+            <OMenu>
+<template #default="{ toggle, close }">
+
+  <OButton
+  size="sm"
+  :data-test="`dashboard-target-item-${targetLabel}`"
+  class="q-pl-sm"
+  @click="toggle">
+    {{ targetLabel }}
+  
+      <template #icon-right><ChevronDown class="tw:w-4 tw:h-4" /></template>
+  </OButton>
+  </template>
+<template #content>
+  <div
+                    style="padding: 3px 16px 16px 16px"
+                    :style="{
+                      width:
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.target.isDerived
+                          ? 'auto'
+                          : '771px',
+                    }"
+                  >
+                    <div>
+                      <div class="q-mr-xs q-mb-sm">
+                        <DynamicFunctionPopUp
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.target
+                          "
+                          :allowAggregation="false"
+                          :customQuery="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].customQuery
+                          "
+                          :chartType="dashboardPanelData.data.type"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
-              :data-test="`dashboard-target-item-${targetLabel}-remove`"
-              @click="removeTarget()"
-              icon="close"
-            />
+  </template>
+</OMenu>
+            <OButton
+  size="icon"
+  style="height: 100%"
+  :data-test="`dashboard-target-item-${targetLabel}-remove`"
+  @click="removeTarget()">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </q-btn-group>
         <div
@@ -312,64 +308,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              color="primary"
-              size="sm"
-              :label="valueLabel"
-              :data-test="`dashboard-value-item-${valueLabel}`"
-              class="q-pl-sm"
-            >
-              <q-menu
-                class="field-function-menu-popup"
-                :data-test="`dashboard-value-item-${valueLabel}-menu`"
-              >
-                <div
-                  style="padding: 3px 16px 16px 16px"
-                  :style="{
-                    width:
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].customQuery ||
-                      dashboardPanelData.data.queries[
-                        dashboardPanelData.layout.currentQueryIndex
-                      ].fields.value.isDerived
-                        ? 'auto'
-                        : '771px',
-                  }"
-                >
-                  <div>
-                    <div class="q-mr-xs q-mb-sm">
-                      <DynamicFunctionPopUp
-                        v-model="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].fields.value
-                        "
-                        :allowAggregation="true"
-                        :customQuery="
-                          dashboardPanelData.data.queries[
-                            dashboardPanelData.layout.currentQueryIndex
-                          ].customQuery
-                        "
-                        :chartType="dashboardPanelData.data.type"
-                      />
+            <OMenu>
+<template #default="{ toggle, close }">
+
+  <OButton
+  size="sm"
+  :data-test="`dashboard-value-item-${valueLabel}`"
+  class="q-pl-sm"
+  @click="toggle">
+    {{ valueLabel }}
+  
+      <template #icon-right><ChevronDown class="tw:w-4 tw:h-4" /></template>
+  </OButton>
+  </template>
+<template #content>
+  <div
+                    style="padding: 3px 16px 16px 16px"
+                    :style="{
+                      width:
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].customQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.value.isDerived
+                          ? 'auto'
+                          : '771px',
+                    }"
+                  >
+                    <div>
+                      <div class="q-mr-xs q-mb-sm">
+                        <DynamicFunctionPopUp
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.value
+                          "
+                          :allowAggregation="true"
+                          :customQuery="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].customQuery
+                          "
+                          :chartType="dashboardPanelData.data.type"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
-              :data-test="`dashboard-value-item-${valueLabel}-remove`"
-              @click="removeValue()"
-              icon="close"
-            />
+  </template>
+</OMenu>
+            <OButton
+  size="icon"
+  style="height: 100%"
+  :data-test="`dashboard-value-item-${valueLabel}-remove`"
+  @click="removeValue()">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </q-btn-group>
         <div
@@ -417,6 +411,10 @@ import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuil
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { ChevronDown } from "lucide-vue-next";
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",
   components: {
@@ -425,7 +423,9 @@ export default defineComponent({
     DashboardFiltersOption,
     DynamicFunctionPopUp,
     DashboardJoinsOption,
-  },
+    OButton,
+    ChevronDown,
+},
   props: ["dashboardData"],
   setup(props) {
     const { t } = useI18n();

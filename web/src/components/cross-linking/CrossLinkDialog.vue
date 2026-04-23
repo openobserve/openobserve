@@ -102,44 +102,29 @@
                 hide-bottom-space
                 data-test="cross-link-field-input"
               />
-              <q-btn
-                dense
-                flat
-                round
-                icon="add"
-                color="primary"
-                size="md"
-                @click="addField"
-                :disable="!newFieldName && !fieldInputValue"
-                data-test="cross-link-add-field-btn"
-              />
+              <OButton
+  variant="ghost"
+  size="icon"
+  @click="addField"
+  data-test="cross-link-add-field-btn"
+  :disabled="!newFieldName && !fieldInputValue">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
             </div>
           </div>
         </q-form>
       </q-card-section>
 
       <q-card-actions align="right" class="q-pa-md">
-        <q-btn
-          flat
-          no-caps
-          dense
-          :label="t('common.cancel')"
-          class="o2-secondary-button tw:h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          @click="onCancel"
-          data-test="cross-link-cancel-btn"
-        />
-        <q-btn
-          flat
-          no-caps
-          dense
-          :label="isEditing ? t('crossLinks.update') : t('crossLinks.add')"
-          class="o2-primary-button tw:h-[36px] q-ml-md"
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          @click="onSubmit"
-          :disable="!form.name || !form.url"
-          data-test="cross-link-save-btn"
-        />
+        <OButton
+  variant="secondary"
+  @click="onCancel"
+  data-test="cross-link-cancel-btn">{{ t('common.cancel') }}</OButton>
+        <OButton
+  @click="onSubmit"
+  data-test="cross-link-save-btn"
+  :disabled="!form.name || !form.url"
+  class="q-ml-md">{{ isEditing ? t('crossLinks.update') : t('crossLinks.add') }}</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -151,6 +136,9 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus } from "lucide-vue-next";
 export interface CrossLink {
   name: string;
   url: string;
@@ -159,7 +147,10 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide },
+  components: { CrossLinkUserGuide,
+    OButton,
+    Plus,
+},
   props: {
     modelValue: {
       type: Boolean,

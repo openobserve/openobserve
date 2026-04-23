@@ -51,13 +51,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem]!"
                 >
-                  <q-btn
-                    :icon="outlinedAdd"
-                    :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                    size="0.4rem"
-                    @click.stop="addSearchTerm(`${props.row.name}=''`)"
-                    round
-                  />
+                  <OButton
+  size="icon"
+  :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
+  @click.stop="addSearchTerm(`${props.row.name}=''`)">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
                 </div>
               </div>
 
@@ -99,27 +98,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!hideAddSearchTerm"
                       class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem]!"
                     >
-                      <q-btn
-                        :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
-                        :icon="outlinedAdd"
-                        size="0.4rem"
-                        @click.stop="addSearchTerm(`${props.row.name}=''`)"
-                        round
-                      />
+                      <OButton
+  size="icon"
+  :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
+  @click.stop="addSearchTerm(`${props.row.name}=''`)">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
                     </div>
                     <div
                       v-if="!hideCopyValue"
                       class="field_overlay tw:bg-[var(--o2-hover-accent)]! tw:rounded-[0.25rem]!"
                     >
-                      <q-btn
-                        :data-test="`log-search-index-list-filter-${props.row.name}-copy-btn`"
-                        icon="content_copy"
-                        size="0.4rem"
-                        @click.stop="copyContentValue(props.row.name)"
-                        round
-                        flat
-                        dense
-                      />
+                      <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`log-search-index-list-filter-${props.row.name}-copy-btn`"
+  @click.stop="copyContentValue(props.row.name)">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+</OButton>
                     </div>
                   </div>
                 </template>
@@ -173,35 +169,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               Total Fields: {{ filteredFieldsCount }}
             </q-tooltip>
-            <q-btn
-              icon="fast_rewind"
-              color="primary"
-              flat
-              :disable="scope.isFirstPage"
-              @click="scope.firstPage"
-              class="pagination-nav-btn"
-            />
+            <OButton
+  variant="ghost"
+  size="icon"
+  @click="scope.firstPage"
+  :disabled="scope.isFirstPage"
+  class="pagination-nav-btn">
+  <template #icon-left><Rewind class="tw:w-4 tw:h-4" /></template>
+</OButton>
             <template v-for="page in visiblePages" :key="page">
-              <q-btn
-                flat
-                :class="[
+              <OButton
+  variant="ghost"
+  @click="setPage(page)"
+  :class="[
                   'pagination-page-btn',
                   scope.pagination.page === page
                     ? 'pagination-page-active'
                     : '',
-                ]"
-                @click="setPage(page)"
-                >{{ page }}</q-btn
-              >
+                ]">{{ page }}</OButton>
             </template>
-            <q-btn
-              icon="fast_forward"
-              color="primary"
-              flat
-              :disable="scope.isLastPage"
-              @click="scope.lastPage"
-              class="pagination-nav-btn"
-            />
+            <OButton
+  variant="ghost"
+  size="icon"
+  @click="scope.lastPage"
+  :disabled="scope.isLastPage"
+  class="pagination-nav-btn">
+  <template #icon-left><FastForward class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </template>
       </q-table>
@@ -229,11 +223,19 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { generateTraceContext } from "@/utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Copy, FastForward, Plus, Rewind } from "lucide-vue-next";
 export default defineComponent({
   name: "IndexList",
   components: {
     FieldValuesPanel,
-  },
+    OButton,
+    Plus,
+    Copy,
+    Rewind,
+    FastForward,
+},
   props: {
     fields: {
       type: Array,

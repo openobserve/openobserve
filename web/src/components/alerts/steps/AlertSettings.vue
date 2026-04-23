@@ -138,28 +138,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-item>
                 </template>
               </q-select>
-              <q-btn
-                icon="refresh"
-                class="iconHoverBtn q-ml-xs"
-                :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-                padding="xs"
-                unelevated
-                size="sm"
-                round
-                flat
-                :title="t('alerts.alertSettings.refreshDestinations')"
-                @click="$emit('refresh:destinations')"
-                style="min-width: auto"
-              />
-              <q-btn
-                data-test="create-destination-btn"
-                :label="t('alerts.alertSettings.addNewDestination')"
-                class="o2-secondary-button q-ml-sm"
-                no-caps
-                size="sm"
-                style="min-height: 28px; height: 28px;"
-                @click="routeToCreateDestination"
-              />
+              <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('alerts.alertSettings.refreshDestinations')"
+  @click="$emit('refresh:destinations')"
+  style="min-width: auto"
+  class="iconHoverBtn q-ml-xs" :class="store.state?.theme === 'dark' ? 'icon-dark' : ''">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+</OButton>
+              <OButton
+  variant="secondary"
+  size="sm"
+  data-test="create-destination-btn"
+  style="min-height: 28px; height: 28px;"
+  @click="routeToCreateDestination"
+  class="q-ml-sm">{{ t('alerts.alertSettings.addNewDestination') }}</OButton>
             </div>
             <div
               v-if="destinationsTouched && (!localDestinations || localDestinations.length === 0)"
@@ -355,27 +349,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-item>
                 </template>
               </q-select>
-              <q-btn
-                icon="refresh"
-                class=" q-ml-xs"
-                padding="xs"
-                unelevated
-                size="sm"
-                round
-                flat
-                :title="t('alerts.alertSettings.refreshDestinations')"
-                @click="$emit('refresh:destinations')"
-                style="min-width: auto"
-              />
-              <q-btn
-                data-test="create-destination-btn"
-                :label="t('alerts.alertSettings.addNewDestination')"
-                class="o2-secondary-button q-ml-sm"
-                no-caps
-                size="sm"
-                style="min-height: 28px; height: 28px;"
-                @click="routeToCreateDestination"
-              />
+              <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('alerts.alertSettings.refreshDestinations')"
+  @click="$emit('refresh:destinations')"
+  style="min-width: auto"
+  class="q-ml-xs">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+</OButton>
+              <OButton
+  variant="secondary"
+  size="sm"
+  data-test="create-destination-btn"
+  style="min-height: 28px; height: 28px;"
+  @click="routeToCreateDestination"
+  class="q-ml-sm">{{ t('alerts.alertSettings.addNewDestination') }}</OButton>
             </div>
             <div
               v-if="destinationsTouched && (!localDestinations || localDestinations.length === 0)"
@@ -432,7 +421,14 @@ import {
   convertMinutesToCron,
 } from "@/utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { RefreshCw } from "lucide-vue-next";
 export default defineComponent({
+  components: {
+    OButton,
+    RefreshCw,
+  },
   name: "Step3AlertConditions",
   props: {
     formData: {

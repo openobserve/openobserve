@@ -49,13 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon class="o2-search-input-icon" name="search" />
                 </template>
               </q-input>
-              <q-btn
-                class="q-ml-sm o2-primary-button tw:h-[36px]"
-                flat
-                no-caps
-                :label="t(`function.addEnrichmentTable`)"
-                @click="showAddUpdateFn({})"
-              />
+              <OButton @click="showAddUpdateFn({})" class="q-ml-sm">{{ t(`function.addEnrichmentTable`) }}</OButton>
             </div>
           </div>
         </div>
@@ -165,56 +159,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-slot:body-cell-actions="props">
                 <q-td :props="props">
                   <!-- Search button - show for uploaded tables or completed URL jobs -->
-                  <q-btn
-                    v-if="!props.row.urlJobs || props.row.urlJobs.length === 0 || props.row.aggregateStatus === 'completed'"
-                    :data-test="`${props.row.name}-explore-btn`"
-                    :title="t('logStream.explore')"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
-                    @click="exploreEnrichmentTable(props)"
-                    icon="search"
-                  />
+                  <OButton
+  variant="ghost"
+  size="icon"
+  v-if="!props.row.urlJobs || props.row.urlJobs.length === 0 || props.row.aggregateStatus === 'completed'"
+  :data-test="`${props.row.name}-explore-btn`"
+  :title="t('logStream.explore')"
+  @click="exploreEnrichmentTable(props)">
+  <template #icon-left><Search class="tw:w-4 tw:h-4" /></template>
+</OButton>
 
                   <!-- Schema Settings button - show for uploaded tables or completed URL jobs -->
-                  <q-btn
-                    v-if="!props.row.urlJobs || props.row.urlJobs.length === 0 || props.row.aggregateStatus === 'completed'"
-                    icon="list_alt"
-                    :title="t('logStream.schemaHeader')"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
-                    @click="listSchema(props)"
-                  />
+                  <OButton
+  variant="ghost"
+  size="icon"
+  v-if="!props.row.urlJobs || props.row.urlJobs.length === 0 || props.row.aggregateStatus === 'completed'"
+  :title="t('logStream.schemaHeader')"
+  @click="listSchema(props)">
+  <template #icon-left><ClipboardList class="tw:w-4 tw:h-4" /></template>
+</OButton>
 
                   <!-- Edit button - show for uploaded tables, completed URL jobs, or failed URL jobs (to add more URLs) -->
-                  <q-btn
-                    v-if="!props.row.urlJobs || props.row.urlJobs.length === 0 || props.row.aggregateStatus === 'completed' || props.row.aggregateStatus === 'failed'"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    icon="edit"
-                    round
-                    flat
-                    :title="t('function.enrichmentTables')"
-                    @click="showAddUpdateFn(props)"
-                  />
+                  <OButton
+  variant="ghost"
+  size="icon"
+  v-if="!props.row.urlJobs || props.row.urlJobs.length === 0 || props.row.aggregateStatus === 'completed' || props.row.aggregateStatus === 'failed'"
+  :title="t('function.enrichmentTables')"
+  @click="showAddUpdateFn(props)">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
 
                   <!-- Delete button - always visible -->
-                  <q-btn
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    :icon="outlinedDelete"
-                    flat
-                    :title="t('function.delete')"
-                    @click="showDeleteDialogFn(props)"
-                  />
+                  <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('function.delete')"
+  @click="showDeleteDialogFn(props)">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
                 </q-td>
               </template>
 
@@ -235,22 +217,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
                       {{ resultTotal }} {{ t('function.enrichmentTables') }}
                     </div>
-                    <q-btn
-                      v-if="selectedEnrichmentTables.length > 0"
-                      data-test="enrichment-tables-bulk-delete-btn"
-                      class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'o2-secondary-button-dark'
-                          : 'o2-secondary-button-light'
-                      "
-                      no-caps
-                      dense
-                      @click="openBulkDeleteDialog"
-                    >
-                      <q-icon name="delete" size="16px" />
+                    <OButton
+  variant="secondary"
+  v-if="selectedEnrichmentTables.length > 0"
+  data-test="enrichment-tables-bulk-delete-btn"
+  @click="openBulkDeleteDialog"
+  class="flex items-center q-mr-sm">
+  <q-icon name="delete" size="16px" />
                       <span class="tw:ml-2">Delete</span>
-                    </q-btn>
+</OButton>
                   </div>
                   <QTablePagination
                     :scope="scope"
@@ -333,7 +308,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup>
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </q-card-section>
 
         <q-card-section>
@@ -393,6 +373,9 @@ import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ClipboardList, Pencil, Search, Trash2 } from "lucide-vue-next";
 export default defineComponent({
   name: "EnrichmentTableList",
   components: {
@@ -402,7 +385,12 @@ export default defineComponent({
     ConfirmDialog,
     EnrichmentSchema,
     AppTabs,
-  },
+    OButton,
+    Search,
+    ClipboardList,
+    Pencil,
+    Trash2,
+},
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",

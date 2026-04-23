@@ -39,30 +39,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="app-performance-auto-refresh-interval tw:ml-[0.5rem]! tw:pl-0! tw:overflow-hidden!"
               @trigger="refreshData"
             />
-            <q-btn
-              :outline="isVariablesChanged ? false : true"
-              class="q-ml-sm tw:border! tw:border-solid! tw:h-[2rem] tw:px-[0.325rem]!"
-              :class="
+            <OButton
+  size="sm"
+  :outline="isVariablesChanged ? false : true"
+  data-test="rum-performance-refresh"
+  @click="refreshData"
+  :text-color="store.state.theme == 'dark' ? 'white' : 'dark'"
+  class="q-ml-sm tw:border! tw:border-solid! tw:h-[2rem] tw:px-[0.325rem]!" :class="
                 !isVariablesChanged
                   ? 'hover:tw:bg-[var(--o2-hover-accent)]!'
                   : ''
-              "
-              data-test="rum-performance-refresh"
-              padding="xs"
-              no-caps
-              icon="refresh"
-              @click="refreshData"
-              :color="isVariablesChanged ? 'warning' : ''"
-              :text-color="store.state.theme == 'dark' ? 'white' : 'dark'"
-            >
-              <q-tooltip>
+              ">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>
                 {{
                   isVariablesChanged
                     ? t("dashboard.refreshToApplyVariableChanges")
                     : t("dashboard.refresh")
                 }}
               </q-tooltip>
-            </q-btn>
+</OButton>
           </div>
         </div>
         <AppTabs
@@ -119,13 +115,18 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import usePerformance from "@/composables/rum/usePerformance";
 import useRum from "@/composables/rum/useRum";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { RefreshCw } from "lucide-vue-next";
 export default defineComponent({
   name: "AppPerformance",
   components: {
     AutoRefreshInterval,
     AppTabs,
     DateTimePickerDashboard,
-  },
+    OButton,
+    RefreshCw,
+},
   setup() {
     const { t } = useI18n();
 

@@ -53,15 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
         </div>
-        <q-btn
-          flat
-          dense
-          round
-          size="xs"
-          :icon="expandState.preview ? 'expand_less' : 'expand_more'"
-          @click.stop="togglePreview"
-          class="expand-toggle-btn"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="togglePreview"
+  class="expand-toggle-btn" />
       </div>
       <div v-show="expandState.preview" class="section-content">
         <keep-alive>
@@ -89,15 +85,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="toggleSummary"
       >
         <span class="tw:text-sm tw:font-semibold">{{ t('alerts.summary.title') }}</span>
-        <q-btn
-          flat
-          dense
-          round
-          size="xs"
-          :icon="expandState.summary ? 'expand_less' : 'expand_more'"
-          @click.stop="toggleSummary"
-          class="expand-toggle-btn"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="toggleSummary"
+  class="expand-toggle-btn" />
       </div>
       <div v-show="expandState.summary" class="summary-section-content">
         <alert-summary
@@ -121,12 +113,14 @@ import { useI18n } from "vue-i18n";
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "AlertWizardRightColumn",
   components: {
     PreviewAlert,
     AlertSummary,
-  },
+    OButton,
+},
   props: {
     formData: {
       type: Object as PropType<any>,

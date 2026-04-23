@@ -131,13 +131,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-history-drawer-date-picker"
             @on:date-change="updateDateTime"
           />
-          <q-btn
-            v-close-popup="true"
-            round
-            flat
-            icon="cancel"
-            data-test="alert-details-close-btn"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true"
+  data-test="alert-details-close-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
     </q-card-section>
@@ -394,18 +394,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       SQL
                     </span>
                   </div>
-                  <q-btn
-                    v-if="anomalySql"
-                    @click="copyToClipboard(anomalySql, 'SQL')"
-                    flat
-                    dense
-                    size="xs"
-                    icon="content_copy"
-                    :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
-                    data-test="anomaly-details-copy-sql-btn"
-                  >
-                    <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
-                  </q-btn>
+                  <OButton
+  variant="ghost"
+  size="sm"
+  v-if="anomalySql"
+  @click="copyToClipboard(anomalySql, 'SQL')"
+  data-test="anomaly-details-copy-sql-btn">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+</OButton>
                 </div>
                 <pre
                   class="code-block-content tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
@@ -451,13 +448,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }}
                     </span>
                   </div>
-                  <q-btn
-                    v-if="
+                  <OButton
+  variant="ghost"
+  size="sm"
+  v-if="
                       alertDetails.conditions &&
                       alertDetails.conditions !== '' &&
                       alertDetails.conditions !== '--'
                     "
-                    @click="
+  @click="
                       copyToClipboard(
                         alertDetails.conditions,
                         alertDetails.type === 'sql'
@@ -467,15 +466,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : t('alerts.alertDetails.conditions'),
                       )
                     "
-                    flat
-                    dense
-                    size="xs"
-                    icon="content_copy"
-                    :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-7'"
-                    data-test="alert-details-copy-conditions-btn"
-                  >
-                    <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
-                  </q-btn>
+  data-test="alert-details-copy-conditions-btn">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+</OButton>
                 </div>
                 <!-- Code content — scrolls internally -->
                 <pre
@@ -538,6 +532,9 @@ import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
 import type { Ref } from "vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Copy } from "lucide-vue-next";
 // Composables
 const { t } = useI18n();
 const store = useStore();

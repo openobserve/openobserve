@@ -51,15 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <q-btn
-        class="text-bold no-border"
-        padding="sm 0"
-        color="secondary"
-        no-caps
-        :label="t(`user.sendInvite`)"
-        @click="inviteUser()"
-        :disable="userEmail == ''"
-        style="
+      <OButton
+  size="sm"
+  @click="inviteUser()"
+  style="
           padding: 7px 9px;
           min-height: 0px;
           width: 100px;
@@ -67,7 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           float: right;
           top: 1px;
         "
-      />
+  :disabled="userEmail == ''"
+  class="text-bold">{{ t(`user.sendInvite`) }}</OButton>
     </div>
   </q-page>
 </template>
@@ -83,7 +79,11 @@ import segment from "@/services/segment_analytics";
 import { getRoles } from "@/services/iam";
 import usersService from "@/services/users";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "MemberInvitationPage",
   props: {
     currentrole: {

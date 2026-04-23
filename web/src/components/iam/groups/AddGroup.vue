@@ -59,26 +59,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-input>
 
         <div class="flex justify-start tw:mt-6">
-          <q-btn
-            v-close-popup
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            @click="$emit('cancel:hideform')"
-            data-test="add-group-cancel-btn"
-          />
-          <q-btn
-            :disable="!name || !isValidGroupName"
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('alerts.save')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            @click="saveGroup"
-            data-test="add-group-submit-btn"
-          />
+          <OButton
+  variant="secondary"
+  v-close-popup
+  @click="$emit('cancel:hideform')"
+  data-test="add-group-cancel-btn"
+  class="q-mr-md">{{ t('alerts.cancel') }}</OButton>
+          <OButton
+  @click="saveGroup"
+  data-test="add-group-submit-btn"
+  :disabled="!name || !isValidGroupName">{{ t('alerts.save') }}</OButton>
         </div>
       </div>
     </q-card-section>
@@ -93,6 +83,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const { t } = useI18n();
 const props = defineProps({
   group: {

@@ -26,14 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="q-pa-md">
         <div class="flex items-center justify-between">
           <div class="text-h6" data-test="dialog-title">Backfill Job Details</div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
-            v-close-popup
-            data-test="close-dialog-btn"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup
+  data-test="close-dialog-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </q-card-section>
 
@@ -52,14 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="getStatusLabel(job.status, job.deletion_status)"
               class="text-lg q-pa-sm"
             />
-            <q-btn
-              v-if="canCancelJob"
-              label="Cancel Job"
-              color="negative"
-              outline
-              @click="confirmCancelJob"
-              data-test="cancel-job-btn"
-            />
+            <OButton
+  variant="destructive"
+  v-if="canCancelJob"
+  @click="confirmCancelJob"
+  data-test="cancel-job-btn">Cancel Job</OButton>
           </div>
 
           <!-- Job Information -->
@@ -237,6 +233,7 @@ import backfillService, { type BackfillJob } from "../../services/backfill";
 import { formatDistanceToNow } from "date-fns";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
 interface Props {
   modelValue: boolean;
   jobId: string;

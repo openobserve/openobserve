@@ -11,26 +11,20 @@
       </div>
       <div class="tw:flex tw:items-center">
         <div>
-          <q-btn
-          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-          :ripple="false"
-          @click="toggleAIChat"
-          data-test="menu-link-ai-item"
-          no-caps
-          :borderless="true"
-          flat
-          dense
-          class="o2-button ai-hover-btn q-py-sm"
-          :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-          style="border-radius: 100%;"
-          @mouseenter="isHovered = true"
-          @mouseleave="isHovered = false"
-
-        >
-          <div class="row items-center no-wrap tw:gap-2  ">
+          <OButton
+  variant="ghost"
+  v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+  @click="toggleAIChat"
+  data-test="menu-link-ai-item"
+  :borderless="true"
+  style="border-radius: 100%;"
+  @mouseenter="isHovered = true"
+  @mouseleave="isHovered = false"
+  class="o2-button ai-hover-btn q-py-sm" :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''">
+  <div class="row items-center no-wrap tw:gap-2  ">
             <img  :src="getBtnLogo" class="header-icon ai-icon" />
           </div>
-        </q-btn>
+</OButton>
         </div>
         <q-icon
           v-close-popup
@@ -75,24 +69,15 @@
     <q-space></q-space>
 
     <q-card-actions align="right" class="q-pa-md">
-      <q-btn
-        flat
-        no-caps
-        :label="t('common.cancel')"
-        class="q-ml-sm o2-secondary-button tw:h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-        v-close-popup
-        data-test="json-editor-cancel"
-      />
-      <q-btn
-        flat
-        no-caps
-        class="q-ml-sm o2-primary-button no-border tw:h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        :label="t('common.save')"
-        @click="saveChanges"
-        data-test="json-editor-save"
-      />
+      <OButton
+  variant="secondary"
+  v-close-popup
+  data-test="json-editor-cancel"
+  class="q-ml-sm">{{ t('common.cancel') }}</OButton>
+      <OButton
+  @click="saveChanges"
+  data-test="json-editor-save"
+  class="q-ml-sm">{{ t('common.save') }}</OButton>
     </q-card-actions>
     </div>
     <!-- o2aichat enableddd -->
@@ -115,12 +100,14 @@ import config from "@/aws-exports";
 import { ChatMessage, ChatHistoryEntry } from "@/ts/interfaces/chat";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "JsonEditor",
   components: {
     QueryEditor: defineAsyncComponent(() => import('@/components/CodeQueryEditor.vue')),
     O2AIChat,
-  },
+    OButton,
+},
   props: {
     data: {
       type: Object,

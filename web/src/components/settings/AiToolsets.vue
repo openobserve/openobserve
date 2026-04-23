@@ -40,14 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon class="o2-search-input-icon" name="search" />
             </template>
           </q-input>
-          <q-btn
-            class="o2-primary-button q-ml-sm tw:h-[36px]"
-            data-test="ai-toolsets-add-btn"
-            no-caps
-            flat
-            :label="t('aiToolset.add')"
-            @click="addToolset"
-          />
+          <OButton
+  data-test="ai-toolsets-add-btn"
+  @click="addToolset"
+  class="q-ml-sm">{{ t('aiToolset.add') }}</OButton>
         </div>
       </div>
 
@@ -93,30 +89,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn
-              :data-test="`ai-toolset-${props.row.name}-edit`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('common.edit')"
-              @click="editToolset(props.row)"
-            />
-            <q-btn
-              :data-test="`ai-toolset-${props.row.name}-delete`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('common.delete')"
-              @click="confirmDeleteToolset(props.row)"
-            />
+            <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`ai-toolset-${props.row.name}-edit`"
+  :title="t('common.edit')"
+  @click="editToolset(props.row)"
+  class="q-ml-xs">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
+            <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`ai-toolset-${props.row.name}-delete`"
+  :title="t('common.delete')"
+  @click="confirmDeleteToolset(props.row)"
+  class="q-ml-xs">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </q-td>
         </template>
 
@@ -175,6 +165,9 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import aiToolsetsService from "@/services/ai_toolsets";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Pencil, Trash2 } from "lucide-vue-next";
 const KIND_COLORS: Record<string, string> = {
   mcp: "blue-7",
   cli: "green-7",
@@ -189,7 +182,10 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     AddAiToolset,
-  },
+    OButton,
+    Pencil,
+    Trash2,
+},
   setup() {
     const store = useStore();
     const router = useRouter();

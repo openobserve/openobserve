@@ -1,28 +1,25 @@
 <template>
   <div>
-    <q-btn
-      :style="{
+    <OMenu v-model="picker.showMenu"
+      anchor="bottom left"
+      self="top left">
+<template #default="{ toggle }">
+
+    <OButton
+  variant="outline"
+  :style="{
         width: changeStyle ? '170px' : '180px',
         height: changeStyle ? '40px' : '',
       }"
-      data-test="date-time-btn"
-      :label="changeStyle ? getTrimmedDisplayValue() : getDisplayValue()"
-      :icon="changeStyle ? '' : 'schedule'"
-      icon-right="arrow_drop_down"
-      class="date-time-button"
-      :class="changeStyle ? computedClass : ''"
-      outline
-      no-caps
-      :disable="isFirstEntry"
-      @click="picker.showMenu = !picker.showMenu"
-    />
-    <q-menu
-      v-if="picker.showMenu"
-      class="date-time-dialog"
-      anchor="bottom left"
-      self="top left"
-      no-route-dismiss
-    >
+  data-test="date-time-btn"
+  @click="toggle"
+  :disabled="isFirstEntry"
+  class="date-time-button" :class="changeStyle ? computedClass : ''">
+  {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
+  <template #icon-right><ChevronDown class="tw:w-4 tw:h-4" /></template>
+</OButton>
+    </template>
+<template #content>
       <q-tab-panels
         class="tw:flex tw:justify-between"
         v-model="picker.activeTab"
@@ -39,19 +36,15 @@
                 v-for="(item, itemIndex) in relativeDates[period.value]"
                 :key="item"
               >
-                <q-btn
-                  :data-test="`date-time-relative-${item}-${period.value}-btn`"
-                  :label="item"
-                  :class="
+                <OButton
+  variant="outline"
+  :data-test="`date-time-relative-${item}-${period.value}-btn`"
+  @click="setRelativeDate(period, item)"
+  :class="
                     isSelected(item, period.value)
                       ? 'rp-selector-selected'
                       : 'rp-selector'
-                  "
-                  outline
-                  dense
-                  flat
-                  @click="setRelativeDate(period, item)"
-                />
+                  ">{{ item }}</OButton>
               </div>
             </div>
             <div class="relative-row q-px-md q-py-sm">
@@ -86,7 +79,8 @@
           </div>
         </q-tab-panel>
       </q-tab-panels>
-    </q-menu>
+    </template>
+    </OMenu>
   </div>
 </template>
 
@@ -94,6 +88,10 @@
 import { ref, reactive, watch, computed } from "vue";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { ChevronDown } from "lucide-vue-next";
 // Define props to receive the value (offset) from parent
 const props = defineProps({
   modelValue: String, // modelValue will bind to the offSet from parent

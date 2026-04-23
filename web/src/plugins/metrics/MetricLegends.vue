@@ -1,15 +1,18 @@
 <template>
-  <q-btn
-    data-cy="metric-legends-button"
-    size="sm"
-    dense
-    flat
-    class="metric-legends-button"
-  >
-    <q-icon name="category" class="q-mr-sm" />
-    <span>{{ t("search.legendLabel") }}</span>
+  <OMenu>
+<template #default="{ toggle }">
 
-    <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
+    <OButton
+  variant="ghost"
+  size="sm"
+  data-cy="metric-legends-button"
+  class="metric-legends-button"
+  @click="toggle">
+  <q-icon name="category" class="q-mr-sm" />
+    <span>{{ t("search.legendLabel") }}</span>
+</OButton>
+    </template>
+<template #content>
       <q-card flat>
         <q-card-section class="metric-legends-title">
           <div class="label">{{ t("search.legendLabel") }}</div>
@@ -28,8 +31,8 @@
           </div>
         </q-card-section>
       </q-card>
-    </q-menu>
-  </q-btn>
+    </template>
+  </OMenu>
 </template>
 
 <script lang="ts">
@@ -37,7 +40,13 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
 export default defineComponent({
+  components: {
+    OButton,
+    OMenu,
+  },
   name: "MetricLegends",
   setup() {
     const { t } = useI18n();

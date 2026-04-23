@@ -34,8 +34,12 @@
             </div>
             </div>
             <div class="col-auto">
-            <q-btn v-close-popup="true" round
-    flat icon="cancel" />
+            <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
             </div>
         </div>
         </q-card-section>
@@ -183,7 +187,9 @@
     outlinedDelete,
     } from "@quasar/extras/material-icons-outlined";
     import DateTime from "@/components/DateTime.vue";
-    const defaultStreamData = {
+
+import OButton from "@/lib/core/Button/Button.vue";
+const defaultStreamData = {
         name: '',
         schema: [],
         stats: {
@@ -208,7 +214,8 @@
         StreamFieldsInputs,
         AppTabs,
         QTablePagination,
-    },
+    OButton,
+},
     setup({ selectedEnrichmentTable }) {
         const { t } = useI18n();
         const store = useStore();

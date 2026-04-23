@@ -70,16 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item>
             </q-list>
           </q-btn-dropdown>
-          <q-btn
-            flat
-            dense
-            round
-            icon="cancel"
-            size="sm"
-            @click="handleClose"
-            data-test="service-graph-side-panel-close-btn"
-            class="close-btn"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  @click="handleClose"
+  data-test="service-graph-side-panel-close-btn"
+  class="close-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
 
@@ -144,18 +142,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex-1" />
 
             <!-- View in Traces button -->
-            <q-btn
-              class="view-logs-btn o2-primary-button tw:py-[0.25rem]! tw:px-[0.25rem]!"
-              dense
-              unelevated
-              no-caps
-              size="sm"
-              data-test="service-graph-side-panel-view-in-traces-btn"
-              @click="viewInTraces"
-            >
-              <q-icon name="search" size="0.8rem" class="tw:pr-[0.12rem]" />
+            <OButton
+  size="sm"
+  data-test="service-graph-side-panel-view-in-traces-btn"
+  @click="viewInTraces"
+  class="view-logs-btn tw:py-[0.25rem]! tw:px-[0.25rem]!">
+  <q-icon name="search" size="0.8rem" class="tw:pr-[0.12rem]" />
               View Traces
-            </q-btn>
+</OButton>
           </div>
           <div class="charts-wrapper tw:py-0! tw:min-h-[10.875rem] tw:w-full">
             <div class="charts-container tw:w-full">
@@ -211,16 +205,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tabs>
 
             <!-- Resource tabs dropdown — shows/hides individual OTEL resource tabs -->
-            <q-btn
+            <OMenu
               v-if="availableResourceTabConfigs.length > 0"
-              flat
-              dense
-              icon="tune"
-              size="1.1rem"
-              data-test="service-graph-node-panel-workload-fields-btn"
+              anchor="bottom right"
+              self="top right"
+              :offset="[0, 4]"
             >
-              <q-tooltip>{{ t("common.resources") }}</q-tooltip>
-              <q-menu anchor="bottom right" self="top right" :offset="[0, 4]">
+              <template #default="{ toggle }">
+              <OButton
+  variant="ghost"
+  data-test="service-graph-node-panel-workload-fields-btn"
+  @click="toggle">
+  <template #icon-left><SlidersHorizontal class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("common.resources") }}</q-tooltip>
+</OButton>
+              </template>
+              <template #content>
                 <q-list
                   dense
                   class="tw:min-w-[12rem]!"
@@ -261,8 +261,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-item>
                   </template>
                 </q-list>
-              </q-menu>
-            </q-btn>
+              </template>
+            </OMenu>
           </div>
           <q-tab-panels v-model="activeTab" animated>
             <!-- Operations Tab -->
@@ -351,15 +351,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                     </template>
                     <template #cell-actions="{ row, column, active }">
-                      <q-btn
-                        v-if="active"
-                        flat
-                        dense
-                        icon="search"
-                        size="xs"
-                        class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!"
-                        data-test="service-graph-side-panel-view-traces-btn"
-                        @click.stop="
+                      <OButton
+  variant="ghost"
+  size="sm"
+  v-if="active"
+  data-test="service-graph-side-panel-view-traces-btn"
+  @click.stop="
                           navigateToTraces({
                             operationName: row._name,
                             errorsOnly: column.id === 'errors',
@@ -373,9 +370,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     : undefined,
                           })
                         "
-                      >
-                        <q-tooltip>View in Traces</q-tooltip>
-                      </q-btn>
+  class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!">
+  <template #icon-left><Search class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>View in Traces</q-tooltip>
+</OButton>
                     </template>
                     <template #empty>
                       <div
@@ -442,15 +440,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     <template #cell-actions="{ row, column, active }">
-                      <q-btn
-                        v-if="active"
-                        flat
-                        dense
-                        icon="search"
-                        size="xs"
-                        class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!"
-                        :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
-                        @click.stop="
+                      <OButton
+  variant="ghost"
+  size="sm"
+  v-if="active"
+  :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
+  @click.stop="
                           navigateToTraces({
                             resourceFilter: {
                               field: cfg.groupField,
@@ -467,9 +462,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     : undefined,
                           })
                         "
-                      >
-                        <q-tooltip>View in Traces</q-tooltip>
-                      </q-btn>
+  class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!">
+  <template #icon-left><Search class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>View in Traces</q-tooltip>
+</OButton>
                     </template>
                     <template #cell-errors="{ item }">
                       <span
@@ -549,16 +545,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-graph-side-panel-metrics-error"
               >
                 <span>{{ metricsCorrelationError }}</span>
-                <q-btn
-                  flat
-                  dense
-                  no-caps
-                  size="sm"
-                  label="Retry"
-                  color="primary"
-                  data-test="service-graph-side-panel-metrics-retry-btn"
-                  @click="fetchMetricsCorrelation(true)"
-                />
+                <OButton
+  variant="ghost"
+  size="sm"
+  data-test="service-graph-side-panel-metrics-retry-btn"
+  @click="fetchMetricsCorrelation(true)">Retry</OButton>
               </div>
 
               <!-- Metrics dashboard -->
@@ -650,6 +641,10 @@ import { type MetricGroupDefinition } from "@/utils/metrics/metricGrouping";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { useI18n } from "vue-i18n";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { Search, SlidersHorizontal } from "lucide-vue-next";
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
 );
@@ -744,7 +739,10 @@ export default defineComponent({
     TelemetryCorrelationDashboard,
     TenstackTable,
     RenderDashboardCharts,
-  },
+    OButton,
+    SlidersHorizontal,
+    Search,
+},
   props: {
     selectedNode: {
       type: Object as PropType<any>,

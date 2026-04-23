@@ -374,13 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-card>
               </q-expansion-item>
 
-              <q-btn 
-                :label="t('nodes.applyFilter')" 
-                class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm o2-primary-button tw:h-[36px]" 
-                flat
-                @click="applyFilter()"
-              >
-              </q-btn>
+              <OButton @click="applyFilter()" class="float-right q-mr-sm q-mb-sm text-bold text-capitalize q-mt-sm">{{ t('nodes.applyFilter') }}</OButton>
 
             </q-list>
           </div>
@@ -407,13 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="search" class="o2-search-input-icon" />
               </template>
             </q-input>
-            <q-btn
-              :label="t('common.refresh')"
-              class="o2-secondary-button tw:h-[36px]"
-              no-caps
-              flat
-              @click="getData(true)">
-            </q-btn>
+            <OButton variant="secondary" @click="getData(true)">{{ t('common.refresh') }}</OButton>
           </div>
            
         </div>
@@ -526,12 +514,14 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "PageCipherKeys",
   components: {
     QTablePagination,
     NoData,
-  },
+    OButton,
+},
   setup() {
     const store = useStore();
     const router = useRouter();

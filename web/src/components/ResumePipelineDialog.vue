@@ -43,28 +43,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions class="resume-pipeline-dialog-actions q-pa-none tw:flex tw:justify-center" style="padding: 0px;">
-        <q-btn
-          v-close-popup
-          unelevated
-          no-caps
-          class="o2-secondary-button"
-          dense
-          @click="onCancel"
-          data-test="cancel-button"
-        >
-          {{ t("confirmDialog.cancel") }}
-        </q-btn>
-        <q-btn
-          v-close-popup
-          unelevated
-          no-caps
-          @click="onConfirm"
-          dense
-          data-test="confirm-button"
-          class="o2-primary-button"
-        >
-        {{ t('pipeline_list.run_pipeline') }}
-        </q-btn>
+        <OButton
+  variant="secondary"
+  v-close-popup
+  @click="onCancel"
+  data-test="cancel-button">{{ t("confirmDialog.cancel") }}</OButton>
+        <OButton
+  v-close-popup
+  @click="onConfirm"
+  data-test="confirm-button">{{ t('pipeline_list.run_pipeline') }}</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -77,7 +64,11 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { convertUnixToQuasarFormat } from "@/utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "ConfirmDialog",
   emits: ["update:ok", "update:cancel", "update:shouldStartfromNow"],
   props: ["title", "message", "lastPausedAt", "shouldStartfromNow","lastPausedAt"],

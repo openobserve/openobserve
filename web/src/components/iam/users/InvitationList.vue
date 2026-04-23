@@ -56,24 +56,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props" side>
-          <q-btn
-            :label="t('invitation.accept')"
-            class="q-mr-sm o2-primary-button no-hover"
-            no-caps
-            flat
-            dense
-            @click="acceptInvitation(props.row)"
-            :data-test="`accept-invitation-${props.row.token}`"
-          />
-          <q-btn
-            :label="t('invitation.reject')"
-            class="o2-secondary-button"
-            no-caps
-            flat
-            dense
-            @click="rejectInvitation(props.row)"
-            :data-test="`reject-invitation-${props.row.token}`"
-          />
+          <OButton
+  @click="acceptInvitation(props.row)"
+  :data-test="`accept-invitation-${props.row.token}`"
+  class="q-mr-sm no-hover">{{ t('invitation.accept') }}</OButton>
+          <OButton
+  variant="secondary"
+  @click="rejectInvitation(props.row)"
+  :data-test="`reject-invitation-${props.row.token}`">{{ t('invitation.reject') }}</OButton>
         </q-td>
       </template>
 
@@ -111,17 +101,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" no-caps class="q-mr-sm o2-secondary-button">
-            {{ t("invitation.cancel") }}
-          </q-btn>
-          <q-btn
-            v-close-popup="true"
-            no-caps
-            class="o2-primary-button"
-            @click="confirmAcceptInvitation"
-          >
-            {{ t("invitation.accept") }}
-          </q-btn>
+          <OButton
+  variant="secondary"
+  v-close-popup="true"
+  class="q-mr-sm">{{ t("invitation.cancel") }}</OButton>
+          <OButton v-close-popup="true" @click="confirmAcceptInvitation">{{ t("invitation.accept") }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -140,17 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" no-caps class="q-mr-sm o2-secondary-button">
-            {{ t("invitation.cancel") }}
-          </q-btn>
-          <q-btn
-            v-close-popup="true"
-            no-caps
-            class="o2-primary-button"
-            @click="confirmRejectInvitation"
-          >
-            {{ t("invitation.reject") }}
-          </q-btn>
+          <OButton
+  variant="secondary"
+  v-close-popup="true"
+  class="q-mr-sm">{{ t("invitation.cancel") }}</OButton>
+          <OButton v-close-popup="true" @click="confirmRejectInvitation">{{ t("invitation.reject") }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -167,12 +145,14 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "InvitationList",
   components: {
     NoData,
     QTablePagination,
-  },
+    OButton,
+},
   props: {
     userEmail: {
       type: String,

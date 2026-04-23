@@ -137,17 +137,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Save Semantic Mappings Button -->
           <div class="tw:flex tw:justify-end tw:mt-4">
-            <q-btn
-              class="text-bold o2-primary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-primary-button-dark'
-                  : 'o2-primary-button-light'
-              "
-              :label="t('common.save')"
-              @click="saveSemanticMappings"
-              :loading="savingSemanticMappings"
-            />
+            <OButton
+  @click="saveSemanticMappings"
+  :loading="savingSemanticMappings"
+  class="text-bold tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!">{{ t('common.save') }}</OButton>
           </div>
         </div>
       </q-expansion-item>
@@ -165,6 +158,7 @@ import GroupHeader from "@/components/common/GroupHeader.vue";
 import alertsService from "@/services/alerts";
 import settingsService from "@/services/settings";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const store = useStore();
 const $q = useQuasar();
 const { t } = useI18n();

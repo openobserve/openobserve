@@ -45,14 +45,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="tw:flex tw:items-center tw:gap-3">
-          <q-btn
-            flat
-            round
-            dense
-            icon="close"
-            @click="isOpen = false"
-            data-test="correlation-dashboard-close"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  @click="isOpen = false"
+  data-test="correlation-dashboard-close">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </q-card-section>
 
@@ -96,17 +95,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </div>
           <!-- Apply Button -->
-          <q-btn
-            flat
-            dense
-            no-caps
-            text-color="light-text"
-            :label="t('common.apply')"
-            :disable="!hasPendingChanges"
-            @click="applyDimensionChanges"
-            class="o2-secondary-button tw:ml-2"
-            data-test="apply-dimension-filters"
-          />
+          <OButton
+  variant="secondary"
+  text-color="light-text"
+  @click="applyDimensionChanges"
+  data-test="apply-dimension-filters"
+  :disabled="!hasPendingChanges"
+  class="tw:ml-2">{{ t('common.apply') }}</OButton>
         </div>
       </div>
 
@@ -138,16 +133,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="logsDashboardData"
             class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
           >
-            <q-btn
-              flat
-              dense
-              color="primary"
-              icon="refresh"
-              :label="t('common.refresh')"
-              @click="loadDashboard"
-              :loading="loading"
-              size="sm"
-            />
+            <OButton
+  variant="ghost"
+  size="sm"
+  @click="loadDashboard"
+  :loading="loading">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  {{ t('common.refresh') }}
+</OButton>
           </div>
 
           <!-- Loading State -->
@@ -259,34 +252,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                           <div class="metric-group-actions">
-                            <q-btn
-                              flat
-                              dense
-                              no-caps
-                              size="xs"
-                              :color="
-                                getGroupSelectionState(group.id) === 'none'
-                                  ? 'primary'
-                                  : 'grey-7'
-                              "
-                              label="All"
-                              @click.stop="selectAllInGroup(group.id)"
-                              :disable="
+                            <OButton
+  variant="ghost"
+  size="sm"
+  @click.stop="selectAllInGroup(group.id)"
+  :disabled="
                                 getGroupSelectionState(group.id) === 'all'
-                              "
-                            />
-                            <q-btn
-                              flat
-                              dense
-                              no-caps
-                              size="xs"
-                              color="grey-7"
-                              label="None"
-                              @click.stop="deselectAllInGroup(group.id)"
-                              :disable="
+                              ">All</OButton>
+                            <OButton
+  variant="ghost"
+  size="sm"
+  @click.stop="deselectAllInGroup(group.id)"
+  :disabled="
                                 getGroupSelectionState(group.id) === 'none'
-                              "
-                            />
+                              ">None</OButton>
                           </div>
                         </div>
                         <q-item
@@ -412,13 +391,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tw:text-sm tw:opacity-70 tw:mb-4">
                       {{ error || t("correlation.metricsErrorDetails") }}
                     </div>
-                    <q-btn
-                      flat
-                      color="primary"
-                      icon="refresh"
-                      :label="t('correlation.retryButton')"
-                      @click="loadDashboard"
-                    />
+                    <OButton variant="ghost" @click="loadDashboard">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  {{ t('correlation.retryButton') }}
+</OButton>
                   </div>
                   <RenderDashboardCharts
                     v-else-if="activeDashboardForGroup"
@@ -477,13 +453,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:text-sm tw:opacity-70 tw:mb-4">
               {{ tracesError || t("correlation.tracesErrorDetails") }}
             </div>
-            <q-btn
-              flat
-              color="primary"
-              icon="refresh"
-              :label="t('correlation.retryButton')"
-              @click="loadCorrelatedTraces"
-            />
+            <OButton variant="ghost" @click="loadCorrelatedTraces">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  {{ t('correlation.retryButton') }}
+</OButton>
           </div>
 
           <!-- Direct Trace Correlation - Full Span List -->
@@ -541,21 +514,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</span>
                 </div>
                 <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
-                  <q-btn
-                    flat
-                    dense
-                    no-caps
-                    color="primary"
-                    icon="open_in_new"
-                    :label="t('correlation.viewInTraces')"
-                    @click="openTracesPage"
-                    data-test="correlation-view-traces-page"
-                    class="tw:text-xs"
-                  >
-                    <q-tooltip>
+                  <OButton
+  variant="ghost"
+  @click="openTracesPage"
+  data-test="correlation-view-traces-page"
+  class="tw:text-xs">
+  <template #icon-left><ExternalLink class="tw:w-4 tw:h-4" /></template>
+  {{ t('correlation.viewInTraces') }}
+  <q-tooltip>
                       {{ t("correlation.viewInTraces") }}
                     </q-tooltip>
-                  </q-btn>
+</OButton>
                   <q-chip dense color="primary" text-color="white">
                     {{ tracesForDimensions.length }} {{ t("menu.traces") }}
                   </q-chip>
@@ -637,16 +606,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="logsDashboardData"
           class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
         >
-          <q-btn
-            flat
-            dense
-            color="primary"
-            icon="refresh"
-            :label="t('common.refresh')"
-            @click="loadDashboard"
-            :loading="loading"
-            size="sm"
-          />
+          <OButton
+  variant="ghost"
+  size="sm"
+  @click="loadDashboard"
+  :loading="loading">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  {{ t('common.refresh') }}
+</OButton>
         </div>
 
         <!-- Loading State -->
@@ -766,34 +733,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
                         <div class="metric-group-actions">
-                          <q-btn
-                            flat
-                            dense
-                            no-caps
-                            size="xs"
-                            :color="
-                              getGroupSelectionState(group.id) === 'none'
-                                ? 'primary'
-                                : 'grey-7'
-                            "
-                            label="All"
-                            @click.stop="selectAllInGroup(group.id)"
-                            :disable="
+                          <OButton
+  variant="ghost"
+  size="sm"
+  @click.stop="selectAllInGroup(group.id)"
+  :disabled="
                               getGroupSelectionState(group.id) === 'all'
-                            "
-                          />
-                          <q-btn
-                            flat
-                            dense
-                            no-caps
-                            size="xs"
-                            color="grey-7"
-                            label="None"
-                            @click.stop="deselectAllInGroup(group.id)"
-                            :disable="
+                            ">All</OButton>
+                          <OButton
+  variant="ghost"
+  size="sm"
+  @click.stop="deselectAllInGroup(group.id)"
+  :disabled="
                               getGroupSelectionState(group.id) === 'none'
-                            "
-                          />
+                            ">None</OButton>
                         </div>
                       </div>
                       <q-item
@@ -925,13 +878,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="tw:text-sm tw:opacity-70 tw:mb-4">
                     {{ error || t("correlation.metricsErrorDetails") }}
                   </div>
-                  <q-btn
-                    flat
-                    color="primary"
-                    icon="refresh"
-                    :label="t('correlation.retryButton')"
-                    @click="loadDashboard"
-                  />
+                  <OButton variant="ghost" @click="loadDashboard">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  {{ t('correlation.retryButton') }}
+</OButton>
                 </div>
                 <RenderDashboardCharts
                   v-else-if="activeDashboardForGroup"
@@ -986,13 +936,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("correlation.tracesError") }}
           </div>
           <div class="tw:text-sm tw:text-gray-500">{{ tracesError }}</div>
-          <q-btn
-            outline
-            color="primary"
-            :label="t('correlation.retryButton')"
-            class="tw:mt-4"
-            @click="loadCorrelatedTraces"
-          />
+          <OButton
+  variant="outline"
+  @click="loadCorrelatedTraces"
+  class="tw:mt-4">{{ t('correlation.retryButton') }}</OButton>
         </div>
 
         <!-- Direct Trace Correlation - Full Span List -->
@@ -1051,21 +998,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
               </q-chip>
               <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
-                <q-btn
-                  flat
-                  dense
-                  no-caps
-                  color="primary"
-                  icon="open_in_new"
-                  :label="t('correlation.viewInTraces')"
-                  @click="openTracesPage"
-                  data-test="correlation-view-traces-page"
-                  class="tw:text-xs"
-                >
-                  <q-tooltip>
+                <OButton
+  variant="ghost"
+  @click="openTracesPage"
+  data-test="correlation-view-traces-page"
+  class="tw:text-xs">
+  <template #icon-left><ExternalLink class="tw:w-4 tw:h-4" /></template>
+  {{ t('correlation.viewInTraces') }}
+  <q-tooltip>
                     {{ t("correlation.viewInTraces") }}
                   </q-tooltip>
-                </q-btn>
+</OButton>
               </div>
             </div>
           </div>
@@ -1128,7 +1071,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:text-base tw:font-semibold">
             {{ t("correlation.selectMetrics") }}
           </div>
-          <q-btn flat round dense icon="close" v-close-popup />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup>
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
 
         <!-- Search Input -->
@@ -1177,30 +1125,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
                 <div class="metric-group-actions">
-                  <q-btn
-                    flat
-                    dense
-                    no-caps
-                    size="xs"
-                    :color="
-                      getGroupSelectionState(group.id) === 'none'
-                        ? 'primary'
-                        : 'grey-7'
-                    "
-                    label="All"
-                    @click="selectAllInGroup(group.id)"
-                    :disable="getGroupSelectionState(group.id) === 'all'"
-                  />
-                  <q-btn
-                    flat
-                    dense
-                    no-caps
-                    size="xs"
-                    color="grey-7"
-                    label="None"
-                    @click="deselectAllInGroup(group.id)"
-                    :disable="getGroupSelectionState(group.id) === 'none'"
-                  />
+                  <OButton
+  variant="ghost"
+  size="sm"
+  @click="selectAllInGroup(group.id)"
+  :disabled="getGroupSelectionState(group.id) === 'all'">All</OButton>
+                  <OButton
+  variant="ghost"
+  size="sm"
+  @click="deselectAllInGroup(group.id)"
+  :disabled="getGroupSelectionState(group.id) === 'none'">None</OButton>
                 </div>
               </div>
 
@@ -1277,6 +1211,9 @@ import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ExternalLink, RefreshCw } from "lucide-vue-next";
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );

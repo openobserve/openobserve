@@ -14,72 +14,50 @@
       <div class="confirmation-buttons">
         <!-- For navigation actions, show 3 buttons -->
         <template v-if="isNavigationAction">
-          <q-btn
-            ref="yesButtonRef"
-            unelevated
-            no-caps
-            label="Allow"
-            class="confirmation-btn confirm-btn"
-            :class="{ 'btn-focused': isFocusedYes }"
-            tabindex="0"
-            @click="handleConfirm"
-            @focus="handleYesFocus"
-            @blur="handleYesBlur"
-          />
-          <q-btn
-            ref="alwaysButtonRef"
-            unelevated
-            no-caps
-            label="Always Allow"
-            class="confirmation-btn always-btn"
-            :class="{ 'btn-focused': isFocusedAlways }"
-            tabindex="1"
-            @click="handleAlwaysConfirm"
-            @focus="handleAlwaysFocus"
-            @blur="handleAlwaysBlur"
-          />
-          <q-btn
-            ref="noButtonRef"
-            unelevated
-            no-caps
-            outline
-            label="No"
-            class="confirmation-btn cancel-btn"
-            :class="{ 'btn-focused': isFocusedNo }"
-            tabindex="2"
-            @click="handleCancel"
-            @focus="handleNoFocus"
-            @blur="handleNoBlur"
-          />
+          <OButton
+  variant="ghost"
+  ref="yesButtonRef"
+  tabindex="0"
+  @click="handleConfirm"
+  @focus="handleYesFocus"
+  @blur="handleYesBlur"
+  class="confirmation-btn confirm-btn" :class="{ 'btn-focused': isFocusedYes }">Allow</OButton>
+          <OButton
+  variant="ghost"
+  ref="alwaysButtonRef"
+  tabindex="1"
+  @click="handleAlwaysConfirm"
+  @focus="handleAlwaysFocus"
+  @blur="handleAlwaysBlur"
+  class="confirmation-btn always-btn" :class="{ 'btn-focused': isFocusedAlways }">Always Allow</OButton>
+          <OButton
+  variant="outline"
+  ref="noButtonRef"
+  tabindex="2"
+  @click="handleCancel"
+  @focus="handleNoFocus"
+  @blur="handleNoBlur"
+  class="confirmation-btn cancel-btn" :class="{ 'btn-focused': isFocusedNo }">No</OButton>
         </template>
 
         <!-- For other actions, show 2 buttons -->
         <template v-else>
-          <q-btn
-            ref="yesButtonRef"
-            unelevated
-            no-caps
-            :label="confirmLabel"
-            class="confirmation-btn confirm-btn"
-            :class="{ 'btn-focused': isFocusedYes }"
-            tabindex="0"
-            @click="handleConfirm"
-            @focus="handleYesFocus"
-            @blur="handleYesBlur"
-          />
-          <q-btn
-            ref="noButtonRef"
-            unelevated
-            no-caps
-            outline
-            :label="cancelLabel"
-            class="confirmation-btn cancel-btn"
-            :class="{ 'btn-focused': isFocusedNo }"
-            tabindex="1"
-            @click="handleCancel"
-            @focus="handleNoFocus"
-            @blur="handleNoBlur"
-          />
+          <OButton
+  variant="ghost"
+  ref="yesButtonRef"
+  tabindex="0"
+  @click="handleConfirm"
+  @focus="handleYesFocus"
+  @blur="handleYesBlur"
+  class="confirmation-btn confirm-btn" :class="{ 'btn-focused': isFocusedYes }">{{ confirmLabel }}</OButton>
+          <OButton
+  variant="outline"
+  ref="noButtonRef"
+  tabindex="1"
+  @click="handleCancel"
+  @focus="handleNoFocus"
+  @blur="handleNoBlur"
+  class="confirmation-btn cancel-btn" :class="{ 'btn-focused': isFocusedNo }">{{ cancelLabel }}</OButton>
         </template>
       </div>
     </div>
@@ -90,6 +68,7 @@
 import { ref, watch, nextTick, computed, onMounted, onUnmounted } from 'vue';
 import { useStore } from 'vuex';
 
+import OButton from "@/lib/core/Button/Button.vue";
 interface ConfirmationData {
   tool?: string;
   args?: Record<string, any>;

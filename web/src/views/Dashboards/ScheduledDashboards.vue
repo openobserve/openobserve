@@ -76,14 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
 
-            <q-btn
-              data-test="alert-list-add-alert-btn"
-              class="o2-primary-button tw:h-[36px] q-ml-md"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-              flat
-              :label="t(`dashboard.newReport`)"
-              @click="createNewReport"
-            />
+            <OButton
+  data-test="alert-list-add-alert-btn"
+  @click="createNewReport"
+  class="q-ml-md">{{ t(`dashboard.newReport`) }}</OButton>
 
             <div class="q-ml-sm">
               <q-icon
@@ -131,6 +127,7 @@ import { convertUnixToQuasarFormat } from "@/utils/date";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const props = defineProps({
   reports: {
     type: Array,

@@ -29,33 +29,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #right>
           <div>
             <!-- show variables dependencies if variables exist -->
-            <q-btn
-              v-if="dashboardVariablesList.length > 0"
-              class="text-bold no-border q-ml-md o2-secondary-button tw:h-[36px]"
-              no-caps
-              no-outline
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              flat
-              label="Show Dependencies"
-              @click="showVariablesDependenciesGraphPopUp = true"
-              data-test="dashboard-variable-dependencies-btn"
-            />
-            <q-btn
-              class="text-bold no-border q-ml-md o2-primary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-primary-button-dark'
-                  : 'o2-primary-button-light'
-              "
-              flat
-              :label="t(`dashboard.newVariable`)"
-              @click="addVariables"
-              data-test="dashboard-add-variable-btn"
-            />
+            <OButton
+  variant="secondary"
+  v-if="dashboardVariablesList.length > 0"
+  no-outline
+  @click="showVariablesDependenciesGraphPopUp = true"
+  data-test="dashboard-variable-dependencies-btn"
+  class="text-bold q-ml-md">Show Dependencies</OButton>
+            <OButton
+  @click="addVariables"
+  data-test="dashboard-add-variable-btn"
+  class="text-bold q-ml-md">{{ t(`dashboard.newVariable`) }}</OButton>
           </div>
         </template>
       </DashboardHeader>
@@ -165,30 +149,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="item-actions">
-                <q-btn
-                  icon="edit"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :title="t('dashboard.edit')"
-                  @click="editVariableFn(variable.name)"
-                  :data-test="`dashboard-edit-variable-${variable.name}`"
-                />
-                <q-btn
-                  :icon="outlinedDelete"
-                  :title="t('dashboard.delete')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  @click.stop="
+                <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('dashboard.edit')"
+  @click="editVariableFn(variable.name)"
+  :data-test="`dashboard-edit-variable-${variable.name}`">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('dashboard.delete')"
+  @click.stop="
                     showDeleteDialogFn({ row: { name: variable.name } })
                   "
-                  data-test="dashboard-delete-variable"
-                />
+  data-test="dashboard-delete-variable">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </div>
             </div>
           </div>
@@ -207,7 +185,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-toolbar>
               <q-toolbar-title>Variables Dependency Graph</q-toolbar-title>
-              <q-btn flat round dense icon="close" v-close-popup="true" />
+              <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
             </q-toolbar>
             <q-card-section style="width: 100%; height: calc(100% - 50px)">
               <VariablesDependenciesGraph
@@ -245,6 +228,9 @@ import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 import useNotifications from "@/composables/useNotifications";
 import { VueDraggableNext } from "vue-draggable-next";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Pencil, Trash2 } from "lucide-vue-next";
 export default defineComponent({
   name: "VariableSettings",
   components: {
@@ -254,7 +240,10 @@ export default defineComponent({
     ConfirmDialog,
     DashboardHeader,
     VariablesDependenciesGraph,
-  },
+    OButton,
+    Pencil,
+    Trash2,
+},
   emits: ["save"],
   setup(props, { emit }) {
     const store: any = useStore();

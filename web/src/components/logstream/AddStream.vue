@@ -25,13 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="col-auto">
-        <q-btn
-          data-test="add-stream-close-btn"
-          v-close-popup="true"
-          round
-          flat
-          icon="cancel"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  data-test="add-stream-close-btn"
+  v-close-popup="true">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </div>
     </div>
     <q-separator />
@@ -89,24 +89,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div class="flex justify-start q-mt-md">
-          <q-btn
-            v-close-popup="true"
-            data-test="add-stream-cancel-btn"
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('logStream.cancel')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          />
-          <q-btn
-            data-test="save-stream-btn"
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('common.save')"
-            type="submit"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          />
+          <OButton
+  variant="secondary"
+  v-close-popup="true"
+  data-test="add-stream-cancel-btn"
+  class="q-mr-md">{{ t('logStream.cancel') }}</OButton>
+          <OButton data-test="save-stream-btn" type="submit">{{ t('common.save') }}</OButton>
         </div>
       </q-form>
     </div>
@@ -125,6 +113,7 @@ import { useQuasar } from "quasar";
 import useStreams from "@/composables/useStreams";
 import { useReo } from "@/services/reodotdev_analytics";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const { t } = useI18n();
 
 

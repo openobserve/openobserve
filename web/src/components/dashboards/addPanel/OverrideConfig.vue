@@ -1,13 +1,10 @@
 <template>
   <div>
-    <q-btn
-      @click="openOverrideConfigPopup"
-      style="cursor: pointer; padding: 0px 5px"
-      :label="t('dashboard.addFieldOverride')"
-      no-caps
-      data-test="dashboard-addpanel-config-override-config-add-btn"
-      class="el-border"
-    />
+    <OButton
+  variant="outline"
+  @click="openOverrideConfigPopup"
+  style="cursor: pointer; padding: 0px 5px"
+  data-test="dashboard-addpanel-config-override-config-add-btn">{{ t('dashboard.addFieldOverride') }}</OButton>
 
     <q-dialog v-model="showOverrideConfigPopup">
       <OverrideConfigPopup
@@ -30,6 +27,7 @@ import { useStore } from "vuex";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 
+import OButton from "@/lib/core/Button/Button.vue";
 interface Column {
   alias: string;
   label: string;
@@ -42,7 +40,9 @@ export interface OverrideConfig {
 
 export default defineComponent({
   name: "OverrideConfig",
-  components: { OverrideConfigPopup },
+  components: { OverrideConfigPopup,
+    OButton,
+},
   props: {
     panelData: {
       type: Object,

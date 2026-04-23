@@ -1,17 +1,13 @@
 <template>
   <div class="tw:relative">
-    <q-btn
-      v-if="showCopyButton"
-      dense
-      size="sm"
-      no-caps
-      class="tw:absolute! tw:top-0! tw:right-0 tw:z-10 q-px-sm tw:py-[0.35rem]! tw:bg-[var(--o2-tag-grey-2)]!"
-      :class="copyButtonClass"
-      icon="content_copy"
-      @click="copyToClipboard"
-    >
-      <q-tooltip>{{ t("common.copyToClipboard") }}</q-tooltip>
-    </q-btn>
+    <OButton
+  size="sm"
+  v-if="showCopyButton"
+  @click="copyToClipboard"
+  class="tw:absolute! tw:top-0! tw:right-0 tw:z-10 q-px-sm tw:py-[0.35rem]! tw:bg-[var(--o2-tag-grey-2)]!" :class="copyButtonClass">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("common.copyToClipboard") }}</q-tooltip>
+</OButton>
     <div class="q-pb-xs flex justify-start items-center q-px-md copy-log-btn">
       <!-- Toolbar slot: consumers add context-specific buttons (View Trace, View Related, etc.) -->
       <slot name="toolbar" />
@@ -74,12 +70,17 @@ import { getImageURL } from "@/utils/zincutils";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Copy } from "lucide-vue-next";
 export default {
   name: "JsonPreview",
   components: {
     LogsHighLighting,
     ChunkedContent,
-  },
+    OButton,
+    Copy,
+},
   props: {
     value: {
       type: Object,

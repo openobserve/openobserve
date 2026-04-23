@@ -103,17 +103,14 @@ limitations under the License. -->
 
         <!-- Retry Button -->
         <div class="result-actions">
-          <q-btn
-            data-test="test-retry-button"
-            flat
-            no-caps
-            dense
-            size="sm"
-            color="primary"
-            :label="t('alerts.retry')"
-            icon="refresh"
-            @click="$emit('retry')"
-          />
+          <OButton
+  variant="ghost"
+  size="sm"
+  data-test="test-retry-button"
+  @click="$emit('retry')">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  {{ t('alerts.retry') }}
+</OButton>
         </div>
       </div>
     </div>
@@ -157,6 +154,9 @@ import { useI18n } from 'vue-i18n';
 import { date } from 'quasar';
 import type { TestResult } from '@/utils/prebuilt-templates/types';
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { RefreshCw } from "lucide-vue-next";
 // Define component props
 interface Props {
   result?: TestResult | null;

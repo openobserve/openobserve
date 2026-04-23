@@ -170,40 +170,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     >
                       {{ formData.fileNameToShow }}
-                      <q-btn
-                        data-test="add-action-script-edit-file-btn"
-                        @click="editFileToUpload"
-                        icon="edit"
-                        no-caps
-                        dense
-                        flat
-                        size="14px"
-                      />
+                      <OButton
+  variant="ghost"
+  size="icon"
+  data-test="add-action-script-edit-file-btn"
+  @click="editFileToUpload">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
                     </div>
                     <div
                       v-if="isEditingActionScript && formData.fileNameToShow == ''"
                       class="q-pt-md q-mt-xs q-pl-md"
                     >
-                      <q-btn
-                        data-test="cancel-upload-new-btn-file"
-                        @click="cancelUploadingNewFile"
-                        color="red"
-                        label="Cancel"
-                        no-caps
-                      />
+                      <OButton
+  variant="destructive"
+  data-test="cancel-upload-new-btn-file"
+  @click="cancelUploadingNewFile">Cancel</OButton>
                     </div>
                   </div>
 
                   <q-stepper-navigation>
-                    <q-btn
-                      data-test="add-action-script-step1-continue-btn"
-                      @click="step = 2"
-                      class="o2-primary-button tw:h-[36px] q-mt-sm"
-                      :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-                      flat
-                      :label="'Continue'"
-                      no-caps
-                    />
+                    <OButton
+  data-test="add-action-script-step1-continue-btn"
+  @click="step = 2"
+  class="q-mt-sm">{{ 'Continue' }}</OButton>
                   </q-stepper-navigation>
                 </q-step>
 
@@ -228,21 +218,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-pa-xs el-border-radius el-border tw:w-fit"
                     >
                       <template v-for="visual in frequencyTabs" :key="visual.value">
-                        <q-btn
-                          :data-test="`add-action-script-schedule-frequency-${visual.value}-btn`"
-                          :color="visual.value === frequency.type ? 'primary' : ''"
-                          :flat="visual.value === frequency.type ? false : true"
-                          dense
-                          no-caps
-                          size="12px"
-                          class="q-px-lg visual-selection-btn"
-                          style="padding-top: 4px; padding-bottom: 4px"
-                          @click="frequency.type = visual.value"
-                          :disable="isEditingActionScript"
-                          :readonly="isEditingActionScript"
-                        >
-                          {{ visual.label }}</q-btn
-                        >
+                        <OButton
+  :data-test="`add-action-script-schedule-frequency-${visual.value}-btn`"
+  :flat="visual.value === frequency.type ? false : true"
+  style="padding-top: 4px; padding-bottom: 4px"
+  @click="frequency.type = visual.value"
+  :readonly="isEditingActionScript"
+  :disabled="isEditingActionScript"
+  class="q-px-lg visual-selection-btn">{{ visual.label }}</OButton>
                       </template>
                     </div>
 
@@ -350,24 +333,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <q-stepper-navigation>
                     <div>
-                      <q-btn
-                        data-test="add-action-script-step2-back-btn"
-                        @click="step = 1"
-                        flat
-                        class="o2-secondary-button tw:h-[36px] q-ml-sm"
-                        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                        :label="'Back'"
-                        no-caps
-                      />
-                      <q-btn
-                        data-test="add-action-script-step2-continue-btn"
-                        @click="step = 3"
-                        class="o2-primary-button tw:h-[36px] q-ml-md "
-                        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-                        flat
-                        :label="'Continue'"
-                        no-caps
-                      />
+                      <OButton
+  variant="secondary"
+  data-test="add-action-script-step2-back-btn"
+  @click="step = 1"
+  class="q-ml-sm">{{ 'Back' }}</OButton>
+                      <OButton
+  data-test="add-action-script-step2-continue-btn"
+  @click="step = 3"
+  class="q-ml-md">{{ 'Continue' }}</OButton>
                     </div>
                   </q-stepper-navigation>
                 </q-step>
@@ -427,24 +401,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <q-stepper-navigation>
-                    <q-btn
-                      data-test="add-action-script-step3-back-btn"
-                      @click="step = formData.type === 'scheduled' ? 2 : 1"
-                      flat
-                      class="o2-secondary-button tw:h-[36px]"
-                      :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                      :label="'Back'"
-                      no-caps
-                    />
-                    <q-btn
-                      data-test="add-action-script-step3-continue-btn"
-                      @click="step = 4"
-                      class="o2-primary-button tw:h-[36px] q-ml-md"
-                      :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-                      flat
-                      :label="'Continue'"
-                      no-caps
-                    />
+                    <OButton
+  variant="secondary"
+  data-test="add-action-script-step3-back-btn"
+  @click="step = formData.type === 'scheduled' ? 2 : 1">{{ 'Back' }}</OButton>
+                    <OButton
+  data-test="add-action-script-step3-continue-btn"
+  @click="step = 4"
+  class="q-ml-md">{{ 'Continue' }}</OButton>
                   </q-stepper-navigation>
                 </q-step>
                 <q-step
@@ -485,42 +449,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                     <div class="col-2 q-ml-none">
-                      <q-btn
-                        :data-test="`add-action-script-header-${header['key']}-delete-btn`"
-                        icon="delete"
-                        class="q-ml-xs iconHoverBtn"
-                        padding="sm"
-                        unelevated
-                        size="sm"
-                        round
-                        flat
-                        :title="t('alert_templates.delete')"
-                        @click="deleteApiHeader(header)"
-                      />
-                      <q-btn
-                        data-test="add-action-script-add-header-btn"
-                        v-if="index === environmentalVariables.length - 1"
-                        icon="add"
-                        class="q-ml-xs iconHoverBtn"
-                        padding="sm"
-                        unelevated
-                        size="sm"
-                        round
-                        flat
-                        :title="t('alert_templates.edit')"
-                        @click="addApiHeader()"
-                      />
+                      <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`add-action-script-header-${header['key']}-delete-btn`"
+  :title="t('alert_templates.delete')"
+  @click="deleteApiHeader(header)"
+  class="q-ml-xs iconHoverBtn">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                      <OButton
+  variant="ghost"
+  size="icon"
+  data-test="add-action-script-add-header-btn"
+  v-if="index === environmentalVariables.length - 1"
+  :title="t('alert_templates.edit')"
+  @click="addApiHeader()"
+  class="q-ml-xs iconHoverBtn">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
                     </div>
                   </div>
                   <q-stepper-navigation>
-                    <q-btn
-                      data-test="add-action-script-step4-back-btn"
-                      flat
-                      @click="step = 3"
-                      class="o2-secondary-button tw:h-[36px]"
-                      :label="'Back'"
-                      no-caps
-                    />
+                    <OButton
+  variant="secondary"
+  data-test="add-action-script-step4-back-btn"
+  @click="step = 3">{{ 'Back' }}</OButton>
                   </q-stepper-navigation>
                 </q-step>
               </q-stepper>
@@ -533,22 +487,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex justify-end q-px-md full-width tw:py-[0.625rem] card-container"
         style="position: sticky; bottom: 0px; z-index: 2"
       >
-        <q-btn
-          data-test="add-action-script-cancel-btn"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          flat
-          :label="t('alerts.cancel')"
-          no-caps
-          @click="openCancelDialog"
-        />
-        <q-btn
-          data-test="add-action-script-save-btn"
-          :label="t('alerts.save')"
-          class="o2-primary-button tw:h-[36px]"
-          flat
-          no-caps
-          @click="saveActionScript"
-        />
+        <OButton
+  variant="secondary"
+  data-test="add-action-script-cancel-btn"
+  @click="openCancelDialog"
+  class="q-mr-md">{{ t('alerts.cancel') }}</OButton>
+        <OButton data-test="add-action-script-save-btn" @click="saveActionScript">{{ t('alerts.save') }}</OButton>
       </div>
       </div>
     </div>
@@ -590,6 +534,9 @@ import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Pencil, Plus, Trash2 } from "lucide-vue-next";
 defineProps({
   report: {
     type: Object,

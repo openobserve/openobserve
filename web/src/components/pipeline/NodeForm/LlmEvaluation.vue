@@ -25,8 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("pipeline.llmEvaluation") }}
       <div>
-        <q-btn v-close-popup="true" round
-flat icon="cancel"></q-btn>
+        <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </div>
     </div>
     <q-separator />
@@ -108,17 +112,16 @@ flat icon="cancel"></q-btn>
               </q-item>
             </template>
           </q-select>
-          <q-btn
-            round
-            flat
-            dense
-            icon="refresh"
-            @click="refreshTemplates"
-            :loading="loadingTemplates"
-            :title="t('common.refresh')"
-            data-test="llm-evaluation-template-refresh-btn"
-            class="q-mt-md"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  @click="refreshTemplates"
+  :loading="loadingTemplates"
+  :title="t('common.refresh')"
+  data-test="llm-evaluation-template-refresh-btn"
+  class="q-mt-md">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
 
         <!-- Enable Sampling Toggle -->
@@ -158,49 +161,23 @@ flat icon="cancel"></q-btn>
           class="flex justify-start full-width q-mt-sm"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
-          <q-btn
-            v-if="pipelineObj.isEditNode"
-            data-test="llm-evaluation-delete-btn"
-            class="o2-secondary-button tw:h-[36px] q-mr-md"
-            color="negative"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
-            @click="openDeleteDialog"
-          >
-            <q-icon name="delete" class="q-mr-xs" />
+          <OButton
+  variant="destructive"
+  v-if="pipelineObj.isEditNode"
+  data-test="llm-evaluation-delete-btn"
+  @click="openDeleteDialog"
+  class="q-mr-md">
+  <q-icon name="delete" class="q-mr-xs" />
             {{ t("pipeline.deleteNode") }}
-          </q-btn>
-          <q-btn
-            data-test="llm-evaluation-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            no-caps
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            @click="openCancelDialog"
-          />
-          <q-btn
-            data-test="llm-evaluation-save-btn"
-            :label="t('alerts.save')"
-            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            flat
-            no-caps
-            type="submit"
-          />
+</OButton>
+          <OButton
+  variant="secondary"
+  data-test="llm-evaluation-cancel-btn"
+  @click="openCancelDialog">{{ t('alerts.cancel') }}</OButton>
+          <OButton
+  data-test="llm-evaluation-save-btn"
+  type="submit"
+  class="q-ml-md">{{ t('alerts.save') }}</OButton>
         </div>
       </q-form>
     </div>
@@ -223,9 +200,15 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { RefreshCw } from "lucide-vue-next";
 export default defineComponent({
   name: "LlmEvaluation",
-  components: { ConfirmDialog },
+  components: { ConfirmDialog,
+    OButton,
+    RefreshCw,
+},
   emits: ["cancel:hideform"],
   setup(props, { emit }) {
     const store = useStore();

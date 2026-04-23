@@ -44,19 +44,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
-          <q-btn
-            :icon="outlinedCancel"
-            :title="t('queries.cancelQuery')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            style="color: red"
-            round
-            flat
-            @click.stop="confirmDeleteAction(props)"
-            data-test="cancelQuery-btn"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('queries.cancelQuery')"
+  style="color: red"
+  @click.stop="confirmDeleteAction(props)"
+  data-test="cancelQuery-btn"
+  class="q-ml-xs">
+  <template #icon-left><XCircle class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </q-td>
       </template>
       <template #body-cell-duration="props">
@@ -71,17 +68,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #bottom="scope">
-        <q-btn
-          data-test="qm-multiple-cancel-query-btn"
-          class="o2-secondary-button no-border tw:h-[36px]"
-          flat
-          outline
-          padding="sm lg"
-          :disable="selectedRow.length === 0"
-          @click="handleMultiQueryCancel"
-          no-caps
-          :label="t('queries.cancelQuery')"
-        />
+        <OButton
+  variant="secondary"
+  size="sm"
+  data-test="qm-multiple-cancel-query-btn"
+  @click="handleMultiQueryCancel"
+  :disabled="selectedRow.length === 0">{{ t('queries.cancelQuery') }}</OButton>
         <q-space />
         <div style="width: auto">
           <q-table-pagination
@@ -109,9 +101,15 @@ import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { durationFormatter } from "@/utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { XCircle } from "lucide-vue-next";
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QTablePagination, NoData },
+  components: { QTablePagination, NoData,
+    OButton,
+    XCircle,
+},
   props: {
     rows: {
       type: Array,

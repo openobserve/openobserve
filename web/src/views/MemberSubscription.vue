@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="subscription_message q-btn-primary"
     >
       <b>Please click the button below to proceed with your subscription after taking above mentioned action.</b><br />
-      <q-btn @click="ProcessSubscription(queryString, 'confirm')" class="q-mt-md">Confirm Member Subscription</q-btn>
+      <OButton @click="ProcessSubscription(queryString, 'confirm')" class="q-mt-md">Confirm Member Subscription</OButton>
     </div> -->
   </q-page>
 </template>
@@ -57,11 +57,13 @@ import { useLocalOrganization, getPath } from "../utils/zincutils";
 import organizationsService from "../services/organizations";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "PageUser",
   components: {
     SanitizedHtmlRenderer,
-  },
+    OButton,
+},
   data() {
     return {
       status: "processing",

@@ -25,54 +25,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="add-regex-pattern-header q-px-md tw:flex tw:items-center tw:justify-between">
         <div class="tw:flex tw:items-center tw:justify-between">
-                <q-btn
-                    data-test="add-regex-pattern-back-btn"
-                    @click="closeAddRegexPatternDialog"
-                    round
-                    flat
-                    icon="arrow_back"
-                />
+                <OButton
+  variant="ghost"
+  size="icon"
+  data-test="add-regex-pattern-back-btn"
+  @click="closeAddRegexPatternDialog">
+  <template #icon-left><ArrowLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
           <div class="add-regex-pattern-title" data-test="add-regex-pattern-title">
             {{ isEdit ? t("regex_patterns.edit_regex_pattern") : t("regex_patterns.create_regex_pattern") }}
           </div>
         </div>
         <div class="tw:flex tw:items-center tw:justify-between tw:gap-2">
-            <q-btn
-            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-            :ripple="false"
-            @click="toggleAIChat"
-            data-test="add-regex-pattern-open-close-ai-btn"
-            no-caps
-            :borderless="true"
-            flat
-            dense
-            class="o2-button ai-hover-btn q-px-sm q-py-sm"
-            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-            style="border-radius: 100%;"
-            @mouseenter="isHovered = true"
-            @mouseleave="isHovered = false"
-            >
-            <div class="row items-center no-wrap tw:gap-2  ">
+            <OButton
+  variant="ghost"
+  v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+  @click="toggleAIChat"
+  data-test="add-regex-pattern-open-close-ai-btn"
+  :borderless="true"
+  style="border-radius: 100%;"
+  @mouseenter="isHovered = true"
+  @mouseleave="isHovered = false"
+  class="o2-button ai-hover-btn q-px-sm q-py-sm" :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''">
+  <div class="row items-center no-wrap tw:gap-2  ">
                 <img  :src="getBtnLogo" class="header-icon ai-icon" />
             </div>
-            </q-btn>
-            <q-btn 
-            data-test="add-regex-pattern-fullscreen-btn"
-            icon="fullscreen" 
-            size="14px" 
-            dense 
-            class="tw:cursor-pointer" 
-            :class="store.state.theme === 'dark' ? 'tw:text-white' : ''"
-            :color="isFullScreen ? 'primary' : undefined"
-            @click="toggleFullScreen"
-          />
-          <q-btn
-            data-test="add-regex-pattern-close-btn"
-            @click="closeAddRegexPatternDialog"
-            round
-            flat
-            icon="cancel"
-        />
+</OButton>
+            <OButton
+  size="icon"
+  data-test="add-regex-pattern-fullscreen-btn"
+  @click="toggleFullScreen"
+  class="tw:cursor-pointer" :class="store.state.theme === 'dark' ? 'tw:text-white' : ''">
+  <template #icon-left><Maximize class="tw:w-4 tw:h-4" /></template>
+</OButton>
+          <OButton
+  variant="ghost"
+  size="icon"
+  data-test="add-regex-pattern-close-btn"
+  @click="closeAddRegexPatternDialog">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
 
       </div>
@@ -117,16 +109,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="regex-pattern-input-label">
                             Regex Pattern
                         </span>
-                        <q-btn v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                         class="tw:px-2 tw:py-1 tw:flex tw:items-center"
-                        style="border-radius: 4px;" dense no-caps flat  @click="toggleAIChat">
-                        <img :src="goToAILogo" class="tw:w-[20px] tw:h-[20px] tw:mr-1" />
+                        <OButton
+  variant="ghost"
+  v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+  style="border-radius: 4px;"
+  @click="toggleAIChat"
+  class="tw:px-2 tw:py-1 tw:flex tw:items-center">
+  <img :src="goToAILogo" class="tw:w-[20px] tw:h-[20px] tw:mr-1" />
                         <span class="tw:text-[#5960B2] tw:text-sm tw:flex tw:items-center tw:gap-1">
                             Try O2 Assistant to write expressions 
                         </span>
                         <q-icon size="sm" name="arrow_right_alt" class="tw:text-[#5960B2] tw:w-[20px] tw:h-[20px] tw:ml-1" />
-
-                            </q-btn>
+</OButton>
                     </div>
                     <div class="regex-pattern-input">
                         <div
@@ -169,12 +163,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             Test Regex Pattern
                         </span>
                         <div class="tw:h-[19px] tw:flex tw:items-center tw:justify-center tw:font-[600]" style="border-radius: 3px;">
-                            <q-btn :disable="regexPatternInputs.pattern.length === 0" class="tw:px-2 tw:bg-[#5960B2] tw:text-[12px] tw:text-white tw:min-h-[19px] tw:h-[19px] tw:flex tw:items-center tw:justify-center"
-                        style="border-radius: 3px;" flat dense no-caps borderless  @click="testStringOutput">
-                        <span>
+                            <OButton
+  variant="ghost"
+  style="border-radius: 3px;"
+  @click="testStringOutput"
+  :disabled="regexPatternInputs.pattern.length === 0"
+  class="tw:px-2 tw:bg-[#5960B2] tw:text-[12px] tw:text-white tw:min-h-[19px] tw:h-[19px] tw:flex tw:items-center tw:justify-center">
+  <span>
                             Test Input
                         </span>
-                    </q-btn>
+</OButton>
                         </div>
                     </div>
                 </div>
@@ -259,26 +257,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </q-form>
             <div class="flex justify-end q-mt-sm" style="position: sticky; bottom: 0; right: 0;">
-                <q-btn
-                    v-close-popup
-                    class="q-mr-md o2-secondary-button tw:h-[36px]"
-                    :label="t('regex_patterns.cancel')"
-                    no-caps
-                    flat
-                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                    data-test="add-regex-pattern-cancel-btn"
-                />
-                <q-btn
-                    class="o2-primary-button no-border tw:h-[36px]"
-                    :label="isSaving ? 'Saving...' : isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')"
-                    type="submit"
-                    no-caps
-                    flat
-                    :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-                    @click="saveRegexPattern"
-                    :disable="isFormEmpty || isSaving"
-                    data-test="add-regex-pattern-save-btn"
-                />
+                <OButton
+  variant="secondary"
+  v-close-popup
+  data-test="add-regex-pattern-cancel-btn"
+  class="q-mr-md">{{ t('regex_patterns.cancel') }}</OButton>
+                <OButton
+  type="submit"
+  @click="saveRegexPattern"
+  data-test="add-regex-pattern-save-btn"
+  :disabled="isFormEmpty || isSaving">{{ isSaving ? 'Saving...' : isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close') }}</OButton>
             </div>
             </div>
             <div  class="q-ml-sm" v-if="store.state.isAiChatEnabled " style="width:35%; max-width: 100%; min-width: 75px; height: calc(100vh - 90px) !important;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
@@ -306,6 +294,9 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
 import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ArrowLeft, Maximize } from "lucide-vue-next";
 export default defineComponent({
     name: "AddRegexPattern",
     props: {
@@ -321,8 +312,11 @@ export default defineComponent({
     emit: ["close", "update:list"],
     components: {
         FullViewContainer,
-        O2AIChat
-    },
+        O2AIChat,
+    OButton,
+    ArrowLeft,
+    Maximize,
+},
 setup(props, {emit}) {
     const { t } = useI18n();
 

@@ -96,22 +96,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- Stripe billing - show subscribe/manage buttons -->
-      <q-btn
-        v-else-if="planType == planName"
-        :label="btnCancelSubscription"
-        text-color="black"
-        class="full-width bg-grey-4 text-bold text-capitalize text-subtitle1"
-        flat
-        @click="cancelSubscription"
-      />
-      <q-btn
-        v-else
-        :label="btnSubscribe"
-        text-color="white"
-        class="full-width bg-primary text-bold text-capitalize text-subtitle1"
-        flat
-        @click="onSubscribe"
-      />
+      <OButton
+  variant="ghost"
+  v-else-if="planType == planName"
+  text-color="black"
+  @click="cancelSubscription"
+  class="full-width bg-grey-4 text-bold text-capitalize text-subtitle1">{{ btnCancelSubscription }}</OButton>
+      <OButton
+  variant="ghost"
+  v-else
+  text-color="white"
+  @click="onSubscribe"
+  class="full-width bg-primary text-bold text-capitalize text-subtitle1">{{ btnSubscribe }}</OButton>
     </div>
   </q-card>
 </template>
@@ -120,7 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "proPlan",
   props: ["planType", "billingProvider", "features", "pricingError"],
   setup(props, { emit }) {

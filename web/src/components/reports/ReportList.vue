@@ -82,14 +82,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-tooltip>
             </div>
 
-            <q-btn
-              data-test="report-list-add-report-btn"
-              class="q-ml-sm o2-primary-button tw:h-[36px]"
-              flat
-              no-caps
-              :label="t(`reports.add`)"
-              @click="createNewReport"
-            />
+            <OButton
+  data-test="report-list-add-report-btn"
+  @click="createNewReport"
+  class="q-ml-sm">{{ t(`reports.add`) }}</OButton>
           </div>
         </div>
       </div>
@@ -223,58 +219,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         color="secondary"
                       />
                     </div>
-                    <q-btn
-                      v-else
-                      :data-test="`report-list-${props.row.name}-pause-start-report`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      :color="props.row.enabled ? 'negative' : 'positive'"
-                      :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-                      round
-                      flat
-                      :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
-                      @click="toggleReportState(props.row)"
-                    />
+                    <OButton
+  variant="ghost"
+  size="icon"
+  v-else
+  :data-test="`report-list-${props.row.name}-pause-start-report`"
+  :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
+  @click="toggleReportState(props.row)" />
 
                     <!-- Edit -->
-                    <q-btn
-                      :data-test="`report-list-${props.row.name}-edit-report`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      icon="edit"
-                      :title="t('alerts.edit')"
-                      @click="editReport(props.row)"
-                    />
+                    <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`report-list-${props.row.name}-edit-report`"
+  :title="t('alerts.edit')"
+  @click="editReport(props.row)">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
 
                     <!-- Move to folder -->
-                    <q-btn
-                      :data-test="`report-list-${props.row.name}-move-report`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      :icon="outlinedDriveFileMove"
-                      title="Move to Folder"
-                      @click="openMoveDialog(props.row)"
-                    />
+                    <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`report-list-${props.row.name}-move-report`"
+  title="Move to Folder"
+  @click="openMoveDialog(props.row)">
+  <template #icon-left><FolderInput class="tw:w-4 tw:h-4" /></template>
+</OButton>
 
                     <!-- Delete -->
-                    <q-btn
-                      :data-test="`report-list-${props.row.name}-delete-report`"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      :icon="outlinedDelete"
-                      :title="t('alerts.delete')"
-                      @click="confirmDeleteReport(props.row)"
-                    />
+                    <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`report-list-${props.row.name}-delete-report`"
+  :title="t('alerts.delete')"
+  @click="confirmDeleteReport(props.row)">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
                   </q-td>
                 </template>
 
@@ -286,38 +267,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="o2-table-footer-title tw:flex tw:items-center tw:whitespace-nowrap">
                         {{ resultTotal }} {{ t("reports.header") }}
                       </div>
-                      <q-btn
-                        v-if="selectedReports.length > 0"
-                        data-test="report-list-move-reports-btn"
-                        class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-secondary-button-dark'
-                            : 'o2-secondary-button-light'
-                        "
-                        no-caps
-                        dense
-                        @click="moveMultipleReports"
-                      >
-                        <q-icon :name="outlinedDriveFileMove" size="16px" />
+                      <OButton
+  variant="secondary"
+  v-if="selectedReports.length > 0"
+  data-test="report-list-move-reports-btn"
+  @click="moveMultipleReports"
+  class="flex items-center q-mr-sm">
+  <q-icon :name="outlinedDriveFileMove" size="16px" />
                         <span class="tw:ml-2">Move</span>
-                      </q-btn>
-                      <q-btn
-                        v-if="selectedReports.length > 0"
-                        data-test="report-list-delete-reports-btn"
-                        class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-secondary-button-dark'
-                            : 'o2-secondary-button-light'
-                        "
-                        no-caps
-                        dense
-                        @click="openBulkDeleteDialog"
-                      >
-                        <q-icon name="delete" size="16px" />
+</OButton>
+                      <OButton
+  variant="secondary"
+  v-if="selectedReports.length > 0"
+  data-test="report-list-delete-reports-btn"
+  @click="openBulkDeleteDialog"
+  class="flex items-center q-mr-sm">
+  <q-icon name="delete" size="16px" />
                         <span class="tw:ml-2">Delete</span>
-                      </q-btn>
+</OButton>
                     </div>
                     <!-- Right: pagination -->
                     <QTablePagination
@@ -396,6 +363,9 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { FolderInput, Pencil, Trash2 } from "lucide-vue-next";
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
 );

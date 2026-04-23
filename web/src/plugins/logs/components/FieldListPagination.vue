@@ -154,42 +154,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tooltip>
 
         <!-- First page button -->
-        <q-btn
-          data-test="logs-page-fields-list-pagination-firstpage-button"
-          icon="fast_rewind"
-          color="primary"
-          flat
-          :disable="isFirstPage"
-          @click="$emit('first-page')"
-          class="pagination-nav-btn"
-          aria-label="First page"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  data-test="logs-page-fields-list-pagination-firstpage-button"
+  @click="$emit('first-page')"
+  aria-label="First page"
+  :disabled="isFirstPage"
+  class="pagination-nav-btn">
+  <template #icon-left><Rewind class="tw:w-4 tw:h-4" /></template>
+</OButton>
 
         <!-- Page number buttons (3 at a time) -->
         <template v-for="page in visiblePages" :key="page">
-          <q-btn
-            flat
-            :data-test="`logs-page-fields-list-pagination-page-${page}-button`"
-            :class="[
+          <OButton
+  variant="ghost"
+  :data-test="`logs-page-fields-list-pagination-page-${page}-button`"
+  @click="$emit('set-page', page)"
+  :class="[
               'pagination-page-btn',
               currentPage === page ? 'pagination-page-active' : '',
-            ]"
-            @click="$emit('set-page', page)"
-            >{{ page }}</q-btn
-          >
+            ]">{{ page }}</OButton>
         </template>
 
         <!-- Last page button -->
-        <q-btn
-          data-test="logs-page-fields-list-pagination-lastpage-button"
-          icon="fast_forward"
-          color="primary"
-          flat
-          :disable="isLastPage"
-          @click="$emit('last-page')"
-          class="pagination-nav-btn"
-          aria-label="Last page"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  data-test="logs-page-fields-list-pagination-lastpage-button"
+  @click="$emit('last-page')"
+  aria-label="Last page"
+  :disabled="isLastPage"
+  class="pagination-nav-btn">
+  <template #icon-left><FastForward class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </div>
 
       <!-- Reset Fields Icon -->
@@ -220,6 +218,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { FastForward, Rewind } from "lucide-vue-next";
 const { t } = useI18n();
 
 interface Props {

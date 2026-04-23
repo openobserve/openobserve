@@ -58,26 +58,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-select>
         </div>
         <div class="col-auto">
-          <q-btn
-            :label="t('common.save')"
-            color="primary"
-            class="text-bold text-capitalize no-border"
-            unelevated
-            @click="saveClaimParserFunction"
-            :loading="savingClaimParser"
-            :disable="!hasClaimParserChanged"
-          />
+          <OButton
+  variant="ghost"
+  @click="saveClaimParserFunction"
+  :loading="savingClaimParser"
+  :disabled="!hasClaimParserChanged"
+  class="text-bold text-capitalize">{{ t('common.save') }}</OButton>
         </div>
         <div class="col-auto">
-          <q-btn
-            flat
-            round
-            dense
-            icon="help_outline"
-            @click="showVrlInfo = true"
-          >
-            <q-tooltip>{{ t("settings.claimParserFunctionInfoTitle") }}</q-tooltip>
-          </q-btn>
+          <OButton variant="ghost" @click="showVrlInfo = true">
+  <template #icon-left><HelpCircle class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("settings.claimParserFunctionInfoTitle") }}</q-tooltip>
+</OButton>
         </div>
       </div>
 
@@ -96,13 +88,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("settings.claimParserFunctionInfoTitle") }}
             </div>
             <div class="col-auto">
-              <q-btn
-                flat
-                round
-                dense
-                icon="close"
-                @click="showVrlInfo = false"
-              />
+              <OButton
+  variant="ghost"
+  size="icon"
+  @click="showVrlInfo = false">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
             </div>
           </div>
 
@@ -126,16 +117,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="row items-center q-mb-sm">
                 <div class="col text-weight-medium">{{ t("settings.claimParserRecentErrors") }}</div>
                 <div class="col-auto">
-                  <q-btn
-                    flat
-                    dense
-                    size="sm"
-                    icon="refresh"
-                    @click="loadRecentErrors"
-                    :loading="loadingErrors"
-                  >
-                    <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
-                  </q-btn>
+                  <OButton
+  variant="ghost"
+  size="sm"
+  @click="loadRecentErrors"
+  :loading="loadingErrors">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+</OButton>
                 </div>
               </div>
 
@@ -165,15 +154,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Show More Button -->
                 <div class="q-mt-sm text-center">
-                  <q-btn
-                    flat
-                    dense
-                    color="primary"
-                    :label="t('common.showMore')"
-                    icon-right="open_in_new"
-                    size="sm"
-                    @click="viewAllErrors"
-                  />
+                  <OButton
+  variant="ghost"
+  size="sm"
+  @click="viewAllErrors">
+  {{ t('common.showMore') }}
+  <template #icon-right><ExternalLink class="tw:w-4 tw:h-4" /></template>
+</OButton>
                 </div>
               </div>
             </div>
@@ -215,14 +202,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="col-auto q-my-none">
-          <q-btn
-            :label="t('settings.addDomain')"
-            color="primary"
-            class="text-bold text-capitalize no-border"
-            @click="addDomain"
-            :disabled="!newDomain || !isValidDomain(newDomain)"
-            unelevated
-          />
+          <OButton
+  variant="ghost"
+  @click="addDomain"
+  :disabled="!newDomain || !isValidDomain(newDomain)"
+  class="text-bold text-capitalize">{{ t('settings.addDomain') }}</OButton>
         </div>
       </div>
 
@@ -240,15 +224,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <div class="domain-header row items-center justify-between q-px-md q-py-sm">
           <div class="text-body1 text-bold">{{ domain.name }}</div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
-            color="negative"
-            @click="removeDomain(index)"
-            :title="t('common.delete')"
-          />
+          <OButton
+  variant="destructive"
+  size="icon"
+  @click="removeDomain(index)"
+  :title="t('common.delete')">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
 
         <div class="q-pa-md">
@@ -298,15 +280,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="col-auto q-my-none">
-                <q-btn
-                  :label="t('settings.addEmail')"
-                  color="secondary"
-                  class="text-bold text-capitalize no-border"
-                  @click="addEmail(domain)"
-                  :disabled="!domain.newEmail || !isValidEmail(domain.newEmail, domain.name)"
-                  unelevated
-                  dense
-                />
+                <OButton
+  variant="ghost"
+  @click="addEmail(domain)"
+  :disabled="!domain.newEmail || !isValidEmail(domain.newEmail, domain.name)"
+  class="text-bold text-capitalize">{{ t('settings.addEmail') }}</OButton>
               </div>
             </div>
 
@@ -318,16 +296,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="email-item row items-center justify-between q-pa-sm q-mb-xs"
               >
                 <div class="text-body2">{{ email }}</div>
-                <q-btn
-                  icon="close"
-                  flat
-                  round
-                  dense
-                  size="sm"
-                  color="negative"
-                  @click="removeEmail(domain, emailIndex)"
-                  :title="t('common.delete')"
-                />
+                <OButton
+  variant="destructive"
+  size="icon"
+  @click="removeEmail(domain, emailIndex)"
+  :title="t('common.delete')">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </div>
             </div>
           </div>
@@ -341,18 +316,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Action Buttons -->
     <div class="flex justify-end q-px-lg q-py-lg full-width tw:absolute tw:bottom-0">
-      <q-btn
-        :label="t('common.cancel')"
-        class="q-mr-md o2-secondary-button tw:h-[36px]"
-        @click="resetForm"
-      />
-      <q-btn
-        :label="t('settings.saveChanges')"
-        class="o2-primary-button no-border tw:h-[36px] q-mr-md"
-        unelevated
-        @click="saveChanges"
-        :loading="saving"
-      />
+      <OButton
+  variant="secondary"
+  @click="resetForm"
+  class="q-mr-md">{{ t('common.cancel') }}</OButton>
+      <OButton
+  @click="saveChanges"
+  :loading="saving"
+  class="q-mr-md">{{ t('settings.saveChanges') }}</OButton>
     </div>
   </div>
 </template>
@@ -369,6 +340,9 @@ import jstransform from "@/services/jstransform";
 import organizations from "@/services/organizations";
 import searchService from "@/services/search";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ExternalLink, HelpCircle, RefreshCw } from "lucide-vue-next";
 interface Domain {
   name: string;
   allowAllUsers: boolean;

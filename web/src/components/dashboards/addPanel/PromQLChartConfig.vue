@@ -469,16 +469,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <div v-show="isConfigOptionVisible('promqlTable', 'configure-column-order')" class="q-mb-sm q-mt-md" style="font-weight: 600"></div>
-        <q-btn
-          v-show="isConfigOptionVisible('promqlTable', 'configure-column-order')"
-          @click="openColumnOrderPopup"
-          style="cursor: pointer; padding: 0px 5px"
-          :label="t(`dashboard.configureColumnOrder`)"
-          no-caps
-          icon="reorder"
-          data-test="dashboard-config-column-order-button"
-          class="el-border"
-        />
+        <OButton
+  variant="outline"
+  v-show="isConfigOptionVisible('promqlTable', 'configure-column-order')"
+  @click="openColumnOrderPopup"
+  style="cursor: pointer; padding: 0px 5px"
+  data-test="dashboard-config-column-order-button">
+  <template #icon-left><GripVertical class="tw:w-4 tw:h-4" /></template>
+  {{ t(`dashboard.configureColumnOrder`) }}
+</OButton>
 
         <!-- Column Order Popup Dialog -->
         <q-dialog
@@ -503,11 +502,16 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { GripVertical } from "lucide-vue-next";
 export default defineComponent({
   name: "PromQLChartConfig",
   components: {
     ColumnOrderPopUp,
-  },
+    OButton,
+    GripVertical,
+},
   props: {
     chartType: {
       type: String,

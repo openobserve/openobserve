@@ -89,17 +89,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
       <!-- Add Variable Button -->
       <div v-if="showAddVariableButton" class="q-ml-xs q-mt-sm">
-        <q-btn
-          outline
-          no-caps
-          icon="add"
-          label="Add Variable"
-          color="primary"
-          size="md"
-          class="el-border"
-          @click="openAddVariable"
-          data-test="dashboard-add-variable-btn"
-        />
+        <OButton
+  variant="outline"
+  @click="openAddVariable"
+  data-test="dashboard-add-variable-btn">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  Add Variable
+</OButton>
       </div>
   </div>
 </template>
@@ -138,6 +134,9 @@ import {
   variableLog,
 } from "@/composables/dashboard/useVariableDebugger";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus } from "lucide-vue-next";
 export default defineComponent({
   name: "VariablesValueSelector",
   props: {
@@ -189,7 +188,9 @@ export default defineComponent({
     VariableQueryValueSelector,
     VariableAdHocValueSelector,
     VariableCustomValueSelector,
-  },
+    OButton,
+    Plus,
+},
   setup(props: any, { emit }) {
     const store = useStore();
     // Try to inject variablesManager from parent (for backward compatibility)

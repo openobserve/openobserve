@@ -13,13 +13,13 @@
             </div>
           </div>
           <div class="col-auto">
-            <q-btn
-              v-close-popup="true"
-              data-test="queryList-cancel"
-              round
-              flat
-              icon="cancel"
-            />
+            <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true"
+  data-test="queryList-cancel">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </div>
       </q-card-section>
@@ -51,9 +51,12 @@ import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "QueryList",
-  components: {},
+  components: {
+    OButton,
+},
   props: {
     schemaData: Object,
     metaData: Object,

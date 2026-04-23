@@ -36,13 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="search" class="cursor-pointer" />
         </template>
       </q-input>
-      <q-btn
-        class="q-ml-sm"
-        color="primary"
-        icon="add"
-        :label="t(`ticket.add`)"
-        @click="addTicket"
-      />
+      <OButton @click="addTicket" class="q-ml-sm">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  {{ t(`ticket.add`) }}
+</OButton>
     </template>
 
     <template v-slot:body-cell-#="props">
@@ -57,6 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus } from "lucide-vue-next";
 const { t } = useI18n();
 
 // Stub props and methods for an incomplete component

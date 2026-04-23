@@ -5,14 +5,12 @@
         <q-icon name="link" size="sm" />
         <span class="header-title">Related Telemetry</span>
       </div>
-      <q-btn
-        icon="close"
-        flat
-        dense
-        round
-        size="sm"
-        @click="$emit('close')"
-      />
+      <OButton
+  variant="ghost"
+  size="icon"
+  @click="$emit('close')">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
     </div>
 
     <div class="correlation-body">
@@ -135,14 +133,10 @@
                 class="query-item"
               >
                 <div class="query-stream">{{ query.stream }}</div>
-                <q-btn
-                  label="View"
-                  size="sm"
-                  color="primary"
-                  outline
-                  dense
-                  @click="navigateToQuery(query, 'traces')"
-                />
+                <OButton
+  variant="outline"
+  size="sm"
+  @click="navigateToQuery(query, 'traces')">View</OButton>
               </div>
             </div>
           </div>
@@ -163,14 +157,10 @@
                 class="query-item"
               >
                 <div class="query-stream">{{ query.stream }}</div>
-                <q-btn
-                  label="View"
-                  size="sm"
-                  color="secondary"
-                  outline
-                  dense
-                  @click="navigateToQuery(query, 'metrics')"
-                />
+                <OButton
+  variant="outline"
+  size="sm"
+  @click="navigateToQuery(query, 'metrics')">View</OButton>
               </div>
             </div>
           </div>
@@ -191,14 +181,10 @@
                 class="query-item"
               >
                 <div class="query-stream">{{ query.stream }}</div>
-                <q-btn
-                  label="View"
-                  size="sm"
-                  color="accent"
-                  outline
-                  dense
-                  @click="navigateToQuery(query, 'logs')"
-                />
+                <OButton
+  variant="outline"
+  size="sm"
+  @click="navigateToQuery(query, 'logs')">View</OButton>
               </div>
             </div>
           </div>
@@ -216,6 +202,7 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext, CorrelationQuery } from "@/utils/telemetryCorrelation";
 import type { CorrelationResult } from "@/utils/telemetryCorrelation";
 
+import OButton from "@/lib/core/Button/Button.vue";
 interface Props {
   show: boolean;
   context: TelemetryContext | null;

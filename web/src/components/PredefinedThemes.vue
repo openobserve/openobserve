@@ -30,16 +30,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">Predefined Themes</div>
         <q-space />
-        <q-btn
-          label="Reset"
-          icon="refresh"
-          flat
-          dense
-          color="negative"
-          @click="resetToDefaultTheme"
-          class="q-mr-sm"
-        />
-        <q-btn icon="close" flat round dense v-close-popup />
+        <OButton
+  variant="destructive"
+  @click="resetToDefaultTheme"
+  class="q-mr-sm">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  Reset
+</OButton>
+        <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup>
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </q-card-section>
 
       <q-card-section class="q-pt-none">
@@ -69,13 +72,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <q-space />
                 <q-badge v-if="isThemeApplied(theme, 'light')" color="positive" label="Applied" class="text-caption q-mr-xs" />
-                <q-btn
-                  label="Apply"
-                  color="primary"
-                  size="sm"
-                  unelevated
-                  @click="applyTheme(theme, 'light')"
-                />
+                <OButton
+  variant="ghost"
+  size="sm"
+  @click="applyTheme(theme, 'light')">Apply</OButton>
               </div>
             </div>
 
@@ -91,13 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <q-space />
                 <q-badge v-if="isCustomThemeApplied('light')" color="positive" label="Applied" class="text-caption q-mr-xs" />
-                <q-btn
-                  label="Apply"
-                  color="primary"
-                  size="sm"
-                  unelevated
-                  @click="applyCustomTheme('light')"
-                />
+                <OButton
+  variant="ghost"
+  size="sm"
+  @click="applyCustomTheme('light')">Apply</OButton>
               </div>
             </div>
           </q-tab-panel>
@@ -113,13 +110,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <q-space />
                 <q-badge v-if="isThemeApplied(theme, 'dark')" color="positive" label="Applied" class="text-caption q-mr-xs" />
-                <q-btn
-                  label="Apply"
-                  color="primary"
-                  size="sm"
-                  unelevated
-                  @click="applyTheme(theme, 'dark')"
-                />
+                <OButton
+  variant="ghost"
+  size="sm"
+  @click="applyTheme(theme, 'dark')">Apply</OButton>
               </div>
             </div>
 
@@ -135,13 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <q-space />
                 <q-badge v-if="isCustomThemeApplied('dark')" color="positive" label="Applied" class="text-caption q-mr-xs" />
-                <q-btn
-                  label="Apply"
-                  color="primary"
-                  size="sm"
-                  unelevated
-                  @click="applyCustomTheme('dark')"
-                />
+                <OButton
+  variant="ghost"
+  size="sm"
+  @click="applyCustomTheme('dark')">Apply</OButton>
               </div>
             </div>
           </q-tab-panel>
@@ -171,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <OButton variant="ghost" v-close-popup>Close</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -185,6 +176,9 @@ import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { hexToRgba, applyThemeColors } from "@/utils/theme";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { RefreshCw } from "lucide-vue-next";
 const $q = useQuasar();
 const store = useStore();
 const { isOpen } = usePredefinedThemes();

@@ -79,50 +79,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </div>
           <!-- Inspect Button -->
-          <q-btn
-            v-if="
+          <OButton
+  variant="outline"
+  size="sm"
+  v-if="
               searchObj.data?.queryResults?.hits?.length > 0 &&
               searchObj.data.lastSearchTraceId &&
               config.isEnterprise == 'true' &&
               config.isCloud == 'false' &&
               store.state.zoConfig.search_inspector_enabled
             "
-            outline
-            no-caps
-            dense
-            color="primary"
-            icon="troubleshoot"
-            label="Inspect"
-            class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
-            size="sm"
-            @click="openSearchJobInspector"
-            data-test="logs-inspect-button"
-          >
-            <q-tooltip>
+  @click="openSearchJobInspector"
+  data-test="logs-inspect-button"
+  class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!">
+  <template #icon-left><ScanSearch class="tw:w-4 tw:h-4" /></template>
+  Inspect
+  <q-tooltip>
               {{ t("volumeInsights.searchInspectionsLabel") }}
             </q-tooltip>
-          </q-btn>
+</OButton>
           <!-- Volume Analysis Button -->
-          <q-btn
-            v-if="
+          <OButton
+  variant="outline"
+  size="sm"
+  v-if="
               searchObj.data?.queryResults?.hits?.length > 0 &&
               !searchObj.meta.sqlMode
             "
-            outline
-            no-caps
-            dense
-            color="primary"
-            icon="timeline"
-            :label="t('volumeInsights.insightsButtonLabel')"
-            class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
-            size="sm"
-            @click="openVolumeAnalysisDashboard"
-            data-test="logs-analyze-dimensions-button"
-          >
-            <q-tooltip>
+  @click="openVolumeAnalysisDashboard"
+  data-test="logs-analyze-dimensions-button"
+  class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!">
+  <template #icon-left><Activity class="tw:w-4 tw:h-4" /></template>
+  {{ t('volumeInsights.insightsButtonLabel') }}
+  <q-tooltip>
               {{ t("volumeInsights.analyzeTooltipLogs") }}
             </q-tooltip>
-          </q-btn>
+</OButton>
           <ORefreshButton
             :last-run-at="searchObj.meta.lastRunAt"
             :loading="searchObj.loading || searchObj.loadingHistogram"
@@ -186,27 +178,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="getPageData('recordsPerPage')"
           ></q-select>
           <!-- Wrap Content Button -->
-          <q-btn
-            v-if="
+          <OButton
+  variant="ghost"
+  v-if="
               searchObj.meta.logsVisualizeToggle === 'logs' ||
               searchObj.meta.logsVisualizeToggle === 'patterns'
             "
-            data-test="logs-search-result-wrap-table-content-btn"
-            icon="wrap_text"
-            flat
-            dense
-            class="wrap-content-btn float-right"
-            :class="{
-              'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
-            }"
-            @click="
+  data-test="logs-search-result-wrap-table-content-btn"
+  @click="
               searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
             "
-          >
-            <q-tooltip>
+  class="wrap-content-btn float-right" :class="{
+              'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
+            }">
+  <template #icon-left><WrapText class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>
               {{ t("search.messageWrapContent") }}
             </q-tooltip>
-          </q-btn>
+</OButton>
         </div>
       </div>
       <div
@@ -294,13 +283,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon name="warning" color="warning" size="xs"></q-icon> Error while
           fetching histogram data.
-          <q-btn
-            @click="toggleErrorDetails"
-            size="sm"
-            data-test="logs-page-histogram-error-details-btn"
-            class="o2-secondary-button"
-            >{{ t("search.histogramErrorBtnLabel") }}</q-btn
-          ><br />
+          <OButton
+  variant="secondary"
+  size="sm"
+  @click="toggleErrorDetails"
+  data-test="logs-page-histogram-error-details-btn">{{ t("search.histogramErrorBtnLabel") }}</OButton><br />
           <span v-if="disableMoreErrorDetails">
             <SanitizedHtmlRenderer
               data-test="logs-search-histogram-error-message"
@@ -521,6 +508,9 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import config from "@/aws-exports";
 import ORefreshButton from "@/lib/core/RefreshButton/RefreshButton.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Activity, ScanSearch, WrapText } from "lucide-vue-next";
 export default defineComponent({
   name: "SearchResult",
   components: {
@@ -544,7 +534,11 @@ export default defineComponent({
     TracesAnalysisDashboard: defineAsyncComponent(
       () => import("../traces/metrics/TracesAnalysisDashboard.vue"),
     ),
-  },
+    OButton,
+    ScanSearch,
+    Activity,
+    WrapText,
+},
   emits: [
     "update:scroll",
     "update:datetime",

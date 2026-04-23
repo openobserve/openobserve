@@ -38,13 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon class="o2-search-input-icon" name="search" />
                 </template>
               </q-input>
-              <q-btn
-                class="o2-primary-button q-ml-sm tw:h-[36px]"
-                no-caps
-                flat
-                :label="t(`cipherKey.add`)"
-                @click="addCipherKey"
-              />
+              <OButton @click="addCipherKey" class="q-ml-sm">{{ t(`cipherKey.add`) }}</OButton>
             </div>
           </div>
       <q-table
@@ -66,30 +60,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <q-btn
-              :data-test="`cipherkey-list-${props.row.name}-update`"
-              icon="edit"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('common.edit')"
-              @click="editCipherKey(props.row)"
-            ></q-btn>
-            <q-btn
-              :data-test="`cipherkey-list-${props.row.name}-delete`"
-              :icon="outlinedDelete"
-              class="q-ml-xs"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('common.delete')"
-              @click="confirmDeleteCipherKey(props.row)"
-            ></q-btn>
+            <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`cipherkey-list-${props.row.name}-update`"
+  :title="t('common.edit')"
+  @click="editCipherKey(props.row)"
+  class="q-ml-xs">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
+            <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`cipherkey-list-${props.row.name}-delete`"
+  :title="t('common.delete')"
+  @click="confirmDeleteCipherKey(props.row)"
+  class="q-ml-xs">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </q-td>
         </template>
         <template #bottom="scope">
@@ -97,22 +85,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
               {{ resultTotal }} {{ t('cipherKey.header') }}
             </div>
-            <q-btn
-              v-if="selectedKeys.length > 0"
-              data-test="cipher-keys-list-delete-keys-btn"
-              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              no-caps
-              dense
-              @click="openBulkDeleteDialog"
-            >
-              <q-icon name="delete" size="16px" />
+            <OButton
+  variant="secondary"
+  v-if="selectedKeys.length > 0"
+  data-test="cipher-keys-list-delete-keys-btn"
+  @click="openBulkDeleteDialog"
+  class="flex items-center q-mr-sm">
+  <q-icon name="delete" size="16px" />
               <span class="tw:ml-2">Delete</span>
-            </q-btn>
+</OButton>
             <QTablePagination
               :scope="scope"
               :resultTotal="resultTotal"
@@ -186,6 +167,9 @@ import CipherKeysService from "@/services/cipher_keys";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Pencil, Trash2 } from "lucide-vue-next";
 export default defineComponent({
   name: "PageCipherKeys",
   components: {
@@ -193,7 +177,10 @@ export default defineComponent({
     NoData,
     AddCipherKey,
     ConfirmDialog,
-  },
+    OButton,
+    Pencil,
+    Trash2,
+},
   setup() {
     const store = useStore();
     const router = useRouter();

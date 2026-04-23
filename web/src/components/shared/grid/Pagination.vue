@@ -38,30 +38,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="position === 'top' && pageTitle"
       class="text-bold row items-center"
     >
-      <q-btn
-        v-if="
+      <OButton
+  variant="ghost"
+  size="icon"
+  v-if="
           collapsibleIcon === 'show' &&
           searchCollapseImage == 'collapse_sidebar_icon'
         "
-        :icon="'img:' + getImageURL('images/common/collapse_sidebar_icon.svg')"
-        class="q-mr-sm"
-        size="sm"
-        round
-        flat
-        @click="toggleSidePanel"
-      />
-      <q-btn
-        v-if="
+  @click="toggleSidePanel"
+  class="q-mr-sm" />
+      <OButton
+  variant="ghost"
+  size="icon"
+  v-if="
           collapsibleIcon === 'show' &&
           searchCollapseImage == 'expand_sidebar_icon'
         "
-        :icon="'img:' + getImageURL('images/common/expand_sidebar_icon.svg')"
-        class="q-mr-sm"
-        size="sm"
-        round
-        flat
-        @click="toggleSidePanel"
-      />
+  @click="toggleSidePanel"
+  class="q-mr-sm" />
       <div class="q-ml-xs">
         {{ resultTotal }}
         {{ pageTitle.slice(-1) == "s" ? pageTitle.slice(0, -1) : pageTitle }}(s)
@@ -102,27 +96,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <q-btn-group>
-        <q-btn
-          icon="chevron_left"
-          :text-color="scope.isFirstPage ? '$light-text2' : '$dark'"
-          class="pageNav"
-          color="#FAFBFD"
-          size="sm"
-          flat
-          :disable="scope.isFirstPage"
-          @click="scope.prevPage"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  :text-color="scope.isFirstPage ? '$light-text2' : '$dark'"
+  @click="scope.prevPage"
+  :disabled="scope.isFirstPage"
+  class="pageNav">
+  <template #icon-left><ChevronLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
         <q-separator vertical />
-        <q-btn
-          icon="chevron_right"
-          :text-color="scope.isLastPage ? '$light-text2' : '$dark'"
-          class="pageNav"
-          color="#FAFBFD"
-          size="sm"
-          flat
-          :disable="scope.isLastPage"
-          @click="scope.nextPage"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  :text-color="scope.isLastPage ? '$light-text2' : '$dark'"
+  @click="scope.nextPage"
+  :disabled="scope.isLastPage"
+  class="pageNav">
+  <template #icon-left><ChevronRight class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </q-btn-group>
     </div>
   </div>
@@ -136,7 +128,15 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { getImageURL } from "../../../utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 export default defineComponent({
+  components: {
+    OButton,
+    ChevronLeft,
+    ChevronRight,
+  },
   name: "QTablePagination",
   // eslint-disable-next-line vue/require-prop-types
   props: [

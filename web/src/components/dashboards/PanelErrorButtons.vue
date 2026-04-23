@@ -3,83 +3,73 @@
     v-if="error || maxQueryRangeWarning || limitNumberOfSeriesWarningMessage || isCachedDataDifferWithCurrentTimeRange || (isPartialData && !isPanelLoading) || (lastTriggeredAt && !viewOnly && !simplifiedPanelView)"
     class="row items-center no-wrap"
   >
-    <q-btn
-      v-if="error"
-      :key="error"
-      :icon="outlinedWarning"
-      flat
-      size="xs"
-      padding="2px"
-      data-test="panel-error-data"
-      class="warning"
-    >
-      <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+    <OButton
+  variant="ghost"
+  size="sm"
+  v-if="error"
+  :key="error"
+  data-test="panel-error-data"
+  class="warning">
+  <template #icon-left><TriangleAlert class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip anchor="bottom right" self="top right" max-width="220px">
         <div style="white-space: pre-wrap">
           {{ error }}
         </div>
       </q-tooltip>
-    </q-btn>
-    <q-btn
-      v-if="maxQueryRangeWarning"
-      :icon="outlinedWarning"
-      flat
-      size="xs"
-      padding="2px"
-      data-test="panel-max-duration-warning"
-      class="warning"
-    >
-      <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+</OButton>
+    <OButton
+  variant="ghost"
+  size="sm"
+  v-if="maxQueryRangeWarning"
+  data-test="panel-max-duration-warning"
+  class="warning">
+  <template #icon-left><TriangleAlert class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip anchor="bottom right" self="top right" max-width="220px">
         <div style="white-space: pre-wrap">
           {{ maxQueryRangeWarning }}
         </div>
       </q-tooltip>
-    </q-btn>
-    <q-btn
-      v-if="limitNumberOfSeriesWarningMessage"
-      :icon="symOutlinedDataInfoAlert"
-      flat
-      size="xs"
-      padding="2px"
-      data-test="panel-limit-number-of-series-warning"
-      class="warning"
-    >
-      <q-tooltip anchor="bottom right" self="top right">
+</OButton>
+    <OButton
+  variant="ghost"
+  size="sm"
+  v-if="limitNumberOfSeriesWarningMessage"
+  data-test="panel-limit-number-of-series-warning"
+  class="warning">
+  <template #icon-left><DatabaseZap class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip anchor="bottom right" self="top right">
         <div style="white-space: pre-wrap">
           {{ limitNumberOfSeriesWarningMessage }}
         </div>
       </q-tooltip>
-    </q-btn>
-    <q-btn
-      v-if="isCachedDataDifferWithCurrentTimeRange"
-      :icon="outlinedRunningWithErrors"
-      flat
-      size="xs"
-      padding="2px"
-      data-test="panel-is-cached-data-differ-with-current-time-range-warning"
-    >
-      <q-tooltip anchor="bottom right" self="top right">
+</OButton>
+    <OButton
+  variant="ghost"
+  size="sm"
+  v-if="isCachedDataDifferWithCurrentTimeRange"
+  data-test="panel-is-cached-data-differ-with-current-time-range-warning">
+  <template #icon-left><AlertTriangle class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip anchor="bottom right" self="top right">
         <div style="white-space: pre-wrap">
           The data shown is cached and is different from the selected time
           range.
         </div>
       </q-tooltip>
-    </q-btn>
-    <q-btn
-      v-if="isPartialData && !isPanelLoading"
-      :icon="symOutlinedClockLoader20"
-      flat
-      size="xs"
-      padding="2px"
-      data-test="panel-partial-data-warning"
-      class="warning"
-    >
-      <q-tooltip anchor="bottom right" self="top right">
+</OButton>
+    <OButton
+  variant="ghost"
+  size="sm"
+  v-if="isPartialData && !isPanelLoading"
+  data-test="panel-partial-data-warning"
+  class="warning">
+  <template #icon-left><Loader2 class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip anchor="bottom right" self="top right">
         <div style="white-space: pre-wrap">
           The data shown is incomplete because the loading was interrupted.
           Refresh to load complete data.
         </div>
       </q-tooltip>
-    </q-btn>
+</OButton>
 
     <!-- Universal Last Refreshed Clock Icon and Time -->
     <span v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView" class="lastRefreshedAt">
@@ -108,9 +98,19 @@ import {
   symOutlinedClockLoader20,
   symOutlinedDataInfoAlert,
 } from "@quasar/extras/material-symbols-outlined";
+
+import OButton from "@/lib/core/Button/Button.vue";
+import { AlertTriangle, DatabaseZap, Loader2, TriangleAlert } from "lucide-vue-next";
 export default defineComponent({
-  name: "PanelErrorButtons",
-  components: { RelativeTime },
+
+name: "PanelErrorButtons",
+  components: { RelativeTime,
+    OButton,
+    TriangleAlert,
+    DatabaseZap,
+    AlertTriangle,
+    Loader2,
+},
   props: {
     error: {
       type: String,

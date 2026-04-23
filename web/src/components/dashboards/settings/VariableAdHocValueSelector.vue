@@ -16,13 +16,26 @@
                 :display-value="adhocVariables[index].operator ? adhocVariables[index].operator : ''"
                 :options="operatorOptions" style="width: auto" class="operator" data-test="dashboard-variable-adhoc-operator-selector"  borderless hide-bottom-space/>
             <q-input v-model="adhocVariables[index].value" placeholder="Enter Value" dense debounce="1000" style="width: 125px" class="" data-test="dashboard-variable-adhoc-value-selector"  borderless hide-bottom-space/>
-            <q-btn class="close tw:ml-1" size="xs" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-3'" padding="8px 2px" square flat dense @click="removeField(index)" icon="close" :data-test="`dashboard-variable-adhoc-close-${index}`"/>
+            <OButton
+  variant="ghost"
+  size="icon"
+  @click="removeField(index)"
+  :data-test="`dashboard-variable-adhoc-close-${index}`"
+  class="close tw:ml-1" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-3'">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
             <!-- <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'">AND</div> -->
         </div>
-        <q-btn class="text-bold no-border q-ml-xs q-mb-sm hideOnPrintMode" no-caps no-outline rounded padding="xs" @click="addFields" data-test="dashboard-variable-adhoc-add-selector" >
-            <DynamicFilterIcon />
+        <OButton
+  size="sm"
+  no-outline
+  rounded
+  @click="addFields"
+  data-test="dashboard-variable-adhoc-add-selector"
+  class="text-bold q-ml-xs q-mb-sm hideOnPrintMode">
+  <DynamicFilterIcon />
             <q-tooltip>Add Dynamic Filter</q-tooltip>
-        </q-btn>
+</OButton>
     </div>
 </template>
 
@@ -32,11 +45,14 @@ import { useSelectAutoComplete } from '../../../composables/useSelectAutocomplet
 import { useStore } from "vuex";
 import DynamicFilterIcon from "../../icons/DynamicFilterIcon.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
     name: 'VariableAdHocValueSelector',
     props: ['modelValue', 'variableItem'],
     emits: ['update:modelValue'],
-    components: { DynamicFilterIcon },
+    components: { DynamicFilterIcon,
+    OButton,
+},
     
     setup(props: any, { emit }) {
         const store = useStore();

@@ -406,23 +406,21 @@ limitations under the License.
     <!-- Test and Preview Actions -->
     <div v-if="!hideActions" class="col-12 q-py-md">
       <div class="flex items-center q-gutter-sm">
-        <q-btn
-          data-test="destination-preview-button"
-          label="Preview"
-          icon="preview"
-          outline
-          no-caps
-          @click="$emit('preview')"
-        />
-        <q-btn
-          data-test="destination-test-button"
-          :loading="isTesting"
-          label="Test"
-          icon="send"
-          outline
-          no-caps
-          @click="$emit('test')"
-        />
+        <OButton
+  variant="outline"
+  data-test="destination-preview-button"
+  @click="$emit('preview')">
+  <template #icon-left><Eye class="tw:w-4 tw:h-4" /></template>
+  Preview
+</OButton>
+        <OButton
+  variant="outline"
+  data-test="destination-test-button"
+  :loading="isTesting"
+  @click="$emit('test')">
+  <template #icon-left><Send class="tw:w-4 tw:h-4" /></template>
+  Test
+</OButton>
       </div>
     </div>
   </div>
@@ -432,6 +430,9 @@ limitations under the License.
 import { computed } from 'vue';
 import type { PropType } from 'vue';
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Eye, Send } from "lucide-vue-next";
 const props = defineProps({
   destinationType: {
     type: String,

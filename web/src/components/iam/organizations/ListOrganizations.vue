@@ -38,14 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
           
-            <q-btn
-              class="q-ml-sm o2-primary-button tw:h-[36px]"
-              flat
-              no-caps
-              :label="t(`organization.add`)"
-              @click="addOrganization"
-              data-test="Add Organization"
-            />
+            <OButton
+  @click="addOrganization"
+  data-test="Add Organization"
+  class="q-ml-sm">{{ t(`organization.add`) }}</OButton>
             </div>
         </div>
         </div>
@@ -69,17 +65,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- <template #body-cell-actions="props">
         <q-td :props="props">
-          <q-btn
-            v-if="props.row.role == 'Admin'"
-            icon="group"
-            :title="t('organization.invite')"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="redirectToInviteMember(props)"
-          ></q-btn>
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-if="props.row.role == 'Admin'"
+  :title="t('organization.invite')"
+  @click="redirectToInviteMember(props)">
+  <template #icon-left><Users class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </q-td>
       </template> -->
 
@@ -101,20 +94,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #body-cell-actions="props">
         <q-td :props="props" side>
-          <q-btn
-            data-test="organization-name-edit"
-            :title="'Edit'"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            icon="edit"
-            @click="renameOrganization(props)"
-            style="cursor: pointer !important"
-          >
-          </q-btn>
+          <OButton
+  variant="ghost"
+  size="icon"
+  data-test="organization-name-edit"
+  :title="'Edit'"
+  @click="renameOrganization(props)"
+  style="cursor: pointer !important"
+  class="q-ml-xs">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </q-td>
       </template>
     </q-table>
@@ -151,13 +140,19 @@ import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Pencil, Users } from "lucide-vue-next";
 export default defineComponent({
   name: "PageOrganization",
   components: {
     AddUpdateOrganization,
     QTablePagination,
     NoData,
-  },
+    OButton,
+    Users,
+    Pencil,
+},
   setup() {
     const store = useStore();
     const router = useRouter();

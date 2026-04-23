@@ -114,7 +114,12 @@
         <q-card-section class="row items-center">
           <div class="text-h6">Generated Query</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup>
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </q-card-section>
 
         <q-separator />
@@ -127,7 +132,7 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <OButton variant="ghost" v-close-popup>Close</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -139,6 +144,7 @@ import { ref } from "vue";
 import TelemetryCorrelationPanel from "@/components/TelemetryCorrelationPanel.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 
+import OButton from "@/lib/core/Button/Button.vue";
 // Demo state
 const showCorrelation = ref(false);
 const selectedContext = ref<TelemetryContext | null>(null);

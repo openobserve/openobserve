@@ -43,33 +43,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="flex q-gutter-sm">
-          <q-btn
-            outline
-            padding="xs sm"
-            class="q-mr-sm tw:h-[36px] el-border"
-            no-caps
-            label="Dashboard Tutorial"
-            @click="showTutorial"
-            data-test="dashboard-panel-tutorial-btn"
-          ></q-btn>
-          <q-btn
-            v-if="
+          <OButton
+  variant="outline"
+  size="sm"
+  @click="showTutorial"
+  data-test="dashboard-panel-tutorial-btn"
+  class="q-mr-sm">Dashboard Tutorial</OButton>
+          <OButton
+  variant="outline"
+  size="sm"
+  v-if="
               !['html', 'markdown', 'custom_chart'].includes(
                 dashboardPanelData.data.type,
               )
             "
-            outline
-            padding="sm"
-            class="q-mr-sm tw:h-[36px] el-border"
-            no-caps
-            icon="info_outline"
-            @click="showViewPanel = true"
-            data-test="dashboard-panel-data-view-query-inspector-btn"
-          >
-            <q-tooltip anchor="center left" self="center right"
+  @click="showViewPanel = true"
+  data-test="dashboard-panel-data-view-query-inspector-btn"
+  class="q-mr-sm">
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip anchor="center left" self="center right"
               >Query Inspector
             </q-tooltip>
-          </q-btn>
+</OButton>
           <DateTimePickerDashboard
             v-if="selectedDate"
             v-model="selectedDate"
@@ -79,56 +74,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @hide="setTimeForVariables"
             data-test="dashboard-global-date-time-picker"
           />
-          <q-btn
-            outline
-            color="red"
-            no-caps
-            flat
-            class="o2-secondary-button tw:h-[36px] q-ml-md"
-            style="color: red !important"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            :label="t('panel.discard')"
-            @click="goBackToDashboardList"
-            data-test="dashboard-panel-discard"
-          />
-          <q-btn
-            class="o2-secondary-button tw:h-[36px] q-ml-md"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
-            flat
-            :label="t('panel.save')"
-            data-test="dashboard-panel-save"
-            @click.stop="savePanelData.execute()"
-            :loading="savePanelData.isLoading.value"
-          />
+          <OButton
+  variant="destructive"
+  style="color: red !important"
+  @click="goBackToDashboardList"
+  data-test="dashboard-panel-discard"
+  class="q-ml-md">{{ t('panel.discard') }}</OButton>
+          <OButton
+  variant="secondary"
+  data-test="dashboard-panel-save"
+  @click.stop="savePanelData.execute()"
+  :loading="savePanelData.isLoading.value"
+  class="q-ml-md">{{ t('panel.save') }}</OButton>
           <template
             v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
           >
-            <q-btn
-              v-if="config.isEnterprise === 'false'"
-              data-test="dashboard-apply"
-              class="tw:h-[36px] q-ml-md o2-primary-button"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-primary-button-dark'
-                  : 'o2-primary-button-light'
-              "
-              no-caps
-              flat
-              dense
-              :loading="searchRequestTraceIds.length > 0"
-              :disable="searchRequestTraceIds.length > 0"
-              :label="t('panel.apply')"
-              @click="() => runQuery(false)"
-            />
+            <OButton
+  v-if="config.isEnterprise === 'false'"
+  data-test="dashboard-apply"
+  :loading="searchRequestTraceIds.length > 0"
+  @click="() => runQuery(false)"
+  :disabled="searchRequestTraceIds.length > 0"
+  class="q-ml-md">{{ t('panel.apply') }}</OButton>
             <q-btn-group
               v-if="config.isEnterprise === 'true'"
               class="tw:h-[36px] q-ml-md o2-primary-button"
@@ -147,20 +114,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'o2-secondary-button-light'
               "
             >
-              <q-btn
-                :data-test="
+              <OButton :data-test="
                   searchRequestTraceIds.length > 0
                     ? 'dashboard-cancel'
                     : 'dashboard-apply'
-                "
-                no-caps
-                :label="
+                " @click="onApplyBtnClick">
+  {{ 
                   searchRequestTraceIds.length > 0
                     ? t('panel.cancel')
                     : t('panel.apply')
-                "
-                @click="onApplyBtnClick"
-              />
+                 }}
+</OButton>
 
               <q-btn-dropdown
                 class="text-bold no-border tw:px-0"
@@ -293,6 +257,9 @@ import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Info } from "lucide-vue-next";
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
 });
@@ -306,7 +273,9 @@ export default defineComponent({
     AddSettingVariable,
     QueryInspector,
     PanelEditor,
-  },
+    OButton,
+    Info,
+},
   setup(props) {
     provide("dashboardPanelDataPageKey", "dashboard");
 

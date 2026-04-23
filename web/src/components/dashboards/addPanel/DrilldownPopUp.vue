@@ -54,39 +54,39 @@
     >
       {{ t("dashboard.goTo") }}
       <q-btn-group class="">
-        <q-btn
-          :class="drilldownData.type == 'byDashboard' ? 'selected' : ''"
-          size="sm"
-          @click="changeTypeOfDrilldown('byDashboard')"
-          data-test="dashboard-drilldown-by-dashboard-btn"
-          ><q-icon
+        <OButton
+  size="sm"
+  @click="changeTypeOfDrilldown('byDashboard')"
+  data-test="dashboard-drilldown-by-dashboard-btn"
+  :class="drilldownData.type == 'byDashboard' ? 'selected' : ''">
+  <q-icon
             class="q-mr-xs"
             :name="outlinedDashboard"
             style="cursor: pointer; height: 25px"
-          />{{ t("menu.dashboard") }}</q-btn
-        >
-        <q-btn
-          :class="drilldownData.type === 'byUrl' ? 'selected' : ''"
-          size="sm"
-          @click="changeTypeOfDrilldown('byUrl')"
-          data-test="dashboard-drilldown-by-url-btn"
-          ><q-icon
+          />{{ t("menu.dashboard") }}
+</OButton>
+        <OButton
+  size="sm"
+  @click="changeTypeOfDrilldown('byUrl')"
+  data-test="dashboard-drilldown-by-url-btn"
+  :class="drilldownData.type === 'byUrl' ? 'selected' : ''">
+  <q-icon
             class="q-mr-xs"
             name="link"
             style="cursor: pointer; height: 25px; display: flex !important"
-          />{{ t("common.url") }}</q-btn
-        >
-        <q-btn
-          :class="drilldownData.type === 'logs' ? 'selected' : ''"
-          size="sm"
-          @click="changeTypeOfDrilldown('logs')"
-          data-test="dashboard-drilldown-by-logs-btn"
-          ><q-icon
+          />{{ t("common.url") }}
+</OButton>
+        <OButton
+  size="sm"
+  @click="changeTypeOfDrilldown('logs')"
+  data-test="dashboard-drilldown-by-logs-btn"
+  :class="drilldownData.type === 'logs' ? 'selected' : ''">
+  <q-icon
             class="q-mr-xs"
             name="search"
             style="cursor: pointer; height: 25px; display: flex !important"
-          />{{ t("common.logs") }}</q-btn
-        >
+          />{{ t("common.logs") }}
+</OButton>
       </q-btn-group>
     </div>
 
@@ -94,20 +94,14 @@
       <div>
         <label>{{ t("dashboard.selectLogsMode") }}</label>
         <q-btn-group class="q-ml-sm">
-          <q-btn
-            :class="drilldownData.data.logsMode === 'auto' ? 'selected' : ''"
-            size="sm"
-            @click="drilldownData.data.logsMode = 'auto'"
-          >
-            {{ t("common.auto") }}
-          </q-btn>
-          <q-btn
-            :class="drilldownData.data.logsMode === 'custom' ? 'selected' : ''"
-            size="sm"
-            @click="drilldownData.data.logsMode = 'custom'"
-          >
-            {{ t("common.custom") }}
-          </q-btn>
+          <OButton
+  size="sm"
+  @click="drilldownData.data.logsMode = 'auto'"
+  :class="drilldownData.data.logsMode === 'auto' ? 'selected' : ''">{{ t("common.auto") }}</OButton>
+          <OButton
+  size="sm"
+  @click="drilldownData.data.logsMode = 'custom'"
+  :class="drilldownData.data.logsMode === 'custom' ? 'selected' : ''">{{ t("common.custom") }}</OButton>
         </q-btn-group>
       </div>
       <div
@@ -253,21 +247,19 @@
             "
           >
             <div>{{ t("dashboard.variables") }}</div>
-            <q-btn
-              icon="add"
-              color="primary"
-              size="sm"
-              padding="sm"
-              @click="
+            <OButton
+  size="sm"
+  @click="
                 () =>
                   drilldownData.data.variables.push({
                     name: '',
                     value: '',
                   })
               "
-              data-test="dashboard-drilldown-add-variable"
-              >{{ t("common.add") }}</q-btn
-            >
+  data-test="dashboard-drilldown-add-variable">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  {{ t("common.add") }}
+</OButton>
           </div>
           <div
             v-for="(variable, index) in drilldownData.data.variables"
@@ -342,37 +334,16 @@
     </div>
 
     <q-card-actions class="confirmActions">
-      <q-btn
-        unelevated
-        no-caps
-        class="o2-secondary-button tw:h-[36px] el-border"
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-secondary-button-dark'
-            : 'o2-secondary-button-light'
-        "
-        flat
-        @click="$emit('close')"
-        data-test="cancel-button"
-      >
-        {{ t("confirmDialog.cancel") }}
-      </q-btn>
-      <q-btn
-        unelevated
-        no-caps
-        class="o2-primary-button tw:h-[36px] q-ml-md el-border"
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-primary-button-dark'
-            : 'o2-primary-button-light'
-        "
-        flat
-        @click="saveDrilldown"
-        style="min-width: 60px"
-        data-test="confirm-button"
-        :disable="isFormValid"
-        :label="isEditMode ? t('dashboard.update') : t('common.add')"
-      />
+      <OButton
+  variant="secondary"
+  @click="$emit('close')"
+  data-test="cancel-button">{{ t("confirmDialog.cancel") }}</OButton>
+      <OButton
+  @click="saveDrilldown"
+  style="min-width: 60px"
+  data-test="confirm-button"
+  :disabled="isFormValid"
+  class="q-ml-md">{{ isEditMode ? t('dashboard.update') : t('common.add') }}</OButton>
     </q-card-actions>
   </div>
 </template>
@@ -399,8 +370,12 @@ import useDashboardPanelData from "../../../composables/dashboard/useDashboardPa
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import { useLoading } from "@/composables/useLoading";
+
+import OButton from "@/lib/core/Button/Button.vue";
+import { Plus } from "lucide-vue-next";
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
+
+() => import("@/components/CodeQueryEditor.vue"),
 );
 
 export default defineComponent({
@@ -409,7 +384,9 @@ export default defineComponent({
     DrilldownUserGuide,
     CommonAutoComplete,
     QueryEditor,
-  },
+    OButton,
+    Plus,
+},
   props: {
     isEditMode: {
       type: Boolean,

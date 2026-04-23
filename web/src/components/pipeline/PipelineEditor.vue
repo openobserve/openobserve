@@ -39,38 +39,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex justify-end items-center">
           <!-- this is normal secondary button but only icon is there without label -->
-            <q-btn
-              class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw:h-[36px] o2-secondary-button tw:min-w-0"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              no-caps
-              flat
-              icon="code"
-              data-test="pipeline-json-edit-btn"
-              @click="openJsonEditor"
-            >
-                  <q-tooltip>{{ t('pipeline.editPipelineJson') }}</q-tooltip>
-                </q-btn>
-          <q-btn
-            data-test="add-pipeline-cancel-btn"
-            :label="t('pipeline.cancel')"
-            flat
-            class="q-ml-md o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            no-caps
-            @click="openCancelDialog"
-          />
+            <OButton
+  variant="secondary"
+  data-test="pipeline-json-edit-btn"
+  @click="openJsonEditor"
+  class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw:min-w-0">
+  <template #icon-left><Code class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t('pipeline.editPipelineJson') }}</q-tooltip>
+</OButton>
+          <OButton
+  variant="secondary"
+  data-test="add-pipeline-cancel-btn"
+  @click="openCancelDialog"
+  class="q-ml-md">{{ t('pipeline.cancel') }}</OButton>
 
-          <q-btn
-            data-test="add-pipeline-save-btn"
-            :label="t('common.save')"
-            class="q-ml-md o2-primary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            no-caps
-            flat
-            :loading="isPipelineSaving"
-            :disable="isPipelineSaving"
-            @click="savePipeline"
-          />
+          <OButton
+  data-test="add-pipeline-save-btn"
+  :loading="isPipelineSaving"
+  @click="savePipeline"
+  :disabled="isPipelineSaving"
+  class="q-ml-md">{{ t('common.save') }}</OButton>
         </div>
       </div>
 
@@ -222,6 +210,11 @@ import JsonEditor from "../common/JsonEditor.vue";
 import { validatePipeline as validatePipelineUtil, type ValidationResult } from '../../utils/validatePipeline';
 import { useReo } from "@/services/reodotdev_analytics";
 
+import useStreams from "@/composables/useStreams";
+import usePipelines from "@/composables/usePipelines";
+import config from "@/aws-exports";
+import OButton from "@/lib/core/Button/Button.vue";
+import { Code } from "lucide-vue-next";
 const functionImage = getImageURL("images/pipeline/transform_function.png");
 const streamImage = getImageURL("images/pipeline/input_stream.png");
 const streamOutputImage = getImageURL("images/pipeline/output_stream.png");
@@ -230,10 +223,8 @@ const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/transform_condition.png");
 const queryImage = getImageURL("images/pipeline/input_query.png");
 const llmEvaluationImage = getImageURL("images/common/ai_icon_primary.svg");
-import useStreams from "@/composables/useStreams";
-import usePipelines from "@/composables/usePipelines";
 
-import config from "@/aws-exports";
+
 
 const PipelineFlow = defineAsyncComponent(
   () => import("@/plugins/pipelines/PipelineFlow.vue"),

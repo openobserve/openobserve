@@ -65,24 +65,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
           />
           <div class="flex justify-start tw:mt-6">
-            <q-btn
-              v-close-popup="true"
-              class="q-mr-md o2-secondary-button tw:h-[36px]"
-              :label="t('user.cancel')"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              data-test="cancel-button"
-              @click="$emit('cancel:hideform')"
-            />
-            <q-btn
-              :label="t('user.save')"
-              class="o2-primary-button no-border tw:h-[36px]"
-              type="submit"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            />
+            <OButton
+  variant="secondary"
+  v-close-popup="true"
+  data-test="cancel-button"
+  @click="$emit('cancel:hideform')"
+  class="q-mr-md">{{ t('user.cancel') }}</OButton>
+            <OButton type="submit">{{ t('user.save') }}</OButton>
           </div>
         </q-form>
       </div>
@@ -100,6 +89,7 @@ import { getImageURL } from "@/utils/zincutils";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -111,6 +101,9 @@ const defaultValue: any = () => {
 };
 
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "ComponentAddUpdateUser",
   props: {
     modelValue: {

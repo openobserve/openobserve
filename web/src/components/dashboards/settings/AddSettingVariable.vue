@@ -385,17 +385,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderless
                   hide-bottom-space
                 >
-                  <q-btn
-                    padding="xs"
-                    round
-                    flat
-                    class="q-ml-sm"
-                    no-caps
-                    icon="info"
-                    data-test="dashboard-variable-max-record-size-info"
-                  >
-                    <q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip>
-                  </q-btn>
+                  <OButton
+  variant="ghost"
+  size="sm"
+  data-test="dashboard-variable-max-record-size-info"
+  class="q-ml-sm">
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip>
+</OButton>
                 </q-input>
               </div>
               <div>
@@ -510,29 +507,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       placeholder="Enter Value"
                     ></CommonAutoComplete>
-                    <q-btn
-                      size="sm"
-                      padding="12px 5px"
-                      style="margin-bottom: 20px; flex-shrink: 0"
-                      flat
-                      dense
-                      @click="removeFilter(index)"
-                      icon="close"
-                      :data-test="`dashboard-variable-adhoc-close-${index}`"
-                    />
+                    <OButton
+  variant="ghost"
+  size="icon"
+  style="margin-bottom: 20px; flex-shrink: 0"
+  @click="removeFilter(index)"
+  :data-test="`dashboard-variable-adhoc-close-${index}`">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
                   </div>
                 </div>
                 <div>
-                  <q-btn
-                    no-caps
-                    icon="add"
-                    no-outline
-                    class="q-mt-sm el-border"
-                    @click="addFilter"
-                    data-test="dashboard-add-filter-btn"
-                  >
-                    Add Filter
-                  </q-btn>
+                  <OButton
+  variant="outline"
+  no-outline
+  @click="addFilter"
+  data-test="dashboard-add-filter-btn"
+  class="q-mt-sm">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  Add Filter
+</OButton>
                 </div>
 
                 <!-- show error if filter has cycle -->
@@ -629,25 +623,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div>
-                <q-btn
-                  flat
-                  round
-                  :disable="variableData?.options?.length === 1"
-                  @click="removeField(index)"
-                  :data-test="`dashboard-custom-variable-${index}-remove`"
-                  icon="cancel"
-                />
+                <OButton
+  variant="ghost"
+  size="icon"
+  @click="removeField(index)"
+  :data-test="`dashboard-custom-variable-${index}-remove`"
+  :disabled="variableData?.options?.length === 1">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </div>
             </div>
             <div class="flex flex-col">
-              <q-btn
-                no-caps
-                icon="add"
-                no-outline
-                class="q-mt-md el-border"
-                @click="addField()"
-                >Add Option</q-btn
-              >
+              <OButton
+  variant="outline"
+  no-outline
+  @click="addField()"
+  class="q-mt-md">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  Add Option
+</OButton>
             </div>
           </div>
           <!-- multiselect toggle for query values and custom variables-->
@@ -752,16 +746,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     borderless
                     hide-bottom-space
                   />
-                  <q-btn
-                    v-if="variableData.multiSelect"
-                    size="sm"
-                    padding="12px 5px"
-                    flat
-                    dense
-                    @click="removeCustomValue(index)"
-                    icon="close"
-                    :data-test="`dashboard-variable-custom-close-${index}`"
-                  />
+                  <OButton
+  variant="ghost"
+  size="icon"
+  v-if="variableData.multiSelect"
+  @click="removeCustomValue(index)"
+  :data-test="`dashboard-variable-custom-close-${index}`">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
                 </div>
               </div>
 
@@ -770,15 +762,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex"
                 style="width: 50%"
               >
-                <q-btn
-                  no-caps
-                  icon="add"
-                  no-outline
-                  class="q-mt-md el-border"
-                  @click="addCustomValue"
-                  data-test="dashboard-add-custom-value-btn"
-                >
-                </q-btn>
+                <OButton
+  variant="outline"
+  size="icon"
+  no-outline
+  @click="addCustomValue"
+  data-test="dashboard-add-custom-value-btn"
+  class="q-mt-md">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </div>
             </div>
           </div>
@@ -834,32 +826,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-form>
       </div>
       <div class="sticky-footer">
-        <q-btn
-          :label="t('dashboard.cancel')"
-          class="o2-secondary-button tw:h-[36px]"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          flat
-          @click="close"
-          data-test="dashboard-variable-cancel-btn"
-        />
-        <q-btn
-          type="submit"
-          :loading="saveVariableApiCall.isLoading.value"
-          class="o2-primary-button tw:h-[36px] q-ml-md"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-primary-button-dark'
-              : 'o2-primary-button-light'
-          "
-          flat
-          @click="addVariableForm?.submit()"
-          data-test="dashboard-variable-save-btn"
-          >Save</q-btn
-        >
+        <OButton
+  variant="secondary"
+  @click="close"
+  data-test="dashboard-variable-cancel-btn">{{ t('dashboard.cancel') }}</OButton>
+        <OButton
+  type="submit"
+  :loading="saveVariableApiCall.isLoading.value"
+  @click="addVariableForm?.submit()"
+  data-test="dashboard-variable-save-btn"
+  class="q-ml-md">Save</OButton>
       </div>
     </div>
   </div>
@@ -899,10 +875,17 @@ import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import useNotifications from "@/composables/useNotifications";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Info, Plus } from "lucide-vue-next";
 export default defineComponent({
   name: "AddSettingVariable",
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
-  components: { DashboardHeader, CommonAutoComplete },
+  components: { DashboardHeader, CommonAutoComplete,
+    OButton,
+    Info,
+    Plus,
+},
   emits: ["close", "save"],
   setup(props, { emit }) {
     // Store dashboard data

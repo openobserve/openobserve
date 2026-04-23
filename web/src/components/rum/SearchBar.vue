@@ -25,15 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ></syntax-guide>
       </div>
       <div class="float-right col-auto">
-        <q-btn
-          v-if="searchObj.data.queryResults.hits"
-          class="q-mr-sm float-left download-logs-btn"
-          size="sm"
-          :disable="!searchObj.data.queryResults.hits.length"
-          icon="download"
-          :title="t('search.exportLogs')"
-          @click="downloadLogs"
-        ></q-btn>
+        <OButton
+  size="icon"
+  v-if="searchObj.data.queryResults.hits"
+  :title="t('search.exportLogs')"
+  @click="downloadLogs"
+  :disabled="!searchObj.data.queryResults.hits.length"
+  class="q-mr-sm float-left download-logs-btn">
+  <template #icon-left><Download class="tw:w-4 tw:h-4" /></template>
+</OButton>
         <div class="float-left">
           <date-time
             auto-apply
@@ -48,20 +48,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="search-time q-pl-sm float-left">
-          <q-btn
-            data-test="logs-search-bar-refresh-btn"
-            data-cy="search-bar-refresh-button"
-            dense
-            flat
-            :title="t('search.runQuery')"
-            class="q-pa-none search-button bg-secondary"
-            @click="searchData"
-            :disable="
+          <OButton
+  variant="ghost"
+  data-test="logs-search-bar-refresh-btn"
+  data-cy="search-bar-refresh-button"
+  :title="t('search.runQuery')"
+  @click="searchData"
+  :disabled="
               searchObj.loading ||
               searchObj.data.streamResults?.list?.length == 0
             "
-            >{{ t("search.runQuery") }}</q-btn
-          >
+  class="q-pa-none search-button bg-secondary">{{ t("search.runQuery") }}</OButton>
         </div>
       </div>
     </div>
@@ -107,6 +104,9 @@ import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Download } from "lucide-vue-next";
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
@@ -115,7 +115,9 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     SyntaxGuide,
-  },
+    OButton,
+    Download,
+},
   emits: ["searchdata", "date-change"],
   props: {
     fieldValues: {

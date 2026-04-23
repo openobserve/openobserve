@@ -33,27 +33,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="legend-count q-mr-md" style="font-size: 14px">
             {{ t("dashboard.totalLegends", { count: legends.length }) }}
           </span>
-          <q-btn
-            :icon="isAllCopied ? 'check' : 'content_copy'"
-            :label="isAllCopied ? 'Copied' : 'Copy all'"
-            class="q-px-sm q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
-            no-caps
-            dense
-            size="sm"
-            @click.stop="copyAllLegends"
-            data-test="dashboard-show-legends-copy-all"
-          />
-          <q-btn
-            icon="close"
-            class="q-ml-xs"
-            unelevated
-            size="sm"
-            round
-            flat
-            :title="t('common.close')"
-            @click.stop="closePopup"
-            data-test="dashboard-show-legends-close"
-          ></q-btn>
+          <OButton
+  size="sm"
+  @click.stop="copyAllLegends"
+  data-test="dashboard-show-legends-copy-all"
+  class="q-px-sm q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal">{{ isAllCopied ? 'Copied' : 'Copy all' }}</OButton>
+          <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('common.close')"
+  @click.stop="closePopup"
+  data-test="dashboard-show-legends-close"
+  class="q-ml-xs">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
 
@@ -77,18 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="legend-text">
                 {{ legend.name }}
               </div>
-              <q-btn
-                :icon="isLegendCopied(index) ? 'check' : 'content_copy'"
-                dense
-                size="xs"
-                no-caps
-                class="copy-btn q-ml-sm tw:font-normal"
-                @click.stop="copyLegend(legend.name, index)"
-              >
-                <q-tooltip>{{
+              <OButton
+  size="sm"
+  @click.stop="copyLegend(legend.name, index)"
+  class="copy-btn q-ml-sm tw:font-normal">
+  <q-tooltip>{{
                   isLegendCopied(index) ? "Copied!" : "Copy legend"
                 }}</q-tooltip>
-              </q-btn>
+</OButton>
             </div>
           </div>
         </div>
@@ -107,7 +96,11 @@ import {
   getColorPalette,
 } from "@/utils/dashboard/colorPalette";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "ShowLegendsPopup",
   props: {
     panelData: {

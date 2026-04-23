@@ -246,17 +246,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #separator>
-          <q-btn
-            data-test="logs-search-field-list-collapse-btn-management"
-            :icon="showManagementTabs ? 'chevron_left' : 'chevron_right'"
-            :title="showManagementTabs ? 'Collapse Fields' : 'Open Fields'"
-            :class="showManagementTabs ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-            color="primary"
-            size="sm"
-            dense
-            round
-            @click="controlManagementTabs"
-          />
+          <OButton
+  size="icon"
+  data-test="logs-search-field-list-collapse-btn-management"
+  :title="showManagementTabs ? 'Collapse Fields' : 'Open Fields'"
+  @click="controlManagementTabs"
+  :class="showManagementTabs ? 'splitter-icon-collapse' : 'splitter-icon-expand'" />
       </template>
 
       <template v-slot:after>
@@ -292,10 +287,13 @@ import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
+
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "AppSettings",
   components: {
-  },
+    OButton,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();

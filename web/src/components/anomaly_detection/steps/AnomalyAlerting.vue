@@ -135,26 +135,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item>
               </template>
             </q-select>
-            <q-btn
-              icon="refresh"
-              class="iconHoverBtn q-ml-xs"
-              :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-              padding="xs"
-              unelevated
-              size="sm"
-              round
-              flat
-              :title="t('alerts.alertSettings.refreshDestinations')"
-              style="min-width: auto"
-              @click="$emit('refresh:destinations')"
-            />
-            <q-btn
-              :label="t('alerts.anomaly.addNewDestination')"
-              class="o2-secondary-button q-ml-sm"
-              no-caps
-              size="sm"
-              @click="openAddDestination"
-            />
+            <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('alerts.alertSettings.refreshDestinations')"
+  style="min-width: auto"
+  @click="$emit('refresh:destinations')"
+  class="iconHoverBtn q-ml-xs" :class="store.state?.theme === 'dark' ? 'icon-dark' : ''">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+</OButton>
+            <OButton
+  variant="secondary"
+  size="sm"
+  @click="openAddDestination"
+  class="q-ml-sm">{{ t('alerts.anomaly.addNewDestination') }}</OButton>
           </div>
           <div
             v-if="
@@ -189,7 +183,14 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { RefreshCw } from "lucide-vue-next";
 export default defineComponent({
+  components: {
+    OButton,
+    RefreshCw,
+  },
   name: "AnomalyAlerting",
 
   props: {

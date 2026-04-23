@@ -1,18 +1,16 @@
 <template>
   <div ref="userGuideBtnRef">
-    <q-btn
-      no-caps
-      @click="onUserGuideClick"
-      padding="xs"
-      class="q-ml-sm"
-      flat
-      icon="help_outline"
-      data-test="cross-link-help-btn"
-    >
-      <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
+    <OButton
+  variant="ghost"
+  size="sm"
+  @click="onUserGuideClick"
+  data-test="cross-link-help-btn"
+  class="q-ml-sm">
+  <template #icon-left><HelpCircle class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
         {{ t("crossLinks.userGuide") }}
       </q-tooltip>
-    </q-btn>
+</OButton>
   </div>
   <div
     class="user-guide scroll o2-input"
@@ -89,7 +87,14 @@ import { ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { HelpCircle } from "lucide-vue-next";
 export default {
+  components: {
+    OButton,
+    HelpCircle,
+  },
   name: "CrossLinkUserGuide",
   setup() {
     const store = useStore();

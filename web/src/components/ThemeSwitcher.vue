@@ -15,12 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn data-test="navbar-theme-toggle-btn" rounded flat dense :ripple="false" @click="toggleDarkMode">
-    <q-icon :name="DarkModeIcon" class="header-icon"></q-icon>
+  <OButton
+  variant="ghost"
+  data-test="navbar-theme-toggle-btn"
+  rounded
+  @click="toggleDarkMode">
+  <q-icon :name="DarkModeIcon" class="header-icon"></q-icon>
     <q-tooltip anchor="top middle" self="bottom middle">
       {{ tooltipText }}
     </q-tooltip>
-  </q-btn>
+</OButton>
 </template>
 
 <script lang="ts">
@@ -33,7 +37,11 @@ import {
   outlinedLightMode,
 } from "@quasar/extras/material-icons-outlined";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
+  components: {
+    OButton,
+  },
   setup() {
     const store = useStore();
     const $q = useQuasar();

@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="col-auto">
-            <q-btn
-              v-close-popup="true"
-              round
-              flat
-              icon="cancel"
-              :data-test="`${type}-folder-move-cancel`"
-            />
+            <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true"
+  :data-test="`${type}-folder-move-cancel`">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </div>
       </q-card-section>
@@ -66,26 +66,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <SelectFolderDropDown :type="type" @folder-selected="selectedFolder = $event"  :activeFolderId="activeFolderId"/>
 
           <div class="flex justify-center q-mt-lg">
-            <q-btn
-              v-close-popup="true"
-              class="q-mb-md text-bold"
-              :label="t('dashboard.cancel')"
-              text-color="light-text"
-              padding="sm md"
-              no-caps
-              :data-test="`${type}-folder-move-cancel`"
-            />
-            <q-btn
-              :data-test="`${type}-folder-move`"
-              :disable="activeFolderId === selectedFolder.value"
-              :loading="onSubmit.isLoading.value"
-              :label="t('common.move')"
-              class="q-mb-md text-bold no-border q-ml-md"
-              color="secondary"
-              padding="sm xl"
-              type="submit"
-              no-caps
-            />
+            <OButton
+  size="sm"
+  v-close-popup="true"
+  text-color="light-text"
+  :data-test="`${type}-folder-move-cancel`"
+  class="q-mb-md text-bold">{{ t('dashboard.cancel') }}</OButton>
+            <OButton
+  size="sm"
+  :data-test="`${type}-folder-move`"
+  :loading="onSubmit.isLoading.value"
+  type="submit"
+  :disabled="activeFolderId === selectedFolder.value"
+  class="q-mb-md text-bold q-ml-md">{{ t('common.move') }}</OButton>
           </div>
         </q-form>
       </q-card-section>
@@ -102,9 +95,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import useNotifications from "@/composables/useNotifications";
   import SelectFolderDropDown from "./SelectFolderDropDown.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
   export default defineComponent({
     name: "MoveAcrossFolders",
-    components: { SelectFolderDropDown },
+    components: { SelectFolderDropDown,
+    OButton,
+},
     props: {
       activeFolderId: {
         type: String,

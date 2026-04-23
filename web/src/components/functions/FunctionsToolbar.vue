@@ -96,61 +96,46 @@
       </q-form>
     </div>
     <div class="add-function-actions flex justify-center tw:gap-2">
-      <q-btn
-            v-if="config.isEnterprise == 'true' && !isAddFunctionComponent && store.state.zoConfig.ai_enabled"
-            :ripple="false"
-            @click="emit('open:chat',!store.state.isAiChatEnabled)"
-            data-test="menu-link-ai-item"
-            no-caps
-            :borderless="true"
-            flat
-            dense
-            class="o2-button ai-hover-btn q-px-sm q-py-sm"
-            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-            style="border-radius: 100%;"
-            @mouseenter="isHovered = true"
-            @mouseleave="isHovered = false"
-
-          >
-            <div class="row items-center no-wrap tw:gap-2  ">
+      <OButton
+  variant="ghost"
+  v-if="config.isEnterprise == 'true' && !isAddFunctionComponent && store.state.zoConfig.ai_enabled"
+  @click="emit('open:chat',!store.state.isAiChatEnabled)"
+  data-test="menu-link-ai-item"
+  :borderless="true"
+  style="border-radius: 100%;"
+  @mouseenter="isHovered = true"
+  @mouseleave="isHovered = false"
+  class="o2-button ai-hover-btn q-px-sm q-py-sm" :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''">
+  <div class="row items-center no-wrap tw:gap-2  ">
               <img  :src="getBtnLogo" class="header-icon ai-icon" />
             </div>
-          </q-btn>
-      <q-btn
-        data-test="add-function-fullscreen-btn"
-        v-close-popup="true"
-        class="o2-secondary-button tw:h-[36px]"
-        :label="t('common.fullscreen')"
-        no-caps
-        flat
-        icon="fullscreen"
-        @click="handleFullScreen"
-      />
-      <q-btn
-        data-test="add-function-test-btn"
-        :label="t('function.testFunction')"
-        class="tw:ml-[12px] o2-secondary-button no-border tw:h-[36px]"
-        no-caps
-        icon="play_arrow"
-        @click="emit('test')"
-      />
-      <q-btn
-        data-test="add-function-cancel-btn"
-        class="tw:ml-[12px] o2-secondary-button no-border tw:h-[36px]"
-        flat
-        :label="t('function.cancel')"
-        no-caps
-        @click="emit('cancel')"
-      />
-      <q-btn
-        data-test="add-function-save-btn"
-        :label="t('function.save')"
-        class="tw:ml-[12px] o2-primary-button no-border tw:h-[36px]"
-        flat
-        type="submit"
-        no-caps
-        @click="onSave"
-      />
+</OButton>
+      <OButton
+  variant="secondary"
+  data-test="add-function-fullscreen-btn"
+  v-close-popup="true"
+  @click="handleFullScreen">
+  <template #icon-left><Maximize class="tw:w-4 tw:h-4" /></template>
+  {{ t('common.fullscreen') }}
+</OButton>
+      <OButton
+  variant="secondary"
+  data-test="add-function-test-btn"
+  @click="emit('test')"
+  class="tw:ml-[12px]">
+  <template #icon-left><Play class="tw:w-4 tw:h-4" /></template>
+  {{ t('function.testFunction') }}
+</OButton>
+      <OButton
+  variant="secondary"
+  data-test="add-function-cancel-btn"
+  @click="emit('cancel')"
+  class="tw:ml-[12px]">{{ t('function.cancel') }}</OButton>
+      <OButton
+  data-test="add-function-save-btn"
+  type="submit"
+  @click="onSave"
+  class="tw:ml-[12px]">{{ t('function.save') }}</OButton>
     </div>
   </div>
 </template>
@@ -166,6 +151,9 @@ import { useStore } from "vuex";
 import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+
+import OButton from "@/lib/core/Button/Button.vue";
+import { Maximize, Play } from "lucide-vue-next";
 const { t } = useI18n();
 
 const q = useQuasar();

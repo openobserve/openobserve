@@ -184,16 +184,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:bg-amber-300'
               "
             >
-              <q-btn
-                :icon="isFunctionErrorOpen ? 'expand_more' : 'chevron_right'"
-                dense
-                size="xs"
-                flat
-                class="q-mr-xs"
-                data-test="table-row-expand-menu"
-                @click.capture.stop="expandFunctionError"
-              ></q-btn
-              ><b>
+              <OButton
+  variant="ghost"
+  size="icon"
+  data-test="table-row-expand-menu"
+  @click.capture.stop="expandFunctionError"
+  class="q-mr-xs" /><b>
                 <q-icon name="warning" size="15px"></q-icon>
                 {{ t("search.functionErrorLabel") }}</b
               >
@@ -328,20 +324,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @mouseover="handleCellMouseOver(cell)"
                 @mouseleave="handleCellMouseLeave()"
               >
-                <q-btn
-                  v-if="cellIndex == 0"
-                  :icon="
-                    expandedRowIndices.has(virtualRow.index)
-                      ? 'expand_more'
-                      : 'chevron_right'
-                  "
-                  dense
-                  size="xs"
-                  flat
-                  class="q-mr-xs"
-                  data-test="table-row-expand-menu"
-                  @click.capture.stop="handleExpandRow(virtualRow.index)"
-                ></q-btn>
+                <OButton
+  variant="ghost"
+  size="icon"
+  v-if="cellIndex == 0"
+  data-test="table-row-expand-menu"
+  @click.capture.stop="handleExpandRow(virtualRow.index)"
+  class="q-mr-xs" />
 
                 <template
                   v-if="activeCellActionId === `${cell.id}_${cell.column.id}`"
@@ -428,6 +417,7 @@ import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 
+import OButton from "@/lib/core/Button/Button.vue";
 interface StreamField {
   name: string;
   isSchemaField: boolean;

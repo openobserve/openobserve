@@ -18,17 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="rca-analysis-container" class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden">
     <!-- Trigger button when no analysis exists and not loading and not in-flight -->
     <div v-if="!hasExistingRca && !rcaLoading && !analysisInFlight" data-test="rca-trigger-section" class="tw:mb-2 tw:flex-shrink-0">
-      <q-btn
-        data-test="trigger-rca-btn"
-        size="sm"
-        color="primary"
-        outline
-        no-caps
-        @click="$emit('trigger-rca')"
-        :disable="rcaLoading"
-      >
-        Analyze Incident
-      </q-btn>
+      <OButton
+  variant="outline"
+  size="sm"
+  data-test="trigger-rca-btn"
+  @click="$emit('trigger-rca')"
+  :disabled="rcaLoading">Analyze Incident</OButton>
     </div>
 
     <!-- Analysis in progress: both background (in-flight) and user-triggered (rcaLoading) -->
@@ -84,7 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, PropType } from "vue";
 import DOMPurify from "dompurify";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "IncidentRCAAnalysis",
   props: {
     hasExistingRca: {

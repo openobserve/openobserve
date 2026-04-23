@@ -15,110 +15,113 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn
-    data-cy="syntax-guide-button"
-    size="sm"
-    dense
-    flat
-    class="syntax-guide-button"
-    :class="sqlmode ? 'sql-mode' : 'normal-mode'"
-    :label="t('search.syntaxGuideLabel')"
-    icon="help"
-  >
-    <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
-      <q-card flat v-if="!sqlmode">
-        <q-card-section class="syntax-guide-title">
-          <div class="label">{{ t("search.syntaxGuideLabel") }}</div>
-        </q-card-section>
-        <q-separator />
-        <q-card-section class="q-pt-none answers">
-          <div class="syntax-section">
-            <div class="syntax-guide-text">
-              <ul class="guide-list">
-                <li>
-                  For instant vector selectors, use
-                  <span class="bg-highlight"
-                    >metric_name{label1="value1", label2="value2"}</span
-                  >
-                </li>
-                <li>
-                  For range vector selectors, use
-                  <span class="bg-highlight">metric_name[5m]</span>
-                </li>
-                <li>
-                  To aggregate data, use
-                  <span class="bg-highlight">sum by (label)(metric_name)</span>
-                  or
-                  <span class="bg-highlight"> avg by (label)(metric_name)</span>
-                </li>
-                <li>
-                  For rate calculations over a range vector, use
-                  <span class="bg-highlight">rate(metric_name[5m])</span>
-                </li>
-              </ul>
+  <OMenu>
+<template #default="{ toggle, close }">
+
+  <OButton
+  variant="ghost"
+  size="sm"
+  data-cy="syntax-guide-button"
+  class="syntax-guide-button" :class="sqlmode ? 'sql-mode' : 'normal-mode'"
+  @click="toggle">
+    <template #icon-left><HelpCircle class="tw:w-4 tw:h-4" /></template>
+      {{ t('search.syntaxGuideLabel') }}
+  </OButton>
+  </template>
+<template #content>
+  <q-card flat v-if="!sqlmode">
+          <q-card-section class="syntax-guide-title">
+            <div class="label">{{ t("search.syntaxGuideLabel") }}</div>
+          </q-card-section>
+          <q-separator />
+          <q-card-section class="q-pt-none answers">
+            <div class="syntax-section">
+              <div class="syntax-guide-text">
+                <ul class="guide-list">
+                  <li>
+                    For instant vector selectors, use
+                    <span class="bg-highlight"
+                      >metric_name{label1="value1", label2="value2"}</span
+                    >
+                  </li>
+                  <li>
+                    For range vector selectors, use
+                    <span class="bg-highlight">metric_name[5m]</span>
+                  </li>
+                  <li>
+                    To aggregate data, use
+                    <span class="bg-highlight">sum by (label)(metric_name)</span>
+                    or
+                    <span class="bg-highlight"> avg by (label)(metric_name)</span>
+                  </li>
+                  <li>
+                    For rate calculations over a range vector, use
+                    <span class="bg-highlight">rate(metric_name[5m])</span>
+                  </li>
+                </ul>
+              </div>
             </div>
-          </div>
-        </q-card-section>
-      </q-card>
-      <q-card flat v-else>
-        <q-card-section class="syntax-guide-title">
-          <div class="label">Syntax Guide: SQL Mode</div>
-        </q-card-section>
-        <q-separator />
-        <q-card-section class="q-pt-none answers">
-          <div class="syntax-section">
-            <div class="syntax-guide-text">
-              <ul class="guide-list">
-                <li>
-                  For full text search of value 'error' use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    match_all('error')</span
-                  >
-                </li>
-                <li>
-                  For column search of value 'error' use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    str_match(<b>fieldname</b>, 'error')</span
-                  >
-                </li>
-                <li>
-                  To search value 200 for code column use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE code=200</span
-                  >
-                </li>
-                <li>
-                  To search value 'stderr' for stream column use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
-                  >
-                </li>
-                <li>
-                  To search and use query function <i>extract_ip</i> on column
-                  log use
-                  <span class="bg-highlight"
-                    >SELECT extract_ip(log) FROM <b>stream</b> WHERE
-                    code=200</span
-                  >
-                </li>
-                <li>
-                  For additional examples,
-                  <a
-                    href="https://openobserve.ai/docs/example-queries/"
-                    target="_blank"
-                    class="hover:tw:underline text-primary"
-                    >click here</a
-                  >.
-                </li>
-              </ul>
+          </q-card-section>
+        </q-card>
+        <q-card flat v-else>
+          <q-card-section class="syntax-guide-title">
+            <div class="label">Syntax Guide: SQL Mode</div>
+          </q-card-section>
+          <q-separator />
+          <q-card-section class="q-pt-none answers">
+            <div class="syntax-section">
+              <div class="syntax-guide-text">
+                <ul class="guide-list">
+                  <li>
+                    For full text search of value 'error' use
+                    <span class="bg-highlight"
+                      >SELECT * FROM <b>stream</b> WHERE
+                      match_all('error')</span
+                    >
+                  </li>
+                  <li>
+                    For column search of value 'error' use
+                    <span class="bg-highlight"
+                      >SELECT * FROM <b>stream</b> WHERE
+                      str_match(<b>fieldname</b>, 'error')</span
+                    >
+                  </li>
+                  <li>
+                    To search value 200 for code column use
+                    <span class="bg-highlight"
+                      >SELECT * FROM <b>stream</b> WHERE code=200</span
+                    >
+                  </li>
+                  <li>
+                    To search value 'stderr' for stream column use
+                    <span class="bg-highlight"
+                      >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
+                    >
+                  </li>
+                  <li>
+                    To search and use query function <i>extract_ip</i> on column
+                    log use
+                    <span class="bg-highlight"
+                      >SELECT extract_ip(log) FROM <b>stream</b> WHERE
+                      code=200</span
+                    >
+                  </li>
+                  <li>
+                    For additional examples,
+                    <a
+                      href="https://openobserve.ai/docs/example-queries/"
+                      target="_blank"
+                      class="hover:tw:underline text-primary"
+                      >click here</a
+                    >.
+                  </li>
+                </ul>
+              </div>
             </div>
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-menu>
-  </q-btn>
+          </q-card-section>
+        </q-card>
+  </template>
+</OMenu>
 </template>
 
 <script lang="ts">
@@ -126,7 +129,15 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { HelpCircle } from "lucide-vue-next";
 export default defineComponent({
+  components: {
+    OButton,
+    HelpCircle,
+  },
   name: "SyntaxGuideMetrics",
   props: {
     sqlmode: {

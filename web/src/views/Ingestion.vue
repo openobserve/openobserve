@@ -22,39 +22,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class=" card-container">
         <div class="q-px-md q-pt-md full-width">
           <span class="text-h6 q-mr-auto"> {{ t("ingestion.header") }}</span>
-          <q-btn
-            v-if="
+          <OButton
+  v-if="
               rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
               store.state.organizationData.rumToken.rum_token != ''
             "
-            class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            no-caps
-            :label="t(`ingestion.resetRUMTokenLabel`)"
-            @click="showRUMUpdateDialogFn"
-          />
-          <q-btn
-            v-else-if="
+  @click="showRUMUpdateDialogFn"
+  class="q-ml-md q-mb-xs text-bold right float-right">{{ t(`ingestion.resetRUMTokenLabel`) }}</OButton>
+          <OButton
+  v-else-if="
               rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
               store.state.organizationData.rumToken.rum_token == ''
             "
-            class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            no-caps
-            :label="t(`ingestion.generateRUMTokenLabel`)"
-            @click="generateRUMToken"
-          />
-          <q-btn
-            v-else
-            class="o2-primary-button tw:h-[36px] q-ml-md q-mb-xs text-bold no-border right float-right"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            no-caps
-            :label="t(`ingestion.resetTokenBtnLabel`)"
-            @click="showUpdateDialogFn"
-          />
+  @click="generateRUMToken"
+  class="q-ml-md q-mb-xs text-bold right float-right">{{ t(`ingestion.generateRUMTokenLabel`) }}</OButton>
+          <OButton
+  v-else
+  @click="showUpdateDialogFn"
+  class="q-ml-md q-mb-xs text-bold right float-right">{{ t(`ingestion.resetTokenBtnLabel`) }}</OButton>
           <q-input
             v-model="globalSearchQuery"
             :placeholder="t('common.search')"
@@ -241,9 +226,12 @@ import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog },
+  components: { ConfirmDialog,
+    OButton,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();

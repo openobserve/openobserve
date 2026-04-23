@@ -21,14 +21,13 @@ limitations under the License.
           {{ t('alerts.destinationPreview') }} - {{ getDestinationTypeName(type) }}
         </div>
         <q-space />
-        <q-btn
-          icon="close"
-          flat
-          round
-          dense
-          data-test="preview-close-button"
-          @click="isOpen = false"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  data-test="preview-close-button"
+  @click="isOpen = false">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </q-card-section>
 
       <q-separator />
@@ -255,21 +254,17 @@ limitations under the License.
       </q-card-section>
 
       <q-card-actions align="center">
-        <q-btn
-          data-test="preview-copy-button"
-          label="Copy Template"
-          icon="content_copy"
-          outline
-          no-caps
-          @click="copyTemplate"
-        />
-        <q-btn
-          data-test="preview-close-button"
-          label="Close"
-          flat
-          no-caps
-          @click="isOpen = false"
-        />
+        <OButton
+  variant="outline"
+  data-test="preview-copy-button"
+  @click="copyTemplate">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+  Copy Template
+</OButton>
+        <OButton
+  variant="ghost"
+  data-test="preview-close-button"
+  @click="isOpen = false">Close</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -280,6 +275,9 @@ import { computed } from 'vue';
 import { useQuasar } from 'quasar';
 import { useI18n } from 'vue-i18n';
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Copy } from "lucide-vue-next";
 const props = defineProps({
   modelValue: {
     type: Boolean,

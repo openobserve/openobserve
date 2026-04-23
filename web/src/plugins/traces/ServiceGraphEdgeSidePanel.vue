@@ -34,16 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </h2>
         </div>
         <div class="panel-header-actions">
-          <q-btn
-            flat
-            dense
-            round
-            icon="cancel"
-            size="sm"
-            @click="handleClose"
-            data-test="service-graph-edge-side-panel-close-btn"
-            class="close-btn"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  @click="handleClose"
+  data-test="service-graph-edge-side-panel-close-btn"
+  class="close-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
 
@@ -171,17 +169,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ tab.label }}
               </button>
             </div>
-            <q-btn
-              flat
-              dense
-              no-caps
-              size="xs"
-              icon="refresh"
-              label="Refresh"
-              @click="loadTrend"
-              :loading="trendLoading"
-              class="refresh-trend-btn"
-            />
+            <OButton
+  variant="ghost"
+  size="sm"
+  @click="loadTrend"
+  :loading="trendLoading"
+  class="refresh-trend-btn">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  Refresh
+</OButton>
           </div>
 
           <!-- Loading -->
@@ -231,9 +227,16 @@ import { useQuasar } from 'quasar';
 import * as echarts from 'echarts';
 import serviceGraphService from '@/services/service_graph';
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { RefreshCw } from "lucide-vue-next";
 type ChartTab = 'rate' | 'errors' | 'duration';
 
 export default defineComponent({
+  components: {
+    OButton,
+    RefreshCw,
+  },
   name: 'ServiceGraphEdgeSidePanel',
   props: {
     selectedEdge: {

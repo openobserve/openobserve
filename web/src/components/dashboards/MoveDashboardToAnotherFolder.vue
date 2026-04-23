@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
-            v-close-popup="true"
-            round
-            flat
-            icon="cancel"
-            data-test="dashboard-folder-move-cancel"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true"
+  data-test="dashboard-folder-move-cancel">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </div>
     </q-card-section>
@@ -64,26 +64,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <SelectFolderDropdown @folder-selected="selectedFolder = $event"  :activeFolderId="activeFolderId"/>
 
         <div class="flex justify-start q-mt-sm">
-          <q-btn
-            v-close-popup="true"
-            class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            flat
-            :label="t('dashboard.cancel')"
-            no-caps
-            data-test="dashboard-folder-move-cancel"
-          />
-          <q-btn
-            data-test="dashboard-folder-move"
-            :disable="activeFolderId === selectedFolder.value"
-            :loading="onSubmit.isLoading.value"
-            :label="t('common.move')"
-            class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            type="submit"
-            no-caps
-          />
+          <OButton
+  variant="secondary"
+  v-close-popup="true"
+  data-test="dashboard-folder-move-cancel">{{ t('dashboard.cancel') }}</OButton>
+          <OButton
+  data-test="dashboard-folder-move"
+  :loading="onSubmit.isLoading.value"
+  type="submit"
+  :disabled="activeFolderId === selectedFolder.value"
+  class="q-ml-md">{{ t('common.move') }}</OButton>
         </div>
       </q-form>
     </q-card-section>
@@ -100,9 +90,12 @@ import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "MoveDashboardToAnotherFolder",
-  components: { SelectFolderDropdown },
+  components: { SelectFolderDropdown,
+    OButton,
+},
   props: {
     activeFolderId: {
       type: String,

@@ -16,9 +16,10 @@
           </div>
         </div>
         <div class="col-auto">
-          <q-btn data-test="associated-regex-patterns-close-btn" v-close-popup="true" round flat>
-            <q-icon name="cancel" />
-          </q-btn>
+          <OButton
+  variant="ghost"
+  data-test="associated-regex-patterns-close-btn"
+  v-close-popup="true"><q-icon name="cancel" /></OButton>
         </div>
       </div>
       <q-separator />
@@ -229,15 +230,10 @@
                     <span class="individual-section-title-main tw:text-[13px] tw:font-[700]">
                       Test Pattern
                     </span>
-                    <q-btn
-                      :disable="testString.length === 0 || testLoading"
-                      class="o2-primary-button tw:h-[28px]"
-                      flat
-                      dense
-                      no-caps
-                      @click="testStringOutput">
-                      <span class="tw:text-[12px]">Test Input</span>
-                    </q-btn>
+                    <OButton
+  @click="testStringOutput"
+  :disabled="testString.length === 0 || testLoading"
+  class="tw:h-[28px]"><span class="tw:text-[12px]">Test Input</span></OButton>
                   </div>
 
                   <div class="tw:flex tw:flex-col tw:gap-1">
@@ -333,12 +329,15 @@
 
               <!-- remove or add pattern button  -->
                <div class="tw:mb-4">
-                <q-btn @click="handleAddOrRemovePattern" borderless no-caps class="q-mr-md o2-secondary-button tw:h-[36px] no-border">
-                  <q-icon class="tw:mr-1" :name="checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'delete' : 'add'"></q-icon>
+                <OButton
+  variant="secondary"
+  @click="handleAddOrRemovePattern"
+  class="q-mr-md">
+  <q-icon class="tw:mr-1" :name="checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'delete' : 'add'"></q-icon>
                   <span>
                     {{ checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'Remove Pattern' : 'Add Pattern' }}
-                  </span> 
-                </q-btn>
+                  </span>
+</OButton>
                </div>
 
                <!-- cancel and update settings button -->
@@ -363,26 +362,19 @@
           </div>
           <q-separator />
           <div v-if="userClickedPattern" :class="store.state.theme === 'dark' ? 'dark-regex-patterns-footer' : 'light-regex-patterns-footer'" class="tw:flex tw:justify-end tw:px-4 tw:py-2">
-            <q-btn
-              v-close-popup="true"
-              label="Cancel"
-              class="q-mr-md o2-secondary-button tw:h-[36px] no-border"
-              padding="sm md"
-              no-caps
-              data-test="associated-regex-patterns-cancel-btn"
-            />
-            <q-btn
-              data-test="associated-regex-patterns-update-btn"
-              label="Update Changes"
-              class="q-pa-none o2-primary-button tw:h-[34px] element-box-shadow"
-              padding="sm xl"
-              type="submit"
-              no-caps
-              dense
-              flat
-              @click="updateRegexPattern"
-              :disabled="!isFormDirty"
-            />
+            <OButton
+  variant="secondary"
+  size="sm"
+  v-close-popup="true"
+  data-test="associated-regex-patterns-cancel-btn"
+  class="q-mr-md">Cancel</OButton>
+            <OButton
+  size="sm"
+  data-test="associated-regex-patterns-update-btn"
+  type="submit"
+  @click="updateRegexPattern"
+  :disabled="!isFormDirty"
+  class="q-pa-none tw:h-[34px] element-box-shadow">Update Changes</OButton>
           </div>
         </div>
       </div>
@@ -409,6 +401,7 @@ import FullViewContainer from '../functions/FullViewContainer.vue';
 import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from '../ConfirmDialog.vue';
 
+import OButton from "@/lib/core/Button/Button.vue";
 export interface PatternAssociation {
     field: string;
     pattern_name: string;
@@ -420,8 +413,9 @@ export default defineComponent({
     name: "AssociatedRegexPatterns",
     components: {
         FullViewContainer,
-        ConfirmDialog
-    },
+        ConfirmDialog,
+    OButton,
+},
     props: {
         data: {
             type: Array as PropType<PatternAssociation[]>,

@@ -34,16 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Search bar -->
     <div class="config-search-wrapper tw:sticky">
       <div class="row no-wrap items-center" style="gap: 4px">
-        <q-btn
-          flat
-          round
-          dense
-          :icon="allSectionsExpanded ? 'unfold_less' : 'unfold_more'"
-          size="sm"
-          class="text-grey-6"
-          @click="toggleAllSections"
-        >
-        </q-btn>
+        <OButton
+  variant="ghost"
+  size="icon"
+  @click="toggleAllSections"
+  class="text-grey-6" />
         <ConfigPanelSearch v-model="searchQuery" />
       </div>
     </div>
@@ -154,15 +149,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'o2-toggle-button-lg-light'
               "
             />
-            <q-btn
-              no-caps
-              padding="xs"
-              size="sm"
-              flat
-              icon="info_outline"
-              class="q-mt-xs"
-            >
-              <q-tooltip
+            <OButton
+  variant="ghost"
+  size="sm"
+  class="q-mt-xs">
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
                 anchor="bottom middle"
                 self="top middle"
                 style="font-size: 10px"
@@ -172,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("dashboard.useDefaultTimeTooltip") }}
                 </span>
               </q-tooltip>
-            </q-btn>
+</OButton>
           </div>
 
           <div v-if="useDefaultTime" class="q-mt-sm">
@@ -216,14 +208,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div v-else>
-              <q-btn
-                @click="showTimePicker = true"
-                style="cursor: pointer; padding: 0px 5px"
-                :label="t('common.set')"
-                class="el-border"
-                no-caps
-                data-test="dashboard-config-set-panel-time"
-              />
+              <OButton
+  variant="outline"
+  @click="showTimePicker = true"
+  style="cursor: pointer; padding: 0px 5px"
+  data-test="dashboard-config-set-panel-time">{{ t('common.set') }}</OButton>
             </div>
           </div>
         </div>
@@ -1490,15 +1479,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <q-btn
-            no-caps
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            @click.stop
-          >
-            <q-tooltip
+          <OButton
+  variant="ghost"
+  size="sm"
+  @click.stop>
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
               self="bottom middle"
@@ -1506,7 +1492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.pivotShowRowTotalsTooltip") }}
             </q-tooltip>
-          </q-btn>
+</OButton>
         </q-toggle>
 
         <q-toggle
@@ -1523,15 +1509,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <q-btn
-            no-caps
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            @click.stop
-          >
-            <q-tooltip
+          <OButton
+  variant="ghost"
+  size="sm"
+  @click.stop>
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
               self="bottom middle"
@@ -1539,7 +1522,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.pivotStickyColTotalsTooltip") }}
             </q-tooltip>
-          </q-btn>
+</OButton>
         </q-toggle>
 
         <q-toggle
@@ -1556,15 +1539,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <q-btn
-            no-caps
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            @click.stop
-          >
-            <q-tooltip
+          <OButton
+  variant="ghost"
+  size="sm"
+  @click.stop>
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
               self="bottom middle"
@@ -1572,7 +1552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.pivotShowColTotalsTooltip") }}
             </q-tooltip>
-          </q-btn>
+</OButton>
         </q-toggle>
 
         <q-toggle
@@ -1589,15 +1569,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <q-btn
-            no-caps
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            @click.stop
-          >
-            <q-tooltip
+          <OButton
+  variant="ghost"
+  size="sm"
+  @click.stop>
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
               self="bottom middle"
@@ -1605,7 +1582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.pivotStickyRowTotalsTooltip") }}
             </q-tooltip>
-          </q-btn>
+</OButton>
         </q-toggle>
       </div>
     </q-expansion-item>
@@ -1629,15 +1606,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.configSectionValueTransformations") }}
-          <q-btn
-            no-caps
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            @click.stop
-          >
-            <q-tooltip
+          <OButton
+  variant="ghost"
+  size="sm"
+  @click.stop>
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"
               self="top middle"
@@ -1645,7 +1619,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.configSectionValueTransformationsTooltip") }}
             </q-tooltip>
-          </q-btn>
+</OButton>
         </div>
       </template>
       <div class="config-section-body">
@@ -1672,15 +1646,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.configSectionFieldOverrides") }}
-          <q-btn
-            no-caps
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            @click.stop
-          >
-            <q-tooltip
+          <OButton
+  variant="ghost"
+  size="sm"
+  @click.stop>
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"
               self="top middle"
@@ -1688,7 +1659,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.configSectionFieldOverridesTooltip") }}
             </q-tooltip>
-          </q-btn>
+</OButton>
         </div>
       </template>
       <div class="config-section-body hide-child-title">
@@ -2287,16 +2258,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.drilldown") }}
-          <q-btn
-            no-caps
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            data-test="dashboard-addpanel-config-drilldown-info"
-            @click.stop
-          >
-            <q-tooltip
+          <OButton
+  variant="ghost"
+  size="sm"
+  data-test="dashboard-addpanel-config-drilldown-info"
+  @click.stop>
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"
               self="top middle"
@@ -2304,7 +2272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.drilldownTooltip") }}
             </q-tooltip>
-          </q-btn>
+</OButton>
         </div>
       </template>
       <div class="config-section-body">
@@ -2337,16 +2305,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.comparisonAgainst") }}
-          <q-btn
-            no-caps
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            data-test="dashboard-addpanel-config-time-shift-info"
-            @click.stop
-          >
-            <q-tooltip
+          <OButton
+  variant="ghost"
+  size="sm"
+  data-test="dashboard-addpanel-config-time-shift-info"
+  @click.stop>
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
               anchor="bottom middle"
               self="top middle"
               style="font-size: 10px"
@@ -2356,7 +2321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dashboard.comparisonAgainstTooltip") }}
               </span>
             </q-tooltip>
-          </q-btn>
+</OButton>
         </div>
       </template>
       <div class="config-section-body">
@@ -2387,14 +2352,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-        <q-btn
-          @click="addTimeShift"
-          style="cursor: pointer; padding: 0px 5px"
-          :label="t('dashboard.addButton')"
-          class="el-border"
-          no-caps
-          data-test="dashboard-addpanel-config-time-shift-add-btn"
-        />
+        <OButton
+  variant="outline"
+  @click="addTimeShift"
+  style="cursor: pointer; padding: 0px 5px"
+  data-test="dashboard-addpanel-config-time-shift-add-btn">{{ t('dashboard.addButton') }}</OButton>
       </div>
     </q-expansion-item>
 
@@ -2417,16 +2379,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.markLines") }}
-          <q-btn
-            no-caps
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            data-test="dashboard-addpanel-config-markline-info"
-            @click.stop
-          >
-            <q-tooltip
+          <OButton
+  variant="ghost"
+  size="sm"
+  data-test="dashboard-addpanel-config-markline-info"
+  @click.stop>
+  <template #icon-left><Info class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"
               self="top middle"
@@ -2434,7 +2393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.markLinesTooltip") }}
             </q-tooltip>
-          </q-btn>
+</OButton>
         </div>
       </template>
       <div class="config-section-body">
@@ -2518,6 +2477,9 @@ import {
   shouldShowTimeShift,
 } from "@/utils/dashboard/configUtils";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Info } from "lucide-vue-next";
 export default defineComponent({
   components: {
     ConfigPanelSearch,
@@ -2538,7 +2500,9 @@ export default defineComponent({
     StepAfter,
     StepMiddle,
     PromQLChartConfig,
-  },
+    OButton,
+    Info,
+},
   props: ["dashboardPanelData", "variablesData", "panelData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject(

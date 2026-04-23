@@ -26,11 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between">
       {{ t("pipeline.streamTitle") }}
       <div>
-          <q-btn v-close-popup="true"
-round
-flat
-icon="cancel" >
-          </q-btn>
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup="true">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
     </div>
     
@@ -132,37 +133,23 @@ class="note-message" >
           class="flex justify-start full-width q-mt-sm"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
-        <q-btn
-            v-if="pipelineObj.isEditNode"
-            data-test="input-node-stream-delete-btn"
-            class="o2-secondary-button tw:h-[36px] q-mr-md"
-            color="negative"
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            no-caps
-            @click="openDeleteDialog"
-            >
-            <q-icon name="delete" class="q-mr-xs" />
+        <OButton
+  variant="destructive"
+  v-if="pipelineObj.isEditNode"
+  data-test="input-node-stream-delete-btn"
+  @click="openDeleteDialog"
+  class="q-mr-md">
+  <q-icon name="delete" class="q-mr-xs" />
             {{ t('pipeline.deleteNode') }}
-          </q-btn>
-          <q-btn
-            data-test="input-node-stream-cancel-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            @click="openCancelDialog"
-          />
-          <q-btn
-            data-test="input-node-stream-save-btn"
-            :label="t('alerts.save')"
-            class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            no-caps
-            type="submit"
-          />
+</OButton>
+          <OButton
+  variant="secondary"
+  data-test="input-node-stream-cancel-btn"
+  @click="openCancelDialog">{{ t('alerts.cancel') }}</OButton>
+          <OButton
+  data-test="input-node-stream-save-btn"
+  type="submit"
+  class="q-ml-md">{{ t('alerts.save') }}</OButton>
         </div>
       </div>
       <div v-else class="pipeline-add-stream ">
@@ -202,6 +189,7 @@ import { useQuasar } from "quasar";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const emit = defineEmits(["cancel:hideform"]);
 
 

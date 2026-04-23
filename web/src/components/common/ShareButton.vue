@@ -15,23 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn
-    :data-test="dataTest"
-    :class="buttonClass"
-    :size="buttonSize"
-    :loading="isLoading"
-    :disable="disabled || !url || isWebUrlNotConfigured"
-    icon="share"
-    @click="handleShareClick"
-  >
-    <span v-if="showLabel" class="q-ml-xs">{{ t("search.shareLink") }}</span>
+  <OButton
+  :data-test="dataTest"
+  :size="buttonSize"
+  :loading="isLoading"
+  @click="handleShareClick"
+  :disabled="disabled || !url || isWebUrlNotConfigured"
+  :class="buttonClass">
+  <template #icon-left><Share2 class="tw:w-4 tw:h-4" /></template>
+  <span v-if="showLabel" class="q-ml-xs">{{ t("search.shareLink") }}</span>
     <q-tooltip v-if="isWebUrlNotConfigured">
      <q-icon color="warning" name="warning" class="q-mr-xs" /> {{ t("search.webUrlNotConfigured") }}
     </q-tooltip>
     <q-tooltip v-else-if="tooltip || !showLabel">
       {{ tooltip || t("search.shareLink") }}
     </q-tooltip>
-  </q-btn>
+</OButton>
 </template>
 
 <script lang="ts">
@@ -41,7 +40,14 @@ import { useStore } from "vuex";
 import { useQuasar, copyToClipboard } from "quasar";
 import shortURLService from "@/services/short_url";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Share2 } from "lucide-vue-next";
 export default defineComponent({
+  components: {
+    OButton,
+    Share2,
+  },
   name: "ShareButton",
   props: {
     // The long URL to be copied and shortened

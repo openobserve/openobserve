@@ -145,16 +145,15 @@
                 />
 
                 <!-- Remove argument button -->
-                <q-btn
-                  v-if="canRemoveArgument(fields.functionName, argIndex)"
-                  icon="close"
-                  dense
-                  flat
-                  round
-                  @click="removeArgument(argIndex)"
-                  class="tw:h-10 tw:w-10"
-                  :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
-                />
+                <OButton
+  variant="ghost"
+  size="icon"
+  v-if="canRemoveArgument(fields.functionName, argIndex)"
+  @click="removeArgument(argIndex)"
+  :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
+  class="tw:h-10 tw:w-10">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </div>
             </div>
           </div>
@@ -163,17 +162,12 @@
         <!-- Add more arguments if allowed -->
       </div>
     </div>
-    <q-btn
-      v-if="canAddArgument(fields.functionName)"
-      @click="addArgument()"
-      color="primary"
-      label="+ Add"
-      padding="5px 14px"
-      class="tw:mt-3"
-      no-caps
-      dense
-      :data-test="`dashboard-function-dropdown-add-argument-button`"
-    />
+    <OButton
+  size="sm"
+  v-if="canAddArgument(fields.functionName)"
+  @click="addArgument()"
+  :data-test="`dashboard-function-dropdown-add-argument-button`"
+  class="tw:mt-3">+ Add</OButton>
   </div>
 </template>
 
@@ -192,9 +186,12 @@ import {
   symOutlinedList,
 } from "@quasar/extras/material-symbols-outlined";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default {
   name: "SelectFunction",
-  components: { HistogramIntervalDropDown, StreamFieldSelect, SubTaskArrow },
+  components: { HistogramIntervalDropDown, StreamFieldSelect, SubTaskArrow,
+    OButton,
+},
   props: {
     modelValue: {
       type: Object,

@@ -14,17 +14,15 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-btn
-    class="dashboard-icons q-px-sm q-ml-sm"
-    size="sm"
-    outline
-    no-caps
-    icon="download"
-    @click="downloadDashboard()"
-    data-test="export-dashboard"
-  >
-    <q-tooltip>{{ t("dashboard.export") }}</q-tooltip>
-  </q-btn>
+  <OButton
+  variant="outline"
+  size="sm"
+  @click="downloadDashboard()"
+  data-test="export-dashboard"
+  class="dashboard-icons q-px-sm q-ml-sm">
+  <template #icon-left><Download class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("dashboard.export") }}</q-tooltip>
+</OButton>
 </template>
 <script lang="ts">
 // @ts-nocheck
@@ -34,7 +32,14 @@ import { getDashboard } from "../../utils/commons.ts";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Download } from "lucide-vue-next";
 export default defineComponent({
+  components: {
+    OButton,
+    Download,
+  },
   name: "ExportDashboard",
   props: ["dashboardId"],
   setup(props, { emit }) {

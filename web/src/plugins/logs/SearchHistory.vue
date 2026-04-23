@@ -54,15 +54,10 @@
         </div>
 
         <div>
-          <q-btn
-            :label=" t('search_history.get_history')"
-            flat
-            @click="fetchSearchHistory"
-            class="q-ml-md o2-primary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            no-caps
-            :disable="isLoading"
-          />
+          <OButton
+  @click="fetchSearchHistory"
+  :disabled="isLoading"
+  class="q-ml-md">{{  t('search_history.get_history') }}</OButton>
         </div>
       </div>
     </div>
@@ -89,16 +84,7 @@
               @click="triggerExpand(props)"
             >
               <q-td>
-                <q-btn
-                  dense
-                  flat
-                  size="xs"
-                  :icon="
-                    expandedRow != props.row.uuid
-                      ? 'expand_more'
-                      : 'expand_less'
-                  "
-                />
+                <OButton variant="ghost" size="icon" />
               </q-td>
 
               <q-td
@@ -129,45 +115,43 @@
                       <strong
                         >SQL Query :
                         <span>
-                          <q-btn
-                            @click.stop="
+                          <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="
                               copyToClipboard(props.row.sql, 'SQL Query')
                             "
-                            size="xs"
-                            dense
-                            flat
-                            icon="content_copy"
-                            class="copy-btn-sql tw:ml-2 tw:py-2 tw:px-2" /></span
+  class="copy-btn-sql tw:ml-2 tw:py-2 tw:px-2">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+</OButton></span
                       ></strong>
-                      <q-btn
-                        @click.stop="goToLogs(props.row)"
-                        size="xs"
-                        label="Logs"
-                        dense
-                        class="copy-btn tw:py-2 tw:mx-2 tw:px-2"
-                        icon="search"
-                        flat
-                        style="
+                      <OButton
+  variant="ghost"
+  size="sm"
+  @click.stop="goToLogs(props.row)"
+  style="
                           color: #f2452f;
                           border: #f2452f 1px solid;
                           font-weight: bolder;
                         "
-                      />
-                      <q-btn
-                        v-if="config.isEnterprise == 'true' && config.isCloud == 'false' && store.state.zoConfig.search_inspector_enabled"
-                        @click.stop="goToInspector(props.row)"
-                        size="xs"
-                        label="Inspect"
-                        dense
-                        class="copy-btn tw:py-2 tw:px-2"
-                        icon="analytics"
-                        flat
-                        style="
+  class="copy-btn tw:py-2 tw:mx-2 tw:px-2">
+  <template #icon-left><Search class="tw:w-4 tw:h-4" /></template>
+  Logs
+</OButton>
+                      <OButton
+  variant="ghost"
+  size="sm"
+  v-if="config.isEnterprise == 'true' && config.isCloud == 'false' && store.state.zoConfig.search_inspector_enabled"
+  @click.stop="goToInspector(props.row)"
+  style="
                           color: #5960b2;
                           border: #5960b2 1px solid;
                           font-weight: bolder;
                         "
-                      />
+  class="copy-btn tw:py-2 tw:px-2">
+  <template #icon-left><BarChart2 class="tw:w-4 tw:h-4" /></template>
+  Inspect
+</OButton>
                     </div>
                     <div class="tw:flex tw:items-start tw:justify-center">
                       <div class="scrollable-content expanded-sql">
@@ -183,18 +167,18 @@
                       <strong
                         >Function Definition :
                         <span>
-                          <q-btn
-                            @click.stop="
+                          <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="
                               copyToClipboard(
                                 props.row.function,
                                 'Function Defination',
                               )
                             "
-                            size="xs"
-                            dense
-                            flat
-                            icon="content_copy"
-                            class="copy-btn-function tw:ml-2 tw:py-2 tw:px-2" /></span
+  class="copy-btn-function tw:ml-2 tw:py-2 tw:px-2">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+</OButton></span
                       ></strong>
                     </div>
 
@@ -291,6 +275,9 @@ import config from "@/aws-exports";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { BarChart2, Copy, Search } from "lucide-vue-next";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
@@ -303,7 +290,11 @@ export default defineComponent({
     QTablePagination,
     AppTabs,
     QueryEditor,
-  },
+    OButton,
+    Copy,
+    Search,
+    BarChart2,
+},
   props: {
     isClicked: {
       type: Boolean,

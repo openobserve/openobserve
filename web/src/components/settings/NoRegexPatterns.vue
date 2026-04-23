@@ -26,9 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="title-text">{{ t("regex_patterns.no_data") }}</span>
         <span class="subtitle-text">Import patterns from your Library or <span class="create-new-text" @click="createNewRegexPattern">Create New</span></span>
         <div class="import-button-container">
-            <q-btn no-caps class="q-mt-sm" @click="importRegexPattern">
-              <span class="import-button-text">{{ t("regex_patterns.import_title") }}</span>
-            </q-btn>
+            <OButton @click="importRegexPattern" class="q-mt-sm"><span class="import-button-text">{{ t("regex_patterns.import_title") }}</span></OButton>
         </div>    
     </div>
   </template>
@@ -38,8 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { useI18n } from "vue-i18n";
     import { getImageURL } from "@/utils/zincutils";
     import { useStore } from "vuex";
-  
+
+import OButton from "@/lib/core/Button/Button.vue";  
   export default defineComponent({
+  components: {
+    OButton,
+  },
     
     name: "NoRegexPatterns",
     emits: ["create-new-regex-pattern", "import-regex-pattern"],

@@ -35,21 +35,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="section-header">{{ t("home.streams") }}</div>
             </div>
-              <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-               aria-label="View all streams"
-               >
-                <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
-                <q-icon name="arrow_forward" class="view-arrow-icon" />
-                <router-link
-                  exact
-                  :to="{
+              <OButton
+  variant="ghost"
+  aria-label="View all streams"
+  :as="RouterLink"
+  :to="{
                     name: 'logstreams',
                     query: { org_identifier: store.state.selectedOrganization?.identifier }
                   }"
-                  class="absolute full-width full-height"
-                  aria-label="Navigate to streams page"
-                ></router-link>
-            </q-btn>
+  :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
+  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
+                <q-icon name="arrow_forward" class="view-arrow-icon" />
+</OButton>
           </div>
 
 
@@ -225,22 +222,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <img :src="functionsIcon" alt="" />
                   </div>
                   <div class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ t("home.functionTitle") }}</div>
-                  <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                  aria-label="View all functions"
-                  class="tw:flex-shrink-0"
-                  >
-                      <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
-                      <q-icon name="arrow_forward" class="view-arrow-icon" />
-                    <router-link
-                      exact
-                      :to="{
+                  <OButton
+  variant="ghost"
+  aria-label="View all functions"
+  :as="RouterLink"
+  :to="{
                         name: 'functionList',
                         query: { org_identifier: store.state.selectedOrganization?.identifier }
                       }"
-                      class="absolute full-width full-height"
-                      aria-label="Navigate to functions page"
-                    ></router-link>
-                </q-btn>
+  class="tw:flex-shrink-0" :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
+  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
+                      <q-icon name="arrow_forward" class="view-arrow-icon" />
+</OButton>
                 </div>
               </div>
               <div class="data-to-display row items-end" aria-live="polite">
@@ -261,22 +254,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <img :src="dashboardsIcon" alt="" />
                   </div>
                   <div class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ t("home.dashboardTitle") }}</div>
-                  <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                  aria-label="View all dashboards"
-                  class="tw:flex-shrink-0"
-                  >
-                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
-                  <q-icon name="arrow_forward" class="view-arrow-icon" />
-                    <router-link
-                      exact
-                      :to="{
+                  <OButton
+  variant="ghost"
+  aria-label="View all dashboards"
+  :as="RouterLink"
+  :to="{
                         name: 'dashboards',
                         query: { org_identifier: store.state.selectedOrganization?.identifier }
                       }"
-                      class="absolute full-width full-height"
-                      aria-label="Navigate to dashboards page"
-                    ></router-link>
-                </q-btn>
+  class="tw:flex-shrink-0" :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
+  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
+                  <q-icon name="arrow_forward" class="view-arrow-icon" />
+</OButton>
                 </div>
               </div>
               <div class="data-to-display row items-end" aria-live="polite">
@@ -299,20 +288,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   {{ t("home.alertTitle") }}
                 </span>
-                <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                aria-label="View all alerts">
-                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
-                  <q-icon name="arrow_forward" class="view-arrow-icon" />
-                  <router-link
-                    exact
-                    :to="{
+                <OButton
+  variant="ghost"
+  aria-label="View all alerts"
+  :as="RouterLink"
+  :to="{
                       name: 'alertList',
                       query: { org_identifier: store.state.selectedOrganization?.identifier }
                     }"
-                    class="absolute full-width full-height"
-                    aria-label="Navigate to alerts page"
-                  ></router-link>
-              </q-btn>
+  :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
+  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
+                  <q-icon name="arrow_forward" class="view-arrow-icon" />
+</OButton>
               </div>
               <div class="row q-pt-sm" style="gap: 16px;">
                 <div class="column">
@@ -347,20 +334,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   {{ t("home.pipelineTitle") }}
                 </span>
-                <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                aria-label="View all pipelines">
-                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
-                  <q-icon name="arrow_forward" class="view-arrow-icon" />
-                  <router-link
-                    exact
-                    :to="{
+                <OButton
+  variant="ghost"
+  aria-label="View all pipelines"
+  :as="RouterLink"
+  :to="{
                       name: 'pipelines',
                       query: { org_identifier: store.state.selectedOrganization?.identifier }
                     }"
-                    class="absolute full-width full-height"
-                    aria-label="Navigate to pipelines page"
-                  ></router-link>
-              </q-btn>
+  :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'">
+  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
+                  <q-icon name="arrow_forward" class="view-arrow-icon" />
+</OButton>
               </div>
               <div class="row q-pt-sm" style="gap: 16px;">
                 <div class="column">
@@ -400,13 +385,7 @@ bordered class="my-card q-py-md">
         <q-separator />
 
         <div align="center" class="q-py-sm">
-          <q-btn
-            no-caps
-            color="primary"
-            @click="() => $router.push({ name: 'ingestion' })"
-            flat
-            >{{ t("home.findIngestion") }}
-          </q-btn>
+          <OButton variant="ghost" @click="() => $router.push({ name: 'ingestion' })">{{ t("home.findIngestion") }}</OButton>
         </div>
       </div>
     </div>
@@ -433,11 +412,12 @@ import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import store from "@/test/unit/helpers/store";
 import { outlinedWindow } from "@quasar/extras/material-icons-outlined";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "PageHome",
 
@@ -921,7 +901,8 @@ export default defineComponent({
     DatabaseDeprecationBanner,
     HomeViewSkeleton,
     WebinarBanner,
-  },
+    OButton,
+},
 });
 </script>
 

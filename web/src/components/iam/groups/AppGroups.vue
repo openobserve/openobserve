@@ -40,14 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
         </div>
-        <q-btn
-          data-test="iam-groups-add-group-btn"
-          class="q-ml-sm o2-primary-button tw:h-[36px]"
-          flat
-          no-caps
-          :label="t(`iam.addGroup`)"
-          @click="addGroup"
-        />
+        <OButton
+  data-test="iam-groups-add-group-btn"
+  @click="addGroup"
+  class="q-ml-sm">{{ t(`iam.addGroup`) }}</OButton>
       </div>
     </div>
     </div>
@@ -76,49 +72,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template  v-slot:actions="slotProps: any">
           <div class="tw:flex tw:items-center tw:gap-2 tw:justify-center">
-            <q-btn
-              :data-test="`iam-groups-edit-${slotProps.column.row.group_name}-role-icon`"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              icon="edit"
-              :title="t('common.edit')"
-              @click="editGroup(slotProps.column.row)"
-            >
-            </q-btn>
-            <q-btn
-              :data-test="`iam-groups-delete-${slotProps.column.row.group_name}-role-icon`"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :icon="outlinedDelete"
-              :title="t('common.delete')"
-              @click="showConfirmDialog(slotProps.column.row)"
-            >
-            </q-btn>
+            <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`iam-groups-edit-${slotProps.column.row.group_name}-role-icon`"
+  :title="t('common.edit')"
+  @click="editGroup(slotProps.column.row)">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
+            <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`iam-groups-delete-${slotProps.column.row.group_name}-role-icon`"
+  :title="t('common.delete')"
+  @click="showConfirmDialog(slotProps.column.row)">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </template>
         <template v-slot:bottom-actions>
-          <q-btn
-            v-if="selectedGroups.length > 0"
-            data-test="iam-groups-bulk-delete-btn"
-            class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
-            dense
-            @click="openBulkDeleteDialog"
-          >
-            <q-icon name="delete" size="16px" />
+          <OButton
+  variant="secondary"
+  v-if="selectedGroups.length > 0"
+  data-test="iam-groups-bulk-delete-btn"
+  @click="openBulkDeleteDialog"
+  class="flex items-center q-mr-sm">
+  <q-icon name="delete" size="16px" />
             <span class="tw:ml-2">{{ t('common.delete') }}</span>
-          </q-btn>
+</OButton>
         </template>
       </app-table>
     </div>
@@ -164,6 +145,9 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Pencil, Trash2 } from "lucide-vue-next";
 const showAddGroup = ref(false);
 
 const { t } = useI18n();

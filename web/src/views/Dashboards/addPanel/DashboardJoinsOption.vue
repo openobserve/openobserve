@@ -11,18 +11,16 @@
         >
           <q-btn-group class="axis-field">
             <div>
-              <q-btn
-                no-caps
-                dense
-                color="primary"
-                icon-right="arrow_drop_down"
-                square
-                :no-wrap="true"
-                size="sm"
-                :data-test="`dashboard-join-item-${index}`"
-                class="q-pl-sm"
-              >
-                <div class="join-btn-content">
+              <OMenu :contentStyle="{ padding: '1rem' }" :data-test="`dashboard-join-menu-${index}`">
+<template #default="{ toggle }">
+
+              <OButton
+  size="sm"
+  :no-wrap="true"
+  :data-test="`dashboard-join-item-${index}`"
+  class="q-pl-sm"
+  @click="toggle">
+  <div class="join-btn-content">
                   <LeftJoinTypeSvg
                     v-if="joinObj?.joinType === 'left'"
                     :shouldFill="true"
@@ -40,44 +38,39 @@
                   />
                   <span class="join-stream-label">{{ joinObj?.stream }}</span>
                 </div>
-                <q-menu
-                  class="q-pa-md"
-                  :data-test="`dashboard-join-menu-${index}`"
-                >
-                  <AddJoinPopUp
-                    :class="themeClass"
-                    v-model="currentJoins[index]"
-                    :joinIndex="index"
-                    :mainStream="mainStreamName"
-                  />
-                </q-menu>
-              </q-btn>
-              <q-btn
-                class="remove-join-btn"
-                size="xs"
-                dense
-                :data-test="`dashboard-join-item-${index}-remove`"
-                icon="close"
-                @click="handleRemoveJoin(index)"
-                :aria-label="t('panel.removeJoin')"
-              >
-                <q-tooltip>{{ t("panel.removeJoin") }}</q-tooltip>
-              </q-btn>
+  <template #icon-right><ChevronDown class="tw:w-4 tw:h-4" /></template>
+</OButton>
+              </template>
+<template #content>
+                <AddJoinPopUp
+                  :class="themeClass"
+                  v-model="currentJoins[index]"
+                  :joinIndex="index"
+                  :mainStream="mainStreamName"
+                />
+              </template>
+            </OMenu>
+              <OButton
+  size="sm"
+  :data-test="`dashboard-join-item-${index}-remove`"
+  @click="handleRemoveJoin(index)"
+  :aria-label="t('panel.removeJoin')"
+  class="remove-join-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("panel.removeJoin") }}</q-tooltip>
+</OButton>
             </div>
           </q-btn-group>
         </div>
-        <q-btn
-          icon="add"
-          color="primary"
-          size="xs"
-          round
-          class="add-btn"
-          data-test="dashboard-add-join-btn"
-          @click="handleAddJoin"
-          :aria-label="t('panel.addJoin')"
-        >
-          <q-tooltip>{{ t("panel.addJoin") }}</q-tooltip>
-        </q-btn>
+        <OButton
+  size="sm"
+  data-test="dashboard-add-join-btn"
+  @click="handleAddJoin"
+  :aria-label="t('panel.addJoin')"
+  class="add-btn">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("panel.addJoin") }}</q-tooltip>
+</OButton>
       </div>
     </div>
   </div>
@@ -94,6 +87,9 @@ import LeftJoinTypeSvg from "@/components/icons/LeftJoinTypeSvg.vue";
 import InnerJoinTypeSvg from "@/components/icons/InnerJoinTypeSvg.vue";
 import RightJoinTypeSvg from "@/components/icons/RightJoinTypeSvg.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ChevronDown, Plus } from "lucide-vue-next";
 export interface JoinFieldReference {
   streamAlias: string;
   field: string;
@@ -152,7 +148,10 @@ export default defineComponent({
     LeftJoinTypeSvg,
     InnerJoinTypeSvg,
     RightJoinTypeSvg,
-  },
+    OButton,
+    ChevronDown,
+    Plus,
+},
 
   setup() {
     const dashboardPanelDataPageKey = inject<string>(

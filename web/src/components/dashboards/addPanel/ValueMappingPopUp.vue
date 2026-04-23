@@ -27,17 +27,15 @@
       <div class="flex items-center q-table__title q-mr-md">
         <span>{{ t("dashboard.valueMappingsTitle") }}</span>
       </div>
-      <q-btn
-        icon="close"
-        class="q-ml-xs"
-        unelevated
-        size="sm"
-        round
-        outline
-        :title="t('dashboard.cancel')"
-        @click.stop="cancelEdit"
-        data-test="dashboard-tab-settings-tab-name-edit-cancel"
-      ></q-btn>
+      <OButton
+  variant="outline"
+  size="icon"
+  :title="t('dashboard.cancel')"
+  @click.stop="cancelEdit"
+  data-test="dashboard-tab-settings-tab-name-edit-cancel"
+  class="q-ml-xs">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
     </div>
     <div class="tw:mb-4">
       <draggable
@@ -152,48 +150,33 @@
                 />
               </div>
               <div v-else class="tw:w-full">
-                <q-btn
-                  :label="t('dashboard.valueMappingSetColor')"
-                  no-caps
-                  flat
-                  dense
-                  class="tw:text-blue-700 tw:font-semibold tw:w-full"
-                  @click="setColorByIndex(index)"
-                />
+                <OButton
+  variant="ghost"
+  @click="setColorByIndex(index)"
+  class="tw:text-blue-700 tw:font-semibold tw:w-full">{{ t('dashboard.valueMappingSetColor') }}</OButton>
               </div>
             </div>
-            <q-btn
-              icon="close"
-              class="delete-btn"
-              dense
-              flat
-              round
-              @click="removeValueMappingByIndex(index)"
-              :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
-            />
+            <OButton
+  variant="ghost"
+  size="icon"
+  @click="removeValueMappingByIndex(index)"
+  :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
+  class="delete-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
         </div>
       </draggable>
       <div class="flex justify-between">
-        <q-btn
-          @click="addValueMapping"
-          :label="t('dashboard.valueMappingAddNew')"
-          no-caps
-          outline
-          dense
-          data-test="dashboard-addpanel-config-value-mapping-add-btn"
-          class="el-border"
-        />
-        <q-btn
-          @click="applyValueMapping"
-          color="primary"
-          :label="t('dashboard.valueMappingApply')"
-          style="margin-right: 10px"
-          padding="5px 14px"
-          no-caps
-          dense
-          data-test="dashboard-addpanel-config-value-mapping-apply-btn"
-        />
+        <OButton
+  variant="outline"
+  @click="addValueMapping"
+  data-test="dashboard-addpanel-config-value-mapping-add-btn">{{ t('dashboard.valueMappingAddNew') }}</OButton>
+        <OButton
+  size="sm"
+  @click="applyValueMapping"
+  style="margin-right: 10px"
+  data-test="dashboard-addpanel-config-value-mapping-apply-btn">{{ t('dashboard.valueMappingApply') }}</OButton>
       </div>
     </div>
   </div>
@@ -206,9 +189,12 @@ import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "ValueMappingPopUp",
-  components: { draggable: VueDraggableNext as any },
+  components: { draggable: VueDraggableNext as any,
+    OButton,
+},
   props: {
     valueMapping: {
       type: Array,

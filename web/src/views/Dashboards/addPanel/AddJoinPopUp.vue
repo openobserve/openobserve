@@ -164,43 +164,37 @@
             />
           </div>
 
-          <q-btn
-            @click="handleAddCondition(argIndex)"
-            no-caps
-            dense
-            flat
-            icon="add"
-            :aria-label="t('panel.addClause')"
-            :data-test="`dashboard-join-condition-add-${argIndex}`"
-          >
-            <q-tooltip
+          <OButton
+  variant="ghost"
+  @click="handleAddCondition(argIndex)"
+  :aria-label="t('panel.addClause')"
+  :data-test="`dashboard-join-condition-add-${argIndex}`">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
               self="bottom middle"
             >
               Add another clause
             </q-tooltip>
-          </q-btn>
+</OButton>
 
-          <q-btn
-            :data-test="`dashboard-join-condition-remove-${argIndex}`"
-            icon="close"
-            dense
-            flat
-            round
-            :disable="modelValue.conditions.length === 1"
-            @click="handleRemoveCondition(argIndex)"
-            class="tw:h-10 tw:w-10"
-            :aria-label="t('panel.removeClause')"
-          >
-            <q-tooltip
+          <OButton
+  variant="ghost"
+  :data-test="`dashboard-join-condition-remove-${argIndex}`"
+  @click="handleRemoveCondition(argIndex)"
+  :aria-label="t('panel.removeClause')"
+  :disabled="modelValue.conditions.length === 1"
+  class="tw:h-10 tw:w-10">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
               self="bottom middle"
             >
               Remove clause
             </q-tooltip>
-          </q-btn>
+</OButton>
         </div>
       </div>
     </div>
@@ -231,6 +225,9 @@ import RightJoinTypeSvg from "@/components/icons/RightJoinTypeSvg.vue";
 import RightJoinLineSvg from "@/components/icons/RightJoinLineSvg.vue";
 import InnerJoinTypeSvg from "@/components/icons/InnerJoinTypeSvg.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus } from "lucide-vue-next";
 export interface StreamOption {
   label: string;
   value: string;
@@ -285,7 +282,9 @@ export default defineComponent({
     RightJoinTypeSvg,
     RightJoinLineSvg,
     InnerJoinTypeSvg,
-  },
+    OButton,
+    Plus,
+},
 
   props: {
     mainStream: {

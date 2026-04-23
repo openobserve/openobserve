@@ -98,16 +98,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-list>
     </q-btn-dropdown>
     </div>
-    <q-btn
-      data-test="logs-search-bar-save-function-btn"
-      class="save-function-btn q-px-sm"
-      icon="save"
-      @click="fnSavedFunctionDialog"
-    >
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
+    <OButton
+  data-test="logs-search-bar-save-function-btn"
+  @click="fnSavedFunctionDialog"
+  class="save-function-btn q-px-sm">
+  <template #icon-left><Save class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
         {{ t("common.save") }}
       </q-tooltip>
-    </q-btn>
+</OButton>
   </q-btn-group>
 </template>
 
@@ -117,6 +116,9 @@ import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
+
+import OButton from "@/lib/core/Button/Button.vue";
+import { Save } from "lucide-vue-next";
 const props = defineProps<{
   functionOptions: { name: string; function: string }[];
 }>();

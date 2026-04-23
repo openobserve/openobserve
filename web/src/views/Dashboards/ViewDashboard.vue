@@ -41,16 +41,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex justify-between items-center tw:w-full tw:px-[0.626rem] tw:min-w-0 card-container tw:h-[48px]"
         >
           <div class="tw:flex tw:flex-1 tw:overflow-hidden">
-            <q-btn
-              v-if="!isFullscreen"
-              no-caps
-              @click="goBackToDashboardList"
-              padding="xs"
-              outline
-              icon="arrow_back_ios_new"
-              data-test="dashboard-back-btn"
-              class="hideOnPrintMode el-border"
-            />
+            <OButton
+  variant="outline"
+  size="icon"
+  v-if="!isFullscreen"
+  @click="goBackToDashboardList"
+  data-test="dashboard-back-btn"
+  class="hideOnPrintMode">
+  <template #icon-left><ArrowLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
             <span
               class="q-table__title folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
               @click="goBackToDashboardList"
@@ -73,18 +72,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
           <div class="tw:flex">
-            <q-btn
-              v-if="!isFullscreen"
-              outline
-              class="dashboard-icons q-px-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              icon="add"
-              @click="addPanelData"
-              data-test="dashboard-panel-add"
-            >
-              <q-tooltip>{{ t("panel.add") }}</q-tooltip>
-            </q-btn>
+            <OButton
+  variant="outline"
+  size="sm"
+  v-if="!isFullscreen"
+  @click="addPanelData"
+  data-test="dashboard-panel-add"
+  class="dashboard-icons q-px-sm hideOnPrintMode">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("panel.add") }}</q-tooltip>
+</OButton>
             <!-- <DateTimePicker 
             class="q-ml-sm"
             ref="refDateTime"
@@ -127,41 +124,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="padding-left: 0px; padding-right: 0px"
               size="sm"
             />
-            <q-btn
-              v-if="config.isEnterprise == 'true' && arePanelsLoading"
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              icon="cancel"
-              @click="cancelQuery"
-              data-test="dashboard-cancel-btn"
-              color="negative"
-            >
-              <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              v-else
-              :outline="isVariablesChanged ? false : true"
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              icon="refresh"
-              @click="refreshData"
-              :disable="arePanelsLoading"
-              :loading="arePanelsLoading"
-              data-test="dashboard-refresh-btn"
-              :color="isVariablesChanged ? 'warning' : ''"
-              :text-color="store.state.theme == 'dark' ? 'white' : 'dark'"
-            >
-              <q-tooltip>
+            <OButton
+  variant="destructive"
+  size="sm"
+  v-if="config.isEnterprise == 'true' && arePanelsLoading"
+  @click="cancelQuery"
+  data-test="dashboard-cancel-btn"
+  class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
+</OButton>
+            <OButton
+  variant="outline"
+  size="sm"
+  v-else
+  :outline="isVariablesChanged ? false : true"
+  @click="refreshData"
+  :loading="arePanelsLoading"
+  data-test="dashboard-refresh-btn"
+  :text-color="store.state.theme == 'dark' ? 'white' : 'dark'"
+  :disabled="arePanelsLoading"
+  class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>
                 {{
                   isVariablesChanged
                     ? "Refresh to apply latest variable changes"
                     : "Refresh"
                 }}
               </q-tooltip>
-            </q-btn>
+</OButton>
 
             <ExportDashboard
               v-if="!isFullscreen"
@@ -175,73 +167,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               button-size="sm"
               data-test="dashboard-share-btn"
             />
-            <q-btn
-              v-if="!isFullscreen"
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              icon="settings"
-              data-test="dashboard-setting-btn"
-              @click="openSettingsDialog"
-            >
-              <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm el-border"
-              size="sm"
-              no-caps
-              :icon="store.state.printMode === true ? 'close' : 'print'"
-              @click="printDashboard"
-              data-test="dashboard-print-btn"
-              ><q-tooltip>{{
+            <OButton
+  variant="outline"
+  size="sm"
+  v-if="!isFullscreen"
+  data-test="dashboard-setting-btn"
+  @click="openSettingsDialog"
+  class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode">
+  <template #icon-left><Settings class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
+</OButton>
+            <OButton
+  variant="outline"
+  size="sm"
+  @click="printDashboard"
+  data-test="dashboard-print-btn"
+  class="dashboard-icons q-px-sm q-ml-sm">
+  <q-tooltip>{{
                 store.state.printMode === true
                   ? t("common.close")
                   : t("dashboard.print")
-              }}</q-tooltip></q-btn
-            >
-            <q-btn
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              :icon="
-                quasar.fullscreen.isActive ? 'fullscreen_exit' : 'fullscreen'
-              "
-              @click="toggleFullscreen"
-              data-test="dashboard-fullscreen-btn"
-              ><q-tooltip>{{
+              }}</q-tooltip>
+</OButton>
+            <OButton
+  variant="outline"
+  size="sm"
+  @click="toggleFullscreen"
+  data-test="dashboard-fullscreen-btn"
+  class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode">
+  <q-tooltip>{{
                 quasar.fullscreen.isActive
                   ? t("dashboard.exitFullscreen")
                   : t("dashboard.fullscreen")
-              }}</q-tooltip></q-btn
-            >
-            <q-btn
-              v-if="!isFullscreen"
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              :icon="outlinedDescription"
-              @click="openScheduledReports"
-              data-test="view-dashboard-scheduled-reports"
-              ><q-tooltip>
+              }}</q-tooltip>
+</OButton>
+            <OButton
+  variant="outline"
+  size="sm"
+  v-if="!isFullscreen"
+  @click="openScheduledReports"
+  data-test="view-dashboard-scheduled-reports"
+  class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode">
+  <template #icon-left><FileText class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>
                 {{ t("dashboard.scheduledDashboards") }}
-              </q-tooltip></q-btn
-            >
-            <q-btn
-              v-if="!isFullscreen"
-              outline
-              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode el-border"
-              size="sm"
-              no-caps
-              icon="code"
-              data-test="dashboard-json-edit-btn"
-              @click="openJsonEditor"
-            >
-              <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
-            </q-btn>
+              </q-tooltip>
+</OButton>
+            <OButton
+  variant="outline"
+  size="sm"
+  v-if="!isFullscreen"
+  data-test="dashboard-json-edit-btn"
+  @click="openJsonEditor"
+  class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode">
+  <template #icon-left><Code class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
+</OButton>
           </div>
         </div>
         <q-separator></q-separator>
@@ -394,6 +375,9 @@ import { hasPanelTime } from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ArrowLeft, Code, FileText, Plus, RefreshCw, Settings } from "lucide-vue-next";
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
 });
@@ -419,7 +403,14 @@ export default defineComponent({
     ScheduledDashboards,
     PanelLayoutSettings,
     DashboardJsonEditor,
-  },
+    OButton,
+    ArrowLeft,
+    Plus,
+    RefreshCw,
+    Settings,
+    FileText,
+    Code,
+},
   setup() {
     const { t } = useI18n();
     const route = useRoute();

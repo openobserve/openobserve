@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script>
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default {
   props: {
     nodeTypes: Array,
@@ -36,18 +37,14 @@ export default {
       :key="node.io_type"
       class="o2vf_node"
     >
-      <q-btn
-        borderless
-        :class="`o2vf_node_${node.io_type}`"
-        flat
-        size="md"
-        class="q-pa-none btn-fixed-width node-draggable"
-        style="width: 170px; justify-content: flex-start;"
-        :draggable="true"
-        @dragstart="onDragStart($event, node)"
-        v-if="node.isSectionHeader==false"
-      >
-        <q-tooltip
+      <OButton
+  variant="ghost"
+  style="width: 170px; justify-content: flex-start;"
+  :draggable="true"
+  @dragstart="onDragStart($event, node)"
+  v-if="node.isSectionHeader==false"
+  class="q-pa-none btn-fixed-width node-draggable" :class="`o2vf_node_${node.io_type}`">
+  <q-tooltip
           anchor="center right"
           self="center left"
           :offset="[10, 0]"
@@ -74,7 +71,7 @@ export default {
             <span class="dot"></span>
           </div>
         </div>
-      </q-btn>
+</OButton>
       <div v-else>
         <div class="q-mb-xs text-subtitle1">
           <div>{{ node.label }}</div>

@@ -1,25 +1,21 @@
 <template>
     <!-- ai button is only enabled when it is enteprise version and also ai is enabled from the BE -->
-    <q-btn
-        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-        :ripple="false"
-        @click.stop="sendToAiChat"
-        data-test="o2-ai-context-add-btn"
-        no-caps
-        :borderless="true"
-        flat
-        :size="props.size"
-        dense
-        :class="[
+    <OButton
+  variant="ghost"
+  v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+  @click.stop="sendToAiChat"
+  data-test="o2-ai-context-add-btn"
+  :borderless="true"
+  :size="props.size"
+  :style="props.style"
+  style="border-radius: 100%;"
+  :class="[
             props.class,
-        ]"
-        :style="props.style"
-        style="border-radius: 100%;"
-        >
-        <div class="row items-center no-wrap">
+        ]">
+  <div class="row items-center no-wrap">
             <img :height="props.imageHeight" :width="props.imageWidth"  :src="getBtnLogo" class="header-icon ai-icon" />
         </div>
-    </q-btn>
+</OButton>
 </template>
 
 <script setup lang="ts">
@@ -27,6 +23,8 @@ import { getImageURL } from '@/utils/zincutils';
 import { computed } from 'vue';
 import { useStore } from 'vuex';
 import config from '@/aws-exports';
+
+import OButton from "@/lib/core/Button/Button.vue";
 //we can pass class to the button to make it customized
 //all of the props are optional
 const props = defineProps({

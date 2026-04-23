@@ -25,16 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="tw:flex tw:items-center tw:gap-2">
-            <q-btn
-              flat
-              round
-              :loading="loading"
-              @click="refreshIncidents"
-              data-test="incident-refresh-btn"
-              class="o2-secondary-button"
-            >
-             Refresh
-            </q-btn>
+            <OButton
+  variant="secondary"
+  :loading="loading"
+  @click="refreshIncidents"
+  data-test="incident-refresh-btn">Refresh</OButton>
             <q-input
               v-model="searchQuery"
               dense
@@ -150,42 +145,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-else-if="col.name === 'actions'">
                 <div class="action-buttons">
-                  <q-btn
-                    v-if="props.row.status === 'open'"
-                    flat
-                    dense
-                    size="sm"
-                    icon="visibility"
-                    class="action-btn acknowledge-btn"
-                    @click.stop="acknowledgeIncident(props.row)"
-                    data-test="incident-ack-btn"
-                  >
-                    <q-tooltip>{{ t("alerts.incidents.acknowledge") }}</q-tooltip>
-                  </q-btn>
-                  <q-btn
-                    v-if="props.row.status !== 'resolved'"
-                    flat
-                    dense
-                    size="sm"
-                    icon="task_alt"
-                    class="action-btn resolve-btn"
-                    @click.stop="resolveIncident(props.row)"
-                    data-test="incident-resolve-btn"
-                  >
-                    <q-tooltip>{{ t("alerts.incidents.resolve") }}</q-tooltip>
-                  </q-btn>
-                  <q-btn
-                    v-if="props.row.status === 'resolved'"
-                    flat
-                    dense
-                    size="sm"
-                    icon="restart_alt"
-                    class="action-btn reopen-btn"
-                    @click.stop="reopenIncident(props.row)"
-                    data-test="incident-reopen-btn"
-                  >
-                    <q-tooltip>{{ t("alerts.incidents.reopen") }}</q-tooltip>
-                  </q-btn>
+                  <OButton
+  variant="ghost"
+  size="sm"
+  v-if="props.row.status === 'open'"
+  @click.stop="acknowledgeIncident(props.row)"
+  data-test="incident-ack-btn"
+  class="action-btn acknowledge-btn">
+  <template #icon-left><Eye class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("alerts.incidents.acknowledge") }}</q-tooltip>
+</OButton>
+                  <OButton
+  variant="ghost"
+  size="sm"
+  v-if="props.row.status !== 'resolved'"
+  @click.stop="resolveIncident(props.row)"
+  data-test="incident-resolve-btn"
+  class="action-btn resolve-btn"><q-tooltip>{{ t("alerts.incidents.resolve") }}</q-tooltip></OButton>
+                  <OButton
+  variant="ghost"
+  size="sm"
+  v-if="props.row.status === 'resolved'"
+  @click.stop="reopenIncident(props.row)"
+  data-test="incident-reopen-btn"
+  class="action-btn reopen-btn">
+  <template #icon-left><RefreshCcw class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>{{ t("alerts.incidents.reopen") }}</q-tooltip>
+</OButton>
                 </div>
               </template>
             </q-td>
@@ -256,13 +242,19 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import NoData from "../shared/grid/NoData.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Eye, RefreshCcw } from "lucide-vue-next";
 export default defineComponent({
   name: "IncidentList",
   components: {
     QTablePagination,
     O2AIContextAddBtn,
     NoData,
-  },
+    OButton,
+    Eye,
+    RefreshCcw,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();

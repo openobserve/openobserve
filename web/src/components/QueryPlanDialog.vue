@@ -20,9 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="row items-center q-pb-sm q-pt-sm">
         <div class="text-h6">{{ t("search.queryPlan") }}</div>
         <q-space />
-        <q-btn icon="close" flat round dense @click="onClose">
-          <q-tooltip>Close (ESC)</q-tooltip>
-        </q-btn>
+        <OButton variant="ghost" @click="onClose">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Close (ESC)</q-tooltip>
+</OButton>
       </q-card-section>
 
       <q-separator />
@@ -78,17 +79,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </div>
                 <q-space />
-                <q-btn
-                  v-if="!isAnalyzing && !showAnalyzeResults"
-                  color="primary"
-                  :label="t('search.analyze')"
-                  no-caps
-                  size="sm"
-                  @click="runAnalyze"
-                  :loading="loading"
-                >
-                  <q-tooltip>{{ t("search.analyzeTooltip") }}</q-tooltip>
-                </q-btn>
+                <OButton
+  size="sm"
+  v-if="!isAnalyzing && !showAnalyzeResults"
+  @click="runAnalyze"
+  :loading="loading">
+  {{ t('search.analyze') }}
+  <q-tooltip>{{ t("search.analyzeTooltip") }}</q-tooltip>
+</OButton>
               </div>
               <q-separator />
 
@@ -217,12 +215,14 @@ import MetricsSummaryCard from "@/components/query-plan/MetricsSummaryCard.vue";
 import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "QueryPlanDialog",
   components: {
     MetricsSummaryCard,
     QueryPlanTree,
-  },
+    OButton,
+},
   props: {
     modelValue: {
       type: Boolean,

@@ -66,23 +66,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="flex items-center" v-if="selectedOrganization">
-              <q-btn
-                v-if="!editTable"
-                data-test="edit-table-btn"
-                label="Edit Quota"
-                flat
-                class="border title-height o2-secondary-button tw:h-[36px]"
-                :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                no-caps
-                :disable="activeTab == 'role-limits' && !expandedRow"
-                @click="editTableWithInput"
-              >
-                <q-icon
+              <OButton
+  variant="secondary"
+  v-if="!editTable"
+  data-test="edit-table-btn"
+  @click="editTableWithInput"
+  :disabled="activeTab == 'role-limits' && !expandedRow"
+  class="border title-height">
+  Edit Quota
+  <q-icon
                   name="edit"
                   style="font-weight: 200; opacity: 0.7"
                   class="q-ml-sm"
                 />
-              </q-btn>
+</OButton>
             </div>
           </div>
           <div class="flex items-center justify-between full-width q-mb-sm">
@@ -333,17 +330,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :style="col.style"
             >
               <template v-if="col.name == 'role_name'">
-                <q-btn
-                  dense
-                  flat
-                  size="xs"
-                  :icon="
-                    expandedRow != props.row.uuid
-                      ? 'chevron_right'
-                      : 'expand_more'
-                  "
-                  @click="triggerExpand(props)"
-                />
+                <OButton
+  variant="ghost"
+  size="icon"
+  @click="triggerExpand(props)" />
                 {{ props.row[col.name] }}
               </template>
               <template v-else> </template>
@@ -496,46 +486,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md tw:py-2"
         v-if="editTable && activeType == 'table'"
       >
-        <q-btn
-          label="Cancel"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          @click="cancelChanges"
-        />
-        <q-btn
-          label="Save"
-          class="o2-primary-button no-border tw:h-[36px]"
-          :disable="Object.keys(changedValues).length === 0"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          @click="saveChanges"
-        />
+        <OButton
+  variant="secondary"
+  @click="cancelChanges"
+  class="q-mr-md">Cancel</OButton>
+        <OButton @click="saveChanges" :disabled="Object.keys(changedValues).length === 0">Save</OButton>
       </div>
       <div
         class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md q-mt-md"
         v-if="editTable && activeType == 'json'"
       >
-        <q-btn
-          label="Cancel"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          @click="cancelJsonChanges"
-          :disable="isSavingJson"
-        />
-        <q-btn
-          :label="isSavingJson ? 'Saving Changes...' : 'Save Changes'"
-          class="o2-primary-button no-border tw:h-[36px]"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          @click="saveJsonChanges"
-          :disable="isSavingJson"
-        />
+        <OButton
+  variant="secondary"
+  @click="cancelJsonChanges"
+  :disabled="isSavingJson"
+  class="q-mr-md">Cancel</OButton>
+        <OButton @click="saveJsonChanges" :disabled="isSavingJson">{{ isSavingJson ? 'Saving Changes...' : 'Save Changes' }}</OButton>
       </div>
     </div>
 
@@ -597,6 +563,8 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import AppTable from "@/components/AppTable.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
+
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "Quota",
   components: {
@@ -608,7 +576,8 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     NoData,
-  },
+    OButton,
+},
   setup() {
     const { t } = useI18n();
     const selectedOrganization = ref<any>(null);

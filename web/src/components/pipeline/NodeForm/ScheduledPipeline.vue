@@ -18,41 +18,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="full-width scheduled-pipeline-container">
     <div class="flex items-center justify-between q-pb-sm">
       <div class="flex items-center">
-        <q-btn
-          icon="cancel"
-          size="14px"
-          class="q-pt-sm"
-          flat
-          dense
-          @click="$emit('cancel:form')"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  @click="$emit('cancel:form')"
+  class="q-pt-sm">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         <div class="q-pb-sm stream-routing-title q-pl-xs">
           {{ t("pipeline.query") }}
         </div>
       </div>
 
       <div class="flex items-center">
-        <q-btn
-          v-if="
+        <OButton
+  variant="ghost"
+  v-if="
             config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
           "
-          :ripple="false"
-          @click="toggleAIChat"
-          data-test="menu-link-ai-item"
-          no-caps
-          :borderless="true"
-          flat
-          dense
-          class="o2-button ai-hover-btn q-px-sm q-py-sm q-mr-sm"
-          :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-          style="border-radius: 100%"
-          @mouseenter="isHovered = true"
-          @mouseleave="isHovered = false"
-        >
-          <div class="row items-center no-wrap tw:gap-2">
+  @click="toggleAIChat"
+  data-test="menu-link-ai-item"
+  :borderless="true"
+  style="border-radius: 100%"
+  @mouseenter="isHovered = true"
+  @mouseleave="isHovered = false"
+  class="o2-button ai-hover-btn q-px-sm q-py-sm q-mr-sm" :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''">
+  <div class="row items-center no-wrap tw:gap-2">
             <img :src="getBtnLogo" class="header-icon ai-icon" />
           </div>
-        </q-btn>
+</OButton>
         <div class="flex items-center app-tabs-container tw:h-[36px] q-mr-sm">
           <AppTabs
             data-test="scheduled-pipeline-tabs"
@@ -67,37 +61,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @on:date-change="updateDateChange"
           class="q-mr-sm"
         />
-        <q-btn
-          data-test="logs-search-bar-refresh-btn"
-          data-cy="search-bar-refresh-button"
-          flat
-          no-caps
-          :title="t('search.runQuery')"
-          class="q-pa-none q-mr-sm o2-primary-button tw:h-[36px]"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-primary-button-dark'
-              : 'o2-primary-button-light'
-          "
-          @click="
+        <OButton
+  data-test="logs-search-bar-refresh-btn"
+  data-cy="search-bar-refresh-button"
+  :title="t('search.runQuery')"
+  @click="
             {
               expandState.output = true;
               expandState.query = false;
               runQuery();
             }
           "
-          >{{ t("search.runQuery") }}</q-btn
-        >
+  class="q-pa-none q-mr-sm">{{ t("search.runQuery") }}</OButton>
 
-        <q-btn
-          data-test="add-function-fullscreen-btn"
-          :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
-          dense
-          style="height: 34px"
-          no-caps
-          :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
-          @click="handleFullScreen"
-        />
+        <OButton
+  size="icon"
+  data-test="add-function-fullscreen-btn"
+  :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
+  style="height: 34px"
+  @click="handleFullScreen" />
       </div>
     </div>
     <q-separator />
@@ -382,40 +364,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 @update:model-value="updateTrigger"
                               />
                             </div>
-                            <q-btn
-                              data-test="scheduled-pipeline-group-by-delete-btn"
-                              :icon="outlinedDelete"
-                              class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
-                              :class="
+                            <OButton
+  variant="ghost"
+  size="icon"
+  data-test="scheduled-pipeline-group-by-delete-btn"
+  :title="t('alert_templates.delete')"
+  @click="deleteGroupByColumn(index)"
+  style="min-width: auto"
+  class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm" :class="
                                 store.state?.theme === 'dark' ? 'icon-dark' : ''
-                              "
-                              padding="xs"
-                              unelevated
-                              size="sm"
-                              round
-                              flat
-                              :title="t('alert_templates.delete')"
-                              @click="deleteGroupByColumn(index)"
-                              style="min-width: auto"
-                            />
+                              ">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
                           </div>
                         </template>
-                        <q-btn
-                          data-test="scheduled-pipeline-group-by-add-btn"
-                          icon="add"
-                          class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
-                          :class="
+                        <OButton
+  variant="ghost"
+  size="icon"
+  data-test="scheduled-pipeline-group-by-add-btn"
+  :title="t('common.add')"
+  @click="addGroupByColumn()"
+  style="min-width: auto"
+  class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm" :class="
                             store.state?.theme === 'dark' ? 'icon-dark' : ''
-                          "
-                          padding="xs"
-                          unelevated
-                          size="sm"
-                          round
-                          flat
-                          :title="t('common.add')"
-                          @click="addGroupByColumn()"
-                          style="min-width: auto"
-                        />
+                          ">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
                       </div>
                     </div>
                     <div
@@ -1074,28 +1048,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-splitter>
           </template>
           <template #separator>
-            <q-btn
-              data-test="logs-search-field-list-collapse-btn"
-              :icon="collapseFields ? 'chevron_right' : 'chevron_left'"
-              :title="
+            <OButton
+  size="icon"
+  data-test="logs-search-field-list-collapse-btn"
+  :title="
                 collapseFields
                   ? t('search.collapseFields')
                   : t('search.openFields')
               "
-              dense
-              size="20px"
-              round
-              class="q-mr-xs field-list-collapse-btn"
-              color="primary"
-              style="
+  style="
                 left: 10px;
                 position: absolute;
                 overflow: auto !important;
                 top: 0px;
                 z-index: 100 !important;
               "
-              @click="collapseFieldList"
-            ></q-btn>
+  @click="collapseFieldList"
+  class="q-mr-xs field-list-collapse-btn" />
           </template>
           <template #after>
             <div class="full-width tw:flex tw:flex-col" style="height: 100%">
@@ -1216,41 +1185,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
               >
                 <div class="flex justify-end">
-                  <q-btn
-                    v-if="pipelineObj.isEditNode"
-                    data-test="stream-routing-query-delete-btn"
-                    class="o2-secondary-button tw:h-[36px]"
-                    flat
-                    no-caps
-                    @mousedown.prevent
-                    @click="$emit('delete:node')"
-                  >
-                    <q-icon name="delete" class="q-mr-xs" />
+                  <OButton
+  variant="secondary"
+  v-if="pipelineObj.isEditNode"
+  data-test="stream-routing-query-delete-btn"
+  @mousedown.prevent
+  @click="$emit('delete:node')">
+  <q-icon name="delete" class="q-mr-xs" />
                     {{ t("pipeline.deleteNode") }}
-                  </q-btn>
+</OButton>
 
-                  <q-btn
-                    data-test="stream-routing-query-cancel-btn"
-                    class="o2-secondary-button tw:h-[36px] q-ml-md"
-                    :label="t('alerts.cancel')"
-                    flat
-                    no-caps
-                    @mousedown.prevent
-                    @click="$emit('cancel:form')"
-                  />
-                  <q-btn
-                    data-test="stream-routing-query-save-btn"
-                    :label="
+                  <OButton
+  variant="secondary"
+  data-test="stream-routing-query-cancel-btn"
+  @mousedown.prevent
+  @click="$emit('cancel:form')"
+  class="q-ml-md">{{ t('alerts.cancel') }}</OButton>
+                  <OButton
+  data-test="stream-routing-query-save-btn"
+  @mousedown.prevent
+  @click.prevent="$emit('submit:form')"
+  :disabled="validatingSqlQuery"
+  class="q-ml-md">
+  {{ 
                       validatingSqlQuery
                         ? t('pipeline.validating')
                         : t('pipeline.validateAndClose')
-                    "
-                    class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-                    no-caps
-                    @mousedown.prevent
-                    @click.prevent="$emit('submit:form')"
-                    :disable="validatingSqlQuery"
-                  />
+                     }}
+</OButton>
                 </div>
               </div>
             </div>
@@ -1343,6 +1305,9 @@ import { debounce } from "lodash-es";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus, Trash2 } from "lucide-vue-next";
 const UnifiedQueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
 );

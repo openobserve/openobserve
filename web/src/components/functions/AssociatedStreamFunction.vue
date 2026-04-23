@@ -49,16 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleStreamRow(props)"
         >
           <q-td auto-width>
-            <q-btn
-              dense
-              flat
-              size="xs"
-              :icon="
-                expandedRow.name != props.row.name
-                  ? 'expand_more'
-                  : 'expand_less'
-              "
-            />
+            <OButton variant="ghost" size="icon" />
           </q-td>
           <q-td v-for="col in props.cols" :key="col.name" :props="props">
             {{ col.value }}
@@ -129,18 +120,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </q-td>
                     <q-td key="actions" :props="props">
-                      <q-btn
-                        data-test="stream-association-delete-function-btn"
-                        :icon="outlinedDelete"
-                        :title="t('function.deleteAssociatedFunction')"
-                        class="q-ml-xs"
-                        padding="sm"
-                        unelevated
-                        size="sm"
-                        round
-                        flat
-                        @click.stop="deleteFunctionFromStream(props.row.name)"
-                      ></q-btn>
+                      <OButton
+  variant="ghost"
+  size="icon"
+  data-test="stream-association-delete-function-btn"
+  :title="t('function.deleteAssociatedFunction')"
+  @click.stop="deleteFunctionFromStream(props.row.name)"
+  class="q-ml-xs">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
                     </q-td>
                   </q-tr>
                 </template>
@@ -185,14 +173,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ t("function.associatedFunctionHeader") }}
                     </div>
-                    <q-btn
-                      data-test="stream-association-associate-function-btn"
-                      color="secondary"
-                      class="q-ml-md q-mb-xs text-bold no-border"
-                      @click="addFunctionInProgress = true"
-                      no-caps
-                      >Associate Function</q-btn
-                    >
+                    <OButton
+  data-test="stream-association-associate-function-btn"
+  @click="addFunctionInProgress = true"
+  class="q-ml-md q-mb-xs text-bold">Associate Function</OButton>
                   </div>
                 </template>
                 <template v-slot:no-data>
@@ -206,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       No functions found
                     </div>
                     <!-- <div>
-                    <q-btn @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
+                    <OButton @click="addFunctionInProgress = true">Associate Function</OButton>
                   </div> -->
                   </div>
                 </template>
@@ -234,15 +218,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
         </div>
-        <q-btn
-          data-test="log-stream-refresh-stats-btn"
-          class="q-ml-md q-mb-xs text-bold no-border"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          :label="t(`logStream.refreshStats`)"
-          @click="getLogStream"
-        />
+        <OButton
+  size="sm"
+  data-test="log-stream-refresh-stats-btn"
+  @click="getLogStream"
+  class="q-ml-md q-mb-xs text-bold">{{ t(`logStream.refreshStats`) }}</OButton>
 
         <QTablePagination
           data-test="log-stream-table-pagination"
@@ -301,9 +281,15 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Trash2 } from "lucide-vue-next";
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData },
+  components: { QTablePagination, SchemaIndex, NoData,
+    OButton,
+    Trash2,
+},
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();

@@ -33,15 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </div>
       <div class="col-auto q-ml-sm">
-        <q-btn
-          @click="dismissWarning"
-          flat
-          round
-          dense
-          icon="close"
-          size="sm"
-          class="text-grey-7"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  @click="dismissWarning"
+  class="text-grey-7">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </div>
     </div>
   </div>
@@ -51,10 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted } from "vue";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const DISMISS_KEY = "mysql_deprecation_dismissed";
 const DISMISS_DURATION_DAYS = 7;
 
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "DatabaseDeprecationBanner",
   setup() {
     const store = useStore();

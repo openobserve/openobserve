@@ -170,13 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <h3 class="feature-title">{{ t("about.ent_lincese_detail_lbl") }}</h3>
               </div>
-              <q-btn
-                no-caps
-                :label="t('about.manage_license')"
-                @click="navigateToLicense"
-                size="sm"
-                class="o2-primary-button"
-              />
+              <OButton size="sm" @click="navigateToLicense">{{ t('about.manage_license') }}</OButton>
             </div>
 
             <div v-if="loadingLicense" class="tw:text-center tw:py-8">
@@ -283,11 +277,13 @@ import licenseServer from "@/services/license_server";
 import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vue";
 import { useQuasar } from "quasar";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "PageAbout",
   components: {
     FeatureComparisonTable,
-  },
+    OButton,
+},
   setup() {
     const store = useStore();
     const router = useRouter();

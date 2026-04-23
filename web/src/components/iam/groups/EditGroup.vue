@@ -63,20 +63,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="position: sticky; bottom: 0.45rem; z-index: 2"
     >
       <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex">
-      <q-btn
-        data-test="edit-group-cancel-btn"
-        class="o2-secondary-button"
-        :label="t('alerts.cancel')"
-        no-caps
-        @click="cancelEditGroup"
-      />
-      <q-btn
-        data-test="edit-group-submit-btn"
-        :label="t('alerts.save')"
-        class="o2-primary-button q-ml-md"
-        no-caps
-        @click="saveGroupChanges"
-      />
+      <OButton
+  variant="secondary"
+  data-test="edit-group-cancel-btn"
+  @click="cancelEditGroup">{{ t('alerts.cancel') }}</OButton>
+      <OButton
+  data-test="edit-group-submit-btn"
+  @click="saveGroupChanges"
+  class="q-ml-md">{{ t('alerts.save') }}</OButton>
       </div>
     </div>
   </div>
@@ -96,6 +90,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import GroupServiceAccounts from "./GroupServiceAccounts.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
 onBeforeMount(() => {
   getGroupDetails();
 });

@@ -38,14 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </q-input>
               </div>
-              <q-btn
-                  class="q-ml-sm o2-primary-button tw:h-[36px]"
-                flat
-                no-caps
-                :label="t(`function.add`)"
-                data-test="function-list-add-function-btn"
-                @click="showAddUpdateFn({})"
-              />
+              <OButton
+  data-test="function-list-add-function-btn"
+  @click="showAddUpdateFn({})"
+  class="q-ml-sm">{{ t(`function.add`) }}</OButton>
           </div>
         </div>
         <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
@@ -70,39 +66,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-slot:body-cell-actions="props">
                 <q-td :props="props">
-                  <q-btn
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    icon="edit"
-                    round
-                    flat
-                    :title="t('function.updateTitle')"
-                    @click="showAddUpdateFn(props)"
-                  >
-                </q-btn>
-                  <q-btn
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    :icon="outlinedDelete"
-                    round
-                    flat
-                    :title="t('function.delete')"
-                    @click="showDeleteDialogFn(props)"
-                  >
-                </q-btn>
-                  <q-btn
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    :icon="outlinedAccountTree"
-                    round
-                    flat
-                    :title="'Associated Pipelines'"
-                    @click="getAssociatedPipelines(props)"
-                  >
-                </q-btn>
+                  <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('function.updateTitle')"
+  @click="showAddUpdateFn(props)">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                  <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('function.delete')"
+  @click="showDeleteDialogFn(props)">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                  <OButton
+  variant="ghost"
+  size="icon"
+  :title="'Associated Pipelines'"
+  @click="getAssociatedPipelines(props)">
+  <template #icon-left><GitFork class="tw:w-4 tw:h-4" /></template>
+</OButton>
                 </q-td>
               </template>
 
@@ -126,22 +110,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
                         {{ resultTotal }} {{ t('function.header') }}
                       </div>
-                  <q-btn
-                    v-if="selectedFunctions.length > 0"
-                    data-test="function-list-delete-functions-btn"
-                    class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    no-caps
-                    dense
-                    @click="openBulkDeleteDialog"
-                  >
-                    <q-icon name="delete" size="16px" />
+                  <OButton
+  variant="secondary"
+  v-if="selectedFunctions.length > 0"
+  data-test="function-list-delete-functions-btn"
+  @click="openBulkDeleteDialog"
+  class="flex items-center q-mr-sm">
+  <q-icon name="delete" size="16px" />
                     <span class="tw:ml-2">Delete</span>
-                  </q-btn>
+</OButton>
                   <QTablePagination
                   :scope="scope"
                   :position="'bottom'"
@@ -280,6 +257,9 @@ import {
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { GitFork, Pencil, Trash2 } from "lucide-vue-next";
 export default defineComponent({
   name: "functionList",
   components: {
@@ -287,7 +267,11 @@ export default defineComponent({
     AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),
     NoData,
     ConfirmDialog,
-  },
+    OButton,
+    Pencil,
+    Trash2,
+    GitFork,
+},
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",

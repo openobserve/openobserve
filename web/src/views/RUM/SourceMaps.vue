@@ -93,26 +93,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-select>
 
         <!-- Apply Button -->
-          <q-btn
-            class="o2-secondary-button tw:h-[36px]"
-            flat
-            no-caps
-            label="Apply Filters"
-            @click="applyFilters"
-            :loading="isLoading"
-          />
+          <OButton
+  variant="secondary"
+  @click="applyFilters"
+  :loading="isLoading">Apply Filters</OButton>
 
       </div>
 
         <!-- Upload Button -->
 
-          <q-btn
-            class="o2-secondary-button tw:h-[36px]"
-            flat
-            no-caps
-            label="Upload Source Maps"
-            @click="navigateToUpload"
-          />
+          <OButton variant="secondary" @click="navigateToUpload">Upload Source Maps</OButton>
       </div>
     </div>
 
@@ -154,30 +144,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-td v-for="col in props.cols" :key="col.name" :props="props">
                 <template v-if="col.name === 'expand'">
                   <div class="cursor-pointer" @click="toggleExpand(props.row)">
-                    <q-btn
-                      dense
-                      flat
-                      size="xs"
-                      :icon="
-                        expandedRow !== getRowKey(props.row)
-                          ? 'expand_more'
-                          : 'expand_less'
-                      "
-                    />
+                    <OButton variant="ghost" size="icon" />
                   </div>
                 </template>
                 <template v-else-if="col.name === 'actions'">
-                  <q-btn
-                    :data-test="`source-maps-${props.row.service}-delete`"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
-                    :icon="outlinedDelete"
-                    title="Delete"
-                    @click="confirmDeleteSourceMap(props.row)"
-                  />
+                  <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`source-maps-${props.row.service}-delete`"
+  title="Delete"
+  @click="confirmDeleteSourceMap(props.row)">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
                 </template>
                 <template v-else>
                   <div class="cursor-pointer" @click="toggleExpand(props.row)">
@@ -242,25 +220,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn
-            v-close-popup
-            unelevated
-            no-caps
-            class="q-mr-sm o2-secondary-button"
-            data-test="cancel-button"
-          >
-            Cancel
-          </q-btn>
-          <q-btn
-            v-close-popup
-            unelevated
-            no-caps
-            class="o2-primary-button"
-            @click="deleteSourceMap"
-            data-test="confirm-button"
-          >
-            OK
-          </q-btn>
+          <OButton
+  variant="secondary"
+  v-close-popup
+  data-test="cancel-button"
+  class="q-mr-sm">Cancel</OButton>
+          <OButton
+  v-close-popup
+  @click="deleteSourceMap"
+  data-test="confirm-button">OK</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -276,6 +244,9 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import sourcemapsService from "@/services/sourcemaps";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Trash2 } from "lucide-vue-next";
 const store = useStore();
 const router = useRouter();
 const $q = useQuasar();

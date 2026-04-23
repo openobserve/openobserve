@@ -81,20 +81,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <q-btn
-        v-if="webinarData.primaryButton"
-        no-caps
-        color="secondary"
-        class="webinar-home-register-btn"
-        :href="webinarData.primaryButton.link"
-        target="_blank"
-        rel="noopener noreferrer"
-        data-test="webinar-home-register-btn"
-      >
-        {{ webinarData.primaryButton.text }}
+      <OButton
+  v-if="webinarData.primaryButton"
+  :href="webinarData.primaryButton.link"
+  target="_blank"
+  rel="noopener noreferrer"
+  data-test="webinar-home-register-btn"
+  class="webinar-home-register-btn">
+  {{ webinarData.primaryButton.text }}
         <q-icon name="arrow_forward" class="q-ml-sm"
 size="1rem" />
-      </q-btn>
+</OButton>
     </div>
   </div>
 </template>
@@ -103,6 +100,7 @@ size="1rem" />
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const store = useStore();
 
 const props = defineProps<{

@@ -28,16 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0 tw:min-w-0">
 
             <!-- Back button — matches dashboard style -->
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              icon="arrow_back_ios_new"
-              data-test="add-alert-back-btn"
-              size="sm"
-              class="el-border"
-              @click="goBackToAlertsList"
-            />
+            <OButton
+  variant="outline"
+  size="icon"
+  data-test="add-alert-back-btn"
+  @click="goBackToAlertsList">
+  <template #icon-left><ArrowLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
 
             <!-- EDIT MODE: (folder → chevron → name) -->
             <template v-if="beingUpdated || anomalyEditMode">
@@ -65,7 +62,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
                 </span>
-                <q-btn v-if="anomalyConfig.status === 'failed'" flat no-caps dense size="xs" color="negative" icon="replay" :label="t('alerts.retry')" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" />
+                <OButton
+  variant="destructive"
+  size="sm"
+  v-if="anomalyConfig.status === 'failed'"
+  :loading="anomalyRetraining"
+  @click="anomalyTriggerRetrain">
+  <template #icon-left><RotateCcw class="tw:w-4 tw:h-4" /></template>
+  {{ t('alerts.retry') }}
+</OButton>
               </template>
             </template>
 
@@ -339,26 +344,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
       >
-        <q-btn
-          data-test="add-alert-cancel-btn"
-          class="o2-secondary-button tw:h-[36px]"
-          :label="t('alerts.cancel')"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          @click="$emit('cancel:hideform')"
-        />
-        <q-btn
-          data-test="add-alert-submit-btn"
-          class="o2-primary-button no-border tw:h-[36px]"
-          :label="isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save')"
-          no-caps
-          flat
-          :loading="isAnomalyMode ? anomalySaving : false"
-          :disable="isAnomalyMode ? !canSaveAlert : false"
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          @click="handleSave"
-        />
+        <OButton
+  variant="secondary"
+  data-test="add-alert-cancel-btn"
+  @click="$emit('cancel:hideform')">{{ t('alerts.cancel') }}</OButton>
+        <OButton
+  data-test="add-alert-submit-btn"
+  :loading="isAnomalyMode ? anomalySaving : false"
+  @click="handleSave"
+  :disabled="isAnomalyMode ? !canSaveAlert : false">{{ isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save') }}</OButton>
       </div>
 
       </div><!-- end LEFT column wrapper -->
@@ -478,6 +472,9 @@ import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ArrowLeft, RotateCcw } from "lucide-vue-next";
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
   props: {
@@ -518,7 +515,10 @@ export default defineComponent({
     AnomalySummary,
     QueryEditor,
     InlineSelectFolderDropdown,
-  },
+    OButton,
+    ArrowLeft,
+    RotateCcw,
+},
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
 

@@ -37,30 +37,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-item-section>{{ item.label }}</q-item-section>
             <q-item-section side>
               <div class="tw:flex tw:gap-1">
-                <q-btn
-                  flat
-                  dense
-                  size="sm"
-                  icon="arrow_upward"
-                  @click.stop="moveUp(index)"
-                  :disable="index === 0"
-                />
-                <q-btn
-                  flat
-                  dense
-                  size="sm"
-                  icon="arrow_downward"
-                  @click.stop="moveDown(index)"
-                  :disable="index === modelValue.length - 1"
-                />
-                <q-btn
-                  flat
-                  dense
-                  size="sm"
-                  icon="delete"
-                  color="negative"
-                  @click.stop="removeItem(item.value)"
-                />
+                <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="moveUp(index)"
+  :disabled="index === 0">
+  <template #icon-left><ArrowUp class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop="moveDown(index)"
+  :disabled="index === modelValue.length - 1">
+  <template #icon-left><ArrowDown class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                <OButton
+  variant="destructive"
+  size="icon"
+  @click.stop="removeItem(item.value)">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </div>
             </q-item-section>
           </q-item>
@@ -75,42 +71,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Center Buttons -->
     <div class="tw:flex tw:flex-col tw:justify-center tw:gap-2">
-      <q-btn
-        outline
-        dense
-        icon="arrow_back"
-        @click="addSelected"
-        :disable="rightSelected.length === 0"
-      >
-        <q-tooltip>Add selected</q-tooltip>
-      </q-btn>
-      <q-btn
-        outline
-        dense
-        icon="keyboard_double_arrow_left"
-        @click="addAll"
-        :disable="availableItems.length === 0"
-      >
-        <q-tooltip>Add all</q-tooltip>
-      </q-btn>
-      <q-btn
-        outline
-        dense
-        icon="arrow_forward"
-        @click="removeSelected"
-        :disable="leftSelected.length === 0"
-      >
-        <q-tooltip>Remove selected</q-tooltip>
-      </q-btn>
-      <q-btn
-        outline
-        dense
-        icon="keyboard_double_arrow_right"
-        @click="removeAll"
-        :disable="modelValue.length === 0"
-      >
-        <q-tooltip>Remove all</q-tooltip>
-      </q-btn>
+      <OButton
+  variant="outline"
+  @click="addSelected"
+  :disabled="rightSelected.length === 0">
+  <template #icon-left><ArrowLeft class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Add selected</q-tooltip>
+</OButton>
+      <OButton
+  variant="outline"
+  @click="addAll"
+  :disabled="availableItems.length === 0">
+  <template #icon-left><ChevronsLeft class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Add all</q-tooltip>
+</OButton>
+      <OButton
+  variant="outline"
+  @click="removeSelected"
+  :disabled="leftSelected.length === 0">
+  <template #icon-left><ArrowRight class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Remove selected</q-tooltip>
+</OButton>
+      <OButton
+  variant="outline"
+  @click="removeAll"
+  :disabled="modelValue.length === 0">
+  <template #icon-left><ChevronsRight class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Remove all</q-tooltip>
+</OButton>
     </div>
 
     <!-- Available Items (Right) -->
@@ -151,6 +139,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronsLeft, ChevronsRight, Trash2 } from "lucide-vue-next";
 interface Item {
   label: string;
   value: string;

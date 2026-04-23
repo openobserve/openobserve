@@ -126,14 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <q-stepper-navigation>
-            <q-btn
-              data-test="add-report-step1-continue-btn"
-              @click="validateForm(2)"
-              class="o2-primary-button tw:h-[36px]"
-              flat
-              no-caps
-              :label="'Continue'"
-            />
+            <OButton data-test="add-report-step1-continue-btn" @click="validateForm(2)">{{ 'Continue' }}</OButton>
           </q-stepper-navigation>
         </q-step>
 
@@ -146,14 +139,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <add-encryption-mechanism v-model:formData="formData" />
           <q-stepper-navigation class="q-pa-none">
-            <q-btn
-              data-test="add-cipher-key-step2-back-btn"
-              flat
-              @click="step = 1"
-              class="o2-secondary-button tw:h-[36px] q-mb-sm"
-              :label="t('common.back')"
-              no-caps
-            />
+            <OButton
+  variant="secondary"
+  data-test="add-cipher-key-step2-back-btn"
+  @click="step = 1"
+  class="q-mb-sm">{{ t('common.back') }}</OButton>
           </q-stepper-navigation>
         </q-step>
       </q-stepper>
@@ -163,25 +153,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex justify-end q-px-sm q-py-lg full-width"
       style="position: sticky; bottom: 0px; z-index: 2"
       >
-        <q-btn
-          data-test="add-cipher-key-cancel-btn"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          :label="t('common.cancel')"
-          no-caps
-          flat
-          @click="openCancelDialog"
-        />
-        <q-btn
-          :disable="
+        <OButton
+  variant="secondary"
+  data-test="add-cipher-key-cancel-btn"
+  @click="openCancelDialog"
+  class="q-mr-md">{{ t('common.cancel') }}</OButton>
+        <OButton
+  data-test="add-cipher-key-save-btn"
+  type="submit"
+  :disabled="
             (step === 1 && isUpdatingCipherKey == false) || isSubmitting
-          "
-          data-test="add-cipher-key-save-btn"
-          class="o2-primary-button no-border tw:h-[36px]"
-          :label="t('common.save')"
-          type="submit"
-          no-caps
-          flat
-        />
+          ">{{ t('common.save') }}</OButton>
       </div>
     </div>
     </q-form>
@@ -210,6 +192,7 @@ import AddEncryptionMechanism from "@/components/cipherkeys/AddEncryptionMechani
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CipherKeysService from "@/services/cipher_keys";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const emit = defineEmits(["cancel:hideform"]);
 const { t } = useI18n();
 const router = useRouter();

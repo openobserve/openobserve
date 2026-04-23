@@ -22,17 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-bold q-px-sm  q-py-sm tw:flex tw:items-center tw:justify-between tw:gap-2">
           {{ t('dashboard.folders') }}
           <div>
-            <q-btn
-              class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              no-caps
-              flat
-              @click.stop="addFolder"
-              data-test="dashboard-new-folder-btn"
-              title="Add Folder"
-            >
-            <q-icon name="add" size="xs" />
-          </q-btn>
+            <OButton
+  variant="secondary"
+  @click.stop="addFolder"
+  data-test="dashboard-new-folder-btn"
+  title="Add Folder"
+  class="text-bold tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"><q-icon name="add" size="xs" /></OButton>
           </div>
         </div>
         <q-separator class="tw:mb-1 tw:mt-[3px]" size="2px"></q-separator>
@@ -77,47 +72,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tab.name
               }}</span>
               <div class="hover-actions">
-              <q-btn
-                  v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
-                  dense
-                  flat
-                  no-caps
-                  icon="more_vert"
-                  style="cursor: pointer; justify-self: end; height: 0.5rem"
-                  size="sm"
-                  data-test="dashboard-more-icon"
+              <OMenu
+                v-if="index || (searchQuery?.length > 0 && index == 0 && tab.folderId.toLowerCase() != 'default')"
               >
-                  <q-menu>
+                <template #default="{ toggle, close }">
+                <OButton
+  variant="ghost"
+  size="sm"
+  style="cursor: pointer; justify-self: end; height: 0.5rem"
+  data-test="dashboard-more-icon"
+  @click.stop="toggle">
+  <template #icon-left><MoreVertical class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                </template>
+                <template #content="{ close }">
                   <q-list dense>
-                      <q-item
-                      v-close-popup
+                    <q-item
                       clickable
-                      @click.stop="editFolder(tab.folderId)"
+                      @click.stop="editFolder(tab.folderId); close()"
                       data-test="dashboard-edit-folder-icon"
-                      >
+                    >
                       <q-item-section avatar>
-                          <q-icon :name="outlinedEdit" size="xs" />
+                        <q-icon :name="outlinedEdit" size="xs" />
                       </q-item-section>
                       <q-item-section>
-                          <q-item-label>{{ t('common.edit') }}</q-item-label>
+                        <q-item-label>{{ t('common.edit') }}</q-item-label>
                       </q-item-section>
-                      </q-item>
-                      <q-item
-                      v-close-popup
+                    </q-item>
+                    <q-item
                       clickable
-                      @click.stop="showDeleteFolderDialogFn(tab.folderId)"
+                      @click.stop="showDeleteFolderDialogFn(tab.folderId); close()"
                       data-test="dashboard-delete-folder-icon"
-                      >
+                    >
                       <q-item-section avatar>
-                          <q-icon :name="outlinedDelete" size="xs" />
+                        <q-icon :name="outlinedDelete" size="xs" />
                       </q-item-section>
                       <q-item-section>
-                          <q-item-label>{{ t('common.delete') }}</q-item-label>
+                        <q-item-label>{{ t('common.delete') }}</q-item-label>
                       </q-item-section>
-                      </q-item>
+                    </q-item>
                   </q-list>
-                  </q-menu>
-              </q-btn>
+                </template>
+              </OMenu>
               </div>
           </div>
           <q-separator />
@@ -197,7 +193,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { useLoading } from "@/composables/useLoading";
   import { useReo } from "@/services/reodotdev_analytics";
 
-  const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { MoreVertical } from "lucide-vue-next";
+const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
     return import("@/components/common/sidebar/MoveAcrossFolders.vue");
   });
 
@@ -214,7 +214,10 @@ export default defineComponent({
       ConfirmDialog,
       AddFolder,
       MoveDashboardToAnotherFolder,
-    },
+    OButton,
+    OMenu,
+    MoreVertical,
+},
     props: {
       type: {
         type: String,

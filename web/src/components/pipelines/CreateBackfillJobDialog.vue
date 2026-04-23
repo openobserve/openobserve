@@ -41,14 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-tooltip>
             </span>
           </div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
-            v-close-popup
-            data-test="close-dialog-btn"
-          />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup
+  data-test="close-dialog-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
       </q-card-section>
 
@@ -90,15 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="settings" size="20px" />
                 <span class="tw:text-sm tw:font-semibold">Advanced Options</span>
               </div>
-              <q-btn
-                flat
-                dense
-                round
-                size="xs"
-                :icon="showAdvanced ? 'expand_less' : 'expand_more'"
-                @click.stop
-                class="expand-toggle-btn"
-              />
+              <OButton
+  variant="ghost"
+  size="icon"
+  @click.stop
+  class="expand-toggle-btn" />
             </div>
             <div v-show="showAdvanced" class="section-content">
               <div class="tw:space-y-4">
@@ -236,21 +231,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-actions class="q-pa-md tw:flex-shrink-0">
         <q-form @submit="onSubmit" class="tw:w-full">
           <div class="flex justify-end tw:gap-2">
-            <q-btn
-              flat
-              label="Cancel"
-              class="o2-secondary-button"
-              @click="onCancel"
-              data-test="cancel-btn"
-            />
-            <q-btn
-              type="submit"
-              label="Create Backfill Job"
-              class="o2-primary-button"
-              :loading="loading"
-              :disable="loading"
-              data-test="create-btn"
-            />
+            <OButton
+  variant="secondary"
+  @click="onCancel"
+  data-test="cancel-btn">Cancel</OButton>
+            <OButton
+  type="submit"
+  :loading="loading"
+  data-test="create-btn"
+  :disabled="loading">Create Backfill Job</OButton>
           </div>
         </q-form>
       </q-card-actions>
@@ -275,21 +264,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right" class="q-px-md q-pb-md">
-        <q-btn
-          flat
-          label="Cancel"
-          class="o2-secondary-button"
-          @click="showDeleteConfirmation = false"
-          data-test="delete-confirm-cancel-btn"
-          autofocus
-        />
-        <q-btn
-          unelevated
-          label="Yes, Delete and Backfill"
-          class="o2-primary-button"
-          @click="confirmDelete"
-          data-test="delete-confirm-yes-btn"
-        />
+        <OButton
+  variant="secondary"
+  @click="showDeleteConfirmation = false"
+  data-test="delete-confirm-cancel-btn"
+  autofocus>Cancel</OButton>
+        <OButton @click="confirmDelete" data-test="delete-confirm-yes-btn">Yes, Delete and Backfill</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -302,6 +282,7 @@ import { useStore } from "vuex";
 import backfillService from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
 interface Props {
   modelValue: boolean;
   pipelineId: string;

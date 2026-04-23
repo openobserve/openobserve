@@ -32,15 +32,18 @@
           :condition-index="index"
         />
       </div>
-      <q-btn
-        icon="add"
-        color="primary"
-        size="xs"
-        round
-        class="add-btn"
-        data-test="dashboard-add-condition-add"
-      >
-        <q-menu v-model="showAddMenu">
+      <OMenu v-model="showAddMenu">
+<template #default="{ toggle }">
+
+        <OButton
+  size="sm"
+  data-test="dashboard-add-condition-add"
+  class="add-btn"
+  @click="toggle">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+</OButton>
+        </template>
+<template #content>
           <q-list>
             <q-item clickable @click="emitAddCondition">
               <q-item-section data-test="dashboard-add-group-add-condition">{{ t("common.addCondition") }}</q-item-section>
@@ -49,18 +52,17 @@
               <q-item-section data-test="dashboard-add-group-add-group">{{ t("common.addGroup") }}</q-item-section>
             </q-item>
           </q-list>
-        </q-menu>
-      </q-btn>
+        </template>
+      </OMenu>
     </div>
     <div v-if="groupNestedIndex !== 0" class="group-remove">
-      <q-btn
-        flat
-        size="xs"
-        dense
-        @click="$emit('remove-group')"
-        icon="close"
-        data-test="dashboard-add-group-remove"
-      />
+      <OButton
+  variant="ghost"
+  size="icon"
+  @click="$emit('remove-group')"
+  data-test="dashboard-add-group-remove">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
     </div>
   </div>
 </template>
@@ -70,9 +72,17 @@ import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import AddCondition from "./AddCondition.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { Plus } from "lucide-vue-next";
 export default defineComponent({
   name: "Group",
-  components: { AddCondition },
+  components: { AddCondition,
+    OButton,
+    OMenu,
+    Plus,
+},
   props: {
     group: {
       type: Object,

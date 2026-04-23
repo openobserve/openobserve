@@ -25,12 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="error" class="tw:text-center tw:py-8">
       <q-icon name="error_outline" size="3rem" color="negative" class="tw:mb-4" />
       <div class="text-body1 text-negative">{{ error }}</div>
-      <q-btn
-        data-test="retry-discovered-services-btn"
-        flat no-caps dense
-        icon="refresh"
-        @click="loadServices"
-      >{{ t('settings.correlation.retry') }}</q-btn>
+      <OButton
+  variant="ghost"
+  data-test="retry-discovered-services-btn"
+  @click="loadServices">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  {{ t('settings.correlation.retry') }}
+</OButton>
     </div>
 
     <!-- Empty State -->
@@ -40,14 +41,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-body2 text-grey-6 tw:mt-2">
         {{ t("settings.correlation.noServicesDescription") }}
       </div>
-      <q-btn
-        data-test="refresh-discovered-services-btn"
-        flat no-caps dense
-        icon="refresh"
-        @click="loadServices(true)"
-        :loading="refreshing"
-        class="tw:mt-3"
-      >{{ t('common.refresh') }}</q-btn>
+      <OButton
+  variant="ghost"
+  data-test="refresh-discovered-services-btn"
+  @click="loadServices(true)"
+  :loading="refreshing"
+  class="tw:mt-3">
+  <template #icon-left><RefreshCw class="tw:w-4 tw:h-4" /></template>
+  {{ t('common.refresh') }}
+</OButton>
     </div>
 
     <!-- Services List -->
@@ -126,24 +128,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
             </q-input>
-            <q-btn
-              data-test="reset-discovered-services-btn"
-              round
-              class="o2-secondary-button"
-              :loading="resetting"
-              @click="confirmResetServices"
-            >
-              {{ t('settings.correlation.resetServices') }}
+            <OButton
+  variant="secondary"
+  data-test="reset-discovered-services-btn"
+  :loading="resetting"
+  @click="confirmResetServices">
+  {{ t('settings.correlation.resetServices') }}
               <q-tooltip>{{ t("settings.correlation.resetServicesTooltip") }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              flat
-              round
-              :loading="refreshing"
-              @click="loadServices(true)"
-              data-test="refresh-discovered-services-btn"
-              class="o2-secondary-button refresh-btn"
-            >{{ t('common.refresh') }}</q-btn>
+</OButton>
+            <OButton
+  variant="secondary"
+  :loading="refreshing"
+  @click="loadServices(true)"
+  data-test="refresh-discovered-services-btn"
+  class="refresh-btn">{{ t('common.refresh') }}</OButton>
           </div>
         </div>
       </div>
@@ -309,7 +307,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="panel-service-name">{{ selectedService?.service_name }}</span>
             <span class="set-id-badge">{{ selectedService?.set_id }}</span>
           </div>
-          <q-btn v-close-popup flat round dense icon="close" size="sm" class="tw:shrink-0" />
+          <OButton
+  variant="ghost"
+  size="icon"
+  v-close-popup
+  class="tw:shrink-0">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
         </div>
 
         <!-- Default set warning banner -->
@@ -419,6 +423,9 @@ import serviceStreamsService from "@/services/service_streams";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { RefreshCw } from "lucide-vue-next";
 const emit = defineEmits<{
   (e: "navigate-to-configuration"): void;
 }>();

@@ -16,138 +16,132 @@
           <template v-for="(element, index) in props.operations">
             <div class="operation-item">
               <q-btn-group>
-                <q-btn
-                  square
-                  icon="drag_indicator"
-                  no-caps
-                  dense
-                  flat
-                  size="sm"
-                  class="drag-handle"
-                  :data-test="`promql-operation-drag-${index}`"
-                >
-                  <q-tooltip>Drag to reorder</q-tooltip>
-                </q-btn>
-                <q-btn
-                  square
-                  icon-right="arrow_drop_down"
-                  no-caps
-                  dense
-                  :no-wrap="true"
-                  color="primary"
-                  size="sm"
-                  :label="computedLabel(element)"
-                  class="q-pl-sm"
-                  :data-test="`promql-operation-${index}`"
-                >
-                  <q-menu class="q-pa-md">
-                    <div style="width: 350px">
-                      <div class="text-weight-medium">
-                        {{ getOperationDef(element.id)?.name || element.id }}
-                      </div>
-                      <div class="text-caption text-grey-7">
-                        {{ getOperationDef(element.id)?.documentation }}
-                      </div>
+                <OButton
+  variant="ghost"
+  size="sm"
+  :data-test="`promql-operation-drag-${index}`"
+  class="drag-handle">
+  <template #icon-left><GripVertical class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Drag to reorder</q-tooltip>
+</OButton>
+                <OMenu contentStyle="padding: 1rem">
+<template #default="{ toggle, close }">
 
-                      <!-- Operation Parameters -->
-                      <template
-                        v-for="(param, paramIndex) in getOperationDef(
-                          element.id,
-                        )?.params"
-                        :key="paramIndex"
-                      >
-                        <!-- Number Parameter -->
-                        <q-input
-                          v-if="param.type === 'number'"
-                          v-model.number="element.params[paramIndex] as number"
-                          type="number"
-                          :label="param.name"
-                          dense
-                          borderless
-                          stack-label
-                          hide-bottom-space
-                          class="showLabelOnTop q-mb-sm"
-                          :data-test="`promql-operation-param-${paramIndex}`"
-                        />
+  <OButton
+  size="sm"
+  :no-wrap="true"
+  :data-test="`promql-operation-${index}`"
+  class="q-pl-sm"
+  @click="toggle">
+    {{ computedLabel(element) }}
+  
+      <template #icon-right><ChevronDown class="tw:w-4 tw:h-4" /></template>
+  </OButton>
+  </template>
+<template #content>
+  <div style="width: 350px">
+                        <div class="text-weight-medium">
+                          {{ getOperationDef(element.id)?.name || element.id }}
+                        </div>
+                        <div class="text-caption text-grey-7">
+                          {{ getOperationDef(element.id)?.documentation }}
+                        </div>
 
-                        <!-- String Parameter -->
-                        <q-input
-                          v-else-if="param.type === 'string'"
-                          v-model="element.params[paramIndex] as string"
-                          :label="param.name"
-                          :placeholder="param.placeholder"
-                          dense
-                          borderless
-                          stack-label
-                          hide-bottom-space
-                          class="showLabelOnTop q-mb-sm"
-                          :data-test="`promql-operation-param-${paramIndex}`"
-                        />
-
-                        <!-- Multi-Select Parameter for labels -->
-                        <q-select
-                          v-else-if="param.type === 'select'"
-                          v-model="element.params[paramIndex] as string[]"
-                          :options="filteredLabels"
-                          :label="param.name"
-                          dense
-                          borderless
-                          stack-label
-                          hide-bottom-space
-                          multiple
-                          use-input
-                          input-debounce="300"
-                          @filter="filterOperationLabels"
-                          class="operation-label-selector showLabelOnTop no-case q-mb-sm"
-                          input-class="tw:normal-case!"
-                          :data-test="`promql-operation-param-${paramIndex}`"
-                          :hint="
-                            availableLabels.length
-                              ? 'Select one or more labels'
-                              : 'No labels available'
-                          "
+                        <!-- Operation Parameters -->
+                        <template
+                          v-for="(param, paramIndex) in getOperationDef(
+                            element.id,
+                          )?.params"
+                          :key="paramIndex"
                         >
-                          <template v-slot:no-option>
-                            <q-item>
-                              <q-item-section class="text-grey">
-                                {{
-                                  availableLabels.length
-                                    ? "No matching labels"
-                                    : "Select a metric first to load labels"
-                                }}
-                              </q-item-section>
-                            </q-item>
-                          </template>
-                        </q-select>
-                      </template>
-                    </div>
-                  </q-menu>
-                </q-btn>
-                <q-btn
-                  size="xs"
-                  dense
-                  @click="removeOperation(index)"
-                  icon="close"
-                  :data-test="`promql-operation-remove-${index}`"
-                />
+                          <!-- Number Parameter -->
+                          <q-input
+                            v-if="param.type === 'number'"
+                            v-model.number="element.params[paramIndex] as number"
+                            type="number"
+                            :label="param.name"
+                            dense
+                            borderless
+                            stack-label
+                            hide-bottom-space
+                            class="showLabelOnTop q-mb-sm"
+                            :data-test="`promql-operation-param-${paramIndex}`"
+                          />
+
+                          <!-- String Parameter -->
+                          <q-input
+                            v-else-if="param.type === 'string'"
+                            v-model="element.params[paramIndex] as string"
+                            :label="param.name"
+                            :placeholder="param.placeholder"
+                            dense
+                            borderless
+                            stack-label
+                            hide-bottom-space
+                            class="showLabelOnTop q-mb-sm"
+                            :data-test="`promql-operation-param-${paramIndex}`"
+                          />
+
+                          <!-- Multi-Select Parameter for labels -->
+                          <q-select
+                            v-else-if="param.type === 'select'"
+                            v-model="element.params[paramIndex] as string[]"
+                            :options="filteredLabels"
+                            :label="param.name"
+                            dense
+                            borderless
+                            stack-label
+                            hide-bottom-space
+                            multiple
+                            use-input
+                            input-debounce="300"
+                            @filter="filterOperationLabels"
+                            class="operation-label-selector showLabelOnTop no-case q-mb-sm"
+                            input-class="tw:normal-case!"
+                            :data-test="`promql-operation-param-${paramIndex}`"
+                            :hint="
+                              availableLabels.length
+                                ? 'Select one or more labels'
+                                : 'No labels available'
+                            "
+                          >
+                            <template v-slot:no-option>
+                              <q-item>
+                                <q-item-section class="text-grey">
+                                  {{
+                                    availableLabels.length
+                                      ? "No matching labels"
+                                      : "Select a metric first to load labels"
+                                  }}
+                                </q-item-section>
+                              </q-item>
+                            </template>
+                          </q-select>
+                        </template>
+                      </div>
+  </template>
+</OMenu>
+                <OButton
+  size="icon"
+  @click="removeOperation(index)"
+  :data-test="`promql-operation-remove-${index}`">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </q-btn-group>
             </div>
           </template>
         </draggable>
 
         <!-- Add Button -->
-        <q-btn
-          flat
-          dense
-          icon="add"
-          size="sm"
-          color="primary"
-          @click="showOperationSelector = true"
-          class="add-operation-btn tw:ml-[0.25rem]"
-          data-test="promql-add-operation"
-        >
-          <q-tooltip>Add operation</q-tooltip>
-        </q-btn>
+        <OButton
+  variant="ghost"
+  size="sm"
+  @click="showOperationSelector = true"
+  data-test="promql-add-operation"
+  class="add-operation-btn tw:ml-[0.25rem]">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Add operation</q-tooltip>
+</OButton>
       </div>
     </div>
 
@@ -207,7 +201,7 @@
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn flat label="Close" color="primary" v-close-popup />
+          <OButton variant="ghost" v-close-popup>Close</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -224,6 +218,10 @@ import {
 } from "@/components/promql/types";
 import { promQueryModeller } from "@/components/promql/operations/queryModeller";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { ChevronDown, GripVertical, Plus } from "lucide-vue-next";
 const props = defineProps<{
   operations: QueryBuilderOperation[];
   dashboardData?: any; // Dashboard data containing shared meta

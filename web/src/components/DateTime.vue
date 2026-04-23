@@ -16,325 +16,316 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div icon="info" class="justify-between date-time-container">
-    <q-btn
-      :data-test="dataTestName"
-      id="date-time-button"
-      ref="datetimeBtn"
-      data-cy="date-time-button"
-      no-caps
-      :label="getDisplayValue"
-      icon="schedule"
-      icon-right="arrow_drop_down"
-      class="date-time-button"
-      :class="{
+    <OMenu anchor="bottom left" self="top left"  @show="onShow" @hide="onHide">
+<template #default="{ toggle, close }">
+
+  <OButton
+  :data-test="dataTestName"
+  id="date-time-button"
+  ref="datetimeBtn"
+  data-cy="date-time-button"
+  :disabled="disable"
+  class="date-time-button" :class="{
         [selectedType + 'type']: !disableRelative,
         hideRelative: disableRelative,
       }"
-      :disable="disable"
-    >
-      <q-menu
-        id="date-time-menu"
-        class="date-time-dialog"
-        anchor="bottom left"
-        self="top left"
-        no-route-dismiss
-        @before-show="onBeforeShow"
-        @before-hide="onBeforeHide"
-        @hide="onHide"
-        @show="onShow"
-      >
-        <div v-if="!disableRelative" class="flex justify-evenly q-py-sm">
-          <q-btn
-            data-test="date-time-relative-tab"
-            size="md"
-            class="tab-button no-border"
-            color="primary"
-            no-caps
-            :flat="selectedType !== 'relative'"
-            @click="setDateType('relative')"
-          >
-            {{ t("common.relative") }}
-          </q-btn>
-          <q-separator vertical inset />
-          <q-btn
-            data-test="date-time-absolute-tab"
-            size="md"
-            class="tab-button no-border"
-            color="primary"
-            no-caps
-            :flat="selectedType !== 'absolute'"
-            @click="setDateType('absolute')"
-          >
-            {{ t("common.absolute") }}
-          </q-btn>
-        </div>
-        <q-separator />
-        <q-tab-panels v-model="selectedType" animated>
-          <q-tab-panel
-            v-if="!disableRelative"
-            name="relative"
-            class="q-pa-none"
-          >
-            <div class="date-time-table relative column">
-              <div
-                class="relative-row q-pl-md q-py-sm"
-                v-for="(period, index) in relativePeriods"
-                :key="'date_' + index"
-              >
-                <div class="relative-period-name">
-                  {{ period.label }}
-                </div>
+  @click="toggle">
+    <template #icon-left><Clock class="tw:w-4 tw:h-4" /></template>
+      {{ getDisplayValue }}
+  
+      <template #icon-right><ChevronDown class="tw:w-4 tw:h-4" /></template>
+  </OButton>
+  </template>
+<template #content="{ close }">
+  <div v-if="!disableRelative" class="flex justify-evenly q-py-sm">
+            <q-btn
+              data-test="date-time-relative-tab"
+              size="md"
+              class="tab-button no-border"
+              color="primary"
+              no-caps
+              :flat="selectedType !== 'relative'"
+              @click="setDateType('relative')"
+            >
+              {{ t("common.relative") }}
+            </q-btn>
+            <q-separator vertical inset />
+            <q-btn
+              data-test="date-time-absolute-tab"
+              size="md"
+              class="tab-button no-border"
+              color="primary"
+              no-caps
+              :flat="selectedType !== 'absolute'"
+              @click="setDateType('absolute')"
+            >
+              {{ t("common.absolute") }}
+            </q-btn>
+          </div>
+          <q-separator />
+          <q-tab-panels v-model="selectedType" animated>
+            <q-tab-panel
+              v-if="!disableRelative"
+              name="relative"
+              class="q-pa-none"
+            >
+              <div class="date-time-table relative column">
                 <div
-                  v-for="(item, item_index) in relativeDates[period.value]"
-                  :key="item"
+                  class="relative-row q-pl-md q-py-sm"
+                  v-for="(period, index) in relativePeriods"
+                  :key="'date_' + index"
                 >
-                  <q-btn
-                    :disable="
-                      relativeDatesInHour[period.value][item_index] >
-                        queryRangeRestrictionInHour &&
-                      queryRangeRestrictionInHour > 0
-                    "
-                    :data-test="`date-time-relative-${item}-${period.value}-btn`"
-                    :class="
-                      selectedType == 'relative' &&
-                      relativePeriod == period.value &&
-                      relativeValue == item
-                        ? 'rp-selector-selected'
-                        : `rp-selector ${relativePeriod}`
-                    "
-                    :label="item"
-                    outline
-                    dense
-                    flat
-                    @click="setRelativeDate(period.value, item)"
-                    :key="'period_' + item_index"
+                  <div class="relative-period-name">
+                    {{ period.label }}
+                  </div>
+                  <div
+                    v-for="(item, item_index) in relativeDates[period.value]"
+                    :key="item"
                   >
-                    <q-tooltip
-                      style="z-index: 10001; font-size: 14px"
-                      anchor="center right"
-                      self="center left"
-                      max-width="300px"
-                      v-if="
+                    <q-btn
+                      :disable="
                         relativeDatesInHour[period.value][item_index] >
                           queryRangeRestrictionInHour &&
                         queryRangeRestrictionInHour > 0
                       "
+                      :data-test="`date-time-relative-${item}-${period.value}-btn`"
+                      :class="
+                        selectedType == 'relative' &&
+                        relativePeriod == period.value &&
+                        relativeValue == item
+                          ? 'rp-selector-selected'
+                          : `rp-selector ${relativePeriod}`
+                      "
+                      :label="item"
+                      outline
+                      dense
+                      flat
+                      @click="setRelativeDate(period.value, item)"
+                      :key="'period_' + item_index"
                     >
-                      {{ queryRangeRestrictionMsg }}
-                    </q-tooltip>
-                  </q-btn>
+                      <q-tooltip
+                        style="z-index: 10001; font-size: 14px"
+                        anchor="center right"
+                        self="center left"
+                        max-width="300px"
+                        v-if="
+                          relativeDatesInHour[period.value][item_index] >
+                            queryRangeRestrictionInHour &&
+                          queryRangeRestrictionInHour > 0
+                        "
+                      >
+                        {{ queryRangeRestrictionMsg }}
+                      </q-tooltip>
+                    </q-btn>
+                  </div>
+                </div>
+
+                <div class="relative-row q-px-md q-py-sm">
+                  <div class="relative-period-name">{{ t("common.custom") }}</div>
+                  <q-tooltip
+                    style="z-index: 10001; font-size: 14px"
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                    v-if="queryRangeRestrictionInHour > 0"
+                  >
+                    {{ queryRangeRestrictionMsg }}
+                  </q-tooltip>
+
+                  <div class="row q-gutter-sm">
+                    <div class="col">
+                      <q-input
+                        v-model.number="relativeValue"
+                        type="number"
+                        dense
+                        filled
+                        min="1"
+                        :step="1"
+                        :max="
+                          relativePeriodsMaxValue[relativePeriod] > 0
+                            ? relativePeriodsMaxValue[relativePeriod]
+                            : ''
+                        "
+                        @update:model-value="onCustomPeriodSelect"
+                      />
+                    </div>
+                    <div class="col">
+                      <q-select
+                        v-model="relativePeriod"
+                        :options="relativePeriodsSelect"
+                        dense
+                        filled
+                        emit-value
+                        @update:modelValue="onCustomPeriodSelect"
+                        popup-content-style="z-index: 10002"
+                        style="width: 100px"
+                      >
+                        <template v-slot:selected-item>
+                          <div>{{ getPeriodLabel }}</div>
+                        </template>
+                      </q-select>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              <div class="relative-row q-px-md q-py-sm">
-                <div class="relative-period-name">{{ t("common.custom") }}</div>
+            </q-tab-panel>
+            <q-tab-panel name="absolute" class="q-pa-none">
+              <div class="date-time-table">
                 <q-tooltip
-                  style="z-index: 10001; font-size: 14px"
                   anchor="center right"
                   self="center left"
                   max-width="300px"
                   v-if="queryRangeRestrictionInHour > 0"
                 >
-                  {{ queryRangeRestrictionMsg }}
-                </q-tooltip>
-
-                <div class="row q-gutter-sm">
-                  <div class="col">
-                    <q-input
-                      v-model.number="relativeValue"
-                      type="number"
-                      dense
-                      filled
-                      min="1"
-                      :step="1"
-                      :max="
-                        relativePeriodsMaxValue[relativePeriod] > 0
-                          ? relativePeriodsMaxValue[relativePeriod]
-                          : ''
-                      "
-                      @update:model-value="onCustomPeriodSelect"
-                    />
-                  </div>
-                  <div class="col">
-                    <q-select
-                      v-model="relativePeriod"
-                      :options="relativePeriodsSelect"
-                      dense
-                      filled
-                      emit-value
-                      @update:modelValue="onCustomPeriodSelect"
-                      popup-content-style="z-index: 10002"
-                      style="width: 100px"
-                    >
-                      <template v-slot:selected-item>
-                        <div>{{ getPeriodLabel }}</div>
-                      </template>
-                    </q-select>
-                  </div>
+                  <span style="font-size: 14px">
+                    {{ queryRangeRestrictionMsg }}</span
+                  ></q-tooltip
+                >
+                <div class="flex justify-center q-pa-none">
+                  <!-- here add -->
+                  <q-date
+                    size="sm"
+                    v-model="selectedDate"
+                    class="absolute-calendar"
+                    range
+                    :locale="dateLocale"
+                    :options="optionsFn"
+                  />
                 </div>
-              </div>
-            </div>
-          </q-tab-panel>
-          <q-tab-panel name="absolute" class="q-pa-none">
-            <div class="date-time-table">
-              <q-tooltip
-                anchor="center right"
-                self="center left"
-                max-width="300px"
-                v-if="queryRangeRestrictionInHour > 0"
-              >
-                <span style="font-size: 14px">
-                  {{ queryRangeRestrictionMsg }}</span
-                ></q-tooltip
-              >
-              <div class="flex justify-center q-pa-none">
-                <!-- here add -->
-                <q-date
-                  size="sm"
-                  v-model="selectedDate"
-                  class="absolute-calendar"
-                  range
-                  :locale="dateLocale"
-                  :options="optionsFn"
-                />
-              </div>
-              <div class="notePara">* You can choose multiple date</div>
-              <q-separator v-if="!disableRelative" class="q-my-sm" />
+                <div class="notePara">* You can choose multiple date</div>
+                <q-separator v-if="!disableRelative" class="q-my-sm" />
 
-              <table v-if="!hideRelativeTime" class="q-px-md startEndTime">
-                <tbody>
-                  <tr>
-                    <td class="label tw:px-2">Start time</td>
-                    <td class="label tw:px-2">End time</td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <q-input
-                        v-model="selectedTime.startTime"
-                        dense
-                        borderless
-                        mask="fulltime"
-                        hide-bottom-space
-                        :rules="['fulltime']"
-                        @blur="
-                          resetTime(
-                            selectedTime.startTime,
-                            selectedTime.endTime,
-                          )
-                        "
-                      >
-                        <template #append>
-                          <q-icon name="access_time" class="cursor-pointer">
-                            <q-popup-proxy
-                              transition-show="scale"
-                              transition-hide="scale"
-                              style="z-index: 10002"
-                            >
-                              <q-time
-                                v-model="selectedTime.startTime"
-                                with-seconds
+                <table v-if="!hideRelativeTime" class="q-px-md startEndTime">
+                  <tbody>
+                    <tr>
+                      <td class="label tw:px-2">Start time</td>
+                      <td class="label tw:px-2">End time</td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <q-input
+                          v-model="selectedTime.startTime"
+                          dense
+                          borderless
+                          mask="fulltime"
+                          hide-bottom-space
+                          :rules="['fulltime']"
+                          @blur="
+                            resetTime(
+                              selectedTime.startTime,
+                              selectedTime.endTime,
+                            )
+                          "
+                        >
+                          <template #append>
+                            <q-icon name="access_time" class="cursor-pointer">
+                              <q-popup-proxy
+                                transition-show="scale"
+                                transition-hide="scale"
+                                style="z-index: 10002"
                               >
-                                <div class="row items-center justify-end">
-                                  <q-btn
-                                    v-close-popup
-                                    label="Close"
-                                    color="primary"
-                                    flat
-                                  />
-                                </div>
-                              </q-time>
-                            </q-popup-proxy>
-                          </q-icon>
-                        </template>
-                      </q-input>
-                    </td>
-                    <td>
-                      <q-input
-                        v-model="selectedTime.endTime"
-                        dense
-                        borderless
-                        mask="fulltime"
-                        :rules="['fulltime']"
-                        hide-bottom-space
-                        @blur="
-                          resetTime(
-                            selectedTime.startTime,
-                            selectedTime.endTime,
-                          )
-                        "
-                      >
-                        <template #append>
-                          <q-icon name="access_time" class="cursor-pointer">
-                            <q-popup-proxy
-                              transition-show="scale"
-                              transition-hide="scale"
-                              style="z-index: 10002"
-                            >
-                              <q-time
-                                v-model="selectedTime.endTime"
-                                :with-seconds="true"
+                                <q-time
+                                  v-model="selectedTime.startTime"
+                                  with-seconds
+                                >
+                                  <div class="row items-center justify-end">
+                                    <q-btn
+                                      label="Close"
+                                      color="primary"
+                                      flat
+                                    />
+                                  </div>
+                                </q-time>
+                              </q-popup-proxy>
+                            </q-icon>
+                          </template>
+                        </q-input>
+                      </td>
+                      <td>
+                        <q-input
+                          v-model="selectedTime.endTime"
+                          dense
+                          borderless
+                          mask="fulltime"
+                          :rules="['fulltime']"
+                          hide-bottom-space
+                          @blur="
+                            resetTime(
+                              selectedTime.startTime,
+                              selectedTime.endTime,
+                            )
+                          "
+                        >
+                          <template #append>
+                            <q-icon name="access_time" class="cursor-pointer">
+                              <q-popup-proxy
+                                transition-show="scale"
+                                transition-hide="scale"
+                                style="z-index: 10002"
                               >
-                                <div class="row items-center justify-end">
-                                  <q-btn
-                                    v-close-popup
-                                    label="Close"
-                                    color="primary"
-                                    flat
-                                  />
-                                </div>
-                              </q-time>
-                            </q-popup-proxy>
-                          </q-icon>
-                        </template>
-                      </q-input>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </q-tab-panel>
-        </q-tab-panels>
-        <q-select
-          v-if="!hideRelativeTimezone"
-          data-test="datetime-timezone-select"
-          v-model="timezone"
-          :options="filteredTimezone"
-          @blur="
-            timezone =
-              timezone == ''
-                ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                : timezone
-          "
-          use-input
-          @filter="timezoneFilterFn"
-          input-debounce="0"
-          dense
-          borderless
-          emit-value
-          fill-input
-          hide-selected
-          :label="t('logStream.timezone')"
-          @update:modelValue="onTimezoneChange"
-          :display-value="`Timezone: ${timezone}`"
-          class="timezone-select o2-custom-select-dashboard"
-          popup-content-style="z-index: 10002"
-        >
-        </q-select>
-        <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
-          <q-separator class="q-my-sm" />
-          <q-btn
-            data-test="date-time-apply-btn"
-            class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
-            no-caps
-            size="sm"
-            @click="saveDate(null)"
-            v-close-popup
+                                <q-time
+                                  v-model="selectedTime.endTime"
+                                  :with-seconds="true"
+                                >
+                                  <div class="row items-center justify-end">
+                                    <q-btn
+                                      label="Close"
+                                      color="primary"
+                                      flat
+                                    />
+                                  </div>
+                                </q-time>
+                              </q-popup-proxy>
+                            </q-icon>
+                          </template>
+                        </q-input>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </q-tab-panel>
+          </q-tab-panels>
+          <q-select
+            v-if="!hideRelativeTimezone"
+            data-test="datetime-timezone-select"
+            v-model="timezone"
+            :options="filteredTimezone"
+            @blur="
+              timezone =
+                timezone == ''
+                  ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                  : timezone
+            "
+            use-input
+            @filter="timezoneFilterFn"
+            input-debounce="0"
+            dense
+            borderless
+            emit-value
+            fill-input
+            hide-selected
+            :label="t('logStream.timezone')"
+            @update:modelValue="onTimezoneChange"
+            :display-value="`Timezone: ${timezone}`"
+            class="timezone-select o2-custom-select-dashboard"
+            popup-content-style="z-index: 10002"
           >
-            {{ t("common.apply") }}
-          </q-btn>
-        </div>
-      </q-menu>
-    </q-btn>
+          </q-select>
+          <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
+            <q-separator class="q-my-sm" />
+            <q-btn
+              data-test="date-time-apply-btn"
+              class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
+              no-caps
+              size="sm"
+              @click="saveDate(null); close()"
+            >
+              {{ t("common.apply") }}
+            </q-btn>
+          </div>
+  </template>
+</OMenu>
   </div>
 </template>
 
@@ -363,7 +354,16 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { toZonedTime } from "date-fns-tz";
 
+import OButton from "@/lib/core/Button/Button.vue";
+import OMenu from "@/lib/overlay/Menu/Menu.vue";
+
+import { ChevronDown, Clock } from "lucide-vue-next";
 export default defineComponent({
+  components: {
+    OButton,
+    Clock,
+    ChevronDown,
+  },
   props: {
     defaultType: {
       type: String,

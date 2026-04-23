@@ -48,19 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-caption tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]! tw:mr-[0.85rem]"
         />
         <!-- Insights Button -->
-        <q-btn
-          outline
-          dense
-          no-caps
-          color="primary"
-          icon="timeline"
-          :label="t('volumeInsights.insightsButtonLabel')"
-          class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
-          @click.stop="openUnifiedAnalysisDashboard"
-          data-test="insights-button"
-        >
-          <q-tooltip>{{ t("volumeInsights.analyzeTooltipTraces") }}</q-tooltip>
-        </q-btn>
+        <OButton
+  variant="outline"
+  @click.stop="openUnifiedAnalysisDashboard"
+  data-test="insights-button"
+  class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold! tw:mr-[0.5rem]">
+  <template #icon-left><Activity class="tw:w-4 tw:h-4" /></template>
+  {{ t('volumeInsights.insightsButtonLabel') }}
+  <q-tooltip>{{ t("volumeInsights.analyzeTooltipTraces") }}</q-tooltip>
+</OButton>
         <ORefreshButton
           :last-run-at="searchObj.meta.lastRunAt"
           :loading="searchObj.loading"
@@ -177,6 +173,9 @@ import TracesSearchResultList from "./components/TracesSearchResultList.vue";
 import { formatLargeNumber } from "../../utils/zincutils";
 import ORefreshButton from "@/lib/core/RefreshButton/RefreshButton.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Activity } from "lucide-vue-next";
 export default defineComponent({
   name: "SearchResult",
   components: {
@@ -185,7 +184,9 @@ export default defineComponent({
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
     ),
-  },
+    OButton,
+    Activity,
+},
   emits: [
     "update:scroll",
     "update:datetime",

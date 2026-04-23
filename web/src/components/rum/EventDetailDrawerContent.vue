@@ -52,15 +52,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="col-auto">
-                <q-btn
-                  round
-                  flat
-                  dense
-                  size="sm"
-                  icon="cancel"
-                  data-test="close-drawer-btn"
-                  @click="$emit('close')"
-                />
+                <OButton
+  variant="ghost"
+  size="icon"
+  data-test="close-drawer-btn"
+  @click="$emit('close')">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </div>
             </div>
             <div
@@ -388,24 +386,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
 
                     <!-- Clickable Trace Button -->
-                    <q-btn
-                      v-if="item._oo_trace_id"
-                      dense
-                      :icon="outlinedAccountTree"
-                      outline
-                      size="0.75rem"
-                      class="tw:ml-[0.625rem]! tw:py-[0]! tw:px-[0.2rem]! tw:border-1! tw:border-[var(--o2-theme-color)]! tw:text-[var(--o2-theme-color)]!"
-                      title="View trace details"
-                      data-test="view-trace-btn"
-                      @click.stop="navigateToSpecificTrace(item._oo_trace_id)"
-                    >
-                      <span
+                    <OButton
+  variant="outline"
+  v-if="item._oo_trace_id"
+  title="View trace details"
+  data-test="view-trace-btn"
+  @click.stop="navigateToSpecificTrace(item._oo_trace_id)"
+  class="tw:ml-[0.625rem]! tw:py-[0]! tw:px-[0.2rem]! tw:border-1! tw:border-[var(--o2-theme-color)]! tw:text-[var(--o2-theme-color)]!">
+  <template #icon-left><GitFork class="tw:w-4 tw:h-4" /></template>
+  <span
                         v-if="item._oo_trace_id"
                         class="tw:text-[10px] tw:pl-[0.2rem] tw:py-[0]! tw:text-[var(--o2-theme-primary)]"
                       >
                         Trace
                       </span>
-                    </q-btn>
+</OButton>
                   </div>
                 </div>
               </div>
@@ -491,16 +486,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Attributes Tab -->
       <q-tab-panel name="attributes" class="q-pa-sm" data-test="attributes-tab">
         <div class="tw:flex tw:justify-start">
-          <q-btn
-            :label="t('common.copyToClipboard')"
-            dense
-            size="sm"
-            no-caps
-            class="q-px-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
-            icon="content_copy"
-            @click="copyAttributesToClipboard"
-            data-test="attributes-copy-btn"
-          />
+          <OButton
+  size="sm"
+  @click="copyAttributesToClipboard"
+  data-test="attributes-copy-btn"
+  class="q-px-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal">
+  <template #icon-left><Copy class="tw:w-4 tw:h-4" /></template>
+  {{ t('common.copyToClipboard') }}
+</OButton>
         </div>
         <div
           class="tw:p-2 tw:rounded tw:overflow-x-auto tw:font-mono tw:text-[10px]"
@@ -547,6 +540,9 @@ import EventTypeBadge from "./common/EventTypeBadge.vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
 import { formatDuration } from "@/utils/zincutils";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Copy, GitFork } from "lucide-vue-next";
 const props = defineProps({
   event: {
     type: Object,

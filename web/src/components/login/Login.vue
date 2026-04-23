@@ -92,16 +92,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div v-if="showSSO" class="flex justify-center">
-          <q-btn
-            data-test="sso-login-btn"
-            class="text-bold no-border"
-            padding="sm lg"
-            color="primary"
-            no-caps
-            style="width: 400px"
-            @click="loginWithSSo"
-          >
-            <div
+          <OButton
+  size="sm"
+  data-test="sso-login-btn"
+  style="width: 400px"
+  @click="loginWithSSo"
+  class="text-bold">
+  <div
               class="flex items-center justify-center full-width text-center relative"
             >
               <img
@@ -111,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <span class="text-center"> Login with SSO</span>
             </div>
-          </q-btn>
+</OButton>
         </div>
 
         <div v-if="showSSO && showInternalLogin" class="q-py-md text-center">
@@ -158,18 +155,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <div class="q-mt-lg q-mb-xl">
-              <q-btn
-                data-cy="login-sign-in"
-                unelevated
-                class="full-width text-bold no-border"
-                color="primary"
-                type="submit"
-                padding="sm lg"
-                :label="t('login.login')"
-                :loading="submitting"
-                no-caps
-                @click="onSignIn()"
-              />
+              <OButton
+  variant="ghost"
+  size="sm"
+  data-cy="login-sign-in"
+  type="submit"
+  :loading="submitting"
+  @click="onSignIn()"
+  class="full-width text-bold">{{ t('login.login') }}</OButton>
             </div>
           </q-form>
         </div>
@@ -201,7 +194,11 @@ import config from "@/aws-exports";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { useReo } from "@/services/reodotdev_analytics";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "PageLogin",
 
   setup() {

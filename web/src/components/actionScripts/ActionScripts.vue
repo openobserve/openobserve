@@ -37,14 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-icon class="o2-search-input-icon" name="search" />
                     </template>
                   </q-input>
-                <q-btn
-                  data-test="action-list-add-btn"
-                  class="q-ml-sm o2-primary-button tw:h-[36px]"
-                  flat
-                  no-caps
-                  :label="t(`actions.add`)"
-                  @click="showAddUpdateFn({})"
-                />
+                <OButton
+  data-test="action-list-add-btn"
+  @click="showAddUpdateFn({})"
+  class="q-ml-sm">{{ t(`actions.add`) }}</OButton>
                 </div>
         </div>
       </div>
@@ -86,30 +82,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     color="secondary"
                   />
                 </div>
-                <q-btn
-                  :data-test="`alert-list-${props.row.name}-update-alert`"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  icon="edit"
-                  :title="t('alerts.edit')"
-                  @click="showAddUpdateFn(props)"
-                >
-              </q-btn>
-                <q-btn
-                  :data-test="`alert-list-${props.row.name}-delete-alert`"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  :icon="outlinedDelete"
-                  flat
-                  :title="t('alerts.delete')"
-                  @click="showDeleteDialogFn(props)"
-                >
-              </q-btn>
+                <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`alert-list-${props.row.name}-update-alert`"
+  :title="t('alerts.edit')"
+  @click="showAddUpdateFn(props)">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
+                <OButton
+  variant="ghost"
+  size="icon"
+  :data-test="`alert-list-${props.row.name}-delete-alert`"
+  :title="t('alerts.delete')"
+  @click="showDeleteDialogFn(props)">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
               </q-td>
             </template>
 
@@ -128,22 +116,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[80px] tw:mr-md">
                     {{ resultTotal }} {{ t('actions.header') }}
                   </div>
-                  <q-btn
-                    v-if="selectedActionScripts.length > 0"
-                    data-test="action-scripts-bulk-delete-btn"
-                    class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    no-caps
-                    dense
-                    @click="openBulkDeleteDialog"
-                  >
-                    <q-icon name="delete" size="16px" />
+                  <OButton
+  variant="secondary"
+  v-if="selectedActionScripts.length > 0"
+  data-test="action-scripts-bulk-delete-btn"
+  @click="openBulkDeleteDialog"
+  class="flex items-center q-mr-sm">
+  <q-icon name="delete" size="16px" />
                     <span class="tw:ml-2">Delete</span>
-                  </q-btn>
+</OButton>
                 </div>
                 <QTablePagination
                 :scope="scope"
@@ -261,25 +242,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :input-debounce="400"
               />
               <div class="flex justify-center q-mt-lg">
-                <q-btn
-                  data-test="clone-action-cancel-btn"
-                  v-close-popup="true"
-                  class="q-mb-md text-bold"
-                  :label="t('alerts.cancel')"
-                  text-color="light-text"
-                  padding="sm md"
-                  no-caps
-                />
-                <q-btn
-                  data-test="clone-action-submit-btn"
-                  :label="t('alerts.save')"
-                  class="q-mb-md text-bold no-border q-ml-md"
-                  color="secondary"
-                  padding="sm xl"
-                  type="submit"
-                  :disable="isSubmitting"
-                  no-caps
-                />
+                <OButton
+  size="sm"
+  data-test="clone-action-cancel-btn"
+  v-close-popup="true"
+  text-color="light-text"
+  class="q-mb-md text-bold">{{ t('alerts.cancel') }}</OButton>
+                <OButton
+  size="sm"
+  data-test="clone-action-submit-btn"
+  type="submit"
+  :disabled="isSubmitting"
+  class="q-mb-md text-bold q-ml-md">{{ t('alerts.save') }}</OButton>
               </div>
             </q-form>
           </q-card-section>
@@ -330,6 +304,9 @@ import actions from "@/services/action_scripts";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Pencil, Trash2 } from "lucide-vue-next";
 interface ActionScriptList {
   "#": string | number; // If this represents a serial number or row index
   id: any; // The unique identifier, specify the type (e.g., string, number) if known
@@ -354,7 +331,10 @@ export default defineComponent({
     ),
     NoData,
     ConfirmDialog,
-  },
+    OButton,
+    Pencil,
+    Trash2,
+},
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",

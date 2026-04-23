@@ -18,14 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <div class="row items-center no-wrap q-mb-sm">
       <div v-if="backButton" class="col-auto">
-        <q-btn
-          class="q-mr-md el-border"
-          no-caps
-          @click="onBackClicked"
-          padding="xs"
-          outline
-          icon="arrow_back_ios_new"
-        />
+        <OButton
+  variant="outline"
+  size="icon"
+  @click="onBackClicked"
+  class="q-mr-md">
+  <template #icon-left><ArrowLeft class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </div>
       <div class="col">
         <div class="text-h6">
@@ -43,9 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent } from "vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { ArrowLeft } from "lucide-vue-next";
 export default defineComponent({
   name: "DashboardHeader",
-  components: {},
+  components: {
+    OButton,
+    ArrowLeft,
+},
   props: {
     title: {
       type: String,

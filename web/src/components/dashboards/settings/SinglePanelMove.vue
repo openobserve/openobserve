@@ -55,22 +55,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-select>
 
-        <q-btn
-          class="text-bold el-border"
-          no-caps
-          outline
-          rounded
-          icon="add"
-          style="padding: 10px; height: 40px; margin-left: 2px"
-          @click="
+        <OButton
+  variant="outline"
+  rounded
+  style="padding: 10px; height: 40px; margin-left: 2px"
+  @click="
             () => {
               isTabEditMode = false;
               showAddTabDialog = true;
             }
           "
-          data-test="dashboard-tab-move-add-tab-btn"
-          ><q-tooltip>Add Tab</q-tooltip></q-btn
-        >
+  data-test="dashboard-tab-move-add-tab-btn"
+  class="text-bold">
+  <template #icon-left><Plus class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip>Add Tab</q-tooltip>
+</OButton>
         <q-dialog
           v-model="showAddTabDialog"
           position="right"
@@ -88,29 +87,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <q-card-actions class="confirmActions">
         <div class="button-container">
-          <q-btn
-            v-close-popup="true"
-            unelevated
-            class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            flat
-            @click="onCancel"
-            data-test="cancel-button"
-          >
-            {{ t("confirmDialog.cancel") }}
-          </q-btn>
-          <q-btn
-            v-close-popup="true"
-            unelevated
-            class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            @click="onConfirm"
-            data-test="confirm-button"
-            :disable="selectedMoveTabId === null"
-          >
-            Move
-          </q-btn>
+          <OButton
+  variant="secondary"
+  v-close-popup="true"
+  @click="onCancel"
+  data-test="cancel-button">{{ t("confirmDialog.cancel") }}</OButton>
+          <OButton
+  v-close-popup="true"
+  @click="onConfirm"
+  data-test="confirm-button"
+  :disabled="selectedMoveTabId === null"
+  class="q-ml-md">Move</OButton>
         </div>
       </q-card-actions>
     </q-card>
@@ -127,9 +114,15 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Plus } from "lucide-vue-next";
 export default defineComponent({
   name: "SinglePanelMove",
-  components: { AddTab },
+  components: { AddTab,
+    OButton,
+    Plus,
+},
   emits: ["update:ok", "update:cancel", "refresh"],
   props: ["title", "message"],
   setup(props, { emit }) {

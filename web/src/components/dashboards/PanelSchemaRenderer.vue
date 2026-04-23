@@ -187,8 +187,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @click.stop
       >
-        <q-btn
-          v-if="
+        <OButton
+  variant="outline"
+  size="sm"
+  v-if="
             showLegendsButton &&
             noData !== 'No Data' &&
             ![
@@ -203,20 +205,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'gauge',
             ].includes(panelSchema.type)
           "
-          color="primary"
-          icon="format_list_bulleted"
-          round
-          outline
-          size="sm"
-          @click="$emit('show-legends')"
-          class="el-border"
-        >
-          <q-tooltip anchor="top middle" self="bottom right">
+  @click="$emit('show-legends')">
+  <template #icon-left><List class="tw:w-4 tw:h-4" /></template>
+  <q-tooltip anchor="top middle" self="bottom right">
             Show Legends
           </q-tooltip>
-        </q-btn>
-        <q-btn
-          v-if="
+</OButton>
+        <OButton
+  variant="outline"
+  size="sm"
+  v-if="
             [
               'area',
               'area-stacked',
@@ -231,20 +229,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             allowAnnotationsAdd &&
             !viewOnly
           "
-          color="primary"
-          :icon="isAddAnnotationMode ? 'cancel' : 'edit'"
-          round
-          outline
-          size="sm"
-          @click="toggleAddAnnotationMode"
-          class="el-border"
-        >
-          <q-tooltip anchor="top middle" self="bottom right">
+  @click="toggleAddAnnotationMode">
+  <q-tooltip anchor="top middle" self="bottom right">
             {{
               isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations"
             }}
           </q-tooltip>
-        </q-btn>
+</OButton>
       </div>
       <div
         class="crosslink-drilldown-menu"
@@ -363,6 +354,9 @@ import {
 } from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { List } from "lucide-vue-next";
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
 });
@@ -416,7 +410,9 @@ export default defineComponent({
     AddAnnotation,
     CustomChartRenderer,
     LoadingProgress,
-  },
+    OButton,
+    List,
+},
   props: {
     selectedTimeObj: {
       required: true,

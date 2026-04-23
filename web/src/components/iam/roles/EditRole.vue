@@ -104,21 +104,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="visual in permissionDisplayOptions"
                     :key="visual.value"
                   >
-                    <q-btn
-                      :data-test="`edit-role-permissions-show-${visual.value}-btn`"
-                      :color="
-                        visual.value === filter.permissions ? 'primary' : ''
-                      "
-                      :flat="visual.value === filter.permissions ? false : true"
-                      dense
-                      no-caps
-                      size="11px"
-                      class="q-px-md visual-selection-btn"
-                      @click="updateTableData(visual.value)"
-                      style="height: 30px;"
-                    >
-                      {{ visual.label }}</q-btn
-                    >
+                    <OButton
+  :data-test="`edit-role-permissions-show-${visual.value}-btn`"
+  :flat="visual.value === filter.permissions ? false : true"
+  @click="updateTableData(visual.value)"
+  style="height: 30px;"
+  class="q-px-md visual-selection-btn">{{ visual.label }}</OButton>
                   </template>
                 </div>
               </div>
@@ -175,18 +166,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="visual in permissionUiOptions"
                 :key="visual.value"
               >
-                <q-btn
-                  :data-test="`edit-role-permissions-show-${visual.value}-btn`"
-                  :color="visual.value === permissionsUiType ? 'primary' : ''"
-                  :flat="visual.value === permissionsUiType ? false : true"
-                  dense
-                  no-caps
-                  size="11px"
-                  class="q-px-md visual-selection-btn"
-                  @click="updatePermissionsUi(visual.value)"
-                >
-                  {{ visual.label }}</q-btn
-                >
+                <OButton
+  :data-test="`edit-role-permissions-show-${visual.value}-btn`"
+  :flat="visual.value === permissionsUiType ? false : true"
+  @click="updatePermissionsUi(visual.value)"
+  class="q-px-md visual-selection-btn">{{ visual.label }}</OButton>
               </template>
             </div>
           </div>
@@ -278,20 +262,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="position: sticky; bottom: 0.45rem; z-index: 2"
       >
       <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex">
-        <q-btn
-          data-test="edit-role-cancel-btn"
-          class="o2-secondary-button"
-          :label="t('alerts.cancel')"
-          no-caps
-          @click="cancelPermissionsUpdate"
-        />
-        <q-btn
-          data-test="edit-role-save-btn"
-          :label="t('alerts.save')"
-          class="o2-primary-button q-ml-md"
-          no-caps
-          @click="saveRole"
-        />
+        <OButton
+  variant="secondary"
+  data-test="edit-role-cancel-btn"
+  @click="cancelPermissionsUpdate">{{ t('alerts.cancel') }}</OButton>
+        <OButton
+  data-test="edit-role-save-btn"
+  @click="saveRole"
+  class="q-ml-md">{{ t('alerts.save') }}</OButton>
       </div>
         
       </div>
@@ -340,6 +318,7 @@ import RePatternsService from "@/services/regex_pattern";
 import config from "@/aws-exports";
 import commonService from "@/services/common";
 
+import OButton from "@/lib/core/Button/Button.vue";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );

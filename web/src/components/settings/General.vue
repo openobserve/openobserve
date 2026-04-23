@@ -151,15 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>&nbsp;</span>
 
           <div class="flex justify-start">
-            <q-btn
-              data-test="dashboard-add-submit"
-              :loading="onSubmit.isLoading.value"
-              :label="t('dashboard.save')"
-              class="q-mb-md o2-primary-button no-border tw:h-[36px]"
-              type="submit"
-              no-caps
-              size="md"
-            />
+            <OButton
+  data-test="dashboard-add-submit"
+  :loading="onSubmit.isLoading.value"
+  type="submit"
+  class="q-mb-md">{{ t('dashboard.save') }}</OButton>
           </div>
         </q-form>
       </div>
@@ -190,28 +186,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="customText"
             />
             <div class="btn-group tw:flex tw:h-[28px]">
-              <q-btn
-                type="button"
-                class="q-mr-sm"
-                no-caps
-                color="red"
-                icon="close"
-                dense
-                size="sm"
-                @click="editingText = !editingText"
-              ></q-btn>
-              <q-btn
-                data-test="settings_ent_logo_custom_text_save_btn"
-                :loading="onSubmit.isLoading.value"
-                icon="check"
-                class="q-mr-sm "
-                dense
-                size="sm"
-                color="primary"
-                type="submit"
-                no-caps
-                @click="updateCustomText"
-              />
+              <OButton
+  variant="destructive"
+  size="icon"
+  type="button"
+  @click="editingText = !editingText"
+  class="q-mr-sm">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
+              <OButton
+  size="icon"
+  data-test="settings_ent_logo_custom_text_save_btn"
+  :loading="onSubmit.isLoading.value"
+  type="submit"
+  @click="updateCustomText"
+  class="q-mr-sm">
+  <template #icon-left><Check class="tw:w-4 tw:h-4" /></template>
+</OButton>
             </div>
           </div>
           <div v-else class="flex items-center">
@@ -220,15 +211,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ store.state.zoConfig.custom_logo_text }}
               </q-tooltip>
             </span>
-            <q-btn
-              data-test="settings_ent_logo_custom_text_edit_btn"
-              :loading="onSubmit.isLoading.value"
-              icon="edit"
-              size="sm"
-              class="text-bold q-ml-sm"
-              type="submit"
-              @click="editingText = !editingText"
-            />
+            <OButton
+  size="icon"
+  data-test="settings_ent_logo_custom_text_edit_btn"
+  :loading="onSubmit.isLoading.value"
+  type="submit"
+  @click="editingText = !editingText"
+  class="text-bold q-ml-sm">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
           <span class="individual-setting-description">
             {{ t("settings.customLogoTextDescription") }}
@@ -255,13 +246,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="max-width: 150px; max-height: 31px"
               class="q-mx-md"
             />
-            <q-btn
-              icon="delete"
-              data-test="setting_ent_custom_logo_img_delete_btn"
-              @click="confirmDeleteLogo('light')"
-              class="q-mx-md"
-              size="sm"
-            ></q-btn>
+            <OButton
+  size="icon"
+  data-test="setting_ent_custom_logo_img_delete_btn"
+  @click="confirmDeleteLogo('light')"
+  class="q-mx-md">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
           <div v-else class="tw:flex tw:items-center tw:gap-3">
             <q-file
@@ -281,28 +272,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-file>
           <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
-              <q-btn
-                type="button"
-                class="q-mr-sm"
-                no-caps
-                color="red"
-                icon="close"
-                dense
-                size="sm"
-                @click="filesLight = null"
-              ></q-btn>
-              <q-btn
-                data-test="settings_ent_logo_custom_light_save_btn"
-                :loading="onSubmit.isLoading.value"
-                icon="check"
-                class="q-mr-sm "
-                dense
-                size="sm"
-                color="primary"
-                type="submit"
-                no-caps
-                @click="uploadImage(filesLight, 'light')"
-              />
+              <OButton
+  variant="destructive"
+  size="icon"
+  type="button"
+  @click="filesLight = null"
+  class="q-mr-sm">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
+              <OButton
+  size="icon"
+  data-test="settings_ent_logo_custom_light_save_btn"
+  :loading="onSubmit.isLoading.value"
+  type="submit"
+  @click="uploadImage(filesLight, 'light')"
+  class="q-mr-sm">
+  <template #icon-left><Check class="tw:w-4 tw:h-4" /></template>
+</OButton>
             </div>
           </div>
           <div class="tw:flex tw:flex-col tw:mb-5">
@@ -333,13 +319,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="max-width: 150px; max-height: 31px"
               class="q-mx-md"
             />
-            <q-btn
-              icon="delete"
-              data-test="setting_ent_custom_logo_dark_img_delete_btn"
-              @click="confirmDeleteLogo('dark')"
-              class="q-mx-md"
-              size="sm"
-            ></q-btn>
+            <OButton
+  size="icon"
+  data-test="setting_ent_custom_logo_dark_img_delete_btn"
+  @click="confirmDeleteLogo('dark')"
+  class="q-mx-md">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
           </div>
           <div v-else class="tw:flex tw:items-center tw:gap-3">
             <q-file
@@ -359,28 +345,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-file>
           <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
-              <q-btn
-                type="button"
-                class="q-mr-sm"
-                no-caps
-                color="red"
-                icon="close"
-                dense
-                size="sm"
-                @click="filesDark = null"
-              ></q-btn>
-              <q-btn
-                data-test="settings_ent_logo_custom_dark_save_btn"
-                :loading="onSubmit.isLoading.value"
-                icon="check"
-                class="q-mr-sm "
-                dense
-                size="sm"
-                color="primary"
-                type="submit"
-                no-caps
-                @click="uploadImage(filesDark, 'dark')"
-              />
+              <OButton
+  variant="destructive"
+  size="icon"
+  type="button"
+  @click="filesDark = null"
+  class="q-mr-sm">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
+              <OButton
+  size="icon"
+  data-test="settings_ent_logo_custom_dark_save_btn"
+  :loading="onSubmit.isLoading.value"
+  type="submit"
+  @click="uploadImage(filesDark, 'dark')"
+  class="q-mr-sm">
+  <template #icon-left><Check class="tw:w-4 tw:h-4" /></template>
+</OButton>
             </div>
           </div>
           <div class="tw:flex tw:flex-col tw:mb-5">
@@ -405,22 +386,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right" class="tw:flex tw:gap-1">
-        <q-btn
-          data-test="logs-search-bar-confirm-dialog-cancel-btn"
-          :label="t('confirmDialog.cancel')"
-          class="o2-secondary-button tw:h-[28px] no-border"
-          flat
-          no-caps
-          @click="cancelConfirmDialog"
-        />
-        <q-btn
-          data-test="logs-search-bar-confirm-dialog-ok-btn"
-          :label="t('confirmDialog.ok')"
-          class="o2-primary-button tw:h-[28px] no-border"
-          no-caps
-          flat
-          @click="confirmDialogOK"
-        />
+        <OButton
+  variant="secondary"
+  data-test="logs-search-bar-confirm-dialog-cancel-btn"
+  @click="cancelConfirmDialog"
+  class="tw:h-[28px]">{{ t('confirmDialog.cancel') }}</OButton>
+        <OButton
+  data-test="logs-search-bar-confirm-dialog-ok-btn"
+  @click="confirmDialogOK"
+  class="tw:h-[28px]">{{ t('confirmDialog.ok') }}</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -438,7 +412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn flat :label="t('settings.close')" color="primary" v-close-popup />
+        <OButton variant="ghost" v-close-popup>{{ t('settings.close') }}</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -461,6 +435,9 @@ import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Check, Pencil, Trash2 } from "lucide-vue-next";
 export default defineComponent({
   name: "PageGeneralSettings",
   methods: {
@@ -478,7 +455,11 @@ export default defineComponent({
   },
   components: {
     GroupHeader,
-  },
+    OButton,
+    Check,
+    Pencil,
+    Trash2,
+},
   setup() {
     const { t } = useI18n();
     const q = useQuasar();

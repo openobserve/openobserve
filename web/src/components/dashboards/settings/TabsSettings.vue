@@ -21,20 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="column full-height" data-test="dashboard-tab-settings">
     <DashboardHeader :title="t('dashboard.tabSettingsTitle')">
       <template #right>
-        <q-btn
-          class="text-bold no-border q-ml-md o2-primary-button"
-          no-caps
-          no-outline
-          rounded
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-primary-button-dark'
-              : 'o2-primary-button-light'
-          "
-          :label="t(`dashboard.newTab`)"
-          @click.stop="addNewItem"
-          data-test="dashboard-tab-settings-add-tab"
-        />
+        <OButton
+  no-outline
+  rounded
+  @click.stop="addNewItem"
+  data-test="dashboard-tab-settings-add-tab"
+  class="text-bold q-ml-md">{{ t(`dashboard.newTab`) }}</OButton>
       </template>
     </DashboardHeader>
     <div class="table-header flex justify-between text-bold">
@@ -84,53 +76,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="edit-input"
                 data-test="dashboard-tab-settings-tab-name-edit"
               />
-              <q-btn
-                icon="check"
-                unelevated
-                size="sm"
-                round
-                flat
-                :title="t('dashboard.save')"
-                @click.stop="saveEdit"
-                :disable="!editTabObj.data.name.trim()"
-                data-test="dashboard-tab-settings-tab-name-edit-save"
-              ></q-btn>
-              <q-btn
-                icon="close"
-                unelevated
-                size="sm"
-                round
-                flat
-                :title="t('dashboard.cancel')"
-                @click.stop="cancelEdit"
-                data-test="dashboard-tab-settings-tab-name-edit-cancel"
-              ></q-btn>
+              <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('dashboard.save')"
+  @click.stop="saveEdit"
+  data-test="dashboard-tab-settings-tab-name-edit-save"
+  :disabled="!editTabObj.data.name.trim()">
+  <template #icon-left><Check class="tw:w-4 tw:h-4" /></template>
+</OButton>
+              <OButton
+  variant="ghost"
+  size="icon"
+  :title="t('dashboard.cancel')"
+  @click.stop="cancelEdit"
+  data-test="dashboard-tab-settings-tab-name-edit-cancel">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
             </div>
             <div class="actions">
-              <q-btn
-                icon="edit"
-                padding="4px"
-                unelevated
-                size="sm"
-                round
-                flat
-                :disabled="tab.tabId === editTabId"
-                :title="t('dashboard.edit')"
-                @click.stop="editItem(tab.tabId)"
-                data-test="dashboard-tab-settings-tab-edit-btn"
-              />
-              <q-btn
-                v-if="currentDashboardData.data.tabs.length !== 1"
-                :icon="outlinedDelete"
-                :title="t('dashboard.delete')"
-                padding="4px"
-                unelevated
-                size="sm"
-                round
-                flat
-                @click.stop="deleteItem(tab.tabId)"
-                data-test="dashboard-tab-settings-tab-delete-btn"
-              />
+              <OButton
+  variant="ghost"
+  size="icon"
+  :disabled="tab.tabId === editTabId"
+  :title="t('dashboard.edit')"
+  @click.stop="editItem(tab.tabId)"
+  data-test="dashboard-tab-settings-tab-edit-btn">
+  <template #icon-left><Pencil class="tw:w-4 tw:h-4" /></template>
+</OButton>
+              <OButton
+  variant="ghost"
+  size="icon"
+  v-if="currentDashboardData.data.tabs.length !== 1"
+  :title="t('dashboard.delete')"
+  @click.stop="deleteItem(tab.tabId)"
+  data-test="dashboard-tab-settings-tab-delete-btn">
+  <template #icon-left><Trash2 class="tw:w-4 tw:h-4" /></template>
+</OButton>
             </div>
           </div>
         </div>
@@ -179,6 +161,9 @@ import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 import { updateDashboard } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
 
+import OButton from "@/lib/core/Button/Button.vue";
+
+import { Check, Pencil, Trash2 } from "lucide-vue-next";
 export default defineComponent({
   name: "TabsSettings",
   components: {
@@ -186,7 +171,11 @@ export default defineComponent({
     DashboardHeader,
     AddTab,
     TabsDeletePopUp,
-  },
+    OButton,
+    Check,
+    Pencil,
+    Trash2,
+},
   emits: ["refresh"],
   setup(props, { emit }) {
     const store = useStore();

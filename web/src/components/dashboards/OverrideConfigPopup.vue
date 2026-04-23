@@ -7,16 +7,14 @@
       <div class="flex items-center q-table__title q-mr-md">
         <span>{{ t("dashboard.overrideConfigTitle") }}</span>
       </div>
-      <q-btn
-        icon="close"
-        class="q-ml-xs"
-        unelevated
-        size="sm"
-        round
-        outline
-        :title="t('dashboard.cancel')"
-        @click.stop="closePopup"
-      ></q-btn>
+      <OButton
+  variant="outline"
+  size="icon"
+  :title="t('dashboard.cancel')"
+  @click.stop="closePopup"
+  class="q-ml-xs">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
     </div>
 
     <div
@@ -102,26 +100,23 @@
           />
         </div>
 
-        <q-btn
-          @click="removeOverrideConfig(index)"
-          icon="close"
-          class="delete-btn"
-          dense
-          flat
-          round
-          :data-test="`dashboard-addpanel-config-unit-config-delete-btn-${index}`"
-        />
+        <OButton
+  variant="ghost"
+  size="icon"
+  @click="removeOverrideConfig(index)"
+  :data-test="`dashboard-addpanel-config-unit-config-delete-btn-${index}`"
+  class="delete-btn">
+  <template #icon-left><X class="tw:w-4 tw:h-4" /></template>
+</OButton>
       </div>
     </div>
-    <q-btn
-      @click="addOverrideConfig"
-      :label="t('dashboard.overrideConfigAddNew')"
-      no-caps
-      class="q-mt-md el-border"
-    />
+    <OButton
+  variant="outline"
+  @click="addOverrideConfig"
+  class="q-mt-md">{{ t('dashboard.overrideConfigAddNew') }}</OButton>
 
     <q-card-actions align="right">
-      <q-btn :label="t('dashboard.overrideConfigSave')" color="primary" @click="saveOverrides" />
+      <OButton @click="saveOverrides">{{ t('dashboard.overrideConfigSave') }}</OButton>
     </q-card-actions>
   </div>
 </template>
@@ -130,7 +125,11 @@
 import { defineComponent, ref, computed, watch, PropType, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
+  components: {
+    OButton,
+  },
   name: "OverrideConfigPopup",
   props: {
     columns: {

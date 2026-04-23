@@ -36,21 +36,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-select>
 
-    <q-btn
-      class="q-mb-md add-folder-btn"
-      data-test="dashboard-folder-move-new-add"
-      style="width: 40px;"
-      :style="computedStyle"
-      no-caps
-      dense
-      @click="
+    <OButton
+  data-test="dashboard-folder-move-new-add"
+  style="width: 40px;"
+  :style="computedStyle"
+  @click="
         () => {
           showAddFolderDialog = true;
         }
       "
-    >
-      <q-icon name="add" size="xs" />
-    </q-btn>
+  class="q-mb-md add-folder-btn"><q-icon name="add" size="xs" /></OButton>
   </div>
   <!-- add folder -->
   <q-dialog
@@ -71,9 +66,12 @@ import { useStore } from "vuex";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import { useRoute } from "vue-router";
 
+import OButton from "@/lib/core/Button/Button.vue";
 export default defineComponent({
   name: "SelectedFolderDropdown",
-  components: { AddFolder },
+  components: { AddFolder,
+    OButton,
+},
   emits: ["folder-selected"],
   props: {
     activeFolderId: {
