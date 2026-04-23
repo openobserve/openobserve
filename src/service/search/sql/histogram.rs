@@ -400,8 +400,7 @@ mod tests {
     #[test]
     fn test_convert_query_with_breakdown_complex_where() {
         // breakdown field + WHERE clause are both preserved
-        let original_query =
-            "SELECT * FROM \"api_logs\" WHERE status >= 400 AND level = 'error'";
+        let original_query = "SELECT * FROM \"api_logs\" WHERE status >= 400 AND level = 'error'";
         let stream_names = vec!["api_logs".to_string()];
         let result =
             convert_to_histogram_query(original_query, &stream_names, false, Some("severity"))

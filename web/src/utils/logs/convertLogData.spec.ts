@@ -527,15 +527,15 @@ describe("convertLogData.ts", () => {
         expect(options.tooltip.backgroundColor).toBe("#ffffff");
       });
 
-      it("injects a scoped CSS hover style block instead of inline event handlers", () => {
+      it("uses no inline event handlers and no injected style blocks", () => {
         const formatter = getFormatter();
         const result = formatter([
           { axisValueLabel: "Jan 1", marker: "●", seriesName: "Info", value: [ts1, 5] },
         ]);
-        // Must use the CSS class approach, not inline onmouseenter
-        expect(result).toContain("oo-tt-row");
+        // Hover effect was removed to avoid repeated <style> injection and CSP violations
         expect(result).not.toContain("onmouseenter");
         expect(result).not.toContain("onmouseleave");
+        expect(result).not.toContain("<style>");
       });
 
       it("contains the timestamp header in the tooltip", () => {
