@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -283,7 +283,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               data-test="pattern-detail-previous-btn"
               class="o2-secondary-button tw:h-[36px]"
-              no-caps
               :disabled="selectedPattern.index === 0"
               @click="$emit('navigate', false, true)"
               icon="navigate_before"
@@ -299,7 +298,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               data-test="pattern-detail-next-btn"
               class="o2-secondary-button tw:h-[36px]"
-              no-caps
               :disabled="selectedPattern.index >= totalPatterns - 1"
               @click="$emit('navigate', true, false)"
               icon-right="navigate_next"
@@ -313,6 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+
 import { computed } from "vue";
 import { useStore } from "vuex";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";

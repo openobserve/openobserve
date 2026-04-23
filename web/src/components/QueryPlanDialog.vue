@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -82,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="!isAnalyzing && !showAnalyzeResults"
                   color="primary"
                   :label="t('search.analyze')"
-                  no-caps
                   size="sm"
                   @click="runAnalyze"
                   :loading="loading"
@@ -146,23 +145,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- EXPLAIN view (tabs for logical/physical) -->
               <div v-else class="plan-container q-pa-md">
                 <q-card flat bordered class="plan-card">
-                  <q-tabs
+                  <OTabs
                     v-model="activeTab"
                     dense
                     class="text-grey"
-                    active-color="primary"
-                    indicator-color="primary"
                     align="left"
-                    no-caps
                   >
-                    <q-tab name="logical" :label="t('search.logicalPlan')" />
-                    <q-tab name="physical" :label="t('search.physicalPlan')" />
-                  </q-tabs>
+                    <OTab name="logical" :label="t('search.logicalPlan')" />
+                    <OTab name="physical" :label="t('search.physicalPlan')" />
+                  </OTabs>
 
                   <q-separator />
 
-                  <q-tab-panels v-model="activeTab" animated>
-                    <q-tab-panel name="logical" class="q-pa-none">
+                  <OTabPanels v-model="activeTab" animated>
+                    <OTabPanel name="logical">
                       <div class="plan-scroll-area">
                         <QueryPlanTree
                           v-if="logicalPlanTree"
@@ -173,9 +169,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ t("search.noLogicalPlan") }}
                         </div>
                       </div>
-                    </q-tab-panel>
+                    </OTabPanel>
 
-                    <q-tab-panel name="physical" class="q-pa-none">
+                    <OTabPanel name="physical">
                       <div class="plan-scroll-area">
                         <QueryPlanTree
                           v-if="physicalPlanTree"
@@ -186,8 +182,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ t("search.noPhysicalPlan") }}
                         </div>
                       </div>
-                    </q-tab-panel>
-                  </q-tab-panels>
+                    </OTabPanel>
+                  </OTabPanels>
                 </q-card>
               </div>
             </div>
@@ -199,6 +195,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -729,11 +729,11 @@ export default defineComponent({
         display: flex;
         flex-direction: column;
 
-        .q-tabs {
+        .o-tabs {
           flex-shrink: 0;
         }
 
-        .q-tab-panels {
+        .o-tab-panels {
           flex: 1;
           overflow: hidden;
         }

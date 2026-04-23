@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -59,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             :label="t('invitation.accept')"
             class="q-mr-sm o2-primary-button no-hover"
-            no-caps
             flat
             dense
             @click="acceptInvitation(props.row)"
@@ -68,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             :label="t('invitation.reject')"
             class="o2-secondary-button"
-            no-caps
             flat
             dense
             @click="rejectInvitation(props.row)"
@@ -111,12 +109,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" no-caps class="q-mr-sm o2-secondary-button">
+          <q-btn v-close-popup="true" class="q-mr-sm o2-secondary-button">
             {{ t("invitation.cancel") }}
           </q-btn>
           <q-btn
             v-close-popup="true"
-            no-caps
             class="o2-primary-button"
             @click="confirmAcceptInvitation"
           >
@@ -140,12 +137,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" no-caps class="q-mr-sm o2-secondary-button">
+          <q-btn v-close-popup="true" class="q-mr-sm o2-secondary-button">
             {{ t("invitation.cancel") }}
           </q-btn>
           <q-btn
             v-close-popup="true"
-            no-caps
             class="o2-primary-button"
             @click="confirmRejectInvitation"
           >
@@ -158,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 import { defineComponent, ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useQuasar, type QTableProps } from "quasar";

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -120,14 +120,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Save/Cancel buttons when editing -->
       <div v-if="incidentDetails && isEditingTitle" class="tw:flex tw:items-center tw:gap-2 tw:ml-auto">
          <q-btn
-          no-caps
           @click="cancelTitleEdit"
           class="o2-secondary-button"
         >
           <span>{{ t('alerts.cancel') }}</span>
         </q-btn>
         <q-btn
-          no-caps
           @click="saveTitleEdit"
           class="o2-primary-button"
         >
@@ -148,7 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="incidentDetails && !isEditingTitle" class="tw:flex tw:gap-2 tw:items-center">
         <q-btn
           v-if="incidentDetails.status === 'open'"
-          no-caps
           unelevated
           @click="acknowledgeIncident"
           :loading="updating"
@@ -159,7 +156,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
         <q-btn
           v-if="incidentDetails.status !== 'resolved'"
-          no-caps
           unelevated
           @click="resolveIncident"
           :loading="updating"
@@ -170,7 +166,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
         <q-btn
           v-if="incidentDetails.status === 'resolved'"
-          no-caps
           unelevated
           @click="reopenIncident"
           :loading="updating"
@@ -183,7 +178,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Edit Title Button -->
         <q-btn
-          no-caps
           flat
           @click="startTitleEdit"
           class="o2-secondary-button"
@@ -198,34 +192,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!loading && incidentDetails" class="card-container tw:flex tw:flex-col tw:overflow-hidden" style="height: calc(100vh - 130px);">
       <!-- Tabs (moved to top level) -->
       <div class="tw:flex-shrink-0 tw:px-4 tw:pt-3">
-        <q-tabs
+        <OTabs
           v-model="activeTab"
-          inline-label
           dense
-          no-caps
           align="left"
           class="tw:flex-1"
           mobile-arrows
-          outside-arrows
           :breakpoint="0"
         >
-          <q-tab
+          <OTab
             name="overview"
             label="Overview"
           />
-          <q-tab
+          <OTab
             name="activity"
             label="Activity"
           />
-          <q-tab
+          <OTab
             name="incidentAnalysis"
             :label="t('alerts.incidents.incidentAnalysis')"
           />
-          <q-tab
+          <OTab
             name="serviceGraph"
             label="Alert Graph"
           />
-          <q-tab
+          <OTab
             name="alertTriggers"
           >
             <template #default>
@@ -234,22 +225,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="tw:text-sm tw:opacity-70">({{ triggers.length }})</span>
               </div>
             </template>
-          </q-tab>
+          </OTab>
 
           <!-- Telemetry tabs always inline -->
-          <q-tab
+          <OTab
             name="logs"
             :label="t('common.logs')"
           />
-          <q-tab
+          <OTab
             name="metrics"
             :label="t('search.metrics')"
           />
-          <q-tab
+          <OTab
             name="traces"
             :label="t('menu.traces')"
           />
-        </q-tabs>
+        </OTabs>
       </div>
 
       <!-- Tab Content Container -->
@@ -487,7 +478,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-btn
                       flat
                       dense
-                      no-caps
                       size="sm"
                       color="primary"
                       @click="activeTab = 'activity'"
@@ -1219,6 +1209,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import { defineComponent, ref, watch, computed, PropType, nextTick, onMounted, onBeforeUnmount, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";

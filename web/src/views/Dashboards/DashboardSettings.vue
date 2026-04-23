@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -45,36 +45,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:before>
         <div class="functions-tabs" style="width: 100%">
-          <q-tabs
+          <OTabs
             v-model="activeTab"
-            indicator-color="transparent"
-            inline-label
-            vertical
+            orientation="vertical"
           >
-            <q-tab
+            <OTab
               name="generalSettings"
               icon="settings"
               :label="t('dashboard.generalSettings')"
               data-test="dashboard-settings-general-tab"
             />
-            <q-tab
+            <OTab
               name="variableSettings"
               icon="data_array"
               :label="t('dashboard.variableSettings')"
               data-test="dashboard-settings-variable-tab"
             />
-            <q-tab
+            <OTab
               name="tabSettings"
               icon="tab"
               :label="t('dashboard.tabSettings')"
               data-test="dashboard-settings-tab-tab"
             />
-          </q-tabs>
+          </OTabs>
         </div>
       </template>
       <template v-slot:after>
         <div class="q-mx-sm q-my-sm scroll" style="width: 60vw">
-          <q-tab-panels
+          <OTabPanels
             v-model="activeTab"
             animated
             swipeable
@@ -82,18 +80,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             transition-prev="fade"
             transition-next="fade"
           >
-            <q-tab-panel name="generalSettings" data-test="general-tab-panels-default">
+            <OTabPanel name="generalSettings" data-test="general-tab-panels-default">
               <GeneralSettings @save="refreshRequired" />
-            </q-tab-panel>
+            </OTabPanel>
 
-            <q-tab-panel name="variableSettings" data-test="variable-tab-panels-default">
+            <OTabPanel name="variableSettings" data-test="variable-tab-panels-default">
               <VariableSettings @save="refreshRequired" />
-            </q-tab-panel>
+            </OTabPanel>
 
-            <q-tab-panel name="tabSettings" data-test="tab-tab-panels-default">
+            <OTabPanel name="tabSettings" data-test="tab-tab-panels-default">
               <TabsSettings @refresh="refreshRequired" />
-            </q-tab-panel>
-          </q-tab-panels>
+            </OTabPanel>
+          </OTabPanels>
         </div>
       </template>
     </q-splitter>
@@ -101,6 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -155,15 +157,15 @@ export default defineComponent({
   }
 }
 
-.q-tab-panel {
+.o-tab-panel {
   padding: 0px !important;
 }
 
 .functions-tabs {
-  .q-tabs {
+  .o-tabs {
     &--vertical {
       margin: 20px 16px 0 16px;
-      .q-tab {
+      .o-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
@@ -171,7 +173,7 @@ export default defineComponent({
         // color: $dark;
         text-transform: capitalize;
         &__content.tab_content {
-          .q-tab {
+          .o-tab {
             &__icon + &__label {
               padding-left: 0.875rem;
               font-weight: 600;

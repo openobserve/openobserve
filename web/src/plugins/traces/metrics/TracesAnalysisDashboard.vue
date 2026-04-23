@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -111,7 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             v-if="showRefreshButton"
             dense
-            no-caps
             color="primary"
             icon="refresh"
             @click="refreshAfterPercentileChange"
@@ -135,17 +134,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <!-- Tabs (only shown if multiple analysis types available) -->
-      <q-tabs
+      <OTabs
         v-if="showTabs"
         v-model="activeAnalysisType"
         dense
-        inline-label
         class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-[var(--o2-text-1)]! insights-dashboard-tabs"
-        active-color="primary"
-        indicator-color="primary"
         align="left"
       >
-        <q-tab
+        <OTab
           v-for="tab in availableTabs"
           :key="tab.name"
           :name="tab.name"
@@ -153,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :icon="tab.icon"
           class="tw:min-h-[3rem]"
         />
-      </q-tabs>
+      </OTabs>
 
       <!-- Dashboard Content with Sidebar -->
       <q-card-section class="analysis-content tw:flex-1 tw:p-0">
@@ -353,6 +349,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -1164,13 +1162,13 @@ watch(
   }
 
   .insights-dashboard-tabs {
-    :deep(.q-tabs__content .q-icon) {
+    :deep(.o-tabs__content .q-icon) {
       font-size: 1.2rem;
       display: flex;
       align-items: center;
     }
 
-    :deep(.q-tab__label) {
+    :deep(.o-tab__label) {
       font-weight: bold;
       padding-left: 0.13rem;
     }

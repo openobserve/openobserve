@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -410,7 +410,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               :label="t('common.refresh')"
               class="o2-secondary-button tw:h-[36px]"
-              no-caps
               flat
               @click="getData(true)">
             </q-btn>
@@ -515,6 +514,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 import { defineComponent, ref, onMounted, onUpdated, watch, Ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";

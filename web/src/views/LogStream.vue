@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -57,7 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="log-stream-refresh-stats-btn"
                 class="q-ml-sm o2-secondary-button tw:h-[36px]"
                 flat
-                no-caps
                 @click="getLogStream(true)"
               >
                 <span>{{ t(`logStream.refreshStats`) }}</span>
@@ -67,7 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="log-stream-add-stream-btn"
                 class="q-ml-sm o2-primary-button tw:h-[36px]"
                 flat
-                no-caps
                 :label="t(`logStream.add`)"
                 @click="addStream"
               />
@@ -214,7 +212,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                   v-if="selected.length > 0"
                   class="o2-secondary-button tw:h-[36px] tw:ml-4"
-                  no-caps
                   flat
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   :disable="isDeleting"
@@ -275,13 +272,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           </div>
         <q-card-actions class="confirmActionsLogStream">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
             v-close-popup="true"
             unelevated
-            no-caps
             class="no-border"
             color="primary"
             @click="deleteStream"
@@ -304,13 +300,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           </div>
         <q-card-actions class="confirmActionsLogStream">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
             v-close-popup="true"
             unelevated
-            no-caps
             class="no-border"
             color="primary"
             @click="deleteBatchStream"
@@ -324,6 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 import {
   computed,
   defineComponent,

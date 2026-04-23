@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div
     :class="
       !customQuery && !fields.isDerived
@@ -41,7 +41,7 @@
     <div
       :style="(!customQuery && !fields.isDerived) ? 'width: calc(100% - 134px)' : 'width: max-content;'"
     >
-      <q-tabs
+      <OTabs
         v-if="!customQuery && !fields.isDerived"
         v-model="fields.type"
         @update:modelValue="onFieldTypeChange"
@@ -49,24 +49,24 @@
         data-test="dynamic-function-popup-tabs"
         :align="'left'"
       >
-        <q-tab
+        <OTab
           name="build"
           label="Build"
           data-test="dynamic-function-popup-tab-build"
           class="tab-item-bold"
         />
-        <q-tab
+        <OTab
           name="raw"
           label="Raw"
           data-test="dynamic-function-popup-tab-raw"
           class="tab-item-bold"
         />
-      </q-tabs>
+      </OTabs>
 
       <q-separator v-if="!customQuery && !fields.isDerived" />
 
-      <q-tab-panels v-if="!customQuery && !fields.isDerived" v-model="fields.type" animated>
-        <q-tab-panel name="build" style="padding: 0px; padding-top: 8px">
+      <OTabPanels v-if="!customQuery && !fields.isDerived" v-model="fields.type" animated>
+        <OTabPanel name="build" style="padding: 0px; padding-top: 8px">
           <div style="display: flex">
             <div style="width: calc(100% - 134px)">
               <div class="text-label-bold tw:pb-3">Configuration</div>
@@ -77,8 +77,8 @@
               />
             </div>
           </div>
-        </q-tab-panel>
-        <q-tab-panel name="raw" style="padding: 0px; padding-top: 8px">
+        </OTabPanel>
+        <OTabPanel name="raw" style="padding: 0px; padding-top: 8px">
           <div style="display: flex; width: 100%">
             <div style="width: 100%; padding-right: 12px">
               <RawQueryBuilder
@@ -87,8 +87,8 @@
               />
             </div>
           </div>
-        </q-tab-panel>
-      </q-tab-panels>
+        </OTabPanel>
+      </OTabPanels>
 
       <div class="tw:pt-2 tw:pr-3" v-if="!customQuery && !fields.isDerived && allowAggregation">
         <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
@@ -101,7 +101,6 @@
             label="Add"
             padding="xs sm"
             class="el-border"
-            no-caps
             @click="toggleHavingFilter"
             v-if="!isHavingFilterVisible()"
             data-test="dynamic-function-popup-having-add-btn"
@@ -164,6 +163,10 @@
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { ref, watch, nextTick } from "vue";
 import RawQueryBuilder from "./RawQueryBuilder.vue";
 import SelectFunction from "./SelectFunction.vue";
