@@ -1008,7 +1008,10 @@ mod tests {
             SearchEventType::from(M::Other),
             SearchEventType::Other
         ));
-        assert!(matches!(SearchEventType::from(M::RUM), SearchEventType::RUM));
+        assert!(matches!(
+            SearchEventType::from(M::RUM),
+            SearchEventType::RUM
+        ));
         assert!(matches!(
             SearchEventType::from(M::DerivedStream),
             SearchEventType::DerivedStream
@@ -1031,7 +1034,10 @@ mod tests {
     fn test_search_event_type_to_meta_all_variants() {
         use meta_search::SearchEventType as M;
         assert!(matches!(M::from(SearchEventType::UI), M::UI));
-        assert!(matches!(M::from(SearchEventType::Dashboards), M::Dashboards));
+        assert!(matches!(
+            M::from(SearchEventType::Dashboards),
+            M::Dashboards
+        ));
         assert!(matches!(M::from(SearchEventType::Reports), M::Reports));
         assert!(matches!(M::from(SearchEventType::Alerts), M::Alerts));
         assert!(matches!(M::from(SearchEventType::Values), M::Values));
@@ -1056,8 +1062,14 @@ mod tests {
             StreamType::from(M::EnrichmentTables),
             StreamType::EnrichmentTables
         ));
-        assert!(matches!(StreamType::from(M::Filelist), StreamType::Filelist));
-        assert!(matches!(StreamType::from(M::Metadata), StreamType::Metadata));
+        assert!(matches!(
+            StreamType::from(M::Filelist),
+            StreamType::Filelist
+        ));
+        assert!(matches!(
+            StreamType::from(M::Metadata),
+            StreamType::Metadata
+        ));
         assert!(matches!(StreamType::from(M::Index), StreamType::Index));
         // ServiceGraph maps to Metadata
         assert!(matches!(

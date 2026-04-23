@@ -74,8 +74,9 @@ impl From<&cluster_rpc::Exemplar> for Exemplar {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use proto::cluster_rpc;
+
+    use super::*;
 
     #[test]
     fn test_label_from_rpc() {
