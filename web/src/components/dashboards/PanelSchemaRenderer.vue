@@ -357,7 +357,6 @@ import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
-import { throttle } from "lodash-es";
 import {
   usePanelAlertCreation,
   usePanelDownload,
@@ -1029,29 +1028,6 @@ export default defineComponent({
     // in the same tick — this ensures only the first one executes the render.
     let streamEndRenderPending = false;
 
-    // Create a throttled version for streaming updates (350ms throttle)
-    // Chunks arrive ~300-400ms apart, so 350ms ensures updates every 2-3 chunks
-    // This prevents excessive re-renders while showing progressive updates
-    const convertPanelDataThrottled = throttle(convertPanelDataCommon, 350, {
-      leading: true, // Call immediately on first invocation
-      trailing: true, // Ensure final call after throttle period
-    });
-
-    // Combined convert + overlay for subsequent streaming chunks.
-    // Must be a single throttled unit because throttle() doesn't return a promise —
-    // calling overlay separately after convertPanelDataThrottled() would run overlay
-    // BEFORE the throttled conversion executes, then the conversion overwrites the result.
-    const convertAndOverlayThrottled = throttle(
-      async () => {
-        await convertPanelDataCommon(true);
-      },
-      350,
-      {
-        leading: true,
-        trailing: true,
-      },
-    );
-
     // Watch for panel schema changes to re-convert panel data
     watch(
       panelSchema,
@@ -1182,15 +1158,12 @@ export default defineComponent({
             // so ChartRenderer's watcher fires once with the overlaid options.
             await convertPanelDataCommon(true);
           } else if (hasData) {
-            // SUBSEQUENT CHUNKS: throttle conversion + overlay as a single unit
-            convertAndOverlayThrottled();
+            // SUBSEQUENT CHUNKS: convert and overlay immediately
+            await convertPanelDataCommon(true);
           }
           // else: !hasData during loading → skip conversion → old chart stays visible
         } else {
           // ---- LOADING COMPLETE ----
-          // Cancel any pending throttled calls and render immediately
-          convertPanelDataThrottled.cancel();
-          convertAndOverlayThrottled.cancel();
           hasRenderedFirstDataChunk.value = false; // Reset for next query
 
           // Claim the final render before awaiting so that watch(loading),
@@ -1219,8 +1192,6 @@ export default defineComponent({
     watch(loading, async (newLoading, oldLoading) => {
       if (oldLoading === true && newLoading === false) {
         // Stream just completed
-        convertPanelDataThrottled.cancel();
-        convertAndOverlayThrottled.cancel();
         hasRenderedFirstDataChunk.value = false;
 
         // If the data watcher's else-branch already claimed the final render
