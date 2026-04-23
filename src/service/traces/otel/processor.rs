@@ -281,11 +281,23 @@ impl OtelIngestionProcessor {
         }
 
         if let Some(input_val) = input {
-            span_attributes.insert(O2Attributes::INPUT.to_string(), input_val);
+            // Always store as a flat string so the column is never flattened into sub-fields.
+            // JSON objects/arrays are serialized; strings are kept as-is.
+            let flat = if input_val.is_string() {
+                input_val
+            } else {
+                json::json!(input_val.to_string())
+            };
+            span_attributes.insert(O2Attributes::INPUT.to_string(), flat);
         }
 
         if let Some(output_val) = output {
-            span_attributes.insert(O2Attributes::OUTPUT.to_string(), output_val);
+            let flat = if output_val.is_string() {
+                output_val
+            } else {
+                json::json!(output_val.to_string())
+            };
+            span_attributes.insert(O2Attributes::OUTPUT.to_string(), flat);
         }
 
         if !model_params.is_empty() {
