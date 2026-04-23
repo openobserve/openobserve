@@ -169,7 +169,7 @@ import { useI18n } from "vue-i18n";
 import { getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 
-export defineComponent({
+export default defineComponent({
   name: "AppFunctions",
   emits: ["sendToAiChat"],
   setup(props, { emit }) {

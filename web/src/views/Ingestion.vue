@@ -262,7 +262,7 @@ import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 
-export defineComponent({
+export default defineComponent({
   name: "PageIngestion",
   components: { ConfirmDialog },
   setup() {
