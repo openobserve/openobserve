@@ -25,7 +25,9 @@ use config::{
     meta::{
         dashboards::usage_report::DashboardInfo,
         function::{RESULT_ARRAY, VRLResultResolver},
-        search::{ScanStats, SearchEventType, StreamResponses, TimeOffset, ValuesEventContext},
+        search::{
+            Request, ScanStats, SearchEventType, StreamResponses, TimeOffset, ValuesEventContext,
+        },
         sql::OrderBy,
         stream::StreamType,
     },
@@ -33,9 +35,12 @@ use config::{
 };
 use log;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::{
-    auditor::{AuditMessage, Protocol, ResponseMeta},
-    config::get_config as get_o2_config,
+use o2_enterprise::enterprise::{
+    common::{
+        auditor::{AuditMessage, Protocol, ResponseMeta},
+        config::get_config as get_o2_config,
+    },
+    log_patterns::{PatternAccumulator, PatternExtractionConfig},
 };
 use tokio::sync::mpsc;
 use tracing::Instrument;
@@ -76,12 +81,12 @@ pub async fn process_search_stream_request(
     org_id: String,
     user_id: String,
     trace_id: String,
-    mut req: config::meta::search::Request,
+    mut req: Request,
     stream_type: StreamType,
     stream_names: Vec<String>,
     req_order_by: OrderBy,
     search_span: tracing::Span,
-    sender: mpsc::Sender<Result<config::meta::search::StreamResponses, infra::errors::Error>>,
+    sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     values_ctx: Option<ValuesEventContext>,
     fallback_order_by_col: Option<String>,
     _audit_ctx: Option<AuditContext>,
@@ -118,8 +123,7 @@ pub async fn process_search_stream_request(
         all_fts_fields.dedup();
 
         log::info!(
-            "[HTTP2_STREAM trace_id {trace_id}] Using FTS fields for pattern extraction: {:?}",
-            all_fts_fields
+            "[HTTP2_STREAM trace_id {trace_id}] Using FTS fields for pattern extraction: {all_fts_fields:?}",
         );
 
         // Get configuration from O2 config and OpenObserve config
@@ -152,21 +156,11 @@ pub async fn process_search_stream_request(
         );
 
         // Create config with stream-specific FTS fields and O2 config values
-        let config = o2_enterprise::enterprise::log_patterns::PatternExtractionConfig {
-            max_logs_for_extraction: max_logs,
-            min_cluster_size: o2_config.log_patterns.min_cluster_size,
-            similarity_threshold: o2_config.log_patterns.similarity_threshold,
-            xdrain_depth: o2_config.log_patterns.xdrain_depth,
-            xdrain_max_child: o2_config.log_patterns.xdrain_max_child,
-            max_clusters: o2_config.log_patterns.max_clusters,
-            min_field_length: o2_config.log_patterns.min_field_length,
-            fts_fields: all_fts_fields,
-        };
+        let config = PatternExtractionConfig::default()
+            .with_fts_fields(all_fts_fields)
+            .with_max_logs(max_logs);
 
-        (
-            Some(o2_enterprise::enterprise::log_patterns::PatternAccumulator::new(config.clone())),
-            Some(config),
-        )
+        (Some(PatternAccumulator::new(config.clone())), Some(config))
     } else {
         (None, None)
     };
@@ -690,16 +684,16 @@ pub async fn process_search_stream_request(
 
         let stats = accumulator.stats();
         log::info!(
-            "[HTTP2_STREAM trace_id {trace_id}] Pattern accumulator stats: {} logs accumulated from {} seen by accumulator, {} total scanned with sampling (sampled: {})",
+            "[HTTP2_STREAM trace_id {trace_id}] Pattern accumulator stats: {} logs accumulated from {} seen by accumulator, {total_scan_records} total scanned with sampling (sampled: {})",
             stats.accumulated_logs,
             stats.total_logs_seen,
-            total_scan_records,
             stats.was_sampled
         );
 
         // Extract patterns if we have logs
         if stats.accumulated_logs > 0 {
             match o2_enterprise::enterprise::log_patterns::extract_patterns_from_stream(
+                &trace_id,
                 accumulator,
                 all_streams.clone(),
                 pattern_config.unwrap(),
@@ -729,18 +723,15 @@ pub async fn process_search_stream_request(
                         }
                         Err(e) => {
                             log::error!(
-                                "[HTTP2_STREAM trace_id {trace_id}] Failed to serialize patterns: {}",
-                                e
+                                "[HTTP2_STREAM trace_id {trace_id}] Failed to serialize patterns: {e}",
                             );
                         }
                     }
                 }
                 Err(e) => {
                     log::error!(
-                        "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction failed: {} (continuing with search results)",
-                        e
+                        "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction failed: {e} (continuing with search results)",
                     );
-                    // Non-fatal: search results were already sent
                 }
             }
         } else {
@@ -765,7 +756,7 @@ pub async fn process_search_stream_request_multi(
     org_id: String,
     user_id: String,
     trace_id: String,
-    queries: Vec<config::meta::search::Request>,
+    queries: Vec<Request>,
     stream_type: StreamType,
     search_span: tracing::Span,
     sender: mpsc::Sender<Result<config::meta::search::StreamResponses, infra::errors::Error>>,
