@@ -220,7 +220,8 @@ const useLogs = () => {
           if (
             searchObj.loading == false &&
             searchObj.loadingHistogram == false &&
-            searchObj.meta.logsVisualizeToggle == "logs"
+            searchObj.meta.logsVisualizeToggle == "logs" &&
+            searchObj.data.stream.selectedStream.length > 0
           ) {
             searchObj.loading = true;
             await getQueryData(false);
