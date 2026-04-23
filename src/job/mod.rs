@@ -85,7 +85,9 @@ async fn patch_sre_readonly_eval_templates() {
         .await
         .is_ok()
     {
-        let _ = infra::dist_lock::unlock(&lock).await;
+        if let Err(e) = infra::dist_lock::unlock(&lock).await {
+            log::error!("dist_lock unlock failed: {e}");
+        }
         return;
     }
 
@@ -93,7 +95,9 @@ async fn patch_sre_readonly_eval_templates() {
         Ok(orgs) => orgs,
         Err(e) => {
             log::error!("Failed to list orgs for sre-readonly eval_templates patch: {e}");
-            let _ = infra::dist_lock::unlock(&lock).await;
+            if let Err(e) = infra::dist_lock::unlock(&lock).await {
+                log::error!("dist_lock unlock failed: {e}");
+            }
             return;
         }
     };
@@ -113,7 +117,9 @@ async fn patch_sre_readonly_eval_templates() {
 
     if failed {
         log::warn!("sre-readonly eval_templates patch had failures — will retry on next startup");
-        let _ = infra::dist_lock::unlock(&lock).await;
+        if let Err(e) = infra::dist_lock::unlock(&lock).await {
+            log::error!("dist_lock unlock failed: {e}");
+        }
         return;
     }
 
@@ -125,7 +131,9 @@ async fn patch_sre_readonly_eval_templates() {
         log::info!("sre-readonly eval_templates patch complete");
     }
 
-    let _ = infra::dist_lock::unlock(&lock).await;
+    if let Err(e) = infra::dist_lock::unlock(&lock).await {
+        log::error!("dist_lock unlock failed: {e}");
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -151,7 +159,9 @@ async fn backfill_sys_rca_agent_openfga_tuples() {
         .await
         .is_ok()
     {
-        let _ = infra::dist_lock::unlock(&lock).await;
+        if let Err(e) = infra::dist_lock::unlock(&lock).await {
+            log::error!("dist_lock unlock failed: {e}");
+        }
         return;
     }
 
@@ -159,7 +169,9 @@ async fn backfill_sys_rca_agent_openfga_tuples() {
         Ok(orgs) => orgs,
         Err(e) => {
             log::error!("Failed to list orgs for OpenFGA backfill: {e}");
-            let _ = infra::dist_lock::unlock(&lock).await;
+            if let Err(e) = infra::dist_lock::unlock(&lock).await {
+                log::error!("dist_lock unlock failed: {e}");
+            }
             return;
         }
     };
@@ -179,7 +191,9 @@ async fn backfill_sys_rca_agent_openfga_tuples() {
 
     if failed {
         log::warn!("SysRcaAgent OpenFGA backfill had failures — will retry on next startup");
-        let _ = infra::dist_lock::unlock(&lock).await;
+        if let Err(e) = infra::dist_lock::unlock(&lock).await {
+            log::error!("dist_lock unlock failed: {e}");
+        }
         return;
     }
 
@@ -191,7 +205,9 @@ async fn backfill_sys_rca_agent_openfga_tuples() {
         log::info!("SysRcaAgent OpenFGA tuple backfill complete");
     }
 
-    let _ = infra::dist_lock::unlock(&lock).await;
+    if let Err(e) = infra::dist_lock::unlock(&lock).await {
+        log::error!("dist_lock unlock failed: {e}");
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -424,8 +440,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // One-time OpenFGA migrations — dist_lock ensures only one node runs each
         // migration even in multi-node deployments. KV flag prevents re-runs.
         // Spawned on background threads so they do not block server startup.
-        tokio::task::spawn(backfill_sys_rca_agent_openfga_tuples());
-        tokio::task::spawn(patch_sre_readonly_eval_templates());
+        // Inner spawn + JoinHandle await catches panics so dist_lock is not held silently.
+        tokio::task::spawn(async {
+            if let Err(e) = tokio::task::spawn(backfill_sys_rca_agent_openfga_tuples()).await {
+                log::error!("backfill_sys_rca_agent_openfga_tuples task panicked: {e}");
+            }
+        });
+        tokio::task::spawn(async {
+            if let Err(e) = tokio::task::spawn(patch_sre_readonly_eval_templates()).await {
+                log::error!("patch_sre_readonly_eval_templates task panicked: {e}");
+            }
+        });
     }
 
     tokio::task::spawn(promql_self_consume::run());
