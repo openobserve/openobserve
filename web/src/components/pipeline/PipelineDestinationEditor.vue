@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="card-container tw:py-2 q-px-md tw:h-[calc(100vh-120px)] tw:overflow-auto">
+    <div class="card-container tw:py-2 q-px-md tw:overflow-auto">
       <div class="tw:w-[50vw]">
         <CreateDestinationForm
           :destination="destination"

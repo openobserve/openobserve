@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
 
       <!-- Custom logo image - shows appropriate logo based on current theme -->
-       <div class="tw:flex tw:items-center">
+      <div class="tw:flex tw:items-center">
         <!-- Dark mode: Show dark logo, fallback to light logo -->
         <img
           v-if="
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :src="
             `data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img
           "
-          style="max-width: 150px; max-height: 32px;"
+          style="max-width: 150px; max-height: 32px"
         />
         <!-- Light mode: Show light logo, fallback to dark logo -->
         <img
@@ -64,10 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
             store.state.zoConfig?.custom_logo_img != null
           "
-          :src="
-            `data:image; base64, ` + store.state.zoConfig?.custom_logo_img
-          "
-          style="max-width: 150px; max-height: 32px;"
+          :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
+          style="max-width: 150px; max-height: 32px"
         />
         <!-- Fallback: Show whichever logo exists (dark or light) -->
         <img
@@ -78,20 +76,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :src="
             `data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img
           "
-          style="max-width: 150px; max-height: 32px;"
+          style="max-width: 150px; max-height: 32px"
         />
         <img
           v-else-if="
             store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
             store.state.zoConfig?.custom_logo_img != null
           "
-          :src="
-            `data:image; base64, ` + store.state.zoConfig?.custom_logo_img
-          "
-          style="max-width: 150px; max-height: 32px;"
+          :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
+          style="max-width: 150px; max-height: 32px"
         />
-       </div>
-
+      </div>
 
       <!-- OpenObserve logo (shown alongside custom logo if configured) -->
       <div
@@ -100,11 +95,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <img
           class="openobserve-logo cursor-pointer"
-          :src="getImageURL(
-            store.state.theme === 'dark'
-              ? 'images/common/openobserve_latest_dark_2.svg'
-              : 'images/common/openobserve_latest_light_2.svg'
-          )"
+          :src="
+            getImageURL(
+              store.state.theme === 'dark'
+                ? 'images/common/openobserve_latest_dark_2.svg'
+                : 'images/common/openobserve_latest_light_2.svg',
+            )
+          "
           @click="goToHome"
           alt="OpenObserve"
         />
@@ -115,11 +112,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="flex relative-position q-mr-sm logo-container">
       <img
         class="openobserve-logo cursor-pointer"
-        :src="getImageURL(
-          store.state.theme === 'dark'
-            ? 'images/common/openobserve_latest_dark_2.svg'
-            : 'images/common/openobserve_latest_light_2.svg'
-        )"
+        :src="
+          getImageURL(
+            store.state.theme === 'dark'
+              ? 'images/common/openobserve_latest_dark_2.svg'
+              : 'images/common/openobserve_latest_light_2.svg',
+          )
+        "
         @click="goToHome"
         alt="OpenObserve"
       />
@@ -138,7 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="warning-msg"
         style="display: inline"
       >
-        <q-icon name="warning" size="xs" class="warning" />{{
+        <q-icon name="warning"
+size="xs" class="warning" />{{
           store.state.organizationData.quotaThresholdMsg
         }}
       </div>
@@ -167,7 +167,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="upgrade-to-enterprise-btn"
       >
         <div class="row items-center no-wrap">
-          <q-icon name="card_giftcard" size="16px" class="q-mr-xs" />
+          <q-icon name="card_giftcard"
+size="16px" class="q-mr-xs" />
           <span class="text-weight-medium">{{ enterpriseButtonText }}</span>
         </div>
       </q-btn>
@@ -199,9 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel -->
       <q-btn
-        v-if="
-          config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
-        "
+        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
         :ripple="false"
         @click="toggleAIChat"
         data-test="menu-link-ai-item"
@@ -244,19 +243,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-list data-test="organization-menu-list" style="width: 100%">
               <q-item data-test="organization-menu-item" style="padding: 0">
-                <q-item-section data-test="organization-menu-item-section" class="column" style="padding: 0px">
+                <q-item-section
+                  data-test="organization-menu-item-section"
+                  class="column"
+                  style="padding: 0px"
+                >
                   <!-- Organization table with search functionality -->
                   <q-table
                     data-test="organization-menu-table"
                     :rows="filteredOrganizations"
                     :row-key="(row) => 'org_' + row.identifier"
-                    :columns="[{ name: 'label', label: 'Organization', field: 'label', align: 'left' }]"
+                    :columns="[
+                      {
+                        name: 'label',
+                        label: 'Organization',
+                        field: 'label',
+                        align: 'left',
+                      },
+                    ]"
                     :visible-columns="['label']"
                     hide-header
                     :pagination="{ rowsPerPage }"
                     :rows-per-page-options="[]"
                     class="org-table"
-                    style="width: 470px; min-height: 420px; height: 420px;"
+                    style="width: 470px; min-height: 420px; height: 420px"
                   >
                     <!-- Search input for filtering organizations -->
                     <template #top>
@@ -264,7 +274,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-input
                           data-test="organization-search-input"
                           :model-value="searchQuery"
-                          @update:model-value="(val) => $emit('update:searchQuery', val)"
+                          @update:model-value="
+                            (val) => $emit('update:searchQuery', val)
+                          "
                           data-cy="index-field-search-input"
                           borderless
                           dense
@@ -293,7 +305,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="organization-menu-item-label-item-label"
                           :class="{
                             'org-menu-item--active':
-                              props.row.identifier === userClickedOrg?.identifier,
+                              props.row.identifier ===
+                              userClickedOrg?.identifier,
                           }"
                         >
                           {{
@@ -345,7 +358,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="row items-center no-wrap">
           <q-icon
-            ><component :is="slackIcon" size="32px" class="header-icon"
+            ><component :is="slackIcon" size="32px"
+class="header-icon"
           /></q-icon>
         </div>
         <q-tooltip anchor="top middle" self="bottom middle">
@@ -354,13 +368,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-btn>
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
-      <q-btn
-        round
-        flat
-        dense
-        :ripple="false"
-        data-test="menu-link-help-item"
-      >
+      <q-btn round flat
+dense :ripple="false" data-test="menu-link-help-item">
         <div class="row items-center no-wrap">
           <q-icon name="help_outline" class="header-icon"></q-icon>
           <q-tooltip anchor="top middle" self="bottom middle">
@@ -407,7 +416,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-separator />
 
             <!-- About page link -->
-            <q-item clickable @click="goToAbout" data-test="menu-link-about-item">
+            <q-item
+              clickable
+              @click="goToAbout"
+              data-test="menu-link-about-item"
+            >
               <q-item-section>
                 <q-item-label>
                   {{ t(`menu.about`) }}
@@ -448,7 +461,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :name="user.picture ? user.picture : 'person'"
             class="header-icon"
           ></q-icon>
-          <q-tooltip anchor="top middle" self="bottom middle">
+          <q-tooltip
+            anchor="top middle"
+            self="bottom middle"
+            class="header-user-tooltip"
+          >
             {{
               user.given_name
                 ? user.given_name + " " + user.family_name
@@ -487,7 +504,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Language selector -->
             <q-item clickable>
               <q-item-section avatar>
-                <q-icon size="xs" name="language" class="padding-none" />
+                <q-icon size="xs"
+name="language" class="padding-none" />
               </q-item-section>
               <q-item-section>
                 <q-item-label class="tw:w-[180px]">{{
@@ -560,7 +578,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openPredefinedThemes"
             >
               <q-item-section avatar>
-                <q-icon size="xs" name="color_lens" class="padding-none" />
+                <q-icon size="xs"
+name="color_lens" class="padding-none" />
               </q-item-section>
               <q-item-section>
                 <q-item-label>{{ t("common.manageTheme") }}</q-item-label>
@@ -577,7 +596,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="signout"
             >
               <q-item-section avatar>
-                <q-icon size="xs" name="exit_to_app" class="padding-none" />
+                <q-icon size="xs"
+name="exit_to_app" class="padding-none" />
               </q-item-section>
               <q-item-section>
                 <q-item-label>{{ t("menu.signOut") }}</q-item-label>
@@ -707,26 +727,31 @@ export default defineComponent({
 
     // Computed property for enterprise button text based on deployment type
     const enterpriseButtonText = computed(() => {
-      const isEnterprise = props.config.isEnterprise === 'true';
-      const isCloud = props.config.isCloud === 'true';
+      const isEnterprise = props.config.isEnterprise === "true";
+      const isCloud = props.config.isCloud === "true";
 
       if (isCloud) {
-        return t('about.header_button.cloud_features');
+        return t("about.header_button.cloud_features");
       } else if (isEnterprise) {
-        return t('about.header_button.enterprise_edition');
+        return t("about.header_button.enterprise_edition");
       } else {
-        return t('about.header_button.get_enterprise_free');
+        return t("about.header_button.get_enterprise_free");
       }
     });
 
     // Computed property for ingestion quota percentage
     const ingestionQuotaPercentage = computed(() => {
-      return Math.ceil(props.store.state.zoConfig.ingestion_quota_used * 100) / 100 || 0;
+      return (
+        Math.ceil(props.store.state.zoConfig.ingestion_quota_used * 100) /
+          100 || 0
+      );
     });
 
     // Computed property for ingestion quota warning color
     const ingestionQuotaColor = computed(() => {
-      return props.store.state.zoConfig.ingestion_quota_used >= 95 ? 'red' : 'orange';
+      return props.store.state.zoConfig.ingestion_quota_used >= 95
+        ? "red"
+        : "orange";
     });
 
     // Event handlers that emit to parent component
@@ -858,5 +883,11 @@ export default defineComponent({
     line-height: 28px;
     display: inline-block;
   }
+}
+
+:deep(.header-user-tooltip) {
+  width: auto;
+  max-width: none;
+  white-space: nowrap;
 }
 </style>

@@ -170,21 +170,21 @@ describe("CellActions", () => {
 
   // ── copyLogToClipboard ─────────────────────────────────────────────────────────
   describe("copyLogToClipboard", () => {
-    it("emits 'copy' event with row value and copyAsJson=false", () => {
+    it("should emit 'copy' with the cell value", () => {
       const wrapper = mountComponent();
       wrapper.vm.copyLogToClipboard("200");
       const emitted = wrapper.emitted("copy");
       expect(emitted).toBeTruthy();
-      expect(emitted![0]).toEqual(["200", false]);
+      expect(emitted![0]).toEqual(["200"]);
     });
 
-    it("emits copy with the correct column value from row", () => {
+    it("should emit 'copy' with the cell value for a different column", () => {
       const wrapper = mountComponent({
         column: { id: "message" },
         row: { message: "Hello World", status: "200" },
       });
       wrapper.vm.copyLogToClipboard("Hello World");
-      expect(wrapper.emitted("copy")![0]).toEqual(["Hello World", false]);
+      expect(wrapper.emitted("copy")![0]).toEqual(["Hello World"]);
     });
   });
 

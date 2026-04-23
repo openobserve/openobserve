@@ -16,49 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="traces-metrics-dashboard tw:w-full">
-    <!-- Collapsible Header -->
-    <div
-      v-if="show"
-      class="dashboard-header tw:flex! tw:items-center! tw:w-full q-px-sm q-py-xs tw:cursor-pointer tw:hover:bg-[var(--o2-hover-accent)] tw:h-[2.5rem]!"
-      @click="toggleCollapse"
-    >
-      <div class="tw:w-full flex items-center justify-between">
-        <div class="flex items-center gap-2 cursor-pointer flex-1">
-          <q-icon
-            name="expand_more"
-            size="1.2rem"
-            class="collapse-icon"
-            :class="{ collapsed: !searchObj.meta.showHistogram }"
-          />
 
-          <div class="header-content tw:ml-[0.125rem]">
-            <span
-              class="tw:text-[0.75rem] tw:font-bold tw:tracking-[0.0625rem]! tw:text-[var(--o2-text-1)]!"
-              >RATE, ERROR & DURATION</span
-            >
-          </div>
-        </div>
-        <q-btn
-          outline
-          dense
-          no-caps
-          color="primary"
-          icon="timeline"
-          :label="t('volumeInsights.insightsButtonLabel')"
-          class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
-          @click.stop="openUnifiedAnalysisDashboard"
-          data-test="insights-button"
-        >
-          <q-tooltip>{{ t("volumeInsights.analyzeTooltipTraces") }}</q-tooltip>
-        </q-btn>
-      </div>
-    </div>
 
-    <!-- Collapsible Charts Section -->
+    <!-- Charts Section -->
     <transition name="slide-fade">
       <div
-        v-show="searchObj.meta.showHistogram"
-        class="charts-wrapper tw:py-0! tw:min-h-[13.5rem]"
+        v-if="show"
+        class="charts-wrapper tw:py-0! tw:min-h-[8.5rem] tw:h-[10rem]"
       >
         <div class="charts-container">
           <RenderDashboardCharts
@@ -77,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </transition>
 
     <TracesMetricsContextMenu
-      v-show="searchObj.meta.showHistogram"
+      v-if="show"
       :visible="contextMenuVisible"
       :x="contextMenuPosition.x"
       :y="contextMenuPosition.y"
@@ -122,6 +86,7 @@ import metrics from "./metrics.json";
 import { deepCopy, formatTimeWithSuffix } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import useParser from "@/composables/useParser";
 
 const RenderDashboardCharts = defineAsyncComponent(
@@ -172,10 +137,6 @@ const currentTimeObj = ref({
 
 const dashboardData = ref(null);
 
-// Collapse state
-const toggleCollapse = () => {
-  searchObj.meta.showHistogram = !searchObj.meta.showHistogram;
-};
 
 // Unified Analysis Dashboard state
 const showAnalysisDashboard = ref(false);
@@ -264,14 +225,21 @@ const getBaseFilters = () => {
   });
 
   // Add user-provided filters from query editor, parsing any human-readable
-  // duration values (e.g. '1.50ms') back to raw microseconds for SQL.
+  // duration values (e.g. '1.50ms') back to raw microseconds for SQL,
+  // and span_kind labels (e.g. 'Server') back to numeric OTEL keys (e.g. '2').
   if (props.filter?.trim().length) {
     const parsed = parseDurationWhereClause(
       props.filter.trim(),
       sqlParser.value,
       searchObj.data.stream.selectedStream.value,
     );
-    baseFilters.push(typeof parsed === "string" ? parsed : props.filter.trim());
+    baseFilters.push(
+      parseSpanKindWhereClause(
+        typeof parsed === "string" ? parsed : props.filter.trim(),
+        sqlParser.value,
+        searchObj.data.stream.selectedStream.value,
+      ),
+    );
   }
 
   return baseFilters;
@@ -301,16 +269,21 @@ const loadDashboard = async () => {
       if (panel.title === "Errors") {
         const errorFilters = ["span_status = 'ERROR'"];
         if (props.filter?.trim().length) {
-          // Parse human-readable duration values back to raw µs for SQL
+          // Parse human-readable duration values back to raw µs for SQL,
+          // and span_kind labels back to numeric OTEL keys.
           const parsedFilter = parseDurationWhereClause(
             props.filter.trim(),
             sqlParser.value,
             searchObj.data.stream.selectedStream.value,
           );
           errorFilters.push(
-            typeof parsedFilter === "string"
-              ? parsedFilter
-              : props.filter.trim(),
+            parseSpanKindWhereClause(
+              typeof parsedFilter === "string"
+                ? parsedFilter
+                : props.filter.trim(),
+              sqlParser.value,
+              searchObj.data.stream.selectedStream.value,
+            ),
           );
         }
 
@@ -743,6 +716,7 @@ defineExpose({
   loadDashboard,
   getBaseFilters,
   rangeFiltersVersion,
+  openUnifiedAnalysisDashboard,
 });
 </script>
 
@@ -759,56 +733,7 @@ defineExpose({
   }
 }
 
-// Dashboard header
-.dashboard-header {
-  user-select: none;
-  transition: background 0.2s ease;
 
-  .header-clickable {
-    padding: 4px 0;
-    border-radius: 4px;
-    transition: background 0.2s ease;
-
-    &:hover {
-      background: rgba(25, 118, 210, 0.06);
-    }
-
-    &:active {
-      background: rgba(25, 118, 210, 0.1);
-    }
-  }
-
-  .collapse-icon {
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    transform-origin: center;
-    color: #6b7280;
-
-    &.collapsed {
-      transform: rotate(-90deg);
-    }
-  }
-
-  .header-content {
-    .text-subtitle2 {
-      font-size: 13px;
-      line-height: 1.2;
-      user-select: none;
-      transition: color 0.2s ease;
-    }
-  }
-
-  .analyze-button {
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0 0.75rem;
-    transition: all 0.2s;
-
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-  }
-}
 
 // Slide fade transition
 .slide-fade-enter-active,
@@ -849,33 +774,6 @@ defineExpose({
 
 // Dark mode support
 body.body--dark {
-  .dashboard-header {
-    .header-clickable {
-      &:hover {
-        background: rgba(25, 118, 210, 0.12);
-      }
-
-      &:active {
-        background: rgba(25, 118, 210, 0.18);
-      }
-    }
-
-    .collapse-icon {
-      color: #9ca3af;
-    }
-
-    .header-content .text-subtitle2 {
-      color: #e5e7eb;
-    }
-
-    .insights-button {
-      background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
-
-      &:hover {
-        background: linear-gradient(135deg, #2c5282 0%, #1e3a5f 100%);
-      }
-    }
-  }
 
   .charts-container {
     border-color: rgba(255, 255, 255, 0.1);

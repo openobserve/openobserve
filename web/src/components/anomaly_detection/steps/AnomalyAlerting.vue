@@ -19,14 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="step-anomaly-alerting"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-    <div class="step-content card-container tw:px-3 tw:py-4">
+    <div class="step-content tw:px-3 tw:py-4">
       <!-- Enable Notifications toggle -->
       <div class="flex items-start alert-settings-row">
         <div
           class="tw:font-semibold flex items-center"
           style="width: 190px; height: 36px"
         >
-          Notifications
+          {{ t('alerts.anomaly.notifications') }}
           <q-icon
             name="info"
             size="17px"
@@ -40,18 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               self="center left"
               max-width="300px"
             >
-              <span style="font-size: 14px">
-                When enabled, a notification will be sent to the selected
-                destination whenever an anomaly is detected.
-              </span>
+              <span style="font-size: 14px">{{ t('alerts.anomaly.notificationsTooltip') }}</span>
             </q-tooltip>
           </q-icon>
         </div>
         <div>
           <q-toggle
             v-model="config.alert_enabled"
-            :label="config.alert_enabled ? 'Enabled' : 'Disabled'"
-            color="primary"
+            :label="config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')"
             size="xs"
             class="o2-toggle-button-xs"
             :class="
@@ -92,8 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               use-input
               input-debounce="300"
               :max-values="undefined"
-              class="destination-select"
-              style="min-width: 300px; max-width: 420px; background: none"
+              class="alert-v3-select destination-select"
+              style="min-width: 300px; max-width: 420px"
               data-test="anomaly-destination"
               @filter="filterDestinations"
             >
@@ -134,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #no-option>
                 <q-item>
                   <q-item-section class="text-grey"
-                    >No destinations found</q-item-section
+                    >{{ t('alerts.anomaly.noDestinationsFound') }}</q-item-section
                   >
                 </q-item>
               </template>
@@ -148,12 +144,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
-              title="Refresh destinations"
+              :title="t('alerts.alertSettings.refreshDestinations')"
               style="min-width: auto"
               @click="$emit('refresh:destinations')"
             />
             <q-btn
-              label="Add New Destination"
+              :label="t('alerts.anomaly.addNewDestination')"
               class="o2-secondary-button q-ml-sm"
               no-caps
               size="sm"
@@ -168,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="font-size: 11px; line-height: 12px"
             data-test="anomaly-destination-error"
           >
-            At least one destination is required!
+            {{ t('alerts.anomaly.destinationRequired') }}
           </div>
         </div>
       </div>
@@ -181,11 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-icon name="info" size="16px"
 class="tw:mt-px tw:flex-shrink-0" />
-        <span>
-          Anomaly detection will still run and write results to the
-          <code>_anomalies</code> stream. Enable notifications to receive alerts
-          when anomalies are detected.
-        </span>
+        <span>{{ t('alerts.anomaly.disabledNotificationsInfo') }}</span>
       </div>
     </div>
   </div>
@@ -310,14 +302,29 @@ export default defineComponent({
 }
 
 .destination-select {
+  // override the compact 28px from alert-v3-select — chips need flexible height
+  min-height: auto !important;
+  height: auto !important;
+  :deep(.q-field__inner) {
+    min-height: auto !important;
+    max-height: none !important;
+    height: auto !important;
+  }
   :deep(.q-field__control) {
-    height: 36px;
-    min-height: 36px;
+    min-height: 1.75rem !important;
+    max-height: none !important;
+    height: auto !important;
     flex-wrap: nowrap;
   }
   :deep(.q-field__control-container) {
     flex-wrap: nowrap;
     overflow: hidden;
+  }
+  :deep(.q-field__marginal) {
+    height: auto !important;
+  }
+  :deep(.q-field__append) {
+    height: auto !important;
   }
 }
 </style>

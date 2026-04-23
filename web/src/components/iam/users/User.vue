@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+  <q-page class="q-pa-none">
     <div>
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
@@ -60,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         </div>
     </div>
-    <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-[calc(100vh-127px)]">
+    <div class="tw:w-full">
+      <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
         <q-table
           ref="qTable"
           :rows="visibleRows"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:selected="selectedUsers"
           :pagination="pagination"
           :filter="filterQuery"
-          :style="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
+          :style="hasVisibleRows ? 'height: calc(100vh - var(--navbar-height) - 92px); overflow-y: auto;' : ''"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
         >
           <template #no-data>
@@ -542,12 +542,12 @@ export default defineComponent({
             let counter = 1;
             currentUserRole.value = "";
             usersState.users = users.map((data: any) => {
-              if (store.state.userInfo.email == data.email) {
-                currentUserRole.value = data.role;
+              if (store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()) {
+                currentUserRole.value = data.role?.toLowerCase();
                 isCurrentUserInternal.value = !data.is_external;
               }
 
-              if (data.email == router.currentRoute.value.query.email) {
+              if (data.email?.toLowerCase() == router.currentRoute.value.query.email?.toString().toLowerCase()) {
                 addUser({ row: data }, true);
               }
 
@@ -557,7 +557,7 @@ export default defineComponent({
                 first_name: data.first_name,
                 last_name: data.last_name,
                 role: data?.status == "pending" ? toCamelCase(data.role) + " (Invited)": toCamelCase(data.role),
-                enableEdit: store.state.userInfo.email == data.email ? true : false,
+                enableEdit: store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase() ? true : false,
                 enableChangeRole: false,
                 enableDelete: config.isCloud == "true" ? true : false,
                 status: data?.status,
@@ -675,7 +675,7 @@ export default defineComponent({
             user.role?.toLowerCase() !== "root" &&
             (currentUserRole.value == "root" ||
               currentUserRole.value == "admin") &&
-              store.state.userInfo.email !== user.email
+              store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
 
           );
         }

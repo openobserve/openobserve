@@ -7,16 +7,16 @@
             {{ t("regex_patterns.title") }}
           </div>
           <q-input
-                v-model="filterQuery"
-                borderless
-                dense
-                class="q-ml-auto no-border o2-search-input"
-                :placeholder="t('regex_patterns.search')"
-              >
-                <template #prepend>
-                  <q-icon class="o2-search-input-icon"  name="search" />
-                </template>
-              </q-input>
+            v-model="filterQuery"
+            borderless
+            dense
+            class="q-ml-auto no-border o2-search-input"
+            :placeholder="t('regex_patterns.search')"
+          >
+          <template #prepend>
+            <q-icon class="o2-search-input-icon"  name="search" />
+          </template>
+        </q-input>
           <q-btn
             class="o2-secondary-button q-ml-sm tw:h-[36px]"
             no-caps
@@ -46,7 +46,7 @@
           :pagination="pagination"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
+            ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 87px); overflow-y: auto;'
             : 'width: 100%'"
         >
         <template #no-data>
@@ -285,7 +285,8 @@
           name: "actions",
           field: "actions",
           label: t("regex_patterns.actions"),
-          align: "left",
+          align: "center",
+          sortable: false,
           classes: "actions-column",
         }
       ]);

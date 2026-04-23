@@ -337,7 +337,7 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
             let active_model = ActiveModel {
                 id: Set(record.id),
                 org_id: Set(org_id.to_owned()),
-                service_name: Set(record.service_name),
+                service_name: Set(record.service_name.clone()),
                 set_id: Set(record.set_id),
                 disambiguation: Set(record.disambiguation),
                 all_dimensions: Set(record.all_dimensions),
@@ -451,6 +451,29 @@ pub async fn list_by_name(
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::ServiceName.eq(service_name))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(records.into_iter().map(model_to_record).collect())
+}
+
+/// List services with optional service name filter.
+/// This avoids loading all records when only service name filtering is needed.
+pub async fn list_filtered_by_service(
+    org_id: &str,
+    service_name: Option<&str>,
+) -> Result<Vec<ServiceRecord>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let query = match service_name {
+        Some(name) => Entity::find()
+            .filter(Column::OrgId.eq(org_id))
+            .filter(Column::ServiceName.eq(name)),
+        None => Entity::find().filter(Column::OrgId.eq(org_id)),
+    };
+
+    let records = query
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;

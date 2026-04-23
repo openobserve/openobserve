@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-[calc(100vh-2.5625rem)] tw:overflow-hidden tw:pt-[0.325rem]">
+  <div class="tw:h-[calc(100vh-var(--navbar-height)-10px)] tw:overflow-hidden tw:pt-[0.325rem]">
     <template v-if="isLoading.length">
       <div
         class="q-pb-lg flex items-center justify-center text-center q-pt-xs tw:h-[calc(100vh-11.875rem)]"
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
           <keep-alive
-            :class="showTabs ? 'tw:h-[calc(100%-53px)]' : 'tw:h-full'"
+            :class="showTabs ? 'tw:h-[calc(100%-var(--navbar-height)+20px)]' : 'tw:h-full'"
           >
             <component
               :is="Component"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </keep-alive>
         </template>
         <template v-else>
-          <div :class="showTabs ? 'tw:h-[calc(100%-53px)]' : 'tw:h-full'">
+          <div :class="showTabs ? 'tw:h-[calc(100%-var(--navbar-height)+20px)]' : 'tw:h-full'">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div class="">
         <div
-          class="card-container q-pa-lg tw:mx-[0.625rem] tw:max-w-full tw:max-h-full tw:h-[calc(100vh - 3.125rem)]"
+          class="card-container q-pa-lg tw:mx-[0.625rem] tw:max-w-full tw:h-[calc(100vh - 3.125rem)]"
         >
           <div class="q-pb-lg">
             <div class="text-left text-h6 text-bold q-pb-md">

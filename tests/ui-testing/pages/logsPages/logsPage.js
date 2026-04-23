@@ -280,7 +280,7 @@ export class LogsPage {
         this.patternCardPercentage = (index) => `[data-test="pattern-card-${index}-percentage"]`;
         this.patternCardIncludeBtn = (index) => `[data-test="pattern-card-${index}-include-btn"]`;
         this.patternCardExcludeBtn = (index) => `[data-test="pattern-card-${index}-exclude-btn"]`;
-        this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}-details-icon"]`;
+        this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
         // Pattern details dialog
         this.closePatternDialog = '[data-test="close-pattern-dialog"]';
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
@@ -1128,6 +1128,9 @@ export class LogsPage {
         await this.page.waitForTimeout(200);
         // Click the q-item directly - it has @click="handleQuickMode" handler
         await this.page.locator(this.quickModeToggle).click();
+        // Close the utilities menu - it stays open after toggle click
+        // (no v-close-popup on the quick mode item)
+        await this.page.keyboard.press('Escape');
     }
 
     // Click on the Quick Mode text label (not the toggle switch) - for testing #10821
@@ -3381,12 +3384,10 @@ export class LogsPage {
             const isSwitchedOff = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--falsy')).catch(() => false);
             if (isSwitchedOff) {
                 await toggleInner.click();
-            } else {
-                await this.page.keyboard.press('Escape');
             }
-        } else {
-            await this.page.keyboard.press('Escape');
         }
+        // Always close the utilities menu
+        await this.page.keyboard.press('Escape');
     }
 
     async clickTimestampField() {
@@ -5970,6 +5971,9 @@ export class LogsPage {
         const remainingTimeout = Math.max(timeout - (Date.now() - startTime), 5000);
         const checkInterval = 500;
         const maxChecks = Math.ceil(remainingTimeout / checkInterval);
+        // Grace period: don't accept "empty" until at least 15s have elapsed, because
+        // the backend may return "No patterns found" before async extraction completes.
+        const emptyGracePeriodMs = 15000;
 
         for (let i = 0; i < maxChecks; i++) {
             // Check each state synchronously to avoid Promise.race resource leaks
@@ -5982,8 +5986,10 @@ export class LogsPage {
                 return 'patterns';
             }
             if (await this.page.locator(this.patternEmptyState).isVisible().catch(() => false)) {
-                testLogger.info('Patterns loading result: empty');
-                return 'empty';
+                if (Date.now() - startTime >= emptyGracePeriodMs) {
+                    testLogger.info('Patterns loading result: empty');
+                    return 'empty';
+                }
             }
 
             if (i < maxChecks - 1) {

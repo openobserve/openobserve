@@ -28,6 +28,12 @@
             "label_option": {
               "rotate": 0
             },
+            "custom_chart_options": {
+              "tooltip": {
+                "appendToBody": true,
+                "confine": false
+              }
+            },
             "show_symbol": false,
             "line_interpolation": "smooth",
             "legend_width": {
@@ -157,7 +163,7 @@
             "x": 33,
             "y": 0,
             "w": 15,
-            "h": 6,
+            "h": 4.5,
             "i": 2
           },
           "htmlContent": "",
@@ -180,16 +186,16 @@
             "label_option": {
               "rotate": 0
             },
+            "custom_chart_options": {
+              "tooltip": {
+                "appendToBody": true,
+                "confine": false
+              }
+            },
             "show_symbol": false,
             "line_interpolation": "smooth",
             "legend_width": {
               "unit": "px"
-            },
-            "tooltip": {
-              "trigger": "axis",
-              "confine": true,
-              "appendToBody": true,
-              "renderMode": "html"
             },
             "base_map": {
               "type": "osm"
@@ -288,7 +294,7 @@
             "x": 0,
             "y": 0,
             "w": 16,
-            "h": 6,
+            "h": 4.5,
             "i": 3
           },
           "htmlContent": "",
@@ -310,6 +316,12 @@
             "axis_border_show": false,
             "label_option": {
               "rotate": 0
+            },
+            "custom_chart_options": {
+              "tooltip": {
+                "appendToBody": true,
+                "confine": false
+              }
             },
             "show_symbol": true,
             "line_interpolation": "smooth",
@@ -427,7 +439,7 @@
             "x": 16,
             "y": 0,
             "w": 17,
-            "h": 6,
+            "h": 4.5,
             "i": 1
           },
 

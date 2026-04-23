@@ -72,6 +72,17 @@ impl FlightDecoderStream {
                     .peak_memory
                     .fetch_max(peak_memory, Ordering::Relaxed);
             }
+            CustomMessage::PartialErr(err) => {
+                if !err.is_empty() {
+                    let mut guard = self.query_context.partial_err.lock();
+                    if guard.is_empty() {
+                        *guard = err;
+                    } else if !guard.contains(&err) {
+                        guard.push_str(" \n ");
+                        guard.push_str(&err);
+                    }
+                }
+            }
         }
     }
 }

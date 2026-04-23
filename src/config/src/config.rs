@@ -21,9 +21,7 @@ use std::{
     time::Duration,
 };
 
-use aes_siv::{KeyInit, siv::Aes256Siv};
 use arc_swap::ArcSwap;
-use base64::{Engine, prelude::BASE64_STANDARD};
 use chromiumoxide::{browser::BrowserConfig, handler::viewport::Viewport};
 use dotenv_config::EnvConfig;
 use hashbrown::{HashMap, HashSet};
@@ -52,7 +50,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 38;
+pub const DB_SCHEMA_VERSION: u64 = 40;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -428,10 +426,37 @@ pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy:
             AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&cfg.smtp.smtp_host)
                 .port(cfg.smtp.smtp_port);
 
-        let option = &cfg.smtp.smtp_encryption;
-        transport_builder = if option == "starttls" {
+        // Resolve effective TLS mode:
+        // 1. If ZO_SMTP_ENCRYPTION is unset/auto, derive from port (465=ssltls, 587=starttls).
+        // 2. If explicitly set, validate it against the port convention. If mismatched, log a
+        //    warning and fall back to the port-derived value so the connection still works.
+        let port_derived = match cfg.smtp.smtp_port {
+            465 => "ssltls",
+            587 | 2587 => "starttls",
+            _ => "",
+        };
+        let effective_encryption = match cfg.smtp.smtp_encryption.as_str() {
+            "" | "auto" => port_derived,
+            explicit => {
+                let mismatch = matches!(
+                    (explicit, cfg.smtp.smtp_port),
+                    ("ssltls", 587) | ("ssltls", 2587) | ("starttls", 465)
+                );
+                if mismatch {
+                    log::warn!(
+                        "[SMTP] ZO_SMTP_ENCRYPTION={explicit} conflicts with port {}; \
+                         falling back to port-derived value '{port_derived}'",
+                        cfg.smtp.smtp_port
+                    );
+                    port_derived
+                } else {
+                    explicit
+                }
+            }
+        };
+        transport_builder = if effective_encryption == "starttls" {
             transport_builder.tls(Tls::Required(tls_parameters))
-        } else if option == "ssltls" {
+        } else if effective_encryption == "ssltls" {
             transport_builder.tls(Tls::Wrapper(tls_parameters))
         } else {
             transport_builder
@@ -553,7 +578,6 @@ pub struct Config {
     pub tokio_console: TokioConsole,
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
-    pub encryption: Encryption,
     pub enrichment_table: EnrichmentTable,
 }
 
@@ -726,6 +750,21 @@ pub struct Http {
         help = "Custom access log format, leave empty to use default format, shortcut: common, json"
     )]
     pub access_log_format: String,
+    #[env_config(
+        name = "ZO_HTTP_REAL_IP_SOURCE",
+        default = "XEnvoyExternalAddress,XRealIp",
+        help = "Comma-separated list of sources to resolve the real client IP; tried in \
+                order, first match wins. TCP peer (ConnectInfo) is always used as the final \
+                fallback. Supported entries: XEnvoyExternalAddress (Envoy/Istio), \
+                XRealIp (nginx, Traefik), RightmostXForwardedFor (nginx/HAProxy/AWS ALB/GCP LB), \
+                RightmostForwarded (RFC 7239), CfConnectingIp (Cloudflare), \
+                TrueClientIp (Akamai/Cloudflare Enterprise), FlyClientIp (Fly.io), \
+                CloudFrontViewerAddress (AWS CloudFront), ConnectInfo (TCP peer). Default \
+                covers the common k8s ingresses. Only list sources whose proxy is actually \
+                in front of this server; clients can spoof any header the server trusts \
+                without an upstream to terminate it."
+    )]
+    pub real_ip_source: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -870,6 +909,16 @@ pub struct Common {
     pub ingestion_url: String,
     #[env_config(name = "ZO_WEB_URL", default = "http://localhost:5080")]
     pub web_url: String,
+    /// Comma-separated list of extra origins allowed for CORS in addition to `web_url`.
+    /// Example: `http://localhost:8081,https://staging.example.com`
+    #[env_config(name = "ZO_CORS_ALLOWED_ORIGINS", default = "")]
+    pub cors_allowed_origins: String,
+    /// Allow alert destinations to target loopback/localhost addresses.
+    /// Disabled by default (SSRF protection). Enable only in trusted environments
+    /// such as CI/CD pipelines or self-hosted single-node setups where the
+    /// server legitimately needs to send notifications to itself.
+    #[env_config(name = "ZO_SSRF_ALLOW_LOOPBACK", default = false)]
+    pub ssrf_allow_loopback: bool,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
     pub base_uri: String,
     #[env_config(name = "ZO_DATA_DIR", default = "./data/openobserve/")]
@@ -1284,6 +1333,18 @@ pub struct Common {
         help = "URL for built-in regex patterns JSON source. Can be customized to use different pattern libraries."
     )]
     pub regex_patterns_source_url: String,
+    #[env_config(
+        name = "ZO_MODEL_PRICING_SOURCE_URL",
+        default = "https://raw.githubusercontent.com/openobserve/sdr_patterns/refs/heads/main/llm_pricing.json",
+        help = "URL for built-in LLM model pricing JSON source."
+    )]
+    pub model_pricing_source_url: String,
+    #[env_config(
+        name = "ZO_MODEL_PRICING_SYNC_INTERVAL_SECS",
+        default = 21600,
+        help = "Interval in seconds for syncing built-in model pricing from GitHub. Default: 6 hours (21600)."
+    )]
+    pub model_pricing_sync_interval_secs: u64,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
     #[env_config(name = "ZO_ES_VERSION", default = "")]
@@ -1378,6 +1439,12 @@ pub struct Common {
         help = "Enable cross-linking feature for drill-down links on log/trace records"
     )]
     pub enable_cross_linking: bool,
+    #[env_config(
+        name = "ZO_AUTO_QUERY_ENABLED",
+        default = false,
+        help = "Enable Live Mode feature in the UI. When true, users can toggle auto-query on filter/time-range changes. When false, the Live Mode toggle is hidden and Run Query button is always shown."
+    )]
+    pub auto_query_enabled: bool,
 }
 
 impl Common {
@@ -1490,10 +1557,14 @@ pub struct Limit {
     pub query_default_limit: i64,
     #[env_config(name = "ZO_QUERY_VALUES_DEFAULT_NUM", default = 10)]
     pub query_values_default_num: i64,
-    #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 1)] // seconds
-    pub query_partition_by_secs: usize,
-    #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 768)] // MB/s/core
+    #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 1024)] // MB/s/core
     pub query_group_base_speed: usize,
+    #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 5)] // seconds
+    pub query_partition_by_secs: usize,
+    #[env_config(name = "ZO_QUERY_PARTITION_MAX_NUM", default = 100)] // max number of partitions
+    pub query_partition_max_num: usize,
+    #[env_config(name = "ZO_DISABLE_PARTITIONS_FOR_NON_TS_ORDER_BY", default = false)]
+    pub disable_partitions_for_non_ts_order_by: bool,
     // Default Config: Run Query Recommendation Analysis for last one hour for every hour
     #[env_config(name = "ZO_QUERY_RECOMMENDATION_DURATION", default = 3600000000)] // microseconds
     pub query_recommendation_duration: i64,
@@ -2281,14 +2352,6 @@ pub struct Pipeline {
 }
 
 #[derive(Serialize, EnvConfig, Default)]
-pub struct Encryption {
-    #[env_config(name = "ZO_MASTER_ENCRYPTION_ALGORITHM", default = "")]
-    pub algorithm: String,
-    #[env_config(name = "ZO_MASTER_ENCRYPTION_KEY", default = "")]
-    pub master_key: String,
-}
-
-#[derive(Serialize, EnvConfig, Default)]
 pub struct HealthCheck {
     #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]
     pub enabled: bool,
@@ -2446,9 +2509,6 @@ pub fn init() -> Config {
         panic!("sns config error: {e}");
     }
 
-    if let Err(e) = check_encryption_config(&mut cfg) {
-        panic!("encryption config error: {e}");
-    }
     // check health check config
     if let Err(e) = check_health_check_config(&mut cfg) {
         panic!("health check config error: {e}");
@@ -2988,7 +3048,10 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.query_group_base_speed *= 1024 * 1024;
     }
     if cfg.limit.query_partition_by_secs == 0 {
-        cfg.limit.query_partition_by_secs = 30;
+        cfg.limit.query_partition_by_secs = 5;
+    }
+    if cfg.limit.query_partition_max_num == 0 {
+        cfg.limit.query_partition_max_num = 100;
     }
     if cfg.limit.query_default_limit == 0 {
         cfg.limit.query_default_limit = 1000;
@@ -3309,34 +3372,6 @@ pub fn get_cluster_name() -> String {
     } else {
         INSTANCE_ID.get("instance_id").unwrap().to_string()
     }
-}
-
-fn check_encryption_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if !cfg.encryption.algorithm.is_empty() {
-        if cfg.encryption.algorithm != "aes-256-siv" {
-            return Err(anyhow::anyhow!(
-                "invalid algorithm specified, only [aes-256-siv] is supported"
-            ));
-        }
-        // this is basically a duplication of code from tables/cipher.rs
-        // but we only support one algorithm for now, so ok. Once we support more
-        // we have to extract this into proper functions and use the same in both places
-        let key = match BASE64_STANDARD.decode(&cfg.encryption.master_key) {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(anyhow::anyhow!(
-                    "master encryption key is not properly base64 encoded: {e}"
-                ));
-            }
-        };
-        match Aes256Siv::new_from_slice(&key) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(anyhow::anyhow!("invalid master encryption key: {e}"));
-            }
-        }
-    }
-    Ok(())
 }
 
 #[inline]

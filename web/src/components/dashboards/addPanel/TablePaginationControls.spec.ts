@@ -665,6 +665,50 @@ describe("TablePaginationControls", () => {
     });
   });
 
+  describe("data-test attributes", () => {
+    it("should render root div with data-test=dashboard-table-pagination-controls", () => {
+      wrapper = createWrapper();
+      expect(
+        wrapper.find('[data-test="dashboard-table-pagination-controls"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should render rows-per-page label with data-test=dashboard-table-rows-per-page-label when pagination enabled", () => {
+      wrapper = createWrapper({ showPagination: true });
+      expect(
+        wrapper
+          .find('[data-test="dashboard-table-rows-per-page-label"]')
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("should not render rows-per-page label when pagination is disabled", () => {
+      wrapper = createWrapper({ showPagination: false });
+      expect(
+        wrapper
+          .find('[data-test="dashboard-table-rows-per-page-label"]')
+          .exists(),
+      ).toBe(false);
+    });
+
+    it("should render count display with data-test=dashboard-table-row-count", () => {
+      wrapper = createWrapper();
+      expect(
+        wrapper.find('[data-test="dashboard-table-row-count"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should show correct count text in the dashboard-table-row-count element", () => {
+      wrapper = createWrapper({
+        showPagination: true,
+        pagination: { rowsPerPage: 10, page: 1 },
+        totalRows: 50,
+      });
+      const countEl = wrapper.find('[data-test="dashboard-table-row-count"]');
+      expect(countEl.text()).toContain("1-10 of 50");
+    });
+  });
+
   describe("Layout and Styling", () => {
     it("should have row layout class", () => {
       wrapper = createWrapper();

@@ -4280,7 +4280,7 @@ export default defineComponent({
         const parsed = JSON.parse(content);
         const formatted = JSON.stringify(parsed, null, 2);
         // Apply syntax highlighting
-        return formatted
+        const highlighted = formatted
           .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
             let cls = 'json-number';
             if (/^"/.test(match)) {
@@ -4296,15 +4296,16 @@ export default defineComponent({
             }
             return `<span class="${cls}">${match}</span>`;
           });
+        return DOMPurify.sanitize(highlighted);
       } catch {
         // Not JSON, return plain text with HTML escaping
-        return content
+        return DOMPurify.sanitize(content
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#039;')
-          .replace(/\n/g, '<br>');
+          .replace(/\n/g, '<br>'));
       }
     };
 

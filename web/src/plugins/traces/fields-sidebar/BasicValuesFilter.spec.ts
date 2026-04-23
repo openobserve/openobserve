@@ -14,9 +14,17 @@ const mockFetchFieldValues = vi.fn();
 const mockCancelFieldStream = vi.fn();
 const mockResetFieldValues = vi.fn();
 
+// Mutable fieldValues object — tests populate it before mounting to control
+// what mappedFieldValues computes.  Tests that don't need specific values leave
+// it empty; the computed returns EMPTY_FIELD_VALUES for unknown keys.
+const mockFieldValues: Record<
+  string,
+  { isLoading: boolean; values: { key: string; count: number }[]; hasMore: boolean; errMsg: string }
+> = {};
+
 vi.mock("@/composables/useFieldValuesStream", () => ({
   default: () => ({
-    fieldValues: {},
+    fieldValues: mockFieldValues,
     fetchFieldValues: mockFetchFieldValues,
     cancelFieldStream: mockCancelFieldStream,
     resetFieldValues: mockResetFieldValues,
@@ -553,5 +561,226 @@ describe("BasicValuesFilter — visibility toggle", () => {
       );
       expect(removeBtn.exists()).toBe(false);
     });
+  });
+});
+
+// ─── mappedFieldValues ────────────────────────────────────────────────────────
+
+describe("BasicValuesFilter — mappedFieldValues", () => {
+  let wrapper: any;
+
+  beforeEach(() => {
+    mockSearchObj.data.editorValue = "";
+    mockSearchObj.data.stream.selectedStream = {
+      label: "test_traces",
+      value: "test_traces",
+    };
+    // Reset shared fieldValues state before each test.
+    Object.keys(mockFieldValues).forEach((k) => delete mockFieldValues[k]);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+  });
+
+  it("should pass values through unchanged for a non-span_kind field", async () => {
+    mockFieldValues["service_name"] = {
+      isLoading: false,
+      values: [{ key: "frontend", count: 5 }],
+      hasMore: false,
+      errMsg: "",
+    };
+    wrapper = mountComponent("service_name");
+    await flushPromises();
+
+    const mapped = wrapper.vm.mappedFieldValues;
+
+    expect(mapped.values).toEqual([{ key: "frontend", count: 5 }]);
+  });
+
+  it("should map numeric key '2' to key 'Server' for span_kind field", async () => {
+    mockFieldValues["span_kind"] = {
+      isLoading: false,
+      values: [{ key: "2", count: 10 }],
+      hasMore: false,
+      errMsg: "",
+    };
+    wrapper = mountComponent("span_kind");
+    await flushPromises();
+
+    const mapped = wrapper.vm.mappedFieldValues;
+
+    expect(mapped.values).toHaveLength(1);
+    expect(mapped.values[0].key).toBe("Server");
+    expect(mapped.values[0].count).toBe(10);
+  });
+
+  it("should map empty string key to key 'Unspecified' for span_kind field", async () => {
+    mockFieldValues["span_kind"] = {
+      isLoading: false,
+      values: [{ key: "", count: 3 }],
+      hasMore: false,
+      errMsg: "",
+    };
+    wrapper = mountComponent("span_kind");
+    await flushPromises();
+
+    const mapped = wrapper.vm.mappedFieldValues;
+
+    expect(mapped.values[0].key).toBe("Unspecified");
+  });
+
+  it("should map null key to key 'Unspecified' for span_kind field", async () => {
+    mockFieldValues["span_kind"] = {
+      isLoading: false,
+      // null cast to string via type coercion in the source
+      values: [{ key: null as unknown as string, count: 2 }],
+      hasMore: false,
+      errMsg: "",
+    };
+    wrapper = mountComponent("span_kind");
+    await flushPromises();
+
+    const mapped = wrapper.vm.mappedFieldValues;
+
+    expect(mapped.values[0].key).toBe("Unspecified");
+  });
+
+  it("should map all known numeric OTEL span kind keys to their display labels", async () => {
+    mockFieldValues["span_kind"] = {
+      isLoading: false,
+      values: [
+        { key: "0", count: 1 },
+        { key: "1", count: 2 },
+        { key: "2", count: 3 },
+        { key: "3", count: 4 },
+        { key: "4", count: 5 },
+        { key: "5", count: 6 },
+      ],
+      hasMore: false,
+      errMsg: "",
+    };
+    wrapper = mountComponent("span_kind");
+    await flushPromises();
+
+    const mapped = wrapper.vm.mappedFieldValues;
+    const keys = mapped.values.map((v: { key: string }) => v.key);
+
+    expect(keys).toEqual(["Unspecified", "Internal", "Server", "Client", "Producer", "Consumer"]);
+  });
+
+  it("should leave an unknown span_kind key unchanged", async () => {
+    mockFieldValues["span_kind"] = {
+      isLoading: false,
+      values: [{ key: "99", count: 1 }],
+      hasMore: false,
+      errMsg: "",
+    };
+    wrapper = mountComponent("span_kind");
+    await flushPromises();
+
+    const mapped = wrapper.vm.mappedFieldValues;
+
+    expect(mapped.values[0].key).toBe("99");
+  });
+
+  it("should preserve isLoading and hasMore from the original entry for span_kind", async () => {
+    mockFieldValues["span_kind"] = {
+      isLoading: true,
+      values: [],
+      hasMore: true,
+      errMsg: "",
+    };
+    wrapper = mountComponent("span_kind");
+    await flushPromises();
+
+    const mapped = wrapper.vm.mappedFieldValues;
+
+    expect(mapped.isLoading).toBe(true);
+    expect(mapped.hasMore).toBe(true);
+  });
+});
+
+// ─── buildSql() — span_kind conversion ───────────────────────────────────────
+
+describe("BasicValuesFilter — buildSql() with span_kind conversion", () => {
+  let wrapper: any;
+
+  beforeEach(() => {
+    mockSearchObj.data.editorValue = "";
+    mockSearchObj.data.stream.selectedStream = {
+      label: "test_traces",
+      value: "test_traces",
+    };
+    Object.keys(mockFieldValues).forEach((k) => delete mockFieldValues[k]);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+  });
+
+  const getSql = () => b64DecodeUnicode(wrapper.vm.buildSql());
+
+  it("should convert span_kind='Server' to span_kind='2' in the generated SQL", async () => {
+    // Mount with a field other than span_kind so buildSql() does not strip
+    // the span_kind condition — we need it preserved to verify conversion.
+    wrapper = mountComponent("service_name");
+    await flushPromises();
+    mockSearchObj.data.editorValue = "span_kind='Server'";
+
+    const sql = getSql();
+
+    expect(sql).toContain("span_kind='2'");
+    expect(sql).not.toContain("span_kind='Server'");
+  });
+
+  it("should convert span_kind='Client' to span_kind='3' in the generated SQL", async () => {
+    wrapper = mountComponent("service_name");
+    await flushPromises();
+    mockSearchObj.data.editorValue = "span_kind='Client'";
+
+    const sql = getSql();
+
+    expect(sql).toContain("span_kind='3'");
+    expect(sql).not.toContain("span_kind='Client'");
+  });
+
+  it("should leave SQL unchanged when there is no span_kind filter", async () => {
+    // Mount with "operation_name" so buildSql() does not strip the
+    // service_name condition — we need it preserved to confirm no
+    // span_kind conversion is applied.
+    wrapper = mountComponent("operation_name");
+    await flushPromises();
+    mockSearchObj.data.editorValue = "service_name='frontend'";
+
+    const sql = getSql();
+
+    expect(sql).toContain("service_name='frontend'");
+    expect(sql).not.toContain("span_kind");
+  });
+
+  it("should convert span_kind label in a compound AND clause and keep other conditions intact", async () => {
+    wrapper = mountComponent("service_name");
+    await flushPromises();
+    mockSearchObj.data.editorValue = "span_kind='Server' AND status_code='200'";
+
+    const sql = getSql();
+
+    expect(sql).toContain("span_kind='2'");
+    expect(sql).toContain("status_code='200'");
+    expect(sql).not.toContain("span_kind='Server'");
+  });
+
+  it("should convert span_kind label in a pipe-style editorValue", async () => {
+    wrapper = mountComponent("service_name");
+    await flushPromises();
+    mockSearchObj.data.editorValue = "match_all('trace') | span_kind='Internal'";
+
+    const sql = getSql();
+
+    expect(sql).toContain("span_kind='1'");
+    expect(sql).not.toContain("span_kind='Internal'");
   });
 });

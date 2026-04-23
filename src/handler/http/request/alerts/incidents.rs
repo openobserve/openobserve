@@ -505,7 +505,7 @@ pub async fn trigger_incident_rca(
             }
         };
     let auth_header = crate::common::utils::auth::build_basic_auth_header(&email, &token);
-    let client = match o2_enterprise::enterprise::alerts::rca_agent::get_agent_client() {
+    let client = match o2_enterprise::enterprise::ai::client::get_agent_client() {
         Some(c) => c,
         None => {
             // Emit failure event instead of misleading Complete event

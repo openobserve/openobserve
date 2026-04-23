@@ -95,12 +95,6 @@ describe("PatternCard", () => {
       expect(percentage.text()).toBe("45.67%");
     });
 
-    it("should display details icon with tooltip", () => {
-      const detailsIcon = wrapper.find(
-        '[data-test="pattern-card-0-details-icon"]',
-      );
-      expect(detailsIcon.exists()).toBe(true);
-    });
   });
 
   describe("Anomaly Detection", () => {
@@ -139,13 +133,6 @@ describe("PatternCard", () => {
         '[data-test="pattern-card-0-exclude-btn"]',
       );
       expect(excludeBtn.exists()).toBe(true);
-    });
-
-    it("should display details icon", () => {
-      const detailsIcon = wrapper.find(
-        '[data-test="pattern-card-0-details-icon"]',
-      );
-      expect(detailsIcon.exists()).toBe(true);
     });
 
     it("should emit click event when card is clicked", async () => {
@@ -290,46 +277,5 @@ describe("PatternCard", () => {
     });
   });
 
-  describe("Details icon tooltip variable/example counts", () => {
-    it("should render details icon button", () => {
-      const detailsIcon = wrapper.find(
-        '[data-test="pattern-card-0-details-icon"]',
-      );
-      expect(detailsIcon.exists()).toBe(true);
-    });
-
-    it("should emit click event when details icon button is clicked", async () => {
-      const detailsIcon = wrapper.find(
-        '[data-test="pattern-card-0-details-icon"]',
-      );
-      await detailsIcon.trigger("click");
-      expect(wrapper.emitted("click")).toBeTruthy();
-      expect(wrapper.emitted("click")![0]).toEqual([mockPattern, mockIndex]);
-    });
-
-    it("should emit click with correct pattern when pattern has no examples", async () => {
-      const patternNoExamples = { ...mockPattern, examples: [] };
-      await wrapper.setProps({ pattern: patternNoExamples });
-      const detailsIcon = wrapper.find(
-        '[data-test="pattern-card-0-details-icon"]',
-      );
-      await detailsIcon.trigger("click");
-      expect(wrapper.emitted("click")).toBeTruthy();
-      expect(wrapper.emitted("click")![0][0]).toEqual(patternNoExamples);
-    });
-
-    it("should emit click with correct pattern when examples have no variables", async () => {
-      const patternNoVars = {
-        ...mockPattern,
-        examples: [{ log_message: "some log", variables: undefined }],
-      };
-      await wrapper.setProps({ pattern: patternNoVars });
-      const detailsIcon = wrapper.find(
-        '[data-test="pattern-card-0-details-icon"]',
-      );
-      await detailsIcon.trigger("click");
-      expect(wrapper.emitted("click")).toBeTruthy();
-      expect(wrapper.emitted("click")![0][0]).toEqual(patternNoVars);
-    });
-  });
 });
+

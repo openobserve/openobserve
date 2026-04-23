@@ -418,6 +418,30 @@ where
                 OFGA_MODELS.get(key).map_or(key, |model| model.key),
                 entity
             )
+        } else if path_columns[1].eq("llm") {
+            // LLM model pricing routes — uses dedicated "model_pricing" resource.
+            // url_len==3: /{org_id}/llm/models  (list / create)
+            // url_len==4: /{org_id}/llm/models/built-in  (read-only catalog)
+            // url_len==4: /{org_id}/llm/models/{model_id}  (get / update / delete)
+            let resource_key = OFGA_MODELS
+                .get("model_pricing")
+                .map_or("model_pricing", |m| m.key);
+            if url_len == 3 {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                } else if method.eq("POST") {
+                    method = "PUT".to_string();
+                }
+                format!("{resource_key}:{}", path_columns[0])
+            } else if path_columns.get(3) == Some(&"built-in") {
+                method = "LIST".to_string();
+                format!("{resource_key}:{}", path_columns[0])
+            } else if path_columns.get(3) == Some(&"refresh-built-in") {
+                method = "PUT".to_string();
+                format!("{resource_key}:{}", path_columns[0])
+            } else {
+                format!("{resource_key}:{}", path_columns[0])
+            }
         } else if path_columns[1].eq("groups") || path_columns[1].eq("roles") {
             // for groups or roles, path will be of format /org/roles/id , so we need
             // to check permission on role:org/id for permissions on that specific role
@@ -448,8 +472,18 @@ where
                     .map_or("templates", |model| model.key),
                 path_columns[0]
             )
+        } else if path_columns.len() > 2
+            && path_columns[1].eq("ai")
+            && path_columns[2].eq("toolsets")
+        {
+            let key = "ai_toolsets";
+            format!(
+                "{}:{}",
+                OFGA_MODELS.get(key).map_or(key, |model| model.key),
+                path_columns[0]
+            )
         } else if url_len == 3 {
-            // Handle /v2 alert apis
+            // Handle /v2 alert and report apis
             if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("alerts") {
                 if method.eq("GET") {
                     method = "LIST".to_string();
@@ -457,6 +491,15 @@ where
                 format!(
                     "{}:{}",
                     OFGA_MODELS.get("alert_folders").unwrap().key,
+                    folder
+                )
+            } else if path_columns[0].eq(V2_API_PREFIX) && path_columns[2].eq("reports") {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                }
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("report_folders").unwrap().key,
                     folder
                 )
             } else if path_columns[1] == "re_patterns" && path_columns[2] == "test" {
@@ -617,9 +660,21 @@ where
                 )
             }
         } else if url_len == 4 {
-            // Handle /v2 alert apis
+            // Handle /v2 alert and report apis
             if path_columns[0].eq(V2_API_PREFIX) {
-                if path_columns[2].eq("alerts") {
+                if path_columns[2].eq("alerts") && path_columns[3].eq("incidents") {
+                    // GET /v2/{org_id}/alerts/incidents → list incidents
+                    if method.eq("GET") {
+                        method = "LIST".to_string();
+                    }
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get("incidents")
+                            .map_or("incidents", |model| model.key),
+                        path_columns[1] // org_id
+                    )
+                } else if path_columns[2].eq("alerts") || path_columns[2].eq("reports") {
                     format!(
                         "{}:{}",
                         OFGA_MODELS
@@ -633,6 +688,8 @@ where
                     }
                     let ofga_type = if path_columns[3].eq("alerts") {
                         "alert_folders"
+                    } else if path_columns[3].eq("reports") {
+                        "report_folders"
                     } else {
                         "folders"
                     };
@@ -826,64 +883,30 @@ where
             && path_columns.get(3) == Some(&"incidents")
             && url_len >= 5
         {
-            // Handle v2 alert incident endpoints (5+ parts)
-            // Incidents use alert_folders permissions:
-            // - LIST permission on alert_folders → can LIST incidents and get stats and get
-            //   specific incidents
-            // - POST permission on alert_folders → can POST/PATCH incidents (update status, trigger
-            //   RCA)
+            // Incident RBAC — all checks are on incidents:{org_id}
+            //
+            // url_len 5, GET, path[4]=="stats"  → LIST  (aggregate read)
+            // url_len 5, GET, path[4]=={id}     → GET   (read specific incident)
+            // url_len 6, GET, path[5]=="events" → GET   (read sub-resource)
+            // url_len 6, PATCH, path[5]=="update"→ PUT  (modify state)
+            // url_len 6, POST, path[5]=="rca"   → POST  (trigger action)
+            // url_len 7, POST  (events/comment) → POST  (create comment)
 
             if method.eq("GET") && url_len == 5 && path_columns.get(4) == Some(&"stats") {
-                // GET incident stats - requires LIST permission on alert_folders
                 method = "LIST".to_string();
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get("alert_folders")
-                        .map_or("alert_folders", |model| model.key),
-                    path_columns[1] // org_id
-                )
-            } else if method.eq("GET") && url_len == 5 {
-                // GET list of incidents - requires LIST permission on alert_folders
-                method = "LIST".to_string();
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get("alert_folders")
-                        .map_or("alert_folders", |model| model.key),
-                    path_columns[1] // org_id
-                )
-            } else if url_len == 6 && method.eq("GET") {
-                // GET specific incident or sub-resources (service_graph)
-                // Requires LIST permission on alert_folders
-                method = "LIST".to_string();
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get("alert_folders")
-                        .map_or("alert_folders", |model| model.key),
-                    path_columns[1] // org_id (check org-level alert_folders permission)
-                )
-            } else if url_len == 6 && (method.eq("PATCH") || method.eq("POST")) {
-                // PATCH incident status or POST RCA - requires POST permission on alert_folders
-                method = "POST".to_string();
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get("alert_folders")
-                        .map_or("alert_folders", |model| model.key),
-                    path_columns[1] // org_id (check org-level alert_folders permission)
-                )
-            } else {
-                // Fallback for other incident operations
-                format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get("alert_folders")
-                        .map_or("alert_folders", |model| model.key),
-                    path_columns[1] // org_id
-                )
+            } else if method.eq("PATCH") {
+                // PATCH /{incident_id}/update → PUT
+                method = "PUT".to_string();
             }
+            // POST (rca, comment) stays POST
+
+            format!(
+                "{}:{}",
+                OFGA_MODELS
+                    .get("incidents")
+                    .map_or("incidents", |model| model.key),
+                path_columns[1] // org_id
+            )
         } else if method.eq("PUT") || method.eq("DELETE") || method.eq("PATCH") {
             method = resolve_write_method(&method, &path_columns);
 
@@ -958,25 +981,6 @@ where
             )
         };
 
-        // Check if the ws request is using internal grpc token
-        if method.eq("GET")
-            && path.contains("/ws")
-            && let Some(auth_header) = parts.headers.get("Authorization")
-            && auth_header
-                .to_str()
-                .unwrap()
-                .eq(&cfg.grpc.internal_grpc_token)
-        {
-            return Ok(AuthExtractor {
-                auth: auth_header.to_str().unwrap().to_string(),
-                method,
-                o2_type: format!("stream:{org_id}"),
-                org_id,
-                bypass_check: true,
-                parent_id: folder,
-            });
-        }
-
         let auth_str = extract_auth_str_from_headers(&parts.headers).await;
 
         // Log auth metadata without exposing sensitive tokens
@@ -993,11 +997,11 @@ where
         };
 
         log::debug!(
-            "AuthExtractor: path='{}', auth_str_empty={}, auth_type='{}', auth_str_len={}",
+            "AuthExtractor: path='{}', auth_str_empty={}, auth_type='{}', auth_str_len={}, object_type='{object_type}'",
             local_path,
             auth_str.is_empty(),
             auth_type,
-            auth_str.len()
+            auth_str.len(),
         );
 
         // if let Some(auth_header) = parts.headers.get("Authorization") {
@@ -1037,7 +1041,6 @@ where
             || path.contains("clusters")
             || path.contains("query_manager")
             || path.contains("/short")
-            || path.contains("/ws")
             || path.contains("/_values_stream")
             // bulk enable of pipelines and alerts
             || path.contains("/bulk/enable")

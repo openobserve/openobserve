@@ -580,7 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- TenstackTable for events -->
           <div
-            class="tw:flex-1 tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded"
+            class="tw:flex-1 traces-events-table-container tw:overflow-hidden tab-content-dynamic-height tw:border-1 tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded"
             :class="
               isLLMSpan && llmMetrics && span.llm_model_name
                 ? 'tab-content-with-llm-metrics'
@@ -598,9 +598,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-columns="false"
               :row-height="28"
               :enable-ai-context-button="false"
+              :hide-view-related-button="true"
+              :hide-expand-field-options="true"
+              @copy="copyContentToClipboard"
               @update:columnOrder="handleEventsColumnOrder"
               @update:columnSizes="handleEventsColumnSizes"
-            />
+            >
+              <template #expanded-row="{ row }">
+                <json-preview
+                  :value="row"
+                  class="tw:py-[0.375rem] tw:pl-[0.375rem]"
+                  copyButtonClass="tw:left-[0.25rem]! tw:w-fit! tw:sticky!"
+                  mode="expanded"
+                />
+              </template>
+            </TenstackTable>
           </div>
         </template>
         <div
@@ -2069,6 +2081,16 @@ export default defineComponent({
       ),
     );
 
+    const copyContentToClipboard = (log: any) => {
+      copyToClipboard(JSON.stringify(log)).then(() =>
+        q.notify({
+          type: "positive",
+          message: "Content Copied Successfully!",
+          timeout: 1000,
+        }),
+      );
+    };
+
     return {
       t,
       activeTab,
@@ -2126,6 +2148,7 @@ export default defineComponent({
       DOMPurify,
       serviceIconUrl,
       getImageURL,
+      copyContentToClipboard,
     };
   },
 });
@@ -2147,6 +2170,12 @@ export default defineComponent({
 :deep(.traces-correlated-logs-container) {
   .logs-table-container .container {
     height: 100% !important;
+  }
+}
+
+:deep(.traces-events-table-container) {
+  .table-container {
+    border-radius: 0 !important;
   }
 }
 

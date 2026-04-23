@@ -315,10 +315,17 @@ pub async fn update_user(
                     if is_root_user(initiator_id) {
                         allow_password_update = true
                     } else {
-                        let initiating_user = db::user::get(Some(org_id), initiator_id)
-                            .await
-                            .unwrap()
-                            .unwrap();
+                        let initiating_user = match db::user::get(Some(org_id), initiator_id).await
+                        {
+                            Ok(Some(u)) => u,
+                            Ok(None) => {
+                                return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
+                            }
+                            Err(e) => {
+                                log::error!("Error fetching initiating user {initiator_id}: {e}");
+                                return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
+                            }
+                        };
                         if (local_user.role.eq(&UserRole::Root)
                             && initiating_user.role.eq(&UserRole::Root))
                             || (!local_user.role.eq(&UserRole::Root)
@@ -403,16 +410,20 @@ pub async fn update_user(
                         message = "Root user role cannot be changed";
                     } else if update_mode.is_self_update() && local_user.role < new_user.role {
                         message = "Self role cannot be upgraded";
-                    } else if local_user.role.ne(&new_user.role) {
+                    } else {
+                        is_org_updated |= local_user.role.ne(&new_user.role);
                         #[cfg(feature = "enterprise")]
-                        if new_org_role.custom_role.is_some() {
+                        if let Some(cr) = new_org_role.custom_role {
                             custom_roles_need_change = true;
-                            custom_roles.extend(new_org_role.custom_role.unwrap());
+                            custom_roles.extend(cr);
+                            is_org_updated = true;
                         }
-                        is_org_updated = true;
                     }
                 }
-                if user.token.is_some() {
+                // Token replacement is a privileged operation — only allow if the
+                // initiator is updating their own token OR has password-update rights
+                // (i.e. Root or Admin updating a non-root user).
+                if user.token.is_some() && (update_mode.is_self_update() || allow_password_update) {
                     new_user.token = user.token.unwrap();
                     is_org_updated = true;
                 }
@@ -616,9 +627,12 @@ pub async fn add_user_to_org(
             root_user.get("root").unwrap().clone()
         } else {
             match db::user::get(Some(org_id), initiator_id).await {
-                Ok(user) => user.unwrap(),
+                Ok(Some(user)) => user,
+                Ok(None) => {
+                    return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
+                }
                 Err(e) => {
-                    log::error!("Error fetching user: {e}");
+                    log::error!("Error fetching initiating user: {e}");
                     return Ok(MetaHttpResponse::not_found("User not found"));
                 }
             }
@@ -905,10 +919,16 @@ pub async fn remove_user_from_org(
     let initiating_user = if is_root_user(initiator_id) {
         ROOT_USER.get("root").unwrap().to_owned()
     } else {
-        db::user::get(Some(org_id), initiator_id)
-            .await
-            .unwrap()
-            .unwrap()
+        match db::user::get(Some(org_id), initiator_id).await {
+            Ok(Some(user)) => user,
+            Ok(None) => {
+                return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
+            }
+            Err(e) => {
+                log::error!("Error fetching initiating user {initiator_id}: {e}");
+                return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
+            }
+        }
     };
 
     let is_allowed =

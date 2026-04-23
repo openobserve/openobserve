@@ -25,8 +25,8 @@ use config::meta::{
 pub use intermediate::convert_str_to_meta_report_timerange;
 pub use queries::ListReportsQueryResult;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ConnectionTrait, EntityTrait, ModelTrait, Set,
-    TransactionTrait,
+    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait,
+    QueryFilter, Set, TransactionTrait,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -268,6 +268,123 @@ pub async fn update_report<C: ConnectionTrait + TransactionTrait>(
     report_active_model.update(&txn).await?;
 
     // Determine which `report_dashboards` records to create, update, and delete.
+    let existing_rltns = models.joined_dashboards;
+    let desired_rltns = report.dashboards;
+    let rltns_to_create = relations::relations_to_create(
+        &txn,
+        &report.org_id,
+        &models.report.id,
+        &existing_rltns,
+        &desired_rltns,
+    )
+    .await?;
+    let rltns_to_update = relations::relations_to_update(&existing_rltns, &desired_rltns)?;
+    let rltns_to_delete = relations::relations_to_delete(&existing_rltns, &desired_rltns);
+
+    if !rltns_to_create.is_empty() {
+        report_dashboards::Entity::insert_many(rltns_to_create)
+            .exec(&txn)
+            .await?;
+    }
+    for rltn_active_model in rltns_to_update {
+        rltn_active_model.update(&txn).await?;
+    }
+    for rltn_pk in rltns_to_delete {
+        report_dashboards::Entity::delete_by_id(rltn_pk)
+            .exec(&txn)
+            .await?;
+    }
+
+    txn.commit().await?;
+    Ok(models.report.id)
+}
+
+/// Deletes a report by its KSUID.
+pub async fn delete_by_id<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    report_id: &str,
+) -> Result<String, Error> {
+    let _lock = super::get_lock().await;
+    let txn = conn.begin().await?;
+    let Some(report_model) = reports::Entity::find()
+        .filter(reports::Column::Id.eq(report_id))
+        .one(&txn)
+        .await?
+    else {
+        return Ok(String::new());
+    };
+    let id = report_model.id.clone();
+    report_model.delete(&txn).await?;
+    txn.commit().await?;
+    Ok(id)
+}
+
+/// Updates the report identified by its KSUID.
+///
+/// Optionally moves it to a new folder if `new_folder_snowflake_id` is given.
+pub async fn update_by_id<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    report_id: &str,
+    new_folder_snowflake_id: Option<&str>,
+    report: MetaReport,
+) -> Result<String, Error> {
+    let _lock = super::get_lock().await;
+    let txn = conn.begin().await?;
+
+    let Some(models) =
+        queries::SelectReportAndJoinRelationsResult::get_by_id(conn, report_id).await?
+    else {
+        return Err(Error::ReportNotFound);
+    };
+
+    // Resolve the new folder FK if moving.
+    let folder_id = if let Some(new_folder_snowflake_id) = new_folder_snowflake_id {
+        let maybe_folder_model = super::folders::get_model(
+            &txn,
+            &report.org_id,
+            new_folder_snowflake_id,
+            FolderType::Reports,
+        )
+        .await?;
+        let folder_model = maybe_folder_model.ok_or(Error::ReportFolderNotFound)?;
+        Set(folder_model.id)
+    } else {
+        NotSet
+    };
+
+    let frequency_intermediate: intermediate::ReportFrequency = report
+        .frequency
+        .try_into()
+        .map_err(|_| Error::NegativeFrequencyInterval)?;
+    let frequency_json = serde_json::to_value(frequency_intermediate)?;
+
+    let destinations_intermediate: intermediate::ReportDestinations =
+        report.destinations.clone().into();
+    let destinations_json = serde_json::to_value(destinations_intermediate)?;
+
+    let report_active_model = reports::ActiveModel {
+        id: Set(models.report.id.clone()),
+        org: Set(models.report.org.clone()),
+        folder_id,
+        name: Set(report.name),
+        title: Set(report.title),
+        description: Set(Some(report.description).filter(|s| !s.is_empty())),
+        enabled: Set(report.enabled),
+        frequency: Set(frequency_json),
+        destinations: Set(destinations_json),
+        message: Set(Some(report.message).filter(|s| !s.is_empty())),
+        timezone: Set(report.timezone),
+        tz_offset: Set(report.tz_offset),
+        owner: Set(Some(report.owner).filter(|s| !s.is_empty())),
+        last_edited_by: Set(Some(report.last_edited_by).filter(|s| !s.is_empty())),
+        created_at: NotSet,
+        updated_at: Set(Some(Utc::now().timestamp_micros())),
+        start_at: Set(report.start),
+        image_preview: Set(report.image_preview),
+    };
+    report_active_model.update(&txn).await?;
+
+    // Update report_dashboards relations.
     let existing_rltns = models.joined_dashboards;
     let desired_rltns = report.dashboards;
     let rltns_to_create = relations::relations_to_create(

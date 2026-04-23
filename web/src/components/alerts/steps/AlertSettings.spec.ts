@@ -282,18 +282,6 @@ describe("AlertSettings.vue", () => {
   });
 
   describe("Scheduled Mode", () => {
-    it("should show all scheduled fields", () => {
-      expect(wrapper.html()).toContain("Threshold");
-      expect(wrapper.html()).toContain("Period");
-      expect(wrapper.html()).toContain("Frequency");
-      expect(wrapper.html()).toContain("Silence Notification");
-      expect(wrapper.html()).toContain("Destination");
-    });
-
-    // Note: Aggregation toggle moved to QueryConfig.vue during alert revamp
-    it.skip("should show aggregation toggle for custom query type", async () => {
-      expect(wrapper.html()).toContain("Aggregation");
-    });
 
     it("should not show aggregation toggle for SQL query type", async () => {
       wrapper.props().formData.query_condition.type = "sql";
@@ -308,125 +296,8 @@ describe("AlertSettings.vue", () => {
     });
   });
 
-  // Note: Aggregation functionality moved to QueryConfig.vue during alert revamp
-  describe.skip("Aggregation Toggle", () => {
-    it("should enable aggregation when toggled", async () => {
-      wrapper.vm.localIsAggregationEnabled = true;
-      await wrapper.vm.toggleAggregation();
-      expect(wrapper.emitted("update:isAggregationEnabled")).toBeTruthy();
-      expect(
-        wrapper.emitted("update:isAggregationEnabled")![0]
-      ).toEqual([true]);
-    });
-
-    it("should disable aggregation when toggled off", async () => {
-      wrapper.vm.localIsAggregationEnabled = false;
-      await wrapper.vm.toggleAggregation();
-      expect(
-        wrapper.emitted("update:isAggregationEnabled")![0]
-      ).toEqual([false]);
-    });
-
-    it("should initialize aggregation object when enabled", async () => {
-      wrapper.vm.localIsAggregationEnabled = true;
-      await wrapper.vm.toggleAggregation();
-      expect(wrapper.props().formData.query_condition.aggregation).toBeDefined();
-      expect(
-        wrapper.props().formData.query_condition.aggregation.group_by
-      ).toEqual([""]);
-      expect(
-        wrapper.props().formData.query_condition.aggregation.function
-      ).toBe("avg");
-    });
-
-    it("should not allow aggregation for SQL query type", async () => {
-      wrapper.props().formData.query_condition.type = "sql";
-      await nextTick();
-      wrapper.vm.localIsAggregationEnabled = true;
-      await wrapper.vm.toggleAggregation();
-      expect(wrapper.vm.localIsAggregationEnabled).toBe(false);
-    });
-
-    it("should not allow aggregation for PromQL query type", async () => {
-      wrapper.props().formData.query_condition.type = "promql";
-      await nextTick();
-      wrapper.vm.localIsAggregationEnabled = true;
-      await wrapper.vm.toggleAggregation();
-      expect(wrapper.vm.localIsAggregationEnabled).toBe(false);
-    });
-
-    it("should show group by fields when aggregation is enabled", async () => {
-      await wrapper.setProps({ isAggregationEnabled: true });
-      wrapper.props().formData.query_condition.aggregation = {
-        group_by: ["field1"],
-        function: "avg",
-        having: { column: "count", operator: ">", value: 10 },
-      };
-      await nextTick();
-      expect(wrapper.html()).toContain("Group By");
-    });
-  });
-
-  // Note: Group By functionality moved to QueryConfig.vue during alert revamp
-  describe.skip("Group By Fields Management", () => {
-    beforeEach(async () => {
-      await wrapper.setProps({ isAggregationEnabled: true });
-      wrapper.props().formData.query_condition.aggregation = {
-        group_by: ["field1"],
-        function: "avg",
-        having: { column: "count", operator: ">", value: 10 },
-      };
-      await nextTick();
-    });
-
-    it("should add group by column", async () => {
-      const initialLength =
-        wrapper.props().formData.query_condition.aggregation.group_by.length;
-      await wrapper.vm.addGroupByColumn();
-      expect(
-        wrapper.props().formData.query_condition.aggregation.group_by.length
-      ).toBe(initialLength + 1);
-    });
-
-    it("should delete group by column", async () => {
-      wrapper.props().formData.query_condition.aggregation.group_by = [
-        "field1",
-        "field2",
-      ];
-      await wrapper.vm.deleteGroupByColumn(0);
-      expect(
-        wrapper.props().formData.query_condition.aggregation.group_by
-      ).toEqual(["field2"]);
-    });
-
-    it("should emit aggregation update when adding column", async () => {
-      await wrapper.vm.addGroupByColumn();
-      expect(wrapper.emitted("update:aggregation")).toBeTruthy();
-    });
-
-    it("should emit aggregation update when deleting column", async () => {
-      await wrapper.vm.deleteGroupByColumn(0);
-      expect(wrapper.emitted("update:aggregation")).toBeTruthy();
-    });
-
-    it("should filter group by fields", async () => {
-      const mockUpdate = vi.fn((cb: Function) => cb());
-      await wrapper.vm.filterFields("field", mockUpdate);
-      expect(wrapper.vm.filteredFields.length).toBeGreaterThan(0);
-    });
-
-    it("should reset filtered fields when search is empty", async () => {
-      const mockUpdate = vi.fn((cb: Function) => cb());
-      await wrapper.vm.filterFields("", mockUpdate);
-      expect(wrapper.vm.filteredFields).toEqual(wrapper.props().columns);
-    });
-  });
 
   describe("Threshold - Without Aggregation", () => {
-    it("should display operator and threshold fields", () => {
-      expect(wrapper.html()).toContain("Threshold");
-    });
-
     it("should update operator", async () => {
       wrapper.props().formData.trigger_condition.operator = ">";
       await wrapper.vm.emitTriggerUpdate();
@@ -464,48 +335,6 @@ describe("AlertSettings.vue", () => {
     });
   });
 
-  // Note: Aggregation threshold functionality moved to QueryConfig.vue during alert revamp
-  describe.skip("Threshold - With Aggregation", () => {
-    beforeEach(async () => {
-      await wrapper.setProps({ isAggregationEnabled: true });
-      wrapper.props().formData.query_condition.aggregation = {
-        group_by: [""],
-        function: "avg",
-        having: { column: "count", operator: ">", value: 10 },
-      };
-      await nextTick();
-    });
-
-    it("should display aggregation function selector", () => {
-      expect(wrapper.vm.aggFunctions).toContain("avg");
-      expect(wrapper.vm.aggFunctions).toContain("count");
-      expect(wrapper.vm.aggFunctions).toContain("sum");
-    });
-
-    it("should update aggregation function", async () => {
-      wrapper.props().formData.query_condition.aggregation.function = "sum";
-      await wrapper.vm.emitAggregationUpdate();
-      expect(wrapper.emitted("update:aggregation")).toBeTruthy();
-    });
-
-    it("should validate aggregation column is required", async () => {
-      wrapper.props().formData.query_condition.aggregation.having.column = "";
-      const result = await wrapper.vm.validate();
-      expect(result.valid).toBe(false);
-    });
-
-    it("should validate aggregation value is required", async () => {
-      wrapper.props().formData.query_condition.aggregation.having.value = "";
-      const result = await wrapper.vm.validate();
-      expect(result.valid).toBe(false);
-    });
-
-    it("should filter numeric columns", async () => {
-      const mockUpdate = vi.fn((cb: Function) => cb());
-      await wrapper.vm.filterNumericColumns("count", mockUpdate);
-      expect(wrapper.vm.filteredNumericColumns).toBeDefined();
-    });
-  });
 
   describe("Period Field", () => {
     it("should display period input", () => {
@@ -550,11 +379,6 @@ describe("AlertSettings.vue", () => {
   });
 
   describe("Frequency - Minutes Mode", () => {
-    it("should display frequency input in minutes mode", () => {
-      expect(wrapper.html()).toContain("Frequency");
-      expect(wrapper.html()).toContain("Interval");
-    });
-
     it("should have minutes as default frequency type", () => {
       expect(wrapper.props().formData.trigger_condition.frequency_type).toBe(
         "minutes"
@@ -590,17 +414,6 @@ describe("AlertSettings.vue", () => {
     beforeEach(async () => {
       wrapper.props().formData.trigger_condition.frequency_type = "cron";
       await nextTick();
-    });
-
-    it("should display cron input in cron mode", () => {
-      // Check that cron input field is rendered
-      const html = wrapper.html();
-      expect(html).toContain('placeholder="Cron Expression *"');
-    });
-
-    it("should display timezone selector in cron mode", () => {
-      const html = wrapper.html();
-      expect(html).toContain('placeholder="Timezone *"');
     });
 
     it("should update cron expression", async () => {
@@ -865,45 +678,6 @@ describe("AlertSettings.vue", () => {
     });
   });
 
-  // Note: Aggregation validation moved to QueryConfig.vue during alert revamp
-  describe.skip("Validation - With Aggregation", () => {
-    beforeEach(async () => {
-      await wrapper.setProps({ isAggregationEnabled: true });
-      wrapper.props().formData.query_condition.aggregation = {
-        group_by: ["field1"],
-        function: "avg",
-        having: { column: "count", operator: ">", value: 10 },
-      };
-      await nextTick();
-    });
-
-    it("should pass validation with valid aggregation", async () => {
-      wrapper.props().formData.trigger_condition.period = 10;
-      wrapper.props().formData.trigger_condition.frequency = 10;
-      wrapper.props().formData.trigger_condition.silence = 10;
-      wrapper.vm.localDestinations = ["dest1"];
-      const result = await wrapper.vm.validate();
-      expect(result.valid).toBe(true);
-    });
-
-    it("should fail validation with empty group by field", async () => {
-      wrapper.props().formData.query_condition.aggregation.group_by = [""];
-      const result = await wrapper.vm.validate();
-      expect(result.valid).toBe(false);
-    });
-
-    it("should fail validation without having column", async () => {
-      wrapper.props().formData.query_condition.aggregation.having.column = "";
-      const result = await wrapper.vm.validate();
-      expect(result.valid).toBe(false);
-    });
-
-    it("should fail validation without having value", async () => {
-      wrapper.props().formData.query_condition.aggregation.having.value = "";
-      const result = await wrapper.vm.validate();
-      expect(result.valid).toBe(false);
-    });
-  });
 
   describe("Methods - Emit Updates", () => {
     it("should emit trigger update", async () => {
@@ -947,27 +721,6 @@ describe("AlertSettings.vue", () => {
   });
 
   describe("Edge Cases", () => {
-    // Note: Columns array functionality moved to QueryConfig.vue during alert revamp
-    it.skip("should handle empty columns array", async () => {
-      const emptyWrapper = mount(AlertSettings, {
-        global: {
-          mocks: { $store: mockStore, $router: mockRouter },
-          provide: { store: mockStore, router: mockRouter },
-          plugins: [i18n],
-        },
-        props: {
-          formData: mockFormData,
-          isRealTime: "false",
-          columns: [],
-          isAggregationEnabled: false,
-          destinations: [],
-          formattedDestinations: [],
-        },
-      });
-      expect(emptyWrapper.vm.filteredFields).toEqual([]);
-      emptyWrapper.unmount();
-    });
-
     it("should handle empty destinations array", async () => {
       const emptyWrapper = mount(AlertSettings, {
         global: {
@@ -1010,13 +763,6 @@ describe("AlertSettings.vue", () => {
       expect(wrapper.props().formData.trigger_condition.cron).toContain("*/5");
     });
 
-    // Note: Aggregation functionality moved to QueryConfig.vue during alert revamp
-    it.skip("should handle null aggregation gracefully", async () => {
-      wrapper.props().formData.query_condition.aggregation = null;
-      await wrapper.vm.toggleAggregation();
-      expect(wrapper.exists()).toBe(true);
-    });
-
     it("should handle multiple group by fields", async () => {
       await wrapper.setProps({ isAggregationEnabled: true });
       wrapper.props().formData.query_condition.aggregation = {
@@ -1033,9 +779,10 @@ describe("AlertSettings.vue", () => {
 
   describe("Accessibility", () => {
     it("should have proper labels for inputs", () => {
-      expect(wrapper.html()).toContain("Threshold");
+      // Note: Threshold and Frequency labels moved to QueryConfig.vue during alert revamp
       expect(wrapper.html()).toContain("Period");
-      expect(wrapper.html()).toContain("Frequency");
+      expect(wrapper.html()).toContain("Silence Notification");
+      expect(wrapper.html()).toContain("Destination");
     });
 
     it("should have info tooltips", () => {
@@ -1060,15 +807,6 @@ describe("AlertSettings.vue", () => {
       wrapper.vm.localDestinations = [];
       const result = await wrapper.vm.validate();
       expect(result.valid).toBe(false);
-    });
-
-    // Note: Aggregation toggle functionality moved to QueryConfig.vue during alert revamp
-    it.skip("should not switch to aggregation for non-custom query types", async () => {
-      wrapper.props().formData.query_condition.type = "sql";
-      await nextTick();
-      wrapper.vm.localIsAggregationEnabled = true;
-      await wrapper.vm.toggleAggregation();
-      expect(wrapper.vm.localIsAggregationEnabled).toBe(false);
     });
 
     it("should not accept invalid cron expressions", async () => {

@@ -42,8 +42,11 @@ vi.mock("vue-router", async () => {
 vi.mock("@/services/reports", () => ({
   default: {
     getReport: vi.fn(),
+    getReportById: vi.fn(),
     createReport: vi.fn(),
+    createReportV2: vi.fn(),
     updateReport: vi.fn(),
+    updateReportById: vi.fn(),
   },
 }));
 
@@ -77,6 +80,10 @@ vi.mock("@/utils/date", () => ({
     timestamp: 1700000000,
     offset: 0,
   })),
+}));
+
+vi.mock("@/utils/commons", () => ({
+  getFoldersListByType: vi.fn(() => Promise.resolve()),
 }));
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -174,8 +181,11 @@ describe("CreateReport", () => {
       data: { dashboards: MOCK_DASHBOARDS },
     } as any);
     vi.mocked(reports.createReport).mockResolvedValue({} as any);
+    vi.mocked(reports.createReportV2).mockResolvedValue({} as any);
     vi.mocked(reports.updateReport).mockResolvedValue({} as any);
+    vi.mocked(reports.updateReportById).mockResolvedValue({} as any);
     vi.mocked(reports.getReport).mockResolvedValue({ data: MOCK_REPORT } as any);
+    vi.mocked(reports.getReportById).mockResolvedValue({ data: MOCK_REPORT } as any);
 
     store.state.selectedOrganization = {
       identifier: "test-org",
@@ -502,7 +512,7 @@ describe("CreateReport", () => {
       await wrapper.vm.saveReport();
       await flushPromises();
 
-      expect(vi.mocked(reports.createReport)).toHaveBeenCalled();
+      expect(vi.mocked(reports.createReportV2)).toHaveBeenCalled();
     });
 
     it("should navigate to reports list after successful create", async () => {

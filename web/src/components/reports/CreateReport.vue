@@ -61,38 +61,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="addReportFormRef"
             @submit="onSubmit"
           >
-            <div
-              data-test="add-report-name-input"
-              class="report-name-input o2-input q-px-sm"
-              style="padding-top: 12px"
-            >
-              <q-input
-                v-model.trim="formData.name"
-                :label="t('alerts.name') + ' *'"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop"
-                stack-label
-                outlined
-                filled
-                dense
-                v-bind:readonly="isEditingReport"
-                v-bind:disable="isEditingReport"
-                :rules="[
-                  (val: any) =>
-                    !!val
-                      ? isValidResourceName(val) ||
-                        `Characters like :, ?, /, #, and spaces are not allowed.`
-                      : t('common.nameRequired'),
-                ]"
-                tabindex="0"
-                style="width: 400px"
+            <div class="tw:flex tw:items-start tw:gap-4 q-px-sm" style="padding-top: 12px">
+              <div data-test="add-report-name-input" class="o2-input">
+                <q-input
+                  v-model.trim="formData.name"
+                  :label="t('alerts.name') + ' *'"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop"
+                  stack-label
+                  borderless
+                  dense
+                  v-bind:readonly="isEditingReport"
+                  v-bind:disable="isEditingReport"
+                  :rules="[
+                    (val: any) =>
+                      !!val
+                        ? isValidResourceName(val) ||
+                          `Characters like :, ?, /, #, and spaces are not allowed.`
+                        : t('common.nameRequired'),
+                  ]"
+                  tabindex="0"
+                  style="width: 330px"
+                >
+                  <template v-slot:hint>
+                    Characters like :, ?, /, #, and spaces are not allowed.
+                  </template>
+                </q-input>
+              </div>
+
+              <div
+                data-test="add-report-folder-select"
+                class="o2-input"
+                style="width: 250px; padding-top: 2px"
               >
-                <template v-slot:hint>
-                  Characters like :, ?, /, #, and spaces are not allowed.
-                </template>
-              </q-input>
+                <SelectFolderDropdown
+                  :activeFolderId="selectedReportFolderId"
+                  type="reports"
+                  :style="'height: 34px;top:28px'"
+                  :disableDropdown="isEditingReport"
+                  @folder-selected="(f: any) => selectedReportFolderId = f.value"
+                />
+              </div>
             </div>
+
             <div
               data-test="add-report-description-input"
               class="report-name-input o2-input q-px-sm"
@@ -104,8 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 bg-color="input-bg"
                 class="showLabelOnTop"
                 stack-label
-                outlined
-                filled
+                borderless
                 dense
                 tabindex="0"
                 style="width: 600px"
@@ -174,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         color="input-border"
                         bg-color="input-bg"
                         class="q-py-sm showLabelOnTop no-case"
-                        filled
+                        borderless
                         stack-label
                         map-options
                         dense
@@ -213,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         color="input-border"
                         bg-color="input-bg"
                         class="q-py-sm showLabelOnTop no-case"
-                        filled
+                        borderless
                         emit-value
                         map-options
                         stack-label
@@ -252,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         color="input-border"
                         bg-color="input-bg"
                         class="q-py-sm showLabelOnTop"
-                        filled
+                        borderless
                         emit-value
                         map-options
                         stack-label
@@ -341,9 +352,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ]"
                             emit-value
                             map-options
-                            outlined
+                            borderless
                             dense
-                            filled
                             :label="t('reports.reportType')"
                             color="input-border"
                             bg-color="input-bg"
@@ -365,9 +375,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             emit-value
                             map-options
-                            outlined
+                            borderless
                             dense
-                            filled
                             :label="t('reports.attachmentType')"
                             color="input-border"
                             bg-color="input-bg"
@@ -454,9 +463,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @update:model-value="
                                 (v) => setDimension(dashboard, 'width', v)
                               "
-                              outlined
+                              borderless
                               dense
-                              filled
                               type="number"
                               min="1"
                               :label="t('reports.dimensionWidth')"
@@ -477,9 +485,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @update:model-value="
                                 (v) => setDimension(dashboard, 'height', v)
                               "
-                              outlined
+                              borderless
                               dense
-                              filled
                               type="number"
                               min="1"
                               :label="t('reports.dimensionHeight')"
@@ -645,7 +652,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @filter="timezoneFilterFn"
                           input-debounce="0"
                           dense
-                          filled
                           emit-value
                           fill-input
                           hide-selected
@@ -654,7 +660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :rules="[(val: any) => !!val || 'Field is required!']"
                           class="timezone-select showLabelOnTop"
                           stack-label
-                          outlined
+                          borderless
                           style="width: 300px"
                         />
                       </div>
@@ -731,7 +737,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="showLabelOnTop"
                           stack-label
                           type="number"
-                          outlined
+                          borderless
                           dense
                           :rules="[(val: any) => !!val || 'Field is required!']"
                           style="width: 100%"
@@ -751,7 +757,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           color="input-border"
                           bg-color="input-bg"
                           class="q-pt-sm q-pb-none showLabelOnTop no-case"
-                          filled
+                          borderless
                           emit-value
                           stack-label
                           dense
@@ -772,7 +778,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="o2-input q-mr-sm"
                       >
                         <q-input
-                          filled
+                          borderless
                           v-model="scheduling.date"
                           label="Start Date *"
                           color="input-border"
@@ -785,7 +791,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ) || 'Date format is incorrect!',
                           ]"
                           stack-label
-                          outlined
                           dense
                           style="width: 160px"
                         >
@@ -819,7 +824,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="o2-input q-mr-sm"
                       >
                         <q-input
-                          filled
                           v-model="scheduling.time"
                           label="Start Time *"
                           color="input-border"
@@ -828,7 +832,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           mask="time"
                           :rules="['time']"
                           stack-label
-                          outlined
+                          borderless
                           dense
                           style="width: 160px"
                         >
@@ -870,7 +874,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @filter="timezoneFilterFn"
                           input-debounce="0"
                           dense
-                          filled
                           emit-value
                           fill-input
                           hide-selected
@@ -879,7 +882,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :rules="[(val: any) => !!val || 'Field is required!']"
                           class="timezone-select showLabelOnTop"
                           stack-label
-                          outlined
+                          borderless
                           style="width: 300px"
                         />
                       </div>
@@ -939,8 +942,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       bg-color="input-bg"
                       class="showLabelOnTop"
                       stack-label
-                      outlined
-                      filled
+                      borderless
                       dense
                       :rules="[
                         (val: any) => !!val.trim() || 'Field is required!',
@@ -961,8 +963,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       bg-color="input-bg"
                       class="showLabelOnTop"
                       stack-label
-                      outlined
-                      filled
+                      borderless
                       dense
                       :rules="[
                         (val: any) =>
@@ -972,7 +973,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ]"
                       tabindex="0"
                       style="width: 100%"
-                      borderless
                       :placeholder="t('user.inviteByEmail')"
                     />
                   </div>
@@ -1103,6 +1103,8 @@ import CronExpressionParser from "cron-parser";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useReo } from "@/services/reodotdev_analytics";
+import SelectFolderDropdown from "@/components/common/sidebar/SelectFolderDropDown.vue";
+import { getFoldersListByType } from "@/utils/commons";
 
 const props = defineProps({
   report: {
@@ -1247,6 +1249,10 @@ const emails = ref("");
 
 const isEditingReport = ref(false);
 
+const selectedReportFolderId = ref<string>(
+  (router.currentRoute.value.query.folder as string) || "default",
+);
+
 const isFetchingReport = ref(false);
 
 const cronError = ref("");
@@ -1261,21 +1267,26 @@ const frequency = ref({
 });
 
 onBeforeMount(async () => {
+  await getFoldersListByType(store, "reports");
   await getDashboaordFolders();
 
-  isEditingReport.value = !!router.currentRoute.value.query?.name;
+  const query = router.currentRoute.value.query;
+  isEditingReport.value = !!(query?.report_id || query?.name);
 
   if (!isEditingReport.value) setInitialReportData();
 
   if (isEditingReport.value) {
-    isEditingReport.value = true;
     isFetchingReport.value = true;
 
-    const reportName: string = (router.currentRoute.value.query?.name ||
-      "") as string;
+    const reportId = query?.report_id as string | undefined;
+    const reportName = (query?.name || "") as string;
+    const org = store.state.selectedOrganization.identifier;
 
-    reports
-      .getReport(store.state.selectedOrganization.identifier, reportName)
+    const fetchPromise = reportId
+      ? reports.getReportById(org, reportId)
+      : reports.getReport(org, reportName);
+
+    fetchPromise
       .then((res: any) => {
         setupEditingReport(res.data);
         originalReportData.value = JSON.stringify(formData.value);
@@ -1325,12 +1336,14 @@ const setInitialReportData = async () => {
     isCachedReport.value = false;
   }
 
-  if (queryParams.folderId) {
-    formData.value.dashboards[0].folder = queryParams.folderId as string;
-    await onFolderSelection(queryParams.folderId as string);
+  // Support both ?folder= (from ReportList) and ?folderId= (legacy links)
+  const reportFolderId = (queryParams.folder || queryParams.folderId) as string | undefined;
+  if (reportFolderId) {
+    formData.value.dashboards[0].folder = reportFolderId;
+    await onFolderSelection(reportFolderId);
   }
 
-  if (queryParams.folderId && queryParams.dashboardId) {
+  if (reportFolderId && queryParams.dashboardId) {
     formData.value.dashboards[0].dashboard = queryParams.dashboardId as string;
     setDashboardTabOptions(queryParams.dashboardId);
   }
@@ -1654,9 +1667,22 @@ const saveReport = async () => {
     delete reportPayload.dashboards[0].attachment_dimensions;
   }
 
-  const reportAction = isEditingReport.value
-    ? reports.updateReport
-    : reports.createReport;
+  const org = store.state.selectedOrganization.identifier;
+  const routeQuery = router.currentRoute.value.query;
+  const reportId = routeQuery?.report_id as string | undefined;
+  const folderId = selectedReportFolderId.value || "default";
+
+  let savePromise: Promise<any>;
+  if (isEditingReport.value && reportId) {
+    // v2 update by ID
+    savePromise = reports.updateReportById(org, reportId, reportPayload);
+  } else if (isEditingReport.value) {
+    // legacy v1 update by name
+    savePromise = reports.updateReport(org, reportPayload);
+  } else {
+    // v2 create with folder
+    savePromise = reports.createReportV2(org, reportPayload, folderId);
+  }
 
   const dismiss = q.notify({
     spinner: true,
@@ -1664,7 +1690,7 @@ const saveReport = async () => {
     timeout: 2000,
   });
 
-  reportAction(store.state.selectedOrganization.identifier, reportPayload)
+  savePromise
     .then(() => {
       q.notify({
         type: "positive",
@@ -1810,6 +1836,7 @@ const goToReports = () => {
     name: "reports",
     query: {
       org_identifier: store.state.selectedOrganization.identifier,
+      folder: selectedReportFolderId.value || "default",
     },
   });
 };
