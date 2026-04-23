@@ -104,6 +104,8 @@ export default defineComponent({
     ServiceIdentitySetup,
     AppTabs,
     SemanticFieldGroupsConfig,
+    OTabs,
+    OTab,
   },
   setup() {
     const store = useStore();
