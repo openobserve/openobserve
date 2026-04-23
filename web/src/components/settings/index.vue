@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('settings.cipherKeys')"
                 >
                 </q-route-tab>
-                <q-route-tab
+                <!-- <q-route-tab
                   v-if="config.isEnterprise == 'true'"
                   data-test="ai-toolsets-tab"
                   name="ai_toolsets"
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon="smart_toy"
                   :label="t('settings.aiToolsets')"
                 >
-                </q-route-tab>
+                </q-route-tab> -->
                 <q-route-tab
                     v-if="config.isEnterprise == 'true' && isMetaOrg"
                     data-test="license-tab"

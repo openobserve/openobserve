@@ -440,6 +440,30 @@ impl ListReportsQueryResult {
                 .eq("[]"),
             );
         }
+        if let Some(name_sub) = &params.name_substring
+            && !name_sub.is_empty()
+        {
+            let pattern = format!("%{}%", name_sub.to_lowercase());
+            query = query.filter(
+                Expr::expr(Func::lower(Expr::col((
+                    reports::Entity,
+                    reports::Column::Name,
+                ))))
+                .like(pattern),
+            );
+        }
+        if let Some(name_sub) = &params.name_substring
+            && !name_sub.is_empty()
+        {
+            let pattern = format!("%{}%", name_sub.to_lowercase());
+            query = query.filter(
+                Expr::expr(Func::lower(Expr::col((
+                    reports::Entity,
+                    reports::Column::Name,
+                ))))
+                .like(pattern),
+            );
+        }
 
         // Order and paginate results.
         query = query

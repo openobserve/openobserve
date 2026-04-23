@@ -219,6 +219,7 @@ pub async fn list_reports(
         folder,
         dashboard,
         destination_less,
+        name_substring: None,
     };
 
     let mut _permitted = None;
@@ -580,10 +581,15 @@ pub async fn list_reports_v2(
     let folder = query.get("folder").map(|s| s.to_owned());
     let dashboard = query.get("dashboard_id").map(|s| s.to_owned());
     let destination_less = query.get("cache").and_then(|s| s.parse::<bool>().ok());
+    let name_substring = query
+        .get("report_name_substring")
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_owned());
     let filters = ReportListFilters {
         folder,
         dashboard,
         destination_less,
+        name_substring,
     };
 
     let mut _permitted = None;
