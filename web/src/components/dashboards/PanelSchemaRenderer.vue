@@ -903,13 +903,15 @@ export default defineComponent({
           // Apply overlay BEFORE assigning to panelData.value.
           // This ensures a single watcher trigger with the overlaid options,
           // avoiding the double-setOption issue (one without graphic, one with).
-          if (
-            applyOverlay &&
-            previousOptionsSnapshot &&
-            isOverlayEligible(panelSchema.value, previousOptionsSnapshot)
-          ) {
-            // Pass container dimensions so the graphic overlay can calculate
-            // width/height (required because ChartRenderer uses notMerge: true).
+          // Even without old data, overlay adds phantom anchor points so the
+          // first streaming chunk doesn't fill the entire chart width.
+          if (applyOverlay) {
+            const hasFullOverlay =
+              previousOptionsSnapshot &&
+              isOverlayEligible(panelSchema.value, previousOptionsSnapshot);
+
+            // Pass container dimensions so the overlay can calculate
+            // graphic width/height and barMaxWidth for bar charts.
             const containerEl = chartPanelRef.value;
             const containerSize = containerEl
               ? {
@@ -969,10 +971,10 @@ export default defineComponent({
             }
 
             result.options = overlayNewDataOnOldOptions(
-              previousOptionsSnapshot,
+              hasFullOverlay ? previousOptionsSnapshot : null,
               result.options,
               containerSize,
-              boundaryTime,
+              hasFullOverlay ? boundaryTime : undefined,
               boundaryInfo.queryStart,
               boundaryInfo.queryEnd,
               boundaryInfo.isLTR,
@@ -1154,14 +1156,17 @@ export default defineComponent({
               }
             }
 
-            // Convert and apply overlay in a single assignment to panelData.value,
-            // so ChartRenderer's watcher fires once with the overlaid options.
+            // Convert and apply overlay in a single assignment to panelData.value.
+            // Always pass true during streaming — overlay adds phantom anchor
+            // points even without old data to prevent first chunk from filling
+            // the entire chart width.
             await convertPanelDataCommon(true);
           } else if (hasData) {
-            // SUBSEQUENT CHUNKS: convert and overlay immediately
+            // SUBSEQUENT CHUNKS: render with overlay if available,
+            // or phantom-anchored render if no cache.
             await convertPanelDataCommon(true);
           }
-          // else: !hasData during loading → skip conversion → old chart stays visible
+          // else: no old chart or no data → skip conversion → loading bar shown
         } else {
           // ---- LOADING COMPLETE ----
           hasRenderedFirstDataChunk.value = false; // Reset for next query

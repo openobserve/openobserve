@@ -54,8 +54,49 @@ export function overlayNewDataOnOldOptions(
   primaryColor?: string,
   histogramIntervalMs?: number,
 ): any {
-  if (!oldOptions?.series?.length) return newOptions;
-  if (!newOptions?.series?.length) return oldOptions;
+  if (!newOptions?.series?.length) return oldOptions ?? newOptions;
+
+  // When there is no old data (first load / no cache), add phantom
+  // anchor points so the chart shows the full time range and correct
+  // bar width even when only partial streaming data has arrived.
+  if (!oldOptions?.series?.length) {
+    const qStartMs = queryStartTime ? queryStartTime / 1000 : 0;
+    const qEndMs = queryEndTime ? queryEndTime / 1000 : 0;
+    const intervalMs = histogramIntervalMs ?? 0;
+
+    if (qStartMs > 0 && qEndMs > 0) {
+      for (const series of newOptions.series) {
+        if (!series.name || !Array.isArray(series.data) || !series.data.length)
+          continue;
+        const firstPoint = series.data[0];
+        if (!Array.isArray(firstPoint) || firstPoint.length < 2) continue;
+
+        const firstTs = toNumericTime(series.data[0]?.[0]);
+        const lastTs = toNumericTime(
+          series.data[series.data.length - 1]?.[0],
+        );
+
+        // Only add interval phantoms (one bucket before/after data edges)
+        // to establish the correct min-interval for bar width.
+        // We do NOT add range anchors — xAxis.min/max already pins the
+        // chart range, and null anchors still skew min-interval calculation.
+        if (!isNaN(firstTs) && intervalMs > 0) {
+          const phantomTs = firstTs - intervalMs;
+          if (phantomTs >= qStartMs) {
+            series.data.unshift([new Date(phantomTs), ""]);
+          }
+        }
+
+        if (!isNaN(lastTs) && intervalMs > 0) {
+          const phantomTs = lastTs + intervalMs;
+          if (phantomTs <= qEndMs) {
+            series.data.push([new Date(phantomTs), ""]);
+          }
+        }
+      }
+    }
+    return newOptions;
+  }
 
   // Shallow-spread newOptions so functions (yAxis.axisLabel.formatter, tooltip.formatter, etc.)
   // are preserved by reference. Only deep-clone series & legend since we mutate their data.
@@ -292,8 +333,8 @@ export function overlayNewDataOnOldOptions(
     }
   }
 
-  // Add a gray overlay on the STALE portion of the chart during streaming.
-  // Only covers the time range where new data hasn't arrived yet, so the user
+  // Add a subtle overlay on the FRESH portion of the chart during streaming.
+  // Only covers the time range where new data has already arrived, so the user
   // can see which part of the chart is fresh vs stale.
   //
   // Uses ECharts graphic component which renders directly on the canvas.
