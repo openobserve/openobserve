@@ -341,6 +341,7 @@ describe("SearchResult", () => {
         "search:timeboxed",
         "get:traceDetails",
         "metrics:filters-updated",
+        "run-query",
       ];
 
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);

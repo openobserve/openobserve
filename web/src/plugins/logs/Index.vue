@@ -287,6 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:recordsPerPage="getMoreDataRecordsPerPage"
                         @expandlog="toggleExpandLog"
                         @send-to-ai-chat="sendToAiChat"
+                        @run-query="searchData"
                       />
                     </div>
                     <div class="text-center col-10 q-ma-none">
@@ -966,6 +967,7 @@ export default defineComponent({
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
       try {
+        searchObj.loading = true;
         searchObj.meta.refreshHistogram = true;
         await getQueryData();
         refreshHistogramChart();

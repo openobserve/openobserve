@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="search-list full-height full-width" ref="searchListContainer">
       <div class="row tw:min-h-[28px] tw:pt-[0.375rem]">
         <div
-          class="col-7 text-left q-pl-lg bg-warning text-white rounded-borders"
+          class="col-9 text-left q-pl-lg bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-8 text-left q-pl-lg warning flex items-center">
+        <div v-else class="col-9 text-left q-pl-lg warning flex items-center">
           {{
             searchObj.meta.logsVisualizeToggle === "patterns"
               ? patternSummaryText
@@ -93,8 +93,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             icon="troubleshoot"
             label="Inspect"
-            class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
-            size="sm"
+            class="analyze-button inspect-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
+            size="xs"
+            padding="2px"
             @click="openSearchJobInspector"
             data-test="logs-inspect-button"
           >
@@ -113,9 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             color="primary"
             icon="timeline"
+            padding="2px"
             :label="t('volumeInsights.insightsButtonLabel')"
             class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
-            size="sm"
+            size="xs"
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
           >
@@ -123,9 +125,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("volumeInsights.analyzeTooltipLogs") }}
             </q-tooltip>
           </q-btn>
+          <ORefreshButton
+            :last-run-at="searchObj.meta.lastRunAt"
+            :loading="searchObj.loading || searchObj.loadingHistogram"
+            :disabled="searchObj.loading || searchObj.loadingHistogram"
+            @click="$emit('run-query')"
+            class="tw:ml-2"
+          />
         </div>
 
-        <div class="col-4 text-right q-pr-sm q-gutter-xs pagination-block">
+        <div class="col-3 text-right q-pr-sm q-gutter-xs pagination-block">
           <q-pagination
             v-if="
               searchObj.meta.resultGrid.showPagination &&
@@ -512,10 +521,12 @@ import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrel
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import config from "@/aws-exports";
+import ORefreshButton from "@/lib/core/RefreshButton/RefreshButton.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
+    ORefreshButton,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -545,6 +556,7 @@ export default defineComponent({
     "update:recordsPerPage",
     "update:columnSizes",
     "sendToAiChat",
+    "run-query",
   ],
   props: {
     expandedLogs: {
@@ -1337,6 +1349,15 @@ export default defineComponent({
     const resetPlotChart = computed(() => {
       return searchObj.meta.resetPlotChart;
     });
+
+    watch(
+      () => searchObj.loading,
+      (loading, wasLoading) => {
+        if (wasLoading && !loading && searchObj.meta.searchApplied) {
+          searchObj.meta.lastRunAt = Date.now();
+        }
+      },
+    );
 
     watch(resetPlotChart, (newVal) => {
       if (newVal) {

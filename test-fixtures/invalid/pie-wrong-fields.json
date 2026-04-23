@@ -1,0 +1,43 @@
+{
+  "_description": "Pie chart with 0 x fields and 3 y fields — should fail minItems/maxItems",
+  "dashboardId": "test-invalid-pie",
+  "title": "Bad Pie Dashboard",
+  "version": 8,
+  "description": "",
+  "tabs": [
+    {
+      "tabId": "tab-1",
+      "name": "Default",
+      "panels": [
+        {
+          "id": "panel-1",
+          "type": "pie",
+          "title": "Bad Pie Chart",
+          "description": "",
+          "queryType": "sql",
+          "layout": { "x": 0, "y": 0, "w": 96, "h": 20, "i": 1 },
+          "queries": [
+            {
+              "query": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  { "label": "a", "alias": "y1", "type": "build", "functionName": "count", "args": [{"type": "field", "value": {"field": "f1"}}] },
+                  { "label": "b", "alias": "y2", "type": "build", "functionName": "count", "args": [{"type": "field", "value": {"field": "f2"}}] },
+                  { "label": "c", "alias": "y3", "type": "build", "functionName": "count", "args": [{"type": "field", "value": {"field": "f3"}}] }
+                ],
+                "z": [],
+                "filter": { "filterType": "group", "logicalOperator": "AND", "conditions": [] }
+              },
+              "config": { "promql_legend": "" }
+            }
+          ],
+          "config": { "show_legends": true }
+        }
+      ]
+    }
+  ]
+}

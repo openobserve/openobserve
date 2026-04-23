@@ -245,6 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:sort="runQueryOnSort"
                       @shareLink="copyTracesUrl"
                       @metrics:filters-updated="onMetricsFiltersUpdated"
+                      @run-query="searchData"
                     />
                   </div>
                 </div>
