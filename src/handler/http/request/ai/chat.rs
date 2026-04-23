@@ -292,8 +292,8 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                 .collect()
         });
 
-        let (tool_mcps, tool_clis) =
-            o2_enterprise::enterprise::ai::toolsets::push::load_sre_tools(org_id_str).await;
+        let (tool_mcps, tool_clis, tool_skills) =
+            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str).await;
         let query_req = QueryRequest {
             query: last_user_message,
             context,
@@ -317,6 +317,11 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                 None
             } else {
                 Some(tool_clis)
+            },
+            skills: if tool_skills.is_empty() {
+                None
+            } else {
+                Some(tool_skills)
             },
         };
 
@@ -721,8 +726,8 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 .collect()
         });
 
-        let (tool_mcps, tool_clis) =
-            o2_enterprise::enterprise::ai::toolsets::push::load_sre_tools(&org_id_str).await;
+        let (tool_mcps, tool_clis, tool_skills) =
+            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(&org_id_str).await;
         let query_req = QueryRequest {
             query: last_user_message,
             context,
@@ -746,6 +751,11 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 None
             } else {
                 Some(tool_clis)
+            },
+            skills: if tool_skills.is_empty() {
+                None
+            } else {
+                Some(tool_skills)
             },
         };
 

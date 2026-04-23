@@ -642,7 +642,6 @@ export const convertPromQLData = async (
                     panelSchema.config.line_interpolation.replace("step-", "")
                   : false,
                 showSymbol: panelSchema.config?.show_symbol ?? false,
-                zlevel: 2,
                 itemStyle: {
                   color: (() => {
                     try {
@@ -675,6 +674,15 @@ export const convertPromQLData = async (
                   silent: true,
                   animation: false,
                   data: getMarkLineData(panelSchema),
+                  lineStyle: {
+                    color: "#8B5A2B",
+                    type: [8, 4],
+                    width: 2,
+                    shadowColor: store.state.theme === "light"
+                      ? "rgba(255, 255, 255, 0.7)"
+                      : "rgba(0, 0, 0, 0.7)",
+                    shadowBlur: 2,
+                  },
                 },
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
@@ -708,7 +716,6 @@ export const convertPromQLData = async (
                   ? panelSchema.config.line_interpolation.replace("step-", "")
                   : false,
                 showSymbol: panelSchema.config?.show_symbol ?? false,
-                zlevel: 2,
                 itemStyle: {
                   color: (() => {
                     try {
@@ -738,6 +745,15 @@ export const convertPromQLData = async (
                   silent: true,
                   animation: false,
                   data: getMarkLineData(panelSchema),
+                  lineStyle: {
+                    color: "#8B5A2B",
+                    type: [8, 4],
+                    width: 2,
+                    shadowColor: store.state.theme === "light"
+                      ? "rgba(255, 255, 255, 0.7)"
+                      : "rgba(0, 0, 0, 0.7)",
+                    shadowBlur: 2,
+                  },
                 },
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
@@ -984,7 +1000,7 @@ export const convertPromQLData = async (
         data: markLines,
       },
       markArea: getSeriesMarkArea(),
-      zlevel: 1,
+      zlevel: 2,
     });
   }
 
