@@ -81,7 +81,10 @@ async fn patch_sre_readonly_eval_templates() {
     };
 
     // Re-check flag inside the lock — another node may have finished while we waited.
-    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY).await.is_ok() {
+    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
+        .await
+        .is_ok()
+    {
         let _ = infra::dist_lock::unlock(&lock).await;
         return;
     }
@@ -144,7 +147,10 @@ async fn backfill_sys_rca_agent_openfga_tuples() {
     };
 
     // Re-check flag inside the lock — another node may have finished while we waited.
-    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY).await.is_ok() {
+    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
+        .await
+        .is_ok()
+    {
         let _ = infra::dist_lock::unlock(&lock).await;
         return;
     }
@@ -162,9 +168,7 @@ async fn backfill_sys_rca_agent_openfga_tuples() {
     // failed orgs are retried on the next startup rather than silently skipped.
     let mut failed = false;
     for org in &orgs {
-        if let Err(e) =
-            crate::service::organization::ensure_sys_rca_agent(&org.identifier).await
-        {
+        if let Err(e) = crate::service::organization::ensure_sys_rca_agent(&org.identifier).await {
             log::warn!(
                 "Failed to backfill SysRcaAgent OpenFGA tuples for org '{}': {e}",
                 org.identifier
