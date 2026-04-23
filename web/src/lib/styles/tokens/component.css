@@ -4,6 +4,14 @@
    ============================================================ */
 
 @theme inline {
+  /* ---- Separator --------------------------------------------- */
+
+  /* Line thickness — 1 px in both orientations */
+  --spacing-separator:       1px;
+  /* Line color — uses semantic border token */
+  --color-separator:         var(--color-border-default);
+  --color-separator-strong:  var(--color-border-strong);
+
   /* ---- Button ------------------------------------------------ */
 
   /* primary */

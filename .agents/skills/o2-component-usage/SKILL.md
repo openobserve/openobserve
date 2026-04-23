@@ -29,7 +29,8 @@ All O2 components use the `O` prefix (e.g. `OButton`, `OInput`, `OModal`).
 
 | Component | Import path | Status |
 |-----------|------------|--------|
-| _(none yet)_ | — | — |
+| `OButton` | `@/lib/core/Button/Button.vue` | ✅ Built |
+| `OSeparator` | `@/lib/core/Separator/Separator.vue` | ✅ Built |
 
 _This table must be updated each time a new component is built and merged._
 
