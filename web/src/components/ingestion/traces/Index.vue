@@ -85,7 +85,7 @@ import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
-export defineComponent({
+export default defineComponent({
   name: "IngestTraces",
   components: {},
   data() {

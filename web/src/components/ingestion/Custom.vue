@@ -90,7 +90,7 @@ import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL } from "@/utils/zincutils";
 
-export defineComponent({
+export default defineComponent({
   name: "CustomPage",
   props: {
     currOrgIdentifier: {
