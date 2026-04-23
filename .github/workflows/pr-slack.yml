@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Get PRs older than 7 days
-        uses: actions/github-script@v6
+        uses: actions/github-script@v9
         id: stale-prs
         with:
           script: |

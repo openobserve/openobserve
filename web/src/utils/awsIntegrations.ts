@@ -345,6 +345,59 @@ export const awsIntegrations: AWSIntegration[] = [
   },
 ];
 
+export const AWS_REGIONS = [
+  { value: 'us-east-1', label: 'US East (N. Virginia)' },
+  { value: 'us-east-2', label: 'US East (Ohio)' },
+  { value: 'us-west-1', label: 'US West (N. California)' },
+  { value: 'us-west-2', label: 'US West (Oregon)' },
+  { value: 'ca-central-1', label: 'Canada (Central)' },
+  { value: 'ca-west-1', label: 'Canada West (Calgary)' },
+  { value: 'eu-west-1', label: 'Europe (Ireland)' },
+  { value: 'eu-west-2', label: 'Europe (London)' },
+  { value: 'eu-west-3', label: 'Europe (Paris)' },
+  { value: 'eu-central-1', label: 'Europe (Frankfurt)' },
+  { value: 'eu-central-2', label: 'Europe (Zurich)' },
+  { value: 'eu-north-1', label: 'Europe (Stockholm)' },
+  { value: 'eu-south-1', label: 'Europe (Milan)' },
+  { value: 'eu-south-2', label: 'Europe (Spain)' },
+  { value: 'ap-east-1', label: 'Asia Pacific (Hong Kong)' },
+  { value: 'ap-south-1', label: 'Asia Pacific (Mumbai)' },
+  { value: 'ap-south-2', label: 'Asia Pacific (Hyderabad)' },
+  { value: 'ap-southeast-1', label: 'Asia Pacific (Singapore)' },
+  { value: 'ap-southeast-2', label: 'Asia Pacific (Sydney)' },
+  { value: 'ap-southeast-3', label: 'Asia Pacific (Jakarta)' },
+  { value: 'ap-southeast-4', label: 'Asia Pacific (Melbourne)' },
+  { value: 'ap-northeast-1', label: 'Asia Pacific (Tokyo)' },
+  { value: 'ap-northeast-2', label: 'Asia Pacific (Seoul)' },
+  { value: 'ap-northeast-3', label: 'Asia Pacific (Osaka)' },
+  { value: 'sa-east-1', label: 'South America (São Paulo)' },
+  { value: 'me-south-1', label: 'Middle East (Bahrain)' },
+  { value: 'me-central-1', label: 'Middle East (UAE)' },
+  { value: 'il-central-1', label: 'Israel (Tel Aviv)' },
+  { value: 'af-south-1', label: 'Africa (Cape Town)' },
+  { value: 'us-gov-east-1', label: 'AWS GovCloud (US-East)' },
+  { value: 'us-gov-west-1', label: 'AWS GovCloud (US-West)' },
+];
+
+export const QUICK_SETUP_SERVICES: { label: string; flag: string }[] = [
+  { label: 'CloudTrail', flag: 'EnableCloudTrail' },
+  { label: 'CloudWatch Logs', flag: 'EnableCloudWatchLogs' },
+  { label: 'CloudWatch Metrics', flag: 'EnableCloudWatchMetrics' },
+  { label: 'VPC Flow Logs', flag: 'EnableVPCFlowLogs' },
+  { label: 'WAF', flag: 'EnableWAF' },
+  { label: 'ALB', flag: 'EnableALB' },
+  { label: 'API Gateway', flag: 'EnableApiGateway' },
+  { label: 'RDS', flag: 'EnableRDS' },
+  { label: 'S3 Access Logs', flag: 'EnableS3AccessLogs' },
+  { label: 'CloudFront', flag: 'EnableCloudFront' },
+  { label: 'Route53', flag: 'EnableRoute53' },
+  { label: 'DynamoDB', flag: 'EnableDynamoDB' },
+  { label: 'EC2', flag: 'EnableEC2' },
+  { label: 'EventBridge', flag: 'EnableEventBridge' },
+  { label: 'Kinesis', flag: 'EnableKinesisStream' },
+  { label: 'Cognito', flag: 'EnableCognito' },
+];
+
 /**
  * Generate AWS CloudFormation console URL with pre-filled parameters
  */
@@ -353,12 +406,13 @@ export const generateCloudFormationURL = (
   organizationId: string,
   endpoint: string,
   accessKey: string,
+  region: string = 'us-east-1',
+  extraParams: Record<string, string> = {},
 ): string => {
   if (!integration.cloudFormationTemplate || integration.comingSoon) {
     return '';
   }
 
-  const region = 'us-east-1'; // Default region, can be made configurable
   const stackName = `o2-${integration.name.replace(/\s+/g, '-')}`;
 
   // Encode parameters for URL
@@ -372,6 +426,7 @@ export const generateCloudFormationURL = (
     param_OrganizationId: organizationId,
     param_HttpEndpointUrl: endpoint,
     param_AccessKey: accessKey,
+    ...Object.fromEntries(Object.entries(extraParams).map(([k, v]) => [`param_${k}`, v])),
   });
 
   return `https://console.aws.amazon.com/cloudformation/home?region=${region}#/stacks/create/review?${params.toString()}`;

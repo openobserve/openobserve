@@ -29,7 +29,7 @@ use tower::{Layer, Service};
 /// Returns the HTTP access log format string based on configuration.
 ///
 /// Supported format specifiers:
-/// - %a - Remote IP address (from X-Forwarded-For or Forwarded header)
+/// - %a - Remote IP address (resolved via ZO_HTTP_REAL_IP_SOURCE)
 /// - %t - Time the request was received (format: [dd/Mon/yyyyTHH:mm:ss.fff +zzzz])
 /// - %r - Request line (method, path, HTTP version)
 /// - %s - Response status code
@@ -102,14 +102,12 @@ where
             .format("[%d/%b/%YT%H:%M:%S%.3f %z]")
             .to_string();
 
-        // Extract request info before moving req
+        // Real IP was resolved up-chain by the `extract_real_ip` middleware.
         let remote_addr = req
-            .headers()
-            .get("X-Forwarded-For")
-            .or_else(|| req.headers().get("Forwarded"))
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("-")
-            .to_string();
+            .extensions()
+            .get::<super::RealIp>()
+            .map(|ip| ip.0.to_string())
+            .unwrap_or_else(|| "-".to_string());
 
         let method = req.method().to_string();
         let path_and_query = req
