@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -42,29 +42,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Single Tab Row -->
     <div class="row justify-between q-pt-sm">
       <div class="col-10">
-        <q-tabs v-model="tab" shrink align="left">
-          <q-tab
+        <OTabs v-model="tab" align="left">
+          <OTab
             data-test="log-detail-json-tab"
             name="json"
             :label="t('common.json')"
           />
-          <q-tab
+          <OTab
             data-test="log-detail-table-tab"
             name="table"
             :label="t('common.table')"
           />
           <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
-          <q-tab
+          <OTab
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-logs"
             :label="t('correlation.correlatedLogs')"
           />
-          <q-tab
+          <OTab
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-metrics"
             :label="t('correlation.correlatedMetrics')"
           />
-          <q-tab
+          <OTab
             v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
             name="correlated-traces"
             :label="t('correlation.correlatedTraces')"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:px-2 tw:py-2"
             @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
              />
-        </q-tabs>
+        </OTabs>
       </div>
       <div
         v-show="tab === 'table'"
@@ -99,14 +99,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-separator />
 
-    <q-tab-panels
+    <OTabPanels
       data-test="log-detail-tab-container"
       :class="['tab-panels-container', tab.startsWith('correlated-') ? 'full-height-panels' : '']"
       v-model="tab"
       animated
       keep-alive
     >
-      <q-tab-panel name="json" class="q-pa-none">
+      <OTabPanel name="json">
         <q-card-section
           data-test="log-detail-json-content"
           class="q-pa-none q-mb-lg q-pt-sm"
@@ -127,8 +127,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @show-correlation="showCorrelation"
           />
         </q-card-section>
-      </q-tab-panel>
-      <q-tab-panel name="table" class="q-pa-none">
+      </OTabPanel>
+      <OTabPanel name="table">
         <q-card-section
           class="tw:p-[0.675rem] q-mb-lg"
           data-test="log-detail-table-content"
@@ -333,10 +333,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-table>
         </q-card-section>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Correlated Logs Tab Panel (Custom Component) -->
-      <q-tab-panel name="correlated-logs" class="q-pa-none full-height">
+      <OTabPanel name="correlated-logs" class="full-height">
         <CorrelatedLogsTable
           v-if="correlationProps"
           :service-name="correlationProps.serviceName"
@@ -378,10 +378,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Correlated Metrics Tab Panel -->
-      <q-tab-panel name="correlated-metrics" class="q-pa-none full-height">
+      <OTabPanel name="correlated-metrics" class="full-height">
         <TelemetryCorrelationDashboard
           v-if="correlationProps"
           mode="embedded-tabs"
@@ -408,10 +408,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Correlated Traces Tab Panel -->
-      <q-tab-panel name="correlated-traces" class="q-pa-none full-height">
+      <OTabPanel name="correlated-traces" class="full-height">
         <TelemetryCorrelationDashboard
           v-if="correlationProps"
           mode="embedded-tabs"
@@ -438,8 +438,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>
         </div>
-      </q-tab-panel>
-    </q-tab-panels>
+      </OTabPanel>
+    </OTabPanels>
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
     <q-separator v-if="tab === 'json' || tab === 'table'" />
@@ -449,7 +449,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="log-detail-previous-detail-btn"
             class="o2-secondary-button tw:h-[36px]"
-            no-caps
             :disabled="currentIndex <= 0"
             @click="$emit('showPrevDetail', false, true)"
             icon="navigate_before"
@@ -480,7 +479,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-detail-table-search-around-btn"
               class="o2-secondary-button tw:h-[36px]"
               text-color="light-text"
-              no-caps
               flat
               :label="t('common.searchAround')"
               @click="searchTimeBoxed(rowData, Number(selectedRelativeValue))"
@@ -504,6 +502,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { defineComponent, ref, onBeforeMount, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -930,7 +932,7 @@ export default defineComponent({
   flex-direction: column;
   overflow: hidden;
 
-  :deep(.q-tab-panel) {
+  :deep(.o-tab-panel) {
     flex: 1;
     display: flex;
     flex-direction: column;

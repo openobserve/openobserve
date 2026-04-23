@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -55,14 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:before>
         <div class="tw:w-full tw:pl-[0.625rem] tw:pb-[0.625rem] ">
           <div class="card-container" style="min-height: calc(100vh - var(--navbar-height) - 87px);">
-            <q-tabs
+            <OTabs
               v-model="billingtab"
-              indicator-color="transparent"
-              inline-label
-              vertical
+              orientation="vertical"
             >
 
-          <q-route-tab
+          <ORouteTab
             exact
             name="plans"
             :to="
@@ -71,11 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :icon="'img:' + getImageURL('images/common/plan_icon.svg')"
             :label="t('billing.plansLabel')"
-            content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             exact
-            default
             name="usage"
             :to="
               '/billings/usage?org_identifier=' +
@@ -87,9 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
             :label="t('billing.usageLabel')"
-            content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             v-if="showInvoiceTab"
             exact
             name="invoice_history"
@@ -99,9 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :icon="'img:' + getImageURL('images/common/invoice_icon.svg')"
             :label="t('billing.invoiceHistoryLabel')"
-            content-class="tab_content"
           />
-        </q-tabs>
+        </OTabs>
         <!-- <q-btn
               data-test="logs-search-field-list-collapse-btn"
               :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
@@ -130,6 +124,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
@@ -143,7 +139,7 @@ import { getImageURL } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import BillingService from "@/services/billings";
 
-export default defineComponent({
+export defineComponent({
   name: "PageIngestion",
   components: { ConfirmDialog, Usage, AppTabs },
   setup() {

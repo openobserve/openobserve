@@ -1,4 +1,4 @@
-<!-- eslint-disable no-prototype-builtins -->
+﻿<!-- eslint-disable no-prototype-builtins -->
 <!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
@@ -34,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'o2-primary-button-light'
             "
             flat
-            no-caps
             :label="t(`ingestion.resetRUMTokenLabel`)"
             @click="showRUMUpdateDialogFn"
           />
@@ -50,7 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'o2-primary-button-light'
             "
             flat
-            no-caps
             :label="t(`ingestion.generateRUMTokenLabel`)"
             @click="generateRUMToken"
           />
@@ -63,7 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'o2-primary-button-light'
             "
             flat
-            no-caps
             :label="t(`ingestion.resetTokenBtnLabel`)"
             @click="showUpdateDialogFn"
           />
@@ -108,10 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="confirmRUMUpdate"
           />
         </div>
-        <q-tabs v-model="ingestTabType" horizontal
-align="left" class="q-ml-md">
-          <q-route-tab
-            default
+        <OTabs v-model="ingestTabType" horizontal align="left" class="q-ml-md">
+          <ORouteTab
             name="recommended"
             :to="{
               name: 'recommended',
@@ -120,9 +115,8 @@ align="left" class="q-ml-md">
               },
             }"
             :label="t('ingestion.recommendedLabel')"
-            content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             name="custom"
             :to="{
               name: 'custom',
@@ -131,9 +125,8 @@ align="left" class="q-ml-md">
               },
             }"
             :label="t('ingestion.customLabel')"
-            content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             name="server"
             :to="{
               name: 'servers',
@@ -142,9 +135,8 @@ align="left" class="q-ml-md">
               },
             }"
             :label="t('ingestion.serverLabel')"
-            content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             name="database"
             :to="{
               name: 'databases',
@@ -153,10 +145,9 @@ align="left" class="q-ml-md">
               },
             }"
             :label="t('ingestion.databaseLabel')"
-            content-class="tab_content"
           />
 
-          <q-route-tab
+          <ORouteTab
             name="security"
             :to="{
               name: 'security',
@@ -165,10 +156,9 @@ align="left" class="q-ml-md">
               },
             }"
             :label="t('ingestion.securityLabel')"
-            content-class="tab_content"
           />
 
-          <q-route-tab
+          <ORouteTab
             name="devops"
             :to="{
               name: 'devops',
@@ -177,10 +167,9 @@ align="left" class="q-ml-md">
               },
             }"
             :label="t('ingestion.devopsLabel')"
-            content-class="tab_content"
           />
 
-          <q-route-tab
+          <ORouteTab
             name="networking"
             :to="{
               name: 'networking',
@@ -189,9 +178,8 @@ align="left" class="q-ml-md">
               },
             }"
             :label="t('ingestion.networkingLabel')"
-            content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             name="message-queues"
             :to="{
               name: 'message-queues',
@@ -200,9 +188,8 @@ align="left" class="q-ml-md">
               },
             }"
             :label="t('ingestion.messageQueuesLabel')"
-            content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             name="languages"
             :to="{
               name: 'languages',
@@ -211,7 +198,6 @@ align="left" class="q-ml-md">
               },
             }"
             :label="t('ingestion.languagesLabel')"
-            content-class="tab_content"
           />
           <q-route-tab
             name="ai-integrations"
@@ -224,7 +210,7 @@ align="left" class="q-ml-md">
             :label="t('ingestion.aiLabel')"
             content-class="tab_content"
           />
-          <q-route-tab
+          <ORouteTab
             name="others"
             :to="{
               name: 'others',
@@ -233,9 +219,8 @@ align="left" class="q-ml-md">
               },
             }"
             :label="t('ingestion.otherLabel')"
-            content-class="tab_content"
           />
-        </q-tabs>
+        </OTabs>
       </div>
     </div>
     <div
@@ -253,6 +238,8 @@ align="left" class="q-ml-md">
 </template>
 
 <script lang="ts">
+import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 // @ts-ignore
 import {
   defineComponent,
@@ -275,7 +262,7 @@ import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 
-export default defineComponent({
+export defineComponent({
   name: "PageIngestion",
   components: { ConfirmDialog },
   setup() {

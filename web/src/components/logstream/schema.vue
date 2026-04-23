@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -219,49 +219,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <div>
               <div class="flex justify-start">
-                <q-tabs v-model="activeMainTab" inline-label dense>
+                <OTabs v-model="activeMainTab" dense>
                   <!-- Schema Settings Tab with conditional class -->
-                  <q-tab
+                  <OTab
                     name="schemaSettings"
                     icon="settings"
                     label="Schema Settings"
-                    no-caps
                   />
 
                   <!-- Red Button Tab -->
-                  <q-tab
+                  <OTab
                     name="redButton"
                     icon="backup"
                     label="Extended Retention"
-                    no-caps
                   />
 
                     <!-- Configuration Tab -->
-                    <q-tab
+                    <OTab
                     name="configuration"
                     icon="tune"
                     label="Configuration"
-                    no-caps
                   />
                   <!-- LLM Evaluation Tab (enterprise + ai_enabled + traces only) -->
-                  <q-tab
+                  <OTab
                     v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled && indexData.stream_type === 'traces'"
                     name="llmEvaluation"
                     icon="psychology"
                     :label="t('pipeline.llmEvaluation')"
-                    no-caps
                     data-test="stream-llm-evaluation-tab"
                   />
 
                   <!-- Cross-Linking Tab -->
-                  <q-tab
+                  <OTab
                     v-if="store.state.zoConfig?.enable_cross_linking"
                     name="crossLinking"
                     icon="link"
                     :label="t('crossLinks.header')"
-                    no-caps
                   />
-                </q-tabs>
+                </OTabs>
               </div>
             </div>
             <!-- schema settings tab -->
@@ -328,7 +323,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="isSchemaUDSEnabled"
                       data-test="schema-add-fields-title"
                       @click="openDialog"
-                      no-caps
                       :disable="isDialogOpen"
                       class="o2-secondary-button tw:h-[36px] tw:w-[32px] q-my-sm tw:min-w-[32px]!"
                       flat
@@ -355,7 +349,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon="close"
                           class="text-bold q-mr-md"
                           text-color="light-text"
-                          no-caps
                           dense
                           flat
                           @click="closeDialog"
@@ -934,7 +927,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-ml-md o2-secondary-button tw:h-[36px]"
                   :label="t('logStream.cancel')"
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  no-caps
                   flat
                   @click="llmEvalFormDirty = false"
                 />
@@ -944,7 +936,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('logStream.updateSettings')"
                   class="no-border q-ml-md o2-primary-button tw:h-[36px]"
                   :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-                  no-caps
                   flat
                   @click="llmEvalSettingsRef?.save()"
                 />
@@ -991,7 +982,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="schema-delete-button"
                     class="text-bold btn-delete o2-secondary-button tw:h-[36px]"
                     :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                    no-caps
                     flat
                     @click="
                       activeMainTab == 'schemaSettings'
@@ -1012,7 +1002,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="q-ml-md o2-secondary-button tw:h-[36px]"
                     :label="t('logStream.cancel')"
                     :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                    no-caps
                     flat
                   />
                   <q-btn
@@ -1022,7 +1011,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class=" no-border q-ml-md o2-primary-button tw:h-[36px"
                     :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                     type="submit"
-                    no-caps
                     flat
                   />
                 </div>
@@ -1065,6 +1053,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
 // @ts-nocheck
 import {
   computed,

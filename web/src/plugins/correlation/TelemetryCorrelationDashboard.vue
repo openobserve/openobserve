@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -99,7 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             flat
             dense
-            no-caps
             text-color="light-text"
             :label="t('common.apply')"
             :disable="!hasPendingChanges"
@@ -111,28 +110,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Tabs (only in dialog mode, hidden in embedded-tabs mode) -->
-      <q-tabs
+      <OTabs
         v-if="!isEmbeddedTabs"
         v-model="activeTab"
         dense
         class="tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
-        active-color="primary"
-        indicator-color="primary"
         align="left"
       >
-        <q-tab name="logs" :label="t('common.logs')" />
-        <q-tab name="metrics" :label="t('search.metrics')" />
-        <q-tab name="traces" :label="t('menu.traces')" />
-      </q-tabs>
+        <OTab name="logs" :label="t('common.logs')" />
+        <OTab name="metrics" :label="t('search.metrics')" />
+        <OTab name="traces" :label="t('menu.traces')" />
+      </OTabs>
 
       <!-- Tab Panels -->
-      <q-tab-panels
+      <OTabPanels
         v-model="activeTab"
         animated
         class="correlation-content tw:flex-1 tw:overflow-auto"
       >
         <!-- Logs Tab Panel -->
-        <q-tab-panel name="logs" class="tw:p-0">
+        <OTabPanel name="logs" class="tw:p-0">
           <!-- Refresh Button -->
           <div
             v-if="logsDashboardData"
@@ -184,10 +181,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("correlation.noLogsDescription") }}
             </div>
           </div>
-        </q-tab-panel>
+        </OTabPanel>
 
         <!-- Metrics Tab Panel -->
-        <q-tab-panel name="metrics" class="tw:p-0 tw:flex tw:flex-col">
+        <OTabPanel name="metrics" class="tw:p-0 tw:flex tw:flex-col">
           <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
           <q-splitter
             v-model="splitterModel"
@@ -262,7 +259,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <q-btn
                               flat
                               dense
-                              no-caps
                               size="xs"
                               :color="
                                 getGroupSelectionState(group.id) === 'none'
@@ -278,7 +274,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <q-btn
                               flat
                               dense
-                              no-caps
                               size="xs"
                               color="grey-7"
                               label="None"
@@ -348,15 +343,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #after>
               <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
                 <!-- Group tabs -->
-                <q-tabs
+                <OTabs
                   v-if="nonEmptyGroupTabs.length > 0"
                   v-model="activeMetricGroupTab"
                   dense
-                  no-caps
                   align="left"
                   class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
                 >
-                  <q-tab
+                  <OTab
                     v-for="group in groupedUniqueMetricStreams.groups.filter(
                       (g) => nonEmptyGroupTabs.includes(g.id),
                     )"
@@ -382,8 +376,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:ml-0.5"
                       />
                     </div>
-                  </q-tab>
-                </q-tabs>
+                  </OTab>
+                </OTabs>
 
                 <!-- Dashboard content -->
                 <div class="tw:flex-1 tw:overflow-auto">
@@ -449,10 +443,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
           </q-splitter>
-        </q-tab-panel>
+        </OTabPanel>
 
         <!-- Traces Tab Panel -->
-        <q-tab-panel name="traces" class="tw:p-0">
+        <OTabPanel name="traces" class="tw:p-0">
           <!-- Refresh Button -->
 
           <!-- Loading State -->
@@ -544,7 +538,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                     flat
                     dense
-                    no-caps
                     color="primary"
                     icon="open_in_new"
                     :label="t('correlation.viewInTraces')"
@@ -602,8 +595,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}
             </div>
           </div>
-        </q-tab-panel>
-      </q-tab-panels>
+        </OTabPanel>
+      </OTabPanels>
     </q-card>
   </q-dialog>
 
@@ -770,7 +763,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-btn
                             flat
                             dense
-                            no-caps
                             size="xs"
                             :color="
                               getGroupSelectionState(group.id) === 'none'
@@ -786,7 +778,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-btn
                             flat
                             dense
-                            no-caps
                             size="xs"
                             color="grey-7"
                             label="None"
@@ -856,15 +847,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
               <!-- Group tabs -->
-              <q-tabs
+              <OTabs
                 v-if="nonEmptyGroupTabs.length > 0"
                 v-model="activeMetricGroupTab"
                 dense
-                no-caps
                 align="left"
                 class="metric-group-tabs tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
               >
-                <q-tab
+                <OTab
                   v-for="group in groupedUniqueMetricStreams.groups.filter(
                     (g) => nonEmptyGroupTabs.includes(g.id),
                   )"
@@ -896,8 +886,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:ml-0.5"
                     />
                   </div>
-                </q-tab>
-              </q-tabs>
+                </OTab>
+              </OTabs>
 
               <!-- Dashboard content -->
               <div class="tw:flex-1 tw:overflow-auto">
@@ -1055,7 +1045,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   flat
                   dense
-                  no-caps
                   color="primary"
                   icon="open_in_new"
                   :label="t('correlation.viewInTraces')"
@@ -1182,7 +1171,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                     flat
                     dense
-                    no-caps
                     size="xs"
                     :color="
                       getGroupSelectionState(group.id) === 'none'
@@ -1196,7 +1184,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                     flat
                     dense
-                    no-caps
                     size="xs"
                     color="grey-7"
                     label="None"
@@ -1246,6 +1233,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import {
   ref,
   computed,
@@ -3102,13 +3093,13 @@ body.body--dark .metric-splitter-separator {
   flex-shrink: 0;
   background: var(--o2-bg-color, #fff);
 
-  :deep(.q-tab) {
+  :deep(.o-tab) {
     min-height: 2rem;
     padding: 0 0.75rem;
     font-size: 0.8125rem;
   }
 
-  :deep(.q-tab__indicator) {
+  :deep(.o-tab__indicator) {
     height: 0.125rem;
   }
 }

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -43,23 +43,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-section class="q-pt-none">
-        <q-tabs
+        <OTabs
           v-model="activeTab"
           dense
           class="text-grey"
-          active-color="primary"
-          indicator-color="primary"
           align="justify"
         >
-          <q-tab name="light" label="Light Mode" />
-          <q-tab name="dark" label="Dark Mode" />
-        </q-tabs>
+          <OTab name="light" label="Light Mode" />
+          <OTab name="dark" label="Dark Mode" />
+        </OTabs>
       </q-card-section>
 
       <q-card-section class="q-pt-none scroll-content-predefined-themes">
-        <q-tab-panels v-model="activeTab" animated>
+        <OTabPanels v-model="activeTab" animated>
           <!-- Light Mode Themes -->
-          <q-tab-panel name="light" class="q-pa-none">
+          <OTabPanel name="light">
             <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card-compact q-mb-sm">
               <div class="row items-center no-wrap">
                 <div class="color-preview-small" :style="{ backgroundColor: theme.light.themeColor }"></div>
@@ -100,10 +98,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-          </q-tab-panel>
+          </OTabPanel>
 
           <!-- Dark Mode Themes -->
-          <q-tab-panel name="dark" class="q-pa-none">
+          <OTabPanel name="dark">
             <div v-for="theme in predefinedThemes" :key="theme.id" class="theme-card-compact q-mb-sm">
               <div class="row items-center no-wrap">
                 <div class="color-preview-small" :style="{ backgroundColor: theme.dark.themeColor }"></div>
@@ -144,8 +142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-          </q-tab-panel>
-        </q-tab-panels>
+          </OTabPanel>
+        </OTabPanels>
       </q-card-section>
 
       <!-- Note at the bottom -->
@@ -179,6 +177,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import { useQuasar } from "quasar";

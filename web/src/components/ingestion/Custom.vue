@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -24,14 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-slot:before>
       <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-140px)]">
-          <q-tabs
+          <OTabs
             v-model="tabs"
-            indicator-color="transparent"
-            inline-label
-            vertical
+            orientation="vertical"
           >
-            <q-route-tab
-              default
+            <ORouteTab
               name="ingestLogs"
               :to="{
                 name: 'ingestLogs',
@@ -40,9 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 },
               }"
               :label="t('ingestion.logsLabel')"
-              content-class="tab_content"
             />
-            <q-route-tab
+            <ORouteTab
               name="ingestMetrics"
               :to="{
                 name: 'ingestMetrics',
@@ -51,9 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 },
               }"
               :label="t('ingestion.metricsLabel')"
-              content-class="tab_content"
             />
-            <q-route-tab
+            <ORouteTab
               name="ingestTraces"
               :to="{
                 name: 'ingestTraces',
@@ -62,9 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 },
               }"
               :label="t('ingestion.tracesLabel')"
-              content-class="tab_content"
             />
-          </q-tabs>
+          </OTabs>
         </div>
       </div>
     </template>
@@ -84,6 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, computed, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
@@ -94,7 +90,7 @@ import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL } from "@/utils/zincutils";
 
-export default defineComponent({
+export defineComponent({
   name: "CustomPage",
   props: {
     currOrgIdentifier: {
@@ -236,10 +232,10 @@ export default defineComponent({
 </style>
 <style lang="scss">
 .ingestionPage {
-  .q-tab-panel {
+  .o-tab-panel {
     padding: 0 !important;
     .tab_content {
-      .q-tab__label {
+      .o-tab__label {
         overflow: hidden !important;
         text-overflow: ellipsis !important;
         white-space: nowrap !important;

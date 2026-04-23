@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex items-center">
             <q-btn
-              no-caps
               padding="xs"
               outline
               icon="arrow_back_ios_new"
@@ -65,29 +64,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Tabs -->
-        <q-tabs
+        <OTabs
           v-model="currentTab"
           dense
           class="alert-insights-tabs q-ml-sm"
-          indicator-color="primary"
           align="left"
           data-test="alert-insights-tabs"
         >
-          <q-tab name="overview" :label="t('alerts.insights.tabs.overview')" data-test="tab-overview" />
-          <q-tab
+          <OTab name="overview" :label="t('alerts.insights.tabs.overview')" data-test="tab-overview" />
+          <OTab
             v-if="isEnterprise"
             name="frequency"
             :label="t('alerts.insights.tabs.frequency')"
             data-test="tab-frequency"
           />
-          <q-tab
+          <OTab
             v-if="isEnterprise"
             name="correlation"
             :label="t('alerts.insights.tabs.correlation')"
             data-test="tab-correlation"
           />
-          <q-tab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
-        </q-tabs>
+          <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
+        </OTabs>
 
         <!-- Filters Section -->
         <div
@@ -282,6 +280,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -777,7 +777,7 @@ onMounted(async () => {
 }
 
 .alert-insights-tabs {
-  :deep(.q-tab__label) {
+  :deep(.o-tab__label) {
     text-transform: none !important;
   }
 }

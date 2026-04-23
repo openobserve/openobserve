@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -73,7 +73,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 class="border title-height o2-secondary-button tw:h-[36px]"
                 :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                no-caps
                 :disable="activeTab == 'role-limits' && !expandedRow"
                 @click="editTableWithInput"
               >
@@ -499,7 +498,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           label="Cancel"
           class="q-mr-md o2-secondary-button tw:h-[36px]"
-          no-caps
           flat
           :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelChanges"
@@ -508,7 +506,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label="Save"
           class="o2-primary-button no-border tw:h-[36px]"
           :disable="Object.keys(changedValues).length === 0"
-          no-caps
           flat
           :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           @click="saveChanges"
@@ -521,7 +518,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           label="Cancel"
           class="q-mr-md o2-secondary-button tw:h-[36px]"
-          no-caps
           flat
           :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelJsonChanges"
@@ -530,7 +526,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           :label="isSavingJson ? 'Saving Changes...' : 'Save Changes'"
           class="o2-primary-button no-border tw:h-[36px]"
-          no-caps
           flat
           :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           @click="saveJsonChanges"
@@ -564,6 +559,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 import { useI18n } from "vue-i18n";
 import {
   computed,
