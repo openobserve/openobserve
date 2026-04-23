@@ -292,6 +292,7 @@ export const useSearchBar = () => {
   const onStreamChange = async (queryStr: string) => {
     try {
       searchObj.loadingStream = true;
+      searchObj.loading = true;
 
       await cancelQuery();
 
@@ -393,6 +394,8 @@ export const useSearchBar = () => {
         ) {
           searchObj.meta.refreshHistogram = true;
           await handleQueryData();
+        } else {
+          searchObj.loading = false;
         }
       }
     } catch (e: any) {
