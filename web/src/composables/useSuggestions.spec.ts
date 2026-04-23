@@ -169,6 +169,24 @@ describe("getSuggestions — insertText quoting", () => {
     expect(item?.insertText).toBe("prod'");
   });
 
+  it("wraps in quotes for second condition when first condition's closing quote is in the query", async () => {
+    // Regression: http = 'te' and host = <cursor>
+    // The closing quote of 'te' must NOT be mistaken for an open quote for host.
+    const c = makeComposable({ storedValues: ["node-1"] });
+    const q = "http = 'te' and host = ";
+    const keywords = await run(c, q, q.length);
+    const item = keywords.find((k: any) => k.label === "node-1");
+    expect(item?.insertText).toBe("'node-1'");
+  });
+
+  it("closes only when second condition genuinely has an open quote", async () => {
+    const c = makeComposable({ storedValues: ["node-1"] });
+    const q = "http = 'te' and host = '";
+    const keywords = await run(c, q, q.length);
+    const item = keywords.find((k: any) => k.label === "node-1");
+    expect(item?.insertText).toBe("node-1'");
+  });
+
   it("inserts numeric values without quotes", async () => {
     const c = makeComposable({ storedValues: ["200", "404"] });
     const keywords = await run(c, "status = ");
