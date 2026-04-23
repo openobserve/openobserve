@@ -382,7 +382,12 @@
     "patternNavNext": "Suivant",
     "patternWildcardSampleValues": "Exemples de valeurs",
     "wildcardSampleValues": "Exemples de valeurs",
-    "patternZScore": "Score Z : {zScore} (fréquence moyenne : {AVGFrequency})"
+    "patternZScore": "Score Z : {zScore} (fréquence moyenne : {AVGFrequency})",
+    "liveMode": "En direct",
+    "liveModeTooltip": "Exécution automatique de la requête sur les changements de filtre/d'heure",
+    "turnOnLiveMode": "Activez le mode Live",
+    "turnOffLiveMode": "Désactiver le mode Live",
+    "autoRunEnabled": "Exécution automatique activée"
   },
   "menu": {
     "home": "Accueil",
