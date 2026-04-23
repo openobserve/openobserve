@@ -888,4 +888,235 @@ mod tests {
             _ => panic!("Expected V1 variant"),
         }
     }
+
+    #[test]
+    fn test_agg_function_from_meta_all_variants() {
+        use meta_alerts::AggFunction as M;
+        assert!(matches!(AggFunction::from(M::Avg), AggFunction::Avg));
+        assert!(matches!(AggFunction::from(M::Min), AggFunction::Min));
+        assert!(matches!(AggFunction::from(M::Max), AggFunction::Max));
+        assert!(matches!(AggFunction::from(M::Sum), AggFunction::Sum));
+        assert!(matches!(AggFunction::from(M::Count), AggFunction::Count));
+        assert!(matches!(AggFunction::from(M::Median), AggFunction::Median));
+        assert!(matches!(AggFunction::from(M::P50), AggFunction::P50));
+        assert!(matches!(AggFunction::from(M::P75), AggFunction::P75));
+        assert!(matches!(AggFunction::from(M::P90), AggFunction::P90));
+        assert!(matches!(AggFunction::from(M::P95), AggFunction::P95));
+        assert!(matches!(AggFunction::from(M::P99), AggFunction::P99));
+    }
+
+    #[test]
+    fn test_agg_function_to_meta_all_variants() {
+        use meta_alerts::AggFunction as M;
+        assert!(matches!(M::from(AggFunction::Avg), M::Avg));
+        assert!(matches!(M::from(AggFunction::Min), M::Min));
+        assert!(matches!(M::from(AggFunction::Max), M::Max));
+        assert!(matches!(M::from(AggFunction::Sum), M::Sum));
+        assert!(matches!(M::from(AggFunction::Count), M::Count));
+        assert!(matches!(M::from(AggFunction::Median), M::Median));
+        assert!(matches!(M::from(AggFunction::P50), M::P50));
+        assert!(matches!(M::from(AggFunction::P75), M::P75));
+        assert!(matches!(M::from(AggFunction::P90), M::P90));
+        assert!(matches!(M::from(AggFunction::P95), M::P95));
+        assert!(matches!(M::from(AggFunction::P99), M::P99));
+    }
+
+    #[test]
+    fn test_query_type_from_meta_all_variants() {
+        use meta_alerts::QueryType as M;
+        assert!(matches!(QueryType::from(M::Custom), QueryType::Custom));
+        assert!(matches!(QueryType::from(M::SQL), QueryType::SQL));
+        assert!(matches!(QueryType::from(M::PromQL), QueryType::PromQL));
+    }
+
+    #[test]
+    fn test_query_type_to_meta_all_variants() {
+        use meta_alerts::QueryType as M;
+        assert!(matches!(M::from(QueryType::Custom), M::Custom));
+        assert!(matches!(M::from(QueryType::SQL), M::SQL));
+        assert!(matches!(M::from(QueryType::PromQL), M::PromQL));
+    }
+
+    #[test]
+    fn test_operator_from_meta_all_variants() {
+        use meta_alerts::Operator as M;
+        assert!(matches!(Operator::from(M::EqualTo), Operator::EqualTo));
+        assert!(matches!(
+            Operator::from(M::NotEqualTo),
+            Operator::NotEqualTo
+        ));
+        assert!(matches!(
+            Operator::from(M::GreaterThan),
+            Operator::GreaterThan
+        ));
+        assert!(matches!(
+            Operator::from(M::GreaterThanEquals),
+            Operator::GreaterThanEquals
+        ));
+        assert!(matches!(Operator::from(M::LessThan), Operator::LessThan));
+        assert!(matches!(
+            Operator::from(M::LessThanEquals),
+            Operator::LessThanEquals
+        ));
+        assert!(matches!(Operator::from(M::Contains), Operator::Contains));
+        assert!(matches!(
+            Operator::from(M::NotContains),
+            Operator::NotContains
+        ));
+    }
+
+    #[test]
+    fn test_operator_to_meta_all_variants() {
+        use meta_alerts::Operator as M;
+        assert!(matches!(M::from(Operator::EqualTo), M::EqualTo));
+        assert!(matches!(M::from(Operator::NotEqualTo), M::NotEqualTo));
+        assert!(matches!(M::from(Operator::GreaterThan), M::GreaterThan));
+        assert!(matches!(
+            M::from(Operator::GreaterThanEquals),
+            M::GreaterThanEquals
+        ));
+        assert!(matches!(M::from(Operator::LessThan), M::LessThan));
+        assert!(matches!(
+            M::from(Operator::LessThanEquals),
+            M::LessThanEquals
+        ));
+        assert!(matches!(M::from(Operator::Contains), M::Contains));
+        assert!(matches!(M::from(Operator::NotContains), M::NotContains));
+    }
+
+    #[test]
+    fn test_search_event_type_from_meta_all_variants() {
+        use meta_search::SearchEventType as M;
+        assert!(matches!(SearchEventType::from(M::UI), SearchEventType::UI));
+        assert!(matches!(
+            SearchEventType::from(M::Dashboards),
+            SearchEventType::Dashboards
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::Reports),
+            SearchEventType::Reports
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::Alerts),
+            SearchEventType::Alerts
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::Values),
+            SearchEventType::Values
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::Other),
+            SearchEventType::Other
+        ));
+        assert!(matches!(SearchEventType::from(M::RUM), SearchEventType::RUM));
+        assert!(matches!(
+            SearchEventType::from(M::DerivedStream),
+            SearchEventType::DerivedStream
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::SearchJob),
+            SearchEventType::SearchJob
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::Download),
+            SearchEventType::Download
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::Insights),
+            SearchEventType::Insights
+        ));
+    }
+
+    #[test]
+    fn test_search_event_type_to_meta_all_variants() {
+        use meta_search::SearchEventType as M;
+        assert!(matches!(M::from(SearchEventType::UI), M::UI));
+        assert!(matches!(M::from(SearchEventType::Dashboards), M::Dashboards));
+        assert!(matches!(M::from(SearchEventType::Reports), M::Reports));
+        assert!(matches!(M::from(SearchEventType::Alerts), M::Alerts));
+        assert!(matches!(M::from(SearchEventType::Values), M::Values));
+        assert!(matches!(M::from(SearchEventType::Other), M::Other));
+        assert!(matches!(M::from(SearchEventType::RUM), M::RUM));
+        assert!(matches!(
+            M::from(SearchEventType::DerivedStream),
+            M::DerivedStream
+        ));
+        assert!(matches!(M::from(SearchEventType::SearchJob), M::SearchJob));
+        assert!(matches!(M::from(SearchEventType::Download), M::Download));
+        assert!(matches!(M::from(SearchEventType::Insights), M::Insights));
+    }
+
+    #[test]
+    fn test_stream_type_from_meta_all_variants() {
+        use meta_stream::StreamType as M;
+        assert!(matches!(StreamType::from(M::Logs), StreamType::Logs));
+        assert!(matches!(StreamType::from(M::Metrics), StreamType::Metrics));
+        assert!(matches!(StreamType::from(M::Traces), StreamType::Traces));
+        assert!(matches!(
+            StreamType::from(M::EnrichmentTables),
+            StreamType::EnrichmentTables
+        ));
+        assert!(matches!(StreamType::from(M::Filelist), StreamType::Filelist));
+        assert!(matches!(StreamType::from(M::Metadata), StreamType::Metadata));
+        assert!(matches!(StreamType::from(M::Index), StreamType::Index));
+        // ServiceGraph maps to Metadata
+        assert!(matches!(
+            StreamType::from(M::ServiceGraph),
+            StreamType::Metadata
+        ));
+    }
+
+    #[test]
+    fn test_stream_type_to_meta_all_variants() {
+        use meta_stream::StreamType as M;
+        assert!(matches!(M::from(StreamType::Logs), M::Logs));
+        assert!(matches!(M::from(StreamType::Metrics), M::Metrics));
+        assert!(matches!(M::from(StreamType::Traces), M::Traces));
+        assert!(matches!(
+            M::from(StreamType::EnrichmentTables),
+            M::EnrichmentTables
+        ));
+        assert!(matches!(M::from(StreamType::Filelist), M::Filelist));
+        assert!(matches!(M::from(StreamType::Metadata), M::Metadata));
+        assert!(matches!(M::from(StreamType::Index), M::Index));
+    }
+
+    #[test]
+    fn test_frequency_type_roundtrip() {
+        use meta_alerts::FrequencyType as M;
+        assert!(matches!(FrequencyType::from(M::Cron), FrequencyType::Cron));
+        assert!(matches!(
+            FrequencyType::from(M::Minutes),
+            FrequencyType::Minutes
+        ));
+        assert!(matches!(M::from(FrequencyType::Cron), M::Cron));
+        assert!(matches!(M::from(FrequencyType::Minutes), M::Minutes));
+    }
+
+    #[test]
+    fn test_compare_historic_data_from_meta() {
+        let meta = meta_alerts::CompareHistoricData {
+            offset: "1h".to_string(),
+        };
+        let converted = CompareHistoricData::from(meta);
+        assert_eq!(converted.offset, "1h");
+    }
+
+    #[test]
+    fn test_condition_roundtrip() {
+        use meta_alerts::Condition as MetaCondition;
+        let meta = MetaCondition {
+            column: "level".to_string(),
+            operator: meta_alerts::Operator::EqualTo,
+            value: serde_json::Value::String("error".to_string()),
+            ignore_case: false,
+        };
+        let local = Condition::from(meta);
+        assert_eq!(local.column, "level");
+        assert!(matches!(local.operator, Operator::EqualTo));
+
+        let back = meta_alerts::Condition::from(local);
+        assert_eq!(back.column, "level");
+        assert!(matches!(back.operator, meta_alerts::Operator::EqualTo));
+    }
 }

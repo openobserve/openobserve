@@ -1634,3 +1634,221 @@ pub async fn send_anomaly_alert(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handler::http::request::anomaly_detection::CreateAnomalyConfigRequest;
+
+    // ── combine_detection_fn ────────────────────────────────────────────────
+
+    #[test]
+    fn test_combine_already_has_parens() {
+        assert_eq!(combine_detection_fn("avg(cpu)", None), "avg(cpu)");
+    }
+
+    #[test]
+    fn test_combine_count_returns_star() {
+        assert_eq!(combine_detection_fn("count", None), "count(*)");
+        assert_eq!(combine_detection_fn("count", Some("ignored")), "count(*)");
+    }
+
+    #[test]
+    fn test_combine_other_with_field() {
+        assert_eq!(combine_detection_fn("avg", Some("cpu")), "avg(cpu)");
+        assert_eq!(combine_detection_fn("sum", Some("bytes")), "sum(bytes)");
+    }
+
+    #[test]
+    fn test_combine_other_no_field() {
+        assert_eq!(combine_detection_fn("avg", None), "avg");
+    }
+
+    #[test]
+    fn test_combine_other_empty_field() {
+        assert_eq!(combine_detection_fn("avg", Some("")), "avg");
+    }
+
+    // ── parse_interval ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_parse_interval_hours() {
+        assert_eq!(parse_interval("1h").unwrap(), 3600);
+        assert_eq!(parse_interval("2h").unwrap(), 7200);
+        assert_eq!(parse_interval("0h").unwrap(), 0);
+    }
+
+    #[test]
+    fn test_parse_interval_minutes() {
+        assert_eq!(parse_interval("30m").unwrap(), 1800);
+        assert_eq!(parse_interval("5m").unwrap(), 300);
+    }
+
+    #[test]
+    fn test_parse_interval_invalid_suffix() {
+        assert!(parse_interval("10s").is_err());
+        assert!(parse_interval("10d").is_err());
+        assert!(parse_interval("abc").is_err());
+    }
+
+    #[test]
+    fn test_parse_interval_invalid_number() {
+        assert!(parse_interval("xh").is_err());
+        assert!(parse_interval("xm").is_err());
+    }
+
+    // ── validate_config_request ─────────────────────────────────────────────
+
+    fn make_valid_filters_req() -> CreateAnomalyConfigRequest {
+        CreateAnomalyConfigRequest {
+            name: "test".to_string(),
+            description: None,
+            stream_name: "logs".to_string(),
+            stream_type: "logs".to_string(),
+            query_mode: "filters".to_string(),
+            filters: Some(serde_json::json!([])),
+            custom_sql: None,
+            detection_function: "count".to_string(),
+            detection_function_field: None,
+            histogram_interval: "5m".to_string(),
+            schedule_interval: "1h".to_string(),
+            detection_window_seconds: 3600,
+            training_window_days: Some(7),
+            retrain_interval_days: Some(7),
+            percentile: Some(97.0),
+            rcf_num_trees: None,
+            rcf_tree_size: None,
+            rcf_shingle_size: None,
+            alert_enabled: None,
+            alert_destinations: vec![],
+            enabled: None,
+            folder_id: None,
+            owner: None,
+        }
+    }
+
+    #[test]
+    fn test_validate_valid_filters_mode() {
+        assert!(validate_config_request(&make_valid_filters_req()).is_ok());
+    }
+
+    #[test]
+    fn test_validate_valid_custom_sql_mode() {
+        let mut req = make_valid_filters_req();
+        req.query_mode = "custom_sql".to_string();
+        req.filters = None;
+        req.custom_sql = Some("SELECT count(*) FROM logs".to_string());
+        assert!(validate_config_request(&req).is_ok());
+    }
+
+    #[test]
+    fn test_validate_invalid_query_mode() {
+        let mut req = make_valid_filters_req();
+        req.query_mode = "invalid".to_string();
+        assert!(validate_config_request(&req).is_err());
+    }
+
+    #[test]
+    fn test_validate_filters_mode_missing_filters() {
+        let mut req = make_valid_filters_req();
+        req.filters = None;
+        assert!(validate_config_request(&req).is_err());
+    }
+
+    #[test]
+    fn test_validate_custom_sql_mode_missing_sql() {
+        let mut req = make_valid_filters_req();
+        req.query_mode = "custom_sql".to_string();
+        req.filters = None;
+        req.custom_sql = None;
+        assert!(validate_config_request(&req).is_err());
+    }
+
+    #[test]
+    fn test_validate_invalid_histogram_interval() {
+        let mut req = make_valid_filters_req();
+        req.histogram_interval = "10d".to_string();
+        assert!(validate_config_request(&req).is_err());
+    }
+
+    #[test]
+    fn test_validate_invalid_schedule_interval() {
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "bad".to_string();
+        assert!(validate_config_request(&req).is_err());
+    }
+
+    // ── model_to_api_json ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_model_to_api_json_replaces_integer_status() {
+        let val = serde_json::json!({"name": "test", "status": 0i64});
+        let result = model_to_api_json(val);
+        assert!(result["status"].is_string());
+    }
+
+    #[test]
+    fn test_model_to_api_json_no_status_field_unchanged() {
+        let val = serde_json::json!({"name": "test"});
+        let result = model_to_api_json(val);
+        assert!(result.get("status").is_none());
+        assert_eq!(result["name"], "test");
+    }
+
+    #[test]
+    fn test_model_to_api_json_non_object_unchanged() {
+        let val = serde_json::json!("just a string");
+        let result = model_to_api_json(val.clone());
+        assert_eq!(result, val);
+    }
+
+    // ── extract_timestamp_from_hit ──────────────────────────────────────────
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extract_timestamp_numeric_underscore_field() {
+        let hit = serde_json::json!({"_timestamp": 1_700_000_000_000_000i64});
+        assert_eq!(
+            extract_timestamp_from_hit(&hit).unwrap(),
+            1_700_000_000_000_000i64
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extract_timestamp_rfc3339_string() {
+        let hit = serde_json::json!({"timestamp": "2026-02-20T13:15:00Z"});
+        let ts = extract_timestamp_from_hit(&hit).unwrap();
+        assert!(ts > 0);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extract_timestamp_naive_datetime_string() {
+        let hit = serde_json::json!({"time_bucket": "2026-02-20T13:15:00"});
+        let ts = extract_timestamp_from_hit(&hit).unwrap();
+        assert!(ts > 0);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extract_timestamp_fractional_seconds() {
+        let hit = serde_json::json!({"time": "2026-02-20T13:15:00.000"});
+        let ts = extract_timestamp_from_hit(&hit).unwrap();
+        assert!(ts > 0);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extract_timestamp_no_field_returns_error() {
+        let hit = serde_json::json!({"value": 42.0});
+        assert!(extract_timestamp_from_hit(&hit).is_err());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extract_timestamp_non_numeric_non_string_value() {
+        let hit = serde_json::json!({"_timestamp": true});
+        assert!(extract_timestamp_from_hit(&hit).is_err());
+    }
+}
