@@ -452,18 +452,6 @@ impl ListReportsQueryResult {
                 .like(pattern),
             );
         }
-        if let Some(name_sub) = &params.name_substring
-            && !name_sub.is_empty()
-        {
-            let pattern = format!("%{}%", name_sub.to_lowercase());
-            query = query.filter(
-                Expr::expr(Func::lower(Expr::col((
-                    reports::Entity,
-                    reports::Column::Name,
-                ))))
-                .like(pattern),
-            );
-        }
 
         // Order and paginate results.
         query = query
@@ -780,6 +768,115 @@ mod tests {
                 "folders"."name" ASC
                 LIMIT 10
                 OFFSET 30
+            "#
+        );
+    }
+
+    #[test]
+    fn list_reports_without_destinations() {
+        const ORG_ID: &str = "TEST_ORG_ID";
+        let params = ListReportsParams::new(ORG_ID).has_destinations(false);
+
+        let postgres_statement = ListReportsQueryResult::select(&params)
+            .into_statement(sea_orm::DatabaseBackend::Postgres)
+            .to_string();
+        collapsed_eq!(
+            &postgres_statement,
+            r#"
+                SELECT
+                "reports"."id",
+                "reports"."org",
+                "reports"."folder_id",
+                "reports"."name",
+                "reports"."title",
+                "reports"."description",
+                "reports"."enabled",
+                "reports"."frequency",
+                "reports"."destinations",
+                "reports"."message",
+                "reports"."timezone",
+                "reports"."tz_offset",
+                "reports"."owner",
+                "reports"."last_edited_by",
+                "reports"."created_at",
+                "reports"."updated_at",
+                "reports"."start_at",
+                "reports"."image_preview",
+                "reports"."id" AS "report_id",
+                "reports"."name" AS "report_name",
+                "reports"."owner" AS "report_owner",
+                "reports"."description" AS "report_description",
+                "reports"."created_at" AS "report_created_at",
+                "reports"."frequency" AS "report_frequency",
+                "folders"."folder_id" AS "folder_id",
+                "folders"."name" AS "folder_name",
+                "reports"."enabled" AS "report_enabled",
+                "report_dashboards"."dashboard_id" AS "report_dashboard_id",
+                "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
+                "report_dashboards"."variables" AS "report_dashboard_variables",
+                "report_dashboards"."timerange" AS "report_dashboard_timerange",
+                "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
+                "folders"."org" AS "org_id"
+                FROM "reports"
+                INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id"
+                INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id"
+                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id"
+                WHERE "folders"."org" = 'TEST_ORG_ID'
+                AND CAST("reports"."destinations" AS text) = '[]'
+                ORDER BY
+                "reports"."name" ASC,
+                "folders"."name" ASC
+            "#
+        );
+
+        let sqlite_statement = ListReportsQueryResult::select(&params)
+            .into_statement(sea_orm::DatabaseBackend::Sqlite)
+            .to_string();
+        collapsed_eq!(
+            &sqlite_statement,
+            r#"
+                SELECT
+                "reports"."id",
+                "reports"."org",
+                "reports"."folder_id",
+                "reports"."name",
+                "reports"."title",
+                "reports"."description",
+                "reports"."enabled",
+                "reports"."frequency",
+                "reports"."destinations",
+                "reports"."message",
+                "reports"."timezone",
+                "reports"."tz_offset",
+                "reports"."owner",
+                "reports"."last_edited_by",
+                "reports"."created_at",
+                "reports"."updated_at",
+                "reports"."start_at",
+                "reports"."image_preview",
+                "reports"."id" AS "report_id",
+                "reports"."name" AS "report_name",
+                "reports"."owner" AS "report_owner",
+                "reports"."description" AS "report_description",
+                "reports"."created_at" AS "report_created_at",
+                "reports"."frequency" AS "report_frequency",
+                "folders"."folder_id" AS "folder_id",
+                "folders"."name" AS "folder_name",
+                "reports"."enabled" AS "report_enabled",
+                "report_dashboards"."dashboard_id" AS "report_dashboard_id",
+                "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
+                "report_dashboards"."variables" AS "report_dashboard_variables",
+                "report_dashboards"."timerange" AS "report_dashboard_timerange",
+                "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
+                "folders"."org" AS "org_id" FROM "reports"
+                INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id"
+                INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id"
+                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id"
+                WHERE "folders"."org" = 'TEST_ORG_ID'
+                AND CAST("reports"."destinations" AS text) = '[]'
+                ORDER BY
+                "reports"."name" ASC,
+                "folders"."name" ASC
             "#
         );
     }
