@@ -19,6 +19,18 @@ import { searchState } from "@/composables/useLogs/searchState";
 
 import { INTERVAL_MAP } from "@/utils/logs/constants";
 
+// Severity-aware sort order for stacked histogram breakdown categories.
+// Lower index = bottom of stack (least severe), higher = top (most severe).
+// Categories not in this map fall back to alphabetical order at rank 100.
+// Defined at module scope so it is allocated once, not on every generateHistogramData call.
+const SEVERITY_ORDER: Record<string, number> = {
+  trace: 0, debug: 1, info: 2, success: 3,
+  pending: 4, cancelled: 5,
+  warn: 6, warning: 6,
+  timeout: 7, failure: 8,
+  error: 9, critical: 10, fatal: 11,
+};
+
 import { formatSizeFromMB, histogramDateTimezone } from "@/utils/zincutils";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
@@ -136,13 +148,14 @@ export const useHistogram = () => {
 
   const generateHistogramData = () => {
     try {
-      // searchObj.data.histogram.chartParams.title = ""
-      let num_records: number = 0;
       const unparsed_x_data: any[] = [];
       const xData: number[] = [];
       const yData: number[] = [];
-      let hasAggregationFlag = false;
 
+      // hasAggregationFlag is set here but consumed by commented-out code below;
+      // kept in place so it's ready if that code is re-enabled.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      let hasAggregationFlag = false;
       const parsedSQL: any = fnParsedSQL();
       if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
         hasAggregationFlag = hasAggregation(parsedSQL.columns);
@@ -152,55 +165,166 @@ export const useHistogram = () => {
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
         searchObj.data.queryResults.aggs
       ) {
-        histogramMappedData = new Map(
-          histogramResults.value.map((item: any) => [
-            item.zo_sql_key,
-            JSON.parse(JSON.stringify(item)),
-          ]),
-        );
+        // NEW: read the breakdown field returned by the backend.
+        // When present, the histogram is rendered as a stacked bar chart grouped
+        // by this field (e.g. "severity"). When absent, falls through to the
+        // original flat single-series path below.
+        const breakdownField: string | null =
+          searchObj.data.queryResults.histogram_breakdown_field ?? null;
 
-        searchObj.data.queryResults.aggs.forEach((item: any) => {
-          if (histogramMappedData.has(item.zo_sql_key)) {
-            histogramMappedData.get(item.zo_sql_key).zo_sql_num +=
-              item.zo_sql_num;
-          } else {
-            histogramMappedData.set(item.zo_sql_key, item);
-          }
-        });
+        // hasBreakdown is true only when the backend both returned a
+        // breakdown field AND the aggs actually contain zo_sql_breakdown values.
+        const hasBreakdown =
+          !!breakdownField &&
+          searchObj.data.queryResults.aggs.some(
+            (item: any) => item.zo_sql_breakdown !== undefined,
+          );
 
-        const mergedData: any = Array.from(histogramMappedData.values());
-        mergedData.map(
-          (bucket: {
-            zo_sql_key: string | number | Date;
-            zo_sql_num: string;
-          }) => {
-            num_records = num_records + parseInt(bucket.zo_sql_num, 10);
-            unparsed_x_data.push(bucket.zo_sql_key);
-            // const histDate = new Date(bucket.zo_sql_key);
-            xData.push(
-              histogramDateTimezone(bucket.zo_sql_key, store.state.timezone),
+        if (hasBreakdown) {
+          // --- NEW: Stacked breakdown path ---
+          // Uses a composite key "timestamp|||category" so that the same
+          // (timestamp, category) pair from different pages is merged correctly.
+          const breakdownMap = new Map<
+            string,
+            { zo_sql_key: string; zo_sql_breakdown: string; zo_sql_num: number }
+          >();
+
+          // Seed from previously accumulated pages
+          histogramResults.value.forEach((item: any) => {
+            if (item.zo_sql_breakdown === undefined || item.zo_sql_breakdown === null) return;
+            const key = `${item.zo_sql_key}|||${item.zo_sql_breakdown}`;
+            breakdownMap.set(key, JSON.parse(JSON.stringify(item)));
+          });
+
+          // Merge current page aggs into the map
+          searchObj.data.queryResults.aggs.forEach((item: any) => {
+            const cat = item.zo_sql_breakdown;
+            if (cat === undefined || cat === null) return;
+            const key = `${item.zo_sql_key}|||${cat}`;
+            if (breakdownMap.has(key)) {
+              breakdownMap.get(key)!.zo_sql_num += parseInt(item.zo_sql_num, 10);
+            } else {
+              breakdownMap.set(key, { ...item, zo_sql_num: parseInt(item.zo_sql_num, 10) });
+            }
+          });
+
+          // Sorted unique timestamps (ISO strings sort lexicographically = chronologically)
+          const allTimestamps = [
+            ...new Set([...breakdownMap.values()].map((r) => r.zo_sql_key)),
+          ].sort();
+
+
+          const rawCategories = [
+            ...new Set([...breakdownMap.values()].map((r) => r.zo_sql_breakdown)),
+          ].filter((c) => c !== undefined && c !== null) as string[];
+
+          const allCategories = rawCategories.sort((a, b) => {
+            const aRank = SEVERITY_ORDER[a.toLowerCase()] ?? 100;
+            const bRank = SEVERITY_ORDER[b.toLowerCase()] ?? 100;
+            if (aRank !== bRank) return aRank - bRank;
+            return a.localeCompare(b); // alphabetical fallback for unknowns
+          });
+
+          // Build per-category count arrays, each aligned to allTimestamps indices
+          const seriesMap = new Map<string, number[]>();
+          allCategories.forEach((cat) =>
+            seriesMap.set(cat, new Array(allTimestamps.length).fill(0)),
+          );
+
+          // Fast timestamp → index lookup to avoid repeated indexOf calls
+          const tsIndex = new Map<string, number>(
+            allTimestamps.map((ts, i) => [ts, i]),
+          );
+
+          breakdownMap.forEach((row) => {
+            const idx = tsIndex.get(row.zo_sql_key);
+            const cat = row.zo_sql_breakdown;
+            if (idx !== undefined && cat !== undefined && cat !== null) {
+              seriesMap.get(cat)![idx] += row.zo_sql_num;
+            }
+          });
+
+          allTimestamps.forEach((ts) => {
+            unparsed_x_data.push(ts);
+            xData.push(histogramDateTimezone(ts, store.state.timezone));
+          });
+
+          // yData holds per-bucket totals (sum across all categories).
+          // Used only for the histogram title count, not for chart rendering.
+          allTimestamps.forEach((_, i) => {
+            yData.push(
+              [...seriesMap.values()].reduce((sum, arr) => sum + arr[i], 0),
             );
-            // xData.push(Math.floor(histDate.getTime()))
-            yData.push(parseInt(bucket.zo_sql_num, 10));
-          },
-        );
+          });
 
-        searchObj.data.queryResults.total = num_records;
+          searchObj.data.queryResults.total = yData.reduce((a, b) => a + b, 0);
+
+          searchObj.data.histogram = {
+            xData,
+            yData,
+            breakdownField,       // NEW: field name used for grouping
+            breakdownSeries: seriesMap, // NEW: Map<category, counts[]> for stacked chart
+            chartParams: {
+              title: getHistogramTitle(),
+              unparsed_x_data,
+              timezone: store.state.timezone,
+            },
+            errorCode: 0,
+            errorMsg: "",
+            errorDetail: "",
+          };
+        } else {
+          // --- EXISTING: Single-series (flat) path ---
+          // Original logic moved here unchanged; previously this was the only path.
+          // num_records was originally declared at the top of the function but is
+          // only used here, so it is now scoped to this block.
+          histogramMappedData = new Map(
+            histogramResults.value.map((item: any) => [
+              item.zo_sql_key,
+              JSON.parse(JSON.stringify(item)),
+            ]),
+          );
+
+          searchObj.data.queryResults.aggs.forEach((item: any) => {
+            if (histogramMappedData.has(item.zo_sql_key)) {
+              histogramMappedData.get(item.zo_sql_key).zo_sql_num +=
+                item.zo_sql_num;
+            } else {
+              histogramMappedData.set(item.zo_sql_key, item);
+            }
+          });
+
+          let num_records = 0; // moved from top of function — only needed in this path
+          const mergedData: any = Array.from(histogramMappedData.values());
+          mergedData.forEach(
+            (bucket: { zo_sql_key: string | number | Date; zo_sql_num: string }) => {
+              num_records = num_records + parseInt(bucket.zo_sql_num, 10);
+              unparsed_x_data.push(bucket.zo_sql_key);
+              xData.push(
+                histogramDateTimezone(bucket.zo_sql_key, store.state.timezone),
+              );
+              yData.push(parseInt(bucket.zo_sql_num, 10));
+            },
+          );
+
+          searchObj.data.queryResults.total = num_records;
+
+          searchObj.data.histogram = {
+            xData,
+            yData,
+            breakdownField: null,       // no breakdown — plain bar chart
+            breakdownSeries: null,      // no breakdown — plain bar chart
+            chartParams: {
+              title: getHistogramTitle(),
+              unparsed_x_data,
+              timezone: store.state.timezone,
+            },
+            errorCode: 0,
+            errorMsg: "",
+            errorDetail: "",
+          };
+        }
       }
-
-      const chartParams = {
-        title: getHistogramTitle(),
-        unparsed_x_data: unparsed_x_data,
-        timezone: store.state.timezone,
-      };
-      searchObj.data.histogram = {
-        xData,
-        yData,
-        chartParams,
-        errorCode: 0,
-        errorMsg: "",
-        errorDetail: "",
-      };
     } catch (e: any) {
       console.error("Error while generating histogram data", e);
       notificationMsg.value = "Error while generating histogram data.";
@@ -211,6 +335,8 @@ export const useHistogram = () => {
     searchObj.data.histogram = {
       xData: [],
       yData: [],
+      breakdownField: null,
+      breakdownSeries: null,
       chartParams: {
         title: getHistogramTitle(),
         unparsed_x_data: [],
