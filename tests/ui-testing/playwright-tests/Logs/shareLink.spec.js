@@ -74,8 +74,9 @@ test.describe("Share Link Test Cases", () => {
 
     // Step 2: Set a specific time range (1 hour)
     await page.locator('[data-test="date-time-btn"]').click();
-    await page.waitForTimeout(500);
-    await page.locator('[data-test="date-time-relative-1-h-btn"]').click();
+    const oneHourBtn = page.locator('[data-test="date-time-relative-1-h-btn"]');
+    await oneHourBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await oneHourBtn.click();
     await page.waitForTimeout(1000);
 
     // Step 3: Click refresh
@@ -222,8 +223,9 @@ test.describe("Share Link Test Cases", () => {
 
     // Set time range to 30 minutes
     await page.locator('[data-test="date-time-btn"]').click();
-    await page.waitForTimeout(500);
-    await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
+    const thirtyMinBtn = page.locator('[data-test="date-time-relative-30-m-btn"]');
+    await thirtyMinBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await thirtyMinBtn.click();
     await page.waitForTimeout(1000);
 
     // Step 2: Click refresh
@@ -404,8 +406,9 @@ test.describe("Share Link Test Cases", () => {
     await page.waitForTimeout(2000);
 
     await page.locator('[data-test="date-time-btn"]').click();
-    await page.waitForTimeout(500);
-    await page.locator('[data-test="date-time-relative-1-h-btn"]').click();
+    const oneHourBtn2 = page.locator('[data-test="date-time-relative-1-h-btn"]');
+    await oneHourBtn2.waitFor({ state: 'visible', timeout: 5000 });
+    await oneHourBtn2.click();
     await page.waitForTimeout(1000);
 
     await pm.logsPage.clickRefresh();

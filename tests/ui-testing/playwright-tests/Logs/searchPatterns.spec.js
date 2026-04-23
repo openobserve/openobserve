@@ -43,6 +43,9 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
+        // Close stream dropdown (multi-select stays open) to avoid overlaying search bar
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(1000);
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
@@ -160,6 +163,9 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
         // Select stream and set time range
         await pm.logsPage.selectStream(PATTERNS_STREAM);
+        // Close stream dropdown (multi-select stays open) to avoid overlaying search bar
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(1000);
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();

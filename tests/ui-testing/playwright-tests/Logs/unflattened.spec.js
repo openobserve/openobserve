@@ -93,14 +93,25 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.streamsMenu.click();
     await page.waitForTimeout(500);
 
+    // Retry stream search until the stream appears (cloud indexing can be slow)
     testLogger.info('Searching for stream: e2e_automate');
-    await pageManager.unflattenedPage.searchStreamInput.waitFor();
-    await pageManager.unflattenedPage.searchStreamInput.click();
-    await pageManager.unflattenedPage.searchStreamInput.fill("e2e_automate");
-    await page.waitForTimeout(500);
+    let streamFound = false;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await pageManager.unflattenedPage.searchStreamInput.waitFor();
+      await pageManager.unflattenedPage.searchStreamInput.click();
+      await pageManager.unflattenedPage.searchStreamInput.fill("e2e_automate");
+      await page.waitForTimeout(1000);
+
+      streamFound = await pageManager.unflattenedPage.streamDetailButton.isVisible().catch(() => false);
+      if (streamFound) break;
+
+      testLogger.info(`Stream not yet indexed, retrying (${attempt + 1}/6)...`);
+      await pageManager.unflattenedPage.searchStreamInput.clear();
+      await page.waitForTimeout(5000);
+    }
 
     testLogger.info('Opening stream detail dialog');
-    await pageManager.unflattenedPage.streamDetailButton.waitFor();
+    await pageManager.unflattenedPage.streamDetailButton.waitFor({ timeout: 10000 });
     await pageManager.unflattenedPage.streamDetailButton.click();
     await page.waitForTimeout(2000);
 

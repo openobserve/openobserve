@@ -105,8 +105,10 @@ test.describe("Streams Regression Bugs", () => {
       testLogger.info(`Data ingested to ${longStreamNames[i]}`, { response });
     });
 
-    // Wait for ingestion to complete
+    // Wait for ingestion to complete and streams to be indexed
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    testLogger.info('Waiting for streams to be indexed before selection...');
+    await page.waitForTimeout(10000);
 
     // Navigate to logs page
     await page.goto(`${logData.logsUrl}?org_identifier=${orgId}`);
@@ -122,8 +124,10 @@ test.describe("Streams Regression Bugs", () => {
     testLogger.info('Adding additional long-named streams to trigger ellipsis');
     for (let i = 1; i < longStreamNames.length; i++) {
       await pm.logsPage.fillStreamFilter(longStreamNames[i]);
-      await pm.logsPage.toggleStreamSelection(longStreamNames[i]);
-      // Wait for stream to be selected
+      await page.waitForTimeout(1000);
+      const toggle = page.locator(`[data-test="log-search-index-list-stream-toggle-${longStreamNames[i]}"] div`).nth(2);
+      await toggle.waitFor({ state: 'visible', timeout: 15000 });
+      await toggle.click();
       await page.waitForLoadState('domcontentloaded').catch(() => {});
     }
 
