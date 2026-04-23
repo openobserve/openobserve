@@ -2424,7 +2424,10 @@ import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
-import { logsUtils } from "@/composables/useLogs/logsUtils";
+import {
+  logsUtils,
+  removeFieldFromWhereAST,
+} from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import {
   getVisualizationConfig,
@@ -5379,6 +5382,7 @@ export default defineComponent({
       backgroundColorStyle,
       editorWidthToggleFunction,
       fnParsedSQL,
+      fnUnparsedSQL,
       iconRight,
       functionToggleIcon,
       searchSchedulerJob,
@@ -5669,10 +5673,23 @@ export default defineComponent({
     },
     removeFieldTerm(fieldName: string) {
       if (!fieldName) return;
-      const newValue = removeFieldCondition(
-        this.searchObj.data.editorValue,
-        fieldName,
-      );
+      let newValue: string;
+      if (this.searchObj.meta.sqlMode) {
+        try {
+          const parsed = this.fnParsedSQL();
+          if (parsed?.where) {
+            const newWhere = removeFieldFromWhereAST(parsed.where, fieldName);
+            newValue = this.fnUnparsedSQL({ ...parsed, where: newWhere }).replaceAll("`", '"');
+          } else {
+            newValue = this.searchObj.data.editorValue;
+          }
+        } catch (e) {
+          console.log("Error removing field condition from SQL:", e);
+          newValue = removeFieldCondition(this.searchObj.data.editorValue, fieldName);
+        }
+      } else {
+        newValue = removeFieldCondition(this.searchObj.data.editorValue, fieldName);
+      }
       this.searchObj.data.editorValue = newValue;
       this.searchObj.data.query = newValue;
       this.searchObj.data.stream.removeFilterField = "";

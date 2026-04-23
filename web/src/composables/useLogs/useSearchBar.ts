@@ -292,6 +292,7 @@ export const useSearchBar = () => {
   const onStreamChange = async (queryStr: string) => {
     try {
       searchObj.loadingStream = true;
+      searchObj.loading = true;
 
       await cancelQuery();
 
@@ -368,6 +369,7 @@ export const useSearchBar = () => {
       }
 
       if (!store.state.zoConfig.query_on_stream_selection) {
+        searchObj.meta.refreshHistogram = true;
         await handleQueryData();
       } else {
         // Reset states when query on selection is disabled
@@ -392,7 +394,10 @@ export const useSearchBar = () => {
           store.state.zoConfig.auto_query_enabled &&
           searchObj.meta.liveMode
         ) {
+          searchObj.meta.refreshHistogram = true;
           await handleQueryData();
+        } else {
+          searchObj.loading = false;
         }
       }
     } catch (e: any) {
