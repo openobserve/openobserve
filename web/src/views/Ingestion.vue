@@ -231,7 +231,7 @@ import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog },
+  components: { ConfirmDialog, OTabs, ORouteTab },
   setup() {
     const { t } = useI18n();
     const store = useStore();

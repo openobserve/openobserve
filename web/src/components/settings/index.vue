@@ -266,6 +266,8 @@ import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 export default defineComponent({
   name: "AppSettings",
   components: {
+    OTabs,
+    ORouteTab,
   },
   setup() {
     const { t } = useI18n();

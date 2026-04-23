@@ -213,6 +213,7 @@ import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "DateTimePicker",
+  components: { OTabPanels, OTabPanel },
   props: {
     modelValue: {
       type: Object,
