@@ -24,6 +24,7 @@ async-fs.workspace = true
 aws-config.workspace = true
 aws-sdk-sns.workspace = true
 axum.workspace = true
+axum-client-ip.workspace = true
 base64.workspace = true
 bitvec.workspace = true
 bytes.workspace = true

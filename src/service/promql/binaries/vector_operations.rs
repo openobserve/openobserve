@@ -203,10 +203,9 @@ fn vector_and(expr: &BinaryExpr, left: Vec<RangeValue>, right: Vec<RangeValue>) 
         ));
     }
 
+    // If either left or right is empty, we return an empty array.
     if left.is_empty() || right.is_empty() {
-        return Err(DataFusionError::NotImplemented(
-            "Either left or right operand is empty.".to_string(),
-        ));
+        return Ok(Value::Matrix(vec![]));
     }
 
     let rhs_sig: HashSet<u64> = right

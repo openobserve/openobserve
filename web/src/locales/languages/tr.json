@@ -382,7 +382,12 @@
     "patternWildcardSampleValues": "Örnek değerler",
     "wildcardSampleValues": "Örnek değerler",
     "patternZScore": "Z puanı: {zScore} (ortalama frekans: {avgFrequency})",
-    "createAlertFromPattern": "Bu modelden uyarı oluştur"
+    "createAlertFromPattern": "Bu modelden uyarı oluştur",
+    "liveMode": "Canlı",
+    "liveModeTooltip": "Filtre/zaman değişikliklerinde sorguyu otomatik çalıştırın",
+    "turnOnLiveMode": "Canlı modu açın",
+    "turnOffLiveMode": "Canlı modu kapat",
+    "autoRunEnabled": "Otomatik çalıştırma etkin"
   },
   "menu": {
     "home": "Ana Sayfa",
