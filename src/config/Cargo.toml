@@ -48,6 +48,7 @@ itoa = "1.0"
 ryu = "1.0"
 indexmap.workspace = true
 itertools.workspace = true
+jsonschema.workspace = true
 lettre.workspace = true
 log.workspace = true
 md5.workspace = true

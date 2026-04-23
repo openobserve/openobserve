@@ -133,6 +133,10 @@ pub enum DashboardError {
 
     #[error("panel with id {0} already exists in tab {1}")]
     PanelAlreadyExists(String, String),
+
+    /// Error that occurs when dashboard validation fails against the shared JSON Schema.
+    #[error("Dashboard validation failed: {0:?}")]
+    PutValidationFailed(Vec<String>),
 }
 
 async fn add_distinct_field_entry(
@@ -609,6 +613,48 @@ async fn put(
         .and_then(|t| if t.is_empty() { None } else { Some(t) })
         .ok_or_else(|| DashboardError::PutMissingTitle)?;
     dashboard.set_title(title);
+
+    // Validate v8 dashboards against shared JSON Schema + native rules
+    if dashboard.version == 8 {
+        match serde_json::to_value(&dashboard) {
+            Ok(json_value) => {
+                if let Some(v8_json) = json_value.get("v8") {
+                    let validation_errors =
+                        config::meta::dashboards::validation::validate_dashboard(v8_json);
+                    if !validation_errors.is_empty() {
+                        let error_messages: Vec<String> = validation_errors
+                            .iter()
+                            .map(|e| e.message.clone())
+                            .collect();
+                        log::warn!(
+                            "Dashboard validation errors for {}: {:?}",
+                            dashboard_id,
+                            error_messages
+                        );
+                        return Err(DashboardError::PutValidationFailed(error_messages));
+                    }
+                } else {
+                    log::error!(
+                        "Dashboard {} serialized without 'v8' key, skipping validation",
+                        dashboard_id
+                    );
+                    return Err(DashboardError::PutValidationFailed(vec![
+                        "Internal error: dashboard missing v8 data for validation".into(),
+                    ]));
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "Failed to serialize dashboard {} for validation: {}",
+                    dashboard_id,
+                    e
+                );
+                return Err(DashboardError::PutValidationFailed(vec![format!(
+                    "Internal error: failed to serialize dashboard for validation: {e}"
+                )]));
+            }
+        }
+    }
 
     dashboard.set_dashboard_id(dashboard_id.to_owned());
     let dash = table::dashboards::put(org_id, folder_id, new_folder_id, dashboard, false).await?;
