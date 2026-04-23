@@ -4,6 +4,7 @@ use infra::table::org_storage_providers::{
 use object_store::ObjectStore;
 
 use super::db::org_storage_providers;
+mod aws_role_utils;
 mod utils;
 
 use utils::{

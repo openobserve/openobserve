@@ -71,6 +71,14 @@ pub struct AzureCredentials {
     pub secret_key: String,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+pub struct AwsRoleArn {
+    pub bucket_name: String,
+    pub region: String,
+    pub org_id: String,
+    pub role_arn: String,
+}
+
 impl From<String> for ProviderType {
     fn from(value: String) -> Self {
         match value.as_str().to_ascii_lowercase().as_str() {
