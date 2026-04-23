@@ -538,8 +538,8 @@ async fn map_group_to_custom_role(
             });
         }
 
-        // Always include default org in DB to match OpenFGA where it's unconditionally added
-        if !custom_orgs.contains_key(&dex_cfg.default_org) {
+        // If the organizations is empty, add the user to the default org
+        if organizations.is_empty() {
             organizations.push(UserOrg {
                 role: role.clone(),
                 name: dex_cfg.default_org.clone(),
