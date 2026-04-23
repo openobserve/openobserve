@@ -28,8 +28,9 @@ use config::meta::{
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter, QueryOrder,
     QuerySelect, RelationTrait, SelectModel, Selector,
+    sea_query::{Alias, Expr, Func},
 };
-use serde_json::{Value as Json, json};
+use serde_json::Value as Json;
 
 use super::{
     super::{
@@ -416,11 +417,28 @@ impl ListReportsQueryResult {
             query =
                 query.filter(dashboards::Column::DashboardId.eq(dashboard_snowflake_id.to_owned()));
         }
+        // Use CAST(destinations AS text) to avoid the "json = jsonb" operator
+        // error in PostgreSQL. The destinations column is typed as `json` in
+        // the schema, but SeaORM binds serde_json values as `jsonb` parameters,
+        // and PostgreSQL has no implicit cast between the two types. Comparing
+        // the text representation sidesteps the mismatch and works on SQLite too.
         if let Some(true) = &params.has_destinations {
-            query = query.filter(reports::Column::Destinations.ne(json!([])));
+            query = query.filter(
+                Expr::expr(Func::cast_as(
+                    Expr::col((reports::Entity, reports::Column::Destinations)),
+                    Alias::new("text"),
+                ))
+                .ne("[]"),
+            );
         }
         if let Some(false) = &params.has_destinations {
-            query = query.filter(reports::Column::Destinations.eq(json!([])));
+            query = query.filter(
+                Expr::expr(Func::cast_as(
+                    Expr::col((reports::Entity, reports::Column::Destinations)),
+                    Alias::new("text"),
+                ))
+                .eq("[]"),
+            );
         }
 
         // Order and paginate results.
@@ -675,13 +693,13 @@ mod tests {
                 INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
                 INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 
                 WHERE "folders"."org" = 'TEST_ORG_ID' 
-                AND "folders"."folder_id" = 'TEST_FOLDER_SNOWFLAKE_ID' 
-                AND "dashboards"."dashboard_id" = 'TEST_DASHBOARD_SNOWFLAKE_ID' 
-                AND "reports"."destinations" <> '[]' 
-                ORDER BY 
+                AND "folders"."folder_id" = 'TEST_FOLDER_SNOWFLAKE_ID'
+                AND "dashboards"."dashboard_id" = 'TEST_DASHBOARD_SNOWFLAKE_ID'
+                AND CAST("reports"."destinations" AS text) <> '[]'
+                ORDER BY
                 "reports"."name" ASC,
-                "folders"."name" ASC 
-                LIMIT 10 
+                "folders"."name" ASC
+                LIMIT 10
                 OFFSET 30
             "#
         );
@@ -692,7 +710,7 @@ mod tests {
         collapsed_eq!(
             &sqlite_statement,
             r#"
-                SELECT 
+                SELECT
                 "reports"."id",
                 "reports"."org",
                 "reports"."folder_id",
@@ -725,18 +743,18 @@ mod tests {
                 "report_dashboards"."variables" AS "report_dashboard_variables",
                 "report_dashboards"."timerange" AS "report_dashboard_timerange",
                 "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
-                "folders"."org" AS "org_id" FROM "reports" 
-                INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
-                INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
-                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 
-                WHERE "folders"."org" = 'TEST_ORG_ID' 
-                AND "folders"."folder_id" = 'TEST_FOLDER_SNOWFLAKE_ID' 
-                AND "dashboards"."dashboard_id" = 'TEST_DASHBOARD_SNOWFLAKE_ID' 
-                AND "reports"."destinations" <> '[]' 
-                ORDER BY 
+                "folders"."org" AS "org_id" FROM "reports"
+                INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id"
+                INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id"
+                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id"
+                WHERE "folders"."org" = 'TEST_ORG_ID'
+                AND "folders"."folder_id" = 'TEST_FOLDER_SNOWFLAKE_ID'
+                AND "dashboards"."dashboard_id" = 'TEST_DASHBOARD_SNOWFLAKE_ID'
+                AND CAST("reports"."destinations" AS text) <> '[]'
+                ORDER BY
                 "reports"."name" ASC,
-                "folders"."name" ASC 
-                LIMIT 10 
+                "folders"."name" ASC
+                LIMIT 10
                 OFFSET 30
             "#
         );
