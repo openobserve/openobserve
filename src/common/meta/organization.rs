@@ -701,6 +701,8 @@ mod tests {
             org_type: "standard".to_string(),
             plan: Default::default(),
             trial_expires_at: None,
+            contract_end_date: None,
+            billing_provider: String::new(),
         };
 
         assert_eq!(details.plan, 0);
@@ -747,6 +749,8 @@ mod tests {
             org_type: "basic".to_string(),
             plan: 0,
             trial_expires_at: None,
+            contract_end_date: None,
+            billing_provider: String::new(),
         };
 
         let details2 = AllOrgListDetails {
@@ -758,6 +762,8 @@ mod tests {
             org_type: "premium".to_string(),
             plan: 1,
             trial_expires_at: Some(1641081600),
+            contract_end_date: None,
+            billing_provider: String::new(),
         };
 
         let response = AllOrganizationResponse {
