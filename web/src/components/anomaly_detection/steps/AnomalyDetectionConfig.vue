@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(filter, idx) in config.filters"
               :key="idx"
               class="tw:flex tw:items-center tw:gap-2 tw:mb-2"
+              data-test="anomaly-filter-row"
             >
               <q-select
                 v-model="filter.field"
