@@ -1,4 +1,8 @@
 @import "tailwindcss" prefix(tw);
+@import "../lib/styles/tokens/base.css";
+@import "../lib/styles/tokens/semantic.css";
+@import "../lib/styles/tokens/component.css";
+@import "../lib/styles/tokens/dark.css";
 
 @plugin "@tailwindcss/typography";
 
