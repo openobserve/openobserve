@@ -23,6 +23,7 @@ use super::{entity::org_storage_providers::*, get_lock};
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors,
+    table::cipher,
 };
 
 // we cannot use service level cache in infra, and we have a 'if-storage-set' check on a hot path
@@ -115,15 +116,31 @@ impl From<Model> for OrgStorageProvider {
     }
 }
 
+fn encrypt_data(dek: &[u8], plaintext: &str) -> Result<String, errors::Error> {
+    config::utils::encryption::Algorithm::Aes256Siv
+        .encrypt(dek, plaintext)
+        .map_err(|e| errors::Error::Message(e.to_string()))
+}
+
+fn decrypt_data(dek: &[u8], ciphertext_b64: &str) -> Result<String, errors::Error> {
+    config::utils::encryption::Algorithm::Aes256Siv
+        .decrypt(dek, ciphertext_b64)
+        .map_err(|e| errors::Error::Message(e.to_string()))
+}
+
 pub async fn add(entry: OrgStorageProvider) -> Result<(), errors::Error> {
     let cache_entry = entry.clone();
+
+    let dek = cipher::get_dek(&entry.org_id).await?;
+
+    let encrypted_data = encrypt_data(&dek, &entry.data)?;
 
     let model = ActiveModel {
         org_id: Set(entry.org_id),
         provider_type: Set(entry.provider_type.to_string()),
         created_at: Set(entry.created_at),
         updated_at: Set(entry.updated_at),
-        data: Set(entry.data),
+        data: Set(encrypted_data),
     };
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -161,7 +178,21 @@ pub async fn get_for_org(org_id: &str) -> Result<Option<OrgStorageProvider>, err
         .filter(Column::OrgId.eq(org_id))
         .one(client)
         .await?;
-    let ret = res.map(|v| v.into());
+
+    let dek = cipher::get_dek(org_id).await?;
+    let ret = res
+    // first decrypt the data, and if successful, replace the model's data field with decrypted
+        .map(|mut v| {
+            let decrypted = decrypt_data(&dek, &v.data);
+            decrypted.map(|data| {
+                v.data = data;
+                v
+            })
+        })
+        // then convert Option<result> to result<option>, and propagate error
+        .transpose()?
+        // finally if all went well, convert to OrgStorageProvider
+        .map(|v| v.into());
 
     // we always cache even when it is None, cause the check is on a hot path,
     // so better to return No quickly from cache and bear pain of invalidation
@@ -196,7 +227,16 @@ pub async fn list_all() -> Result<Vec<OrgStorageProvider>, errors::Error> {
     let _lock = get_lock().await;
 
     let res = Entity::find().all(client).await?;
-    let ret = res.into_iter().map(|v| v.into()).collect();
+    let temp: Vec<OrgStorageProvider> = res.into_iter().map(|v| v.into()).collect();
+    let mut ret = Vec::with_capacity(temp.len());
+
+    for mut t in temp.into_iter() {
+        let dek = cipher::get_dek(&t.org_id).await?;
+        let decrypted = decrypt_data(&dek, &t.data)?;
+        t.data = decrypted;
+        ret.push(t);
+    }
+
     Ok(ret)
 }
 
