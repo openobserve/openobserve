@@ -375,6 +375,14 @@ describe("convertLogData.ts", () => {
       expect(options.series[0].name).toBe("(empty)");
     });
 
+    it("does NOT map numeric 0 category to '(empty)' — 0 is a real value", () => {
+      // zo_sql_breakdown = 0 (numeric) must render as "0", not "(empty)".
+      // The old `category || "(empty)"` pattern incorrectly treated 0 as falsy.
+      const bd = new Map<string, number[]>([[0 as any, [5]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.series[0].name).toBe("0");
+    });
+
     it("assigns semantic color for known levels in light theme", () => {
       const bd = makeBreakdown([["error", [1]]]);
       const { options } = convertStackedLogData([ts1], bd, baseParams, false);

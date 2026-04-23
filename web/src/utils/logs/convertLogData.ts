@@ -200,7 +200,9 @@ export const convertStackedLogData = (
     : classicColorPaletteLightTheme;
 
   const series = [...breakdownSeries.entries()].map(([category, values]) => {
-    const label = category || "(empty)";
+    // Use explicit check so numeric 0 is treated as a real value, not empty.
+    // `category || "(empty)"` would incorrectly map 0 → "(empty)" because 0 is falsy.
+    const label = (category === null || category === undefined || category === "") ? "(empty)" : String(category);
     const displayLabel = label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
     return {
       name: displayLabel,

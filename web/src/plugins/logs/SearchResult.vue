@@ -1016,7 +1016,8 @@ export default defineComponent({
       const timestamp = formatDate(new Date(xData[dataIndex]));
 
       const rows = [...breakdownSeries.entries()].map(([category, counts]) => {
-        const label = category || "(empty)";
+        // Explicit check so numeric 0 is not treated as empty (0 is falsy in JS).
+        const label = (category === null || category === undefined || category === "") ? "(empty)" : String(category);
         const displayLabel = label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
         const rawValue = label.toLowerCase() === "(empty)" ? "" : label.toLowerCase();
         const matchedSeries = (plotChart.value?.options?.series ?? []).find(
