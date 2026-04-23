@@ -17,7 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="parentRef"
-    class="container tw:rounded-none! tw:overflow-x-auto tw:relative table-container"
+    :class="[
+      'container tw:rounded-none! tw:overflow-x-auto tw:overflow-y-clip! tw:relative',
+      !props.scrollEl ? 'table-container' : '',
+    ]"
   >
     <table
       v-if="table"
@@ -500,6 +503,15 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  scrollEl: {
+    type: Object as PropType<HTMLElement | null>,
+    default: null,
+  },
+  /** Pixels of content above the virtual list within the shared scroll container (e.g. histogram height). */
+  scrollMargin: {
+    type: Number,
+    default: 0,
+  },
 });
 
 const { t } = useI18n();
@@ -784,7 +796,9 @@ const expandedRowHeights = ref<{ [key: number]: number }>({});
 const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
-    getScrollElement: () => parentRef.value,
+    getScrollElement: () =>
+      (props.scrollEl as HTMLElement | null) ?? parentRef.value,
+    scrollMargin: props.scrollMargin,
     estimateSize: (index: number) => {
       // Check if this is an expanded row (odd indices after expansion)
       const isExpandedRow = formattedRows.value[index]?.original?.isExpandedRow;
@@ -815,7 +829,7 @@ const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
 
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 
-const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+const totalSize = computed(() => rowVirtualizer.value.getTotalSize() + 22);
 
 const setExpandedRows = () => {
   props.expandedRows.forEach((index: any) => {
@@ -1035,7 +1049,11 @@ const showCorrelation = (row: any) => {
   emits("show-correlation", row);
 };
 
-const sendToAiChat = (value: any, isEntireRow: boolean = false, append: boolean = true) => {
+const sendToAiChat = (
+  value: any,
+  isEntireRow: boolean = false,
+  append: boolean = true,
+) => {
   if (isEntireRow) {
     //here we will get the original value of the row
     //and we need to filter the row if props.columns have any filtered cols that user applied
