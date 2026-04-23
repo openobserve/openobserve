@@ -1264,6 +1264,7 @@ import {
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import {
   groupMetricsByCategory,
+  getDefaultMetricSelections,
   type MetricGroupDefinition,
   DEFAULT_METRIC_GROUP_DEFINITIONS,
 } from "@/utils/metrics/metricGrouping";
@@ -1591,11 +1592,18 @@ const uniqueMetricStreams = computed(() => {
   return getUniqueStreams(props.metricStreams);
 });
 
-// Selected metric streams (default to first 6 unique streams)
-// Apply SELECT_ALL_VALUE defaults for unstable dimensions
+// Selected metric streams — prefer curated defaults from group definitions,
+// fall back to first 6 unique streams for non-OTel deployments.
+// Apply SELECT_ALL_VALUE defaults for unstable dimensions.
 const selectedMetricStreams = ref<StreamInfo[]>(
   applyUnstableDimensionDefaults(
-    getUniqueStreams(props.metricStreams).slice(0, 6),
+    (() => {
+      const unique = getUniqueStreams(props.metricStreams);
+      const defs =
+        props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS;
+      const defaults = getDefaultMetricSelections(defs, unique);
+      return defaults.length > 0 ? defaults : unique.slice(0, 6);
+    })(),
   ),
 );
 
