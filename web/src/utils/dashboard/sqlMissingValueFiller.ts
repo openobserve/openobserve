@@ -143,66 +143,42 @@ export const fillMissingValues = (
     endTimeForFill = formattedUserEnd;
   }
 
-  // Build map from processedData for O(1) lookup
+  // Build map from processedData for O(1) lookup, and track actual data
+  // time range so we only fill gaps between real data points.
   const hasBreakdown =
     xAxisKeysWithoutTimeStamp.length > 0 ||
     breakdownAxisKeysWithoutTimeStamp.length > 0;
   const searchDataMap = new Map();
+  let actualMinTime: string | null = null;
+  let actualMaxTime: string | null = null;
   processedData?.forEach((d: any) => {
+    const timeVal = `${getDataValue(d, timeKey)}`;
     const key = hasBreakdown
-      ? `${getDataValue(d, timeKey)}-${getDataValue(d, uniqueKey)}`
-      : `${getDataValue(d, timeKey)}`;
+      ? `${timeVal}-${getDataValue(d, uniqueKey)}`
+      : timeVal;
     searchDataMap.set(key, d);
+    if (!actualMinTime || timeVal < actualMinTime) actualMinTime = timeVal;
+    if (!actualMaxTime || timeVal > actualMaxTime) actualMaxTime = timeVal;
   });
+
+  // Clamp fill range to actual data bounds. Chunk metadata time_offset
+  // can extend beyond where real data rows exist — without clamping,
+  // we'd create empty entries at timestamps with no actual data.
+  const formattedFillStart = formatUtc(binnedFillStart);
+  if (actualMinTime && formattedFillStart < actualMinTime) {
+    binnedFillStart = dateBin(
+      interval,
+      new Date(actualMinTime + "Z"),
+      origin,
+    );
+  }
+  if (actualMaxTime && endTimeForFill > actualMaxTime) {
+    endTimeForFill = actualMaxTime;
+  }
 
   const filledData: any = [];
 
-  // RTL: insert anchors at the user's selected start time when the fill loop
-  // doesn't yet cover it. Anchor/phantom entries use empty string (not
-  // noValueConfigOption) so ECharts renders them as gaps rather than plotted
-  // points at the configured value.
-  //  - Edge anchor (pinned at user's start): pins the x-axis left edge.
-  //  - Phantom anchor (one interval before first real data): gives ECharts a
-  //    consecutive pair so it can derive the correct bar width.
-  if (!isLTR && binnedFillStart > binnedDate) {
-    const startAnchorTimes: string[] = [formatUtc(binnedDate)];
-
-    const nearAnchorTime = new Date(
-      binnedFillStart.getTime() - interval * 1000,
-    );
-    if (nearAnchorTime > binnedDate) {
-      startAnchorTimes.push(formatUtc(nearAnchorTime));
-    }
-
-    if (!hasBreakdown) {
-      startAnchorTimes.forEach((t) => {
-        const anchorEntry: any = { [timeKey]: t };
-        keys.forEach((key) => {
-          if (key !== timeKey) anchorEntry[key] = "";
-        });
-        filledData.push(anchorEntry);
-      });
-    } else {
-      startAnchorTimes.forEach((t) => {
-        uniqueXAxisValues.forEach((uniqueValue: any) => {
-          const anchorEntry: any = {
-            [timeKey]: t,
-            [uniqueKey]: uniqueValue,
-          };
-          keys.forEach((key) => {
-            if (key !== timeKey && key !== uniqueKey) {
-              anchorEntry[key] = "";
-            }
-          });
-          filledData.push(anchorEntry);
-        });
-      });
-    }
-  }
-
-  // Fill slot-by-slot in chronological order from binnedFillStart
-  // (resultMetaData start) to endTimeForFill (user's end).
-  // Only covers the range where streaming data has been received.
+  // Fill slot-by-slot in chronological order, only between actual data points.
   let currentTime = binnedFillStart;
   let currentFormattedTime = formatUtc(currentTime);
 
@@ -242,49 +218,6 @@ export const fillMissingValues = (
 
     currentTime = new Date(currentTime.getTime() + intervalMillis);
     currentFormattedTime = formatUtc(currentTime);
-  }
-
-  // LTR: insert anchors at the user's selected end time when the fill loop
-  // doesn't yet cover it. Same empty-string semantics as the RTL anchors.
-  //  - Phantom anchor (one interval after last real data): consecutive pair
-  //    for bar sizing.
-  //  - Edge anchor (pinned at user's end): pins the x-axis right edge.
-  if (isLTR) {
-    const binnedUserEnd = dateBin(interval, endTime, origin);
-    const formattedBinnedUserEnd = formatUtc(binnedUserEnd);
-
-    if (endTimeForFill < formattedBinnedUserEnd) {
-      const endAnchorTimes: string[] = [];
-      if (currentFormattedTime < formattedBinnedUserEnd) {
-        endAnchorTimes.push(currentFormattedTime);
-      }
-      endAnchorTimes.push(formattedBinnedUserEnd);
-
-      if (!hasBreakdown) {
-        endAnchorTimes.forEach((t) => {
-          const anchorEntry: any = { [timeKey]: t };
-          keys.forEach((key) => {
-            if (key !== timeKey) anchorEntry[key] = "";
-          });
-          filledData.push(anchorEntry);
-        });
-      } else {
-        endAnchorTimes.forEach((t) => {
-          uniqueXAxisValues.forEach((uniqueValue: any) => {
-            const anchorEntry: any = {
-              [timeKey]: t,
-              [uniqueKey]: uniqueValue,
-            };
-            keys.forEach((key) => {
-              if (key !== timeKey && key !== uniqueKey) {
-                anchorEntry[key] = "";
-              }
-            });
-            filledData.push(anchorEntry);
-          });
-        });
-      }
-    }
   }
 
   return filledData;

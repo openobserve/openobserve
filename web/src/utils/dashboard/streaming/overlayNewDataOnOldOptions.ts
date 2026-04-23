@@ -39,6 +39,8 @@ function toNumericTime(val: any): number {
  * @param queryEndTime - User-selected query end (µs), used as the right edge anchor.
  * @param isLTR - true for LTR streaming (overlay on LEFT/fresh), false for RTL (overlay on RIGHT/fresh).
  * @param primaryColor - hex color string for the overlay (e.g. '#5156BE'). Falls back to grey if omitted.
+ * @param histogramIntervalMs - histogram bucket interval in milliseconds (from resultMetaData).
+ *   Used for phantom point placement instead of deriving from data points.
  * @returns Merged options with new data overlaid on old
  */
 export function overlayNewDataOnOldOptions(
@@ -50,6 +52,7 @@ export function overlayNewDataOnOldOptions(
   queryEndTime?: number,
   isLTR?: boolean,
   primaryColor?: string,
+  histogramIntervalMs?: number,
 ): any {
   if (!oldOptions?.series?.length) return newOptions;
   if (!newOptions?.series?.length) return oldOptions;
@@ -110,27 +113,14 @@ export function overlayNewDataOnOldOptions(
     }
   }
 
-  // First pass: compute the full time range across ALL new series.
-  // fillMissingValues ensures the new data spans the entire query range,
-  // so newMinTime/newMaxTime represent the new query's time boundaries.
-  // We use this to filter out old data points that fall outside the new range
-  // (e.g. when switching from 1-week to 1-day view).
-  let newMinTime = Infinity;
-  let newMaxTime = -Infinity;
-  for (const newSeries of merged.series) {
-    if (!newSeries.name || !Array.isArray(newSeries.data)) continue;
-    for (const point of newSeries.data) {
-      if (Array.isArray(point) && point.length >= 2) {
-        const t = toNumericTime(point[0]);
-        if (!isNaN(t)) {
-          if (t < newMinTime) newMinTime = t;
-          if (t > newMaxTime) newMaxTime = t;
-        }
-      }
-    }
-  }
+  // Convert boundary values from µs to ms once for all series.
+  const queryStartMs = queryStartTime ? queryStartTime / 1000 : 0;
+  const queryEndMs = queryEndTime ? queryEndTime / 1000 : 0;
 
-  // For each series in new options, fill time gaps from old options
+  // Boundary-based range splitting: use the four values (queryStart, queryEnd,
+  // boundaryTime, isLTR) to cleanly separate fresh data (from new chunks) and
+  // stale data (from old chart). No per-point null replacement — genuine nulls
+  // in new data are preserved, and old data only fills the stale range.
   for (const newSeries of merged.series) {
     // Skip annotation series (no name)
     if (!newSeries.name) continue;
@@ -138,80 +128,110 @@ export function overlayNewDataOnOldOptions(
     const oldSeries = oldOptions.series.find(
       (s: any) => s.name === newSeries.name,
     );
-    if (!oldSeries?.data?.length) continue;
+    if (!oldSeries?.data?.length || !Array.isArray(oldSeries.data)) continue;
 
-    // Build set of timestamps covered by new data (using numeric ms)
-    const newTimeSlots = new Set<number>();
-    if (Array.isArray(newSeries.data)) {
-      newSeries.data.forEach((point: any) => {
-        if (Array.isArray(point) && point.length >= 2) {
-          const t = toNumericTime(point[0]);
-          if (!isNaN(t)) {
-            newTimeSlots.add(t);
-          }
-        }
-      });
-    }
+    // Skip non-time-series data (plain values, not [timestamp, value] pairs)
+    const firstPoint = newSeries.data?.[0];
+    if (!Array.isArray(firstPoint) || firstPoint.length < 2) continue;
 
-    // If new data uses [timestamp, value] format (time-series)
-    if (newTimeSlots.size > 0 && Array.isArray(oldSeries.data)) {
-      // Build old data lookup by timestamp for O(1) access
-      const oldDataByTime = new Map<number, any>();
-      for (const oldPoint of oldSeries.data) {
-        if (Array.isArray(oldPoint) && oldPoint.length >= 2) {
-          const oldT = toNumericTime(oldPoint[0]);
-          if (!isNaN(oldT) && oldT >= newMinTime && oldT <= newMaxTime) {
-            oldDataByTime.set(oldT, oldPoint);
-          }
+    // Build old data lookup by timestamp for phantom and stale data filtering.
+    const oldDataByTime = new Map<number, any>();
+    for (const oldPoint of oldSeries.data) {
+      if (Array.isArray(oldPoint) && oldPoint.length >= 2) {
+        const t = toNumericTime(oldPoint[0]);
+        if (!isNaN(t)) {
+          oldDataByTime.set(t, oldPoint);
         }
       }
+    }
 
-      // Replace null-valued new entries with old real entries.
-      // fillMissingValues creates null placeholders for the full query range,
-      // which makes the overlay think those time slots are "covered" by new data.
-      // By replacing nulls with old values, the chart stays continuous during
-      // streaming instead of showing a gap between old and new data.
-      for (let i = 0; i < newSeries.data.length; i++) {
-        const point = newSeries.data[i];
-        if (Array.isArray(point) && point.length >= 2) {
-          const value = point[1];
-          if (value == null || value === "") {
-            const t = toNumericTime(point[0]);
-            const oldPoint = oldDataByTime.get(t);
-            if (oldPoint && oldPoint[1] != null && oldPoint[1] !== "") {
-              newSeries.data[i] = oldPoint;
-            }
+    const intervalMs = histogramIntervalMs ?? 0;
+
+    if (isLTR) {
+      // LTR: new data covers [queryStart → chunkEnd].
+      const lastNewTime = toNumericTime(
+        newSeries.data[newSeries.data.length - 1]?.[0],
+      );
+
+      if (!isNaN(lastNewTime)) {
+        // Compute phantom timestamp (one interval after last new point).
+        const phantomTime =
+          intervalMs > 0 ? lastNewTime + intervalMs : 0;
+        const phantomInRange = phantomTime > 0 && phantomTime <= queryEndMs;
+
+        // Collect stale old data AFTER last new timestamp,
+        // excluding the phantom timestamp to avoid duplicates.
+        const staleOldData: any[] = [];
+        let phantomOldValue: any = null;
+
+        oldDataByTime.forEach((oldPoint, t) => {
+          if (phantomInRange && t === phantomTime) {
+            // Reserve this point's value for the phantom
+            phantomOldValue = oldPoint[1];
+          } else if (t > lastNewTime && t <= queryEndMs) {
+            staleOldData.push(oldPoint);
           }
+        });
+
+        // Add phantom with old data value for visual continuity & bar width.
+        // Falls back to null when old data has no value at that timestamp
+        // (null still contributes the timestamp for bar width derivation).
+        if (phantomInRange) {
+          newSeries.data.push([
+            new Date(phantomTime),
+            phantomOldValue ?? null,
+          ]);
+        }
+
+        // Append remaining stale old data
+        if (staleOldData.length) {
+          newSeries.data = [...newSeries.data, ...staleOldData];
         }
       }
+    } else {
+      // RTL: new data covers [chunkStart → queryEnd].
+      const firstNewTime = toNumericTime(newSeries.data[0]?.[0]);
 
-      // Append old data points for time slots NOT covered by new data,
-      // but ONLY if they fall within the new query's time range.
-      // This prevents old data from a different time range (e.g. 1-week)
-      // leaking into the new chart (e.g. 1-day) when the user changes
-      // the time picker.
-      oldDataByTime.forEach((oldPoint, oldT) => {
-        if (!newTimeSlots.has(oldT)) {
-          newSeries.data.push(oldPoint);
-        }
-      });
+      if (!isNaN(firstNewTime)) {
+        // Compute phantom timestamp (one interval before first new point).
+        const phantomTime =
+          intervalMs > 0 ? firstNewTime - intervalMs : 0;
+        const phantomInRange = phantomTime > 0 && phantomTime >= queryStartMs;
 
-      // Sort by timestamp to maintain chronological order
-      newSeries.data.sort((a: any, b: any) => {
-        if (Array.isArray(a) && Array.isArray(b)) {
-          return toNumericTime(a[0]) - toNumericTime(b[0]);
+        // Collect stale old data BEFORE first new timestamp,
+        // excluding the phantom timestamp to avoid duplicates.
+        const staleOldData: any[] = [];
+        let phantomOldValue: any = null;
+
+        oldDataByTime.forEach((oldPoint, t) => {
+          if (phantomInRange && t === phantomTime) {
+            phantomOldValue = oldPoint[1];
+          } else if (t < firstNewTime && t >= queryStartMs) {
+            staleOldData.push(oldPoint);
+          }
+        });
+
+        // Add phantom with old data value for visual continuity & bar width.
+        if (phantomInRange) {
+          newSeries.data = [
+            [new Date(phantomTime), phantomOldValue ?? null],
+            ...newSeries.data,
+          ];
         }
-        return 0;
-      });
+
+        // Prepend remaining stale old data
+        if (staleOldData.length) {
+          newSeries.data = [...staleOldData, ...newSeries.data];
+        }
+      }
     }
-    // For categorical data (non-time-series), don't overlay — just use new data
   }
 
   // For series in OLD that don't exist in NEW yet:
   // Keep them visible with reduced opacity so user knows they're stale.
   // Filter their data to the new time range so they don't stretch the x-axis
   // (e.g. old 1-week series shouldn't expand a 1-day chart).
-  const hasValidNewRange = newMinTime !== Infinity && newMaxTime !== -Infinity;
+  const hasValidQueryRange = queryStartMs > 0 && queryEndMs > 0;
   for (const oldSeries of oldOptions.series) {
     if (!oldSeries.name) continue;
     const existsInNew = merged.series.some(
@@ -225,12 +245,12 @@ export function overlayNewDataOnOldOptions(
           : oldSeries.data,
       };
 
-      // Filter old data points to the new query's time range
-      if (hasValidNewRange && Array.isArray(cloned.data)) {
+      // Filter old data points to the user's query time range
+      if (hasValidQueryRange && Array.isArray(cloned.data)) {
         cloned.data = cloned.data.filter((point: any) => {
           if (Array.isArray(point) && point.length >= 2) {
             const t = toNumericTime(point[0]);
-            return !isNaN(t) && t >= newMinTime && t <= newMaxTime;
+            return !isNaN(t) && t >= queryStartMs && t <= queryEndMs;
           }
           return false;
         });
@@ -315,10 +335,7 @@ export function overlayNewDataOnOldOptions(
     }
 
     if (plotWidth > 0 && plotHeight > 0) {
-      // Convert µs → ms for comparison with newMin/newMaxTime.
       const boundaryMs = boundaryTime ? boundaryTime / 1000 : 0;
-      const queryStartMs = queryStartTime ? queryStartTime / 1000 : newMinTime;
-      const queryEndMs = queryEndTime ? queryEndTime / 1000 : newMaxTime;
       const totalRange = queryEndMs - queryStartMs;
       const hasValidRange = boundaryMs > 0 && totalRange > 0;
 

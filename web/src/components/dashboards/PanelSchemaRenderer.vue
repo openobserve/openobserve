@@ -939,6 +939,9 @@ export default defineComponent({
                 ? store.state.defaultThemeColors?.dark
                 : store.state.defaultThemeColors?.light) ||
               "#3F7994";
+            const histogramIntervalMs =
+              (resultMetaData.value?.[0]?.[0]?.histogram_interval ?? 0) *
+              1000;
             result.options = overlayNewDataOnOldOptions(
               previousOptionsSnapshot,
               result.options,
@@ -948,6 +951,7 @@ export default defineComponent({
               boundaryInfo.queryEnd,
               boundaryInfo.isLTR,
               primaryColor,
+              histogramIntervalMs,
             );
           }
 
