@@ -7,11 +7,16 @@
   font-weight: 600;
   padding: 0 0.75rem;
   transition: all 0.2s;
+  margin-left: 2px;
 
   &:hover {
       transform: translateY(-1px);
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
+}
+
+.inspect-button{
+  margin-left: 4px;
 }
 
 .pagination-block {
@@ -49,14 +54,14 @@
   }
 
   .wrap-content-btn {
-    height: 1.45rem !important; // 23px - match select-pagination
-    min-height: 1.45rem !important;
+    height: 1.4rem !important; // 23px - match select-pagination
+    min-height: 1.3rem !important;
     width: 1.45rem !important; // Square button
     padding: 0 !important;
     border: 0.0626rem solid var(--o2-border-color) !important;
     border-radius: 0.25rem !important; // 4px - match select-pagination
     transition: all 0.2s ease;
-    margin: 5px 0px; // Match select-pagination vertical alignment
+    margin: 7px 0px; // Match select-pagination vertical alignment
     background: rgba(255, 255, 255, 0.1) !important; // Glassmorphic
     backdrop-filter: blur(10px) !important;
     display: flex !important;

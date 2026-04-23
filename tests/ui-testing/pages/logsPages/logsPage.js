@@ -576,9 +576,9 @@ export class LogsPage {
         return false;
     }
 
-    async selectStream(stream, maxRetries = 3, apiWaitMs = null) {
+    async selectStream(stream, maxRetries = 5, apiWaitMs = null) {
         // Cloud environments need longer for streams to be indexed after ingestion
-        const effectiveApiWaitMs = apiWaitMs ?? (isCloudEnvironment() ? 90000 : 30000);
+        const effectiveApiWaitMs = apiWaitMs ?? (isCloudEnvironment() ? 120000 : 30000);
         testLogger.info(`selectStream: Selecting stream: ${stream} (apiWait: ${effectiveApiWaitMs}ms)`);
 
         // First, wait for the stream to be available via API (skip if apiWaitMs is 0)
@@ -689,8 +689,8 @@ export class LogsPage {
                 await this.page.waitForTimeout(500);
 
                 if (attempt < maxRetries) {
-                    testLogger.debug(`selectStream: Waiting 5s before retry...`);
-                    await this.page.waitForTimeout(5000); // Wait before retry for stream to be indexed
+                    testLogger.debug(`selectStream: Waiting 10s before retry...`);
+                    await this.page.waitForTimeout(10000); // Wait before retry for stream to be indexed
 
                     // Navigate to logs page again to refresh stream list
                     await this.page.goto(logsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});

@@ -130,9 +130,9 @@ export const convertTableData = (
       const aliasLower = it.alias.toLowerCase();
       const actualField = fieldNameCache[aliasLower] || it.alias;
 
-      obj["name"] = it.label;
+      obj["name"] = it.label || it.alias;
       obj["field"] = actualField;
-      obj["label"] = it.label;
+      obj["label"] = it.label || it.alias;
       obj["align"] = !isNumber ? "left" : "right";
       obj["sortable"] = true;
 

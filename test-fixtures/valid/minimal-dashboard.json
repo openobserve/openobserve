@@ -1,0 +1,64 @@
+{
+  "dashboardId": "test-minimal-1",
+  "title": "Minimal Dashboard",
+  "version": 8,
+  "description": "",
+  "tabs": [
+    {
+      "tabId": "tab-1",
+      "name": "Default",
+      "panels": [
+        {
+          "id": "panel-1",
+          "type": "line",
+          "title": "My Line Chart",
+          "description": "",
+          "queryType": "sql",
+          "layout": { "x": 0, "y": 0, "w": 96, "h": 20, "i": 1 },
+          "queries": [
+            {
+              "query": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "default",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "_timestamp",
+                    "alias": "x_axis_1",
+                    "type": "build",
+                    "functionName": "histogram",
+                    "args": [
+                      { "type": "field", "value": { "field": "_timestamp", "streamAlias": null } }
+                    ]
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "count",
+                    "alias": "y_axis_1",
+                    "type": "build",
+                    "functionName": "count",
+                    "args": [
+                      { "type": "field", "value": { "field": "_timestamp", "streamAlias": null } }
+                    ]
+                  }
+                ],
+                "z": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": { "promql_legend": "" }
+            }
+          ],
+          "config": {
+            "show_legends": true
+          }
+        }
+      ]
+    }
+  ]
+}
