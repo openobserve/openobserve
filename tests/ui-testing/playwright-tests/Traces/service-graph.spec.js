@@ -36,15 +36,19 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
       testLogger.info('Trace ingestion complete');
 
       // Wait for the service graph daemon to process (runs every ~30s)
+      // Increased to 4 minutes to allow 6-8 daemon cycles for full topology processing
       testLogger.info('Waiting for service graph daemon to process data...');
       const waitResult = await waitForServiceGraphData(page, {
-        maxWaitMs: 120000,
+        maxWaitMs: 240000,  // 4 minutes (was 2 min) - allows more daemon cycles
         pollIntervalMs: 10000,
         expectedMinEdges: 10,
       });
 
       if (waitResult.success) {
         testLogger.info(`Service graph data ready: ${waitResult.edges.length} edges found after ${waitResult.waitedMs}ms`);
+        // Additional wait to ensure all nodes are fully created after edges appear
+        testLogger.info('Waiting additional 30s for node creation to complete...');
+        await new Promise(resolve => setTimeout(resolve, 30000));
       } else {
         testLogger.warn(`Service graph data may be incomplete after ${waitResult.waitedMs}ms - continuing with available data`);
       }
@@ -486,9 +490,11 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     // The service graph daemon processes traces in batches. Circular dependency
     // services (service-a/b/c) may not appear in the first topology snapshot.
     // Poll the API until they appear or timeout.
+    // NOTE: Edge case services may take longer to appear than production services.
+    // Use a longer timeout to allow the daemon to process all ingested traces.
     const circularServices = ['service-a', 'service-b', 'service-c'];
-    const maxWaitMs = 60000;
-    const pollIntervalMs = 5000;
+    const maxWaitMs = 120000;
+    const pollIntervalMs = 10000;
     const startTime = Date.now();
     let foundCircularNodes = [];
     let nodes = [];

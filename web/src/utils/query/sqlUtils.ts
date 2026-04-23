@@ -1000,7 +1000,7 @@ export const getStreamNameFromQuery = async (query: any) => {
             extractTablesFromNode(obj?.stmt);
           });
         } else {
-          streamName = parsedQuery?.from[0]?.table;
+          streamName = parsedQuery?.from?.[0]?.table;
         }
       }
     } catch (error) {

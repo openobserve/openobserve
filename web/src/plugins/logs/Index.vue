@@ -287,6 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:recordsPerPage="getMoreDataRecordsPerPage"
                         @expandlog="toggleExpandLog"
                         @send-to-ai-chat="sendToAiChat"
+                        @run-query="searchData"
                       />
                     </div>
                     <div class="text-center col-10 q-ma-none">
@@ -966,6 +967,8 @@ export default defineComponent({
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
       try {
+        searchObj.loading = true;
+        searchObj.meta.refreshHistogram = true;
         await getQueryData();
         refreshHistogramChart();
         showJobScheduler.value = true;
@@ -2206,6 +2209,51 @@ export default defineComponent({
                 searchObj.data.datetime.relativeTimePeriod,
               )
             : cloneDeep(searchObj.data.datetime);
+      },
+      { deep: true },
+    );
+
+    // Live mode: when auto_query_enabled is true in zoConfig, live mode is on
+    // by default so queries auto-run on filter or datetime changes (debounced).
+    // Users can toggle it off via the Run Query dropdown.
+    // zoConfig may not be populated yet at mount time; watch for it to arrive.
+    watch(
+      () => store.state.zoConfig?.auto_query_enabled,
+      (enabled) => {
+        if (enabled && !searchObj.meta.liveMode) {
+          searchObj.meta.liveMode = true;
+        }
+      },
+      { immediate: true },
+    );
+
+    // Debounced auto-run triggered by datetime changes in live mode.
+    // Only fires when query_on_stream_selection is true (i.e., the existing
+    // updateDateTime path is NOT already auto-running the query).
+    // Uses runQueryFn so the histogram is also refreshed.
+    const debouncedAutoRunOnDatetime = debounce(() => {
+      if (
+        searchObj.meta.liveMode &&
+        store.state.zoConfig?.auto_query_enabled &&
+        store.state.zoConfig?.query_on_stream_selection !== false &&
+        searchObj.meta.logsVisualizeToggle === "logs" &&
+        !searchObj.loading &&
+        !searchObj.loadingHistogram
+      ) {
+        runQueryFn();
+      }
+    }, 500);
+
+    watch(
+      () => [
+        searchObj.data.datetime.type,
+        searchObj.data.datetime.startTime,
+        searchObj.data.datetime.endTime,
+        searchObj.data.datetime.relativeTimePeriod,
+      ],
+      (_newVal, _oldVal) => {
+        if (searchObj.shouldIgnoreWatcher) return;
+        debouncedAutoRunOnDatetime();
       },
       { deep: true },
     );

@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="azure-integration-category-tabs"
       >
         <q-tab name="all" label="All Services" />
+        <q-tab name="logs" label="Logs" />
         <q-tab name="compute" label="Compute" />
         <q-tab name="storage" label="Storage" />
         <q-tab name="security" label="Security" />

@@ -404,6 +404,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
     tokio::task::spawn(db::system_settings::watch());
+    tokio::task::spawn(db::model_pricing::watch());
     tokio::task::spawn(db::alerts::templates::watch());
     tokio::task::spawn(db::alerts::destinations::watch());
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
@@ -411,10 +412,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::organization::org_settings_watch());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
-    // Service streams watch only needed on queriers - they serve the UI APIs.
-    // Skip if the feature is disabled to avoid unnecessary coordinator traffic.
+    // Watch needed on queriers (UI APIs) and on whichever node role is the configured
+    // processing node (ingester or compactor) so their local cache stays in sync with
+    // coordinator events emitted by the flusher.
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() && get_o2_config().service_streams.enabled {
+    if get_o2_config().service_streams.enabled
+        && get_o2_config().service_streams.local_node_needs_cache()
+    {
         tokio::task::spawn(async move {
             o2_enterprise::enterprise::service_streams::cache::watch().await
         });
@@ -451,6 +455,30 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("system settings cache failed");
 
+    db::model_pricing::cache()
+        .await
+        .expect("model pricing cache failed");
+
+    // Sync built-in model pricing from GitHub (initial + periodic)
+    if LOCAL_NODE.is_querier() {
+        tokio::task::spawn(async {
+            if let Err(e) = db::model_pricing_sync::sync_built_in_from_github(false).await {
+                log::error!("[model_pricing] initial built-in sync failed: {e}");
+            }
+        });
+        tokio::task::spawn(async {
+            let interval = std::time::Duration::from_secs(
+                config::get_config().common.model_pricing_sync_interval_secs,
+            );
+            loop {
+                tokio::time::sleep(interval).await;
+                if let Err(e) = db::model_pricing_sync::sync_built_in_from_github(false).await {
+                    log::error!("[model_pricing] periodic built-in sync failed: {e}");
+                }
+            }
+        });
+    }
+
     // ensure system templates exist in database BEFORE caching
     alerts::templates::ensure_system_templates()
         .await
@@ -474,10 +502,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::domain_management::db::cache()
         .await
         .expect("domain management cache failed");
-    // Service streams cache only needed on queriers - they serve the UI APIs.
-    // Skip if the feature is disabled to avoid unnecessary DB load at startup.
+    // Warm the cache on queriers (UI APIs) and on whichever node role is the configured
+    // processing node so that get_coverage_deficit returns accurate data from startup
+    // rather than always returning (0, 0) until files happen to be processed.
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() && get_o2_config().service_streams.enabled {
+    if get_o2_config().service_streams.enabled
+        && get_o2_config().service_streams.local_node_needs_cache()
+    {
         o2_enterprise::enterprise::service_streams::cache::init_cache()
             .await
             .expect("service discovery cache failed");
@@ -499,15 +530,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     config_watcher::run();
-
-    #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() && get_o2_config().ai.enabled {
-        tokio::task::spawn(async move {
-            o2_enterprise::enterprise::ai::agent::prompt::prompts::load_system_prompt()
-                .await
-                .expect("load system prompt failed");
-        });
-    }
 
     // Initialize slot-based admission ledger on querier nodes
     #[cfg(feature = "enterprise")]

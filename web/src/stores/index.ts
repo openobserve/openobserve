@@ -41,6 +41,7 @@ const organizationObj = {
   allDashboardData: {},
   allAlertsListByFolderId: {},
   allAlertsListByNames: {},
+  allReportsListByFolderId: {} as Record<string, any[]>,
   allDashboardListHash: {},
   rumToken: {
     rum_token: "",
@@ -186,6 +187,9 @@ export default createStore({
     },
     setAllAlertsListByFolderId(state, payload) {
       state.organizationData.allAlertsListByFolderId = payload;
+    },
+    setAllReportsListByFolderId(state, payload) {
+      state.organizationData.allReportsListByFolderId = payload;
     },
     setAllAlertsListByNames(state, payload) {
       state.organizationData.allAlertsListByNames = payload;
@@ -389,6 +393,9 @@ export default createStore({
     },
     setAllAlertsListByFolderId(context, payload) {
       context.commit("setAllAlertsListByFolderId", payload);
+    },
+    setAllReportsListByFolderId(context, payload) {
+      context.commit("setAllReportsListByFolderId", payload);
     },
     setAllAlertsListByNames(context, payload) {
       context.commit("setAllAlertsListByNames", payload);

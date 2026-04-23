@@ -168,7 +168,7 @@ describe("FlameGraphView", () => {
       expect(wrapper.vm.totalSpans).toBe(3);
     });
 
-    it("should calculate max depth correctly", () => {
+    it("should calculate depth correctly", () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
@@ -180,7 +180,7 @@ describe("FlameGraphView", () => {
       expect(wrapper.vm.maxDepth).toBe(1);
     });
 
-    it("should return 0 for max depth when no spans", () => {
+    it("should return 0 for depth when no spans", () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: [],
@@ -243,7 +243,7 @@ describe("FlameGraphView", () => {
       expect(wrapper.text()).toContain("spans");
     });
 
-    it("should display max depth", () => {
+    it("should display depth", () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
@@ -253,7 +253,7 @@ describe("FlameGraphView", () => {
       });
 
       expect(wrapper.text()).toContain("1");
-      expect(wrapper.text()).toContain("max depth");
+      expect(wrapper.text()).toContain("depth");
     });
 
     it("should show empty state when no data", () => {

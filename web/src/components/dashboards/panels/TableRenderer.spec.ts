@@ -98,10 +98,6 @@ vi.mock("@/composables/useLogsHighlighter", () => ({
   }),
 }));
 
-vi.mock("@/utils/dashboard/panelValidation", () => ({
-  findFirstValidMappedValue: vi.fn().mockReturnValue(null),
-}));
-
 vi.mock("@/utils/dashboard/colorPalette", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
@@ -118,6 +114,10 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
+vi.mock("@/utils/dashboard/dashboardValidator", () => ({
+  findFirstValidMappedValue: vi.fn().mockReturnValue(null),
+}));
+
 // CSS.supports is not available in jsdom
 vi.stubGlobal("CSS", { supports: () => false });
 
@@ -130,7 +130,7 @@ vi.stubGlobal("URL", {
 });
 
 import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
-import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
+import { findFirstValidMappedValue } from "@/utils/dashboard/dashboardValidator";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
@@ -548,6 +548,73 @@ describe("TableRenderer", () => {
       wrapper = createWrapper({ data: { rows: mockTableData.rows } });
       expect(wrapper.exists()).toBe(true);
       consoleSpy.mockRestore();
+    });
+  });
+
+  // ── copy cell — timestamp column format ────────────────────────────────────
+  // Verifies that TableRenderer passes columns with format functions through to
+  // TenstackTable so that getCellDisplayValue returns the formatted string (not
+  // the raw ISO "T" value) when the copy button is clicked.
+  describe("copy cell — timestamp column format", () => {
+    const ISO_RAW = "2024-01-15T10:30:00Z";
+    const FORMATTED = "2024-01-15 10:30:00";
+    // Minimal simulation of parseTimestampValue behaviour.
+    const tsFormat = (val: any): string =>
+      val ? String(val).replace("T", " ").replace("Z", "") : val;
+
+    const tsData = {
+      columns: [
+        {
+          name: "event_time",
+          label: "Event Time",
+          field: "event_time",
+          align: "left",
+          format: tsFormat,
+          sortable: false,
+        },
+      ],
+      rows: [{ event_time: ISO_RAW }],
+    };
+
+    it("should forward the column format function to TenstackTable unchanged", () => {
+      wrapper = createWrapper({ data: tsData });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const cols = table.props("columns") as any[];
+      const tsCol = cols.find((c: any) => c.field === "event_time" || c.name === "event_time");
+      expect(tsCol).toBeDefined();
+      expect(typeof tsCol.format).toBe("function");
+    });
+
+    it("the format function on the timestamp column should produce a value without the ISO 'T' separator", () => {
+      wrapper = createWrapper({ data: tsData });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const cols = table.props("columns") as any[];
+      const tsCol = cols.find((c: any) => c.field === "event_time" || c.name === "event_time");
+      const result = tsCol.format(ISO_RAW);
+      expect(result).toBe(FORMATTED);
+      expect(result).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    });
+
+    it("the format function should produce the same formatted value that will be written to clipboard on copy", () => {
+      wrapper = createWrapper({ data: tsData });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
+      const cols = table.props("columns") as any[];
+      const tsCol = cols.find((c: any) => c.field === "event_time" || c.name === "event_time");
+      // The clipboard copy path calls getCellDisplayValue which calls col.format(rawValue).
+      // Verify format(rawValue) === expected formatted string so both display and copy are consistent.
+      expect(tsCol.format(ISO_RAW)).toBe(FORMATTED);
+    });
+
+    it("should render the formatted (non-T) timestamp value in the table cell", () => {
+      wrapper = createWrapper({ data: tsData });
+      // The formatted value must appear somewhere in the rendered output.
+      expect(wrapper.text()).toContain(FORMATTED);
+    });
+
+    it("should not render the raw ISO T-format string in the table cell", () => {
+      wrapper = createWrapper({ data: tsData });
+      // The raw ISO string with "T" must NOT appear (it should be replaced by the formatted value).
+      expect(wrapper.text()).not.toContain(ISO_RAW);
     });
   });
 });
