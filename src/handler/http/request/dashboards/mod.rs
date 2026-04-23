@@ -87,6 +87,10 @@ impl From<DashboardError> for Response {
             DashboardError::PanelAlreadyExists(panel_id, tab_id) => MetaHttpResponse::conflict(
                 format!("Panel with id {panel_id} already exists in tab {tab_id}"),
             ),
+            DashboardError::PutValidationFailed(errors) => MetaHttpResponse::bad_request(format!(
+                "Dashboard validation failed: {}",
+                errors.join("; ")
+            )),
         }
     }
 }
@@ -123,7 +127,7 @@ impl From<DashboardError> for Response {
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
         ("x-o2-mcp" = json!({
-            "description": "Create a dashboard with visualization panels. LAYOUT: 192-column grid with {x, y, w, h, i} where x=column(0-191), y=row, w=width, h=height, i=panel_id. Common widths: full=192, half=96, third=64. PANEL QUERIES: Each panel query needs 'fields' with x/y/z arrays populated EVEN when customQuery=true. AXIS RULES: x=dimension/time field, y=metric field(s), z=only for heatmaps(color intensity)/stacked-charts(breakdown field)/geo-maps(value). For most charts (line/area/bar/pie), leave z=[]. Use SELECT aliases as column values. Example: 'SELECT histogram(_timestamp) as ts, COUNT(*) as cnt' needs x=[{label:'ts',alias:'ts',column:'ts',aggregationFunction:null}], y=[{label:'cnt',alias:'cnt',column:'cnt',aggregationFunction:null}], z=[]. FILTER: The 'filter' field in 'fields' MUST be an object (NOT an array). Use: {type:'list',values:[],logicalOperator:'AND',filterType:'list'} for no filters.",
+            "description": "Create a dashboard with visualization panels. LAYOUT: 192-column grid with {x, y, w, h, i} where x=column(0-191), y=row, w=width, h=height, i=panel_id. Common widths: full=192, half=96, third=64. PANEL QUERIES: Each panel query needs 'fields' with x/y/z arrays populated EVEN when customQuery=true. AXIS RULES: x=dimension/time field, y=metric field(s), z=only for heatmaps(color intensity)/stacked-charts(breakdown field)/geo-maps(value). For most charts (line/area/bar/pie), leave z=[]. Use SELECT aliases as column values. Example: 'SELECT histogram(_timestamp) as ts, COUNT(*) as cnt' needs x=[{label:'ts',alias:'ts',column:'ts',aggregationFunction:null}], y=[{label:'cnt',alias:'cnt',column:'cnt',aggregationFunction:null}], z=[]. FILTER: The 'filter' field in 'fields' MUST be an object (NOT an array). Use: {filterType:'group',logicalOperator:'AND',conditions:[]} for no filters.",
             "category": "dashboards"
         }))
     )

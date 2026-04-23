@@ -183,6 +183,8 @@ export const useSearchConnection = () => {
         searchObj.data.histogram = {
           xData: [],
           yData: [],
+          breakdownField: null,
+          breakdownSeries: null,
           chartParams: {
             title: "",
             unparsed_x_data: [],
