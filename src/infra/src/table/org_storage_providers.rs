@@ -184,6 +184,13 @@ pub fn update_cache(org_id: &str, provider_info: OrgStorageProvider) {
     cache.insert(org_id.to_string(), Some(provider_info));
 }
 
+// be careful when using this fn. Ideally this should only be used when completely
+// removing the org level storage for an org.
+pub fn remove_from_cache(org_id: &str) {
+    let mut cache = CACHE.write().unwrap();
+    cache.remove(org_id);
+}
+
 pub async fn list_all() -> Result<Vec<OrgStorageProvider>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let _lock = get_lock().await;

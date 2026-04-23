@@ -115,7 +115,6 @@ mod m20260414_000001_add_is_system_to_cipher_keys;
 mod m20260414_000002_create_org_ai_toolsets;
 mod m20260415_000001_create_model_pricing_table;
 mod m20260415_000002_add_source_to_model_pricing;
-mod m20260401_00001_create_org_s3_table;
 
 pub struct Migrator;
 

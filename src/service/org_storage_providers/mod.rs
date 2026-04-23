@@ -127,6 +127,12 @@ pub async fn set_storage(
     Ok(())
 }
 
+pub async fn validate_provider(provider: &OrgStorageProvider) -> Result<(), anyhow::Error> {
+    let provider = get_provider(provider.provider_type, &provider.data).await?;
+    test_provider(&provider).await?;
+    Ok(())
+}
+
 // what is redacted in get_redacted_config above matters, as we use its response here as existing
 pub fn merge_configs(
     provider_type: ProviderType,
