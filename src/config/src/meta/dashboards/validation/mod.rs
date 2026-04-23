@@ -101,4 +101,17 @@ mod tests {
             errors
         );
     }
+
+    #[test]
+    fn test_valid_promql_table_dashboard() {
+        let json_str =
+            include_str!("../../../../../../test-fixtures/valid/promql-table-dashboard.json");
+        let json: Value = serde_json::from_str(json_str).unwrap();
+        let errors = validate_dashboard(&json);
+        assert!(
+            errors.is_empty(),
+            "Expected valid PromQL table dashboard, got errors: {:?}",
+            errors
+        );
+    }
 }

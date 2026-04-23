@@ -1,0 +1,45 @@
+{
+  "dashboardId": "test-promql-table-1",
+  "title": "PromQL Table Dashboard",
+  "version": 8,
+  "description": "",
+  "tabs": [
+    {
+      "tabId": "tab-1",
+      "name": "Default",
+      "panels": [
+        {
+          "id": "panel-1",
+          "type": "table",
+          "title": "PromQL Table",
+          "description": "",
+          "queryType": "promql",
+          "layout": { "x": 0, "y": 0, "w": 96, "h": 20, "i": 1 },
+          "queries": [
+            {
+              "query": "rate(http_requests_total[5m])",
+              "customQuery": false,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": { "promql_legend": "" }
+            }
+          ],
+          "config": {
+            "promql_table_mode": "all",
+            "show_legends": false
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -16,6 +16,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   findFirstValidMappedValue,
+  validateDashboard,
   validateDashboardJson,
 } from "@/utils/dashboard/dashboardValidator";
 
@@ -331,6 +332,56 @@ describe("panelValidation", () => {
       };
       const errors = validateDashboardJson(dashboard);
       expect(errors.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("validateDashboard - tableMinFields", () => {
+    const basePromQLTableDashboard = {
+      dashboardId: "d1",
+      title: "Test",
+      version: 8,
+      tabs: [
+        {
+          tabId: "tab-1",
+          name: "Default",
+          panels: [
+            {
+              id: "p1",
+              type: "table",
+              title: "PromQL Table",
+              queryType: "promql",
+              layout: { x: 0, y: 0, w: 96, h: 20, i: 1 },
+              queries: [
+                {
+                  query: "rate(http_requests_total[5m])",
+                  customQuery: false,
+                  fields: { stream: "", x: [], y: [], filter: { filterType: "group", logicalOperator: "AND", conditions: [] } },
+                },
+              ],
+              config: {},
+            },
+          ],
+        },
+      ],
+    };
+
+    it("does not flag PromQL table with empty x/y as invalid", () => {
+      const errors = validateDashboard(basePromQLTableDashboard);
+      expect(errors).toHaveLength(0);
+    });
+
+    it("does not flag promql-builder table with empty x/y as invalid", () => {
+      const dashboard = {
+        ...basePromQLTableDashboard,
+        tabs: [
+          {
+            ...basePromQLTableDashboard.tabs[0],
+            panels: [{ ...basePromQLTableDashboard.tabs[0].panels[0], queryType: "promql-builder" }],
+          },
+        ],
+      };
+      const errors = validateDashboard(dashboard);
+      expect(errors).toHaveLength(0);
     });
   });
 });

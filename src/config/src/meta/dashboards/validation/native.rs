@@ -113,6 +113,12 @@ fn validate_table_fields(dashboard: &Value, errors: &mut Vec<super::ValidationEr
                     continue;
                 }
 
+                // PromQL table panels don't use x/y fields — skip field count check.
+                let query_type = panel.get("queryType").and_then(|t| t.as_str()).unwrap_or("");
+                if query_type == "promql" || query_type == "promql-builder" {
+                    continue;
+                }
+
                 // Currently table panels only use the first query for validation.
                 // Multi-query table panels are not supported yet.
                 let query = match panel.get("queries").and_then(|q| q.get(0)) {
@@ -851,6 +857,51 @@ mod tests {
                             "x": [],
                             "y": [{"label": "count"}]
                         }
+                    }]
+                }]
+            }]
+        });
+        let errors = validate(&dashboard);
+        assert!(errors.iter().all(|e| e.code != "TABLE_EMPTY_FIELDS"));
+    }
+
+    #[test]
+    fn test_validate_promql_table_empty_fields_skipped() {
+        // PromQL table panels always have x: [], y: [] — must not trigger TABLE_EMPTY_FIELDS
+        let dashboard = json!({
+            "tabs": [{
+                "tabId": "t1",
+                "panels": [{
+                    "id": "p1",
+                    "type": "table",
+                    "queryType": "promql",
+                    "queries": [{
+                        "customQuery": false,
+                        "fields": {
+                            "stream": "",
+                            "x": [],
+                            "y": []
+                        }
+                    }]
+                }]
+            }]
+        });
+        let errors = validate(&dashboard);
+        assert!(errors.iter().all(|e| e.code != "TABLE_EMPTY_FIELDS"));
+    }
+
+    #[test]
+    fn test_validate_promql_builder_table_empty_fields_skipped() {
+        let dashboard = json!({
+            "tabs": [{
+                "tabId": "t1",
+                "panels": [{
+                    "id": "p1",
+                    "type": "table",
+                    "queryType": "promql-builder",
+                    "queries": [{
+                        "customQuery": false,
+                        "fields": { "x": [], "y": [] }
                     }]
                 }]
             }]

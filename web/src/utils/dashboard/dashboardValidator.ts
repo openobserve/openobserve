@@ -122,6 +122,7 @@ const tableMinFields: KeywordDefinition = {
   keyword: "tableMinFields",
   validate: function _tableMinFields(_schema: boolean, data: any) {
     if (!_schema || data?.type !== "table") return true;
+    if (data?.queryType === "promql" || data?.queryType === "promql-builder") return true;
     const query = data?.queries?.[0];
     if (!query || query.customQuery) return true;
     const xLen = query.fields?.x?.length || 0;
