@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -152,7 +152,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="view-logs-btn o2-secondary-button"
             dense
             unelevated
-            no-caps
             size="sm"
             :title="t('traces.viewLogs')"
             @click.stop="viewSpanLogs"
@@ -237,16 +236,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-tabs
+    <OTabs
       v-model="activeTab"
       dense
-      inline-label
       align="left"
       class="text-bold q-mx-sm span_details_tabs"
       data-test="trace-details-sidebar-tabs"
     >
       <!-- LLM Preview Tab (conditional - shown first for LLM traces) -->
-      <q-tab
+      <OTab
         v-if="isLLMSpan"
         name="preview"
         label="Preview"
@@ -254,50 +252,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="trace-details-sidebar-tabs-preview"
       />
 
-      <q-tab
+      <OTab
         name="attributes"
         :label="t('common.attributes')"
         style="text-transform: capitalize"
         data-test="trace-details-sidebar-tabs-attributes"
       />
-      <q-tab
+      <OTab
         name="events"
         :label="t('common.events')"
         style="text-transform: capitalize"
         data-test="trace-details-sidebar-tabs-events"
       />
-      <q-tab
+      <OTab
         name="exceptions"
         :label="t('common.exceptions')"
         style="text-transform: capitalize"
         data-test="trace-details-sidebar-tabs-exceptions"
       />
-      <q-tab
+      <OTab
         name="links"
         :label="t('common.links')"
         style="text-transform: capitalize"
         data-test="trace-details-sidebar-tabs-links"
       />
       <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
-      <q-tab
+      <OTab
         v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
         name="correlated-logs"
         :label="t('correlation.correlatedLogs')"
         style="text-transform: capitalize"
         data-test="trace-details-sidebar-tabs-correlated-logs"
       />
-      <q-tab
+      <OTab
         v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
         name="correlated-metrics"
         :label="t('correlation.correlatedMetrics')"
         style="text-transform: capitalize"
         data-test="trace-details-sidebar-tabs-correlated-metrics"
       />
-    </q-tabs>
+    </OTabs>
     <q-separator style="width: 100%" />
-    <q-tab-panels v-model="activeTab" class="span_details_tab-panels tw:grow">
+    <OTabPanels v-model="activeTab" class="span_details_tab-panels tw:grow">
       <!-- LLM Preview Tab Panel -->
-      <q-tab-panel
+      <OTabPanel
         v-if="isLLMSpan"
         name="preview"
         class="llm-preview-panel q-pa-md"
@@ -320,7 +318,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     outline
                     class="q-px-sm q-ml-sm"
                     size="sm"
-                    no-caps
                     :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
                     :title="
                       isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
@@ -364,7 +361,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     outline
                     class="q-px-sm q-ml-sm"
                     size="sm"
-                    no-caps
                     :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
                     :title="
                       isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
@@ -412,9 +408,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</pre>
           </q-expansion-item>
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
-      <q-tab-panel
+      <OTabPanel
         name="attributes"
         class="q-pa-none tw:flex tw:flex-col tw:overflow-hidden"
       >
@@ -422,7 +418,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:justify-start tw:pb-[0.3rem]">
           <q-btn-toggle
             v-model="attributesViewMode"
-            no-caps
             toggle-color="primary"
             text-color="primary"
             bordered
@@ -557,8 +552,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </TenstackTable>
         </div>
-      </q-tab-panel>
-      <q-tab-panel
+      </OTabPanel>
+      <OTabPanel
         name="events"
         class="tw:p-0 tw:flex tw:flex-col tw:h-[30.6rem]!"
       >
@@ -627,8 +622,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           No events present for this span
         </div>
-      </q-tab-panel>
-      <q-tab-panel name="exceptions">
+      </OTabPanel>
+      <OTabPanel name="exceptions">
         <q-table
           v-if="getExceptionEvents.length"
           ref="qTable"
@@ -778,9 +773,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           No exceptions present for this span
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
-      <q-tab-panel name="links">
+      <OTabPanel name="links">
         <div v-if="spanLinks.length">
           <q-virtual-scroll
             type="table"
@@ -841,10 +836,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           No links present for this span
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Correlated Logs Tab Panel -->
-      <q-tab-panel
+      <OTabPanel
         name="correlated-logs"
         class="q-pa-none full-height traces-correlated-logs-container"
       >
@@ -892,10 +887,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Correlated Metrics Tab Panel -->
-      <q-tab-panel
+      <OTabPanel
         name="correlated-metrics"
         class="q-pa-none full-height traces-correlated-metrics-container"
       >
@@ -945,12 +940,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </q-tab-panel>
-    </q-tab-panels>
+      </OTabPanel>
+    </OTabPanels>
   </div>
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { cloneDeep } from "lodash-es";
 import { date, useQuasar, type QTableProps, copyToClipboard } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
@@ -2859,16 +2858,16 @@ body.body--dark {
 
 <style lang="scss">
 .span_details_tabs {
-  .q-tab__indicator {
+  .o-tab__indicator {
     display: none;
   }
-  .q-tab--active {
+  .o-tab--active {
     border-bottom: 1px solid var(--q-primary);
   }
 }
 
 .span_details_tab-panels {
-  .q-tab-panel {
+  .o-tab-panel {
     padding: 8px 8px 8px 8px;
     overflow-y: auto;
     overflow-x: hidden;

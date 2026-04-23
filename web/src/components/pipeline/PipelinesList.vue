@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -56,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? 'o2-secondary-button-dark'
                           : 'o2-secondary-button-light'
                       "
-                      no-caps
                       flat
                       :label="t(`pipeline.history`)"
                       @click="goToPipelineHistory"
@@ -70,7 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? 'o2-secondary-button-dark'
                           : 'o2-secondary-button-light'
                       "
-                      no-caps
                       flat
                       :label="t('pipeline.backfill')"
                       @click="goToBackfillJobs"
@@ -78,7 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                     data-test="pipeline-list-import-pipeline-btn"
                     class="q-ml-sm o2-secondary-button tw:h-[36px]"
-                    no-caps
                     flat
                     :label="t(`pipeline.import`)"
                     @click="routeToImportPipeline"
@@ -89,7 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="pipeline-list-add-pipeline-btn"
                   class="q-ml-sm o2-primary-button tw:h-[36px]"
                   flat
-                  no-caps
                   :label="t(`pipeline.addPipeline`)"
                   @click="routeToAddPipeline"
                 />
@@ -101,7 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="padding: 0 0.5rem"
                   icon="menu"
                   flat
-                  no-caps
                   data-test="pipeline-list-overflow-menu-btn"
                 >
                   <q-menu>
@@ -373,7 +368,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="selectedPipelines.length > 0"
                   data-test="pipeline-list-export-pipelines-btn"
                   class="flex  q-mr-sm items-center no-border o2-secondary-button tw:h-[36px]"
-                  no-caps
                   dense
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   @click="exportBulkPipelines"
@@ -385,7 +379,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="selectedPipelines.length > 0"
                   data-test="pipeline-list-pause-pipelines-btn"
                   class="flex q-mr-sm items-center no-border o2-secondary-button tw:h-[36px]"
-                  no-caps
                   dense
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   @click="bulkTogglePipelines('pause')"
@@ -397,7 +390,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="selectedPipelines.length > 0"
                   data-test="pipeline-list-resume-pipelines-btn"
                   class="flex q-mr-sm items-center no-border o2-secondary-button tw:h-[36px] tw:w-[180px]"
-                  no-caps
                   dense
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   @click="bulkTogglePipelines('resume')"
@@ -409,7 +401,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="selectedPipelines.length > 0"
                   data-test="pipeline-list-delete-pipelines-btn"
                   class="flex q-mr-sm items-center no-border o2-secondary-button tw:h-[36px]"
-                  no-caps
                   dense
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   @click="openBulkDeleteDialog"
@@ -555,7 +546,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-actions class="pipeline-error-actions">
         <q-btn
           flat
-          no-caps
           :label="t('pipeline_list.close')"
           class="o2-secondary-button tw:h-[36px]"
           :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
@@ -566,6 +556,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-dialog>
 </template>
 <script setup lang="ts">
+
 import {
   ref,
   onBeforeMount,

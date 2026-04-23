@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -168,7 +168,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="save"
             icon-right="saved_search"
             class="saved-views-dropdown no-border"
-            content-class="saved-views-dropdown-menu"
           >
             <q-list
               :style="
@@ -446,7 +445,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-btn
           data-test="logs-search-bar-utilities-menu-btn"
           class="group-menu-btn element-box-shadow"
-          no-caps
           menu-anchor="bottom left"
           menu-self="top left"
           icon="menu"
@@ -1007,7 +1005,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'primary'
                       : undefined
                   "
-                  no-caps
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? handleGenerateSQLQuery()
@@ -1057,7 +1054,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-cy="search-bar-visuzlie-hard-refresh-button"
                       dense
                       flat
-                      no-caps
                       :title="t('search.refreshCacheAndRunQuery')"
                       class="q-pa-sm search-button-dropdown tw:text-[12px]"
                       v-close-popup
@@ -1128,7 +1124,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'primary'
                       : undefined
                   "
-                  no-caps
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? handleGenerateSQLQuery()
@@ -1178,7 +1173,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-cy="search-bar-visuzlie-hard-refresh-button"
                       dense
                       flat
-                      no-caps
                       :title="t('search.refreshCacheAndRunQuery')"
                       class="q-pa-sm search-button-dropdown tw:text-[12px]"
                       v-close-popup
@@ -1253,7 +1247,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'primary'
                     : undefined
                 "
-                no-caps
                 @click="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? handleGenerateSQLQuery()
@@ -1314,7 +1307,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-cy="search-bar-refresh-button"
                     dense
                     flat
-                    no-caps
                     :title="t('search.refreshCacheAndRunQuery')"
                     class="q-pa-sm tw:text-[12px]"
                     v-close-popup
@@ -1677,7 +1669,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 @click="downloadCustomFileType = option.value"
                 :label="option.label"
-                no-caps
                 size="sm"
                 outline
               />
@@ -1688,7 +1679,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-actions align="right">
           <q-btn
             unelevated
-            no-caps
             class="q-mr-sm o2-secondary-button"
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
             :label="t('confirmDialog.cancel')"
@@ -1696,7 +1686,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             unelevated
-            no-caps
             class="q-mr-sm o2-primary-button"
             data-test="logs-search-bar-confirm-dialog-ok-btn"
             :label="t('search.btnDownload')"
@@ -1756,7 +1745,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="saved-view-dialog-cancel-btn"
             unelevated
-            no-caps
             class="q-mr-sm o2-secondary-button"
             :label="t('confirmDialog.cancel')"
             v-close-popup
@@ -1765,7 +1753,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="saved-view-dialog-save-btn"
             v-if="!saveViewLoader"
             unelevated
-            no-caps
             :label="t('common.save')"
             class="o2-primary-button"
             @click="handleSavedView"
@@ -1774,7 +1761,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="saved-view-dialog-loading-btn"
             v-if="saveViewLoader"
             unelevated
-            no-caps
             :label="t('confirmDialog.loading')"
             color="primary"
             class="text-bold"
@@ -1845,7 +1831,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="saved-function-dialog-cancel-btn"
             unelevated
-            no-caps
             class="q-mr-sm o2-secondary-button"
             :label="t('confirmDialog.cancel')"
             v-close-popup
@@ -1854,7 +1839,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="saved-view-dialog-save-btn"
             v-if="!saveFunctionLoader"
             unelevated
-            no-caps
             :label="t('confirmDialog.ok')"
             class="o2-primary-button"
             @click="saveFunction"
@@ -1863,7 +1847,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="saved-function-dialog-loading-btn"
             v-if="saveFunctionLoader"
             unelevated
-            no-caps
             :label="t('confirmDialog.loading')"
             class="o2-primary-button"
           />
@@ -1923,7 +1906,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="search-scheduler-max-records-cancel-btn"
             unelevated
-            no-caps
             class="q-mr-sm o2-secondary-button"
             :label="t('confirmDialog.cancel')"
             v-close-popup
@@ -1937,7 +1919,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="search-scheduler-max-records-submit-btn"
             unelevated
-            no-caps
             :label="t('confirmDialog.ok')"
             class="o2-primary-button"
             @click="addJobScheduler"
@@ -1971,7 +1952,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-actions align="right">
           <q-btn
             unelevated
-            no-caps
             class="q-mr-sm o2-secondary-button"
             :label="t('confirmDialog.cancel')"
             v-close-popup
@@ -1979,7 +1959,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             unelevated
-            no-caps
             :label="t('confirmDialog.ok')"
             class="o2-primary-button"
             :disable="!searchInspectTraceId.trim()"
@@ -2286,6 +2265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 // @ts-nocheck
 import {
   defineComponent,

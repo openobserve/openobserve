@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       id="date-time-button"
       ref="datetimeBtn"
       data-cy="date-time-button"
-      no-caps
       :label="getDisplayValue"
       icon="schedule"
       icon-right="arrow_drop_down"
@@ -49,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="md"
             class="tab-button no-border"
             color="primary"
-            no-caps
             :flat="selectedType !== 'relative'"
             @click="setDateType('relative')"
           >
@@ -61,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="md"
             class="tab-button no-border"
             color="primary"
-            no-caps
             :flat="selectedType !== 'absolute'"
             @click="setDateType('absolute')"
           >
@@ -69,8 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
         </div>
         <q-separator />
-        <q-tab-panels v-model="selectedType" animated>
-          <q-tab-panel
+        <OTabPanels v-model="selectedType" animated>
+          <OTabPanel
             v-if="!disableRelative"
             name="relative"
             class="q-pa-none"
@@ -174,8 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-          </q-tab-panel>
-          <q-tab-panel name="absolute" class="q-pa-none">
+          </OTabPanel>
+          <OTabPanel name="absolute">
             <div class="date-time-table">
               <q-tooltip
                 anchor="center right"
@@ -292,8 +289,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </tbody>
               </table>
             </div>
-          </q-tab-panel>
-        </q-tab-panels>
+          </OTabPanel>
+        </OTabPanels>
         <q-select
           v-if="!hideRelativeTimezone"
           data-test="datetime-timezone-select"
@@ -325,7 +322,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             data-test="date-time-apply-btn"
             class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
-            no-caps
             size="sm"
             @click="saveDate(null)"
             v-close-popup
@@ -339,6 +335,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 // @ts-nocheck
 import {
   ref,

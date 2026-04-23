@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -33,21 +33,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="tw:mb-6">
-      <q-tabs
+      <OTabs
         v-model="activeCategory"
         dense
-        inline-label
         class="text-grey-7"
-        active-color="primary"
-        indicator-color="primary"
         data-test="azure-integration-category-tabs"
       >
-        <q-tab name="all" label="All Services" />
-        <q-tab name="compute" label="Compute" />
-        <q-tab name="storage" label="Storage" />
-        <q-tab name="security" label="Security" />
-        <q-tab name="networking" label="Networking" />
-      </q-tabs>
+        <OTab name="all" label="All Services" />
+        <OTab name="compute" label="Compute" />
+        <OTab name="storage" label="Storage" />
+        <OTab name="security" label="Security" />
+        <OTab name="networking" label="Networking" />
+      </OTabs>
     </div>
 
     <div
@@ -71,6 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import { defineComponent, ref, computed } from "vue";
 import { azureIntegrations } from "@/utils/azureIntegrations";
 import AzureIntegrationTile from "./AzureIntegrationTile.vue";

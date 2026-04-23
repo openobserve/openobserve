@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -150,14 +150,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="alertDetails"
     >
       <!-- Tab Panels -->
-      <q-tab-panels
+      <OTabPanels
         v-model="activeTab"
         animated
         class="tw:flex-1 tw:overflow-hidden tw:bg-transparent"
         style="display: flex; flex-direction: column"
       >
         <!-- History Panel -->
-        <q-tab-panel
+        <OTabPanel
           name="history"
           class="tw:flex tw:flex-col tw:h-full tw:p-0 tw:overflow-hidden"
         >
@@ -354,10 +354,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-table>
             </div>
           </div>
-        </q-tab-panel>
+        </OTabPanel>
 
         <!-- Condition Panel -->
-        <q-tab-panel
+        <OTabPanel
           name="condition"
           class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden tw:p-0"
         >
@@ -520,13 +520,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-        </q-tab-panel>
-      </q-tab-panels>
+        </OTabPanel>
+      </OTabPanels>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -1072,13 +1074,13 @@ watch(
 }
 
 /* ── Tab panels fill height ── */
-:deep(.q-tab-panels) {
+:deep(.o-tab-panels) {
   flex: 1;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
-:deep(.q-tab-panel) {
+:deep(.o-tab-panel) {
   flex: 1;
 }
 </style>

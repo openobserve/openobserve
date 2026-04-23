@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
     >
     <div v-if="!showImportRegexPatternDialog" class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
@@ -19,7 +19,6 @@
               </q-input>
           <q-btn
             class="o2-secondary-button q-ml-sm tw:h-[36px]"
-            no-caps
             flat
             :label="t(`regex_patterns.import`)"
             @click="importRegexPattern"
@@ -28,7 +27,6 @@
           <q-btn
             data-test="regex-pattern-list-add-pattern-btn"
             class="o2-primary-button q-ml-sm tw:h-[36px]"
-            no-caps
             flat
             :label="t(`regex_patterns.create_pattern`)"
             @click="createRegexPattern"
@@ -160,7 +158,6 @@
                   ? 'o2-secondary-button-dark'
                   : 'o2-secondary-button-light'
               "
-              no-caps
               dense
               @click="openBulkDeleteDialog"
             >
@@ -205,6 +202,7 @@
   </template>
 
 <script lang="ts">
+
     import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue"; 
     import type { Ref } from "vue";
     import { useI18n } from "vue-i18n";

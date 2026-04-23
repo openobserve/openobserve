@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -43,7 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             class="o2-primary-button q-ml-sm tw:h-[36px]"
             data-test="ai-toolsets-add-btn"
-            no-caps
             flat
             :label="t('aiToolset.add')"
             @click="addToolset"
@@ -154,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 import {
   defineComponent,
   ref,

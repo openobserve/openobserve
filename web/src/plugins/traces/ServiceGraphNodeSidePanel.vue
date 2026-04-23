@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -41,7 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn-dropdown
             flat
             dense
-            no-caps
             size="sm"
             class="tw:pl-[0.675rem]! tw:border! tw:border-[var(--o2-primary-btn-bg)]! tw:rounded! tw:text-[0.7rem]! tw:tracking-[0.03rem]! tw:text-[var(--o2-primary-btn-bg)]!"
             label="View Related"
@@ -148,7 +147,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="view-logs-btn o2-primary-button tw:py-[0.25rem]! tw:px-[0.25rem]!"
               dense
               unelevated
-              no-caps
               size="sm"
               data-test="service-graph-side-panel-view-in-traces-btn"
               @click="viewInTraces"
@@ -179,22 +177,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:flex tw:items-end tw:border-b tw:border-b-[var(--o2-border-color)] tw:mx-[0.5rem] tw:mb-[0.375rem]"
             data-test="service-graph-node-panel-tabs-row"
           >
-            <q-tabs
+            <OTabs
               v-model="activeTab"
               dense
-              inline-label
-              outside-arrows
               align="left"
               class="text-bold tw:flex-1 tw:w-[calc(100%-2rem)]!"
               data-test="service-graph-node-panel-tabs"
             >
-              <q-tab
+              <OTab
                 name="operations"
                 label="Operations"
                 style="text-transform: capitalize"
                 data-test="service-graph-node-panel-tab-operations"
               />
-              <q-tab
+              <OTab
                 v-for="cfg in activeResourceTabConfigs"
                 :key="cfg.id"
                 :name="cfg.id"
@@ -202,13 +198,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="text-transform: capitalize"
                 :data-test="`service-graph-node-panel-tab-${cfg.id}`"
               />
-              <q-tab
+              <OTab
                 name="metrics"
                 label="Metrics"
                 style="text-transform: capitalize"
                 data-test="service-graph-node-panel-tab-metrics"
               />
-            </q-tabs>
+            </OTabs>
 
             <!-- Resource tabs dropdown — shows/hides individual OTEL resource tabs -->
             <q-btn
@@ -264,9 +260,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-menu>
             </q-btn>
           </div>
-          <q-tab-panels v-model="activeTab" animated>
+          <OTabPanels v-model="activeTab" animated>
             <!-- Operations Tab -->
-            <q-tab-panel
+            <OTabPanel
               name="operations"
               class="tw:p-0! panel-section tw:mb-0!"
               data-test="service-graph-side-panel-recent-operations"
@@ -388,11 +384,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </TenstackTable>
                 </div>
               </template>
-            </q-tab-panel>
+            </OTabPanel>
 
             <!-- Nodes Tab -->
             <!-- Dynamic OTEL resource tabs (Pods, Nodes, Hosts, Containers, Functions, ECS Tasks…) -->
-            <q-tab-panel
+            <OTabPanel
               v-for="cfg in activeResourceTabConfigs"
               :key="cfg.id"
               :name="cfg.id"
@@ -522,10 +518,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </TenstackTable>
                 </div>
               </template>
-            </q-tab-panel>
+            </OTabPanel>
 
             <!-- Metrics Tab -->
-            <q-tab-panel
+            <OTabPanel
               name="metrics"
               class="tw:p-0! panel-section tw:mb-0! tw:h-full!"
               data-test="service-graph-side-panel-metrics"
@@ -552,7 +548,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   flat
                   dense
-                  no-caps
                   size="sm"
                   label="Retry"
                   color="primary"
@@ -593,8 +588,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 No metrics available for this service.
               </div>
-            </q-tab-panel>
-          </q-tab-panels>
+            </OTabPanel>
+          </OTabPanels>
         </template>
       </div>
     </div>
@@ -617,6 +612,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import {
   defineComponent,
   computed,

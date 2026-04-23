@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -356,7 +356,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.latitude != null
                     "
-                    no-caps
                     padding="sm"
                     @click="addLatitude(props.row)"
                     data-test="dashboard-add-latitude-data"
@@ -369,7 +368,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.longitude != null
                     "
-                    no-caps
                     padding="sm"
                     @click="addLongitude(props.row)"
                     data-test="dashboard-add-longitude-data"
@@ -426,7 +424,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.name != null
                     "
-                    no-caps
                     padding="sm"
                     @click="addMapName(props.row)"
                     data-test="dashboard-add-x-data"
@@ -439,7 +436,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.value_for_maps != null
                     "
-                    no-caps
                     padding="sm"
                     @click="addMapValue(props.row)"
                     data-test="dashboard-add-y-data"
@@ -475,7 +471,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.source != null
                     "
-                    no-caps
                     padding="sm"
                     @click="addSource(props.row)"
                     data-test="dashboard-add-source-data"
@@ -488,7 +483,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields?.target != null
                     "
-                    no-caps
                     padding="sm"
                     @click="addTarget(props.row)"
                     data-test="dashboard-add-target-data"
@@ -553,6 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+
 import {
   defineComponent,
   reactive,

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div
    class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
   >
@@ -30,7 +30,6 @@
               @click="fetchSearchHistory"
               class="q-ml-md o2-primary-button tw:h-[36px] tw:rounded-md"
               :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-              no-caps
               flat
               dense
               :disable="isLoading"
@@ -349,6 +348,7 @@
   <!-- Show NoData component if there's no data to display -->
 </template>
 <script lang="ts">
+
 //@ts-nocheck
 import {
   ref,

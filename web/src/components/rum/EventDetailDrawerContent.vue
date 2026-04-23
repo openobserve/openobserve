@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -104,30 +104,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
     <div class="row q-pt-sm q-px-sm">
       <div class="col-12">
-        <q-tabs v-model="activeTab" shrink align="left">
-          <q-tab
+        <OTabs v-model="activeTab" align="left">
+          <OTab
             data-test="event-detail-overview-tab"
             name="overview"
             label="Overview"
           />
-          <q-tab
+          <OTab
             data-test="event-detail-network-tab"
             name="network"
             label="Network"
           />
-          <q-tab
+          <OTab
             data-test="event-detail-attributes-tab"
             name="attributes"
             label="Attributes"
           />
-        </q-tabs>
+        </OTabs>
       </div>
     </div>
 
     <q-separator />
 
     <!-- Tab Content -->
-    <q-tab-panels
+    <OTabPanels
       v-model="activeTab"
       animated
       keep-alive
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="tab-content-container"
     >
       <!-- Overview Tab -->
-      <q-tab-panel name="overview" class="q-pa-sm" data-test="overview-tab">
+      <OTabPanel name="overview" class="q-pa-sm" data-test="overview-tab">
         <template v-if="event && Object.keys(event).length">
           <!-- Error Details -->
           <div
@@ -412,10 +412,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </div>
         </template>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Network Tab -->
-      <q-tab-panel name="network" class="q-pa-sm" data-test="network-tab">
+      <OTabPanel name="network" class="q-pa-sm" data-test="network-tab">
         <template v-if="networkResources.length > 0">
           <div class="tw:font-bold tw:mb-2 tw:text-sm">
             Network Requests ({{ networkResources.length }})
@@ -468,17 +468,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           No network requests found for this event
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Console Tab -->
-      <q-tab-panel name="console" class="q-pa-sm" data-test="console-tab">
+      <OTabPanel name="console" class="q-pa-sm" data-test="console-tab">
         <div class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm">
           Console logs coming soon
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Performance Tab -->
-      <q-tab-panel
+      <OTabPanel
         name="performance"
         class="q-pa-sm"
         data-test="performance-tab"
@@ -486,16 +486,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm">
           Performance metrics coming soon
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Attributes Tab -->
-      <q-tab-panel name="attributes" class="q-pa-sm" data-test="attributes-tab">
+      <OTabPanel name="attributes" class="q-pa-sm" data-test="attributes-tab">
         <div class="tw:flex tw:justify-start">
           <q-btn
             :label="t('common.copyToClipboard')"
             dense
             size="sm"
-            no-caps
             class="q-px-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
             icon="content_copy"
             @click="copyAttributesToClipboard"
@@ -524,12 +523,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
           </div>
         </div>
-      </q-tab-panel>
-    </q-tab-panels>
+      </OTabPanel>
+    </OTabPanels>
   </q-card>
 </template>
 
 <script setup lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
+import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
