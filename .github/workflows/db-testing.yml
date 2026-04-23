@@ -4,9 +4,21 @@ on:
   push:
     branches:
       - "main"
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "web/**"
+      - "tests/ui-testing/**"
+      - "tests/playwright-tests/**"
   pull_request:
     branches:
       - "*"
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "web/**"
+      - "tests/ui-testing/**"
+      - "tests/playwright-tests/**"
   merge_group:
 
 concurrency:
@@ -61,7 +73,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          prefix-key: db-testing
+          shared-key: backend-debug-mimalloc
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: |

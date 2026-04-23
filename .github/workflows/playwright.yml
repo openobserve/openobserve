@@ -4,17 +4,15 @@ on:
   push:
     branches:
       - "main"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
   pull_request:
     branches:
       - "*"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
   merge_group:
 
 concurrency:
@@ -80,7 +78,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          prefix-key: playwright
+          shared-key: playwright-release
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: |
@@ -380,7 +379,16 @@ jobs:
         run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
-        run: sleep 60
+        run: |
+          for i in $(seq 1 120); do
+            if curl -sf http://localhost:5080/web/login > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server failed to start in 120s"
+          exit 1
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login

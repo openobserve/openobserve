@@ -4,17 +4,15 @@ on:
   push:
     branches:
       - "main"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
   pull_request:
     branches:
       - "*"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
   merge_group:
 
 concurrency:
@@ -75,6 +73,8 @@ jobs:
         if: steps.check_changes.outputs.has_changes == 'true'
         with:
           cache-on-failure: true
+          shared-key: unit-tests
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         if: steps.check_changes.outputs.has_changes == 'true'
