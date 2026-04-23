@@ -730,9 +730,11 @@ export default defineComponent({
       const resultMeta = resultMetaData.value?.[0];
       const queryStart = Number(metadata.value?.queries?.[0]?.startTime ?? 0);
       const queryEnd = Number(metadata.value?.queries?.[0]?.endTime ?? 0);
+      // PromQL always streams LTR (oldest timestamps first), no time_offset.
+      const isPromQL = panelSchema.value?.queryType === "promql";
 
-      if (!resultMeta?.length) {
-        return { boundaryTime: 0, queryStart, queryEnd, isLTR: false };
+      if (isPromQL || !resultMeta?.length) {
+        return { boundaryTime: 0, queryStart, queryEnd, isLTR: isPromQL };
       }
 
       const firstEntry = resultMeta[0];
@@ -939,14 +941,39 @@ export default defineComponent({
                 ? store.state.defaultThemeColors?.dark
                 : store.state.defaultThemeColors?.light) ||
               "#3F7994";
-            const histogramIntervalMs =
-              (resultMetaData.value?.[0]?.[0]?.histogram_interval ?? 0) *
-              1000;
+            const meta = resultMetaData.value?.[0]?.[0];
+            // SQL: histogram_interval in seconds. PromQL: step in µs.
+            const histogramIntervalMs = meta?.histogram_interval
+              ? meta.histogram_interval * 1000
+              : meta?.step
+                ? meta.step / 1000
+                : 0;
+
+            // For PromQL (no time_offset), derive boundaryTime from the
+            // last timestamp in the new series data (LTR: fresh edge).
+            // Convert ms → µs to match the boundaryTime convention.
+            let { boundaryTime } = boundaryInfo;
+            if (!boundaryTime && boundaryInfo.isLTR && result.options?.series) {
+              for (const s of result.options.series) {
+                if (!s.name || !Array.isArray(s.data) || !s.data.length)
+                  continue;
+                const lastPt = s.data[s.data.length - 1];
+                if (!Array.isArray(lastPt)) continue;
+                const t =
+                  typeof lastPt[0] === "number"
+                    ? lastPt[0]
+                    : new Date(lastPt[0]).getTime();
+                if (!isNaN(t) && t * 1000 > boundaryTime) {
+                  boundaryTime = t * 1000; // ms → µs
+                }
+              }
+            }
+
             result.options = overlayNewDataOnOldOptions(
               previousOptionsSnapshot,
               result.options,
               containerSize,
-              boundaryInfo.boundaryTime,
+              boundaryTime,
               boundaryInfo.queryStart,
               boundaryInfo.queryEnd,
               boundaryInfo.isLTR,

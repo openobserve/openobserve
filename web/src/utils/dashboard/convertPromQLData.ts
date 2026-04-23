@@ -231,15 +231,6 @@ export const convertPromQLData = async (
   // sort the timestamp and make an array
   xAxisData = Array.from(xAxisData).sort();
 
-  // Add end time from metadata to reserve full time range and prevent chart shifting during chunked data loading
-  if (metadata?.queries?.[0]?.endTime) {
-    const endTimeInSeconds = Math.floor(metadata.queries[0].endTime / 1000000); // Convert from microseconds to seconds
-    // Only add if end time is not already in the data
-    if (!xAxisData.includes(endTimeInSeconds)) {
-      xAxisData.push(endTimeInSeconds);
-    }
-  }
-
   // convert timestamp to specified timezone time
   xAxisData.forEach((value: number, index: number) => {
     // we need both milliseconds and date (object or string)
@@ -537,6 +528,21 @@ export const convertPromQLData = async (
     },
     series: [],
   };
+  // Pin x-axis range to the user's full query range to prevent chart
+  // shifting during chunked data loading (replaces old anchor point approach).
+  if (metadata?.queries?.[0]?.startTime && metadata?.queries?.[0]?.endTime) {
+    const queryStartMs = metadata.queries[0].startTime / 1000; // µs to ms
+    const queryEndMs = metadata.queries[0].endTime / 1000;
+    options.xAxis.min =
+      store.state.timezone !== "UTC"
+        ? toZonedTime(queryStartMs, store.state.timezone)
+        : new Date(queryStartMs).toISOString().slice(0, -1);
+    options.xAxis.max =
+      store.state.timezone !== "UTC"
+        ? toZonedTime(queryEndMs, store.state.timezone)
+        : new Date(queryEndMs).toISOString().slice(0, -1);
+  }
+
   // to pass grid index in gauge chart
   let gaugeIndex = 0;
 
