@@ -637,4 +637,88 @@ describe("CodeQueryEditor", () => {
       expect(found).toBe(true);
     });
   });
+
+  // Tests for validateDoubleQuotes.
+  // The detection regex is tested directly here — this avoids async Monaco mock
+  // coordination while still covering every pattern the component will flag.
+  describe("validateDoubleQuotes — detection regex", () => {
+    // Mirror of the regex used in validateDoubleQuotes in CodeQueryEditor.vue.
+    // Update here if the regex changes in the component.
+    const makeRegex = () =>
+      /(?:NOT\s+LIKE|NOT\s+IN\s*\(|!=|<>|>=|<=|=|>|<|LIKE|IN\s*\()\s*("[^'"]*'|'[^'"]*"|"[^"]*")/gi;
+
+    const findInvalidQuotes = (text: string): string[] => {
+      const r = makeRegex();
+      const matches: string[] = [];
+      let m;
+      while ((m = r.exec(text)) !== null) matches.push(m[1]);
+      return matches;
+    };
+
+    // ── double-quoted values ────────────────────────────────────────────────
+
+    it('flags = "value"', () => {
+      expect(findInvalidQuotes(`WHERE http_endpoint = "test"`)).toEqual([`"test"`]);
+    });
+
+    it('flags != "value"', () => {
+      expect(findInvalidQuotes(`WHERE status != "error"`)).toEqual([`"error"`]);
+    });
+
+    it('flags LIKE "%value%"', () => {
+      expect(findInvalidQuotes(`WHERE msg LIKE "%error%"`)).toEqual([`"%error%"`]);
+    });
+
+    it('flags NOT LIKE "value"', () => {
+      expect(findInvalidQuotes(`WHERE path NOT LIKE "%admin%"`)).toEqual([`"%admin%"`]);
+    });
+
+    it('flags IN ("value")', () => {
+      expect(findInvalidQuotes(`WHERE status IN ("200")`)).toEqual([`"200"`]);
+    });
+
+    it("flags every double-quoted value across multiple conditions", () => {
+      expect(
+        findInvalidQuotes(`WHERE status = "200" AND env = "prod"`),
+      ).toEqual([`"200"`, `"prod"`]);
+    });
+
+    it('flags double-quoted URL path: = "/api/v1/payments"', () => {
+      expect(
+        findInvalidQuotes(`WHERE http_endpoint = "/api/v1/payments"`),
+      ).toEqual([`"/api/v1/payments"`]);
+    });
+
+    // ── mismatched quotes ───────────────────────────────────────────────────
+
+    it('flags mismatched open-double close-single: = "value\'', () => {
+      expect(findInvalidQuotes(`WHERE field = "test'`)).toEqual([`"test'`]);
+    });
+
+    it("flags mismatched open-single close-double: = 'value\"", () => {
+      expect(findInvalidQuotes(`WHERE field = 'test"`)).toEqual([`'test"`]);
+    });
+
+    // ── valid cases — must NOT be flagged ────────────────────────────────────
+
+    it("does NOT flag single-quoted values", () => {
+      expect(findInvalidQuotes(`WHERE status = 'ok' AND env = 'prod'`)).toEqual([]);
+    });
+
+    it("does NOT flag numeric values", () => {
+      expect(findInvalidQuotes(`WHERE status = 200 AND code >= 400`)).toEqual([]);
+    });
+
+    it('does NOT flag double-quoted table names in FROM clause', () => {
+      expect(
+        findInvalidQuotes(`SELECT * FROM "test_table" WHERE status = 200`),
+      ).toEqual([]);
+    });
+
+    it("does NOT flag a valid URL path in single quotes", () => {
+      expect(
+        findInvalidQuotes(`WHERE http_endpoint = '/api/v1/payments'`),
+      ).toEqual([]);
+    });
+  });
 });
