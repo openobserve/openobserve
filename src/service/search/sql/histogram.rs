@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::StreamType, utils::sql::is_eligible_for_histogram};
+use config::{
+    HISTOGRAM_BREAKDOWN_FIELDS, meta::stream::StreamType, utils::sql::is_eligible_for_histogram,
+};
 use infra::errors::{Error, ErrorCodes};
 use sqlparser::{
     ast::{SetExpr, Statement},
@@ -98,18 +100,8 @@ fn single_stream_histogram_query(
 }
 
 /// Detects the preferred histogram breakdown field from stream schema fields.
-///
-/// Priority order:
-/// 1. `severity`
-/// 2. `log_level`
-/// 3. `level`
-/// 4. `status`
 pub fn detect_histogram_breakdown_field(schema_fields: &[String]) -> Option<String> {
-    // Keep this priority aligned with the Logs visualization fallback in
-    // `web/src/plugins/logs/Index.vue`. Severity is preferred because it is generally the most
-    // explicit and normalized log categorization.
-    const PRIORITIZED_FIELDS: &[&str] = &["severity", "log_level", "level", "status"];
-    for prioritized_field in PRIORITIZED_FIELDS {
+    for prioritized_field in HISTOGRAM_BREAKDOWN_FIELDS.iter() {
         if let Some(field) = schema_fields
             .iter()
             .find(|field_name| field_name.eq_ignore_ascii_case(prioritized_field))
