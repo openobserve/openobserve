@@ -769,9 +769,10 @@ export default defineComponent({
             ...variableListName,
           ];
           panelFields.forEach((field) => {
+            const displayName = field.label || field.alias;
             selectedValues.push({
-              label: field.label,
-              value: '${row.field["' + field.label + '"]}',
+              label: displayName,
+              value: '${row.field["' + displayName + '"]}',
             });
           });
         });
