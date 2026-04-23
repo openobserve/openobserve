@@ -46,7 +46,10 @@ const EXTERNAL_CONTRACT_CHECK_INTERVAL: u64 = 3600;
 
 /// (days-remaining threshold, stage stored after the warning fires).
 /// Walked in descending-urgency order so we send at most one warning per tick.
-const EXPIRY_WARNING_STAGES: &[(i64, o2_enterprise::enterprise::cloud::billings::ExpiryNotificationStage)] = {
+const EXPIRY_WARNING_STAGES: &[(
+    i64,
+    o2_enterprise::enterprise::cloud::billings::ExpiryNotificationStage,
+)] = {
     use o2_enterprise::enterprise::cloud::billings::ExpiryNotificationStage::*;
     &[(30, ThirtyDay), (7, SevenDay), (1, OneDay)]
 };
@@ -420,8 +423,7 @@ async fn check_external_contract_expiry() {
         // Walk thresholds in descending-urgency order; send the first warning whose
         // threshold is reached and hasn't been sent yet.
         let pending_stage = EXPIRY_WARNING_STAGES.iter().find(|(threshold, stage)| {
-            days_remaining <= *threshold
-                && cb.expiry_notified_stage.is_none_or(|s| s < *stage)
+            days_remaining <= *threshold && cb.expiry_notified_stage.is_none_or(|s| s < *stage)
         });
 
         let stage = match pending_stage {

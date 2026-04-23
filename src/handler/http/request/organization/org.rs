@@ -714,7 +714,10 @@ pub async fn extend_external_contract(
     if req.new_end_date <= now {
         return MetaHttpResponse::bad_request("new_end_date must be in the future");
     }
-    if billing.end_date.is_some_and(|current| req.new_end_date <= current) {
+    if billing
+        .end_date
+        .is_some_and(|current| req.new_end_date <= current)
+    {
         return MetaHttpResponse::bad_request(
             "new_end_date must be after the current contract end date",
         );
