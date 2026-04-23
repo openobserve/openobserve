@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -139,7 +139,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { HardDrive, Database } from "lucide-vue-next";
 import BillingService from "@/services/billings";
 
-export default defineComponent({
+export defineComponent({
   name: "PageIngestion",
   components: {
     OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs },

@@ -169,7 +169,7 @@ import { useI18n } from "vue-i18n";
 import { getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 
-export default defineComponent({
+export defineComponent({
   name: "AppFunctions",
   components: { OTabs, OTab, ORouteTab, OButton },
   emits: ["sendToAiChat"],

@@ -280,7 +280,7 @@ import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
-export default defineComponent({
+export defineComponent({
   name: "AppSettings",
   components: {
     OTabs,

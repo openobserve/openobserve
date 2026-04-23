@@ -390,7 +390,16 @@ import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { ChevronLeft, RefreshCw, Pause, Play, Pencil, Eye, Trash2, AlertCircle } from "lucide-vue-next";
+import {
+  ChevronLeft,
+  RefreshCw,
+  Pause,
+  Play,
+  Pencil,
+  Eye,
+  Trash2,
+  AlertCircle,
+} from "lucide-vue-next";
 import BackfillJobDetails from "./BackfillJobDetails.vue";
 import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";
 import NoData from "../shared/grid/NoData.vue";

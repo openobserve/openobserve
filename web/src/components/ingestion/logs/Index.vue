@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -24,10 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-slot:before>
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-140px)]">
-          <OTabs
-            v-model="ingestiontabs"
-            orientation="vertical"
-          >
+          <OTabs v-model="ingestiontabs" orientation="vertical">
             <ORouteTab
               name="curl"
               :to="{
@@ -58,7 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   org_identifier: store.state.selectedOrganization.identifier,
                 },
               }"
-              :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
+              :icon="
+                'img:' + getImageURL('images/ingestion/fluentbit_icon.png')
+              "
               label="FluentBit"
             />
             <ORouteTab
@@ -151,7 +150,7 @@ import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
-export default defineComponent({
+export defineComponent({
   name: "IngestLogs",
   components: { OTabs, OTab, ORouteTab },
   props: {
@@ -273,7 +272,6 @@ export default defineComponent({
   .head {
     padding-bottom: 1rem;
   }
-  
 }
 </style>
 <style lang="scss">

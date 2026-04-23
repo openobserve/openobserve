@@ -606,6 +606,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";

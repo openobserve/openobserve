@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="condition">
     <q-select
       v-if="conditionIndex !== 0"
