@@ -49,4 +49,27 @@
   --color-button-destructive-hover:    var(--color-error-700);
   --color-button-destructive-disabled: var(--color-error-300);
   --color-button-destructive-foreground: var(--color-white);
+
+  /* ---- Tabs ------------------------------------------------- */
+
+  /* Indicator underline / vertical bar on active tab */
+  --color-tabs-indicator:           var(--color-primary-600);
+  /* Active tab text */
+  --color-tabs-active-text:         var(--color-primary-600);
+  /* Inactive tab text */
+  --color-tabs-inactive-text:       var(--color-text-secondary);
+  /* Hover tab text */
+  --color-tabs-hover-text:          var(--color-text-primary);
+  /* Hover tab background */
+  --color-tabs-hover-bg:            var(--color-grey-100);
+  /* Disabled tab text */
+  --color-tabs-disabled-text:       var(--color-text-disabled);
+  /* Bottom border of the tab bar row */
+  --color-tabs-bar-border:          var(--color-border-default);
+  /* Focus ring color */
+  --color-tabs-focus-ring:          var(--color-primary-400);
+  /* Tab bar standard height */
+  --spacing-tabs-height:            40px;
+  /* Tab bar compact height */
+  --spacing-tabs-height-dense:      32px;
 }
