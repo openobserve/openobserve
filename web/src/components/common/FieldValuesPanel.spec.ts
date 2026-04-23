@@ -311,34 +311,47 @@ describe("FieldValuesPanel.vue", () => {
       expect((wrapper.vm as any).selectedValues).toEqual([]);
     });
 
-    it("emits 'add-multiple-search-terms' with include when Include mode button clicked", async () => {
-      wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
-      // Set filterMode to 'exclude' while selectedValues is empty so no premature emit
-      (wrapper.vm as any).filterMode = "exclude";
-      await nextTick();
-      (wrapper.vm as any).selectedValues = ["value-1", "value-2"];
-      await nextTick();
-      const includeBtn = wrapper.find(
-        '[data-test="field-values-panel-include-mode-btn"]'
-      );
-      await includeBtn.trigger("click");
-      const emitted = wrapper.emitted("add-multiple-search-terms");
-      expect(emitted).toBeTruthy();
-      expect(emitted![0]).toEqual(["status", ["value-1", "value-2"], "include"]);
-    });
+    // Mode-switch emissions are debounced (300 ms) so fake timers are required
+    // to flush the debounce before asserting the emitted event.
+    describe("mode switch emits (debounced)", () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+      afterEach(() => {
+        vi.useRealTimers();
+      });
 
-    it("emits 'add-multiple-search-terms' with exclude when Exclude mode button clicked", async () => {
-      wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
-      // filterMode defaults to 'include'; set selectedValues then click exclude
-      (wrapper.vm as any).selectedValues = ["value-1"];
-      await nextTick();
-      const excludeBtn = wrapper.find(
-        '[data-test="field-values-panel-exclude-mode-btn"]'
-      );
-      await excludeBtn.trigger("click");
-      const emitted = wrapper.emitted("add-multiple-search-terms");
-      expect(emitted).toBeTruthy();
-      expect(emitted![0]).toEqual(["status", ["value-1"], "exclude"]);
+      it("emits 'add-multiple-search-terms' with include when Include mode button clicked", async () => {
+        wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
+        // Set filterMode to 'exclude' while selectedValues is empty so no premature emit
+        (wrapper.vm as any).filterMode = "exclude";
+        await nextTick();
+        (wrapper.vm as any).selectedValues = ["value-1", "value-2"];
+        await nextTick();
+        const includeBtn = wrapper.find(
+          '[data-test="field-values-panel-include-mode-btn"]'
+        );
+        await includeBtn.trigger("click");
+        vi.runAllTimers();
+        const emitted = wrapper.emitted("add-multiple-search-terms");
+        expect(emitted).toBeTruthy();
+        expect(emitted![0]).toEqual(["status", ["value-1", "value-2"], "include"]);
+      });
+
+      it("emits 'add-multiple-search-terms' with exclude when Exclude mode button clicked", async () => {
+        wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
+        // filterMode defaults to 'include'; set selectedValues then click exclude
+        (wrapper.vm as any).selectedValues = ["value-1"];
+        await nextTick();
+        const excludeBtn = wrapper.find(
+          '[data-test="field-values-panel-exclude-mode-btn"]'
+        );
+        await excludeBtn.trigger("click");
+        vi.runAllTimers();
+        const emitted = wrapper.emitted("add-multiple-search-terms");
+        expect(emitted).toBeTruthy();
+        expect(emitted![0]).toEqual(["status", ["value-1"], "exclude"]);
+      });
     });
 
     it("does NOT clear selectedValues after applying multi-select include", async () => {
