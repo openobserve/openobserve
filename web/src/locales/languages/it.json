@@ -382,7 +382,12 @@
     "patternWildcardSampleValues": "Valori di esempio",
     "wildcardSampleValues": "Valori di esempio",
     "patternZScore": "Z-score: {zScore} (frequenza media: {avgFrequency})",
-    "createAlertFromPattern": "Crea un avviso da questo modello"
+    "createAlertFromPattern": "Crea un avviso da questo modello",
+    "liveMode": "Dal vivo",
+    "liveModeTooltip": "Interrogazione automatica sulle modifiche al filtro/orario",
+    "turnOnLiveMode": "Attiva la modalità Live",
+    "turnOffLiveMode": "Disattiva la modalità Live",
+    "autoRunEnabled": "Esecuzione automatica abilitata"
   },
   "menu": {
     "home": "Home",

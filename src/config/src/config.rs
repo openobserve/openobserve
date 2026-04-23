@@ -1439,6 +1439,12 @@ pub struct Common {
         help = "Enable cross-linking feature for drill-down links on log/trace records"
     )]
     pub enable_cross_linking: bool,
+    #[env_config(
+        name = "ZO_AUTO_QUERY_ENABLED",
+        default = false,
+        help = "Enable Live Mode feature in the UI. When true, users can toggle auto-query on filter/time-range changes. When false, the Live Mode toggle is hidden and Run Query button is always shown."
+    )]
+    pub auto_query_enabled: bool,
 }
 
 impl Common {
@@ -1551,10 +1557,14 @@ pub struct Limit {
     pub query_default_limit: i64,
     #[env_config(name = "ZO_QUERY_VALUES_DEFAULT_NUM", default = 10)]
     pub query_values_default_num: i64,
-    #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 1)] // seconds
-    pub query_partition_by_secs: usize,
-    #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 768)] // MB/s/core
+    #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 1024)] // MB/s/core
     pub query_group_base_speed: usize,
+    #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 5)] // seconds
+    pub query_partition_by_secs: usize,
+    #[env_config(name = "ZO_QUERY_PARTITION_MAX_NUM", default = 100)] // max number of partitions
+    pub query_partition_max_num: usize,
+    #[env_config(name = "ZO_DISABLE_PARTITIONS_FOR_NON_TS_ORDER_BY", default = false)]
+    pub disable_partitions_for_non_ts_order_by: bool,
     // Default Config: Run Query Recommendation Analysis for last one hour for every hour
     #[env_config(name = "ZO_QUERY_RECOMMENDATION_DURATION", default = 3600000000)] // microseconds
     pub query_recommendation_duration: i64,
@@ -3038,7 +3048,10 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.query_group_base_speed *= 1024 * 1024;
     }
     if cfg.limit.query_partition_by_secs == 0 {
-        cfg.limit.query_partition_by_secs = 30;
+        cfg.limit.query_partition_by_secs = 5;
+    }
+    if cfg.limit.query_partition_max_num == 0 {
+        cfg.limit.query_partition_max_num = 100;
     }
     if cfg.limit.query_default_limit == 0 {
         cfg.limit.query_default_limit = 1000;
