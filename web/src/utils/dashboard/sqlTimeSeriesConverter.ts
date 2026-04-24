@@ -152,8 +152,8 @@ export const applyAutoSQLTimeSeries = (
       const queryEndMs = parseInt(metadata?.queries[0]?.endTime?.toString() ?? "0") / 1000;
       const timeGap = metadata?.queries[0]?.timeRangeGap?.seconds ?? 0;
       if (queryStartMs > 0 && queryEndMs > 0) {
-        options.xAxis[0].min = toZonedTime(queryStartMs + timeGap, store.state.timezone);
-        options.xAxis[0].max = toZonedTime(queryEndMs + timeGap, store.state.timezone);
+        options.xAxis[0].min = toZonedTime(queryStartMs + timeGap * 1000, store.state.timezone);
+        options.xAxis[0].max = toZonedTime(queryEndMs + timeGap * 1000, store.state.timezone);
       }
 
       options.tooltip.formatter = function (name: any) {
@@ -389,8 +389,8 @@ export const applyCustomSQLTimeSeries = (
       const queryEndMs = parseInt(metadata?.queries[0]?.endTime?.toString() ?? "0") / 1000;
       const timeGap = metadata?.queries[0]?.timeRangeGap?.seconds ?? 0;
       if (queryStartMs > 0 && queryEndMs > 0) {
-        options.xAxis[0].min = toZonedTime(queryStartMs + timeGap, store.state.timezone);
-        options.xAxis[0].max = toZonedTime(queryEndMs + timeGap, store.state.timezone);
+        options.xAxis[0].min = toZonedTime(queryStartMs + timeGap * 1000, store.state.timezone);
+        options.xAxis[0].max = toZonedTime(queryEndMs + timeGap * 1000, store.state.timezone);
       }
 
       options.tooltip.formatter = function (name: any) {

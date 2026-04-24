@@ -50,6 +50,7 @@ export const fillMissingValues = (
   zAxisKeys: string[],
   breakDownKeys: string[],
   noValueConfigOption: any,
+  loading?: any,
 ): any[] => {
   // Get the interval in minutes
   const interval = resultMetaData?.map(
@@ -123,8 +124,12 @@ export const fillMissingValues = (
   let binnedFillStart: Date;
   let endTimeForFill: string;
 
-  if (isLTR) {
-    // LTR: fill from user's start to latest chunk's end
+  if (!loading) {
+    // Final render or cancel: fill the full user query range
+    binnedFillStart = binnedDate;
+    endTimeForFill = formattedUserEnd;
+  } else if (isLTR) {
+    // LTR streaming: fill from user's start to latest chunk's end
     binnedFillStart = binnedDate;
     const lastChunkEndTime =
       resultMetaData?.[resultMetaData.length - 1]?.time_offset?.end_time ?? 0;
@@ -133,7 +138,7 @@ export const fillMissingValues = (
       : endTime;
     endTimeForFill = formatUtc(fillEndTime);
   } else {
-    // RTL: fill from earliest chunk's start to user's end (existing behavior)
+    // RTL streaming: fill from earliest chunk's start to user's end
     const resultMetaStartTime =
       resultMetaData?.[resultMetaData.length - 1]?.time_offset?.start_time ?? 0;
     const fillStartTime = resultMetaStartTime
@@ -161,19 +166,22 @@ export const fillMissingValues = (
     if (!actualMaxTime || timeVal > actualMaxTime) actualMaxTime = timeVal;
   });
 
-  // Clamp fill range to actual data bounds. Chunk metadata time_offset
-  // can extend beyond where real data rows exist — without clamping,
-  // we'd create empty entries at timestamps with no actual data.
-  const formattedFillStart = formatUtc(binnedFillStart);
-  if (actualMinTime && formattedFillStart < actualMinTime) {
-    binnedFillStart = dateBin(
-      interval,
-      new Date(actualMinTime + "Z"),
-      origin,
-    );
-  }
-  if (actualMaxTime && endTimeForFill > actualMaxTime) {
-    endTimeForFill = actualMaxTime;
+  // During streaming, clamp fill range to actual data bounds. Chunk metadata
+  // time_offset can extend beyond where real data rows exist — without
+  // clamping, we'd create empty entries at timestamps with no actual data.
+  // On final render (!loading), skip clamping to fill the full query range.
+  if (loading) {
+    const formattedFillStart = formatUtc(binnedFillStart);
+    if (actualMinTime && formattedFillStart < actualMinTime) {
+      binnedFillStart = dateBin(
+        interval,
+        new Date(actualMinTime + "Z"),
+        origin,
+      );
+    }
+    if (actualMaxTime && endTimeForFill > actualMaxTime) {
+      endTimeForFill = actualMaxTime;
+    }
   }
 
   const filledData: any = [];

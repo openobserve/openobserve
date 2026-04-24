@@ -89,6 +89,8 @@ export const convertPromQLData = async (
   hoveredSeriesState: any,
   annotations: any,
   metadata: any = null,
+  resultMetaData?: any,
+  loading?: any,
 ) => {
   // Set gridlines visibility based on config.show_gridlines (default: true)
   const showGridlines =
@@ -230,6 +232,45 @@ export const convertPromQLData = async (
 
   // sort the timestamp and make an array
   xAxisData = Array.from(xAxisData).sort();
+
+  // Fill missing timestamps from queryStart to queryEnd using PromQL step.
+  // Only on final render (loading=false) — during streaming, overlay handles gaps.
+  // This ensures cancelled queries show the full time range with nulls.
+  if (
+    !loading &&
+    xAxisData.length >= 2 &&
+    metadata?.queries?.[0]?.startTime &&
+    metadata?.queries?.[0]?.endTime
+  ) {
+    const metaStep = resultMetaData?.[0]?.[0]?.step;
+    const stepSeconds = metaStep
+      ? metaStep / 1_000_000
+      : (xAxisData[1] as number) - (xAxisData[0] as number);
+
+    if (stepSeconds > 0) {
+      const queryStartSec =
+        parseInt(metadata.queries[0].startTime) / 1_000_000;
+      const queryEndSec = parseInt(metadata.queries[0].endTime) / 1_000_000;
+
+      // Anchor to actual data grid — query range has fractional seconds
+      // but PromQL data uses integer timestamps. Snap to the data's grid.
+      const anchor = xAxisData[0] as number;
+      const gridStart =
+        anchor -
+        Math.ceil((anchor - queryStartSec) / stepSeconds) * stepSeconds;
+      const gridEnd =
+        anchor +
+        Math.ceil((queryEndSec - anchor) / stepSeconds) * stepSeconds;
+
+      const existingTimestamps = new Set(xAxisData);
+      for (let t = gridStart; t <= gridEnd; t += stepSeconds) {
+        if (!existingTimestamps.has(t)) {
+          xAxisData.push(t);
+        }
+      }
+      xAxisData.sort((a: number, b: number) => a - b);
+    }
+  }
 
   // convert timestamp to specified timezone time
   xAxisData.forEach((value: number, index: number) => {
