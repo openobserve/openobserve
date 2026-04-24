@@ -1985,4 +1985,49 @@ mod tests {
         assert!(!rum.organization_identifier.is_empty());
         assert!(!rum.api_version.is_empty());
     }
+
+    #[test]
+    fn test_config_response_persist_stream_selection_default_false() {
+        let cfg = Config::default();
+        assert!(!cfg.common.persist_stream_selection);
+    }
+
+    #[test]
+    fn test_config_response_persist_stream_selection_serialization_false() {
+        use std::collections::HashMap;
+
+        let map: HashMap<&str, bool> = [("persist_stream_selection", false)]
+            .iter()
+            .cloned()
+            .collect();
+        let json = serde_json::to_string(&map).unwrap();
+        assert!(json.contains("\"persist_stream_selection\":false"));
+    }
+
+    #[test]
+    fn test_config_response_persist_stream_selection_serialization_true() {
+        use std::collections::HashMap;
+
+        let map: HashMap<&str, bool> = [("persist_stream_selection", true)]
+            .iter()
+            .cloned()
+            .collect();
+        let json = serde_json::to_string(&map).unwrap();
+        assert!(json.contains("\"persist_stream_selection\":true"));
+    }
+
+    #[test]
+    fn test_common_config_persist_stream_selection_can_be_enabled() {
+        let mut cfg = Config::default();
+        cfg.common.persist_stream_selection = true;
+        assert!(cfg.common.persist_stream_selection);
+    }
+
+    #[test]
+    fn test_common_config_persist_stream_selection_can_be_disabled() {
+        let mut cfg = Config::default();
+        cfg.common.persist_stream_selection = true;
+        cfg.common.persist_stream_selection = false;
+        assert!(!cfg.common.persist_stream_selection);
+    }
 }
