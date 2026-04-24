@@ -114,57 +114,29 @@ describe("convertLogData.ts", () => {
       expect(options.xAxis.type).toBe("time");
     });
 
-    it("calculates yAxis interval as max(y) / 2 for positive values", () => {
+    it("sets yAxis splitNumber to 3 to keep tick density low on short charts", () => {
       const { options } = convertLogData([1, 2, 3], [10, 20, 5], {
         title: "",
         unparsed_x_data: [],
         timezone: "UTC",
         itemStyle: null,
       });
-      expect(options.yAxis.interval).toBe(10); // max=20, 20/2=10
+      expect(options.yAxis.splitNumber).toBe(3);
     });
 
-    it("calculates yAxis interval as max(y) / 2 for a single value", () => {
-      const { options } = convertLogData([1], [42], {
-        title: "",
-        unparsed_x_data: [],
-        timezone: "UTC",
-        itemStyle: null,
-      });
-      expect(options.yAxis.interval).toBe(21);
-    });
-
-    it("yAxis interval is 0 when all y values are 0", () => {
-      const { options } = convertLogData([1, 2], [0, 0], {
-        title: "",
-        unparsed_x_data: [],
-        timezone: "UTC",
-        itemStyle: null,
-      });
-      expect(options.yAxis.interval).toBe(0);
-    });
-
-    it("yAxis interval is 0 when all y values are negative (reduce clamps to 0)", () => {
-      // y.reduce(max, 0) returns 0 when all values < 0 — avoids negative intervals
-      const { options } = convertLogData([1, 2], [-10, -5], {
-        title: "",
-        unparsed_x_data: [],
-        timezone: "UTC",
-        itemStyle: null,
-      });
-      expect(options.yAxis.interval).toBe(0);
-    });
-
-    it("yAxis axisLabel formatter rounds fractional values", () => {
+    it("yAxis axisLabel formatter formats values using the 'numbers' unit", () => {
       const { options } = convertLogData([1], [10], {
         title: "",
         unparsed_x_data: [],
         timezone: "UTC",
         itemStyle: null,
       });
-      expect(options.yAxis.axisLabel.formatter(10.7)).toBe(11);
-      expect(options.yAxis.axisLabel.formatter(10.2)).toBe(10);
-      expect(options.yAxis.axisLabel.formatter(0)).toBe(0);
+      // Small values keep 2 decimals with no unit suffix
+      expect(options.yAxis.axisLabel.formatter(10.7)).toBe("10.70");
+      expect(options.yAxis.axisLabel.formatter(0)).toBe("0.00");
+      // Large values are abbreviated (K / M / B / T / Q)
+      expect(options.yAxis.axisLabel.formatter(1500)).toBe("1.50K");
+      expect(options.yAxis.axisLabel.formatter(2_500_000)).toBe("2.50M");
     });
 
     it("maps x/y data correctly for UTC timezone", () => {
