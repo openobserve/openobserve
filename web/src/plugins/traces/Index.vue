@@ -1431,12 +1431,14 @@ onActivated(async () => {
 const runQueryFn = () => {
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.runQuery = false;
+  if (searchObj.loading) cancelSearch();
   getQueryData();
 };
 
 const runQueryOnSort = () => {
   searchObj.data.resultGrid.currentPage = 0;
   searchObj.runQuery = false;
+  if (searchObj.loading) cancelSearch();
   getQueryData(false, true);
 };
 
@@ -1579,6 +1581,7 @@ const onSearchModeChange = (mode: "traces" | "spans" | "service-graph") => {
     took: 0,
     errorCount: 0,
   };
+  if (searchObj.loading) cancelSearch();
   getQueryData();
 };
 
@@ -1756,6 +1759,7 @@ const searchData = () => {
 
 const getMoreData = () => {
   if (searchObj.meta.refreshInterval == 0) {
+    if (searchObj.loading) cancelSearch();
     getQueryData(true);
 
     if (config.isCloud == "true") {
@@ -1855,23 +1859,14 @@ watch(
 
 // Debounced auto-run on query text changes in live mode.
 const debouncedAutoRunOnQuery = debounce(() => {
-  if (
-    searchObj.meta.liveMode &&
-    store.state.zoConfig?.auto_query_enabled &&
-    !searchObj.loading
-  ) {
+  if (searchObj.meta.liveMode && store.state.zoConfig?.auto_query_enabled) {
     searchData();
   }
 }, 500);
 
 // Debounced auto-run on datetime changes in live mode.
-// Traces has no existing auto-run on datetime, so no guard needed.
 const debouncedAutoRunOnDatetime = debounce(() => {
-  if (
-    searchObj.meta.liveMode &&
-    store.state.zoConfig?.auto_query_enabled &&
-    !searchObj.loading
-  ) {
+  if (searchObj.meta.liveMode && store.state.zoConfig?.auto_query_enabled) {
     searchData();
   }
 }, 500);

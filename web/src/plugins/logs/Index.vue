@@ -518,10 +518,7 @@ export default defineComponent({
       this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
     },
     searchData() {
-      if (this.searchObj.loading == false) {
-        this.searchObj.loading = true;
-        this.searchObj.runQuery = true;
-      }
+      this.runQueryFn();
 
       if (config.isCloud == "true") {
         segment.track("Button Click", {
@@ -553,6 +550,7 @@ export default defineComponent({
         this.searchObj.meta.refreshHistogram = true;
         this.searchObj.data.queryResults.aggs = null;
         if (this.searchObj.meta.jobId == "") {
+          await this.cancelQuery();
           await this.getQueryData(false);
           this.refreshHistogramChart();
         } else {
@@ -581,6 +579,7 @@ export default defineComponent({
         //   this.searchObj.data.resultGrid.currentPage + 1;
         this.searchObj.loading = true;
         if (this.searchObj.meta.jobId == "") {
+          await this.cancelQuery();
           await this.getQueryData(true);
           this.refreshHistogramChart();
         } else {
@@ -618,6 +617,7 @@ export default defineComponent({
         this.searchObj.data.resultGrid.currentPage =
           this.searchObj.data.resultGrid.currentPage - 1;
 
+        await this.cancelQuery();
         await this.getQueryData(true);
         this.refreshHistogramChart();
 
@@ -984,6 +984,7 @@ export default defineComponent({
       try {
         searchObj.loading = true;
         searchObj.meta.refreshHistogram = true;
+        await cancelQuery();
         await getQueryData();
         refreshHistogramChart();
         showJobScheduler.value = true;
@@ -2253,9 +2254,7 @@ export default defineComponent({
         store.state.zoConfig?.auto_query_enabled &&
         store.state.zoConfig?.query_on_stream_selection !== false &&
         searchObj.meta.logsVisualizeToggle === "logs" &&
-        searchObj.data.stream.selectedStream.length > 0 &&
-        !searchObj.loading &&
-        !searchObj.loadingHistogram
+        searchObj.data.stream.selectedStream.length > 0
       ) {
         runQueryFn();
       }
@@ -3022,6 +3021,7 @@ export default defineComponent({
       splitterModel,
       // loadPageData,
       getQueryData,
+      cancelQuery,
       getJobData,
       searchResultRef,
       runQueryFn,
