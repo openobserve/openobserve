@@ -30,11 +30,13 @@ function handleClick(): void {
 const baseClasses = computed<string>(() => [
   'o-tab',
   'tw:relative tw:items-center tw:gap-1.5',
-  // Vertical tabs stretch full width and left-align; horizontal tabs are inline-centered
+  // Vertical tabs: flex stretch (no w-full so mx works correctly) + horizontal margins
+  // Horizontal tabs: inline-flex centered
   isVertical.value
-    ? 'tw:flex tw:w-full tw:justify-start'
+    ? 'tw:flex tw:justify-start'
     : 'tw:inline-flex tw:justify-center',
-  'tw:px-2 tw:font-medium tw:text-sm tw:whitespace-nowrap tw:rounded-t-md',
+  'tw:px-2 tw:font-medium tw:text-sm tw:whitespace-nowrap',
+  isVertical.value ? '' : 'tw:rounded-t-md',
   'tw:outline-none tw:transition-colors tw:duration-150',
   'tw:select-none',
   'tw:focus-visible:outline-none',
@@ -50,9 +52,8 @@ const stateClasses = computed<string>(() => {
   if (isActive.value) {
     return [
       'tw:text-tabs-active-text tw:cursor-pointer tw:bg-tabs-active-bg',
-      // Indicator: bottom border (horizontal) or right border (vertical)
       isVertical.value
-        ? 'tw:border-e-2 tw:border-tabs-indicator'
+        ? 'tw:border-l-2 tw:border-tabs-indicator'
         : 'tw:border-b-2 tw:border-tabs-indicator',
     ].join(' ')
   }
@@ -60,7 +61,7 @@ const stateClasses = computed<string>(() => {
     'tw:text-tabs-inactive-text tw:cursor-pointer',
     'tw:enabled:hover:text-tabs-hover-text tw:enabled:hover:bg-tabs-hover-bg',
     // Always render the border (transparent when inactive) to prevent layout shift on activation.
-    isVertical.value ? 'tw:border-e-2 tw:border-transparent' : 'tw:border-b-2 tw:border-transparent',
+    isVertical.value ? 'tw:border-l-2 tw:border-transparent' : 'tw:border-b-2 tw:border-transparent',
   ].join(' ')
 })
 
