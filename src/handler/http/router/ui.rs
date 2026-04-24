@@ -46,9 +46,25 @@ pub async fn serve(Path(path): Path<String>) -> impl IntoResponse {
         Some(content) => {
             let mime = mime_guess::from_path(file_path).first_or_octet_stream();
             let data = content.data();
+
+            // Vite emits content-hashed filenames under assets/ and monacoeditorwork/,
+            // so those URLs are safe to cache forever. index.html must revalidate so
+            // users pick up new deploys. Everything else gets a short TTL.
+            let cache_control = if file_path.starts_with("assets/")
+                || file_path.starts_with("monacoeditorwork/")
+            {
+                "public, max-age=31536000, immutable"
+            } else if file_path == "index.html" {
+                "no-cache"
+            } else {
+                "public, max-age=3600"
+            };
+
             Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, mime.as_ref())
+                .header(header::CACHE_CONTROL, cache_control)
+                .header("X-Content-Type-Options", "nosniff")
                 .body(Body::from(data.to_vec()))
                 .unwrap()
         }
