@@ -32,12 +32,18 @@ jobs:
 
       # ── PR: add lowest open milestone (skip drafts) ──
       - name: Add milestone to PR
-        if: github.event_name == 'pull_request_target' && github.event.pull_request.draft == false && github.event.pull_request.milestone == null
+        if: github.event_name == 'pull_request_target' && github.event.pull_request.draft == false
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          CURRENT=$(gh api "repos/$GH_REPO/pulls/$NUMBER" --jq '.milestone.title // empty')
+          if [ -n "$CURRENT" ]; then
+            echo "Milestone already set to '$CURRENT' — skipping"
+            exit 0
+          fi
+
           MILESTONE=$(gh api "repos/$GH_REPO/milestones?state=open&per_page=100" --jq '
             [.[] | select(.title != "Backlog")] |
             map({
@@ -98,12 +104,18 @@ jobs:
 
       # ── Issue: add lowest open milestone ──
       - name: Add milestone to issue
-        if: github.event_name == 'issues' && github.event.issue.milestone == null
+        if: github.event_name == 'issues'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.issue.number }}
         run: |
+          CURRENT=$(gh api "repos/$GH_REPO/issues/$NUMBER" --jq '.milestone.title // empty')
+          if [ -n "$CURRENT" ]; then
+            echo "Milestone already set to '$CURRENT' — skipping"
+            exit 0
+          fi
+
           MILESTONE=$(gh api "repos/$GH_REPO/milestones?state=open&per_page=100" --jq '
             [.[] | select(.title != "Backlog")] |
             map({
