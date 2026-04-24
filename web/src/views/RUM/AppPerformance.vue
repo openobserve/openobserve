@@ -65,11 +65,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
           </div>
         </div>
-        <AppTabs
+        <OTabs
           class="q-px-md"
-          :tabs="tabs"
-          v-model:active-tab="activePerformanceTab"
-        />
+          v-model="activePerformanceTab"
+          align="left"
+          dense
+        >
+          <OTab
+            v-for="tab in tabs"
+            :key="tab.value"
+            :name="tab.value"
+            :label="tab.label"
+          />
+        </OTabs>
       </div>
     </div>
 
@@ -114,7 +122,8 @@ import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
-import AppTabs from "@/components/common/AppTabs.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import usePerformance from "@/composables/rum/usePerformance";
 import useRum from "@/composables/rum/useRum";
@@ -123,7 +132,8 @@ export default defineComponent({
   name: "AppPerformance",
   components: {
     AutoRefreshInterval,
-    AppTabs,
+    OTabs,
+    OTab,
     DateTimePickerDashboard,
   },
   setup() {
@@ -163,42 +173,10 @@ export default defineComponent({
     });
 
     const tabs = [
-      {
-        label: t("rum.overview"),
-        value: "overview",
-        style: {
-          width: "fit-content",
-          padding: "0.5rem 0.75rem",
-          margin: "0 0.25rem",
-        },
-      },
-      {
-        label: t("rum.webVitals"),
-        value: "web_vitals",
-        style: {
-          width: "fit-content",
-          padding: "0.5rem 0.75rem",
-          margin: "0 0.25rem",
-        },
-      },
-      {
-        label: t("rum.errors"),
-        value: "errors",
-        style: {
-          width: "fit-content",
-          padding: "0.5rem 0.75rem",
-          margin: "0 0.25rem",
-        },
-      },
-      {
-        label: t("rum.api"),
-        value: "api",
-        style: {
-          width: "fit-content",
-          padding: "0.5rem 0.75rem",
-          margin: "0 0.25rem",
-        },
-      },
+      { label: t("rum.overview"), value: "overview" },
+      { label: t("rum.webVitals"), value: "web_vitals" },
+      { label: t("rum.errors"), value: "errors" },
+      { label: t("rum.api"), value: "api" },
     ];
 
     const routeName = computed(() => router.currentRoute.value.name);
