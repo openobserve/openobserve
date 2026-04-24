@@ -81,8 +81,8 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
 const wrapperClasses = computed<string[]>(() => [
   'o-tabs',
   isVertical.value
-    ? 'tw:flex-col tw:border-e tw:border-tabs-bar-border'
-    : 'tw:flex-row tw:flex-wrap tw:border-b tw:border-tabs-bar-border',
+    ? 'tw:flex-col tw:border-e'
+    : 'tw:flex-row tw:flex-wrap',
   alignClasses[props.align],
 ])
 </script>
