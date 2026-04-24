@@ -661,4 +661,178 @@ describe("fillMissingValues", () => {
     expect(Array.isArray(result)).toBe(true);
     expect(result.length).toBeGreaterThan(0);
   });
+
+  // ---------------------------------------------------------------------------
+  // Additional chart type support
+  // ---------------------------------------------------------------------------
+
+  it("fills data for area-stacked chart type", () => {
+    const processedData = [{ ts: "2024-01-15T10:00:00", value: 100 }];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("area-stacked"),
+      makeResultMetaData(60),
+      makeMetadata(),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      null,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ ts: "2024-01-15T10:00:00", value: 100 });
+  });
+
+  it("fills data for scatter chart type", () => {
+    const processedData = [{ ts: "2024-01-15T10:00:00", value: 55 }];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("scatter"),
+      makeResultMetaData(60),
+      makeMetadata(),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      null,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ ts: "2024-01-15T10:00:00", value: 55 });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Multiple y-axis and z-axis keys
+  // ---------------------------------------------------------------------------
+
+  it("fills null entries for multiple y-axis keys", () => {
+    const processedData = [{ ts: "2024-01-15T09:00:00", v1: 1, v2: 2 }];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeResultMetaData(60),
+      makeMetadata(),
+      ["ts"],
+      ["v1", "v2"],
+      [],
+      [],
+      0,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      ts: "2024-01-15T10:00:00",
+      v1: 0,
+      v2: 0,
+    });
+  });
+
+  it("includes z-axis keys in the null entry key set", () => {
+    const processedData = [{ ts: "2024-01-15T09:00:00", y: 1, z: 2 }];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeResultMetaData(60),
+      makeMetadata(),
+      ["ts"],
+      ["y"],
+      ["z"],
+      [],
+      null,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      ts: "2024-01-15T10:00:00",
+      y: null,
+      z: null,
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Multiple resultMetaData entries (chunk coverage union)
+  // ---------------------------------------------------------------------------
+
+  it("handles multiple resultMetaData entries: uses first histogram_interval", () => {
+    // Only the first resultMetaData's histogram_interval is used (line 56-58)
+    const multiMeta = [
+      { histogram_interval: 60 },
+      { histogram_interval: 120 },
+    ];
+    const processedData = [{ ts: "2024-01-15T10:00:00", value: 42 }];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      multiMeta,
+      makeMetadata(),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      null,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].value).toBe(42);
+  });
+
+  // ---------------------------------------------------------------------------
+  // LTR streaming: single data point (actualMin === actualMax)
+  // ---------------------------------------------------------------------------
+
+  it("LTR streaming: single data point clamped to one entry", () => {
+    const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
+    const chunkStart = userStart;
+    const chunkEnd = userStart + 3 * 60_000;
+
+    const processedData = [{ ts: "2024-01-15T10:02:00", value: 7 }];
+
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeChunkMetaData(chunkStart, chunkEnd, 60),
+      makeRangeMetadata(userStart, userEnd),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      0,
+      true, // loading
+    );
+
+    // Only the single data point should be returned (actualMin === actualMax)
+    expect(result).toHaveLength(1);
+    expect(result[0].value).toBe(7);
+  });
+
+  // ---------------------------------------------------------------------------
+  // xAxisKeys contains the time key in addition to another field
+  // ---------------------------------------------------------------------------
+
+  it("uses xAxisKeysWithoutTimeStamp[0] as uniqueKey when present", () => {
+    const processedData = [
+      { ts: "2024-01-15T10:00:00", category: "a", value: 10 },
+      { ts: "2024-01-15T10:00:00", category: "b", value: 20 },
+    ];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("bar"),
+      makeResultMetaData(60),
+      makeMetadata(),
+      ["ts", "category"], // two x-axis keys, "ts" is time, "category" is uniqueKey
+      ["value"],
+      [],
+      [],
+      null,
+    );
+
+    // Two entries (one per unique category value)
+    expect(result).toHaveLength(2);
+    const catA = result.find((r: any) => r.category === "a");
+    const catB = result.find((r: any) => r.category === "b");
+    expect(catA).toBeDefined();
+    expect(catB).toBeDefined();
+  });
 });

@@ -133,5 +133,54 @@ describe("isOverlayEligible", () => {
       const panelSchema = { type: "line", queries: [{}] };
       expect(isOverlayEligible(panelSchema, validOldOptions)).toBe(true);
     });
+
+    it("returns true when _queryCount is 0 and queries is empty", () => {
+      const panelSchema = { type: "line", queries: [] };
+      const oldOptions = {
+        series: [{ name: "A", data: [[1, 2]] }],
+        _queryCount: 0,
+      };
+      expect(isOverlayEligible(panelSchema, oldOptions)).toBe(true);
+    });
+
+    it("returns false when _queryCount is 0 but queries has entries", () => {
+      const panelSchema = { type: "line", queries: [{}] };
+      const oldOptions = {
+        series: [{ name: "A", data: [[1, 2]] }],
+        _queryCount: 0,
+      };
+      expect(isOverlayEligible(panelSchema, oldOptions)).toBe(false);
+    });
+  });
+
+  describe("combined guard conditions", () => {
+    it("returns false when both chart type and query count changed", () => {
+      const panelSchema = { type: "bar", queries: [{}, {}] };
+      const oldOptions = {
+        series: [{ name: "A", data: [[1, 2]] }],
+        _chartType: "line",
+        _queryCount: 1,
+      };
+      expect(isOverlayEligible(panelSchema, oldOptions)).toBe(false);
+    });
+
+    it("returns true when _chartType is empty string (falsy, guard skipped)", () => {
+      const panelSchema = { type: "line", queries: [{}] };
+      const oldOptions = {
+        series: [{ name: "A", data: [[1, 2]] }],
+        _chartType: "",
+      };
+      // "" is falsy → `oldOptions._chartType &&` short-circuits → guard skipped → true
+      expect(isOverlayEligible(panelSchema, oldOptions)).toBe(true);
+    });
+
+    it("returns true for eligible type with series and no prior metadata at all", () => {
+      const panelSchema = { type: "h-stacked", queries: [{}, {}] };
+      const oldOptions = {
+        series: [{ name: "A", data: [[1, 2]] }],
+        // No _chartType, no _queryCount
+      };
+      expect(isOverlayEligible(panelSchema, oldOptions)).toBe(true);
+    });
   });
 });

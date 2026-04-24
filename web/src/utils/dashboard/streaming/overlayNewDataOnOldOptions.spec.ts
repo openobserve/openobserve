@@ -21,6 +21,8 @@ const ts = (min: number) => new Date(Date.UTC(2024, 0, 1, 0, min, 0)).getTime();
 const tsDate = (min: number) => new Date(Date.UTC(2024, 0, 1, 0, min, 0));
 const toMicro = (ms: number) => ms * 1000;
 const INTERVAL_MS = 60_000; // 1 minute
+const toNum = (v: any): number =>
+  typeof v === "number" ? v : v instanceof Date ? v.getTime() : new Date(v).getTime();
 
 function makeSeries(
   name: string,
@@ -796,6 +798,121 @@ describe("overlayNewDataOnOldOptions", () => {
     });
   });
 
+  describe("null values in series data", () => {
+    it("preserves genuine null y-values in new data during LTR overlay", () => {
+      const oldOpts = {
+        series: [makeOldSeries("A", [[ts(0), 1], [ts(1), 2], [ts(5), 5]])],
+      };
+      const newOpts = {
+        series: [
+          makeSeries("A", [
+            [tsDate(0), 10],
+            [tsDate(1), null], // genuine null — should be preserved
+          ]),
+        ],
+      };
+
+      const result = overlayNewDataOnOldOptions(
+        oldOpts, newOpts, undefined,
+        toMicro(ts(2)), toMicro(ts(0)), toMicro(ts(10)),
+        true, undefined, INTERVAL_MS,
+      );
+
+      const seriesA = result.series.find((s: any) => s.name === "A");
+      // The null y-value at ts(1) should be preserved, not replaced with old data
+      const pointAt1 = seriesA.data.find(
+        (d: any) => toNum(d[0]) === ts(1),
+      );
+      expect(pointAt1).toBeDefined();
+      expect(pointAt1[1]).toBeNull();
+    });
+
+    it("preserves genuine null y-values in new data during RTL overlay", () => {
+      const oldOpts = {
+        series: [makeOldSeries("A", [[ts(0), 1], [ts(5), 5], [ts(10), 10]])],
+      };
+      const newOpts = {
+        series: [
+          makeSeries("A", [
+            [tsDate(5), null], // genuine null
+            [tsDate(10), 100],
+          ]),
+        ],
+      };
+
+      const result = overlayNewDataOnOldOptions(
+        oldOpts, newOpts, undefined,
+        toMicro(ts(5)), toMicro(ts(0)), toMicro(ts(10)),
+        false, undefined, INTERVAL_MS,
+      );
+
+      const seriesA = result.series.find((s: any) => s.name === "A");
+      const pointAt5 = seriesA.data.find(
+        (d: any) => toNum(d[0]) === ts(5),
+      );
+      expect(pointAt5).toBeDefined();
+      expect(pointAt5[1]).toBeNull();
+    });
+
+    it("handles series where all new data points have null values", () => {
+      const oldOpts = {
+        series: [makeOldSeries("A", [[ts(0), 1], [ts(5), 5]])],
+      };
+      const newOpts = {
+        series: [
+          makeSeries("A", [
+            [tsDate(0), null],
+            [tsDate(1), null],
+          ]),
+        ],
+      };
+
+      const result = overlayNewDataOnOldOptions(
+        oldOpts, newOpts, undefined,
+        toMicro(ts(2)), toMicro(ts(0)), toMicro(ts(10)),
+        true, undefined, INTERVAL_MS,
+      );
+
+      const seriesA = result.series.find((s: any) => s.name === "A");
+      expect(seriesA).toBeDefined();
+      // Both null values should be preserved
+      const newPoints = seriesA.data.filter(
+        (d: any) => {
+          const t = toNum(d[0]);
+          return t === ts(0) || t === ts(1);
+        },
+      );
+      expect(newPoints).toHaveLength(2);
+      expect(newPoints[0][1]).toBeNull();
+      expect(newPoints[1][1]).toBeNull();
+    });
+
+    it("handles old series with null y-values in stale data", () => {
+      const oldOpts = {
+        series: [makeOldSeries("A", [[ts(0), null], [ts(5), 5], [ts(10), null]])],
+      };
+      const newOpts = {
+        series: [
+          makeSeries("A", [[tsDate(5), 50], [tsDate(10), 100]]),
+        ],
+      };
+
+      const result = overlayNewDataOnOldOptions(
+        oldOpts, newOpts, undefined,
+        toMicro(ts(5)), toMicro(ts(0)), toMicro(ts(10)),
+        false, undefined, INTERVAL_MS,
+      );
+
+      const seriesA = result.series.find((s: any) => s.name === "A");
+      // Old stale point at ts(0) with null value should be prepended
+      const stalePoint = seriesA.data.find(
+        (d: any) => toNum(d[0]) === ts(0),
+      );
+      expect(stalePoint).toBeDefined();
+      expect(stalePoint[1]).toBeNull();
+    });
+  });
+
   describe("series with null name (annotation series)", () => {
     it("skips annotation series during merge", () => {
       const oldOpts = {
@@ -820,6 +937,240 @@ describe("overlayNewDataOnOldOptions", () => {
       const annotationSeries = result.series.filter((s: any) => s.name == null);
       expect(annotationSeries.length).toBe(1);
       expect(annotationSeries[0].data[0][1]).toBe(200);
+    });
+  });
+
+  describe("grid with string values (parseInt fallback)", () => {
+    it("parses grid.top as string via parseInt for graphic overlay", () => {
+      const queryStart = toMicro(ts(0));
+      const queryEnd = toMicro(ts(10));
+      const boundary = toMicro(ts(5));
+      const oldOpts = {
+        series: [makeOldSeries("A", [[ts(0), 1]])],
+        grid: { left: 40, right: 20, top: "15px", bottom: 50 },
+      };
+      const newOpts = {
+        series: [makeSeries("A", [[tsDate(0), 10]])],
+        grid: { left: 40, right: 20, top: "15px", bottom: 50 },
+      };
+
+      const result = overlayNewDataOnOldOptions(
+        oldOpts, newOpts, makeContainerSize(),
+        boundary, queryStart, queryEnd, true,
+      );
+
+      expect(result.graphic).toBeDefined();
+      // top parsed as parseInt("15px") = 15
+      expect(result.graphic[0].top).toBe(15);
+    });
+  });
+
+  describe("multiple series overlay", () => {
+    it("overlays multiple series independently in LTR", () => {
+      const queryStart = toMicro(ts(0));
+      const queryEnd = toMicro(ts(10));
+      const boundary = toMicro(ts(5));
+
+      const oldOpts = {
+        series: [
+          makeOldSeries("A", [[ts(0), 1], [ts(5), 5], [ts(8), 8]]),
+          makeOldSeries("B", [[ts(0), 10], [ts(5), 50], [ts(9), 90]]),
+        ],
+      };
+      const newOpts = {
+        series: [
+          makeSeries("A", [[tsDate(0), 100], [tsDate(1), 200]]),
+          makeSeries("B", [[tsDate(0), 1000], [tsDate(2), 2000]]),
+        ],
+      };
+
+      const result = overlayNewDataOnOldOptions(
+        oldOpts, newOpts, undefined,
+        boundary, queryStart, queryEnd, true, undefined, INTERVAL_MS,
+      );
+
+      const seriesA = result.series.find((s: any) => s.name === "A");
+      const seriesB = result.series.find((s: any) => s.name === "B");
+
+      // A: new data at ts(0),ts(1) + phantom + stale old after ts(1)
+      expect(seriesA.data[0][1]).toBe(100);
+      expect(seriesA.data[1][1]).toBe(200);
+
+      // B: new data at ts(0),ts(2) + phantom + stale old after ts(2)
+      expect(seriesB.data[0][1]).toBe(1000);
+      expect(seriesB.data[1][1]).toBe(2000);
+    });
+  });
+
+  describe("RTL phantom with old data value", () => {
+    it("uses old data value for RTL phantom when old has data at phantom timestamp", () => {
+      const queryStart = toMicro(ts(0));
+      const queryEnd = toMicro(ts(10));
+      const boundary = toMicro(ts(5));
+
+      const oldOpts = {
+        series: [
+          makeOldSeries("A", [[ts(0), 1], [ts(4), 44], [ts(7), 7]]),
+        ],
+      };
+      const newOpts = {
+        series: [
+          makeSeries("A", [[tsDate(5), 50], [tsDate(6), 60]]),
+        ],
+      };
+
+      const result = overlayNewDataOnOldOptions(
+        oldOpts, newOpts, undefined,
+        boundary, queryStart, queryEnd, false, undefined, INTERVAL_MS,
+      );
+
+      const seriesA = result.series[0];
+      // Phantom at ts(4) = ts(5) - 60s. Old has value 44 at ts(4)
+      const phantom = seriesA.data.find(
+        (p: any) => toNum(p[0]) === ts(4),
+      );
+      expect(phantom).toBeDefined();
+      expect(phantom[1]).toBe(44);
+    });
+  });
+
+  describe("graphic overlay edge cases", () => {
+    it("does not add graphic when freshFraction is 0 (LTR, boundary at queryStart)", () => {
+      const queryStart = toMicro(ts(0));
+      const queryEnd = toMicro(ts(10));
+      const boundary = toMicro(ts(0)); // boundary at start → freshFraction = 0
+
+      const oldOpts = {
+        series: [makeOldSeries("A", [[ts(0), 1]])],
+        _gridRect: { x: 50, y: 10, width: 700, height: 350 },
+      };
+      const newOpts = {
+        series: [makeSeries("A", [[tsDate(0), 10]])],
+      };
+
+      const result = overlayNewDataOnOldOptions(
+        oldOpts, newOpts, makeContainerSize(),
+        boundary, queryStart, queryEnd, true, "#5156BE", // LTR
+      );
+
+      // LTR: freshFraction = (boundaryMs - queryStartMs) / totalRange = 0 → no graphic
+      expect(result.graphic).toBeUndefined();
+    });
+
+    it("does not add graphic when containerSize is not provided", () => {
+      const oldOpts = {
+        series: [makeOldSeries("A", [[ts(0), 1]])],
+        _gridRect: { x: 50, y: 10, width: 700, height: 350 },
+      };
+      const newOpts = {
+        series: [makeSeries("A", [[tsDate(0), 10]])],
+      };
+
+      const result = overlayNewDataOnOldOptions(
+        oldOpts, newOpts, undefined,
+        toMicro(ts(5)), toMicro(ts(0)), toMicro(ts(10)), true, "#5156BE",
+      );
+
+      expect(result.graphic).toBeUndefined();
+    });
+
+    it("clamps overlay to plot rect boundaries", () => {
+      const queryStart = toMicro(ts(0));
+      const queryEnd = toMicro(ts(10));
+      const boundary = toMicro(ts(9)); // near-full LTR coverage
+
+      const oldOpts = {
+        series: [makeOldSeries("A", [[ts(0), 1]])],
+        _gridRect: { x: 50, y: 10, width: 700, height: 350 },
+      };
+      const newOpts = {
+        series: [makeSeries("A", [[tsDate(0), 10]])],
+      };
+
+      const result = overlayNewDataOnOldOptions(
+        oldOpts, newOpts, makeContainerSize(),
+        boundary, queryStart, queryEnd, true, "#5156BE",
+      );
+
+      expect(result.graphic).toBeDefined();
+      // LTR: overlay width = 90% of plotWidth ≈ 630
+      expect(result.graphic[0].left).toBe(50); // clamped to plotLeft
+      expect(result.graphic[0].shape.width).toBeLessThanOrEqual(700);
+    });
+  });
+
+  describe("non-array data points in series", () => {
+    it("skips overlay for series with plain value data (not [timestamp, value])", () => {
+      const queryStart = toMicro(ts(0));
+      const queryEnd = toMicro(ts(10));
+      const boundary = toMicro(ts(5));
+
+      const oldOpts = {
+        series: [
+          makeOldSeries("A", [[ts(0), 1], [ts(5), 5]]),
+        ],
+      };
+      const newOpts = {
+        series: [
+          { name: "A", data: [10, 20, 30], type: "bar" }, // plain values
+        ],
+      };
+
+      const result = overlayNewDataOnOldOptions(
+        oldOpts, newOpts, undefined,
+        boundary, queryStart, queryEnd, true, undefined, INTERVAL_MS,
+      );
+
+      const seriesA = result.series.find((s: any) => s.name === "A");
+      // Data should remain as-is (no merge attempted)
+      expect(seriesA.data).toEqual([10, 20, 30]);
+    });
+  });
+
+  describe("yAxis and grid edge cases", () => {
+    it("handles missing yAxis in both old and new options", () => {
+      const oldOpts = {
+        series: [makeOldSeries("A", [[ts(0), 1]])],
+      };
+      const newOpts = {
+        series: [makeSeries("A", [[tsDate(0), 10]])],
+      };
+
+      const result = overlayNewDataOnOldOptions(oldOpts, newOpts);
+      // Should not crash and result should have no yAxis modifications
+      expect(result).toBeDefined();
+    });
+
+    it("handles grid.bottom as array with multiple entries", () => {
+      const oldOpts = {
+        series: [makeOldSeries("A", [[ts(0), 1]])],
+        grid: [{ bottom: 100 }, { bottom: 50 }],
+      };
+      const newOpts = {
+        series: [makeSeries("A", [[tsDate(0), 10]])],
+        grid: [{ bottom: 40 }, { bottom: 60 }],
+      };
+
+      const result = overlayNewDataOnOldOptions(oldOpts, newOpts);
+      // Only first grid entry is compared; old (100) > new (40) → preserved
+      expect(result.grid[0].bottom).toBe(100);
+      // Second entry preserved from new
+      expect(result.grid[1].bottom).toBe(60);
+    });
+
+    it("handles yAxis nameGap when old has non-numeric nameGap", () => {
+      const oldOpts = {
+        series: [makeOldSeries("A", [[ts(0), 1]])],
+        yAxis: { nameGap: "50" }, // string, not number
+      };
+      const newOpts = {
+        series: [makeSeries("A", [[tsDate(0), 10]])],
+        yAxis: { nameGap: 30 },
+      };
+
+      const result = overlayNewDataOnOldOptions(oldOpts, newOpts);
+      // typeof "50" !== "number" → falls back to 0, new (30) > 0 → uses new
+      expect(result.yAxis.nameGap).toBe(30);
     });
   });
 });
