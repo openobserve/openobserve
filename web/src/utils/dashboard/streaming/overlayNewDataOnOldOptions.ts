@@ -66,7 +66,11 @@ export function overlayNewDataOnOldOptions(
 
     if (qStartMs > 0 && qEndMs > 0) {
       for (const series of newOptions.series) {
-        if (series.name == null || !Array.isArray(series.data) || !series.data.length)
+        if (
+          series.name == null ||
+          !Array.isArray(series.data) ||
+          !series.data.length
+        )
           continue;
         const firstPoint = series.data[0];
         if (!Array.isArray(firstPoint) || firstPoint.length < 2) continue;
@@ -83,14 +87,14 @@ export function overlayNewDataOnOldOptions(
         if (!isNaN(firstTs) && intervalMs > 0) {
           const phantomTs = firstTs - intervalMs;
           if (phantomTs >= qStartMs) {
-            series.data.unshift([new Date(phantomTs), ""]);
+            series.data.unshift([new Date(phantomTs), null]);
           }
         }
 
         if (!isNaN(lastTs) && intervalMs > 0) {
           const phantomTs = lastTs + intervalMs;
           if (phantomTs <= qEndMs) {
-            series.data.push([new Date(phantomTs), ""]);
+            series.data.push([new Date(phantomTs), null]);
           }
         }
       }
