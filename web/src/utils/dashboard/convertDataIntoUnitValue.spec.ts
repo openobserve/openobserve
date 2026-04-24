@@ -38,7 +38,7 @@ import {
   validatePanel,
   validateDashboardJson,
   validateSQLPanelFields,
-} from "@/utils/dashboard/dashboardValidator";
+} from "@/utils/dashboard/panelValidation";
 
 // Mock vuex store for logsUtils
 const mockVuexStore = {
@@ -119,7 +119,7 @@ vi.mock("@/utils/dashboard/colorPalette", () => ({
 }));
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
-  CURRENT_DASHBOARD_SCHEMA_VERSION: 8
+  CURRENT_DASHBOARD_SCHEMA_VERSION: "v3"
 }));
 
 describe("Dashboard Data Conversion Utils", () => {
@@ -975,7 +975,7 @@ describe("Dashboard Data Conversion Utils", () => {
     const validDashboard = {
       dashboardId: "test-dashboard",
       title: "Test Dashboard",
-      version: 8,
+      version: "v3",
       tabs: [
         {
           tabId: "tab1",
@@ -985,9 +985,7 @@ describe("Dashboard Data Conversion Utils", () => {
               id: "panel1",
               title: "Panel 1",
               type: "line",
-              layout: { x: 0, y: 0, w: 12, h: 6, i: 1 },
-              queries: [],
-              config: {},
+              layout: { x: 0, y: 0, w: 12, h: 6, i: "panel1" }
             }
           ]
         }
@@ -999,42 +997,52 @@ describe("Dashboard Data Conversion Utils", () => {
       expect(errors).toHaveLength(0);
     });
 
-    it("should return error for missing title", () => {
-      const dashboard = { ...validDashboard, title: undefined };
+    it("should return error for missing dashboardId", () => {
+      const dashboard = { ...validDashboard };
+      delete dashboard.dashboardId;
       const errors = validateDashboardJson(dashboard);
-      expect(errors.some((e: string) => e.toLowerCase().includes("title"))).toBe(true);
+      expect(errors).toContain("Dashboard ID is required");
+    });
+
+    it("should return error for missing title", () => {
+      const dashboard = { ...validDashboard };
+      delete dashboard.title;
+      const errors = validateDashboardJson(dashboard);
+      expect(errors).toContain("Dashboard title is required");
     });
 
     it("should return error for missing version", () => {
-      const dashboard = { ...validDashboard, version: undefined };
+      const dashboard = { ...validDashboard };
+      delete dashboard.version;
       const errors = validateDashboardJson(dashboard);
-      expect(errors.length).toBeGreaterThan(0);
+      expect(errors).toContain("Dashboard version is required");
     });
 
     it("should return error for incorrect version", () => {
-      const dashboard = { ...validDashboard, version: 7 };
+      const dashboard = { ...validDashboard, version: "v2" };
       const errors = validateDashboardJson(dashboard);
-      expect(errors.length).toBeGreaterThan(0);
+      expect(errors).toContain("Dashboard version must be v3.");
     });
 
     it("should return error for missing tabs", () => {
-      const dashboard = { ...validDashboard, tabs: undefined };
+      const dashboard = { ...validDashboard };
+      delete dashboard.tabs;
       const errors = validateDashboardJson(dashboard);
-      expect(errors.length).toBeGreaterThan(0);
+      expect(errors).toContain("Dashboard must have at least one tab");
     });
 
     it("should return error for empty tabs array", () => {
       const dashboard = { ...validDashboard, tabs: [] };
       const errors = validateDashboardJson(dashboard);
-      expect(errors.some((e: string) => e.toLowerCase().includes("tab"))).toBe(true);
+      expect(errors).toContain("Dashboard must have at least one tab");
     });
 
     it("should return error for null/undefined dashboard", () => {
       const errors1 = validateDashboardJson(null);
-      expect(errors1.length).toBeGreaterThan(0);
+      expect(errors1).toContain("Dashboard JSON is empty or invalid");
 
       const errors2 = validateDashboardJson(undefined);
-      expect(errors2.length).toBeGreaterThan(0);
+      expect(errors2).toContain("Dashboard JSON is empty or invalid");
     });
 
     it("should return error for duplicate tab IDs", () => {
@@ -1046,7 +1054,7 @@ describe("Dashboard Data Conversion Utils", () => {
         ]
       };
       const errors = validateDashboardJson(dashboard);
-      expect(errors.some((e: string) => e.includes("Duplicate tab ID"))).toBe(true);
+      expect(errors).toContain("Duplicate tab ID found: tab1");
     });
 
     it("should return error for missing tab name", () => {
@@ -1055,7 +1063,7 @@ describe("Dashboard Data Conversion Utils", () => {
         tabs: [{ tabId: "tab1", panels: [] }]
       };
       const errors = validateDashboardJson(dashboard);
-      expect(errors.some((e: string) => e.toLowerCase().includes("name"))).toBe(true);
+      expect(errors).toContain("Tab tab1 must have a name");
     });
 
     it("should return error for duplicate panel IDs", () => {
@@ -1065,13 +1073,13 @@ describe("Dashboard Data Conversion Utils", () => {
           tabId: "tab1",
           name: "Tab 1",
           panels: [
-            { id: "panel1", title: "Panel 1", type: "line", layout: { x: 0, y: 0, w: 12, h: 6, i: 1 }, queries: [], config: {} },
-            { id: "panel1", title: "Panel 2", type: "bar", layout: { x: 0, y: 6, w: 12, h: 6, i: 2 }, queries: [], config: {} }
+            { id: "panel1", title: "Panel 1", type: "line", layout: { x: 0, y: 0, w: 12, h: 6, i: "panel1-1" } },
+            { id: "panel1", title: "Panel 2", type: "bar", layout: { x: 0, y: 6, w: 12, h: 6, i: "panel1-2" } }
           ]
         }]
       };
       const errors = validateDashboardJson(dashboard);
-      expect(errors.some((e: string) => e.includes("Duplicate panel ID"))).toBe(true);
+      expect(errors).toContain("Duplicate panel ID found: panel1");
     });
 
     it("should return error for unsupported panel type", () => {
@@ -1081,12 +1089,12 @@ describe("Dashboard Data Conversion Utils", () => {
           tabId: "tab1",
           name: "Tab 1",
           panels: [
-            { id: "panel1", title: "Panel 1", type: "unsupported", layout: { x: 0, y: 0, w: 12, h: 6, i: 1 }, queries: [], config: {} }
+            { id: "panel1", title: "Panel 1", type: "unsupported", layout: { x: 0, y: 0, w: 12, h: 6, i: "panel1" } }
           ]
         }]
       };
       const errors = validateDashboardJson(dashboard);
-      expect(errors.some((e: string) => e.includes("not supported") || e.includes("enum"))).toBe(true);
+      expect(errors).toContain('Panel panel1: Chart type "unsupported" is not supported.');
     });
 
     it("should handle missing panel properties", () => {
@@ -1096,12 +1104,12 @@ describe("Dashboard Data Conversion Utils", () => {
           tabId: "tab1",
           name: "Tab 1",
           panels: [
-            { title: "Panel 1", type: "line", layout: { x: 0, y: 0, w: 12, h: 6, i: 1 } }
+            { title: "Panel 1", type: "line", layout: { x: 0, y: 0, w: 12, h: 6, i: "panel1" } } // Missing id
           ]
         }]
       };
       const errors = validateDashboardJson(dashboard);
-      expect(errors.some((e: string) => e.toLowerCase().includes("id") || e.toLowerCase().includes("required"))).toBe(true);
+      expect(errors).toContain("Panel in tab tab1 is missing an ID");
     });
 
   });
@@ -1164,7 +1172,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(panelData, errors, true, [{ name: "value" }], "dashboard", mockStore, checkTimestampAlias);
-      expect(errors).toContain("Add one field for the X-Axis");
+      expect(errors).toContain("Add one fields for the X-Axis");
     });
 
     it("should validate metric chart requirements", () => {
@@ -1520,7 +1528,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(panelData, errors, true, [{ name: "value" }], "dashboard", mockStore, checkTimestampAlias);
-      expect(errors).toContain("Add one field for the X-Axis");
+      expect(errors).toContain("Add one fields for the X-Axis");
     });
 
     it("should handle line chart with missing fields", () => {
@@ -1725,32 +1733,56 @@ describe("Dashboard Data Conversion Utils", () => {
       expect(errors).toContain("Each tab must have a tabId");
     });
 
+    it("should handle validateDashboardJson with missing layout.i", () => {
+      // Test to cover line where panel layout.i is missing
+      const dashboard = {
+        dashboardId: "test-dashboard", 
+        title: "Test Dashboard",
+        version: "v3",
+        tabs: [{
+          tabId: "tab1",
+          name: "Tab 1",
+          panels: [{
+            id: "panel1",
+            title: "Panel 1", 
+            type: "line",
+            layout: { x: 0, y: 0, w: 12, h: 6 } // Missing i
+          }]
+        }]
+      };
+      const errors = validateDashboardJson(dashboard);
+      expect(errors).toContain("Panel panel1 is missing a layout.i value");
+    });
+
     it("should handle validateDashboardJson with duplicate layout.i", () => {
+      // Test to cover line where duplicate layout.i values exist
       const dashboard = {
         dashboardId: "test-dashboard",
-        title: "Test Dashboard",
-        version: 8,
+        title: "Test Dashboard", 
+        version: "v3",
         tabs: [{
           tabId: "tab1",
           name: "Tab 1",
           panels: [
-            { id: "panel1", title: "Panel 1", type: "line", layout: { x: 0, y: 0, w: 12, h: 6, i: 1 }, queries: [], config: {} },
-            { id: "panel2", title: "Panel 2", type: "bar", layout: { x: 0, y: 6, w: 12, h: 6, i: 1 }, queries: [], config: {} }
+            { id: "panel1", title: "Panel 1", type: "line", layout: { x: 0, y: 0, w: 12, h: 6, i: "same" } },
+            { id: "panel2", title: "Panel 2", type: "bar", layout: { x: 0, y: 6, w: 12, h: 6, i: "same" } } // Duplicate i
           ]
         }]
       };
       const errors = validateDashboardJson(dashboard);
-      expect(errors.some((e: string) => e.includes("Duplicate layout.i"))).toBe(true);
+      expect(errors).toContain("Duplicate layout.i value found in tab tab1: same");
     });
 
     it("should handle validateDashboardJson with missing panels array", () => {
+      // Test to cover line where tab doesn't have panels array
       const dashboard = {
         dashboardId: "test-dashboard",
         title: "Test Dashboard",
-        version: 8,
+        version: "v3", 
         tabs: [{
           tabId: "tab1",
           name: "Tab 1"
+          // Missing panels array
         }]
       };
       const errors = validateDashboardJson(dashboard);
@@ -2018,7 +2050,7 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
-      expect(errors).toContain("Add one field for the X-Axis");
+      expect(errors).toContain("Add one fields for the X-Axis");
     });
 
     it("should handle pie chart with multiple x fields", () => {
@@ -2421,7 +2453,7 @@ describe("Dashboard Data Conversion Utils", () => {
         },
         layout: { currentQueryIndex: 0 }
       };
-      const errors: string[] = [];
+      const errors = [];
       validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }], "dashboard", mockStore, checkTimestampAlias);
       expect(errors).toContain("Join #1: Stream is required");
     });

@@ -307,12 +307,29 @@ pub async fn search_http2_stream(
 
     // Convert the original query to a histogram query
     let mut converted_histogram_query: Option<String> = None;
+    let mut histogram_breakdown_field: Option<String> = None;
     if is_ui_histogram {
+        histogram_breakdown_field = if !is_multi_stream_search {
+            if let Some(stream_name) = stream_names.first() {
+                crate::service::search::sql::histogram::resolve_histogram_breakdown_field(
+                    &org_id,
+                    stream_name,
+                    stream_type,
+                )
+                .await
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         // Convert the original query to a histogram query
         match crate::service::search::sql::histogram::convert_to_histogram_query(
             &req.query.sql,
             &stream_names,
             is_multi_stream_search,
+            histogram_breakdown_field.as_deref(),
         ) {
             Ok(histogram_query) => {
                 req.query.sql = histogram_query;
@@ -576,6 +593,7 @@ pub async fn search_http2_stream(
                     } = v
                 {
                     results.converted_histogram_query = converted_histogram_query.clone();
+                    results.histogram_breakdown_field = histogram_breakdown_field.clone();
                 }
                 v.to_chunks()
             }

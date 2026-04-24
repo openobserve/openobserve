@@ -14,24 +14,33 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { convertLogData, formatDate } from "./convertLogData";
+import {
+  convertLogData,
+  convertStackedLogData,
+  formatDate,
+  formatCount,
+} from "./convertLogData";
+
+// Stub the color-palette module so tests are not coupled to palette values.
+vi.mock("@/utils/dashboard/colorPalette", () => ({
+  classicColorPaletteLightTheme: ["#aaa", "#bbb", "#ccc"],
+  classicColorPaletteDarkTheme:  ["#111", "#222", "#333"],
+}));
 
 describe("convertLogData.ts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Mock getComputedStyle to return the expected theme color
-    Object.defineProperty(window, 'getComputedStyle', {
+    Object.defineProperty(window, "getComputedStyle", {
       value: () => ({
         getPropertyValue: (prop: string) => {
-          if (prop === '--o2-theme-color') {
-            return '#7A80C2';
-          }
-          return '';
-        }
+          if (prop === "--o2-theme-color") return "#7A80C2";
+          if (prop === "--o2-dark-theme-color") return "#5A60A2";
+          return "";
+        },
       }),
       writable: true,
-      configurable: true
+      configurable: true,
     });
   });
 
@@ -39,59 +48,40 @@ describe("convertLogData.ts", () => {
     vi.clearAllTimers();
   });
 
-  describe("convertLogData Function", () => {
-    it("should return basic chart options structure", () => {
-      const x = [1640995200000, 1640998800000]; // Jan 1, 2022 timestamps
-      const y = [10, 20];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result).toHaveProperty("options");
-      expect(result.options).toHaveProperty("title");
-      expect(result.options).toHaveProperty("backgroundColor");
-      expect(result.options).toHaveProperty("grid");
-      expect(result.options).toHaveProperty("tooltip");
-      expect(result.options).toHaveProperty("xAxis");
-      expect(result.options).toHaveProperty("yAxis");
-      expect(result.options).toHaveProperty("toolbox");
-      expect(result.options).toHaveProperty("series");
-    });
-
-    it("should configure title correctly", () => {
-      const x = [1640995200000];
-      const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.title).toEqual({
-        left: "center",
-        textStyle: {
-          fontSize: 12,
-          fontWeight: "normal",
-        },
+  // ---------------------------------------------------------------------------
+  // convertLogData
+  // ---------------------------------------------------------------------------
+  describe("convertLogData", () => {
+    it("returns all required top-level ECharts config keys", () => {
+      const result = convertLogData([1640995200000], [10], {
+        title: "T",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
       });
+      for (const key of ["title", "backgroundColor", "grid", "tooltip", "xAxis", "yAxis", "toolbox", "series"]) {
+        expect(result.options).toHaveProperty(key);
+      }
     });
 
-    it("should set backgroundColor to transparent", () => {
-      const x = [1640995200000];
-      const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.backgroundColor).toBe("transparent");
+    it("sets backgroundColor to transparent", () => {
+      const { options } = convertLogData([1640995200000], [10], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
+      });
+      expect(options.backgroundColor).toBe("transparent");
     });
 
-    it("should configure grid layout properly", () => {
-      const x = [1640995200000];
-      const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.grid).toEqual({
+    it("configures grid layout", () => {
+      const { options } = convertLogData([1640995200000], [10], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
+      });
+      expect(options.grid).toEqual({
         containLabel: true,
         left: "20",
         right: "20",
@@ -100,431 +90,486 @@ describe("convertLogData.ts", () => {
       });
     });
 
-    it("should configure tooltip correctly", () => {
-      const x = [1640995200000];
-      const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.tooltip.show).toBe(true);
-      expect(result.options.tooltip.trigger).toBe("axis");
-      expect(result.options.tooltip.textStyle.fontSize).toBe(12);
-      expect(result.options.tooltip.axisPointer.type).toBe("cross");
-      expect(result.options.tooltip.axisPointer.label.show).toBe(true);
-      expect(result.options.tooltip.axisPointer.label.fontsize).toBe(12);
-    });
-
-    it("should configure xAxis as time type", () => {
-      const x = [1640995200000];
-      const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.xAxis.type).toBe("time");
-    });
-
-    it("should configure yAxis with correct properties", () => {
-      const x = [1640995200000];
-      const y = [10, 20, 5];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.yAxis.type).toBe("value");
-      expect(result.options.yAxis.axisLine.show).toBe(true);
-      expect(result.options.yAxis.axisPointer.label.precision).toBe(0);
-      expect(result.options.yAxis.interval).toBe(10); // Math.max(...y) / 2 = 20 / 2 = 10
-    });
-
-    it("should calculate yAxis interval correctly with different values", () => {
-      const x = [1640995200000];
-      const y = [5, 15, 25, 35];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.yAxis.interval).toBe(17.5); // Math.max(...y) / 2 = 35 / 2 = 17.5
-    });
-
-    it("should have yAxis formatter that rounds values", () => {
-      const x = [1640995200000];
-      const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.yAxis.axisLabel.formatter(10.7)).toBe(11);
-      expect(result.options.yAxis.axisLabel.formatter(10.3)).toBe(10);
-      expect(result.options.yAxis.axisLabel.formatter(0)).toBe(0);
-    });
-
-    it("should configure toolbox correctly", () => {
-      const x = [1640995200000];
-      const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.toolbox).toEqual({
-        orient: "vertical",
-        show: true,
-        showTitle: false,
-        tooltip: {
-          show: false,
-        },
-        itemSize: 0,
-        itemGap: 0,
-        bottom: "100%",
-        feature: {
-          dataZoom: {
-            show: true,
-            yAxisIndex: "none",
-          },
-        },
+    it("configures tooltip", () => {
+      const { options } = convertLogData([1640995200000], [10], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
       });
+      expect(options.tooltip.show).toBe(true);
+      expect(options.tooltip.trigger).toBe("axis");
+      expect(options.tooltip.textStyle.fontSize).toBe(12);
+      // formatter_test was dead code and has been removed
+      expect(options.tooltip).not.toHaveProperty("formatter_test");
     });
 
-    it("should map x and y data correctly to series for UTC timezone", () => {
-      const x = [1640995200000, 1640998800000]; // Jan 1, 2022 timestamps
+    it("sets xAxis type to time", () => {
+      const { options } = convertLogData([1640995200000], [10], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
+      });
+      expect(options.xAxis.type).toBe("time");
+    });
+
+    it("sets yAxis splitNumber to 3 to keep tick density low on short charts", () => {
+      const { options } = convertLogData([1, 2, 3], [10, 20, 5], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
+      });
+      expect(options.yAxis.splitNumber).toBe(3);
+    });
+
+    it("yAxis axisLabel formatter formats values using the 'numbers' unit", () => {
+      const { options } = convertLogData([1], [10], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
+      });
+      // Small values keep 2 decimals with no unit suffix
+      expect(options.yAxis.axisLabel.formatter(10.7)).toBe("10.70");
+      expect(options.yAxis.axisLabel.formatter(0)).toBe("0.00");
+      // Large values are abbreviated (K / M / B / T / Q)
+      expect(options.yAxis.axisLabel.formatter(1500)).toBe("1.50K");
+      expect(options.yAxis.axisLabel.formatter(2_500_000)).toBe("2.50M");
+    });
+
+    it("maps x/y data correctly for UTC timezone", () => {
+      const x = [1640995200000, 1640998800000];
       const y = [10, 20];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.series).toHaveLength(1);
-      expect(result.options.series[0].data).toEqual([
+      const { options } = convertLogData(x, y, {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
+      });
+      expect(options.series[0].data).toEqual([
         [1640995200000, 10],
         [1640998800000, 20],
       ]);
     });
 
-    it("should handle non-UTC timezone with date conversion", () => {
-      const x = [1640995200000]; // Jan 1, 2022 00:00:00 UTC
-      const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "America/New_York" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.series[0].data).toHaveLength(1);
-      // The timestamp should be converted to the specified timezone
-      expect(result.options.series[0].data[0][1]).toBe(10);
+    it("converts timestamps for non-UTC timezone", () => {
+      const { options } = convertLogData([1640995200000], [10], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "America/New_York",
+        itemStyle: null,
+      });
+      // toZonedTime shifts the timestamp; value must still be 10
+      expect(options.series[0].data[0][1]).toBe(10);
+      // The timestamp must differ from UTC raw value
+      expect(options.series[0].data[0][0]).not.toBe(1640995200000);
     });
 
-    it("should configure series styling correctly", () => {
-      const x = [1640995200000];
-      const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.series[0].type).toBe("bar");
-      expect(result.options.series[0].emphasis).toEqual({ focus: "series" });
-      expect(result.options.series[0].itemStyle.color).toBe("#7A80C2");
+    it("defaults missing y values to 0 when x is longer", () => {
+      const { options } = convertLogData([1, 2, 3], [10, 20], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
+      });
+      expect(options.series[0].data[2][1]).toBe(0);
     });
 
-    it("should handle empty x array", () => {
-      const x: any[] = [];
-      const y: any[] = [];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.series[0].data).toEqual([]);
+    it("uses custom itemStyle when provided", () => {
+      const itemStyle = { color: "#ff0000" };
+      const { options } = convertLogData([1], [10], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle,
+      });
+      expect(options.series[0].itemStyle).toBe(itemStyle);
     });
 
-    it("should handle mismatched x and y arrays", () => {
-      const x = [1640995200000, 1640998800000, 1641002400000];
-      const y = [10, 20]; // y has fewer elements
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.series[0].data).toEqual([
-        [1640995200000, 10],
-        [1640998800000, 20],
-        [1641002400000, 0], // Missing y value defaults to 0
-      ]);
+    it("reads theme color from CSS custom property in light mode", () => {
+      document.body.classList.remove("body--dark");
+      const { options } = convertLogData([1], [10], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
+      });
+      expect(options.series[0].itemStyle.color).toBe("#7A80C2");
     });
 
-    it("should handle x array longer than y array", () => {
-      const x = [1640995200000, 1640998800000];
-      const y = [10]; // y has fewer elements
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.series[0].data).toEqual([
-        [1640995200000, 10],
-        [1640998800000, 0], // Missing y value defaults to 0
-      ]);
+    it("reads theme color from body CSS property in dark mode", () => {
+      document.body.classList.add("body--dark");
+      Object.defineProperty(window, "getComputedStyle", {
+        value: (el: Element) => ({
+          getPropertyValue: (prop: string) => {
+            if (el === document.body && prop === "--o2-dark-theme-color") return "#5A60A2";
+            if (prop === "--o2-theme-color") return "#7A80C2";
+            return "";
+          },
+        }),
+        writable: true,
+        configurable: true,
+      });
+      const { options } = convertLogData([1], [10], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
+      });
+      expect(options.series[0].itemStyle.color).toBe("#5A60A2");
+      document.body.classList.remove("body--dark");
     });
 
-    it("should handle y array with zero values", () => {
-      const x = [1640995200000, 1640998800000];
-      const y = [0, 0];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.series[0].data).toEqual([
-        [1640995200000, 0],
-        [1640998800000, 0],
-      ]);
-      expect(result.options.yAxis.interval).toBe(0); // Math.max(...y) / 2 = 0 / 2 = 0
+    it("handles empty x and y arrays", () => {
+      const { options } = convertLogData([], [], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
+      });
+      expect(options.series[0].data).toEqual([]);
     });
 
-    it("should handle negative y values", () => {
-      const x = [1640995200000, 1640998800000];
-      const y = [-10, -5];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.series[0].data).toEqual([
-        [1640995200000, -10],
-        [1640998800000, -5],
-      ]);
-      expect(result.options.yAxis.interval).toBe(-2.5); // Math.max(...y) / 2 = -5 / 2 = -2.5
+    it("series type is bar with emphasis", () => {
+      const { options } = convertLogData([1], [10], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
+      });
+      expect(options.series[0].type).toBe("bar");
+      expect(options.series[0].emphasis).toEqual({ focus: "series" });
     });
 
-    it("should handle mixed positive and negative y values", () => {
-      const x = [1640995200000, 1640998800000, 1641002400000];
-      const y = [-10, 0, 20];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.series[0].data).toEqual([
-        [1640995200000, -10],
-        [1640998800000, 0],
-        [1641002400000, 20],
-      ]);
-      expect(result.options.yAxis.interval).toBe(10); // Math.max(...y) / 2 = 20 / 2 = 10
-    });
-
-    it("should handle single data point", () => {
-      const x = [1640995200000];
-      const y = [42];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.series[0].data).toEqual([[1640995200000, 42]]);
-      expect(result.options.yAxis.interval).toBe(21); // Math.max(...y) / 2 = 42 / 2 = 21
-    });
-
-    it("should handle different timezone formats", () => {
-      const x = [1640995200000];
-      const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "Europe/London" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.series[0].data).toHaveLength(1);
-      expect(result.options.series[0].data[0][1]).toBe(10);
-    });
-
-    it("should handle large numbers in y values", () => {
-      const x = [1640995200000];
-      const y = [1000000];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.series[0].data).toEqual([[1640995200000, 1000000]]);
-      expect(result.options.yAxis.interval).toBe(500000); // Math.max(...y) / 2 = 1000000 / 2 = 500000
-    });
-
-    it("should handle decimal values in y", () => {
-      const x = [1640995200000, 1640998800000];
-      const y = [10.5, 20.7];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.series[0].data).toEqual([
-        [1640995200000, 10.5],
-        [1640998800000, 20.7],
-      ]);
-      expect(result.options.yAxis.interval).toBe(10.35); // Math.max(...y) / 2 = 20.7 / 2 = 10.35
-    });
-
-    it("should handle params with different timezone settings", () => {
-      const x = [1640995200000];
-      const y = [10];
-      const params1 = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-      const params2 = { title: "Test Chart", unparsed_x_data: [], timezone: "Asia/Tokyo" };
-
-      const result1 = convertLogData(x, y, params1);
-      const result2 = convertLogData(x, y, params2);
-
-      // Both should have valid series data but potentially different timestamps
-      expect(result1.options.series[0].data).toHaveLength(1);
-      expect(result2.options.series[0].data).toHaveLength(1);
-      expect(result1.options.series[0].data[0][1]).toBe(10);
-      expect(result2.options.series[0].data[0][1]).toBe(10);
-    });
-
-    it("should handle tooltip formatter_test function", () => {
-      const x = [1640995200000];
-      const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-
-      expect(result.options.tooltip).toHaveProperty("formatter_test");
-      expect(typeof result.options.tooltip.formatter_test).toBe("function");
-    });
-
-    it("should return empty string from formatter_test when name length is 0", () => {
-      const x = [1640995200000];
-      const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-      const formatterResult = result.options.tooltip.formatter_test([]);
-
-      expect(formatterResult).toBe("");
-    });
-
-    it("should format tooltip correctly with valid data", () => {
-      const x = [1640995200000];
-      const y = [10];
-      const params = { title: "Test Chart", unparsed_x_data: [], timezone: "UTC" };
-
-      const result = convertLogData(x, y, params);
-      const mockData = [{ data: [1640995200000], value: [1640995200000, 10] }];
-      const formatterResult = result.options.tooltip.formatter_test(mockData);
-
-      expect(formatterResult).toContain("UTC");
-      expect(formatterResult).toContain("<b>10</b>");
+    it("configures toolbox with hidden dataZoom buttons", () => {
+      const { options } = convertLogData([1], [10], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "UTC",
+        itemStyle: null,
+      });
+      expect(options.toolbox.itemSize).toBe(0);
+      expect(options.toolbox.bottom).toBe("100%");
+      expect(options.toolbox.feature.dataZoom.show).toBe(true);
     });
   });
 
-  describe("formatDate Function", () => {
-    it("should format date correctly with basic date", () => {
-      const date = new Date("2022-01-01T10:30:45");
-      const result = formatDate(date);
-
-      expect(result).toBe("2022-01-01 10:30:45");
+  // ---------------------------------------------------------------------------
+  // formatCount
+  // ---------------------------------------------------------------------------
+  describe("formatCount", () => {
+    it("returns raw value for numbers below 1000", () => {
+      expect(formatCount(0)).toBe("0");
+      expect(formatCount(1)).toBe("1");
+      expect(formatCount(999)).toBe("999");
     });
 
-    it("should pad single digits with zeros", () => {
-      const date = new Date("2022-03-05T09:07:08");
-      const result = formatDate(date);
-
-      expect(result).toBe("2022-03-05 09:07:08");
+    it("formats thousands with one decimal and k suffix", () => {
+      expect(formatCount(1000)).toBe("1k");
+      expect(formatCount(1500)).toBe("1.5k");
+      expect(formatCount(3200)).toBe("3.2k");
+      expect(formatCount(10000)).toBe("10k");
+      expect(formatCount(999900)).toBe("999.9k");
     });
 
-    it("should handle January (month 0)", () => {
-      const date = new Date(2022, 0, 15, 14, 25, 30); // January is month 0
-      const result = formatDate(date);
-
-      expect(result).toBe("2022-01-15 14:25:30");
+    it("strips trailing .0 for exact thousands", () => {
+      expect(formatCount(2000)).toBe("2k");
+      expect(formatCount(50000)).toBe("50k");
     });
 
-    it("should handle December (month 11)", () => {
-      const date = new Date(2022, 11, 25, 23, 59, 59); // December is month 11
-      const result = formatDate(date);
-
-      expect(result).toBe("2022-12-25 23:59:59");
+    it("formats millions with M suffix", () => {
+      expect(formatCount(1_000_000)).toBe("1M");
+      expect(formatCount(1_500_000)).toBe("1.5M");
+      expect(formatCount(2_200_000)).toBe("2.2M");
+      expect(formatCount(10_000_000)).toBe("10M");
     });
 
-    it("should handle leap year date", () => {
-      const date = new Date(2020, 1, 29, 12, 0, 0); // Feb 29, 2020 (leap year)
-      const result = formatDate(date);
-
-      expect(result).toBe("2020-02-29 12:00:00");
+    it("strips trailing .0 for exact millions", () => {
+      expect(formatCount(3_000_000)).toBe("3M");
     });
 
-    it("should handle midnight time", () => {
-      const date = new Date(2022, 5, 15, 0, 0, 0);
-      const result = formatDate(date);
+    it("prefers M over k for values >= 1 000 000", () => {
+      // Must not produce "1000k"
+      const result = formatCount(1_000_000);
+      expect(result).toBe("1M");
+      expect(result).not.toContain("k");
+    });
+  });
 
-      expect(result).toBe("2022-06-15 00:00:00");
+  // ---------------------------------------------------------------------------
+  // convertStackedLogData
+  // ---------------------------------------------------------------------------
+  describe("convertStackedLogData", () => {
+    const baseParams = { title: "Test", timezone: "UTC", breakdownField: "level" };
+    const ts1 = 1640995200000;
+    const ts2 = 1640998800000;
+
+    const makeBreakdown = (entries: [string, number[]][]) =>
+      new Map<string, number[]>(entries);
+
+    it("returns an options object with all required ECharts keys", () => {
+      const bd = makeBreakdown([["error", [10, 20]]]);
+      const { options } = convertStackedLogData([ts1, ts2], bd, baseParams, false);
+      for (const key of ["backgroundColor", "grid", "tooltip", "legend", "xAxis", "yAxis", "toolbox", "series"]) {
+        expect(options).toHaveProperty(key);
+      }
     });
 
-    it("should handle noon time", () => {
-      const date = new Date(2022, 5, 15, 12, 0, 0);
-      const result = formatDate(date);
-
-      expect(result).toBe("2022-06-15 12:00:00");
+    it("produces one series per breakdown category", () => {
+      const bd = makeBreakdown([["error", [10]], ["warn", [5]], ["info", [20]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.series).toHaveLength(3);
     });
 
-    it("should handle end of day time", () => {
-      const date = new Date(2022, 5, 15, 23, 59, 59);
-      const result = formatDate(date);
-
-      expect(result).toBe("2022-06-15 23:59:59");
+    it("stacks all series on 'total'", () => {
+      const bd = makeBreakdown([["error", [10]], ["info", [5]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      options.series.forEach((s: any) => expect(s.stack).toBe("total"));
     });
 
-    it("should handle year boundaries", () => {
-      const dateEndOfYear = new Date(2021, 11, 31, 23, 59, 59);
-      const dateStartOfYear = new Date(2022, 0, 1, 0, 0, 0);
-
-      expect(formatDate(dateEndOfYear)).toBe("2021-12-31 23:59:59");
-      expect(formatDate(dateStartOfYear)).toBe("2022-01-01 00:00:00");
+    it("capitalizes the first letter of each category label", () => {
+      const bd = makeBreakdown([["error", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.series[0].name).toBe("Error");
     });
 
-    it("should handle single digit values correctly", () => {
-      const date = new Date(2022, 0, 1, 1, 1, 1); // All single digits
-      const result = formatDate(date);
-
-      expect(result).toBe("2022-01-01 01:01:01");
+    it("lowercases remaining letters of the category label", () => {
+      const bd = makeBreakdown([["WARNING", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.series[0].name).toBe("Warning");
     });
 
-    it("should handle timestamp input", () => {
-      const timestamp = 1640995200000; // Jan 1, 2022 00:00:00 UTC
-      const date = new Date(timestamp);
-      const result = formatDate(date);
-
-      expect(result).toMatch(/2022-01-01 \d{2}:\d{2}:\d{2}/);
+    it("maps empty-string category to '(empty)' label", () => {
+      const bd = makeBreakdown([["", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.series[0].name).toBe("(empty)");
     });
 
-    it("should handle future dates", () => {
-      const date = new Date(2030, 11, 25, 15, 30, 45);
-      const result = formatDate(date);
-
-      expect(result).toBe("2030-12-25 15:30:45");
+    it("does NOT map numeric 0 category to '(empty)' — 0 is a real value", () => {
+      // zo_sql_breakdown = 0 (numeric) must render as "0", not "(empty)".
+      // The old `category || "(empty)"` pattern incorrectly treated 0 as falsy.
+      const bd = new Map<string, number[]>([[0 as any, [5]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.series[0].name).toBe("0");
     });
 
-    it("should handle past dates", () => {
-      const date = new Date(1990, 5, 15, 10, 20, 30);
-      const result = formatDate(date);
-
-      expect(result).toBe("1990-06-15 10:20:30");
+    it("assigns semantic color for known levels in light theme", () => {
+      const bd = makeBreakdown([["error", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.series[0].itemStyle.color).toBe("#EF5350");
     });
 
-    it("should handle different months correctly", () => {
-      const dates = [
-        new Date(2022, 0, 1), // January
-        new Date(2022, 1, 1), // February
-        new Date(2022, 2, 1), // March
-        new Date(2022, 9, 1), // October
-        new Date(2022, 10, 1), // November
-        new Date(2022, 11, 1), // December
-      ];
-
-      const results = dates.map(formatDate);
-
-      expect(results[0]).toContain("2022-01-01");
-      expect(results[1]).toContain("2022-02-01");
-      expect(results[2]).toContain("2022-03-01");
-      expect(results[3]).toContain("2022-10-01");
-      expect(results[4]).toContain("2022-11-01");
-      expect(results[5]).toContain("2022-12-01");
+    it("assigns semantic color for known levels in dark theme", () => {
+      const bd = makeBreakdown([["error", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, true);
+      expect(options.series[0].itemStyle.color).toBe("#D95C5C");
     });
 
-    it("should maintain consistency across different date objects with same values", () => {
-      const date1 = new Date(2022, 5, 15, 12, 30, 45);
-      const date2 = new Date("2022-06-15T12:30:45");
+    it("assigns info color for known info level in light theme", () => {
+      const bd = makeBreakdown([["info", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.series[0].itemStyle.color).toBe("#1E88E5");
+    });
 
-      const result1 = formatDate(date1);
-      const result2 = formatDate(date2);
+    it("falls back to palette hash for unknown category labels", () => {
+      const bd = makeBreakdown([["unknownXYZ", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      // Should be one of the mocked palette colors, not undefined
+      expect(["#aaa", "#bbb", "#ccc"]).toContain(options.series[0].itemStyle.color);
+    });
 
-      expect(result1).toMatch(/2022-06-15 12:30:45/);
+    it("falls back to dark palette for unknown labels in dark theme", () => {
+      const bd = makeBreakdown([["unknownXYZ", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, true);
+      expect(["#111", "#222", "#333"]).toContain(options.series[0].itemStyle.color);
+    });
+
+    it("passes UTC timestamps through unchanged", () => {
+      const bd = makeBreakdown([["info", [5, 10]]]);
+      const { options } = convertStackedLogData([ts1, ts2], bd, baseParams, false);
+      expect(options.series[0].data[0][0]).toBe(ts1);
+      expect(options.series[0].data[1][0]).toBe(ts2);
+    });
+
+    it("converts timestamps via toZonedTime for non-UTC timezone", () => {
+      const params = { ...baseParams, timezone: "America/New_York" };
+      const bd = makeBreakdown([["info", [5]]]);
+      const { options } = convertStackedLogData([ts1], bd, params, false);
+      // toZonedTime shifts the value — must differ from raw ts
+      expect(options.series[0].data[0][0]).not.toBe(ts1);
+      // But the count stays the same
+      expect(options.series[0].data[0][1]).toBe(5);
+    });
+
+    it("uses 0 for missing count values (sparse data)", () => {
+      // Series has fewer values than xData length
+      const bd = new Map([["warn", [10]]]);
+      const { options } = convertStackedLogData([ts1, ts2], bd, baseParams, false);
+      expect(options.series[0].data[1][1]).toBe(0);
+    });
+
+    it("shows legend at the bottom", () => {
+      const bd = makeBreakdown([["info", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.legend.show).toBe(true);
+      expect(options.legend.bottom).toBe(0);
+    });
+
+    it("sets grid bottom to 20 to accommodate legend", () => {
+      const bd = makeBreakdown([["info", [1]]]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      expect(options.grid.bottom).toBe("20");
+    });
+
+    it("handles empty breakdownSeries Map", () => {
+      const { options } = convertStackedLogData([ts1], new Map(), baseParams, false);
+      expect(options.series).toHaveLength(0);
+    });
+
+    // Tooltip formatter tests
+    describe("tooltip formatter", () => {
+      const getFormatter = (isDark = false) => {
+        const bd = makeBreakdown([["error", [10]], ["info", [5]]]);
+        const { options } = convertStackedLogData([ts1], bd, baseParams, isDark);
+        return options.tooltip.formatter;
+      };
+
+      it("returns empty string for empty params array", () => {
+        const formatter = getFormatter();
+        expect(formatter([])).toBe("");
+        expect(formatter(null)).toBe("");
+      });
+
+      it("escapes HTML in axisValueLabel to prevent XSS", () => {
+        const formatter = getFormatter();
+        const result = formatter([
+          { axisValueLabel: "<script>alert(1)</script>", marker: "●", seriesName: "Info", value: [ts1, 5] },
+        ]);
+        expect(result).not.toContain("<script>");
+        expect(result).toContain("&lt;script&gt;");
+      });
+
+      it("escapes HTML in seriesName to prevent XSS", () => {
+        const formatter = getFormatter();
+        const result = formatter([
+          { axisValueLabel: "Jan 1", marker: "●", seriesName: "<b>Evil</b>", value: [ts1, 5] },
+        ]);
+        expect(result).not.toContain("<b>Evil</b>");
+        expect(result).toContain("&lt;b&gt;Evil&lt;/b&gt;");
+      });
+
+      it("escapes ampersands in series names", () => {
+        const formatter = getFormatter();
+        const result = formatter([
+          { axisValueLabel: "Jan 1", marker: "●", seriesName: "Errors & Warnings", value: [ts1, 10] },
+        ]);
+        expect(result).toContain("Errors &amp; Warnings");
+      });
+
+      it("renders p.marker HTML unescaped (ECharts-trusted content)", () => {
+        const markerHtml = '<span style="color:#EF5350">●</span>';
+        const formatter = getFormatter();
+        const result = formatter([
+          { axisValueLabel: "Jan 1", marker: markerHtml, seriesName: "Error", value: [ts1, 5] },
+        ]);
+        // marker is ECharts-generated HTML — must appear verbatim, not escaped
+        expect(result).toContain(markerHtml);
+      });
+
+      it("formats counts using formatCount (1500 → 1.5k)", () => {
+        const formatter = getFormatter();
+        const result = formatter([
+          { axisValueLabel: "Jan 1", marker: "●", seriesName: "Error", value: [ts1, 1500] },
+        ]);
+        expect(result).toContain("1.5k");
+        expect(result).not.toContain("1500");
+      });
+
+      it("formats counts over 1M using M suffix", () => {
+        const formatter = getFormatter();
+        const result = formatter([
+          { axisValueLabel: "Jan 1", marker: "●", seriesName: "Info", value: [ts1, 2_500_000] },
+        ]);
+        expect(result).toContain("2.5M");
+      });
+
+      it("uses dark tooltip background in dark theme", () => {
+        const bd = makeBreakdown([["info", [1]]]);
+        const { options } = convertStackedLogData([ts1], bd, baseParams, true);
+        expect(options.tooltip.backgroundColor).toBe("#1e1e2e");
+      });
+
+      it("uses white tooltip background in light theme", () => {
+        const bd = makeBreakdown([["info", [1]]]);
+        const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+        expect(options.tooltip.backgroundColor).toBe("#ffffff");
+      });
+
+      it("uses no inline event handlers and no injected style blocks", () => {
+        const formatter = getFormatter();
+        const result = formatter([
+          { axisValueLabel: "Jan 1", marker: "●", seriesName: "Info", value: [ts1, 5] },
+        ]);
+        // Hover effect was removed to avoid repeated <style> injection and CSP violations
+        expect(result).not.toContain("onmouseenter");
+        expect(result).not.toContain("onmouseleave");
+        expect(result).not.toContain("<style>");
+      });
+
+      it("contains the timestamp header in the tooltip", () => {
+        const formatter = getFormatter();
+        const result = formatter([
+          { axisValueLabel: "2022-01-01", marker: "●", seriesName: "Info", value: [ts1, 5] },
+        ]);
+        expect(result).toContain("2022-01-01");
+      });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // formatDate
+  // ---------------------------------------------------------------------------
+  describe("formatDate", () => {
+    it("formats date correctly", () => {
+      expect(formatDate(new Date("2022-01-01T10:30:45"))).toBe("2022-01-01 10:30:45");
+    });
+
+    it("pads single-digit values with zeros", () => {
+      expect(formatDate(new Date(2022, 2, 5, 9, 7, 8))).toBe("2022-03-05 09:07:08");
+    });
+
+    it("handles January (month 0)", () => {
+      expect(formatDate(new Date(2022, 0, 15, 14, 25, 30))).toBe("2022-01-15 14:25:30");
+    });
+
+    it("handles December (month 11)", () => {
+      expect(formatDate(new Date(2022, 11, 25, 23, 59, 59))).toBe("2022-12-25 23:59:59");
+    });
+
+    it("handles midnight", () => {
+      expect(formatDate(new Date(2022, 5, 15, 0, 0, 0))).toBe("2022-06-15 00:00:00");
+    });
+
+    it("handles leap-year date", () => {
+      expect(formatDate(new Date(2020, 1, 29, 12, 0, 0))).toBe("2020-02-29 12:00:00");
+    });
+
+    it("handles year boundaries", () => {
+      expect(formatDate(new Date(2021, 11, 31, 23, 59, 59))).toBe("2021-12-31 23:59:59");
+      expect(formatDate(new Date(2022, 0, 1, 0, 0, 0))).toBe("2022-01-01 00:00:00");
+    });
+
+    it("handles all months correctly", () => {
+      const months = ["01","02","03","04","05","06","07","08","09","10","11","12"];
+      months.forEach((m, i) => {
+        expect(formatDate(new Date(2022, i, 1, 0, 0, 0))).toContain(`2022-${m}-01`);
+      });
+    });
+
+    it("handles future dates", () => {
+      expect(formatDate(new Date(2030, 11, 25, 15, 30, 45))).toBe("2030-12-25 15:30:45");
     });
   });
 });
