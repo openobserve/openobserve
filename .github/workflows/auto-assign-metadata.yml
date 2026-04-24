@@ -8,6 +8,8 @@ on:
   pull_request_review:
     types: [submitted]
 
+permissions: {}
+
 jobs:
   auto-assign:
     runs-on: ubuntu-latest
