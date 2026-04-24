@@ -365,6 +365,7 @@ pub enum FilterType {
     #[default]
     Condition,
     Group,
+    List,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -509,6 +510,13 @@ pub enum Unit {
     CurrencyRupee,
     #[serde(rename = "custom")]
     Custom,
+    #[serde(rename = "short")]
+    Short,
+    #[serde(rename = "px")]
+    Px,
+    /// Catch-all for unknown/future unit values — prevents deserialization failure.
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
