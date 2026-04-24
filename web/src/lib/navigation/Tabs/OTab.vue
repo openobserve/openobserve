@@ -25,7 +25,7 @@ function handleClick(): void {
 const baseClasses = [
   'o-tab',
   'tw:relative tw:inline-flex tw:items-center tw:justify-center tw:gap-1.5',
-  'tw:px-4 tw:font-medium tw:text-sm tw:whitespace-nowrap',
+  'tw:px-2 tw:font-medium tw:text-sm tw:whitespace-nowrap tw:rounded-t-md',
   'tw:outline-none tw:transition-colors tw:duration-150',
   'tw:select-none',
   'tw:focus-visible:outline-none',
@@ -40,7 +40,7 @@ const stateClasses = computed<string>(() => {
   }
   if (isActive.value) {
     return [
-      'tw:text-tabs-active-text tw:cursor-pointer',
+      'tw:text-tabs-active-text tw:cursor-pointer tw:bg-tabs-active-bg',
       // Indicator: bottom border (horizontal) or right border (vertical)
       isVertical.value
         ? 'tw:border-e-2 tw:border-tabs-indicator'
@@ -50,10 +50,10 @@ const stateClasses = computed<string>(() => {
   return [
     'tw:text-tabs-inactive-text tw:cursor-pointer',
     'tw:enabled:hover:text-tabs-hover-text tw:enabled:hover:bg-tabs-hover-bg',
-    // Transparent placeholder border so layout doesn't shift on activation
-    isVertical.value
-      ? 'tw:border-e-2 tw:border-transparent'
-      : 'tw:border-b-2 tw:border-transparent',
+    // Vertical tabs need the transparent side-border to prevent horizontal content shift on activation.
+    // Horizontal tabs use a fixed height (h-[40px]) with box-sizing:border-box, so the border is
+    // already baked into the height — no layout shift occurs without it.
+    isVertical.value ? 'tw:border-e-2 tw:border-transparent' : '',
   ].join(' ')
 })
 
