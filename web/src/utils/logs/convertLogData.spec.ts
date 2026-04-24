@@ -329,16 +329,27 @@ describe("convertLogData.ts", () => {
       options.series.forEach((s: any) => expect(s.stack).toBe("total"));
     });
 
-    it("capitalizes the first letter of each category label", () => {
+    it("preserves the original case of each category label", () => {
       const bd = makeBreakdown([["error", [1]]]);
       const { options } = convertStackedLogData([ts1], bd, baseParams, false);
-      expect(options.series[0].name).toBe("Error");
+      expect(options.series[0].name).toBe("error");
     });
 
-    it("lowercases remaining letters of the category label", () => {
+    it("preserves all-uppercase category labels as-is", () => {
       const bd = makeBreakdown([["WARNING", [1]]]);
       const { options } = convertStackedLogData([ts1], bd, baseParams, false);
-      expect(options.series[0].name).toBe("Warning");
+      expect(options.series[0].name).toBe("WARNING");
+    });
+
+    it("keeps distinct-case categories as separate series", () => {
+      const bd = makeBreakdown([
+        ["INFO", [3]],
+        ["Info", [2]],
+        ["info", [1]],
+      ]);
+      const { options } = convertStackedLogData([ts1], bd, baseParams, false);
+      const names = options.series.map((s: any) => s.name);
+      expect(names).toEqual(["INFO", "Info", "info"]);
     });
 
     it("maps empty-string category to '(empty)' label", () => {
