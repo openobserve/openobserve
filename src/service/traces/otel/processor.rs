@@ -288,7 +288,7 @@ impl OtelIngestionProcessor {
         }
 
         if let Some(input_val) = input {
-           span_attributes.insert(O2Attributes::INPUT.to_string(), input_val);
+            span_attributes.insert(O2Attributes::INPUT.to_string(), input_val);
         }
 
         if let Some(output_val) = output {
