@@ -44,6 +44,7 @@ jobs:
               title: .title,
               sort_key: ([.title | scan("[0-9]+")] | map(tonumber))
             }) |
+            map(select(.sort_key | length > 0)) |
             sort_by(.sort_key) |
             .[0].title // empty')
 
@@ -119,6 +120,7 @@ jobs:
               title: .title,
               sort_key: ([.title | scan("[0-9]+")] | map(tonumber))
             }) |
+            map(select(.sort_key | length > 0)) |
             sort_by(.sort_key) |
             .[0].title // empty')
 
