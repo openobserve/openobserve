@@ -166,22 +166,21 @@ export const fillMissingValues = (
     if (!actualMaxTime || timeVal > actualMaxTime) actualMaxTime = timeVal;
   });
 
-  // During streaming, clamp fill range to actual data bounds. Chunk metadata
-  // time_offset can extend beyond where real data rows exist — without
-  // clamping, we'd create empty entries at timestamps with no actual data.
-  // On final render (!loading), skip clamping to fill the full query range.
   if (loading) {
-    const formattedFillStart = formatUtc(binnedFillStart);
-    if (actualMinTime && formattedFillStart < actualMinTime) {
-      binnedFillStart = dateBin(
-        interval,
-        new Date(actualMinTime + "Z"),
-        origin,
-      );
+    // LTR streaming: clamp both edges to actual data bounds. Timestamps
+    // before actualMinTime or after actualMaxTime have no new data yet —
+    // the overlay preserves previously rendered chart values for those.
+    // RTL streaming: no clamping — the fill extends from chunkStart to
+    // userEnd so the "newer" (right) side gets noValue entries.
+    if (isLTR) {
+      if (actualMinTime && actualMinTime > formatUtc(binnedFillStart)) {
+        binnedFillStart = new Date(actualMinTime + "Z");
+      }
+      if (actualMaxTime && actualMaxTime < endTimeForFill) {
+        endTimeForFill = actualMaxTime;
+      }
     }
-    if (actualMaxTime && endTimeForFill > actualMaxTime) {
-      endTimeForFill = actualMaxTime;
-    }
+
   }
 
   const filledData: any = [];
