@@ -83,6 +83,16 @@ pub async fn save(Path(org_id): Path<String>, Json(body): Json<SetupStorageReque
         Ok(None) => {}
     }
 
+    let validated_data = match crate::service::org_storage_providers::enforce_checks(
+        req.provider,
+        req.data.to_string(),
+    ) {
+        Ok(v) => v,
+        Err(e) => {
+            return HttpResponse::bad_request(e);
+        }
+    };
+
     log::info!("setting up org-level storage for org {org_id}");
 
     let provider = OrgStorageProvider {
@@ -90,7 +100,7 @@ pub async fn save(Path(org_id): Path<String>, Json(body): Json<SetupStorageReque
         provider_type: req.provider,
         created_at: chrono::Utc::now().timestamp_micros(),
         updated_at: chrono::Utc::now().timestamp_micros(),
-        data: req.data.to_string(),
+        data: validated_data,
     };
 
     match crate::service::org_storage_providers::set_storage(&org_id, provider).await {
@@ -209,7 +219,15 @@ pub async fn update(Path(org_id): Path<String>, Json(req): Json<SetupStorageRequ
         }
     };
 
-    existing.data = new_creds;
+    let validated_data =
+        match crate::service::org_storage_providers::enforce_checks(req.provider, new_creds) {
+            Ok(v) => v,
+            Err(e) => {
+                return HttpResponse::bad_request(e);
+            }
+        };
+
+    existing.data = validated_data;
     existing.updated_at = chrono::Utc::now().timestamp_micros();
 
     match crate::service::org_storage_providers::set_storage(&org_id, existing).await {

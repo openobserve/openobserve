@@ -6,8 +6,10 @@ use object_store::ObjectStore;
 use super::db::org_storage_providers;
 use crate::service::org_storage_providers::utils::_merge_aws_role_arn;
 mod aws_role_utils;
+mod checks;
 mod utils;
 
+pub use checks::enforce_checks;
 use utils::{
     _merge_aws_credentials, _merge_azure_credentials, _merge_gcp_credentials, get_aws, get_azure,
     get_gcp, test_provider,

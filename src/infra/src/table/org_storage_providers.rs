@@ -84,9 +84,9 @@ pub struct AwsRoleArn {
 impl From<String> for ProviderType {
     fn from(value: String) -> Self {
         match value.as_str().to_ascii_lowercase().as_str() {
-            "aws_credentials" => Self::AwsCredentials,
-            "gcp_credentials" => Self::GcpCredentials,
-            "azure_credentials" => Self::AzureCredentials,
+            "AwsCredentials" => Self::AwsCredentials,
+            "GcpCredentials" => Self::GcpCredentials,
+            "AzureCredentials" => Self::AzureCredentials,
             "AwsRoleArn" => Self::AwsRoleArn,
             _ => Self::AwsCredentials,
         }
@@ -96,10 +96,10 @@ impl From<String> for ProviderType {
 impl std::fmt::Display for ProviderType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AwsCredentials => write!(f, "aws_credentials"),
+            Self::AwsCredentials => write!(f, "AwsCredentials"),
             Self::AwsRoleArn => write!(f, "AwsRoleArn"),
-            Self::AzureCredentials => write!(f, "azure_credentials"),
-            Self::GcpCredentials => write!(f, "gcp_credentials"),
+            Self::AzureCredentials => write!(f, "AzureCredentials"),
+            Self::GcpCredentials => write!(f, "GcpCredentials"),
         }
     }
 }
