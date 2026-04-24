@@ -308,6 +308,8 @@ import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 export default defineComponent({
   name: "DashboardQueryEditor",
   components: {
+    OTabs,
+    OTab,
     ConfirmDialog,
     QueryTypeSelector,
     UnifiedQueryEditor,

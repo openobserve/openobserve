@@ -2506,6 +2506,8 @@ import {
 
 export default defineComponent({
   components: {
+    OTabs,
+    OTab,
     ConfigPanelSearch,
     Drilldown,
     ValueMapping,
