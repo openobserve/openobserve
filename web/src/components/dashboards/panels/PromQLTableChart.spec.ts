@@ -81,7 +81,7 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
-vi.mock("@/utils/dashboard/dashboardValidator", () => ({
+vi.mock("@/utils/dashboard/panelValidation", () => ({
   findFirstValidMappedValue: vi.fn().mockReturnValue(null),
 }));
 
