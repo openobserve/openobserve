@@ -28,7 +28,9 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
-  getServiceIconDataUrl: vi.fn().mockReturnValue("data:image/svg+xml;base64,ICON"),
+  getServiceIconDataUrl: vi
+    .fn()
+    .mockReturnValue("data:image/svg+xml;base64,ICON"),
 }));
 
 vi.mock("@/composables/useTraces", () => ({
@@ -36,6 +38,19 @@ vi.mock("@/composables/useTraces", () => ({
     searchObj: { meta: { serviceColors: { alertmanager: "#1ab8be" } } },
     buildQueryDetails: vi.fn(),
     navigateToLogs: vi.fn(),
+  }),
+}));
+
+vi.mock("@/aws-exports", () => ({
+  default: {
+    isEnterprise: "true",
+    isCloud: "false",
+  },
+}));
+
+vi.mock("@/composables/useServiceCorrelation", () => ({
+  useServiceCorrelation: () => ({
+    findRelatedTelemetry: vi.fn().mockResolvedValue(null),
   }),
 }));
 
@@ -251,9 +266,9 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should call getServiceIconDataUrl with the span service name", () => {
       expect(
-        vi.mocked(getServiceIconDataUrl).mock.calls.some(
-          (call) => call[0] === mockSpan.service_name,
-        ),
+        vi
+          .mocked(getServiceIconDataUrl)
+          .mock.calls.some((call) => call[0] === mockSpan.service_name),
       ).toBe(true);
     });
   });
@@ -429,7 +444,9 @@ describe("TraceDetailsSidebar", async () => {
         '[data-test="trace-details-sidebar-attributes-table"]',
       );
       expect(attributesTable.exists()).toBe(true);
-      expect(attributesTable.text()).toContain("dev2-openobserve-alertmanager-1");
+      expect(attributesTable.text()).toContain(
+        "dev2-openobserve-alertmanager-1",
+      );
     });
   });
 
@@ -919,6 +936,61 @@ describe("TraceDetailsSidebar", async () => {
       expect(Array.isArray(newWrapper.vm.spanLinks)).toBe(true);
 
       newWrapper.unmount();
+    });
+  });
+
+  describe("correlateForMetrics — no data found", () => {
+    let correlationWrapper: any;
+
+    beforeEach(async () => {
+      correlationWrapper = mount(TraceDetailsSidebar, {
+        attachTo: "#app",
+        props: {
+          span: mockSpan,
+          baseTracePosition: mockBaseTracePosition,
+          searchQuery: "",
+          streamName: "default",
+          serviceStreamsEnabled: true,
+        },
+        global: {
+          plugins: [i18n, router],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            "q-resize-observer": true,
+            "q-virtual-scroll": {
+              template: `
+                <div>
+                  <slot name="before"></slot>
+                  <div v-for="(item, index) in items" :key="index">
+                    <slot :item="item" :index="index"></slot>
+                  </div>
+                </div>
+              `,
+              props: ["items"],
+            },
+          },
+        },
+      });
+
+      await correlationWrapper.vm.$nextTick();
+    });
+
+    afterEach(() => {
+      correlationWrapper?.unmount();
+    });
+
+    it("should set correlationError to noDataFound message when findRelatedTelemetry returns null", async () => {
+      const metricsTab = correlationWrapper.find(
+        '[data-test="trace-details-sidebar-tabs-correlated-metrics"]',
+      );
+      expect(metricsTab.exists()).toBe(true);
+
+      await metricsTab.trigger("click");
+      await flushPromises();
+
+      expect(correlationWrapper.vm.correlationError).toContain("No Data Found");
     });
   });
 

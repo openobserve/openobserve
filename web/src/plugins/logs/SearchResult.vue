@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="search-list full-height full-width" ref="searchListContainer">
       <div class="row tw:min-h-[28px] tw:pt-[0.375rem]">
         <div
-          class="col-9 text-left q-pl-lg bg-warning text-white rounded-borders"
+          class="col-8 text-left q-pl-lg bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :htmlContent="searchObj.data.countErrorMsg"
           />
         </div>
-        <div v-else class="col-9 text-left q-pl-lg warning flex items-center">
+        <div v-else class="col-8 text-left q-pl-lg warning flex items-center">
           {{
             searchObj.meta.logsVisualizeToggle === "patterns"
               ? patternSummaryText
@@ -87,12 +87,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               config.isCloud == 'false' &&
               store.state.zoConfig.search_inspector_enabled
             "
-            outline
             no-caps
             dense
             color="primary"
             icon="troubleshoot"
-            label="Inspect"
             class="analyze-button inspect-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
             size="xs"
             padding="2px"
@@ -109,13 +107,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.data?.queryResults?.hits?.length > 0 &&
               !searchObj.meta.sqlMode
             "
-            outline
             no-caps
             dense
             color="primary"
             icon="timeline"
             padding="2px"
-            :label="t('volumeInsights.insightsButtonLabel')"
             class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
             size="xs"
             @click="openVolumeAnalysisDashboard"
@@ -134,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="col-3 text-right q-pr-sm q-gutter-xs pagination-block">
+        <div class="col-4 text-right q-pr-sm q-gutter-xs pagination-block">
           <q-pagination
             v-if="
               searchObj.meta.resultGrid.showPagination &&

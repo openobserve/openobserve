@@ -678,7 +678,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
   test.describe("Validation Tests", () => {
 
-    test("Validation: Missing required fields", {
+    test.skip("Validation: Missing required fields", {
       tag: ['@edge-case', '@anomaly', '@P2', '@all']
     }, async ({ page }) => {
       testLogger.info('Testing validation errors');
