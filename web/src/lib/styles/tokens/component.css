@@ -56,6 +56,8 @@
   --color-tabs-indicator:           var(--color-primary-600);
   /* Active tab text */
   --color-tabs-active-text:         var(--color-primary-600);
+  /* Active tab background — lightest primary tint */
+  --color-tabs-active-bg:           var(--color-primary-100);
   /* Inactive tab text */
   --color-tabs-inactive-text:       var(--color-text-secondary);
   /* Hover tab text */
