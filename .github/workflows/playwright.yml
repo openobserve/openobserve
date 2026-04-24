@@ -115,8 +115,47 @@ jobs:
           COVERAGE: "true"
         run: cd web && npm ci && npm run build
 
+      - name: Inspect web/dist before embed
+        run: |
+          echo "=== web/dist total size ==="
+          du -sh web/dist
+          echo "=== file count ==="
+          find web/dist -type f | wc -l
+          echo "=== top 20 largest files ==="
+          find web/dist -type f -printf '%s %p\n' | sort -rn | head -20
+          echo "=== breakdown by extension ==="
+          find web/dist -type f -printf '%f\n' | awk -F. '{print $NF}' | sort | uniq -c | sort -rn
+
       - name: Build and run binary
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+        env:
+          CARGO_PROFILE_RELEASE_INCREMENTAL: "false"
+        run: |
+          set -o pipefail
+          /usr/bin/time -v cargo build --release \
+              --target x86_64-unknown-linux-gnu \
+              --timings \
+              2>&1 | tee cargo-build.log
+
+      - name: Collect timing artifacts
+        if: always()
+        run: |
+          mkdir -p build-timings
+          cp cargo-build.log build-timings/ 2>/dev/null || true
+          # cargo --timings writes to target/cargo-timings/
+          cp -r target/cargo-timings build-timings/ 2>/dev/null || true
+          echo "=== cargo-timings contents ==="
+          ls -la build-timings/cargo-timings/ || true
+          echo "=== top 30 slowest units from cargo log ==="
+          grep -E '^\s+Compiling' cargo-build.log | tail -50 || true
+
+      - name: Upload build timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-timings
+          path: build-timings/
+          retention-days: 7
+          if-no-files-found: warn
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
