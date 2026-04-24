@@ -51,7 +51,7 @@ const EXPIRY_WARNING_STAGES: &[(
     o2_enterprise::enterprise::cloud::billings::ExpiryNotificationStage,
 )] = {
     use o2_enterprise::enterprise::cloud::billings::ExpiryNotificationStage::*;
-    &[(30, ThirtyDay), (7, SevenDay), (1, OneDay)]
+    &[(1, OneDay), (7, SevenDay), (30, ThirtyDay)]
 };
 
 pub fn start() {
