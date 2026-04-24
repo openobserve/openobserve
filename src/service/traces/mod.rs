@@ -244,8 +244,13 @@ pub async fn handle_otlp_request(
     // Initialize OTEL processor for enriching spans with AI/ML observability attributes
     let otel_processor = OtelIngestionProcessor::new();
 
-    // Pre-load user-defined model pricing entries for this org (in-memory cache, no I/O)
-    let org_pricing_entries = crate::service::db::model_pricing::get_org_pricing_entries(org_id);
+    // Pre-load user-defined model pricing entries for this org (in-memory cache, no I/O).
+    // When ZO_MODEL_PRICING_ENABLED=false, skip DB pricing and fall back to hardcoded values.
+    let org_pricing_entries = if config::get_config().common.model_pricing_enabled {
+        crate::service::db::model_pricing::get_org_pricing_entries(org_id)
+    } else {
+        std::sync::Arc::new(vec![])
+    };
 
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();

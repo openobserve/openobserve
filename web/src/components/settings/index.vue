@@ -135,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </q-route-tab>
                 <q-route-tab
+                  v-if="store.state.zoConfig.model_pricing_enabled !== false"
                   data-test="model-pricing-tab"
                   name="model_pricing"
                   :to="{

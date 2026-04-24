@@ -1350,6 +1350,12 @@ pub struct Common {
     )]
     pub regex_patterns_source_url: String,
     #[env_config(
+        name = "ZO_MODEL_PRICING_ENABLED",
+        default = true,
+        help = "Enable user-defined model pricing. When false, falls back to hardcoded built-in pricing only."
+    )]
+    pub model_pricing_enabled: bool,
+    #[env_config(
         name = "ZO_MODEL_PRICING_SOURCE_URL",
         default = "https://raw.githubusercontent.com/openobserve/sdr_patterns/refs/heads/main/llm_pricing.json",
         help = "URL for built-in LLM model pricing JSON source."
