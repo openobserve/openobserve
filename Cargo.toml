@@ -38,7 +38,6 @@ profiling = [
 ]
 pyroscope = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 tokio-console = ["dep:console-subscriber"]
-ci-fast-embed = ["dep:rust-embed"]
 
 [profile.release]
 debug = false
@@ -146,7 +145,6 @@ regex-syntax.workspace = true
 reqwest.workspace = true
 rquickjs.workspace = true
 rust-embed-for-web = "11.3"
-rust-embed = { version = "8", optional = true }
 rustls.workspace = true
 rustls-pemfile.workspace = true
 rustls-native-certs.workspace = true
