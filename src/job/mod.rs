@@ -46,6 +46,7 @@ mod flatten_compactor;
 mod incidents;
 pub mod metrics;
 mod mmdb_downloader;
+#[cfg(feature = "enterprise")]
 mod org_storage;
 #[cfg(feature = "enterprise")]
 pub(crate) mod pipeline;
@@ -778,9 +779,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(o2_enterprise::enterprise::pipeline::pipeline_job::run());
         tokio::task::spawn(cipher::run());
         tokio::task::spawn(db::keys::watch());
+        tokio::task::spawn(org_storage::run());
     }
-
-    tokio::task::spawn(org_storage::run());
 
     #[cfg(feature = "vectorscan")]
     {

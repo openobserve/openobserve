@@ -826,9 +826,7 @@ pub fn service_routes() -> Router {
         // sourcemaps
         .route("/{org_id}/sourcemaps",get(sourcemaps::list).post(sourcemaps::upload_maps).delete(sourcemaps::delete))
         .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
-        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace))
-        // todo: org storage
-        .route("/{org_id}/storage",get(org_storage::get).post(org_storage::save).put(org_storage::update));
+        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace));
 
     #[cfg(feature = "enterprise")]
     {
@@ -908,7 +906,8 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/_analytics", get(service_streams::get_dimension_analytics))
             .route("/{org_id}/service_streams/_correlate", post(service_streams::correlate_streams))
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
-            .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services));
+            .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
+            .route("/{org_id}/storage",get(org_storage::get).post(org_storage::save).put(org_storage::update));
     }
 
     #[cfg(feature = "cloud")]
