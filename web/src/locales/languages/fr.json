@@ -3274,7 +3274,8 @@
     "metricsErrorDetails": "Une erreur s'est produite lors de la récupération des données des métriques. Veuillez réessayer.",
     "noMetricsDescription": "Aucune métrique n'a été trouvée pour cette corrélation dans la plage de temps sélectionnée.",
     "errorRetrievingTraces": "Une erreur s'est produite lors de la récupération des traces.",
-    "serviceGroupProtected": "Le groupe de services ne peut pas être supprimé. Vous ne pouvez modifier que les champs mappés."
+    "serviceGroupProtected": "Le groupe de services ne peut pas être supprimé. Vous ne pouvez modifier que les champs mappés.",
+    "noDataFound": "Aucune donnée trouvée"
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",
