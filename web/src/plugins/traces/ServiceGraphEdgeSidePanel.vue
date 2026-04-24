@@ -703,7 +703,7 @@ export default defineComponent({
 
     watch(
       () => [props.selectedEdge?.from, props.selectedEdge?.to, props.visible] as const,
-      ([, , visible]) => {
+      ([ , visible]) => {
         if (visible && props.selectedEdge) {
           loadTrend();
         } else if (!visible) {

@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-800'
                   ]"
                 >
-                  {{ indexData.stats.doc_time_min }} → {{ indexData.stats.doc_time_max }}
+                  {{ indexData.stats.doc_time_min }} ? {{ indexData.stats.doc_time_max }}
                 </div>
               </div>
             </div>
@@ -1114,6 +1114,7 @@ export default defineComponent({
     },
   },
   components: {
+    OTabs, OTab,
     ConfirmDialog,
     StreamFieldsInputs,
     AppTabs,
@@ -1891,7 +1892,7 @@ export default defineComponent({
                   // check if search is label
                   return (
                     t.toLowerCase().includes(searchTerm) || // direct match with stored value
-                    labelToValueMap[searchTerm] === t // label → value match
+                    labelToValueMap[searchTerm] === t // label ? value match
                   );
                 })
               ) {

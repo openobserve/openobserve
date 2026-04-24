@@ -1242,6 +1242,8 @@ import { contextRegistry, createIncidentsContextProvider } from '@/composables/c
 export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
+    OTabs,
+    OTab,
     TelemetryCorrelationDashboard,
     CorrelatedLogsTable,
     IncidentServiceGraph,
