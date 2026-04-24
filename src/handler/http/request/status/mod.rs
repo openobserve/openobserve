@@ -194,6 +194,8 @@ struct ConfigResponse<'a> {
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
     auto_query_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    org_storage_providers: String,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -311,6 +313,9 @@ pub async fn zo_config() -> impl IntoResponse {
     let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled);
     let actions_enabled = enterprise_value!(false, o2cfg.actions.enabled);
     let super_cluster_enabled = enterprise_value!(false, o2cfg.super_cluster.enabled);
+
+    #[cfg(feature = "enterprise")]
+    let org_storage_providers = o2cfg.org_storage.allowed_providers.clone();
 
     let custom_logo_text = enterprise_value!(
         "".to_string(),
@@ -434,6 +439,8 @@ pub async fn zo_config() -> impl IntoResponse {
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled: cfg.common.search_inspector_enabled,
         auto_query_enabled: cfg.common.auto_query_enabled,
+        #[cfg(feature = "enterprise")]
+        org_storage_providers,
     })
 }
 
