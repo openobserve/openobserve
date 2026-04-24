@@ -169,8 +169,6 @@ export default defineComponent({
       .o-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
         // color: $dark;
         text-transform: capitalize;
         &__content.tab_content {

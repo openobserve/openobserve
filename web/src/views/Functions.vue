@@ -328,7 +328,6 @@ export default defineComponent({
     min-width: 2.5rem;
     width: 2.5rem;
     padding: 0;
-    border-radius: 0.5rem;
     transition: background-color 0.2s ease, color 0.2s ease;
 
     .o-tab__icon {
