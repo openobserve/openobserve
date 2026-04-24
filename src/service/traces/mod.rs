@@ -246,10 +246,13 @@ pub async fn handle_otlp_request(
 
     // Pre-load user-defined model pricing entries for this org (in-memory cache, no I/O).
     // When ZO_MODEL_PRICING_ENABLED=false, skip DB pricing and fall back to hardcoded values.
+    static EMPTY_PRICING: std::sync::OnceLock<
+        std::sync::Arc<Vec<crate::service::db::model_pricing::CachedModelPricing>>,
+    > = std::sync::OnceLock::new();
     let org_pricing_entries = if config::get_config().common.model_pricing_enabled {
         crate::service::db::model_pricing::get_org_pricing_entries(org_id)
     } else {
-        std::sync::Arc::new(vec![])
+        std::sync::Arc::clone(EMPTY_PRICING.get_or_init(|| std::sync::Arc::new(vec![])))
     };
 
     for res_span in res_spans {
