@@ -494,7 +494,7 @@ function loadStreamLists() {
     const queryParams = router.currentRoute.value.query;
     const previouslySelectedStream = searchObj.data.stream.selectedStream.value;
     const persistedStream =
-      store.state.zoConfig?.persist_stream_selection && !queryParams.stream
+      store.state.zoConfig?.auto_query_enabled && !queryParams.stream
         ? restoreTracesStream(store.state.selectedOrganization.identifier)
         : "";
     searchObj.data.stream.streamLists = [];
@@ -1824,7 +1824,7 @@ const runQuery = computed(() => {
 watch(
   () => searchObj.data.stream.selectedStream.value,
   (streamValue: string) => {
-    if (store.state.zoConfig?.persist_stream_selection && streamValue) {
+    if (store.state.zoConfig?.auto_query_enabled && streamValue) {
       saveTracesStream(
         store.state.selectedOrganization.identifier,
         streamValue,

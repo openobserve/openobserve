@@ -226,7 +226,7 @@ export default defineComponent({
       // for metrics page, use stream type as metric
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
 
-      if (store.state.zoConfig?.persist_stream_selection) {
+      if (store.state.zoConfig?.auto_query_enabled) {
         const persisted = restoreMetricsStream(
           store.state.selectedOrganization.identifier,
         );
@@ -281,7 +281,7 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.data.queries[0]?.fields?.stream,
       (stream: string) => {
-        if (store.state.zoConfig?.persist_stream_selection && stream) {
+        if (store.state.zoConfig?.auto_query_enabled && stream) {
           saveMetricsStream(
             store.state.selectedOrganization.identifier,
             stream,

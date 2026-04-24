@@ -1146,7 +1146,7 @@ export default defineComponent({
           restoreUrlQueryParams(dashboardPanelData);
 
           if (
-            store.state.zoConfig?.persist_stream_selection &&
+            store.state.zoConfig?.auto_query_enabled &&
             !router.currentRoute.value.query.stream &&
             !searchObj.data.stream.selectedStream.length
           ) {
@@ -1707,7 +1707,7 @@ export default defineComponent({
       () => searchObj.data.stream.selectedStream,
       (streams: string[]) => {
         if (
-          store.state.zoConfig?.persist_stream_selection &&
+          store.state.zoConfig?.auto_query_enabled &&
           Array.isArray(streams) &&
           streams.length
         ) {

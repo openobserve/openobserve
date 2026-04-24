@@ -1467,12 +1467,6 @@ pub struct Common {
         help = "Enable Live Mode feature in the UI. When true, users can toggle auto-query on filter/time-range changes. When false, the Live Mode toggle is hidden and Run Query button is always shown."
     )]
     pub auto_query_enabled: bool,
-    #[env_config(
-        name = "ZO_PERSIST_STREAM_SELECTION",
-        default = false,
-        help = "When true, the last selected stream(s) on the Logs, Traces, and Metrics pages are persisted in browser localStorage and restored on page reload or navigation."
-    )]
-    pub persist_stream_selection: bool,
 }
 
 impl Common {
@@ -3611,32 +3605,5 @@ mod tests {
     #[test]
     fn test_ensure_not_empty_single_char() {
         assert!(ensure_not_empty("a", "TEST").is_ok());
-    }
-
-    #[test]
-    fn test_persist_stream_selection_default_is_false() {
-        let cfg = Config::default();
-        assert!(!cfg.common.persist_stream_selection);
-    }
-
-    #[test]
-    fn test_persist_stream_selection_can_be_set_true() {
-        let mut cfg = Config::default();
-        cfg.common.persist_stream_selection = true;
-        assert!(cfg.common.persist_stream_selection);
-    }
-
-    #[test]
-    fn test_persist_stream_selection_independent_of_auto_query_enabled() {
-        let mut cfg = Config::default();
-        cfg.common.auto_query_enabled = true;
-        cfg.common.persist_stream_selection = false;
-        assert!(cfg.common.auto_query_enabled);
-        assert!(!cfg.common.persist_stream_selection);
-
-        cfg.common.auto_query_enabled = false;
-        cfg.common.persist_stream_selection = true;
-        assert!(!cfg.common.auto_query_enabled);
-        assert!(cfg.common.persist_stream_selection);
     }
 }
