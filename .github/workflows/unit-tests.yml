@@ -4,15 +4,9 @@ on:
   push:
     branches:
       - "main"
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
   pull_request:
     branches:
       - "*"
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
   merge_group:
 
 concurrency:
@@ -24,14 +18,41 @@ env:
   ZO_RESULT_CACHE_ENABLED: true
 
 jobs:
+  check_changes:
+    name: check_changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has_backend_changes: ${{ steps.check.outputs.has_backend_changes }}
+      has_ui_changes: ${{ steps.check.outputs.has_ui_changes }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: check
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
+          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
+            echo "has_backend_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_backend_changes=false" >> $GITHUB_OUTPUT
+          fi
+          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -q '^web/'; then
+            echo "has_ui_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_ui_changes=false" >> $GITHUB_OUTPUT
+          fi
+
   backend_unit_tests:
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_backend_changes == 'true'
     runs-on:
       labels: ubicloud-standard-8
     permissions:
       contents: read
 
-    # Note: Services always start regardless of conditional logic in steps.
-    # GitHub Actions does not support conditional services.
     services:
       postgres:
         image: postgres:17.5-alpine3.22
@@ -50,55 +71,37 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if API code has changes
-        id: check_changes
-        run: |
-          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: Setup Rust Toolchain
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-11-11
           targets: x86_64-unknown-linux-gnu
       - uses: taiki-e/install-action@v2
-        if: steps.check_changes.outputs.has_changes == 'true'
         with:
           tool: nextest
       - uses: Swatinem/rust-cache@v2
-        if: steps.check_changes.outputs.has_changes == 'true'
         with:
           cache-on-failure: true
           shared-key: unit-tests
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           bash ./.github/protoc.sh
 
       - name: Simulate building frontend code
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: mkdir -p web/dist && touch web/dist/index.html
 
       - name: Print rustc cfg
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: rustc -C target-cpu=native --print cfg
 
       - name: Check code formatting
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: cargo fmt --all -- --check
 
       - name: Run clippy
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
 
       - name: Wait for PostgreSQL to be ready
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           echo "Waiting for PostgreSQL to be fully ready..."
           for i in {1..30}; do
@@ -111,7 +114,6 @@ jobs:
           done
 
       - name: Run unit tests
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           # required for all dbs
           export ZO_INTERNAL_GRPC_TOKEN=fake
@@ -136,6 +138,8 @@ jobs:
           ./coverage.sh check
 
   ui_unit_tests:
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_ui_changes == 'true'
     runs-on:
       labels: ubicloud-standard-8
     permissions:
@@ -147,17 +151,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if frontend code has changes
-        id: check_changes
-        run: |
-          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -q "^web/"; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: Setup Node.js
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/setup-node@v5
         with:
           node-version: '22'
@@ -165,23 +159,26 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
-        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: web
         run: npm ci
 
       - name: Run frontend unit tests with coverage and check thresholds
-        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: web
         run: ./coverage.sh check
 
   unit_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [backend_unit_tests, ui_unit_tests]
+    needs: [check_changes, backend_unit_tests, ui_unit_tests]
     if: always()
     steps:
       - name: Check test results
         run: |
+          if [ "${{ needs.check_changes.result }}" != "success" ]; then
+            echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"
+            exit 1
+          fi
+
           if [ "${{ needs.backend_unit_tests.result }}" == "success" ] || [ "${{ needs.backend_unit_tests.result }}" == "skipped" ]; then
             echo "Backend tests passed or skipped"
           else

@@ -4,21 +4,9 @@ on:
   push:
     branches:
       - "main"
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "web/**"
-      - "tests/ui-testing/**"
-      - "tests/playwright-tests/**"
   pull_request:
     branches:
       - "*"
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "web/**"
-      - "tests/ui-testing/**"
-      - "tests/playwright-tests/**"
   merge_group:
 
 concurrency:
@@ -40,8 +28,33 @@ env:
   ZO_INGEST_ALLOWED_UPTO: 48  # Allow backdated data ingestion for backfill tests
 
 jobs:
+  check_changes:
+    name: check_changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: check
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
+          if [ -z "$CHANGED" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          elif echo "$CHANGED" | grep -qvE '(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/)'; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
   api_integration_tests:
     name: api_integration_tests
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-8
     steps:
       - name: Remove unused tools
@@ -192,11 +205,15 @@ jobs:
   api_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [api_integration_tests]
+    needs: [check_changes, api_integration_tests]
     if: always()
     steps:
       - name: Check test results
         run: |
+          if [ "${{ needs.check_changes.result }}" != "success" ]; then
+            echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"
+            exit 1
+          fi
           if [ "${{ needs.api_integration_tests.result }}" == "success" ] || [ "${{ needs.api_integration_tests.result }}" == "skipped" ]; then
             echo "API tests passed or skipped"
             exit 0
