@@ -3,6 +3,8 @@ name: Auto Assign Metadata
 on:
   issues:
     types: [opened]
+  # pull_request_target runs with base-repo secrets for fork PRs — safe as long
+  # as no actions/checkout step is added without pinning ref to the base branch.
   pull_request_target:
     types: [opened, ready_for_review]
 
@@ -67,6 +69,8 @@ jobs:
             -F org="$ORG" -F num="$PROJECT_NUMBER" \
             --jq '.data.organization.projectV2.id')
 
+          [ -n "$PROJECT_ID" ] || { echo "::warning::Project not found — check PROJECT_NUMBER and token scope"; exit 0; }
+
           gh api graphql \
             -f query='mutation($project:ID!,$content:ID!){addProjectV2ItemById(input:{projectId:$project,contentId:$content}){item{id}}}' \
             -f project="$PROJECT_ID" \
@@ -130,6 +134,8 @@ jobs:
             -f query='query($org:String!,$num:Int!){organization(login:$org){projectV2(number:$num){id}}}' \
             -F org="$ORG" -F num="$PROJECT_NUMBER" \
             --jq '.data.organization.projectV2.id')
+
+          [ -n "$PROJECT_ID" ] || { echo "::warning::Project not found — check PROJECT_NUMBER and token scope"; exit 0; }
 
           gh api graphql \
             -f query='mutation($project:ID!,$content:ID!){addProjectV2ItemById(input:{projectId:$project,contentId:$content}){item{id}}}' \
