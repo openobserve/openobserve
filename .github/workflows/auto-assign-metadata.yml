@@ -12,19 +12,11 @@ jobs:
   auto-assign:
     runs-on: ubuntu-latest
     steps:
-      - name: Generate app token
-        id: app_token
-        uses: actions/create-github-app-token@v3
-        with:
-          private-key: ${{ secrets.PRIVATE_KEY }}
-          app-id: ${{ secrets.APP_ID }}
-          owner: ${{ github.repository_owner }}
-
       # ── PR: assign creator ──
       - name: Assign PR creator
         if: github.event_name == 'pull_request'
         env:
-          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
           CREATOR: ${{ github.event.pull_request.user.login }}
@@ -37,7 +29,7 @@ jobs:
       - name: Add milestone to PR
         if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
         env:
-          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
         run: |
@@ -62,7 +54,7 @@ jobs:
       - name: Add PR to project
         if: github.event_name == 'pull_request'
         env:
-          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           NODE_ID: ${{ github.event.pull_request.node_id }}
         run: |
           PROJECT_ID=$(gh api graphql -f query='
@@ -83,7 +75,7 @@ jobs:
       - name: Add Needs-Testing label on approval
         if: github.event_name == 'pull_request_review' && github.event.review.state == 'approved'
         env:
-          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
         run: |
@@ -95,7 +87,7 @@ jobs:
       - name: Assign issue creator
         if: github.event_name == 'issues'
         env:
-          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.issue.number }}
           CREATOR: ${{ github.event.issue.user.login }}
@@ -113,7 +105,7 @@ jobs:
       - name: Add milestone to issue
         if: github.event_name == 'issues'
         env:
-          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.issue.number }}
         run: |
@@ -138,7 +130,7 @@ jobs:
       - name: Add issue to project
         if: github.event_name == 'issues'
         env:
-          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           NODE_ID: ${{ github.event.issue.node_id }}
         run: |
           PROJECT_ID=$(gh api graphql -f query='
