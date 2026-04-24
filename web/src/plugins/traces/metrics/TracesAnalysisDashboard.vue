@@ -273,6 +273,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               round
               @click="toggleDimensionSelector"
+              @mousedown.stop
+              @touchstart.stop
+              @pointerdown.stop
             />
           </template>
 

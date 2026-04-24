@@ -30,6 +30,9 @@
             dense
             round
             @click="collapseSidebar"
+            @mousedown.stop
+            @touchstart.stop
+            @pointerdown.stop
           />
       </template>
       <template v-slot:after>

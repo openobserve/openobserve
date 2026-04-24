@@ -1095,6 +1095,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 z-index: 100 !important;
               "
               @click="collapseFieldList"
+              @mousedown.stop
+              @touchstart.stop
+              @pointerdown.stop
             ></q-btn>
           </template>
           <template #after>

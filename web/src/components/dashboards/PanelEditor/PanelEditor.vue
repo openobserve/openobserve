@@ -112,6 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               style="top: 14px; z-index: 100"
               @click.stop="collapseFieldList"
+              @mousedown.stop
+              @touchstart.stop
+              @pointerdown.stop
             />
           </template>
 
@@ -469,6 +472,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               round
               style="top: 14px; z-index: 100"
               @click="collapseFieldList"
+              @mousedown.stop
+              @touchstart.stop
+              @pointerdown.stop
             />
           </template>
 

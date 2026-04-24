@@ -148,6 +148,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             round
             @click="collapseSidebar"
+            @mousedown.stop
+            @touchstart.stop
+            @pointerdown.stop
           />
         </template>
         <template v-slot:after>
