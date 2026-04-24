@@ -1026,6 +1026,10 @@ export default defineComponent({
     },
   },
   components: {
+    OTabs,
+    OTab,
+    OTabPanels,
+    OTabPanel,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,
