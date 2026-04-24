@@ -326,6 +326,7 @@ export const useSearchBar = () => {
       //if empty then we are displaying no events found... message on the UI instead of throwing in an error format
       if (!allStreamFields.length) {
         // searchObj.data.errorMsg = t("search.noFieldFound");
+        searchObj.loading = false;
         return;
       }
 
@@ -377,6 +378,8 @@ export const useSearchBar = () => {
         searchObj.data.histogram = {
           xData: [],
           yData: [],
+          breakdownField: null,
+          breakdownSeries: null,
           chartParams: {
             title: "",
             unparsed_x_data: [],

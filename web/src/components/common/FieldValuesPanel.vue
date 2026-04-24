@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { watchDebounced } from "@vueuse/core";
+import { useDebounceFn, watchDebounced } from "@vueuse/core";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { formatLargeNumber } from "@/utils/zincutils";
@@ -324,17 +324,28 @@ watchDebounced(
 );
 
 /**
+ * Debounced emission for mode changes. The UI toggle updates immediately
+ * (instant feedback) but the API call is consolidated so that rapid
+ * include→exclude→include clicks only fire one search at the end, preventing
+ * a brief "no events found" flash (from an intermediate result set) that
+ * would reset the field-list scroll position.
+ */
+const debouncedEmitModeChange = useDebounceFn((mode: "include" | "exclude") => {
+  if (selectedValues.value.length > 0) {
+    emit("add-multiple-search-terms", props.fieldName, [...selectedValues.value], mode);
+  }
+}, 300);
+
+/**
  * Called when the user explicitly clicks the include/exclude toggle.
- * Sets filterMode and immediately re-applies the current selection under
- * the new mode so the query updates in real time.
+ * Updates filterMode immediately for instant visual feedback, then
+ * debounces the actual query emission to avoid rapid successive API calls.
  * This is the ONLY path that should emit add-multiple-search-terms for
  * a mode change — the prop-sync watcher below only updates the ref silently.
  */
 const setFilterMode = (mode: "include" | "exclude") => {
   filterMode.value = mode;
-  if (selectedValues.value.length > 0) {
-    emit("add-multiple-search-terms", props.fieldName, [...selectedValues.value], mode);
-  }
+  debouncedEmitModeChange(mode);
 };
 
 // Keep filterMode in sync with the external filter state.

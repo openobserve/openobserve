@@ -3412,6 +3412,7 @@
     },
     "loadingLogs": "Loading logs...",
     "noLogsFound": "No Logs Found",
+    "noDataFound": "No Data Found",
     "noLogsDescription": "No logs found for this correlation in the selected time range.",
     "service": "Service: {service}",
     "tracesPlaceholder": "Traces will be implemented here",
