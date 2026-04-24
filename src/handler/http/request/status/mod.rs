@@ -195,6 +195,7 @@ struct ConfigResponse<'a> {
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
     auto_query_enabled: bool,
+    persist_stream_selection: bool,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -436,6 +437,7 @@ pub async fn zo_config() -> impl IntoResponse {
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled: cfg.common.search_inspector_enabled,
         auto_query_enabled: cfg.common.auto_query_enabled,
+        persist_stream_selection: cfg.common.persist_stream_selection,
     })
 }
 
