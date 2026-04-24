@@ -66,7 +66,7 @@ export function overlayNewDataOnOldOptions(
 
     if (qStartMs > 0 && qEndMs > 0) {
       for (const series of newOptions.series) {
-        if (!series.name || !Array.isArray(series.data) || !series.data.length)
+        if (series.name == null || !Array.isArray(series.data) || !series.data.length)
           continue;
         const firstPoint = series.data[0];
         if (!Array.isArray(firstPoint) || firstPoint.length < 2) continue;
@@ -163,8 +163,8 @@ export function overlayNewDataOnOldOptions(
   // stale data (from old chart). No per-point null replacement — genuine nulls
   // in new data are preserved, and old data only fills the stale range.
   for (const newSeries of merged.series) {
-    // Skip annotation series (no name)
-    if (!newSeries.name) continue;
+    // Skip annotation series (no name — undefined/null, not empty string)
+    if (newSeries.name == null) continue;
 
     const oldSeries = oldOptions.series.find(
       (s: any) => s.name === newSeries.name,
@@ -274,7 +274,7 @@ export function overlayNewDataOnOldOptions(
   // (e.g. old 1-week series shouldn't expand a 1-day chart).
   const hasValidQueryRange = queryStartMs > 0 && queryEndMs > 0;
   for (const oldSeries of oldOptions.series) {
-    if (!oldSeries.name) continue;
+    if (oldSeries.name == null) continue;
     const existsInNew = merged.series.some(
       (s: any) => s.name === oldSeries.name,
     );
