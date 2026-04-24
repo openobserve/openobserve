@@ -1017,9 +1017,6 @@ export default defineComponent({
       }
     };
 
-    // Track if we've rendered the first chunk with actual data
-    let hasRenderedFirstDataChunk = ref(false);
-
     // --- Streaming overlay state ---
     // Snapshot of old panelData.options taken when streaming starts (for refresh overlay).
     // Immutable once set — each chunk overlays against the same original.
@@ -1112,64 +1109,27 @@ export default defineComponent({
           (data.value[0]?.result?.length > 0 ||
             (Array.isArray(data.value[0]) && data.value[0].length > 0));
 
-        // Use throttled version during loading (streaming), immediate version when complete
-        // This prevents excessive re-renders during PromQL data streaming
         if (loading.value) {
           // ---- STREAMING (chunks arriving) ----
-          if (hasData && !hasRenderedFirstDataChunk.value) {
-            // FIRST CHUNK WITH DATA: render immediately
-            hasRenderedFirstDataChunk.value = true;
-
-            // Snapshot old rendered options if they exist — this is IMMUTABLE from here.
-            const hasOldChart = panelData.value?.options?.series?.length > 0;
-            if (hasOldChart) {
-              previousOptionsSnapshot = JSON.parse(
-                JSON.stringify(panelData.value.options),
-              );
-              // Tag with metadata for eligibility checks
-              previousOptionsSnapshot._chartType = panelSchema.value?.type;
-              previousOptionsSnapshot._queryCount =
-                panelSchema.value?.queries?.length;
-
-              // Capture actual grid pixel rect from the ECharts instance.
-              // With containLabel: true, the actual plot area differs from raw grid config.
-              // WARNING: getModel().getComponent() is an ECharts internal API, not public.
-              // Validated against echarts 5.6.0. Revisit if ECharts is upgraded.
-              try {
-                const chartInstance = chartRendererRef.value?.chart;
-                if (chartInstance) {
-                  const gridModel = chartInstance
-                    ?.getModel()
-                    ?.getComponent("grid");
-                  const gridRect = gridModel?.coordinateSystem?.getRect();
-                  if (gridRect) {
-                    previousOptionsSnapshot._gridRect = {
-                      x: gridRect.x,
-                      y: gridRect.y,
-                      width: gridRect.width,
-                      height: gridRect.height,
-                    };
-                  }
-                }
-              } catch (e) {
-                // Ignore — will fall back to grid config values in overlay
-              }
-            }
-
-            // Convert and apply overlay in a single assignment to panelData.value.
-            // Always pass true during streaming — overlay adds phantom anchor
-            // points even without old data to prevent first chunk from filling
-            // the entire chart width.
-            await convertPanelDataCommon(true);
-          } else if (hasData) {
-            // SUBSEQUENT CHUNKS: render with overlay if available,
-            // or phantom-anchored render if no cache.
+          // Every chunk overlays against previousOptionsSnapshot (captured
+          // once in the loading watcher when streaming starts), or falls back
+          // to phantom anchors when no snapshot is available.
+          if (hasData) {
             await convertPanelDataCommon(true);
           }
-          // else: no old chart or no data → skip conversion → loading bar shown
+          // else: no data yet → skip conversion → loading bar shown
         } else {
           // ---- LOADING COMPLETE ----
-          hasRenderedFirstDataChunk.value = false; // Reset for next query
+          // Skip refresh-reset firings: when the executor sets state.data = []
+          // at the start of a new query, this watcher fires with hasData=false
+          // while loading hasn't yet been flipped to true. If we converted here
+          // we'd assign an empty result to panelData.value, destroying the
+          // previous chart before the streaming first-chunk can snapshot it
+          // for the overlay. True zero-result completions are handled by the
+          // watch(loading, ...) handler below.
+          if (!hasData && panelData.value?.options?.series?.length > 0) {
+            return;
+          }
 
           // Claim the final render before awaiting so that watch(loading),
           // which fires in the same tick, sees the flag and skips its render.
@@ -1189,16 +1149,47 @@ export default defineComponent({
       { deep: true },
     );
 
-    // Watch loading separately to handle stream completion.
-    // The data watcher above watches [data, theme, timezone, annotations] — NOT loading.
-    // When loading transitions from true→false without a simultaneous data change,
-    // the data watcher doesn't fire. This watcher ensures we always clean up
-    // streaming state and do a final render when the stream ends.
+    // Watch loading to bookend each streaming session.
+    // Start (false→true): snapshot the current chart for the overlay.
+    //   Every chunk overlays against this same original — the snapshot is
+    //   immutable from here until the stream ends.
+    // End (true→false): do the final render without overlay (unless the
+    //   data watcher already claimed it via streamEndRenderPending) and
+    //   clear the snapshot so the next stream captures fresh.
     watch(loading, async (newLoading, oldLoading) => {
-      if (oldLoading === true && newLoading === false) {
-        // Stream just completed
-        hasRenderedFirstDataChunk.value = false;
+      if (oldLoading === false && newLoading === true) {
+        const hasOldChart = panelData.value?.options?.series?.length > 0;
+        if (hasOldChart) {
+          previousOptionsSnapshot = JSON.parse(
+            JSON.stringify(panelData.value.options),
+          );
+          previousOptionsSnapshot._chartType = panelSchema.value?.type;
+          previousOptionsSnapshot._queryCount =
+            panelSchema.value?.queries?.length;
 
+          // Capture actual grid pixel rect from the ECharts instance.
+          // With containLabel: true, the actual plot area differs from raw grid config.
+          // WARNING: getModel().getComponent() is an ECharts internal API, not public.
+          // Validated against echarts 5.6.0. Revisit if ECharts is upgraded.
+          try {
+            const chartInstance = chartRendererRef.value?.chart;
+            if (chartInstance) {
+              const gridModel = chartInstance?.getModel()?.getComponent("grid");
+              const gridRect = gridModel?.coordinateSystem?.getRect();
+              if (gridRect) {
+                previousOptionsSnapshot._gridRect = {
+                  x: gridRect.x,
+                  y: gridRect.y,
+                  width: gridRect.width,
+                  height: gridRect.height,
+                };
+              }
+            }
+          } catch {
+            // Ignore — will fall back to grid config values in overlay
+          }
+        }
+      } else if (oldLoading === true && newLoading === false) {
         // If the data watcher's else-branch already claimed the final render
         // (simultaneous data + loading change in the same tick), skip here.
         if (streamEndRenderPending) return;
@@ -1404,21 +1395,27 @@ export default defineComponent({
       ) {
         return "";
       }
+      // A rendered chart is already on screen — suppress "No Data" even if
+      // the raw data buffer is momentarily empty. This prevents a flicker on
+      // refresh where the executor resets state.data = [] before loading
+      // flips to true, transiently firing this computed with empty data.
+      if (panelData.value?.options?.series?.length > 0) {
+        return "";
+      }
       // Check if the queryType is 'promql'
-      else if (panelSchema.value?.queryType == "promql") {
+      if (panelSchema.value?.queryType == "promql") {
         // Check if the 'filteredData' array has elements and every item has a non-empty 'result' array
         return filteredData.value?.length &&
           filteredData.value.some((item: any) => item?.result?.length)
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
-      } else {
-        // The queryType is not 'promql'
-        return data.value.length &&
-          data.value[0]?.length &&
-          handleNoData(panelSchema.value.type)
-          ? ""
-          : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
       }
+      // The queryType is not 'promql'
+      return data.value.length &&
+        data.value[0]?.length &&
+        handleNoData(panelSchema.value.type)
+        ? ""
+        : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
     });
 
     // when the error changes, emit the error
