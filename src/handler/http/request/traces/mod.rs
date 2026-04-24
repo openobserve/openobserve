@@ -340,9 +340,9 @@ pub async fn get_latest_traces(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(llm_usage_tokens_input) as llm_usage_details_input, \
-            sum(llm_usage_tokens_output) as llm_usage_details_output, \
-            sum(llm_usage_tokens_total) as llm_usage_details_total, \
+            sum(CAST(llm_usage_tokens_input AS BIGINT)) as llm_usage_details_input, \
+            sum(CAST(llm_usage_tokens_output AS BIGINT)) as llm_usage_details_output, \
+            sum(CAST(llm_usage_tokens_total AS BIGINT)) as llm_usage_details_total, \
             sum(llm_usage_cost_total) as llm_cost_details_total, \
             FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
             FROM \"{stream_name}\""
@@ -976,9 +976,9 @@ async fn process_latest_traces_stream(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(llm_usage_tokens_input) as llm_usage_details_input, \
-            sum(llm_usage_tokens_output) as llm_usage_details_output, \
-            sum(llm_usage_tokens_total) as llm_usage_details_total, \
+            sum(CAST(llm_usage_tokens_input AS BIGINT)) as llm_usage_details_input, \
+            sum(CAST(llm_usage_tokens_output AS BIGINT)) as llm_usage_details_output, \
+            sum(CAST(llm_usage_tokens_total AS BIGINT)) as llm_usage_details_total, \
             sum(llm_usage_cost_total) as llm_cost_details_total, \
             FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
             FROM \"{stream_name}\""

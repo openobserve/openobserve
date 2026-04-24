@@ -312,7 +312,7 @@ pub async fn get_latest_users(
         "SELECT trace_id, \
         min(start_time) as trace_start_time, \
         max(end_time) as trace_end_time, \
-        sum(llm_usage_tokens_total) as llm_usage_details_total, \
+        sum(CAST(llm_usage_tokens_total AS BIGINT)) as llm_usage_details_total, \
         sum(llm_usage_cost_total) as llm_cost_details_total \
         FROM \"{stream_name}\" \
         WHERE trace_id IN ('{trace_ids_sql}') \
