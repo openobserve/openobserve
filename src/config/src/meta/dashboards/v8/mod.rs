@@ -365,6 +365,7 @@ pub enum FilterType {
     #[default]
     Condition,
     Group,
+    List,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -473,43 +474,14 @@ pub enum PromqlTableMode {
     All,
 }
 
+/// The backend never interprets unit values — it stores and echoes them back to
+/// the frontend as-is. Using a plain `String` means any value the frontend
+/// sends (including future ones like "short", "px", etc.) round-trips without
+/// corruption or deserialization errors.
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-pub enum Unit {
-    #[serde(rename = "numbers")]
-    Numbers,
-    #[serde(rename = "bytes")]
-    Bytes,
-    #[serde(rename = "kilobytes")]
-    Kilobytes,
-    #[serde(rename = "megabytes")]
-    Megabytes,
-    #[serde(rename = "bps")]
-    Bps,
-    #[serde(rename = "seconds")]
-    Seconds,
-    #[serde(rename = "milliseconds")]
-    Milliseconds,
-    #[serde(rename = "microseconds")]
-    Microseconds,
-    #[serde(rename = "nanoseconds")]
-    Nanoseconds,
-    #[serde(rename = "percent-1")]
-    PercentNormalized,
-    #[serde(rename = "percent")]
-    Percent,
-    #[serde(rename = "currency-dollar")]
-    CurrencyDollar,
-    #[serde(rename = "currency-euro")]
-    CurrencyEuro,
-    #[serde(rename = "currency-pound")]
-    CurrencyPound,
-    #[serde(rename = "currency-yen")]
-    CurrencyYen,
-    #[serde(rename = "currency-rupee")]
-    CurrencyRupee,
-    #[serde(rename = "custom")]
-    Custom,
-}
+#[serde(transparent)]
+#[schema(value_type = String)]
+pub struct Unit(pub String);
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
