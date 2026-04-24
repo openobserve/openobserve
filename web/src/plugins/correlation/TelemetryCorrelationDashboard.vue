@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Search -->
                 <div
-                  class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                  class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
                 >
                   <q-input
                     v-model="metricSearchText"
@@ -702,7 +702,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Search -->
               <div
-                class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
               >
                 <q-input
                   v-model="metricSearchText"
@@ -1264,6 +1264,7 @@ import {
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import {
   groupMetricsByCategory,
+  getDefaultMetricSelections,
   type MetricGroupDefinition,
   DEFAULT_METRIC_GROUP_DEFINITIONS,
 } from "@/utils/metrics/metricGrouping";
@@ -1563,7 +1564,9 @@ const applyUnstableDimensionDefaults = (
     const notMatchedKeys: string[] = [];
 
     // For each filter in the stream, check if it maps to an unstable dimension
-    for (const [filterKey, filterValue] of Object.entries(stream.filters ?? {})) {
+    for (const [filterKey, filterValue] of Object.entries(
+      stream.filters ?? {},
+    )) {
       // Look up the semantic dimension ID for this field name
       const dimensionId = fieldToDimensionId.get(filterKey);
 
@@ -1589,11 +1592,18 @@ const uniqueMetricStreams = computed(() => {
   return getUniqueStreams(props.metricStreams);
 });
 
-// Selected metric streams (default to first 6 unique streams)
-// Apply SELECT_ALL_VALUE defaults for unstable dimensions
+// Selected metric streams — prefer curated defaults from group definitions,
+// fall back to first 6 unique streams for non-OTel deployments.
+// Apply SELECT_ALL_VALUE defaults for unstable dimensions.
 const selectedMetricStreams = ref<StreamInfo[]>(
   applyUnstableDimensionDefaults(
-    getUniqueStreams(props.metricStreams).slice(0, 6),
+    (() => {
+      const unique = getUniqueStreams(props.metricStreams);
+      const defs =
+        props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS;
+      const defaults = getDefaultMetricSelections(defs, unique);
+      return defaults.length > 0 ? defaults : unique.slice(0, 6);
+    })(),
   ),
 );
 
@@ -1893,7 +1903,9 @@ const applyDimensionChanges = () => {
 
     // For each filter in the stream, find its semantic dimension ID
     // and update with the new value from activeDimensions
-    for (const [filterKey, _filterValue] of Object.entries(stream.filters ?? {})) {
+    for (const [filterKey, _filterValue] of Object.entries(
+      stream.filters ?? {},
+    )) {
       const dimensionId = fieldToDimensionId.get(filterKey);
       if (dimensionId && activeDimensions.value[dimensionId] !== undefined) {
         const newValue = activeDimensions.value[dimensionId];

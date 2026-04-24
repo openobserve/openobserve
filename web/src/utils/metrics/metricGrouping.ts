@@ -31,10 +31,16 @@ import type { StreamInfo } from "@/services/service_streams";
 
 export type MetricGroupId = string;
 
+export interface DefaultMetricConfig {
+  streamName: string;
+  filters?: Record<string, string>;
+}
+
 export interface MetricGroupDefinition {
   id: string;
   label: string;
   icon: string | {};
+  defaultMetrics?: DefaultMetricConfig[];
 }
 
 export interface MetricGroupConfig {
@@ -183,6 +189,76 @@ export const DEFAULT_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
   { id: "infra", label: "Infra", icon: "dns" },
   { id: "others", label: "Others", icon: "category" },
 ];
+
+/**
+ * Group definitions for Kubernetes-instrumented deployments using OTel semantic
+ * naming conventions (kubeletstats / cluster receiver).
+ *
+ * Splits pod and node metrics into dedicated tabs and pre-selects the most
+ * operationally relevant streams by default. Falls back to slice(0,6) for
+ * deployments that use Prometheus-style naming (no OTel k8s_* metrics present).
+ */
+export const K8S_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
+  {
+    id: "pods",
+    label: "Pods",
+    icon: "view_in_ar",
+    defaultMetrics: [
+      { streamName: "k8s_pod_cpu_usage" },
+      { streamName: "k8s_pod_memory_usage" },
+      { streamName: "k8s_pod_cpu_request_utilization" },
+      { streamName: "k8s_pod_memory_request_utilization" },
+      { streamName: "k8s_pod_cpu_limit_utilization" },
+      { streamName: "k8s_pod_memory_limit_utilization" },
+      { streamName: "k8s_pod_network_io" },
+    ],
+  },
+  {
+    id: "nodes",
+    label: "Nodes",
+    icon: "computer",
+    defaultMetrics: [
+      { streamName: "k8s_node_cpu_usage" },
+      { streamName: "k8s_node_memory_rss" },
+      { streamName: "k8s_node_network_io" },
+    ],
+  },
+  { id: "network", label: "Network", icon: "wifi" },
+  { id: "others", label: "Others", icon: "category" },
+];
+
+/**
+ * Return the ordered list of streams that match the defaultMetrics declared on
+ * each group definition. Only streams present in `availableStreams` are included.
+ *
+ * Matching rules:
+ * - stream_name must equal DefaultMetricConfig.streamName
+ * - every key/value in DefaultMetricConfig.filters must match the stream's filters
+ *
+ * Returns an empty array when no group has defaultMetrics configured, allowing
+ * the caller to apply a fallback (e.g. slice(0, 6)).
+ */
+export function getDefaultMetricSelections(
+  groupDefs: MetricGroupDefinition[],
+  availableStreams: StreamInfo[],
+): StreamInfo[] {
+  const results: StreamInfo[] = [];
+  for (const group of groupDefs) {
+    if (!group.defaultMetrics?.length) continue;
+    for (const def of group.defaultMetrics) {
+      const match = availableStreams.find(
+        (s) =>
+          s.stream_name === def.streamName &&
+          (!def.filters ||
+            Object.entries(def.filters).every(
+              ([k, v]) => s.filters?.[k] === v,
+            )),
+      );
+      if (match) results.push(match);
+    }
+  }
+  return results;
+}
 
 /**
  * Classify a single metric stream name into a group.
