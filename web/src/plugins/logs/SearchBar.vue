@@ -974,7 +974,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   flat
                   :title="t('search.cancel')"
-                  class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
+                  class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</q-btn
                 >
@@ -1022,12 +1022,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </q-btn>
-                <q-separator
-                  v-if="visualizeSearchRequestTraceIds.length === 0"
-                  class="tw:h-[29px] tw:w-[1px]"
-                />
+                <q-separator class="tw:h-[29px] tw:w-[1px]" />
                 <q-btn-dropdown
-                  v-if="visualizeSearchRequestTraceIds.length === 0"
                   flat
                   class="tw:h-[29px] search-button-dropdown"
                   :class="[
@@ -1097,7 +1093,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   flat
                   :title="t('search.cancel')"
-                  class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
+                  class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</q-btn
                 >
@@ -1146,12 +1142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </q-btn>
-                <q-separator
-                  v-if="visualizeSearchRequestTraceIds.length === 0"
-                  class="tw:h-[29px] tw:w-[1px]"
-                />
+                <q-separator class="tw:h-[29px] tw:w-[1px]" />
                 <q-btn-dropdown
-                  v-if="visualizeSearchRequestTraceIds.length === 0"
                   flat
                   class="tw:h-[29px] search-button-dropdown"
                   :class="[
