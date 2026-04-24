@@ -398,8 +398,6 @@ const tracesPartitionMap: Record<
   { partition: number; chunks: Record<number, number> }
 > = {};
 
-searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
-
 const selectedStreamName = computed(
   () => searchObj.data.stream.selectedStream.value,
 );
@@ -519,7 +517,6 @@ function loadStreamLists() {
         : "";
     searchObj.data.stream.streamLists = [];
     if (searchObj.data.streamResults.list.length > 0) {
-      let lastUpdatedStreamTime = 0;
       let selectedStreamItemObj = {};
       let foundPriorityMatch = false;
       searchObj.data.streamResults.list.map((item: any) => {
@@ -547,13 +544,6 @@ function loadStreamLists() {
         ) {
           selectedStreamItemObj = itemObj;
           foundPriorityMatch = true;
-        } else if (
-          !foundPriorityMatch &&
-          !queryParams.stream &&
-          item.stats.doc_time_max >= lastUpdatedStreamTime
-        ) {
-          lastUpdatedStreamTime = item.stats.doc_time_max;
-          selectedStreamItemObj = itemObj;
         }
       });
 
@@ -1420,28 +1410,24 @@ async function loadPageData() {
 
   //get stream list
   await getStreamList();
-}
-
-function runQueryIfRequested() {
-  const queryParams = router.currentRoute.value.query;
-  const hasStream = !!queryParams.stream;
-  const hasOrg = !!queryParams.org_identifier;
-  const hasPeriod =
-    !!queryParams.period || (!!queryParams.from && !!queryParams.to);
-  const shouldRunQuery = queryParams["run-query"] === "true";
-
-  if (hasStream && hasOrg && hasPeriod && shouldRunQuery) {
+  if (searchObj.data.stream.selectedStream.value) {
     searchData();
   }
 }
 
 onBeforeMount(async () => {
+  if (
+    searchObj.organizationIdentifier &&
+    searchObj.organizationIdentifier !==
+      store.state.selectedOrganization.identifier
+  ) {
+    resetSearchObj();
+  }
   setupContextProvider();
   restoreUrlQueryParams();
   await importSqlParser();
   if (!searchObj.loading) {
     await loadPageData();
-    runQueryIfRequested();
   }
 });
 
@@ -1466,20 +1452,15 @@ onActivated(async () => {
   if (params.reload === "true") {
     restoreUrlQueryParams();
     await loadPageData();
-    runQueryIfRequested();
   }
+
   if (
     searchObj.organizationIdentifier !=
     store.state.selectedOrganization.identifier
   ) {
+    resetSearchObj();
     restoreUrlQueryParams();
-    loadPageData();
-  }
-
-  if (router.currentRoute.value.path.indexOf("/traces") > -1) {
-    setTimeout(() => {
-      // if (searchResultRef.value) searchResultRef.value?.reDrawChart();
-    }, 300);
+    await loadPageData();
   }
 });
 
