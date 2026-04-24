@@ -980,6 +980,7 @@ export default defineComponent({
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
+      if (!searchObj.data.stream.selectedStream.length) return;
       try {
         searchObj.loading = true;
         searchObj.meta.refreshHistogram = true;
@@ -2252,6 +2253,7 @@ export default defineComponent({
         store.state.zoConfig?.auto_query_enabled &&
         store.state.zoConfig?.query_on_stream_selection !== false &&
         searchObj.meta.logsVisualizeToggle === "logs" &&
+        searchObj.data.stream.selectedStream.length > 0 &&
         !searchObj.loading &&
         !searchObj.loadingHistogram
       ) {
