@@ -646,7 +646,10 @@ import {
 } from "@/utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics/metrics.json";
-import { type MetricGroupDefinition } from "@/utils/metrics/metricGrouping";
+import {
+  type MetricGroupDefinition,
+  K8S_METRIC_GROUP_DEFINITIONS,
+} from "@/utils/metrics/metricGrouping";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { useI18n } from "vue-i18n";
 
@@ -968,14 +971,14 @@ export default defineComponent({
       navigateToTraces({ errorsOnly, minDurationMicros, maxDurationMicros });
     };
 
-    // Metric group definitions — controls which category tabs appear in the metrics dashboard.
-    // Defaults to pods + nodes + others for service-graph workloads. Consumers can extend
-    // this list by pushing entries whose ids are registered in METRIC_GROUP_PATTERNS.
-    const metricGroupResources = ref<MetricGroupDefinition[]>([
-      { id: "pods", label: "Pods", icon: DeployedCode },
-      { id: "nodes", label: "Nodes", icon: "dns" },
-      { id: "others", label: "Others", icon: "category" },
-    ]);
+    // Metric group definitions — controls which category tabs and default selections
+    // appear in the metrics dashboard. Uses K8S_METRIC_GROUP_DEFINITIONS for OTel
+    // semantic defaults; overrides the pods icon with the project-specific component.
+    const metricGroupResources = ref<MetricGroupDefinition[]>(
+      K8S_METRIC_GROUP_DEFINITIONS.map((g) =>
+        g.id === "pods" ? { ...g, icon: DeployedCode } : g,
+      ),
+    );
 
     // Metrics Correlation State
     const showTelemetryDialog = ref(false);
