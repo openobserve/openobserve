@@ -498,20 +498,20 @@ fn build_external_contract_expiry_email(
     };
 
     let subject = format!(
-        "[OpenObserve] External contract expiring in {} day{} — {}",
+        "[OpenObserve] Contract expiring in {} day{} — {}",
         days_remaining,
         if days_remaining == 1 { "" } else { "s" },
         display_name
     );
 
     let message = if days_remaining <= 1 {
-        "Your external contract expires tomorrow. Please contact your account manager to renew \
+        "Your contract expires tomorrow. Please contact your account manager to renew \
          and avoid service interruption."
     } else if days_remaining <= 7 {
-        "Your external contract is expiring soon. Please contact your account manager to renew \
+        "Your contract is expiring soon. Please contact your account manager to renew \
          your subscription."
     } else {
-        "Your external contract will expire in the coming weeks. Please reach out to your \
+        "Your contract will expire in the coming weeks. Please reach out to your \
          account manager if you'd like to renew."
     };
 
@@ -519,7 +519,7 @@ fn build_external_contract_expiry_email(
     let org_id_esc = html_escape(org_id);
     let body = format!(
         "<html><body>\
-        <h2>External Contract Expiry Notice</h2>\
+        <h2>Contract Expiry Notice</h2>\
         <p><strong>Organization:</strong> {display_name_esc} ({org_id_esc})</p>\
         <p>{message}</p>\
         <p><strong>Days remaining:</strong> {days_remaining}</p>\
