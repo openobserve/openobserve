@@ -15,34 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-item
+  <!-- Internal link -->
+  <RouterLink
+    v-if="!external"
     :data-test="`menu-link-${link}-item`"
-    v-ripple="true"
-    :to="
-      !external
-        ? {
-            path: link,
-            exact: false,
-            query: {
-              org_identifier: store.state.selectedOrganization?.identifier,
-            },
-          }
-        : ''
-    "
-    clickable
-    :class="{
-      'q-router-link--active':
-        router.currentRoute.value.path.indexOf(link) == 0 && link != '/',
-      'q-link-function': title == 'Functions',
+    :to="{
+      path: link,
+      query: { org_identifier: store.state.selectedOrganization?.identifier },
     }"
-    :target="target"
     :aria-current="isActive ? 'page' : undefined"
     :aria-label="ariaLabel"
-    v-on="external ? { click: () => openWebPage(link) } : {}"
+    :class="[
+      'menu-link',
+      { 'menu-link--active': isActive, 'q-link-function': title === 'Functions' },
+    ]"
   >
-    <q-item-section v-if="icon" avatar>
+    <div class="menu-link__section">
       <div class="icon-wrapper">
-        <q-icon :name="icon" />
+        <q-icon
+          v-if="icon"
+          :name="icon"
+          class="menu-link__icon"
+        />
+        <q-icon v-else-if="iconComponent" class="menu-link__icon">
+          <component :is="iconComponent" />
+        </q-icon>
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
@@ -52,11 +49,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ badge > 99 ? '99+' : badge }}
         </div>
       </div>
-      <q-item-label>{{ title }}</q-item-label>
-    </q-item-section>
-    <q-item-section v-else-if="iconComponent" avatar>
+      <span class="menu-link__label">{{ title }}</span>
+    </div>
+  </RouterLink>
+
+  <!-- External link -->
+  <a
+    v-else
+    :data-test="`menu-link-${link}-item`"
+    :href="link"
+    :target="target"
+    rel="noopener noreferrer"
+    :aria-label="ariaLabel"
+    class="menu-link"
+    @click.prevent="openWebPage(link)"
+  >
+    <div class="menu-link__section">
       <div class="icon-wrapper">
-        <q-icon><component :is="iconComponent" /></q-icon>
+        <q-icon
+          v-if="icon"
+          :name="icon"
+          class="menu-link__icon"
+        />
+        <q-icon v-else-if="iconComponent" class="menu-link__icon">
+          <component :is="iconComponent" />
+        </q-icon>
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
@@ -66,13 +83,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ badge > 99 ? '99+' : badge }}
         </div>
       </div>
-      <q-item-label>{{ title }}</q-item-label>
-    </q-item-section>
-  </q-item>
+      <span class="menu-link__label">{{ title }}</span>
+    </div>
+  </a>
 </template>
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
+import { RouterLink } from "vue-router";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
@@ -153,6 +171,7 @@ export default defineComponent({
     return {
       store,
       router,
+      RouterLink,
       openWebPage,
       isActive,
       ariaLabel,
@@ -162,160 +181,83 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-@import "../styles/menu-variables";
-@import "../styles/menu-animations";
 
-.q-item {
-  padding: 1px 8px;
-  margin: 0px;
-  border-radius: 6px;
-
-  /* Always have a border to prevent layout shift when active */
+.menu-link {
+  display: block;
+  padding: 4px 8px;
+  margin: 1px 5px;
+  border-radius: 0;
   border: 1px solid transparent;
-
-  /* Minimal height to prevent scrollbar */
-  min-height: 24px;
-
-  // Add top margin to first item so border is visible
-  &:first-child {
-    margin-top: 4px;
-  }
-
-  // Phase 2: Enhanced transitions
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
-
-  // Phase 6: Performance optimizations
-  // Use transform and opacity for GPU acceleration
+  text-decoration: none;
+  cursor: pointer;
+  color: var(--o2-sidebar-icon-color-default);
+  background: transparent;
+  transition: background 200ms ease, color 200ms ease, border-color 200ms ease;
   will-change: transform;
   transform: translateZ(0);
 
-  // Phase 2: Enhanced hover state with 3D icon effect
-  &:hover:not(.q-router-link--active) {
-    transform: translateZ(0);
-    // background-color: rgba(30, 41, 59, 0.6);
+  &--active {
+    background: var(--o2-sidebar-nav-active-bg);
+    color: var(--o2-sidebar-icon-color);
+    border-color: rgba(255, 255, 255, 0.18);
 
-    .q-icon {
-      color: var(--o2-menu-color);
-      // 3D pop-out effect with slight rotation
-      transform: translateZ(20px) scale(1.15) rotateY(5deg);
-      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-    }
-
-    .q-item-label {
-      color: var(--o2-menu-color);
-      transform: translateY(-2px);
+    .menu-link__icon,
+    .menu-link__label {
+      color: var(--o2-sidebar-icon-color);
     }
   }
 
-  // Phase 2 & 3: Enhanced active state with modern UX
-  &.q-router-link--active {
-    transform: translateZ(0) !important;
-    // Rich, vibrant multi-layer gradient background
-    // background:
-    //   linear-gradient(135deg, rgba(168, 85, 247, 0.4) 0%, rgba(236, 72, 153, 0.35) 100%),
-    //   linear-gradient(180deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.25) 100%) !important;
-    // // Stronger border with glow
-    // border: 1px solid rgba(168, 85, 247, 0.6) !important;
-    // // Minimal shadow for subtle depth
-    // box-shadow:
-    //   0 0 8px rgba(168, 85, 247, 0.2),
-    //   0 2px 8px rgba(168, 85, 247, 0.25),
-    //   inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-    background: linear-gradient(135deg, var(--o2-menu-gradient-start) 0%, var(--o2-menu-gradient-end) 100%) !important;
+  &:not(.menu-link--active):hover {
+    background: var(--o2-sidebar-nav-hover-bg);
+    color: var(--o2-sidebar-icon-color);
 
-    box-shadow: 0 4px 12px rgba(89, 155, 174, 0.09) !important;
-    color: var(--o2-menu-color) !important;
-    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
-    // Subtle inner highlight for depth
-    position: relative;
-    backdrop-filter: blur(8px) !important;
-
-    .q-icon {
-      // Minimal icon glow
-      filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.4));
-      color: var(--o2-menu-color); // Lighter purple for better visibility
+    .menu-link__icon {
+      transform: scale(1.12);
+      transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
-    .q-item-label {
-      font-weight: 700;
-      color: var(--o2-menu-color); // Very light purple/white for contrast
-      text-shadow: 0 0 4px rgba(168, 85, 247, 0.3);
-    }
-
-    // Phase 3: Enhanced active indicator with minimal shadow
-    &::before {
-      content: " ";
-      width: 6px;
-      height: 100%;
-      position: absolute;
-      left: -8px;
-      top: 50%;
-      transform: translateY(-50%);
-      // Brighter gradient
-      background: linear-gradient(180deg, var(--o2-primary-btn-bg) 0%, var(--o2-primary-btn-bg) 50%, var(--o2-primary-btn-bg) 100%);
-      border-radius: 0 2px 2px 0;
-      // Minimal glow
-      box-shadow: 0 0 6px var(--o2-menu-color);
-    }
-
-    // Subtle animated glow overlay
-    &::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: --o2-menu-gradient-start;
-      border-radius: 0 6px 6px 0;
-      pointer-events: none;
+    .menu-link__icon,
+    .menu-link__label {
+      color: var(--o2-sidebar-icon-color);
     }
   }
 
-  // Phase 2: Enhanced focus state for keyboard navigation
   &:focus-visible {
-    outline: 2px solid #a855f7;
+    outline: 2px solid var(--o2-sidebar-indicator, rgba(255, 255, 255, 0.5));
     outline-offset: 2px;
   }
-
-  &.ql-item-mini {
-    margin: 0;
-
-    &::before {
-      display: none;
-    }
-  }
-
-  &[aria-label="Billing"] {
-    .q-icon {
-      font-size: 1.3rem;
-    }
-  }
 }
 
-// Phase 3: Enhanced icon container with 3D effects and spring bounce-back
-.q-item__section--avatar {
-  margin: 0;
-  padding: 0;
+.menu-link__section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   min-width: 40px;
-  perspective: 1000px; // Enable 3D space
-
-  .q-icon {
-    padding: 4px;
-    border-radius: 12px;
-    // Spring bounce-back effect: overshoots and bounces back
-    transition: all 600ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
-    transform-style: preserve-3d;
-  }
 }
 
-// Add spring bounce-back transition to label
-.q-item-label {
-  transition: all 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  transform-style: preserve-3d;
+.menu-link__icon {
+  padding: 4px;
+  color: inherit;
+  transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  // q-icon renders as <i> — keep sizing
+  font-size: 1.3rem;
+  width: 1.3rem;
+  height: 1.3rem;
 }
 
-// Phase 4: Badge support
+.menu-link__label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: inherit;
+  text-align: center;
+  display: block;
+}
+
+// Badge
 .icon-wrapper {
   position: relative;
   display: inline-block;
@@ -329,7 +271,7 @@ export default defineComponent({
   height: 16px;
   padding: 0 4px;
   background: linear-gradient(135deg, #ef4444 0%, #ec4899 100%);
-  border: 2px solid #0f172a;
+  border: 2px solid rgba(0, 0, 0, 0.5);
   border-radius: 50%;
   font-size: 9px;
   font-weight: 700;
@@ -341,31 +283,7 @@ export default defineComponent({
   box-shadow: 0 4px 8px rgba(239, 68, 68, 0.5);
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   z-index: 1;
-
-  // Phase 6: Performance - GPU acceleration
   will-change: opacity;
   transform: translateZ(0);
-
-  // Light mode
-  body.body--light & {
-    border-color: #ffffff;
-    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
-  }
 }
-
-// Light mode support - using :deep() to pierce scoped styles
-body.body--light {
-  .q-item {
-
-
-    &.q-router-link--active {
-
-      // &::before {
-      //   // background: linear-gradient(180deg, var(--o2-body-primary-bg) 0%, var(--o2-body-secondary-bg) 100%) !important;
-      //   box-shadow: 4px 0px 0px var(--o2-menu-color) !important;
-      // }
-    }
-  }
-}
-
 </style>

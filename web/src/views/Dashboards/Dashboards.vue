@@ -21,75 +21,140 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="q-pa-none flex flex-col"
     :key="store.state.selectedOrganization.identifier"
   >
-    <!-- searchBar at top -->
-     <div class="tw:w-full tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs">
-      <div class="card-container">
-        <div class="flex justify-between full-width tw:py-3 tw:px-4 items-center">
-            <div class="q-table__title">{{ t("dashboard.header") }}</div>
-
-              <div class="flex q-ml-auto tw:ps-2">
+    <!-- Splitter: sidebar + content, full page height -->
+     <div 
+      class="full-width alert-list-table"
+      style="height: calc(100vh - var(--navbar-height))"
+     >
+       <q-splitter
+            v-model="splitterModel"
+            unit="px"
+            :limits="[200, 500]"
+            style="height: calc(100vh - var(--navbar-height))"
+            data-test="dashboard-splitter"
+    >
+      <template v-slot:before>
+        <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:bg-[var(--color-primary-50)]! tw:border-r tw:border-[var(--o2-border-color)]">
+          <!-- Page title -->
+          <div class="tw:px-3 tw:h-[52px] tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border-color)]">
+            <div class="tw:flex tw:items-center tw:gap-2 tw:text-base tw:font-semibold tw:text-[var(--color-text-primary)]">
+              <q-icon :name="outlinedDashboard" size="18px" class="tw:text-[var(--color-primary-600)]" />
+              {{ t("dashboard.header") }}
+            </div>
+          </div>
+          <!-- Sidebar header -->
+          <div class="dashboard-folder-header dashboard-sticky-top"
+            :class="store.state.theme === 'dark' ? 'dashboard-folder-header-dark' : 'dashboard-folder-header-light'"
+          >
+            <div class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:px-3 tw:h-[36px] tw:border-b tw:border-[var(--o2-border-color)]">
+              <span class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wider tw:text-[var(--color-text-secondary)]">{{ t("dashboard.folderLabel") }}</span>
+              <q-btn
+                flat dense round
+                class="tw:h-[22px]! tw:w-[22px]! tw:min-w-[22px]! tw:text-[var(--color-text-secondary)] tw:hover:bg-[var(--color-primary-100)]!"
+                @click.stop="addFolder"
+                data-test="dashboard-new-folder-btn"
+                title="Add Folder"
+              >
+                <q-icon name="add" size="14px" />
+              </q-btn>
+            </div>
+            <!-- Search Input -->
+            <div class="tw:px-3 tw:py-2">
+              <q-input
+                v-model="folderSearchQuery"
+                dense
+                borderless
+                data-test="folder-search"
+                placeholder="Search Folder"
+                clearable
+                class="tw:bg-white tw:rounded tw:border tw:border-[var(--o2-border-color)] tw:px-2 tw:text-sm"
+                :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+                hide-bottom-space
+              >
+                <template #prepend>
+                  <q-icon class="o2-search-input-icon" name="search" size="xs" />
+                </template>
+              </q-input>
+            </div>
+          </div>
+          <!-- Folder list -->
+          <div class="dashboards-tabs tw:flex-1 tw:overflow-y-auto">
+            <OTabs
+              orientation="vertical"
+              v-model="activeFolderId"
+              data-test="dashboards-folder-tabs"
+            >
+              <OTab
+                v-for="(tab, index) in filteredFolders"
+                :key="tab.folderId"
+                :name="tab.folderId"
+                class="individual-tab"
+                :data-test="`dashboard-folder-tab-${tab.folderId}`"
+              >
+                <div class="folder-item full-width row justify-between no-wrap">
+                  <span class="folder-name text-truncate" :title="tab.name">{{ tab.name }}</span>
+                  <div class="hover-actions">
+                    <q-btn
+                      v-if="index || (folderSearchQuery?.length > 0 && index == 0 && tab.folderId.toLowerCase() != 'default')"
+                      dense flat icon="more_vert"
+                      style="cursor: pointer; height: 1.2rem"
+                      size="xs"
+                      data-test="dashboard-more-icon"
+                      @click.stop
+                    >
+                      <q-menu>
+                        <q-list dense>
+                          <q-item v-close-popup clickable @click.stop="editFolder(tab.folderId)" data-test="dashboard-edit-folder-icon">
+                            <q-item-section avatar><q-icon :name="outlinedEdit" size="xs" /></q-item-section>
+                            <q-item-section><q-item-label>Edit</q-item-label></q-item-section>
+                          </q-item>
+                          <q-item v-close-popup clickable @click.stop="showDeleteFolderDialogFn(tab.folderId)" data-test="dashboard-delete-folder-icon">
+                            <q-item-section avatar><q-icon :name="outlinedDelete" size="xs" /></q-item-section>
+                            <q-item-section><q-item-label>Delete</q-item-label></q-item-section>
+                          </q-item>
+                        </q-list>
+                      </q-menu>
+                    </q-btn>
+                  </div>
+                </div>
+              </OTab>
+            </OTabs>
+          </div>
+        </div>
+      </template>
+      <template v-slot:after>
+          <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:bg-white!">
+            <!-- Actions bar -->
+            <div class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:px-4 tw:py-2 tw:border-b tw:border-[var(--o2-border-color)] tw:h-[52px]">
+              <div class="tw:flex tw:items-center tw:gap-2 tw:mr-auto">
                 <q-input
                   v-model="dynamicQueryModel"
                   dense
                   borderless
-                  :placeholder="
-                    searchAcrossFolders
-                      ? t('dashboard.searchAcross')
-                      : t('dashboard.search')
-                  "
+                  :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('dashboard.search')"
                   data-test="dashboard-search"
                   :clearable="searchAcrossFolders"
                   @clear="clearSearchHistory"
-                  class="o2-search-input"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-search-input-dark'
-                      : 'o2-search-input-light'
-                  "
-                hide-bottom-space>
+                  class="o2-search-input tw:min-w-[200px]"
+                  :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+                  hide-bottom-space
+                >
                   <template #prepend>
-                    <q-icon
-                      class="o2-search-input-icon"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'o2-search-input-icon-dark'
-                          : 'o2-search-input-icon-light'
-                      "
-                      name="search"
-                    />
+                    <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
                   </template>
                 </q-input>
-              </div>
-              <div class="tw:mb-2">
                 <q-toggle
                   data-test="dashboard-search-across-folders-toggle"
                   v-model="searchAcrossFolders"
                   label="All Folders"
                   size="lg"
-                  class="q-ml-sm tw:h-[36px] o2-toggle-button-lg"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-toggle-button-lg-dark'
-                      : 'o2-toggle-button-lg-light'
-                  "
-                >
-                </q-toggle>
-                <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
-                  {{
-                    searchAcrossFolders
-                      ? t("dashboard.searchSelf")
-                      : t("dashboard.searchAll")
-                  }}
-                </q-tooltip>
+                  class="o2-toggle-button-lg tw:h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
+                />
               </div>
-              <!-- import dashboard button with dropdown -->
               <q-btn-dropdown
-                class="q-ml-sm o2-secondary-button tw:h-[36px]"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-secondary-button-dark'
-                    : 'o2-secondary-button-light'
-                "
+                class="o2-secondary-button tw:h-[36px]"
+                :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                 flat
                 :label="t(`dashboard.import`)"
                 data-test="dashboard-import"
@@ -109,176 +174,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-item>
                 </q-list>
               </q-btn-dropdown>
-              <!-- new dashboard button -->
               <q-btn
-                class="q-ml-sm o2-primary-button tw:h-[36px]"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-primary-button-dark'
-                    : 'o2-primary-button-light'
-                "
+                class="o2-primary-button tw:h-[36px]"
+                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                 flat
                 data-test="dashboard-new"
                 :label="t(`dashboard.add`)"
                 @click="addDashboard"
               />
-        </div>
-      </div>
-     </div>
-     <div 
-      class="full-width alert-list-table"
-      style="height: calc(100vh - 116px)"
-     >
-       <q-splitter
-            v-model="splitterModel"
-            unit="px"
-            :limits="[200, 500]"
-            style="height: calc(100vh - 116px)"
-            data-test="dashboard-splitter"
-    >
-      <template v-slot:before>
-        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-        <div class="tw:h-full">
-          <div class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
-          <!-- folder list starts here -->
-          <div
-            class="dashboard-folder-header dashboard-sticky-top "
-            :class="
-              store.state.theme === 'dark'
-                ? 'dashboard-folder-header-dark'
-                : 'dashboard-folder-header-light'
-            "
-          >
-            <div
-              class="text-bold q-px-sm q-py-sm tw:flex tw:items-center tw:justify-between tw:gap-2"
-            >
-              {{ t("dashboard.folderLabel") }}
-              <div>
-                <q-btn
-                  class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-secondary-button-dark'
-                      : 'o2-secondary-button-light'
-                  "
-                  flat
-                  @click.stop="addFolder"
-                  data-test="dashboard-new-folder-btn"
-                  title="Add Folder"
-                >
-                  <q-icon name="add" size="xs" />
-                </q-btn>
-              </div>
             </div>
-            <q-separator class="tw:mb-1 tw:mt-[3px]" size="2px"></q-separator>
-            <!-- Search Input -->
-            <div style="width: 100%" class="flex folder-item q-py-xs">
-              <q-input
-                v-model="folderSearchQuery"
-                dense
-                borderless
-                data-test="folder-search"
-                placeholder="Search Folder"
-                style="width: 100%"
-                clearable
-                class="tw:mx-2 q-px-xs"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-search-input-dark'
-                    : 'o2-search-input-light'
-                "
-               hide-bottom-space>
-                <template #prepend>
-                  <q-icon
-                    class="o2-search-input-icon"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-search-input-icon-dark'
-                        : 'o2-search-input-icon-light'
-                    "
-                    name="search"
-                  />
-                </template>
-              </q-input>
-              <div></div>
-            </div>
-          </div>
-          <div class="dashboards-tabs tw:flex-1 tw:overflow-y-auto">
-            <OTabs
-              orientation="vertical"
-              v-model="activeFolderId"
-              data-test="dashboards-folder-tabs"
-            >
-              <OTab
-                v-for="(tab, index) in filteredFolders"
-                :key="tab.folderId"
-                :name="tab.folderId"
-                class="individual-tab"
-                :data-test="`dashboard-folder-tab-${tab.folderId}`"
-              >
-                <div class="folder-item full-width row justify-between no-wrap">
-                  <span class="folder-name text-truncate" :title="tab.name">{{
-                    tab.name
-                  }}</span>
-                  <div class="hover-actions">
-                    <q-btn
-                      v-if="
-                        index ||
-                        (folderSearchQuery?.length > 0 &&
-                          index == 0 &&
-                          tab.folderId.toLowerCase() != 'default')
-                      "
-                      dense
-                      flat
-                      icon="more_vert"
-                      style="cursor: pointer; justify-self: end; height: 0.5rem"
-                      size="sm"
-                      data-test="dashboard-more-icon"
-                    >
-                      <q-menu>
-                        <q-list dense>
-                          <q-item
-                            v-close-popup
-                            clickable
-                            @click.stop="editFolder(tab.folderId)"
-                            data-test="dashboard-edit-folder-icon"
-                          >
-                            <q-item-section avatar>
-                              <q-icon :name="outlinedEdit" size="xs" />
-                            </q-item-section>
-                            <q-item-section>
-                              <q-item-label>Edit</q-item-label>
-                            </q-item-section>
-                          </q-item>
-                          <q-item
-                            v-close-popup
-                            clickable
-                            @click.stop="showDeleteFolderDialogFn(tab.folderId)"
-                            data-test="dashboard-delete-folder-icon"
-                          >
-                            <q-item-section avatar>
-                              <q-icon :name="outlinedDelete" size="xs" />
-                            </q-item-section>
-                            <q-item-section>
-                              <q-item-label>Delete</q-item-label>
-                            </q-item-section>
-                          </q-item>
-                        </q-list>
-                      </q-menu>
-                    </q-btn>
-                  </div>
-                </div>
-              </OTab>
-            </OTabs>
-          </div>
-        </div>
-        </div>
-        </div>
-      </template>
-      <template v-slot:after>
-          <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-            <div class="tw:h-full card-container">
-          <!-- add dashboard table -->
+            <!-- Table -->
           <q-table
             ref="qTable"
             :rows="dashboards"
@@ -294,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-table"
             :style="
               !filterQuery.length && dashboards.length > 0
-                ? 'height: calc(100vh  - var(--navbar-height) - 80px)'
+                ? 'height: calc(100vh - var(--navbar-height) - 52px)'
                 : ''
             "
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
@@ -571,7 +476,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="confirmBulkDelete"
           />
         </div>
-        </div>
       </template>
     </q-splitter>
      </div>
@@ -613,6 +517,7 @@ import {
   moveModuleToAnotherFolder,
 } from "../../utils/commons.ts";
 import {
+  outlinedDashboard,
   outlinedDelete,
   outlinedDriveFileMove,
   outlinedEdit,
@@ -1426,6 +1331,7 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       changeMaxRecordToReturn,
+      outlinedDashboard,
       outlinedDelete,
       outlinedEdit,
       outlinedDriveFileMove,
@@ -1517,6 +1423,7 @@ export default defineComponent({
   .individual-tab {
     min-height: 1.5rem;
   }
+
   .folder-item {
     display: flex;
     justify-content: space-between;
@@ -1531,45 +1438,12 @@ export default defineComponent({
       }
     }
 
-    // .folder-name {
-    //   white-space: nowrap;
-    //   overflow: hidden;
-    //   text-overflow: ellipsis;
-    // }
-
     .hover-actions {
       display: none;
       align-items: center;
 
       .q-btn {
         margin-left: 0.5rem;
-      }
-    }
-  }
-
-  .o-tabs {
-    &--vertical {
-      margin: 5px;
-
-      .o-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        text-transform: capitalize;
-
-        &__content.tab_content {
-          .o-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-
-        &--active {
-          background-color: var(--o2-primary-btn-bg);
-          color: white;
-        }
       }
     }
   }
@@ -1589,13 +1463,12 @@ export default defineComponent({
   }
 
   &.dashboard-folder-header-light {
-    background-color: white;
+    background-color: var(--color-primary-50);
   }
 
   &.dashboard-folder-header-dark {
     background-color: #1a1a1a;
   }
-  border-radius: 0.625rem;
 }
 
 .bottom-btn-dashboard-list {

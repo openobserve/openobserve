@@ -1,0 +1,41 @@
+/* ============================================================
+   LAYOUT TOKENS — header, sidebar, and navigation chrome
+   Default values are set here based on the base primary palette.
+   theme.ts overrides these at runtime when the user picks a theme.
+   ============================================================ */
+
+:root {
+  /* --- Header (always light in light mode) --- */
+  --o2-header-bg: #ffffff;
+  --o2-header-border: rgba(0, 0, 0, 0.08);
+  --o2-header-shadow: none;
+  --o2-header-text: #19191e;
+
+  /* --- Sidebar — darkened tone of primary (#3F7994 = primary-600) --- */
+  /* tone 1: sidebar shell (primary mixed heavily toward near-black) */
+  --o2-sidebar-bg: color-mix(in srgb, var(--color-primary-600) 82%, #071220);
+  /* tone 2: active item background (semi-transparent white overlay on sidebar) */
+  --o2-sidebar-nav-active-bg: rgba(255, 255, 255, 0.18);
+  /* tone 3: hover item background (lighter semi-transparent white) */
+  --o2-sidebar-nav-hover-bg: rgba(255, 255, 255, 0.10);
+  /* icon/label colors — full white for maximum contrast on dark sidebar */
+  --o2-sidebar-icon-color: rgba(255, 255, 255, 1);
+  --o2-sidebar-icon-color-default: rgba(255, 255, 255, 0.85);
+  /* active indicator stripe — bright white */
+  --o2-sidebar-indicator: rgba(255, 255, 255, 0.9);
+}
+
+/* Dark mode — Quasar adds .body--dark to <body> */
+.body--dark {
+  --o2-header-bg: #19191e;
+  --o2-header-border: rgba(255, 255, 255, 0.08);
+  --o2-header-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  --o2-header-text: #ffffff;
+
+  --o2-sidebar-bg: color-mix(in srgb, var(--color-primary-700) 55%, #030711);
+  --o2-sidebar-nav-active-bg: rgba(255, 255, 255, 0.15);
+  --o2-sidebar-nav-hover-bg: rgba(255, 255, 255, 0.08);
+  --o2-sidebar-icon-color: rgba(255, 255, 255, 1);
+  --o2-sidebar-icon-color-default: rgba(255, 255, 255, 0.82);
+  --o2-sidebar-indicator: rgba(255, 255, 255, 0.9);
+}

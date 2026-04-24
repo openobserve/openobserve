@@ -177,7 +177,8 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
     :class="['o-tabs tw:flex tw:flex-col tw:relative', alignClasses[align]]"
     @keydown="handleKeydown"
     @focusin="handleFocusin"
-    @focusout="handleFocusout"
+    @focusout="handleFocusout""
+    class="tw:px-1.5"
   >
     <slot />
     <div

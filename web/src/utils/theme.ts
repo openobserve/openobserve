@@ -87,6 +87,14 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     // const headerMenuBg = hexToRgba(themeColor, 2); // 0.3 alpha (30% theme color)
     // document.body.style.setProperty('--o2-header-menu-bg', headerMenuBg);
 
+    // Apply sidebar background (darker tone of primary color)
+    const sidebarBg = mixColors(themeColor, '#030711', 60); // 60% primary + 40% very dark
+    document.body.style.setProperty('--o2-sidebar-bg', sidebarBg);
+    // Active/hover use white overlays — always readable regardless of primary color
+    document.body.style.setProperty('--o2-sidebar-nav-active-bg', 'rgba(255, 255, 255, 0.18)');
+    document.body.style.setProperty('--o2-sidebar-nav-hover-bg', 'rgba(255, 255, 255, 0.10)');
+    document.body.style.setProperty('--o2-sidebar-indicator', 'rgba(255, 255, 255, 0.9)');
+
     // Apply menu gradient colors
     if (isDefault) {
       // Use default menu gradient colors
@@ -115,6 +123,7 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     document.documentElement.style.removeProperty('--o2-menu-gradient-start');
     document.documentElement.style.removeProperty('--o2-menu-gradient-end');
     document.documentElement.style.removeProperty('--o2-menu-color');
+    document.documentElement.style.removeProperty('--o2-sidebar-bg');
     document.body.style.removeProperty('background');
   } else {
     // Apply light mode theme color
@@ -146,6 +155,14 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     document.documentElement.style.setProperty('--o2-inactive-tab-bg', inactiveTabBg);
 
 
+    // Apply sidebar background (darker tone of primary color for light mode)
+    const sidebarBg = mixColors(themeColor, '#071220', 82); // 82% primary + 18% very dark
+    document.documentElement.style.setProperty('--o2-sidebar-bg', sidebarBg);
+    // Active/hover use white overlays — always readable regardless of primary color
+    document.documentElement.style.setProperty('--o2-sidebar-nav-active-bg', 'rgba(255, 255, 255, 0.18)');
+    document.documentElement.style.setProperty('--o2-sidebar-nav-hover-bg', 'rgba(255, 255, 255, 0.10)');
+    document.documentElement.style.setProperty('--o2-sidebar-indicator', 'rgba(255, 255, 255, 0.9)');
+
     // Apply menu gradient colors
     if (isDefault) {
       // Use default menu gradient colors
@@ -172,6 +189,8 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     document.body.style.removeProperty('--o2-menu-gradient-start');
     document.body.style.removeProperty('--o2-menu-gradient-end');
     document.body.style.removeProperty('--o2-menu-color');
+    document.body.style.removeProperty('--o2-sidebar-bg');
+    document.body.style.removeProperty('--o2-sidebar-indicator');
   }
 
   // Dispatch event to notify components (like SearchResult) to re-render

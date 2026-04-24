@@ -4,6 +4,7 @@
 @import "../lib/styles/tokens/semantic.css";
 @import "../lib/styles/tokens/component.css";
 @import "../lib/styles/tokens/dark.css";
+@import "../lib/styles/tokens/layout.css";
 
 @plugin "@tailwindcss/typography";
 

@@ -30,8 +30,6 @@ function handleClick(): void {
 const baseClasses = computed<string>(() => [
   'o-tab',
   'tw:relative tw:items-center tw:gap-1.5',
-  // Vertical tabs: flex stretch (no w-full so mx works correctly) + horizontal margins
-  // Horizontal tabs: inline-flex centered
   isVertical.value
     ? 'tw:flex tw:justify-start'
     : 'tw:inline-flex tw:justify-center',

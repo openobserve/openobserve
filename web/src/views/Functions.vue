@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page>
-    <div class=" tw:pb-[0.625rem]">
+    <div>
       <q-splitter
         v-model="splitterModel"
         unit="px"
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:overflow-hidden logs-splitter-smooth"
       >
         <template v-slot:before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+          <div class="tw:w-full tw:h-full">
             <div
               v-if="showSidebar"
               class="card-container tw:h-[calc(100vh-50px)]"
@@ -143,11 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template v-slot:after>
-          <!-- :templates="templates"
-            :functionAssociatedStreams="functionAssociatedStreams"
-            @get:functionAssociatedStreams="getFunctionAssociatedStreams"
-            @get:templates="getTemplates" -->
-            <div class=" q-pt-xs">
+            <div>
               <RouterView v-slot="{ Component }">
                 <component :is="Component" @sendToAiChat="sendToAiChat" />
               </RouterView>

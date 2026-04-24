@@ -19,7 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     view="hHh Lpr lff"
     :class="[store.state.printMode === true ? 'printMode' : '']"
   >
-    <q-header>
+    <q-header
+      class="tw:bg-[var(--o2-header-bg)]! tw:text-[var(--o2-header-text)]! tw:border-b tw:border-[var(--o2-header-border)]"
+    >
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
 
@@ -63,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :breakpoint="500"
       role="navigation"
       aria-label="Main navigation"
-      class="card-container q-mt-xs tw:mb-[0.675rem]"
+    class="card-container tw:bg-[var(--o2-sidebar-bg)]!"
     >
       <q-list class="leftNavList">
         <menu-link
@@ -1309,7 +1311,8 @@ export default defineComponent({
 }
 
 .q-drawer {
-  border-radius: 0.625rem;
+  border-radius: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 .warning-msg {
@@ -1377,69 +1380,7 @@ export default defineComponent({
 
 .q-list {
   &.leftNavList {
-    padding: 4px 0px 0px 0px;
-
-    .q-item {
-      margin: 0px 5px;
-      display: list-item;
-      text-align: center;
-      list-style: none;
-      padding: 2px 2px;
-      border-radius: 5px;
-
-      .q-icon {
-        height: 1.3rem;
-        width: 1.3rem;
-      }
-
-      .q-item__label {
-        padding-bottom: 4px;
-      }
-
-      &.q-router-link--active {
-        .q-icon img {
-          filter: brightness(100);
-        }
-
-        .q-item__label {
-          color: var(--o2-menu-color);
-
-          // Light mode: make text blue for readability
-          body.body--light & {
-            color: #19191e !important;
-          }
-          // Dark mode: make text blue for readability
-          body.body--dark & {
-            color: #ffffff !important;
-          }
-        }
-        color: var(--o2-menu-color);
-
-        // Light mode: make item text blue
-        body.body--light & {
-          color: var(--o2-menu-color) !important;
-
-          .q-icon {
-            color: #19191e !important;
-          }
-        }
-
-        // Dark mode: make item text blue
-        body.body--dark & {
-          color: var(--o2-menu-color) !important;
-
-          .q-icon {
-            color: #ffffff !important;
-          }
-        }
-      }
-
-      &__label {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--o2-text-secondary);
-      }
-    }
+    padding: 4px 0 0 0;
   }
 
   .flagIcon img {
@@ -1798,8 +1739,5 @@ body.ai-chat-open {
       }
     }
   }
-}
-.q-drawer {
-  margin-bottom: 0.675rem;
 }
 </style>
