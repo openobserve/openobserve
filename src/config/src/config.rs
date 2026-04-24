@@ -1467,6 +1467,12 @@ pub struct Common {
         help = "Enable Live Mode feature in the UI. When true, users can toggle auto-query on filter/time-range changes. When false, the Live Mode toggle is hidden and Run Query button is always shown."
     )]
     pub auto_query_enabled: bool,
+    #[env_config(
+        name = "ZO_PERSIST_STREAM_SELECTION",
+        default = false,
+        help = "When true, the last selected stream(s) on the Logs, Traces, and Metrics pages are persisted in browser localStorage and restored on page reload or navigation."
+    )]
+    pub persist_stream_selection: bool,
 }
 
 impl Common {
