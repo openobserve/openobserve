@@ -1,0 +1,156 @@
+name: Auto Assign Metadata
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened, ready_for_review]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  auto-assign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate app token
+        id: app_token
+        uses: actions/create-github-app-token@v3
+        with:
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          app-id: ${{ secrets.APP_ID }}
+          owner: ${{ github.repository_owner }}
+
+      # ── PR: assign creator ──
+      - name: Assign PR creator
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          CREATOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          gh pr edit "$NUMBER" --add-assignee "$CREATOR" \
+            && echo "Assigned $CREATOR to PR #$NUMBER" \
+            || echo "::warning::Could not assign $CREATOR to PR #$NUMBER"
+
+      # ── PR: add lowest open milestone (skip drafts) ──
+      - name: Add milestone to PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          MILESTONE=$(gh api "repos/$GH_REPO/milestones?state=open&per_page=100" --jq '
+            [.[] | select(.title != "Backlog")] |
+            map({
+              title: .title,
+              sort_key: ([.title | scan("[0-9]+")] | map(tonumber))
+            }) |
+            sort_by(.sort_key) |
+            .[0].title // empty')
+
+          if [ -n "$MILESTONE" ]; then
+            gh pr edit "$NUMBER" -m "$MILESTONE" \
+              && echo "Set milestone: $MILESTONE" \
+              || echo "::warning::Could not set milestone $MILESTONE"
+          else
+            echo "::warning::No open milestones found"
+          fi
+
+      # ── PR: add to project ──
+      - name: Add PR to project
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          NODE_ID: ${{ github.event.pull_request.node_id }}
+        run: |
+          PROJECT_ID=$(gh api graphql -f query='
+            query {
+              organization(login: "openobserve") {
+                projectV2(number: 19) { id }
+              }
+            }' --jq '.data.organization.projectV2.id')
+
+          gh api graphql \
+            -f query='mutation($project:ID!,$content:ID!){addProjectV2ItemById(input:{projectId:$project,contentId:$content}){item{id}}}' \
+            -f project="$PROJECT_ID" \
+            -f content="$NODE_ID" \
+            && echo "Added PR to project" \
+            || echo "::warning::Could not add PR to project"
+
+      # ── PR review: add Needs-Testing label on approval ──
+      - name: Add Needs-Testing label on approval
+        if: github.event_name == 'pull_request_review' && github.event.review.state == 'approved'
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr edit "$NUMBER" --add-label "Needs-Testing" \
+            && echo "Added Needs-Testing label to PR #$NUMBER" \
+            || echo "::warning::Could not add label to PR #$NUMBER"
+
+      # ── Issue: assign creator if unassigned ──
+      - name: Assign issue creator
+        if: github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          CREATOR: ${{ github.event.issue.user.login }}
+        run: |
+          ASSIGNEE_COUNT=$(gh api "repos/$GH_REPO/issues/$NUMBER" --jq '.assignees | length')
+          if [ "$ASSIGNEE_COUNT" -eq 0 ]; then
+            gh issue edit "$NUMBER" --add-assignee "$CREATOR" \
+              && echo "Assigned $CREATOR to issue #$NUMBER" \
+              || echo "::warning::Could not assign $CREATOR to issue #$NUMBER"
+          else
+            echo "Issue already has assignees — skipping"
+          fi
+
+      # ── Issue: add lowest open milestone ──
+      - name: Add milestone to issue
+        if: github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          MILESTONE=$(gh api "repos/$GH_REPO/milestones?state=open&per_page=100" --jq '
+            [.[] | select(.title != "Backlog")] |
+            map({
+              title: .title,
+              sort_key: ([.title | scan("[0-9]+")] | map(tonumber))
+            }) |
+            sort_by(.sort_key) |
+            .[0].title // empty')
+
+          if [ -n "$MILESTONE" ]; then
+            gh issue edit "$NUMBER" -m "$MILESTONE" \
+              && echo "Set milestone: $MILESTONE" \
+              || echo "::warning::Could not set milestone $MILESTONE"
+          else
+            echo "::warning::No open milestones found"
+          fi
+
+      # ── Issue: add to project ──
+      - name: Add issue to project
+        if: github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          NODE_ID: ${{ github.event.issue.node_id }}
+        run: |
+          PROJECT_ID=$(gh api graphql -f query='
+            query {
+              organization(login: "openobserve") {
+                projectV2(number: 19) { id }
+              }
+            }' --jq '.data.organization.projectV2.id')
+
+          gh api graphql \
+            -f query='mutation($project:ID!,$content:ID!){addProjectV2ItemById(input:{projectId:$project,contentId:$content}){item{id}}}' \
+            -f project="$PROJECT_ID" \
+            -f content="$NODE_ID" \
+            && echo "Added issue to project" \
+            || echo "::warning::Could not add issue to project"
