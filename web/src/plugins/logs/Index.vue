@@ -123,7 +123,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           data-test="logs-search-filter-error-message"
                           style="white-space: pre-line"
-                        >{{ searchObj.data.filterErrMsg }}</div>
+                        >
+                          {{ searchObj.data.filterErrMsg }}
+                        </div>
                       </h5>
                     </div>
                     <div
@@ -488,6 +490,7 @@ import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
+import { saveLogsStream, restoreLogsStream } from "@/utils/streamPersist";
 
 export default defineComponent({
   name: "PageSearch",
@@ -826,7 +829,9 @@ export default defineComponent({
               },
             },
           };
-          let savedSearchObj = JSON.parse(JSON.stringify(serializableSearchObj));
+          let savedSearchObj = JSON.parse(
+            JSON.stringify(serializableSearchObj),
+          );
           savedSearchObj.loading = false;
           savedSearchObj.loadingHistogram = false;
           savedSearchObj.loadingCounter = false;
@@ -1140,6 +1145,19 @@ export default defineComponent({
 
           restoreUrlQueryParams(dashboardPanelData);
 
+          if (
+            store.state.zoConfig?.persist_stream_selection &&
+            !router.currentRoute.value.query.stream &&
+            !searchObj.data.stream.selectedStream.length
+          ) {
+            const persisted = restoreLogsStream(
+              store.state.selectedOrganization.identifier,
+            );
+            if (persisted.length) {
+              searchObj.data.stream.selectedStream = persisted;
+            }
+          }
+
           if (isEnterpriseClusterEnabled()) {
             await getRegionInfo();
           }
@@ -1352,7 +1370,8 @@ export default defineComponent({
 
                 for (const [index, token] of parsedFilterQuery.entries()) {
                   if (streamFieldNames.has(token)) {
-                    parsedFilterQuery[index] = quoteSqlIdentifierIfNeeded(token);
+                    parsedFilterQuery[index] =
+                      quoteSqlIdentifierIfNeeded(token);
                   }
                 }
 
@@ -1506,7 +1525,8 @@ export default defineComponent({
           if (
             (item.expr.type === "column_ref" &&
               (item.expr?.column?.expr?.value === fieldName ||
-                (typeof item.expr.column === "string" && item.expr.column.replace(/['"`]/g, "") === fieldName))) ||
+                (typeof item.expr.column === "string" &&
+                  item.expr.column.replace(/['"`]/g, "") === fieldName))) ||
             (item.expr.type === "aggr_func" &&
               item.expr?.args?.expr?.column?.value === fieldName)
           ) {
@@ -1682,6 +1702,20 @@ export default defineComponent({
     const shouldRefreshWithoutCache = ref(false);
     // Store the histogram query so it persists even after searchResponse is cleared
     const storedHistogramQuery = ref("");
+
+    watch(
+      () => searchObj.data.stream.selectedStream,
+      (streams: string[]) => {
+        if (
+          store.state.zoConfig?.persist_stream_selection &&
+          Array.isArray(streams) &&
+          streams.length
+        ) {
+          saveLogsStream(store.state.selectedOrganization.identifier, streams);
+        }
+      },
+      { deep: true },
+    );
 
     // Watch for histogram query in search results and store it immediately
     // This ensures the histogram query is saved before queryResults might be reset
@@ -1921,7 +1955,8 @@ export default defineComponent({
                       ?.visualization_histogram_interval,
                   time_offset: {
                     start_time:
-                      searchObj?.data?.customDownloadQueryObj?.query?.start_time,
+                      searchObj?.data?.customDownloadQueryObj?.query
+                        ?.start_time,
                     end_time:
                       searchObj?.data?.customDownloadQueryObj?.query?.end_time,
                   },
@@ -2553,10 +2588,10 @@ export default defineComponent({
     };
 
     const detectHistogramBreakdownField = (): string | null => {
-      const selectedStreamFields =
-        (searchObj.data.stream?.selectedStreamFields ?? []) as Array<{
-          name?: string | null;
-        }>;
+      const selectedStreamFields = (searchObj.data.stream
+        ?.selectedStreamFields ?? []) as Array<{
+        name?: string | null;
+      }>;
       const fieldNameMap = new Map<string, string>();
 
       selectedStreamFields.forEach((field) => {
