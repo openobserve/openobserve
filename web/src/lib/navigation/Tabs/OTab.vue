@@ -40,7 +40,6 @@ const baseClasses = computed<string>(() => [
   'tw:outline-none tw:transition-colors tw:duration-150',
   'tw:select-none',
   'tw:focus-visible:outline-none',
-  'tw:focus-visible:ring-2 tw:focus-visible:ring-tabs-focus-ring tw:focus-visible:ring-inset',
 ].join(' '))
 
 const stateClasses = computed<string>(() => {
