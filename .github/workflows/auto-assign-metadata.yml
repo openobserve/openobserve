@@ -10,6 +10,9 @@ on:
 
 permissions: {}
 
+env:
+  PROJECT_NUMBER: "19"
+
 jobs:
   auto-assign:
     runs-on: ubuntu-latest
@@ -58,13 +61,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           NODE_ID: ${{ github.event.pull_request.node_id }}
+          ORG: ${{ github.repository_owner }}
         run: |
-          PROJECT_ID=$(gh api graphql -f query='
-            query {
-              organization(login: "openobserve") {
-                projectV2(number: 19) { id }
-              }
-            }' --jq '.data.organization.projectV2.id')
+          PROJECT_ID=$(gh api graphql \
+            -f query='query($org:String!,$num:Int!){organization(login:$org){projectV2(number:$num){id}}}' \
+            -F org="$ORG" -F num="$PROJECT_NUMBER" \
+            --jq '.data.organization.projectV2.id')
 
           gh api graphql \
             -f query='mutation($project:ID!,$content:ID!){addProjectV2ItemById(input:{projectId:$project,contentId:$content}){item{id}}}' \
@@ -134,13 +136,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           NODE_ID: ${{ github.event.issue.node_id }}
+          ORG: ${{ github.repository_owner }}
         run: |
-          PROJECT_ID=$(gh api graphql -f query='
-            query {
-              organization(login: "openobserve") {
-                projectV2(number: 19) { id }
-              }
-            }' --jq '.data.organization.projectV2.id')
+          PROJECT_ID=$(gh api graphql \
+            -f query='query($org:String!,$num:Int!){organization(login:$org){projectV2(number:$num){id}}}' \
+            -F org="$ORG" -F num="$PROJECT_NUMBER" \
+            --jq '.data.organization.projectV2.id')
 
           gh api graphql \
             -f query='mutation($project:ID!,$content:ID!){addProjectV2ItemById(input:{projectId:$project,contentId:$content}){item{id}}}' \
