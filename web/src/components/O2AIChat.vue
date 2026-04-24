@@ -1088,6 +1088,10 @@ export default defineComponent({
     appendMode: {
       type: Boolean,
       default: true
+    },
+    aiChatPayload: {
+      type: Object as () => { text: string; autoSend: boolean; id: number } | null,
+      default: null
     }
   },
   setup(props) {
@@ -1644,7 +1648,9 @@ export default defineComponent({
     };
 
     watch(() => props.aiChatInputContext, (newAiChatInputContext: string) => {
+      console.log('[O2AIChat] aiChatInputContext changed:', newAiChatInputContext);
       if(newAiChatInputContext) {
+
         // Create a reference chip from the context
         const contextChip: ReferenceChip = {
           id: `context-${Date.now()}`,
@@ -1669,6 +1675,22 @@ export default defineComponent({
         }
         // If component not ready, chips will be processed when componentReady becomes true
         // No fallback text needed - avoids flickering when chat opens
+      }
+    });
+
+    // Atomic payload watcher — text + autoSend arrive together, no timing race
+    watch(() => props.aiChatPayload, (payload) => {
+      console.log('[O2AIChat] aiChatPayload:', payload);
+      if (!payload?.text) return;
+      if (payload.autoSend) {
+        console.log('[O2AIChat] aiChatPayload autoSend=true, sending:', payload.text);
+        inputMessage.value = payload.text;
+        nextTick(() => {
+          setTimeout(() => {
+            console.log('[O2AIChat] firing sendMessage via payload, inputMessage=', inputMessage.value);
+            sendMessage();
+          }, 50);
+        });
       }
     });
 
