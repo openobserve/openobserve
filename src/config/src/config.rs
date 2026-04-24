@@ -3612,4 +3612,31 @@ mod tests {
     fn test_ensure_not_empty_single_char() {
         assert!(ensure_not_empty("a", "TEST").is_ok());
     }
+
+    #[test]
+    fn test_persist_stream_selection_default_is_false() {
+        let cfg = Config::default();
+        assert!(!cfg.common.persist_stream_selection);
+    }
+
+    #[test]
+    fn test_persist_stream_selection_can_be_set_true() {
+        let mut cfg = Config::default();
+        cfg.common.persist_stream_selection = true;
+        assert!(cfg.common.persist_stream_selection);
+    }
+
+    #[test]
+    fn test_persist_stream_selection_independent_of_auto_query_enabled() {
+        let mut cfg = Config::default();
+        cfg.common.auto_query_enabled = true;
+        cfg.common.persist_stream_selection = false;
+        assert!(cfg.common.auto_query_enabled);
+        assert!(!cfg.common.persist_stream_selection);
+
+        cfg.common.auto_query_enabled = false;
+        cfg.common.persist_stream_selection = true;
+        assert!(!cfg.common.auto_query_enabled);
+        assert!(cfg.common.persist_stream_selection);
+    }
 }
