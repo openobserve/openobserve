@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import type { OTabsProps, OTabsEmits, OTabsSlots } from './OTabs.types'
-import { computed, provide, ref } from 'vue'
+import { computed, provide, ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { TABS_CONTEXT_KEY } from './OTabs.types'
 import type { TabsContext } from './OTabs.types'
 
 // ── Focus ring tracking ────────────────────────────────────────────────────
 const focusedTabEl = ref<HTMLElement | null>(null)
+const scrollRef = ref<HTMLElement | null>(null)
+const tablistRef = ref<HTMLElement | null>(null)
 
 const focusRingStyle = computed<Record<string, string> | null>(() => {
-  if (!focusedTabEl.value || !tablistRef.value) return null
+  const parent = scrollRef.value ?? tablistRef.value
+  if (!focusedTabEl.value || !parent) return null
   const tabRect = focusedTabEl.value.getBoundingClientRect()
-  const parentRect = tablistRef.value.getBoundingClientRect()
+  const parentRect = parent.getBoundingClientRect()
   return {
     left: `${tabRect.left - parentRect.left}px`,
     top: `${tabRect.top - parentRect.top}px`,
@@ -62,9 +65,6 @@ const context = computed<TabsContext>(() => ({
 provide(TABS_CONTEXT_KEY, context)
 
 // ── Keyboard navigation ────────────────────────────────────────────────────
-/** Ref to the tablist element so we can query tabs from it */
-const tablistRef = ref<HTMLElement | null>(null)
-
 function getFocusableTabs(): HTMLElement[] {
   if (!tablistRef.value) return []
   return Array.from(
@@ -99,6 +99,65 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 }
 
+// ── Scroll arrows (horizontal only) ───────────────────────────────────────
+const hasOverflow = ref(false)
+const canScrollLeft = ref(false)
+const canScrollRight = ref(false)
+
+function updateScrollState(): void {
+  const el = scrollRef.value
+  if (!el) {
+    hasOverflow.value = false
+    canScrollLeft.value = false
+    canScrollRight.value = false
+    return
+  }
+  hasOverflow.value = el.scrollWidth > el.clientWidth + 1
+  canScrollLeft.value = el.scrollLeft > 1
+  canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+}
+
+function scrollTabs(direction: 1 | -1): void {
+  const el = scrollRef.value
+  if (!el) return
+  el.scrollBy({ left: direction * 200, behavior: 'smooth' })
+}
+
+let ro: ResizeObserver | null = null
+
+onMounted(() => {
+  if (isVertical.value) return
+  const el = scrollRef.value
+  if (!el) return
+  el.addEventListener('scroll', updateScrollState, { passive: true })
+  ro = new ResizeObserver(updateScrollState)
+  ro.observe(el)
+  if (tablistRef.value) ro.observe(tablistRef.value)
+  nextTick(updateScrollState)
+})
+
+onUnmounted(() => {
+  scrollRef.value?.removeEventListener('scroll', updateScrollState)
+  ro?.disconnect()
+})
+
+// Auto-scroll to reveal the active tab when modelValue changes
+watch(() => props.modelValue, async () => {
+  if (isVertical.value) return
+  await nextTick()
+  const el = scrollRef.value
+  if (!el) return
+  const activeTab = el.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+  if (!activeTab) return
+  const tabRect = activeTab.getBoundingClientRect()
+  const containerRect = el.getBoundingClientRect()
+  if (tabRect.left < containerRect.left) {
+    el.scrollBy({ left: tabRect.left - containerRect.left - 8, behavior: 'smooth' })
+  } else if (tabRect.right > containerRect.right) {
+    el.scrollBy({ left: tabRect.right - containerRect.right + 8, behavior: 'smooth' })
+  }
+})
+
 // ── CSS classes ────────────────────────────────────────────────────────────
 const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
   left:    'tw:justify-start',
@@ -106,22 +165,16 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
   right:   'tw:justify-end',
   justify: 'tw:justify-stretch',
 }
-
-const wrapperClasses = computed<string[]>(() => [
-  'o-tabs',
-  isVertical.value
-    ? 'tw:flex-col'
-    : 'tw:flex-row tw:flex-wrap',
-  alignClasses[props.align],
-])
 </script>
 
 <template>
+  <!-- Vertical: simple flex column, no scroll arrows -->
   <div
+    v-if="isVertical"
     ref="tablistRef"
     role="tablist"
-    :aria-orientation="orientation"
-    :class="['tw:flex tw:relative', wrapperClasses]"
+    aria-orientation="vertical"
+    :class="['o-tabs tw:flex tw:flex-col tw:relative', alignClasses[align]]"
     @keydown="handleKeydown"
     @focusin="handleFocusin"
     @focusout="handleFocusout"
@@ -133,5 +186,62 @@ const wrapperClasses = computed<string[]>(() => [
       :style="focusRingStyle"
       class="tw:absolute tw:pointer-events-none tw:rounded tw:ring-2 tw:ring-inset tw:ring-tabs-focus-ring tw:transition-all tw:duration-200 tw:ease-in-out"
     />
+  </div>
+
+  <!-- Horizontal: scroll container with left/right arrow buttons -->
+  <div
+    v-else
+    class="tw:flex tw:flex-row tw:items-stretch"
+  >
+    <!-- Left arrow -->
+    <button
+      v-show="hasOverflow"
+      :disabled="!canScrollLeft"
+      type="button"
+      aria-hidden="true"
+      tabindex="-1"
+      class="tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:cursor-pointer tw:text-tabs-active-text tw:enabled:hover:text-tabs-indicator tw:disabled:opacity-30 tw:disabled:cursor-default tw:border-b-2 tw:border-transparent tw:bg-transparent tw:outline-none"
+      @click="scrollTabs(-1)"
+    >
+      <span class="material-icons" style="font-size: 25px; line-height: 1;">navigate_before</span>
+    </button>
+
+    <!-- Overflow-hidden scroll container -->
+    <div
+      ref="scrollRef"
+      class="tw:flex-1 tw:overflow-x-hidden tw:relative"
+    >
+      <div
+        ref="tablistRef"
+        role="tablist"
+        aria-orientation="horizontal"
+        :class="['o-tabs tw:flex tw:flex-row tw:relative', alignClasses[align]]"
+        @keydown="handleKeydown"
+        @focusin="handleFocusin"
+        @focusout="handleFocusout"
+      >
+        <slot />
+      </div>
+      <!-- Focus ring positioned relative to scroll container -->
+      <div
+        v-if="focusRingStyle"
+        aria-hidden="true"
+        :style="focusRingStyle"
+        class="tw:absolute tw:pointer-events-none tw:rounded tw:ring-2 tw:ring-inset tw:ring-tabs-focus-ring tw:transition-all tw:duration-200 tw:ease-in-out"
+      />
+    </div>
+
+    <!-- Right arrow -->
+    <button
+      v-show="hasOverflow"
+      :disabled="!canScrollRight"
+      type="button"
+      aria-hidden="true"
+      tabindex="-1"
+      class="tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:cursor-pointer tw:text-tabs-active-text tw:enabled:hover:text-tabs-indicator tw:disabled:opacity-30 tw:disabled:cursor-default tw:border-b-2 tw:border-transparent tw:bg-transparent tw:outline-none"
+      @click="scrollTabs(1)"
+    >
+      <span class="material-icons" style="font-size: 25px; line-height: 1;">navigate_next</span>
+    </button>
   </div>
 </template>
