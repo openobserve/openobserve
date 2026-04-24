@@ -53,10 +53,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
-              :label="'Query ' + (index + 1)"
               @click.stop
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
+              <span>{{ 'Query ' + (index + 1) }}</span>
               <q-icon
                 v-if="promqlMode"
                 :name="
