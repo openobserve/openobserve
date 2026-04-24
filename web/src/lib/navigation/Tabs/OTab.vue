@@ -59,10 +59,8 @@ const stateClasses = computed<string>(() => {
   return [
     'tw:text-tabs-inactive-text tw:cursor-pointer',
     'tw:enabled:hover:text-tabs-hover-text tw:enabled:hover:bg-tabs-hover-bg',
-    // Vertical tabs need the transparent side-border to prevent horizontal content shift on activation.
-    // Horizontal tabs use a fixed height (h-[40px]) with box-sizing:border-box, so the border is
-    // already baked into the height — no layout shift occurs without it.
-    isVertical.value ? 'tw:border-e-2 tw:border-transparent' : '',
+    // Always render the border (transparent when inactive) to prevent layout shift on activation.
+    isVertical.value ? 'tw:border-e-2 tw:border-transparent' : 'tw:border-b-2 tw:border-transparent',
   ].join(' ')
 })
 
