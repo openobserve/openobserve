@@ -1691,7 +1691,10 @@
     "streamTotal": "Ruisseaux",
     "totalDashboard": "Tableaux de bord",
     "viewButton": "Afficher",
-    "noDataAvailable": "Aucune donnée disponible"
+    "noDataAvailable": "Aucune donnée disponible",
+    "tabAiAssistant": "Assistant O2 AI",
+    "tabOverview": "Vue d'ensemble",
+    "tabUsage": "Utilisation"
   },
   "billing": {
     "header": "Utilisation et facturation",
@@ -3613,5 +3616,28 @@
     "errLoadModel": "Impossible de charger le modèle",
     "tierDefaultName": "Par défaut",
     "tierConditionalName": "Niveau conditionnel"
+  },
+  "overview": {
+    "title": "Vue d'ensemble du système",
+    "activeAnomalies": "Anomalies actives",
+    "activeIncidents": "Incidents actifs",
+    "services": "Des services",
+    "recentEvents": "Évènements récents",
+    "investigate": "Enquêter →",
+    "untitledIncident": "Incident sans titre",
+    "viewLatencyCharts": "Afficher les graphiques de latence et RED",
+    "elevatedErrorRate": "Taux d'erreur élevé",
+    "reqPerSec": "reque/s",
+    "allClear": "Tout est clair",
+    "allClearDesc": "Aucune anomalie active, aucun incident ou service dégradé dans la fenêtre de temps sélectionnée."
+  },
+  "chatHistory": {
+    "title": "Discussions",
+    "newChat": "Nouveau chat",
+    "search": "Rechercher",
+    "noMatches": "Aucune allumette",
+    "noHistory": "Pas d'historique des discussions",
+    "delete": "Supprimer",
+    "clearAll": "Tout effacer"
   }
 }
