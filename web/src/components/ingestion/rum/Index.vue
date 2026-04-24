@@ -173,8 +173,6 @@ export default defineComponent({
       .o-tab {
         justify-content: flex-start;
         padding: 0 0.6rem 0 0.6rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
         text-transform: capitalize;
 
         &__content.tab_content {
