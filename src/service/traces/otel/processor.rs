@@ -204,11 +204,18 @@ impl OtelIngestionProcessor {
                 usage.insert("output".to_string(), 0);
             }
             if !usage.contains_key("total") {
-                // Total = input + output only. Cache tokens (cache_read_input_tokens,
-                // cache_creation_input_tokens) are subsets of input, not additive.
-                let input = usage.get("input").copied().unwrap_or(0);
-                let output = usage.get("output").copied().unwrap_or(0);
-                usage.insert("total".to_string(), input + output);
+                // Sum all keys except "total" and known subset keys.
+                // Cache tokens (cache_read_input_tokens, cache_creation_input_tokens)
+                // are subsets of input — adding them would double-count. All other
+                // keys (including custom usage keys) are distinct and additive.
+                const SUBSET_KEYS: &[&str] =
+                    &["cache_read_input_tokens", "cache_creation_input_tokens"];
+                let total: i64 = usage
+                    .iter()
+                    .filter(|(k, _)| k.as_str() != "total" && !SUBSET_KEYS.contains(&k.as_str()))
+                    .map(|(_, &v)| v)
+                    .sum();
+                usage.insert("total".to_string(), total);
             }
 
             // Calculate cost from tokens if cost is missing but we have model and usage.
