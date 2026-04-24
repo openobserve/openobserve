@@ -268,7 +268,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-btn>
                   </div>
                 </div>
-                <q-separator />
               </OTab>
             </OTabs>
           </div>
@@ -1517,8 +1516,6 @@ export default defineComponent({
 
   .individual-tab {
     min-height: 1.5rem;
-    margin-bottom: 6px;
-    border-bottom: 1px lightgray dotted;
   }
   .folder-item {
     display: flex;
