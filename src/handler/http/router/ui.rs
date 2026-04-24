@@ -23,7 +23,10 @@ use axum::{
     routing::get,
 };
 use config::get_config;
+#[cfg(not(feature = "ci-fast-embed"))]
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
+#[cfg(feature = "ci-fast-embed")]
+use rust_embed::RustEmbed;
 
 #[derive(RustEmbed)]
 #[folder = "web/dist/"]
@@ -45,11 +48,14 @@ pub async fn serve(Path(path): Path<String>) -> impl IntoResponse {
     match WebAssets::get(file_path) {
         Some(content) => {
             let mime = mime_guess::from_path(file_path).first_or_octet_stream();
-            let data = content.data();
+            #[cfg(not(feature = "ci-fast-embed"))]
+            let body = Body::from(content.data().to_vec());
+            #[cfg(feature = "ci-fast-embed")]
+            let body = Body::from(content.data.into_owned());
             Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, mime.as_ref())
-                .body(Body::from(data.to_vec()))
+                .body(body)
                 .unwrap()
         }
         None => Response::builder()

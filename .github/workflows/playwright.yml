@@ -132,6 +132,7 @@ jobs:
         run: |
           set -o pipefail
           /usr/bin/time -v cargo build --release \
+              --features ci-fast-embed \
               --target x86_64-unknown-linux-gnu \
               --timings \
               2>&1 | tee cargo-build.log
