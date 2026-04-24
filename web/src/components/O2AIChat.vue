@@ -402,6 +402,23 @@
                           <span class="detail-label">Duration</span>
                           <span class="detail-value">{{ block.summary.took }}ms</span>
                         </div>
+                        <!-- CLI tool summary (return_code / stdout_lines / stderr_lines / truncated) -->
+                        <div v-if="block.summary.return_code !== undefined" class="detail-item">
+                          <span class="detail-label">Exit code</span>
+                          <code class="detail-value">{{ block.summary.return_code }}</code>
+                        </div>
+                        <div v-if="block.summary.stdout_lines !== undefined" class="detail-item">
+                          <span class="detail-label">Stdout</span>
+                          <span class="detail-value">{{ block.summary.stdout_lines }} lines</span>
+                        </div>
+                        <div v-if="block.summary.stderr_lines" class="detail-item">
+                          <span class="detail-label">Stderr</span>
+                          <span class="detail-value">{{ block.summary.stderr_lines }} lines</span>
+                        </div>
+                        <div v-if="block.summary.truncated" class="detail-item">
+                          <span class="detail-label">Output</span>
+                          <span class="detail-value">truncated</span>
+                        </div>
                       </template>
                       <!-- Existing context details -->
                       <div v-if="getToolCallDisplayData(block.context)?.query" class="detail-item">
@@ -463,6 +480,22 @@
                           </q-btn>
                         </div>
                         <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.vrl }}</code>
+                      </div>
+                      <div v-if="getToolCallDisplayData(block.context)?.command" class="detail-item">
+                        <div class="detail-header">
+                          <span class="detail-label">Command</span>
+                          <q-btn
+                            flat
+                            dense
+                            size="xs"
+                            icon="content_copy"
+                            class="copy-btn"
+                            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.command)"
+                          >
+                            <q-tooltip>Copy command</q-tooltip>
+                          </q-btn>
+                        </div>
+                        <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.command }}</code>
                       </div>
                       <!-- Tool response: SearchSQL hits -->
                       <template v-if="block.response && block.response.hits">
@@ -4531,6 +4564,9 @@ export default defineComponent({
       // Handle flat structure (StreamSchema, etc.)
       if (context.stream_name) data.stream = context.stream_name;
       if (context.type) data.type = context.type;
+
+      // CLI tools: surface the command string
+      if (context.command) data.command = context.command;
 
       return Object.keys(data).length > 0 ? data : null;
     };
