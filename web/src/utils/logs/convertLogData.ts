@@ -243,6 +243,11 @@ export const convertStackedLogData = (
         appendToBody: true,
         confine: false,
         enterable: true,
+        // Cap the ECharts tooltip container at 20vh and let it scroll
+        // vertically when a high-cardinality breakdown overflows.
+        // !important is required because ECharts writes inline styles.
+        extraCssText:
+          "max-height: 20vh !important; overflow-y: auto !important; overflow-x: hidden !important; white-space: normal !important;",
         backgroundColor: isDarkTheme ? "#1e1e2e" : "#ffffff",
         borderColor: isDarkTheme ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)",
         textStyle: { fontSize: 12, color: textColor },

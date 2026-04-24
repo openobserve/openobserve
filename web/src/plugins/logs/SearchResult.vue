@@ -1029,9 +1029,14 @@ export default defineComponent({
 
       const margin = 10;
       const panelW = 250;
-      const panelH = rows.length * 28 + 60;
+      // Cap panel height at the viewport so placement math stays valid even
+      // for high-cardinality breakdowns. Actual scroll is handled in CSS.
+      const panelH = Math.min(rows.length * 28 + 60, window.innerHeight - 2 * margin);
       const x = Math.min(event.clientX + margin, window.innerWidth - panelW - margin);
-      const y = Math.min(event.clientY + margin, window.innerHeight - panelH - margin);
+      const y = Math.max(
+        margin,
+        Math.min(event.clientY + margin, window.innerHeight - panelH - margin),
+      );
 
       pinnedTooltip.value = { visible: true, x, y, field: breakdownField ?? "", timestamp, rows };
 
