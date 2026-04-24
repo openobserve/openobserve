@@ -3,7 +3,7 @@ name: Auto Assign Metadata
 on:
   issues:
     types: [opened]
-  pull_request:
+  pull_request_target:
     types: [opened, ready_for_review]
   pull_request_review:
     types: [submitted]
@@ -19,7 +19,7 @@ jobs:
     steps:
       # ── PR: assign creator ──
       - name: Assign PR creator
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request_target'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -32,7 +32,7 @@ jobs:
 
       # ── PR: add lowest open milestone (skip drafts) ──
       - name: Add milestone to PR
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+        if: github.event_name == 'pull_request_target' && github.event.pull_request.draft == false && github.event.pull_request.milestone == null
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -58,7 +58,7 @@ jobs:
 
       # ── PR: add to project ──
       - name: Add PR to project
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request_target'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           NODE_ID: ${{ github.event.pull_request.node_id }}
@@ -108,7 +108,7 @@ jobs:
 
       # ── Issue: add lowest open milestone ──
       - name: Add milestone to issue
-        if: github.event_name == 'issues'
+        if: github.event_name == 'issues' && github.event.issue.milestone == null
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
