@@ -375,8 +375,11 @@ describe("useHistogram Composable", () => {
       expect(series.get("error")).toEqual([2, 4]);
     });
 
-    it("skips seed rows in histogramResults.value that lack zo_sql_breakdown", () => {
-      // Skeleton entries (zo_sql_num: 0, no breakdown) pushed by response handler.
+    it("keeps skeleton timestamps on the x-axis even when they have no breakdown data", () => {
+      // Skeleton entries (zo_sql_num: 0, no breakdown) pushed by response handler
+      // pre-populate the full query range. Both ts1 and ts2 must appear on the
+      // x-axis so the chart fills the whole range from the first render rather
+      // than "growing from the center" as partitions stream in.
       mockState.histogramResults.value = [
         { zo_sql_key: ts1, zo_sql_num: 0 }, // skeleton
         { zo_sql_key: ts2, zo_sql_num: 0 }, // skeleton
@@ -388,9 +391,11 @@ describe("useHistogram Composable", () => {
       wrapper.vm.generateHistogramData();
       const hist = mockState.searchObj.data.histogram;
 
-      // Only ts1 appears — skeleton-only ts2 bucket is dropped by the filter.
-      expect(hist.chartParams.unparsed_x_data).toEqual([ts1]);
-      expect(hist.xData).toEqual([new Date(ts1).getTime()]);
+      // Both timestamps present; empty bucket renders as 0 across all categories.
+      expect(hist.chartParams.unparsed_x_data).toEqual([ts1, ts2]);
+      expect(hist.xData).toEqual([new Date(ts1).getTime(), new Date(ts2).getTime()]);
+      const series = hist.breakdownSeries as unknown as Map<string, number[]>;
+      expect(series.get("info")).toEqual([4, 0]);
     });
 
     it("yData holds per-timestamp totals summed across categories", () => {

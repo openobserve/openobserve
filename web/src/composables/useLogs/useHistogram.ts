@@ -189,8 +189,18 @@ export const useHistogram = () => {
             { zo_sql_key: string; zo_sql_breakdown: string; zo_sql_num: number }
           >();
 
+          // Collect every timestamp we know about — including zero-filled
+          // skeleton entries that have no breakdown — so the x-axis matches
+          // the full query range from the first render (same behaviour as
+          // the flat path). Without this the chart would appear to grow
+          // outward from the center as partitions stream in.
+          const timestampSet = new Set<string>();
+
           // Seed from previously accumulated pages
           histogramResults.value.forEach((item: any) => {
+            if (item.zo_sql_key !== undefined && item.zo_sql_key !== null) {
+              timestampSet.add(item.zo_sql_key);
+            }
             if (item.zo_sql_breakdown === undefined || item.zo_sql_breakdown === null) return;
             const key = `${item.zo_sql_key}|||${item.zo_sql_breakdown}`;
             breakdownMap.set(key, JSON.parse(JSON.stringify(item)));
@@ -198,6 +208,9 @@ export const useHistogram = () => {
 
           // Merge current page aggs into the map
           searchObj.data.queryResults.aggs.forEach((item: any) => {
+            if (item.zo_sql_key !== undefined && item.zo_sql_key !== null) {
+              timestampSet.add(item.zo_sql_key);
+            }
             const cat = item.zo_sql_breakdown;
             if (cat === undefined || cat === null) return;
             const key = `${item.zo_sql_key}|||${cat}`;
@@ -209,9 +222,7 @@ export const useHistogram = () => {
           });
 
           // Sorted unique timestamps (ISO strings sort lexicographically = chronologically)
-          const allTimestamps = [
-            ...new Set([...breakdownMap.values()].map((r) => r.zo_sql_key)),
-          ].sort();
+          const allTimestamps = [...timestampSet].sort();
 
 
           // Coerce to string — numeric breakdown values (e.g. severity=0, status=404)
