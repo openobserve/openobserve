@@ -115,18 +115,8 @@ jobs:
           COVERAGE: "true"
         run: cd web && npm ci && npm run build
 
-      - name: Inspect web/dist before embed
-        run: |
-          echo "=== web/dist total size ==="
-          du -sh web/dist
-          echo "=== file count ==="
-          find web/dist -type f | wc -l
-          echo "=== top 20 largest files ==="
-          find web/dist -type f -printf '%s %p\n' | sort -rn | head -20
-          echo "=== breakdown by extension ==="
-          find web/dist -type f -printf '%f\n' | awk -F. '{print $NF}' | sort | uniq -c | sort -rn
-
       - name: Build and run binary
+<<<<<<< HEAD
         env:
           CARGO_PROFILE_RELEASE_INCREMENTAL: "false"
         run: |
@@ -157,6 +147,9 @@ jobs:
           path: build-timings/
           retention-days: 7
           if-no-files-found: warn
+=======
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+>>>>>>> parent of c2820ba1e (get cargo build timings)
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
