@@ -801,8 +801,18 @@ export const useStreamFields = () => {
     try {
       if (searchObj.data.streamResults.list.length > 0) {
         let lastUpdatedStreamTime = 0;
+        let latestStream = "";
 
         let selectedStream: any[] = [];
+        let existingValidStreams: any[] = [];
+
+        // Capture current selection (from localStorage restore or in-session state)
+        // to use as a fallback when no URL param is present.
+        const currentSelection: string[] = Array.isArray(
+          searchObj.data.stream.selectedStream,
+        )
+          ? searchObj.data.stream.selectedStream
+          : [];
 
         searchObj.data.stream.streamLists = [];
         let itemObj: {
@@ -824,13 +834,26 @@ export const useStreamFields = () => {
           }
           if (
             !router.currentRoute.value?.query?.stream &&
+            currentSelection.includes(item.name)
+          ) {
+            existingValidStreams.push(itemObj.value);
+          }
+          if (
+            !router.currentRoute.value?.query?.stream &&
             item.stats.doc_time_max >= lastUpdatedStreamTime
           ) {
-            selectedStream = [];
             lastUpdatedStreamTime = item.stats.doc_time_max;
-            selectedStream.push(itemObj.value);
+            latestStream = item.name;
           }
         }
+
+        // Priority: URL param > existing valid selection > latest by doc_time_max
+        if (!selectedStream.length && existingValidStreams.length) {
+          selectedStream = existingValidStreams;
+        } else if (!selectedStream.length && latestStream) {
+          selectedStream = [latestStream];
+        }
+
         if (
           (store.state.zoConfig.query_on_stream_selection == false ||
             router.currentRoute.value.query?.type == "stream_explorer") &&
