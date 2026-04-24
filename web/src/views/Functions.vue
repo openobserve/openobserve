@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTabs
                 v-model="activeTab"
                 orientation="vertical"
-                class="card-container"
                 :class="{ 'compact-tabs': isCompactSidebar }"
               >
                 <ORouteTab
