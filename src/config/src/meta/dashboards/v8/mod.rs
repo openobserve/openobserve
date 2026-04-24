@@ -366,6 +366,8 @@ pub enum FilterType {
     Condition,
     Group,
     List,
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -455,15 +457,18 @@ pub enum ChartAlign {
     Center,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum AggregationType {
+    #[default]
     Last,
     Min,
     Max,
     Avg,
     Sum,
     Count,
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -920,20 +925,18 @@ pub enum VariableScope {
     Panels,
 }
 
-/// Wire format uses snake_case: "query_values", "constant", "textbox", "custom", "dynamic_filters"
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
-pub enum VariableType {
-    #[default]
-    #[serde(rename = "query_values")]
-    QueryValues,
-    #[serde(rename = "constant")]
-    Constant,
-    #[serde(rename = "textbox")]
-    Textbox,
-    #[serde(rename = "custom")]
-    Custom,
-    #[serde(rename = "dynamic_filters")]
-    DynamicFilters,
+/// The backend never interprets variable type values — stored and echoed back
+/// to the frontend as-is. Using a plain String prevents deserialization failures
+/// on new types the frontend introduces (e.g. "query", future types).
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(transparent)]
+#[schema(value_type = String)]
+pub struct VariableType(pub String);
+
+impl Default for VariableType {
+    fn default() -> Self {
+        VariableType("query_values".to_string())
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -997,10 +1000,9 @@ pub struct CustomFieldsOption {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum BaseMapType {
-    Osm,
-}
+#[serde(transparent)]
+#[schema(value_type = String)]
+pub struct BaseMapType(pub String);
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
@@ -1010,10 +1012,9 @@ pub struct BaseMap {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum MapTypeValue {
-    World,
-}
+#[serde(transparent)]
+#[schema(value_type = String)]
+pub struct MapTypeValue(pub String);
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
@@ -1080,12 +1081,9 @@ pub struct SizeByValue {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-pub enum LegendSizeUnit {
-    #[serde(rename = "px")]
-    Px,
-    #[serde(rename = "%")]
-    Percent,
-}
+#[serde(transparent)]
+#[schema(value_type = String)]
+pub struct LegendSizeUnit(pub String);
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(default)]
