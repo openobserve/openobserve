@@ -883,7 +883,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-else-if="correlationError"
-              class="tw:text-base tw:text-[0.875rem] tw:font-bold"
+              class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
             >
               {{ correlationError }}
             </div>
@@ -939,7 +939,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-else-if="correlationError"
-              class="tw:text-base tw:text-[0.875rem] tw:font-bold"
+              class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
             >
               {{ correlationError }}
             </div>
