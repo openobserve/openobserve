@@ -161,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import { defineComponent, ref, computed, onBeforeMount, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
@@ -171,6 +172,7 @@ import config from "@/aws-exports";
 
 export default defineComponent({
   name: "AppFunctions",
+  components: { OTabs, OTab, ORouteTab },
   emits: ["sendToAiChat"],
   setup(props, { emit }) {
     const store = useStore();
