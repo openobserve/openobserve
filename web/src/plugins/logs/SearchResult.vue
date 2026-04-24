@@ -1013,14 +1013,15 @@ export default defineComponent({
 
       const rows = [...breakdownSeries.entries()].map(([category, counts]) => {
         // Explicit check so numeric 0 is not treated as empty (0 is falsy in JS).
+        // Case is preserved — we never re-capitalize or lowercase user data;
+        // the tooltip label and the filter term must match the source exactly.
         const label = (category === null || category === undefined || category === "") ? "(empty)" : String(category);
-        const displayLabel = label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
-        const rawValue = label.toLowerCase() === "(empty)" ? "" : label.toLowerCase();
+        const rawValue = label === "(empty)" ? "" : label;
         const matchedSeries = (plotChart.value?.options?.series ?? []).find(
-          (s: any) => s.name?.toLowerCase() === displayLabel.toLowerCase(),
+          (s: any) => s.name === label,
         );
         return {
-          displayLabel,
+          displayLabel: label,
           rawValue,
           count: (counts as number[])[dataIndex] ?? 0,
           color: matchedSeries?.itemStyle?.color ?? "#888",

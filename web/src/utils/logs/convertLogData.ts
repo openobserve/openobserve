@@ -205,10 +205,11 @@ export const convertStackedLogData = (
   const series = [...breakdownSeries.entries()].map(([category, values]) => {
     // Use explicit check so numeric 0 is treated as a real value, not empty.
     // `category || "(empty)"` would incorrectly map 0 → "(empty)" because 0 is falsy.
+    // Case is preserved from the source data — "INFO", "Info", "info" render as
+    // three distinct series instead of being collapsed to one normalized label.
     const label = (category === null || category === undefined || category === "") ? "(empty)" : String(category);
-    const displayLabel = label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
     return {
-      name: displayLabel,
+      name: label,
       type: "bar",
       stack: "total",
       emphasis: { focus: "series" },
