@@ -77,15 +77,16 @@ const heightClasses = computed<string>(() => {
     @click="handleClick"
   >
     <!--
-      When a default slot is provided, render it directly (custom content:
-      badges, close icons, tooltips, etc.). Otherwise use icon + label props.
+      If label or icon props are provided, render them (prop-driven mode).
+      If neither is set, fall back to the default slot (custom content mode:
+      badges, close icons, folder rows, etc.).
     -->
-    <slot v-if="$slots.default" />
-    <template v-else>
+    <template v-if="label || icon">
       <slot name="icon">
         <span v-if="icon" class="o-tab__icon tw:text-base tw:leading-none material-icons">{{ icon }}</span>
       </slot>
       <span v-if="label" class="o-tab__label">{{ label }}</span>
     </template>
+    <slot v-else />
   </button>
 </template>
