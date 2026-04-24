@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -141,7 +141,8 @@ import BillingService from "@/services/billings";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog, Usage, AppTabs },
+  components: {
+    OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs },
   setup() {
     const { t } = useI18n();
     const store = useStore();

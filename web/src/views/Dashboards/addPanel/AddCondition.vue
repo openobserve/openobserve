@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="condition">
     <q-select
       v-if="conditionIndex !== 0"
@@ -185,6 +185,7 @@ import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 export default defineComponent({
   name: "AddCondition",
   components: {
+    OTabs, OTab, OTabPanels, OTabPanel,
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     StreamFieldSelect,
