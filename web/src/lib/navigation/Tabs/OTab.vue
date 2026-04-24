@@ -16,21 +16,30 @@ const isActive = computed<boolean>(() => context?.value.modelValue === props.nam
 const isDense = computed<boolean>(() => context?.value.dense ?? false)
 const isVertical = computed<boolean>(() => context?.value.isVertical ?? false)
 
+/** True when the icon prop uses Quasar's `img:` prefix (renders as <img>) */
+const isImgIcon = computed<boolean>(() => Boolean(props.icon?.startsWith('img:')))
+/** The resolved src URL (stripped of `img:` prefix) */
+const imgSrc = computed<string>(() => (props.icon?.startsWith('img:') ? props.icon.slice(4) : ''))
+
 function handleClick(): void {
   if (props.disable) return
   context?.value.onTabClick(props.name)
 }
 
 // ── Classes ────────────────────────────────────────────────────────────────
-const baseClasses = [
+const baseClasses = computed<string>(() => [
   'o-tab',
-  'tw:relative tw:inline-flex tw:items-center tw:justify-center tw:gap-1.5',
+  'tw:relative tw:items-center tw:gap-1.5',
+  // Vertical tabs stretch full width and left-align; horizontal tabs are inline-centered
+  isVertical.value
+    ? 'tw:flex tw:w-full tw:justify-start'
+    : 'tw:inline-flex tw:justify-center',
   'tw:px-2 tw:font-medium tw:text-sm tw:whitespace-nowrap tw:rounded-t-md',
   'tw:outline-none tw:transition-colors tw:duration-150',
   'tw:select-none',
   'tw:focus-visible:outline-none',
   'tw:focus-visible:ring-2 tw:focus-visible:ring-tabs-focus-ring tw:focus-visible:ring-inset',
-].join(' ')
+].join(' '))
 
 const stateClasses = computed<string>(() => {
   if (props.disable) {
@@ -83,9 +92,21 @@ const heightClasses = computed<string>(() => {
     -->
     <template v-if="label || icon">
       <slot name="icon">
-        <span v-if="icon" class="o-tab__icon tw:text-base tw:leading-none material-icons">{{ icon }}</span>
+        <!-- img: prefix (Quasar compat) → render as <img> -->
+        <img
+          v-if="icon && isImgIcon"
+          :src="imgSrc"
+          class="o-tab__icon tw:h-4 tw:w-4 tw:shrink-0 tw:object-contain"
+          aria-hidden="true"
+          alt=""
+        />
+        <!-- Regular Material icon name → render as icon font glyph -->
+        <span
+          v-else-if="icon"
+          class="o-tab__icon tw:text-base tw:leading-none tw:shrink-0 material-icons"
+        >{{ icon }}</span>
       </slot>
-      <span v-if="label" class="o-tab__label">{{ label }}</span>
+      <span v-if="label" class="o-tab__label tw:truncate">{{ label }}</span>
     </template>
     <slot v-else />
   </button>
