@@ -3,6 +3,10 @@ import {
   classicColorPaletteLightTheme,
   classicColorPaletteDarkTheme,
 } from "@/utils/dashboard/colorPalette";
+import {
+  formatUnitValue,
+  getUnitValue,
+} from "@/utils/dashboard/convertDataIntoUnitValue";
 
 export const convertLogData = (
   x: any,
@@ -57,11 +61,10 @@ export const convertLogData = (
           precision: 0,
         },
       },
-      // show three tick marks: 0, mid, max
-      interval: y.reduce((a: number, b: number) => Math.max(a, b), 0) / 2,
+      splitNumber: 3,
       axisLabel: {
         formatter: function (value: any) {
-          return Math.round(value);
+          return formatUnitValue(getUnitValue(value, "numbers", "", 2));
         },
       },
     },
@@ -278,8 +281,10 @@ export const convertStackedLogData = (
         type: "value",
         axisLine: { show: true },
         axisPointer: { label: { precision: 0 } },
+        splitNumber: 3,
         axisLabel: {
-          formatter: (value: number) => Math.round(value).toString(),
+          formatter: (value: number) =>
+            formatUnitValue(getUnitValue(value, "numbers", "", 2)),
         },
       },
       toolbox: {
