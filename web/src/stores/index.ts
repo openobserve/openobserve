@@ -437,6 +437,7 @@ export default createStore({
     //   context.commit('setCurrentPanelsData', payload);
     // },
     setConfig(context, payload) {
+      payload.persist_stream_selection = true; // Ensure stream selection persistence across navigation
       context.commit("setConfig", payload);
     },
     appTheme(context, payload) {
