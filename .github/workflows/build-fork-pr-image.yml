@@ -62,6 +62,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          shared-key: fork-pr-release
+          save-if: "false"
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
         with:

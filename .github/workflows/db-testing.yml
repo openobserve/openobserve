@@ -24,8 +24,33 @@ env:
   ZO_FILE_PUSH_INTERVAL: 1
 
 jobs:
+  check_changes:
+    name: check_changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: check
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
+          if [ -z "$CHANGED" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          elif echo "$CHANGED" | grep -qvE '(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/)'; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
   db_validation_tests:
     name: db_validation_tests
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-8
     permissions:
       contents: read
@@ -61,7 +86,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          prefix-key: db-testing
+          shared-key: backend-debug-mimalloc
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: |
@@ -185,11 +211,15 @@ jobs:
   db_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [db_validation_tests]
+    needs: [check_changes, db_validation_tests]
     if: always()
     steps:
       - name: Check test results
         run: |
+          if [ "${{ needs.check_changes.result }}" != "success" ]; then
+            echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"
+            exit 1
+          fi
           if [ "${{ needs.db_validation_tests.result }}" == "success" ] || [ "${{ needs.db_validation_tests.result }}" == "skipped" ]; then
             echo "DB validation tests passed or skipped"
             exit 0
