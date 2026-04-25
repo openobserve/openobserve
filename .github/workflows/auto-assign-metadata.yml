@@ -48,11 +48,14 @@ jobs:
             [.[] | select(.title != "Backlog")] |
             map({
               title: .title,
+              due_ts: (if .due_on then (.due_on | fromdateiso8601) else null end),
               sort_key: ([.title | scan("[0-9]+")] | map(tonumber))
             }) |
             map(select(.sort_key | length > 0)) |
-            sort_by(.sort_key) |
-            .[0].title // empty')
+            . as $ms |
+            (($ms | map(select(.due_ts == null or .due_ts >= now)) | sort_by(.sort_key) | .[0].title) //
+             ($ms | sort_by(.due_ts) | .[-1].title) //
+             empty)')
 
           if [ -n "$MILESTONE" ]; then
             gh pr edit "$NUMBER" -m "$MILESTONE" \
@@ -120,11 +123,14 @@ jobs:
             [.[] | select(.title != "Backlog")] |
             map({
               title: .title,
+              due_ts: (if .due_on then (.due_on | fromdateiso8601) else null end),
               sort_key: ([.title | scan("[0-9]+")] | map(tonumber))
             }) |
             map(select(.sort_key | length > 0)) |
-            sort_by(.sort_key) |
-            .[0].title // empty')
+            . as $ms |
+            (($ms | map(select(.due_ts == null or .due_ts >= now)) | sort_by(.sort_key) | .[0].title) //
+             ($ms | sort_by(.due_ts) | .[-1].title) //
+             empty)')
 
           if [ -n "$MILESTONE" ]; then
             gh issue edit "$NUMBER" -m "$MILESTONE" \
