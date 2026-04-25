@@ -486,7 +486,9 @@ const loadServiceGraph = async () => {
         const aScore = (a.errorFlag ? 2 : 0) + (a.latencyFlag ? 1 : 0);
         const bScore = (b.errorFlag ? 2 : 0) + (b.latencyFlag ? 1 : 0);
         if (bScore !== aScore) return bScore - aScore;
-        return (b.error_rate ?? 0) - (a.error_rate ?? 0);
+        const errDiff = (b.error_rate ?? 0) - (a.error_rate ?? 0);
+        if (errDiff !== 0) return errDiff;
+        return a.id.localeCompare(b.id);
       })
       .slice(0, 9);
   } catch {
