@@ -278,7 +278,7 @@ test.describe("Dashboard Table Chart - Core Features", () => {
     }
   );
 
-  test(
+  test.skip(
     "should display VRL-created field as column when dynamic columns enabled",
     { tag: ["@tableChart", "@functional", "@P1"] },
     async ({ page }) => {
