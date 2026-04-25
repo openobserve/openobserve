@@ -1278,7 +1278,6 @@ import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.v
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
-import { duration } from "moment";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -2584,38 +2583,45 @@ const fetchTracesByDimensions = (): Promise<any[]> => {
   const accumulated: any[] = [];
 
   return new Promise((resolve, reject) => {
-    fetchQueryDataWithHttpStream(
-      {
-        queryReq: {
-          stream_name: streamName,
-          filter: filter,
-          start_time: props.timeRange.startTime,
-          end_time: props.timeRange.endTime,
-          from: 0,
-          size: 50,
-        },
-        type: "traces",
-        traceId,
-        org_id: currentOrgIdentifier.value,
-      },
-      {
-        data: (_: any, response: any) => {
-          const hits: any[] = response.content?.results?.hits || [];
-          if (hits.length > 0) {
-            accumulated.push(...formatTracesMetaData(hits));
-          }
-        },
-        error: (_: any, err: any) => {
-          currentTracesStreamTraceId = null;
-          reject(err);
-        },
-        complete: () => {
-          currentTracesStreamTraceId = null;
-          resolve(accumulated);
-        },
-        reset: () => {},
-      },
-    );
+    (async () => {
+      try {
+        await fetchQueryDataWithHttpStream(
+          {
+            queryReq: {
+              stream_name: streamName,
+              filter: filter,
+              start_time: props.timeRange.startTime,
+              end_time: props.timeRange.endTime,
+              from: 0,
+              size: 50,
+            },
+            type: "traces",
+            traceId,
+            org_id: currentOrgIdentifier.value,
+          },
+          {
+            data: (_: any, response: any) => {
+              const hits: any[] = response.content?.results?.hits || [];
+              if (hits.length > 0) {
+                accumulated.push(...formatTracesMetaData(hits));
+              }
+            },
+            error: (_: any, err: any) => {
+              currentTracesStreamTraceId = null;
+              reject(err);
+            },
+            complete: () => {
+              currentTracesStreamTraceId = null;
+              resolve(accumulated);
+            },
+            reset: () => {},
+          },
+        );
+      } catch (e) {
+        currentTracesStreamTraceId = null;
+        reject(e);
+      }
+    })();
   });
 };
 
