@@ -131,41 +131,32 @@ mod tests {
     }
 
     #[test]
-    fn test_new_creates_aggregated_display() {
+    fn test_new_aggregated_output() {
         let plan = empty_plan();
         let d = DisplayableExecutionPlan::new(plan.as_ref());
-        // indent(false) must produce non-empty output containing the plan name
         let s = format!("{}", d.indent(false));
-        assert!(!s.is_empty());
         assert!(s.contains("EmptyExec"));
+        // EmptyExec has no metrics, so the aggregated branch writes "metrics=[]"
+        assert!(s.contains("metrics=[]"));
     }
 
     #[test]
-    fn test_with_full_metrics_creates_display() {
+    fn test_with_full_metrics_output() {
         let plan = empty_plan();
         let d = DisplayableExecutionPlan::with_full_metrics(plan.as_ref());
         let s = format!("{}", d.indent(false));
         assert!(s.contains("EmptyExec"));
+        assert!(s.contains("metrics=[]"));
     }
 
     #[test]
     fn test_indent_verbose_vs_default() {
         let plan = empty_plan();
         let d = DisplayableExecutionPlan::new(plan.as_ref());
-        // Both modes must produce output; verbose may differ but both must not panic.
         let default_out = format!("{}", d.indent(false));
         let verbose_out = format!("{}", d.indent(true));
         assert!(!default_out.is_empty());
         assert!(!verbose_out.is_empty());
-    }
-
-    #[test]
-    fn test_metrics_section_present_in_output() {
-        let plan = empty_plan();
-        let d = DisplayableExecutionPlan::new(plan.as_ref());
-        let s = format!("{}", d.indent(false));
-        // EmptyExec has no metrics, so the aggregated branch writes "metrics=[]"
-        assert!(s.contains("metrics=[]"));
     }
 }
 

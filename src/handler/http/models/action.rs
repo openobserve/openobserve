@@ -163,16 +163,18 @@ mod tests {
         assert_eq!(resp.name, "my_action");
         assert_eq!(resp.created_by, "user@example.com");
         // last_run_at falls back to created_at when last_executed_at is None
-        assert_eq!(resp.last_run_at, Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap());
+        assert_eq!(
+            resp.last_run_at,
+            Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap()
+        );
         assert!(resp.last_successful_at.is_none());
     }
 
     #[test]
     fn test_try_from_action_info_response_no_id_errors() {
         let action = make_action(None, None, None);
-        let result = GetActionInfoResponse::try_from(action);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("No Id"));
+        let err = GetActionInfoResponse::try_from(action).unwrap_err();
+        assert!(err.to_string().contains("No Id"));
     }
 
     #[test]
@@ -203,19 +205,17 @@ mod tests {
     }
 
     #[test]
-    fn test_serialize_datetime_to_microseconds() {
+    fn test_serialize_datetime_fields() {
+        // Covers serialize_datetime (required field) and serialize_option_datetime (None case)
+        // in a single serialization pass.
         let action = make_action(Some(test_ksuid()), None, None);
         let resp = GetActionInfoResponse::try_from(action).unwrap();
         let json = serde_json::to_value(&resp).unwrap();
-        let expected_micros = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap().timestamp_micros();
+        let expected_micros = Utc
+            .with_ymd_and_hms(2024, 1, 1, 0, 0, 0)
+            .unwrap()
+            .timestamp_micros();
         assert_eq!(json["created_at"], expected_micros);
-    }
-
-    #[test]
-    fn test_serialize_option_datetime_none() {
-        let action = make_action(Some(test_ksuid()), None, None);
-        let resp = GetActionInfoResponse::try_from(action).unwrap();
-        let json = serde_json::to_value(&resp).unwrap();
         assert!(json["last_successful_at"].is_null());
     }
 
