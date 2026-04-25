@@ -1962,7 +1962,35 @@
     "alertTitle": "Alerts",
     "dashboardTitle": "Dashboards",
     "streamTotal": "Streams",
-    "totalDashboard": "Dashboards"
+    "totalDashboard": "Dashboards",
+    "tabAiAssistant": "O2 AI Assistant",
+    "tabOverview": "Overview",
+    "tabUsage": "Usage"
+  },
+  "overview": {
+    "title": "System Overview",
+    "activeAnomalies": "Active Anomalies",
+    "activeIncidents": "Active Incidents",
+    "services": "Services",
+    "recentEvents": "Recent Events",
+    "investigate": "Investigate →",
+    "untitledIncident": "Untitled Incident",
+    "viewLatencyCharts": "View latency & RED charts",
+    "elevatedErrorRate": "Elevated error rate",
+    "reqPerSec": "req/s",
+    "allClear": "All clear",
+    "allClearDesc": "No active anomalies, incidents, or degraded services in the selected time window."
+  },
+  "chatHistory": {
+    "title": "Chats",
+    "newChat": "New chat",
+    "search": "Search",
+    "noMatches": "No matches",
+    "noHistory": "No chat history",
+    "delete": "Delete",
+    "clearAll": "Clear all",
+    "clearAllTitle": "Clear all chats",
+    "clearAllMessage": "This will permanently delete all chat history. This action cannot be undone."
   },
   "billing": {
     "header": "Usage & Billing",
