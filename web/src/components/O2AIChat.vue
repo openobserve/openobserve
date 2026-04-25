@@ -1688,7 +1688,6 @@ export default defineComponent({
     };
 
     watch(() => props.aiChatInputContext, (newAiChatInputContext: string) => {
-      console.log('[O2AIChat] aiChatInputContext changed:', newAiChatInputContext);
       if(newAiChatInputContext) {
 
         // Create a reference chip from the context
@@ -1720,14 +1719,11 @@ export default defineComponent({
 
     // Atomic payload watcher — text + autoSend arrive together, no timing race
     watch(() => props.aiChatPayload, (payload) => {
-      console.log('[O2AIChat] aiChatPayload:', payload);
       if (!payload?.text) return;
       if (payload.autoSend) {
-        console.log('[O2AIChat] aiChatPayload autoSend=true, sending:', payload.text);
         inputMessage.value = payload.text;
         nextTick(() => {
           setTimeout(() => {
-            console.log('[O2AIChat] firing sendMessage via payload, inputMessage=', inputMessage.value);
             sendMessage();
           }, 50);
         });

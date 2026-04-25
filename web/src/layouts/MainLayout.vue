@@ -1126,8 +1126,6 @@ export default defineComponent({
         shouldAutoSend = value.autoSend ?? false;
       }
 
-      console.log('[MainLayout] sendToAiChat — text:', text, '| shouldAutoSend:', shouldAutoSend);
-
       aiChatAppendMode.value = append;
 
       // Deliver text + autoSend atomically in a single object so O2AIChat
