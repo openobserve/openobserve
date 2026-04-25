@@ -466,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="
                   $emit('apply-filter-immediately', {
                     field,
-                    value: fieldValue,
+                    value: getFilterValue(field, fieldValue),
                     operator: action.operator,
                   })
                 "
@@ -527,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click.stop="
                       $emit('apply-filter-immediately', {
                         field,
-                        value: fieldValue,
+                        value: getFilterValue(field, fieldValue),
                         operator: action.operator,
                       })
                     "
@@ -1146,6 +1146,15 @@ export default defineComponent({
       { operator: "=" as const, iconComponent: EqualIcon },
       { operator: "!=" as const, iconComponent: NotEqualIcon },
     ];
+
+    const RAW_VALUE_FILTER_FIELDS = new Set(["start_time", "end_time"]);
+
+    const getFilterValue = (field: string, displayValue: unknown): unknown => {
+      if (RAW_VALUE_FILTER_FIELDS.has(field)) {
+        return (props.span as Record<string, unknown>)[field] ?? displayValue;
+      }
+      return displayValue;
+    };
 
     const attributesForDisplay = computed(() => {
       const attrs = { ...spanDetails.value.attrs };
@@ -2141,6 +2150,7 @@ export default defineComponent({
       linkColumns,
       getTagRows,
       tagColumns,
+      getFilterValue,
       attributesForDisplay,
       attributesViewMode,
       attributesTableColumns,
