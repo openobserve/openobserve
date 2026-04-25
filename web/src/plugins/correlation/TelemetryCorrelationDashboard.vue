@@ -2693,6 +2693,7 @@ const openTracesPage = () => {
       to: props.timeRange.endTime,
       query: b64EncodeUnicode(filterQuery), // Base64 encode the filter query
       org_identifier: org,
+      tab: "traces",
     },
   });
 
