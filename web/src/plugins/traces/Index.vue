@@ -308,6 +308,7 @@ import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
+import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -492,6 +493,10 @@ function loadStreamLists() {
   try {
     const queryParams = router.currentRoute.value.query;
     const previouslySelectedStream = searchObj.data.stream.selectedStream.value;
+    const persistedStream =
+      store.state.zoConfig?.auto_query_enabled && !queryParams.stream
+        ? restoreTracesStream(store.state.selectedOrganization.identifier)
+        : "";
     searchObj.data.stream.streamLists = [];
     if (searchObj.data.streamResults.list.length > 0) {
       let lastUpdatedStreamTime = 0;
@@ -511,6 +516,14 @@ function loadStreamLists() {
           !foundPriorityMatch &&
           !queryParams.stream &&
           previouslySelectedStream === item.name
+        ) {
+          selectedStreamItemObj = itemObj;
+          foundPriorityMatch = true;
+        } else if (
+          !foundPriorityMatch &&
+          !queryParams.stream &&
+          !previouslySelectedStream &&
+          persistedStream === item.name
         ) {
           selectedStreamItemObj = itemObj;
           foundPriorityMatch = true;
@@ -1807,6 +1820,18 @@ const changeRelativeDate = computed(() => {
 const runQuery = computed(() => {
   return searchObj.runQuery;
 });
+
+watch(
+  () => searchObj.data.stream.selectedStream.value,
+  (streamValue: string) => {
+    if (store.state.zoConfig?.auto_query_enabled && streamValue) {
+      saveTracesStream(
+        store.state.selectedOrganization.identifier,
+        streamValue,
+      );
+    }
+  },
+);
 
 watch(showFields, () => {
   if (searchObj.meta.showHistogram == true && searchObj.meta.sqlMode == false) {
