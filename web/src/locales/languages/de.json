@@ -3638,6 +3638,8 @@
     "noMatches": "Keine Treffer",
     "noHistory": "Kein Chatverlauf",
     "delete": "Löschen",
-    "clearAll": "Alles löschen"
+    "clearAll": "Alles löschen",
+    "clearAllTitle": "Alle Chats löschen",
+    "clearAllMessage": "Dadurch wird der gesamte Chatverlauf dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
   }
 }

@@ -3649,6 +3649,8 @@
     "noMatches": "Eşleşme yok",
     "noHistory": "Sohbet geçmişi yok",
     "delete": "Sil",
-    "clearAll": "Tümünü temizle"
+    "clearAll": "Tümünü temizle",
+    "clearAllTitle": "Tüm sohbetleri temizle",
+    "clearAllMessage": "Bu, tüm sohbet geçmişini kalıcı olarak silecektir. Bu işlem geri alınamaz."
   }
 }

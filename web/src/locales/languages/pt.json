@@ -3638,6 +3638,8 @@
     "noMatches": "Sem jogos",
     "noHistory": "Sem histórico de bate-papo",
     "delete": "Excluir",
-    "clearAll": "Limpar tudo"
+    "clearAll": "Limpar tudo",
+    "clearAllTitle": "Limpar todos os bate-papos",
+    "clearAllMessage": "Isso excluirá permanentemente todo o histórico de bate-papo. Essa ação não pode ser desfeita."
   }
 }

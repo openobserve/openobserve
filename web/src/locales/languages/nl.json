@@ -3649,6 +3649,8 @@
     "noMatches": "Geen wedstrijden",
     "noHistory": "Geen chatgeschiedenis",
     "delete": "Verwijderen",
-    "clearAll": "Alles wissen"
+    "clearAll": "Alles wissen",
+    "clearAllTitle": "Alle chats wissen",
+    "clearAllMessage": "Hiermee wordt alle chatgeschiedenis definitief verwijderd. Deze actie kan niet ongedaan worden gemaakt."
   }
 }

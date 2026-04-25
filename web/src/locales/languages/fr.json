@@ -3638,6 +3638,8 @@
     "noMatches": "Aucune allumette",
     "noHistory": "Pas d'historique des discussions",
     "delete": "Supprimer",
-    "clearAll": "Tout effacer"
+    "clearAll": "Tout effacer",
+    "clearAllTitle": "Effacer tous les chats",
+    "clearAllMessage": "Cela supprimera définitivement tout l'historique des discussions. Cette action ne peut pas être annulée."
   }
 }

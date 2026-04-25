@@ -3638,6 +3638,8 @@
     "noMatches": "一致なし",
     "noHistory": "チャット履歴なし",
     "delete": "[削除]",
-    "clearAll": "すべてクリア"
+    "clearAll": "すべてクリア",
+    "clearAllTitle": "すべてのチャットをクリア",
+    "clearAllMessage": "これにより、すべてのチャット履歴が完全に削除されます。このアクションは元に戻せません。"
   }
 }

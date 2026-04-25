@@ -3642,6 +3642,8 @@
     "noMatches": "没有匹配项",
     "noHistory": "没有聊天记录",
     "delete": "删除",
-    "clearAll": "全部清除"
+    "clearAll": "全部清除",
+    "clearAllTitle": "清除所有聊天",
+    "clearAllMessage": "这将永久删除所有聊天记录。此操作无法撤消。"
   }
 }

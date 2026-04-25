@@ -3636,6 +3636,8 @@
     "noMatches": "No hay coincidencias",
     "noHistory": "Sin historial de chat",
     "delete": "Borrar",
-    "clearAll": "Borrar todo"
+    "clearAll": "Borrar todo",
+    "clearAllTitle": "Borrar todos los chats",
+    "clearAllMessage": "Esto borrará permanentemente todo el historial de chat. Esta acción no se puede deshacer."
   }
 }

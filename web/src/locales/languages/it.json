@@ -3647,6 +3647,8 @@
     "noMatches": "Nessuna corrispondenza",
     "noHistory": "Nessuna cronologia chat",
     "delete": "Elimina",
-    "clearAll": "Cancella tutto"
+    "clearAll": "Cancella tutto",
+    "clearAllTitle": "Cancella tutte le chat",
+    "clearAllMessage": "Ciò eliminerà definitivamente tutta la cronologia chat. Questa azione non può essere annullata."
   }
 }
