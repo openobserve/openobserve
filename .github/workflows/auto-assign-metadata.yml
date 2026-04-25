@@ -52,10 +52,11 @@ jobs:
               sort_key: ([.title | scan("[0-9]+")] | map(tonumber))
             }) |
             map(select(.sort_key | length > 0)) |
-            . as $ms |
-            (($ms | map(select(.due_ts == null or .due_ts >= now)) | sort_by(.sort_key) | .[0].title) //
-             ($ms | sort_by(.due_ts) | .[-1].title) //
-             empty)')
+            sort_by(.sort_key) |
+            if length == 0 then empty
+            elif (.[0].due_ts != null and .[0].due_ts < now) then (.[1].title // .[0].title)
+            else .[0].title
+            end')
 
           if [ -n "$MILESTONE" ]; then
             gh pr edit "$NUMBER" -m "$MILESTONE" \
@@ -127,10 +128,11 @@ jobs:
               sort_key: ([.title | scan("[0-9]+")] | map(tonumber))
             }) |
             map(select(.sort_key | length > 0)) |
-            . as $ms |
-            (($ms | map(select(.due_ts == null or .due_ts >= now)) | sort_by(.sort_key) | .[0].title) //
-             ($ms | sort_by(.due_ts) | .[-1].title) //
-             empty)')
+            sort_by(.sort_key) |
+            if length == 0 then empty
+            elif (.[0].due_ts != null and .[0].due_ts < now) then (.[1].title // .[0].title)
+            else .[0].title
+            end')
 
           if [ -n "$MILESTONE" ]; then
             gh issue edit "$NUMBER" -m "$MILESTONE" \
