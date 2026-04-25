@@ -16,8 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="tw:px-[0.625rem] q-pt-xs home-page" :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''">
 
-    <!-- Tab bar (drag to reorder) -->
+    <!-- Tab bar (drag to reorder) — hidden for OSS (single tab) -->
     <div
+      v-if="isEnterpriseOrCloud"
       class="home-tab-bar"
       @dragover.prevent
       @drop="onTabDrop($event)"
@@ -40,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- O2 AI Assistant tab -->
     <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
-      <HomeChatHistory />
-      <O2AIChat :is-open="true" :header-height="0" />
+      <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
+      <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
     </div>
 
     <!-- Overview tab -->
@@ -497,11 +498,17 @@ export default defineComponent({
     const LS_TAB_ORDER_KEY = "o2_home_tab_order";
     const LS_ACTIVE_TAB_KEY = "o2_home_active_tab";
 
-    const DEFAULT_TABS = [
-      { id: "ai",       label: t("home.tabAiAssistant") },
-      { id: "overview", label: t("home.tabOverview")    },
-      { id: "usage",    label: t("home.tabUsage")       },
-    ];
+    const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
+
+    const DEFAULT_TABS = isEnterpriseOrCloud
+      ? [
+          { id: "ai",       label: t("home.tabAiAssistant") },
+          { id: "overview", label: t("home.tabOverview")    },
+          { id: "usage",    label: t("home.tabUsage")       },
+        ]
+      : [
+          { id: "usage",    label: t("home.tabUsage")       },
+        ];
 
     function loadTabOrder() {
       try {
@@ -968,6 +975,14 @@ export default defineComponent({
 
 
 
+    const homeChat = ref<any>(null);
+    function onLoadChat(id: number) {
+      homeChat.value?.loadChat(id);
+    }
+    function onNewChat() {
+      homeChat.value?.addNewChat();
+    }
+
     return {
       t,
       store,
@@ -1018,6 +1033,10 @@ export default defineComponent({
       onTabDragEnd,
       onTabDrop,
       emit,
+      isEnterpriseOrCloud,
+      homeChat,
+      onLoadChat,
+      onNewChat,
     };
   },
   computed: {

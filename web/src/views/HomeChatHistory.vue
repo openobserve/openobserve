@@ -5,6 +5,11 @@ import { useI18n } from 'vue-i18n'
 import { useChatHistory } from '@/composables/useChatHistory'
 import type { ChatHistoryEntry } from '@/ts/interfaces/chat'
 
+const emit = defineEmits<{
+  (e: 'load-chat', id: number): void
+  (e: 'new-chat'): void
+}>()
+
 const store = useStore()
 const { t } = useI18n()
 
@@ -37,12 +42,12 @@ const activeChatId = computed(() => store.state.currentChatTimestamp)
 
 function selectChat(id: number) {
   store.dispatch('setCurrentChatTimestamp', id)
-  store.dispatch('setChatUpdated', true)
+  emit('load-chat', id)
 }
 
 function newChat() {
   store.dispatch('setCurrentChatTimestamp', null)
-  store.dispatch('setChatUpdated', false)
+  emit('new-chat')
 }
 
 async function deleteChat(e: MouseEvent, id: number) {
@@ -149,7 +154,8 @@ function formatTime(ts: string): string {
   display: flex;
   flex-direction: column;
   height: 100%;
-  width: 13.75em;
+  font-size: 1rem;
+  width: 15em;
   flex-shrink: 0;
   border-right: 0.0625em solid var(--o2-border-color);
   background: var(--o2-card-bg);

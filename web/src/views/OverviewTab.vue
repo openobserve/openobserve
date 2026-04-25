@@ -240,18 +240,33 @@ const isIncidentsEnabled = computed(
 );
 
 // ── Date / time picker ───────────────────────────────────────────────────────
-const dateTimeRef = ref<any>(null);
-const dateTimeType = ref("relative");
-const relativeTime = ref("15m");
+const LS_TIME_KEY = "o2_overview_time";
+
+function loadSavedTime() {
+  try {
+    const raw = localStorage.getItem(LS_TIME_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+const saved = loadSavedTime();
 const now = Date.now();
-const absoluteTime = ref({
-  startTime: (now - 15 * 60 * 1000) * 1000,
-  endTime: now * 1000,
-});
-const timeRange = ref({
-  startTime: (now - 15 * 60 * 1000) * 1000,
-  endTime: now * 1000,
-});
+const dateTimeRef = ref<any>(null);
+const dateTimeType = ref(saved?.type ?? "relative");
+const relativeTime = ref(saved?.relative ?? "15m");
+const absoluteTime = ref(
+  saved?.absolute ?? {
+    startTime: (now - 15 * 60 * 1000) * 1000,
+    endTime: now * 1000,
+  }
+);
+const timeRange = ref(
+  saved?.timeRange ?? {
+    startTime: (now - 15 * 60 * 1000) * 1000,
+    endTime: now * 1000,
+  }
+);
 
 const onDateChange = (value: any) => {
   timeRange.value = {
@@ -265,6 +280,12 @@ const onDateChange = (value: any) => {
     dateTimeType.value = "absolute";
     absoluteTime.value = { startTime: value.startTime, endTime: value.endTime };
   }
+  localStorage.setItem(LS_TIME_KEY, JSON.stringify({
+    type: dateTimeType.value,
+    relative: relativeTime.value,
+    absolute: absoluteTime.value,
+    timeRange: timeRange.value,
+  }));
   loadAll();
 };
 
@@ -427,13 +448,9 @@ const loadIncidents = async () => {
 const loadServiceGraph = async () => {
   if (!isEnterpriseOrCloud.value) return;
   try {
-    // Use the same stream the Service Graph page last used — stored in localStorage
-    const storedStream = localStorage.getItem("serviceGraph_streamFilter");
-    const stream = storedStream && storedStream !== "all" ? storedStream : undefined;
-    graphStream.value = stream ?? "default";
+    graphStream.value = "default";
 
     const res = await serviceGraphService.getCurrentTopology(orgId.value, {
-      streamName: stream,
       startTime: timeRange.value.startTime,
       endTime: timeRange.value.endTime,
     });
