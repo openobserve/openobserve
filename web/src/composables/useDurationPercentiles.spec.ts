@@ -267,6 +267,7 @@ describe("useDurationPercentiles", () => {
         p75: null,
         p95: null,
         p99: null,
+        max: null,
       });
     });
 
@@ -330,6 +331,7 @@ describe("useDurationPercentiles", () => {
         p75: null,
         p95: null,
         p99: null,
+        max: null,
       });
     });
 
@@ -344,7 +346,8 @@ describe("useDurationPercentiles", () => {
         ` approx_percentile_cont(duration, 0.50) as p50,` +
         ` approx_percentile_cont(duration, 0.75) as p75,` +
         ` approx_percentile_cont(duration, 0.95) as p95,` +
-        ` approx_percentile_cont(duration, 0.99) as p99` +
+        ` approx_percentile_cont(duration, 0.99) as p99,` +
+        ` max(duration) as max` +
         ` FROM "${BASE_PAYLOAD.streamName}" WHERE duration >= 1000`;
       expect(callArg.queryReq.query.sql).toBe(b64EncodeUnicode(expectedSqlFragment));
     });
@@ -359,7 +362,8 @@ describe("useDurationPercentiles", () => {
         ` approx_percentile_cont(duration, 0.50) as p50,` +
         ` approx_percentile_cont(duration, 0.75) as p75,` +
         ` approx_percentile_cont(duration, 0.95) as p95,` +
-        ` approx_percentile_cont(duration, 0.99) as p99` +
+        ` approx_percentile_cont(duration, 0.99) as p99,` +
+        ` max(duration) as max` +
         ` FROM "${BASE_PAYLOAD.streamName}"`;
       expect(callArg.queryReq.query.sql).toBe(b64EncodeUnicode(expectedSqlFragment));
     });
@@ -389,6 +393,7 @@ describe("useDurationPercentiles", () => {
         p75: 300,
         p95: 400,
         p99: 500,
+        max: null,
       });
       expect(isLoading.value).toBe(false);
     });
@@ -415,6 +420,7 @@ describe("useDurationPercentiles", () => {
         p75: null,
         p95: null,
         p99: null,
+        max: null,
       });
       expect(isLoading.value).toBe(true);
     });
@@ -438,6 +444,7 @@ describe("useDurationPercentiles", () => {
       expect(percentiles.value.p75).toBeNull();
       expect(percentiles.value.p95).toBeNull();
       expect(percentiles.value.p99).toBeNull();
+      expect(percentiles.value.max).toBeNull();
     });
   });
 

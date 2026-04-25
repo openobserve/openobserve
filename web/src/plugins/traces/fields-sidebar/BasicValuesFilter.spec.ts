@@ -19,7 +19,12 @@ const mockResetFieldValues = vi.fn();
 // it empty; the computed returns EMPTY_FIELD_VALUES for unknown keys.
 const mockFieldValues: Record<
   string,
-  { isLoading: boolean; values: { key: string; count: number }[]; hasMore: boolean; errMsg: string }
+  {
+    isLoading: boolean;
+    values: { key: string; count: number }[];
+    hasMore: boolean;
+    errMsg: string;
+  }
 > = {};
 
 vi.mock("@/composables/useFieldValuesStream", () => ({
@@ -34,21 +39,32 @@ vi.mock("@/composables/useFieldValuesStream", () => ({
 const mockFetchPercentiles = vi.fn();
 const mockCancelPercentileFetch = vi.fn();
 // Kept as a vi.fn() so individual tests can assert on calls or override the return value.
-const mockParseDurationWhereClause = vi.fn((whereClause: string) => whereClause);
+const mockParseDurationWhereClause = vi.fn(
+  (whereClause: string) => whereClause,
+);
+
+// Mutable object closed over by the mock factory — mutate per-test to vary percentile values.
+const mockPercentilesValue = {
+  p25: null as number | null,
+  p50: null as number | null,
+  p75: null as number | null,
+  p95: null as number | null,
+  p99: null as number | null,
+  max: null as number | null,
+};
 
 vi.mock("@/composables/useDurationPercentiles", () => ({
   default: () => ({
-    percentiles: {
-      value: { p25: null, p50: null, p75: null, p95: null, p99: null },
-    },
+    percentiles: { value: mockPercentilesValue },
     isLoading: { value: false },
     errMsg: { value: "" },
     fetchPercentiles: mockFetchPercentiles,
     cancelFetch: mockCancelPercentileFetch,
   }),
   // Delegates to the module-level vi.fn() so tests can inspect calls or change behaviour.
-  parseDurationWhereClause: (...args: Parameters<typeof mockParseDurationWhereClause>) =>
-    mockParseDurationWhereClause(...args),
+  parseDurationWhereClause: (
+    ...args: Parameters<typeof mockParseDurationWhereClause>
+  ) => mockParseDurationWhereClause(...args),
 }));
 
 vi.mock("@/composables/useParser", () => ({
@@ -100,11 +116,7 @@ interface MountOptions {
 }
 
 const mountComponent = (fieldName: string, options: MountOptions = {}) => {
-  const {
-    dataType = "Utf8",
-    selectedFields,
-    showVisibilityToggle,
-  } = options;
+  const { dataType = "Utf8", selectedFields, showVisibilityToggle } = options;
 
   const props: Record<string, unknown> = { row: { name: fieldName, dataType } };
   if (selectedFields !== undefined) props.selectedFields = selectedFields;
@@ -258,7 +270,9 @@ describe("BasicValuesFilter — openFilterCreator", () => {
     mockFetchFieldValues.mockReset();
     mockFetchPercentiles.mockReset();
     // Restore the default pass-through implementation before each test.
-    mockParseDurationWhereClause.mockImplementation((whereClause: string) => whereClause);
+    mockParseDurationWhereClause.mockImplementation(
+      (whereClause: string) => whereClause,
+    );
   });
 
   afterEach(() => {
@@ -390,7 +404,9 @@ describe("BasicValuesFilter — openFilterCreator", () => {
   it("should pass the parseDurationWhereClause-converted whereClause to fetchPercentiles", async () => {
     // Simulate parseDurationWhereClause converting '1.50ms' → 1500 so the
     // resulting whereClause uses raw microseconds, not human-readable strings.
-    mockParseDurationWhereClause.mockImplementationOnce(() => "service_name='svc-a' AND duration >= 1500");
+    mockParseDurationWhereClause.mockImplementationOnce(
+      () => "service_name='svc-a' AND duration >= 1500",
+    );
     mockSearchObj.data.editorValue =
       "service_name='svc-a' AND duration >= '1.50ms'";
     wrapper = mountComponent("duration");
@@ -667,7 +683,14 @@ describe("BasicValuesFilter — mappedFieldValues", () => {
     const mapped = wrapper.vm.mappedFieldValues;
     const keys = mapped.values.map((v: { key: string }) => v.key);
 
-    expect(keys).toEqual(["Unspecified", "Internal", "Server", "Client", "Producer", "Consumer"]);
+    expect(keys).toEqual([
+      "Unspecified",
+      "Internal",
+      "Server",
+      "Client",
+      "Producer",
+      "Consumer",
+    ]);
   });
 
   it("should leave an unknown span_kind key unchanged", async () => {
@@ -776,11 +799,59 @@ describe("BasicValuesFilter — buildSql() with span_kind conversion", () => {
   it("should convert span_kind label in a pipe-style editorValue", async () => {
     wrapper = mountComponent("service_name");
     await flushPromises();
-    mockSearchObj.data.editorValue = "match_all('trace') | span_kind='Internal'";
+    mockSearchObj.data.editorValue =
+      "match_all('trace') | span_kind='Internal'";
 
     const sql = getSql();
 
     expect(sql).toContain("span_kind='1'");
     expect(sql).not.toContain("span_kind='Internal'");
+  });
+});
+
+// ─── duration field — Max percentile row ─────────────────────────────────────
+
+describe("BasicValuesFilter — duration field Max percentile row", () => {
+  let wrapper: any;
+
+  beforeEach(() => {
+    mockSearchObj.data.editorValue = "";
+    mockSearchObj.data.stream.selectedStream = {
+      label: "test_traces",
+      value: "test_traces",
+    };
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+    // Reset the shared mutable percentiles object back to all-null after each test.
+    Object.keys(mockPercentilesValue).forEach(
+      (k) => ((mockPercentilesValue as any)[k] = null),
+    );
+  });
+
+  describe("when percentiles.value.max is non-null", () => {
+    beforeEach(() => {
+      mockPercentilesValue.max = 5_000_000;
+    });
+
+    it("should have hasPercentiles true when only max is populated", async () => {
+      wrapper = mountComponent("duration");
+      await flushPromises();
+
+      // max=5_000_000 (non-null) so hasPercentiles computed returns true.
+      expect(wrapper.vm.hasPercentiles).toBe(true);
+    });
+  });
+
+  describe("when all percentiles including max are null", () => {
+    it("should have hasPercentiles false when all percentiles including max are null", async () => {
+      // Default module-level mock has all values null (including max).
+      wrapper = mountComponent("duration");
+      await flushPromises();
+
+      expect(wrapper.vm.hasPercentiles).toBe(false);
+    });
   });
 });
