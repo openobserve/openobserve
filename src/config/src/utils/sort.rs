@@ -90,4 +90,60 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_sort_float_zero_and_negative_zero() {
+        // 0.0 and -0.0 compare equal under partial_cmp.
+        assert_eq!(sort_float(&0.0, &-0.0), Ordering::Equal);
+        assert_eq!(sort_float(&-0.0, &0.0), Ordering::Equal);
+    }
+
+    #[test]
+    fn test_sort_float_subnormal_values() {
+        let tiny = f64::MIN_POSITIVE / 2.0;
+        assert_eq!(sort_float(&tiny, &f64::MIN_POSITIVE), Ordering::Less);
+        assert_eq!(sort_float(&f64::MIN_POSITIVE, &tiny), Ordering::Greater);
+    }
+
+    #[test]
+    fn test_sort_float_extreme_values() {
+        assert_eq!(sort_float(&f64::MIN, &f64::MAX), Ordering::Less);
+        assert_eq!(sort_float(&f64::MAX, &f64::MIN), Ordering::Greater);
+        assert_eq!(
+            sort_float(&f64::NEG_INFINITY, &f64::INFINITY),
+            Ordering::Less
+        );
+    }
+
+    #[test]
+    fn test_sort_float_only_nans() {
+        let mut nans = [f64::NAN, f64::NAN, f64::NAN];
+        // Sorting only NaN values must not panic and must yield a stable result.
+        nans.sort_by(sort_float);
+        assert!(nans.iter().all(|v| v.is_nan()));
+    }
+
+    #[test]
+    fn test_sort_float_empty_and_single_element() {
+        let mut empty: [f64; 0] = [];
+        empty.sort_by(sort_float);
+
+        let mut single = [3.14_f64];
+        single.sort_by(sort_float);
+        assert_eq!(single[0], 3.14);
+    }
+
+    #[test]
+    fn test_sort_float_already_sorted() {
+        let mut sorted = [-1.0, 0.0, 1.0, 2.0];
+        sorted.sort_by(sort_float);
+        assert_eq!(sorted, [-1.0, 0.0, 1.0, 2.0]);
+    }
+
+    #[test]
+    fn test_sort_float_reverse_sorted() {
+        let mut data = [3.0, 2.0, 1.0, 0.0, -1.0];
+        data.sort_by(sort_float);
+        assert_eq!(data, [-1.0, 0.0, 1.0, 2.0, 3.0]);
+    }
 }

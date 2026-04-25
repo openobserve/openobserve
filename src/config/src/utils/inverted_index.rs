@@ -104,4 +104,50 @@ mod tests {
             assert_eq!(convert_parquet_file_name_to_tantivy_file(input), expected);
         }
     }
+
+    #[test]
+    fn test_convert_vortex_file_name_to_tantivy_file() {
+        let input = "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.vortex";
+        let expected = "files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.ttv";
+        assert_eq!(
+            convert_parquet_file_name_to_tantivy_file(input),
+            Some(expected.to_string())
+        );
+    }
+
+    #[test]
+    fn test_convert_returns_none_for_unsupported_extension() {
+        // Files that are neither .parquet nor .vortex should return None.
+        let input = "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.json";
+        assert_eq!(convert_parquet_file_name_to_tantivy_file(input), None);
+    }
+
+    #[test]
+    fn test_convert_returns_none_for_short_path() {
+        // Paths shorter than 4 segments are rejected — there is no stream_type slot.
+        assert_eq!(
+            convert_parquet_file_name_to_tantivy_file("files/default/logs"),
+            None
+        );
+        assert_eq!(convert_parquet_file_name_to_tantivy_file(""), None);
+        assert_eq!(convert_parquet_file_name_to_tantivy_file("a/b/c"), None);
+    }
+
+    #[test]
+    fn test_convert_returns_none_for_unknown_stream_type() {
+        // service_graph / enrichment_tables / file_list are not handled by this
+        // converter — only logs/metrics/traces/metadata map to a tantivy index.
+        let input = "files/default/service_graph/x/2024/02/16/16/1.parquet";
+        assert_eq!(convert_parquet_file_name_to_tantivy_file(input), None);
+
+        let input = "files/default/enrichment_tables/x/2024/02/16/16/1.parquet";
+        assert_eq!(convert_parquet_file_name_to_tantivy_file(input), None);
+    }
+
+    #[test]
+    fn test_convert_path_without_extension_returns_none() {
+        // Final segment without a recognized extension is rejected.
+        let input = "files/default/logs/quickstart1/2024/02/16/16/no_extension";
+        assert_eq!(convert_parquet_file_name_to_tantivy_file(input), None);
+    }
 }
