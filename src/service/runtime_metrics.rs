@@ -228,6 +228,48 @@ async fn update_basic_runtime_info(runtime_name: &str) {
     );
 }
 
+#[cfg(test)]
+mod tests {
+    use tokio::runtime::Handle;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_register_runtime_adds_handle() {
+        let handle = Handle::current();
+        register_runtime("test_runtime".to_string(), handle);
+        let handles = RUNTIME_HANDLES.lock().unwrap();
+        assert!(handles.iter().any(|(name, _)| name == "test_runtime"));
+    }
+
+    #[tokio::test]
+    async fn test_collect_runtime_metrics_empty_does_not_panic() {
+        // With no registered runtimes the loop body never executes — just verify no panic.
+        // We can't easily assert metric values here without tokio_unstable, but the
+        // stable branch (update_basic_runtime_info) runs and must not panic.
+        collect_runtime_metrics().await;
+    }
+
+    #[tokio::test]
+    async fn test_collect_runtime_metrics_with_registered_runtime() {
+        let handle = Handle::current();
+        register_runtime("collect_test".to_string(), handle);
+        // Must complete without panic on both stable and unstable tokio builds.
+        collect_runtime_metrics().await;
+    }
+
+    #[cfg(not(tokio_unstable))]
+    #[tokio::test]
+    async fn test_update_basic_runtime_info_sets_workers_to_minus_one() {
+        update_basic_runtime_info("basic_test").await;
+        // TOKIO_RUNTIME_TASKS gauge for "workers" should be -1
+        let gauge = config::metrics::TOKIO_RUNTIME_TASKS
+            .with_label_values(&["basic_test", "workers"])
+            .get();
+        assert_eq!(gauge, -1);
+    }
+}
+
 pub async fn start_metrics_collector() {
     #[cfg(tokio_unstable)]
     log::info!("Starting runtime metrics collector with full tokio_unstable metrics support");
