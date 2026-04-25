@@ -11,6 +11,7 @@ export interface DurationPercentiles {
   p75: number | null;
   p95: number | null;
   p99: number | null;
+  max: number | null;
 }
 
 export interface FetchPercentilesPayload {
@@ -176,6 +177,7 @@ const useDurationPercentiles = () => {
     p75: null,
     p95: null,
     p99: null,
+    max: null,
   });
   const isLoading = ref(false);
   const errMsg = ref("");
@@ -201,6 +203,7 @@ const useDurationPercentiles = () => {
       p75: null,
       p95: null,
       p99: null,
+      max: null,
     };
 
     const { traceId } = generateTraceContext();
@@ -214,7 +217,8 @@ const useDurationPercentiles = () => {
       ` approx_percentile_cont(duration, 0.50) as p50,` +
       ` approx_percentile_cont(duration, 0.75) as p75,` +
       ` approx_percentile_cont(duration, 0.95) as p95,` +
-      ` approx_percentile_cont(duration, 0.99) as p99` +
+      ` approx_percentile_cont(duration, 0.99) as p99,` +
+      ` max(duration) as max` +
       ` FROM "${payload.streamName}"${where}`;
 
     fetchQueryDataWithHttpStream(
@@ -250,6 +254,7 @@ const useDurationPercentiles = () => {
                 p75: row.p75 ?? null,
                 p95: row.p95 ?? null,
                 p99: row.p99 ?? null,
+                max: row.max ?? null,
               };
               isLoading.value = false;
             }
