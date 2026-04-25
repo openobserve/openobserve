@@ -299,7 +299,7 @@ const recentEvents = ref<any[]>([]);
 
 // Service graph raw data + panel state
 const graphData = ref<{ nodes: any[]; edges: any[] }>({ nodes: [], edges: [] });
-const graphStream = ref("default");
+const graphStream = ref(localStorage.getItem("serviceGraph_streamFilter") || "");
 const selectedService = ref<any>(null);
 const servicePanelVisible = ref(false);
 
@@ -442,7 +442,7 @@ const loadIncidents = async () => {
 const loadServiceGraph = async () => {
   if (!isEnterpriseOrCloud.value) return;
   try {
-    graphStream.value = "default";
+    graphStream.value = "all";
 
     const res = await serviceGraphService.getCurrentTopology(orgId.value, {
       startTime: timeRange.value.startTime,
