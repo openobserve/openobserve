@@ -1272,11 +1272,13 @@ import type { StreamInfo } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, getUUID } from "@/utils/zincutils";
+import useHttpStreaming from "@/composables/useStreamingSearch";
 import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
+import { duration } from "moment";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1327,6 +1329,11 @@ const { generateDashboard, generateLogsDashboard } =
   useMetricsCorrelationDashboard();
 const { semanticGroups, loadSemanticGroups } = useServiceCorrelation();
 const { formatTracesMetaData } = useTraces();
+const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
+  useHttpStreaming();
+
+// Track in-flight dimension-based trace stream so it can be cancelled on re-fetch
+let currentTracesStreamTraceId: string | null = null;
 
 // Resolved group definitions and their ids (reactive to prop changes)
 const groupDefs = computed(
@@ -2544,41 +2551,72 @@ const fetchTraceByTraceId = async (traceId: string) => {
 };
 
 /**
- * Fetch traces via dimension-based correlation
+ * Fetch traces via dimension-based correlation using HTTP streaming (/latest_stream)
  */
-const fetchTracesByDimensions = async () => {
+const fetchTracesByDimensions = (): Promise<any[]> => {
   if (!props.traceStreams?.length) {
-    return [];
+    return Promise.resolve([]);
   }
 
   const traceStreamInfo = props.traceStreams[0];
   const streamName = traceStreamInfo.stream_name;
 
-  // Build filter using ALL filters from the trace stream's filters
-  // This uses all the filters coming from the correlation API
   const filterParts: string[] = [];
-
-  // Use all filters from traceStreamInfo.filters
   if (traceStreamInfo.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
       filterParts.push(`${fieldName}='${value}'`);
     }
   }
-
   const filter = filterParts.join(" AND ");
 
-  const response = await searchService.get_traces({
-    org_identifier: currentOrgIdentifier.value,
-    start_time: props.timeRange.startTime,
-    end_time: props.timeRange.endTime,
-    filter: filter,
-    size: 50,
-    from: 0,
-    stream_name: streamName,
-  });
+  // Cancel any previous in-flight stream
+  if (currentTracesStreamTraceId) {
+    cancelStreamQueryBasedOnRequestId({
+      trace_id: currentTracesStreamTraceId,
+      org_id: currentOrgIdentifier.value,
+    });
+    currentTracesStreamTraceId = null;
+  }
 
-  // Format traces with service colors and proper structure for TraceBlock
-  return formatTracesMetaData(response.data?.hits || []);
+  const traceId = getUUID().replace(/-/g, "");
+  currentTracesStreamTraceId = traceId;
+
+  const accumulated: any[] = [];
+
+  return new Promise((resolve, reject) => {
+    fetchQueryDataWithHttpStream(
+      {
+        queryReq: {
+          stream_name: streamName,
+          filter: filter,
+          start_time: props.timeRange.startTime,
+          end_time: props.timeRange.endTime,
+          from: 0,
+          size: 50,
+        },
+        type: "traces",
+        traceId,
+        org_id: currentOrgIdentifier.value,
+      },
+      {
+        data: (_: any, response: any) => {
+          const hits: any[] = response.content?.results?.hits || [];
+          if (hits.length > 0) {
+            accumulated.push(...formatTracesMetaData(hits));
+          }
+        },
+        error: (_: any, err: any) => {
+          currentTracesStreamTraceId = null;
+          reject(err);
+        },
+        complete: () => {
+          currentTracesStreamTraceId = null;
+          resolve(accumulated);
+        },
+        reset: () => {},
+      },
+    );
+  });
 };
 
 /**
