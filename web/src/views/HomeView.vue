@@ -458,7 +458,7 @@ bordered class="my-card q-py-md">
 
 <script lang="ts">
 import { useQuasar } from "quasar";
-import { computed, defineComponent, ref, watch, onMounted } from "vue";
+import { computed, defineComponent, ref, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import orgService from "../services/organizations";
@@ -981,6 +981,15 @@ export default defineComponent({
     function onNewChat() {
       homeChat.value?.addNewChat();
     }
+
+    function onSwitchTab(e: Event) {
+      const tab = (e as CustomEvent).detail;
+      if (DEFAULT_TABS.find(t => t.id === tab)) {
+        activeHomeTab.value = tab;
+      }
+    }
+    onMounted(() => window.addEventListener("o2:home-switch-tab", onSwitchTab));
+    onUnmounted(() => window.removeEventListener("o2:home-switch-tab", onSwitchTab));
 
     return {
       t,

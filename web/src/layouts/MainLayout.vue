@@ -1082,6 +1082,11 @@ export default defineComponent({
     };
 
     const toggleAIChat = () => {
+      // On the home page, switch to the AI tab instead of opening the side panel
+      if (router.currentRoute.value.name === "home") {
+        window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
+        return;
+      }
       const isEnabled = !store.state.isAiChatEnabled;
       store.dispatch("setIsAiChatEnabled", isEnabled);
       window.dispatchEvent(new Event("resize"));
