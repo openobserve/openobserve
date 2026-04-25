@@ -476,7 +476,6 @@ import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import OverviewTab from "@/views/OverviewTab.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
-import store from "@/test/unit/helpers/store";
 import { outlinedWindow } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({

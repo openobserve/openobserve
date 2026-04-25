@@ -430,17 +430,11 @@ const loadHistoryAndSplit = async () => {
 };
 
 const loadIncidents = async () => {
-  console.log('[OverviewTab] loadIncidents — isIncidentsEnabled:', isIncidentsEnabled.value,
-    '| isEnterpriseOrCloud:', isEnterpriseOrCloud.value,
-    '| incidents_enabled:', store.state.zoConfig?.incidents_enabled,
-    '| zoConfig keys:', Object.keys(store.state.zoConfig ?? {}));
   if (!isIncidentsEnabled.value) return;
   try {
     const res = await incidentsService.list(orgId.value, "open", 10, 0);
     incidents.value = res.data?.incidents ?? [];
-    console.log('[OverviewTab] loadIncidents — got', incidents.value.length, 'incidents');
-  } catch (e) {
-    console.error('[OverviewTab] loadIncidents error:', e);
+  } catch {
     incidents.value = [];
   }
 };
@@ -528,13 +522,6 @@ const formatReqRate = (reqs: number) => {
   return String(reqs);
 };
 
-const formatLatency = (ns: number): string => {
-  if (!ns && ns !== 0) return "—";
-  if (ns < 1_000) return `${ns}ns`;
-  if (ns < 1_000_000) return `${(ns / 1_000).toFixed(0)}µs`;
-  if (ns < 1_000_000_000) return `${(ns / 1_000_000).toFixed(0)}ms`;
-  return `${(ns / 1_000_000_000).toFixed(2)}s`;
-};
 
 const sortedDimensions = (dims: Record<string, string>): [string, string][] =>
   Object.keys(dims).sort().map((k) => [k, dims[k]]);
@@ -638,7 +625,6 @@ watch(
 
 // zoConfig loads asynchronously after mount — retry incidents when it becomes available
 watch(isIncidentsEnabled, (enabled) => {
-  console.log('[OverviewTab] isIncidentsEnabled changed ->', enabled, '| incidents.length:', incidents.value.length, '| isLoading:', isLoading.value);
   if (enabled && incidents.value.length === 0) loadIncidents();
 });
 </script>

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useI18n } from 'vue-i18n'
+import { useQuasar } from 'quasar'
 import { useChatHistory } from '@/composables/useChatHistory'
 import type { ChatHistoryEntry } from '@/ts/interfaces/chat'
 
@@ -12,6 +13,7 @@ const emit = defineEmits<{
 
 const store = useStore()
 const { t } = useI18n()
+const $q = useQuasar()
 
 const { loadHistory, deleteChatById, clearAllHistory } = useChatHistory(
   () => store.state.userInfo.email ?? '',
@@ -57,10 +59,17 @@ async function deleteChat(e: MouseEvent, id: number) {
   await refresh()
 }
 
-async function clearAll() {
-  await clearAllHistory()
-  newChat()
-  await refresh()
+function clearAll() {
+  $q.dialog({
+    title: t('chatHistory.clearAllTitle'),
+    message: t('chatHistory.clearAllMessage'),
+    cancel: true,
+    persistent: true,
+  }).onOk(async () => {
+    await clearAllHistory()
+    newChat()
+    await refresh()
+  })
 }
 
 function formatTime(ts: string): string {

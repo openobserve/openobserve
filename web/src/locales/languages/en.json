@@ -1988,7 +1988,9 @@
     "noMatches": "No matches",
     "noHistory": "No chat history",
     "delete": "Delete",
-    "clearAll": "Clear all"
+    "clearAll": "Clear all",
+    "clearAllTitle": "Clear all chats",
+    "clearAllMessage": "This will permanently delete all chat history. This action cannot be undone."
   },
   "billing": {
     "header": "Usage & Billing",
