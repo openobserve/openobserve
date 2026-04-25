@@ -34,7 +34,7 @@ jobs:
       - id: check
         run: |
           CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
+          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qE '^src/|^proto/|^\.cargo/|^Cargo\.(toml|lock)$|^build\.rs$|^rust-toolchain\.toml$'; then
             echo "has_backend_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_backend_changes=false" >> $GITHUB_OUTPUT
