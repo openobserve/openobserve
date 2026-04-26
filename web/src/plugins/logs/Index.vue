@@ -1214,6 +1214,11 @@ export default defineComponent({
     }
 
     const handleActivation = async () => {
+      const savedAutoRun = localStorage.getItem("oo_toggle_auto_run");
+      if (savedAutoRun !== null) {
+        searchObj.meta.liveMode = savedAutoRun === "true";
+      }
+
       try {
         const queryParams: any = router.currentRoute.value.query;
 
@@ -2271,7 +2276,7 @@ export default defineComponent({
     watch(
       () => store.state.zoConfig?.auto_query_enabled,
       (enabled) => {
-        if (enabled && !searchObj.meta.liveMode) {
+        if (enabled && localStorage.getItem("oo_toggle_auto_run") === null) {
           searchObj.meta.liveMode = true;
         }
       },

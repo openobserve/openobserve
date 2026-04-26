@@ -1420,6 +1420,12 @@ onUnmounted(() => {
 
 onActivated(async () => {
   setupContextProvider();
+
+  const savedAutoRun = localStorage.getItem("oo_toggle_auto_run");
+  if (savedAutoRun !== null) {
+    searchObj.meta.liveMode = savedAutoRun === "true";
+  }
+
   const params = router.currentRoute.value.query;
   if (params.reload === "true") {
     restoreUrlQueryParams();
@@ -1866,12 +1872,13 @@ watch(moveSplitter, () => {
   }
 });
 
-// Live mode: enable by default when auto_query_enabled flag is on.
+// Live mode: enable by default when auto_query_enabled flag is on,
+// but only when the user has never explicitly set a preference.
 // zoConfig may not be populated yet at mount time; watch for it to arrive.
 watch(
   () => store.state.zoConfig?.auto_query_enabled,
   (enabled) => {
-    if (enabled && !searchObj.meta.liveMode) {
+    if (enabled && localStorage.getItem("oo_toggle_auto_run") === null) {
       searchObj.meta.liveMode = true;
     }
   },

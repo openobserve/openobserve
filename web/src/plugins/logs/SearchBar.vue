@@ -4805,7 +4805,7 @@ export default defineComponent({
 
     const toggleLiveMode = () => {
       searchObj.meta.liveMode = !searchObj.meta.liveMode;
-      localStorage.setItem("oo_live_mode_logs", String(searchObj.meta.liveMode));
+      localStorage.setItem("oo_toggle_auto_run", String(searchObj.meta.liveMode));
     };
 
     const handleHistogramMode = () => {};
