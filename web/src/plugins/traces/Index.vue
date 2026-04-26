@@ -1872,14 +1872,17 @@ watch(moveSplitter, () => {
   }
 });
 
-// Live mode: enable by default when auto_query_enabled flag is on,
-// but only when the user has never explicitly set a preference.
-// zoConfig may not be populated yet at mount time; watch for it to arrive.
+// Live mode: when auto_query_enabled is true in zoConfig, always sync from
+// localStorage so the module-level singleton reflects the user's preference
+// even after navigating between pages. Defaults to true when no preference
+// has been saved yet. zoConfig may not be populated yet at mount time;
+// watch for it to arrive.
 watch(
   () => store.state.zoConfig?.auto_query_enabled,
   (enabled) => {
-    if (enabled && localStorage.getItem("oo_toggle_auto_run") === null) {
-      searchObj.meta.liveMode = true;
+    if (enabled) {
+      const saved = localStorage.getItem("oo_toggle_auto_run");
+      searchObj.meta.liveMode = saved === null ? true : saved === "true";
     }
   },
   { immediate: true },
