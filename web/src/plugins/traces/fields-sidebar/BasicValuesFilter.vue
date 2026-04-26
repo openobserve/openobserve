@@ -111,7 +111,7 @@
                       `duration<='${formatTimeWithSuffix(percentiles[p.key])}'`,
                     )
                   "
-                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.625rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]! tw:ml-auto!"
+                  class="o2-custom-button-hover tw:mr-[0.625rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]! tw:ml-auto!"
                 >
                   <q-icon
                     :name="outlinedArrowBackIos"
