@@ -1892,7 +1892,10 @@ const debouncedAutoRunOnQuery = debounce(() => {
 // Debounced auto-run on datetime changes in live mode.
 // Traces has no existing auto-run on datetime, so no guard needed.
 const debouncedAutoRunOnDatetime = debounce(() => {
+  // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (2500ms).
+  // Only auto-run here for relative time to avoid double-triggering.
   if (
+    searchObj.data.datetime.type === "relative" &&
     searchObj.meta.liveMode &&
     store.state.zoConfig?.auto_query_enabled &&
     !searchObj.loading

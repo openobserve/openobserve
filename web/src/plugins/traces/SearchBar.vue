@@ -411,6 +411,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
+import { debounce } from "lodash-es";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -604,6 +605,24 @@ export default defineComponent({
       }
     };
 
+    // Debounced query trigger for absolute time when auto-run is enabled.
+    // Gives the user 2.5s to finish typing start/end time before firing.
+    const triggerAbsoluteQueryDebounced = debounce((value: object) => {
+      if (config.isCloud == "true" && value.userChangedValue) {
+        segment.track("Button Click", {
+          button: "Date Change",
+          tab: value.tab,
+          value: value,
+          stream_name: searchObj.data.stream.selectedStream.value,
+          page: "Search Logs",
+        });
+      }
+
+      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
+        emit("searchdata");
+      }
+    }, 2500);
+
     const updateDateTime = async (value: object) => {
       if (router.currentRoute.value.name !== "traces") return;
       if (
@@ -659,6 +678,15 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       await nextTick();
+
+      if (
+        value.valueType === "absolute" &&
+        store.state.zoConfig?.auto_query_enabled
+      ) {
+        // Debounce query trigger so user can finish typing the full time value
+        triggerAbsoluteQueryDebounced(value);
+        return;
+      }
 
       if (config.isCloud == "true" && value.userChangedValue) {
         segment.track("Button Click", {
