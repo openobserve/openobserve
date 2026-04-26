@@ -33,6 +33,11 @@ export default function useRoutePrefetch() {
       return Promise.all([
         import("@/plugins/logs/Index.vue"),
         import("@/plugins/logs/SearchResult.vue"),
+        import("@/components/CodeQueryEditor.vue"),
+        // CodeQueryEditor awaits editor.all.js before editor.api; prefetch both
+        // so Monaco's ~900 KB editor.all doesn't wait for user click.
+        import("monaco-editor/esm/vs/editor/editor.all.js"),
+        import("monaco-editor/esm/vs/editor/editor.api"),
       ]);
     },
     "/metrics": () => import("@/plugins/metrics/Index.vue"),

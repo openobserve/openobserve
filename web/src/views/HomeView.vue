@@ -461,15 +461,20 @@ bordered class="my-card q-py-md">
 
 <script lang="ts">
 import { useQuasar } from "quasar";
-import { computed, defineComponent, ref, watch, onMounted, onUnmounted } from "vue";
+import { computed, defineComponent, defineAsyncComponent, ref, watch, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import orgService from "../services/organizations";
 import config from "../aws-exports";
 import { formatSizeFromMB, addCommasToNumber, getImageURL } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
+import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import pipelines from "@/services/pipelines";
-import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
+// Lazy-load the chart renderer so echarts (~1 MB) doesn't block Home's initial paint.
+// Charts fade in shortly after the page is interactive.
+const CustomChartRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/panels/CustomChartRenderer.vue"),
+);
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import UsageReportBanner from "@/enterprise/components/billings/UsageReportBanner.vue";
@@ -494,6 +499,7 @@ export default defineComponent({
     const no_data_ingest = ref(false);
     const isCloud = config.isCloud;
     const { setStreams } = useStreams();
+    const { prefetchRoute } = useRoutePrefetch();
     const alertsPanelDataKey = ref(0);
     const pipelinesPanelDataKey = ref(0);
     const isLoadingSummary = ref(false);
@@ -985,8 +991,17 @@ export default defineComponent({
       : summary.value.index_size;
   });
 
-
-
+    // Speculatively prefetch the Logs route during Home idle time so the
+    // Home → Logs navigation is instant. Logs is statistically the most-clicked
+    // route and pulls ~1.5 MB of chunks (including Monaco) on first visit.
+    onMounted(() => {
+      const schedule =
+        (window as any).requestIdleCallback ||
+        ((cb: () => void) => setTimeout(cb, 200));
+      schedule(() => {
+        prefetchRoute("/logs");
+      });
+    });
 
     const homeChat = ref<any>(null);
     function onLoadChat(id: number) {
