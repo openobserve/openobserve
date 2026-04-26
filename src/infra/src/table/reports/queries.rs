@@ -28,9 +28,9 @@ use config::meta::{
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter, QueryOrder,
     QuerySelect, RelationTrait, SelectModel, Selector,
-    sea_query::{Expr, Func},
+    sea_query::{Alias, Expr, Func},
 };
-use serde_json::{Value as Json, json};
+use serde_json::Value as Json;
 
 use super::{
     super::{
@@ -417,11 +417,28 @@ impl ListReportsQueryResult {
             query =
                 query.filter(dashboards::Column::DashboardId.eq(dashboard_snowflake_id.to_owned()));
         }
+        // Use CAST(destinations AS text) to avoid the "json = jsonb" operator
+        // error in PostgreSQL. The destinations column is typed as `json` in
+        // the schema, but SeaORM binds serde_json values as `jsonb` parameters,
+        // and PostgreSQL has no implicit cast between the two types. Comparing
+        // the text representation sidesteps the mismatch and works on SQLite too.
         if let Some(true) = &params.has_destinations {
-            query = query.filter(reports::Column::Destinations.ne(json!([])));
+            query = query.filter(
+                Expr::expr(Func::cast_as(
+                    Expr::col((reports::Entity, reports::Column::Destinations)),
+                    Alias::new("text"),
+                ))
+                .ne("[]"),
+            );
         }
         if let Some(false) = &params.has_destinations {
-            query = query.filter(reports::Column::Destinations.eq(json!([])));
+            query = query.filter(
+                Expr::expr(Func::cast_as(
+                    Expr::col((reports::Entity, reports::Column::Destinations)),
+                    Alias::new("text"),
+                ))
+                .eq("[]"),
+            );
         }
         if let Some(name_sub) = &params.name_substring
             && !name_sub.is_empty()
@@ -688,13 +705,13 @@ mod tests {
                 INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
                 INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 
                 WHERE "folders"."org" = 'TEST_ORG_ID' 
-                AND "folders"."folder_id" = 'TEST_FOLDER_SNOWFLAKE_ID' 
-                AND "dashboards"."dashboard_id" = 'TEST_DASHBOARD_SNOWFLAKE_ID' 
-                AND "reports"."destinations" <> '[]' 
-                ORDER BY 
+                AND "folders"."folder_id" = 'TEST_FOLDER_SNOWFLAKE_ID'
+                AND "dashboards"."dashboard_id" = 'TEST_DASHBOARD_SNOWFLAKE_ID'
+                AND CAST("reports"."destinations" AS text) <> '[]'
+                ORDER BY
                 "reports"."name" ASC,
-                "folders"."name" ASC 
-                LIMIT 10 
+                "folders"."name" ASC
+                LIMIT 10
                 OFFSET 30
             "#
         );
@@ -705,7 +722,7 @@ mod tests {
         collapsed_eq!(
             &sqlite_statement,
             r#"
-                SELECT 
+                SELECT
                 "reports"."id",
                 "reports"."org",
                 "reports"."folder_id",
@@ -738,19 +755,128 @@ mod tests {
                 "report_dashboards"."variables" AS "report_dashboard_variables",
                 "report_dashboards"."timerange" AS "report_dashboard_timerange",
                 "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
-                "folders"."org" AS "org_id" FROM "reports" 
-                INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id" 
-                INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id" 
-                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id" 
-                WHERE "folders"."org" = 'TEST_ORG_ID' 
-                AND "folders"."folder_id" = 'TEST_FOLDER_SNOWFLAKE_ID' 
-                AND "dashboards"."dashboard_id" = 'TEST_DASHBOARD_SNOWFLAKE_ID' 
-                AND "reports"."destinations" <> '[]' 
-                ORDER BY 
+                "folders"."org" AS "org_id" FROM "reports"
+                INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id"
+                INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id"
+                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id"
+                WHERE "folders"."org" = 'TEST_ORG_ID'
+                AND "folders"."folder_id" = 'TEST_FOLDER_SNOWFLAKE_ID'
+                AND "dashboards"."dashboard_id" = 'TEST_DASHBOARD_SNOWFLAKE_ID'
+                AND CAST("reports"."destinations" AS text) <> '[]'
+                ORDER BY
                 "reports"."name" ASC,
-                "folders"."name" ASC 
-                LIMIT 10 
+                "folders"."name" ASC
+                LIMIT 10
                 OFFSET 30
+            "#
+        );
+    }
+
+    #[test]
+    fn list_reports_without_destinations() {
+        const ORG_ID: &str = "TEST_ORG_ID";
+        let params = ListReportsParams::new(ORG_ID).has_destinations(false);
+
+        let postgres_statement = ListReportsQueryResult::select(&params)
+            .into_statement(sea_orm::DatabaseBackend::Postgres)
+            .to_string();
+        collapsed_eq!(
+            &postgres_statement,
+            r#"
+                SELECT
+                "reports"."id",
+                "reports"."org",
+                "reports"."folder_id",
+                "reports"."name",
+                "reports"."title",
+                "reports"."description",
+                "reports"."enabled",
+                "reports"."frequency",
+                "reports"."destinations",
+                "reports"."message",
+                "reports"."timezone",
+                "reports"."tz_offset",
+                "reports"."owner",
+                "reports"."last_edited_by",
+                "reports"."created_at",
+                "reports"."updated_at",
+                "reports"."start_at",
+                "reports"."image_preview",
+                "reports"."id" AS "report_id",
+                "reports"."name" AS "report_name",
+                "reports"."owner" AS "report_owner",
+                "reports"."description" AS "report_description",
+                "reports"."created_at" AS "report_created_at",
+                "reports"."frequency" AS "report_frequency",
+                "folders"."folder_id" AS "folder_id",
+                "folders"."name" AS "folder_name",
+                "reports"."enabled" AS "report_enabled",
+                "report_dashboards"."dashboard_id" AS "report_dashboard_id",
+                "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
+                "report_dashboards"."variables" AS "report_dashboard_variables",
+                "report_dashboards"."timerange" AS "report_dashboard_timerange",
+                "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
+                "folders"."org" AS "org_id"
+                FROM "reports"
+                INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id"
+                INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id"
+                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id"
+                WHERE "folders"."org" = 'TEST_ORG_ID'
+                AND CAST("reports"."destinations" AS text) = '[]'
+                ORDER BY
+                "reports"."name" ASC,
+                "folders"."name" ASC
+            "#
+        );
+
+        let sqlite_statement = ListReportsQueryResult::select(&params)
+            .into_statement(sea_orm::DatabaseBackend::Sqlite)
+            .to_string();
+        collapsed_eq!(
+            &sqlite_statement,
+            r#"
+                SELECT
+                "reports"."id",
+                "reports"."org",
+                "reports"."folder_id",
+                "reports"."name",
+                "reports"."title",
+                "reports"."description",
+                "reports"."enabled",
+                "reports"."frequency",
+                "reports"."destinations",
+                "reports"."message",
+                "reports"."timezone",
+                "reports"."tz_offset",
+                "reports"."owner",
+                "reports"."last_edited_by",
+                "reports"."created_at",
+                "reports"."updated_at",
+                "reports"."start_at",
+                "reports"."image_preview",
+                "reports"."id" AS "report_id",
+                "reports"."name" AS "report_name",
+                "reports"."owner" AS "report_owner",
+                "reports"."description" AS "report_description",
+                "reports"."created_at" AS "report_created_at",
+                "reports"."frequency" AS "report_frequency",
+                "folders"."folder_id" AS "folder_id",
+                "folders"."name" AS "folder_name",
+                "reports"."enabled" AS "report_enabled",
+                "report_dashboards"."dashboard_id" AS "report_dashboard_id",
+                "report_dashboards"."tab_names" AS "report_dashboard_tab_names",
+                "report_dashboards"."variables" AS "report_dashboard_variables",
+                "report_dashboards"."timerange" AS "report_dashboard_timerange",
+                "dashboards"."dashboard_id" AS "dashboard_snowflake_id",
+                "folders"."org" AS "org_id" FROM "reports"
+                INNER JOIN "folders" ON "reports"."folder_id" = "folders"."id"
+                INNER JOIN "report_dashboards" ON "reports"."id" = "report_dashboards"."report_id"
+                INNER JOIN "dashboards" ON "report_dashboards"."dashboard_id" = "dashboards"."id"
+                WHERE "folders"."org" = 'TEST_ORG_ID'
+                AND CAST("reports"."destinations" AS text) = '[]'
+                ORDER BY
+                "reports"."name" ASC,
+                "folders"."name" ASC
             "#
         );
     }
