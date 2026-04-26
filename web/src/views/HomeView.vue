@@ -461,7 +461,7 @@ bordered class="my-card q-py-md">
 
 <script lang="ts">
 import { useQuasar } from "quasar";
-import { computed, defineComponent, defineAsyncComponent, ref, watch, onMounted } from "vue";
+import { computed, defineComponent, defineAsyncComponent, ref, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import orgService from "../services/organizations";
@@ -482,8 +482,13 @@ import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vu
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import { useRouter } from "vue-router";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
-import OverviewTab from "@/views/OverviewTab.vue";
-import O2AIChat from "@/components/O2AIChat.vue";
+// OverviewTab statically imports plugins/traces/ServiceGraphNodeSidePanel,
+// which transitively pulls echarts (~1 MB) into the main bundle. Lazy-load it
+// so echarts only ships when the user actually selects the Overview tab.
+const OverviewTab = defineAsyncComponent(() => import("@/views/OverviewTab.vue"));
+// O2AIChat pulls highlight.js + marked. Lazy-load so they don't ship until
+// the user opens the AI panel.
+const O2AIChat = defineAsyncComponent(() => import("@/components/O2AIChat.vue"));
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import { outlinedWindow } from "@quasar/extras/material-icons-outlined";
 

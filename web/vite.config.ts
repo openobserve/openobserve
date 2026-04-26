@@ -159,31 +159,46 @@ export default defineConfig({
         }),
       ],
       output: {
-        manualChunks: {
-          "o2cs-analytics": ["@rudderstack/analytics-js"],
-          "o2cs-oo-rum": [
-            "@openobserve/browser-logs",
-            "@openobserve/browser-rum",
-          ],
-          "o2cs-date-fns": ["date-fns", "date-fns-tz"],
-          // monaco-editor removed from manualChunks to enable true lazy loading
-          // "monaco-editor": ["monaco-editor"],
-          moment: ["moment", "moment-timezone"],
-          lodash: ["lodash-es"],
-          echarts: [
-            "echarts/core",
-            "echarts/renderers",
-            "echarts/components",
-            "echarts/features",
-            "echarts/charts",
-          ],
-          luxon: ["luxon"],
-          marked: ["marked"],
-          jszip: ["jszip"],
-          leaflet: ["leaflet"],
-          gridstack: ["gridstack"],
-          "flag-icons": ["flag-icons"],
-          "highlight.js": ["highlight.js"],
+        manualChunks(id: string) {
+          // Node polyfills used by axios (Buffer for FormData) — keep them in
+          // their own small chunk so they don't piggyback on echarts and force
+          // a 1 MB preload on every cold visit. Match by resolved path so
+          // rollup-plugin-node-polyfills' virtual modules are also captured.
+          if (
+            /node_modules\/(buffer|base64-js|ieee754)\//.test(id) ||
+            /rollup-plugin-node-polyfills\/polyfills\/(buffer|base64-js|ieee754)/.test(id)
+          ) {
+            return "node-polyfills";
+          }
+          if (id.includes("@rudderstack/analytics-js")) return "o2cs-analytics";
+          if (
+            id.includes("@openobserve/browser-logs") ||
+            id.includes("@openobserve/browser-rum")
+          ) {
+            return "o2cs-oo-rum";
+          }
+          if (id.includes("date-fns")) return "o2cs-date-fns";
+          if (id.includes("/moment/") || id.includes("moment-timezone")) {
+            return "moment";
+          }
+          if (id.includes("lodash-es")) return "lodash";
+          if (
+            /node_modules\/(echarts|zrender)\//.test(id) ||
+            id.includes("echarts/core") ||
+            id.includes("echarts/renderers") ||
+            id.includes("echarts/components") ||
+            id.includes("echarts/features") ||
+            id.includes("echarts/charts")
+          ) {
+            return "echarts";
+          }
+          if (id.includes("/luxon/")) return "luxon";
+          if (id.includes("/marked/")) return "marked";
+          if (id.includes("/jszip/")) return "jszip";
+          if (id.includes("/leaflet/")) return "leaflet";
+          if (id.includes("/gridstack/")) return "gridstack";
+          if (id.includes("/flag-icons/")) return "flag-icons";
+          if (id.includes("/highlight.js/")) return "highlight.js";
         },
         chunkFileNames: ({ name }) => {
           if (name.startsWith("o2cs-")) {

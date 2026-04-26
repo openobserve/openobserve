@@ -22,7 +22,7 @@ import "@quasar/extras/material-icons/material-icons.css";
 import store from "./stores";
 import App from "./App.vue";
 import createRouter from "./router";
-import i18n from "./locales";
+import i18n, { initialLocaleLoad } from "./locales";
 import "./styles/quasar-overrides.scss";
 import "./styles/tailwind.css";
 import config from "./aws-exports";
@@ -268,4 +268,10 @@ router.onError(async (error) => {
   }
 });
 
-app.mount("#app");
+// Locale messages are now loaded lazily — wait for the active locale to be
+// registered before mounting so the first paint shows translated text instead
+// of raw translation keys. Using .then() rather than top-level await so we
+// don't need to bump the build target above es2020.
+initialLocaleLoad.then(() => {
+  app.mount("#app");
+});
