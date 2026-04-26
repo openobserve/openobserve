@@ -1407,6 +1407,7 @@ onBeforeMount(async () => {
     await loadPageData();
     runQueryIfRequested();
   }
+  console.log("on before mount");
 });
 
 onDeactivated(() => {
@@ -1749,6 +1750,7 @@ const searchData = () => {
       searchObj.data.stream.selectedStream?.label
     )
   ) {
+    console.log("Node stream selected");
     return;
   }
 
@@ -1890,11 +1892,17 @@ watch(
 
 // Debounced auto-run on query text changes in live mode.
 const debouncedAutoRunOnQuery = debounce(() => {
+  console.log("debouncedAutoRunOnQuery", {
+    liveMode: searchObj.meta.liveMode,
+    auto_query_enabled: store.state.zoConfig?.auto_query_enabled,
+    loading: !searchObj.loading,
+  });
   if (
     searchObj.meta.liveMode &&
     store.state.zoConfig?.auto_query_enabled &&
     !searchObj.loading
   ) {
+    console.log("search data");
     searchData();
   }
 }, 500);
@@ -1910,6 +1918,7 @@ const debouncedAutoRunOnDatetime = debounce(() => {
     store.state.zoConfig?.auto_query_enabled &&
     !searchObj.loading
   ) {
+    console.log("debouncedAutoRunOnDatetime");
     searchData();
   }
 }, 500);
@@ -1917,6 +1926,7 @@ const debouncedAutoRunOnDatetime = debounce(() => {
 watch(
   () => searchObj.data.query,
   () => {
+    console.log("Query watch triggered");
     debouncedAutoRunOnQuery();
   },
 );
