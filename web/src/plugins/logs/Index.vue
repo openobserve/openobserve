@@ -2283,7 +2283,10 @@ export default defineComponent({
     // updateDateTime path is NOT already auto-running the query).
     // Uses runQueryFn so the histogram is also refreshed.
     const debouncedAutoRunOnDatetime = debounce(() => {
+      // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (1500ms).
+      // Only auto-run here for relative time to avoid double-triggering.
       if (
+        searchObj.data.datetime.type === "relative" &&
         searchObj.meta.liveMode &&
         store.state.zoConfig?.auto_query_enabled &&
         store.state.zoConfig?.query_on_stream_selection !== false &&
