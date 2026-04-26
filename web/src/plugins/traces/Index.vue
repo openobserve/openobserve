@@ -1214,7 +1214,7 @@ async function extractFields() {
             name: rowName,
             ftsKey: ftsKeys.has(rowName),
             showValues: !idFields[rowName],
-            label: rowName === "duration" ? "duration (µs)" : rowName,
+            label: rowName,
             dataType: schemaTypeMap.get(rowName),
             isSchemaField: true,
           });
