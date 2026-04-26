@@ -281,6 +281,12 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
         ModelPricing::simple("gemini-1\\.5-flash", 0.075, 0.30),
         ModelPricing::simple("gemini-pro", 0.50, 1.50),
         ModelPricing::simple("gemini-embedding-001", 0.15, 0.0),
+        ModelPricing::simple("deepseek-r1", 0.55, 2.19),
+        ModelPricing::simple("deepseek-reasoner", 0.55, 2.19),
+        ModelPricing::simple("deepseek-v3", 0.27, 1.10),
+        ModelPricing::simple("deepseek-chat", 0.27, 1.10),
+        ModelPricing::simple("deepseek-coder", 0.14, 0.28),
+        ModelPricing::simple("deepseek", 0.27, 1.10),
     ]
 });
 
@@ -394,6 +400,21 @@ mod tests {
         assert!(calculate_cost("o1-pro", 1000, 500).is_some());
         assert!(calculate_cost("o3-pro", 1000, 500).is_some());
         assert!(calculate_cost("o3-mini", 1000, 500).is_some());
+    }
+
+    #[test]
+    fn test_deepseek_models() {
+        assert!(calculate_cost("deepseek-chat", 1000, 500).is_some());
+        assert!(calculate_cost("deepseek-reasoner", 1000, 500).is_some());
+        assert!(calculate_cost("deepseek-r1", 1000, 500).is_some());
+        assert!(calculate_cost("deepseek-v3", 1000, 500).is_some());
+
+        // deepseek-chat: $0.27/1M input, $1.10/1M output
+        let (input_cost, output_cost, total_cost) =
+            calculate_cost("deepseek-chat", 1_000_000, 1_000_000).unwrap();
+        assert!((input_cost - 0.27).abs() < 1e-10);
+        assert!((output_cost - 1.10).abs() < 1e-10);
+        assert!((total_cost - 1.37).abs() < 1e-10);
     }
 
     #[test]

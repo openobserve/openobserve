@@ -159,8 +159,10 @@ impl OtelIngestionProcessor {
         span_attributes
             .retain(|key, _| !self.input_output_extractor.is_input_output_attribute(key));
 
-        // need to guarantee have the field USAGE_DETAILS and COST_DETAILS
-        if input.is_some() || output.is_some() {
+        // Compute total tokens and cost whenever we have messages OR token counts.
+        // Spans that omit message content (e.g. DeepSeek) still send token counts via
+        // gen_ai.usage.* attributes; those must also trigger total + cost computation.
+        if input.is_some() || output.is_some() || !usage.is_empty() {
             // Convert span start time from nanoseconds to microseconds for valid_from comparison.
             let span_ts_micros = i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX);
             let matched_pricing = model_name.as_ref().and_then(|mn| {
@@ -196,12 +198,16 @@ impl OtelIngestionProcessor {
                 usage.insert("output".to_string(), output_tokens);
             }
 
-            // Ensure usage has a input,output,total
-            if !usage.contains_key("input") {
-                usage.insert("input".to_string(), 0);
-            }
-            if !usage.contains_key("output") {
-                usage.insert("output".to_string(), 0);
+            // When messages are present but no token counts were reported, default to zero
+            // so the usage object is always complete. When only token counts were sent
+            // (no message content), skip inserting zeros for absent keys.
+            if input.is_some() || output.is_some() {
+                if !usage.contains_key("input") {
+                    usage.insert("input".to_string(), 0);
+                }
+                if !usage.contains_key("output") {
+                    usage.insert("output".to_string(), 0);
+                }
             }
             if !usage.contains_key("total") {
                 // Total = input + output only. Cache tokens (cache_read_input_tokens,
@@ -1014,6 +1020,45 @@ mod tests {
         // 500 tokens * $0.00002 = $0.01
         assert!((output_cost - 0.01).abs() < 1e-10);
         assert!((total_cost - 0.015).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_process_span_deepseek_token_only_no_messages() {
+        // DeepSeek spans often omit message content but include token counts.
+        // Total tokens and cost must still be computed in this case.
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("deepseek-chat"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(39595));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(75));
+        // No gen_ai.input.messages or gen_ai.output.messages
+
+        let resource_attrs = HashMap::new();
+        let events = vec![];
+
+        processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
+
+        let usage = span_attrs.get(O2Attributes::USAGE_DETAILS).unwrap();
+        assert_eq!(usage.get("input").and_then(|v| v.as_i64()), Some(39595));
+        assert_eq!(usage.get("output").and_then(|v| v.as_i64()), Some(75));
+        assert_eq!(
+            usage.get("total").and_then(|v| v.as_i64()),
+            Some(39670),
+            "total must be input + output even without message content"
+        );
+
+        // Cost should be calculated from built-in deepseek pricing
+        assert!(
+            span_attrs.contains_key(O2Attributes::COST_DETAILS),
+            "cost must be computed for deepseek-chat"
+        );
+        let cost = span_attrs.get(O2Attributes::COST_DETAILS).unwrap();
+        assert!(cost.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0) > 0.0);
     }
 
     #[test]
