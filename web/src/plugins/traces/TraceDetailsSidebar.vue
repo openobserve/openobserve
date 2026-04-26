@@ -1142,12 +1142,18 @@ export default defineComponent({
       return lines.join("\n");
     };
 
+    const store = useStore();
+
+    const RAW_VALUE_FILTER_FIELDS = new Set([
+      "start_time",
+      "end_time",
+      store.state?.zoConfig?.timestamp_column || "_timestamp",
+    ]);
+
     const filterActions = [
       { operator: "=" as const, iconComponent: EqualIcon },
       { operator: "!=" as const, iconComponent: NotEqualIcon },
     ];
-
-    const RAW_VALUE_FILTER_FIELDS = new Set(["start_time", "end_time"]);
 
     const getFilterValue = (field: string, displayValue: unknown): unknown => {
       if (RAW_VALUE_FILTER_FIELDS.has(field)) {
@@ -1253,8 +1259,6 @@ export default defineComponent({
     onBeforeMount(() => {
       spanDetails.value = getFormattedSpanDetails();
     });
-
-    const store = useStore();
 
     // Get current theme from store
     const isDarkMode = computed(() => store.state.theme === "dark");

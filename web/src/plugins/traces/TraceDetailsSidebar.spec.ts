@@ -1032,6 +1032,36 @@ describe("TraceDetailsSidebar", async () => {
       const result = wrapper.vm.getFilterValue("start_time", displayValue);
       expect(result).toBe(displayValue);
     });
+
+    it("should return the raw value for the configured timestamp column (@timestamp)", async () => {
+      // mockStore has zoConfig.timestamp_column = "@timestamp", so RAW_VALUE_FILTER_FIELDS
+      // includes "@timestamp". Mount a wrapper whose span contains @timestamp so the raw
+      // value can be returned rather than falling back to displayValue.
+      const rawTsValue = 9_999_999_999_999;
+      const spanWithTsCol = { ...mockSpan, "@timestamp": rawTsValue };
+      const tsWrapper = mount(TraceDetailsSidebar, {
+        attachTo: "#app",
+        props: { span: spanWithTsCol, baseTracePosition: mockBaseTracePosition, searchQuery: "" },
+        global: {
+          plugins: [i18n, router],
+          provide: { store: mockStore },
+          stubs: { "q-resize-observer": true, "q-virtual-scroll": { template: "<div><slot /></div>", props: ["items"] } },
+        },
+      });
+      await tsWrapper.vm.$nextTick();
+      const displayValue = "2025-07-14T10:14:52.843Z";
+      expect(tsWrapper.vm.getFilterValue("@timestamp", displayValue)).toBe(rawTsValue);
+      tsWrapper.unmount();
+    });
+
+    it("should return the display value unchanged for _timestamp when timestamp_column is @timestamp", () => {
+      // mockStore.zoConfig.timestamp_column = "@timestamp", so RAW_VALUE_FILTER_FIELDS
+      // is Set(["start_time", "end_time", "@timestamp"]).
+      // "_timestamp" is NOT in the set — display value must pass through unchanged.
+      const displayValue = "2025-07-14T10:14:52.843Z";
+      const result = wrapper.vm.getFilterValue("_timestamp", displayValue);
+      expect(result).toBe(displayValue);
+    });
   });
 
   describe("apply-filter-immediately emit — getFilterValue called at the emit site", () => {

@@ -206,17 +206,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="searchData"
             :loading="isLoading"
             :disable="isLoading"
-            >
-              <q-tooltip v-if="searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled">{{ t("search.autoRunEnabled") }}</q-tooltip>
-              <q-icon
-                v-if="searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled"
-                name="autorenew"
-                size="14px"
-                class="q-mr-xs"
-              />
-              {{ t("search.runQuery") }}
-            </q-btn
           >
+            <q-tooltip
+              v-if="
+                searchObj.meta.liveMode &&
+                store.state.zoConfig.auto_query_enabled
+              "
+              >{{ t("search.autoRunEnabled") }}</q-tooltip
+            >
+            <q-icon
+              v-if="
+                searchObj.meta.liveMode &&
+                store.state.zoConfig.auto_query_enabled
+              "
+              name="autorenew"
+              size="14px"
+              class="q-mr-xs"
+            />
+            {{ t("search.runQuery") }}
+          </q-btn>
           <!-- Dropdown: shown when live mode feature is enabled -->
           <q-separator
             v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
@@ -239,7 +247,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section avatar class="tw:min-w-0 tw:pr-2">
                   <q-icon
-                    :name="searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'"
+                    :name="
+                      searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'
+                    "
                     size="16px"
                     :color="searchObj.meta.liveMode ? 'primary' : ''"
                   />
@@ -480,7 +490,6 @@ export default defineComponent({
     let parser: any;
     let streamName = "";
     const dateTimeRef = ref(null);
-
 
     const { getStream } = useStreams();
 

@@ -56,7 +56,7 @@ const mockPercentilesValue = {
 vi.mock("@/composables/useDurationPercentiles", () => ({
   default: () => ({
     percentiles: { value: mockPercentilesValue },
-    isLoading: { value: false },
+    isLoading: false,
     errMsg: { value: "" },
     fetchPercentiles: mockFetchPercentiles,
     cancelFetch: mockCancelPercentileFetch,
@@ -852,6 +852,70 @@ describe("BasicValuesFilter — duration field Max percentile row", () => {
       await flushPromises();
 
       expect(wrapper.vm.hasPercentiles).toBe(false);
+    });
+  });
+
+  describe("when max percentile is set — >= button visibility", () => {
+    // q-expansion-item only renders its default slot when isExpanded is true.
+    // There is no public prop/event API to expand the panel from outside, so we
+    // mount with a stub that unconditionally renders the default slot, isolating
+    // the percentile-row template logic from Quasar's lazy-render behaviour.
+    const mountExpanded = (fieldName: string) =>
+      mount(BasicValuesFilter, {
+        attachTo: "#app",
+        props: { row: { name: fieldName } },
+        global: {
+          provide: { store },
+          plugins: [i18n],
+          stubs: {
+            FieldTypeBadge: true,
+            FieldValuesPanel: true,
+            "q-expansion-item": {
+              template: "<div><slot /><slot name='header' /></div>",
+            },
+          },
+        },
+      });
+
+    it("should NOT render the >= button for the max percentile row", async () => {
+      // All 6 PERCENTILE_LABELS rows render whenever hasPercentiles is true.
+      // v-if="p.key !== 'max'" hides the >= button only on the max row, so
+      // exactly 5 >= buttons appear (one per non-max percentile).
+      mockPercentilesValue.max = 5_000_000;
+
+      wrapper = mountExpanded("duration");
+      await flushPromises();
+
+      const equalBtns = wrapper.findAll(
+        '[data-test="log-search-subfield-list-equal-duration-field-btn"]',
+      );
+      // 6 rows total, max row excluded by v-if → exactly 5 >= buttons.
+      expect(equalBtns).toHaveLength(5);
+    });
+
+    it("should render the >= button for non-max percentile rows", async () => {
+      // p50 is non-null — hasPercentiles is true and p.key !== 'max' so the
+      // >= button is rendered for the p50 row.
+      mockPercentilesValue.p50 = 3_000_000;
+
+      wrapper = mountExpanded("duration");
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="log-search-subfield-list-equal-duration-field-btn"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should always render the <= button for the max percentile row", async () => {
+      // The <= button has no v-if guard, so it must appear for every rendered row.
+      mockPercentilesValue.max = 5_000_000;
+
+      wrapper = mountExpanded("duration");
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="log-search-subfield-list-not-equal-duration-field-btn"]').exists(),
+      ).toBe(true);
     });
   });
 });

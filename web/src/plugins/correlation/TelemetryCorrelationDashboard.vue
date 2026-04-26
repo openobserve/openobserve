@@ -569,6 +569,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :hits="tracesForDimensions"
                 :loading="false"
                 :show-header="false"
+                :show-cell-actions="false"
                 @row-click="openTraceInNewWindow"
               />
             </div>
@@ -1076,6 +1077,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hits="tracesForDimensions"
               :loading="false"
               :show-header="false"
+              :show-cell-actions="false"
               @row-click="openTraceInNewWindow"
             />
           </div>
