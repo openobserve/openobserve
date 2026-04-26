@@ -1394,14 +1394,6 @@ function runQueryIfRequested() {
     !!queryParams.period || (!!queryParams.from && !!queryParams.to);
   const shouldRunQuery = queryParams["run-query"] === "true";
 
-  console.log("[Traces:Index] runQueryIfRequested:", {
-    hasStream,
-    hasOrg,
-    hasPeriod,
-    shouldRunQuery,
-    willSearch: hasStream && hasOrg && hasPeriod && shouldRunQuery,
-  });
-
   if (hasStream && hasOrg && hasPeriod && shouldRunQuery) {
     searchData();
   }
@@ -1415,7 +1407,6 @@ onBeforeMount(async () => {
     await loadPageData();
     runQueryIfRequested();
   }
-  console.log("[Traces:Index] onBeforeMount done");
 });
 
 onDeactivated(() => {
@@ -1758,7 +1749,6 @@ const searchData = () => {
       searchObj.data.stream.selectedStream?.label
     )
   ) {
-    console.log("Node stream selected");
     return;
   }
 
@@ -1900,17 +1890,11 @@ watch(
 
 // Debounced auto-run on query text changes in live mode.
 const debouncedAutoRunOnQuery = debounce(() => {
-  console.log("debouncedAutoRunOnQuery", {
-    liveMode: searchObj.meta.liveMode,
-    auto_query_enabled: store.state.zoConfig?.auto_query_enabled,
-    loading: !searchObj.loading,
-  });
   if (
     searchObj.meta.liveMode &&
     store.state.zoConfig?.auto_query_enabled &&
     !searchObj.loading
   ) {
-    console.log("search data");
     searchData();
   }
 }, 500);
@@ -1926,18 +1910,13 @@ const debouncedAutoRunOnDatetime = debounce(() => {
     store.state.zoConfig?.auto_query_enabled &&
     !searchObj.loading
   ) {
-    console.log("debouncedAutoRunOnDatetime");
     searchData();
   }
 }, 500);
 
 watch(
   () => searchObj.data.query,
-  (newVal, oldVal) => {
-    console.log("[Traces:Index] data.query changed:", {
-      from: oldVal,
-      to: newVal,
-    });
+  () => {
     debouncedAutoRunOnQuery();
   },
 );
