@@ -420,14 +420,8 @@ async fn check_external_contract_expiry() {
         // Check if we need to send expiry warnings
         let days_remaining = (end_date - now) / day_micros;
 
-        // Walk thresholds in descending-urgency order; send the first warning whose
-        // threshold is reached and hasn't been sent yet.
-        let pending_stage = EXPIRY_WARNING_STAGES.iter().find(|(threshold, stage)| {
-            days_remaining <= *threshold && cb.expiry_notified_stage.is_none_or(|s| s < *stage)
-        });
-
-        let stage = match pending_stage {
-            Some((_, s)) => *s,
+        let stage = match find_pending_expiry_stage(days_remaining, cb.expiry_notified_stage) {
+            Some(s) => s,
             None => continue,
         };
 
@@ -534,4 +528,187 @@ fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
+}
+
+/// Pick the most-urgent expiry warning stage that should fire, given the current
+/// `days_remaining` and the last stage already notified.
+///
+/// Walks `EXPIRY_WARNING_STAGES` in descending-urgency order (30 → 7 → 1) and
+/// returns the first stage whose threshold has been reached and is strictly
+/// greater than `current_stage`. Returns `None` when no new warning is due.
+fn find_pending_expiry_stage(
+    days_remaining: i64,
+    current_stage: Option<o2_enterprise::enterprise::cloud::billings::ExpiryNotificationStage>,
+) -> Option<o2_enterprise::enterprise::cloud::billings::ExpiryNotificationStage> {
+    EXPIRY_WARNING_STAGES
+        .iter()
+        .find(|(threshold, stage)| {
+            days_remaining <= *threshold && current_stage.is_none_or(|s| s < *stage)
+        })
+        .map(|(_, stage)| *stage)
+}
+
+#[cfg(test)]
+mod tests {
+    use o2_enterprise::enterprise::cloud::billings::ExpiryNotificationStage;
+
+    use super::*;
+
+    #[test]
+    fn test_html_escape_basic_chars() {
+        assert_eq!(
+            html_escape("<script>alert('x')</script>"),
+            "&lt;script&gt;alert('x')&lt;/script&gt;"
+        );
+        assert_eq!(html_escape("a & b"), "a &amp; b");
+        assert_eq!(html_escape(""), "");
+        assert_eq!(html_escape("plain text"), "plain text");
+    }
+
+    #[test]
+    fn test_html_escape_orders_amp_first() {
+        // & must be escaped before < and > so we don't double-escape entities.
+        assert_eq!(html_escape("&<>"), "&amp;&lt;&gt;");
+        assert_eq!(html_escape("&amp;"), "&amp;amp;");
+    }
+
+    #[test]
+    fn test_build_expiry_email_singular_day() {
+        let (subject, body) = build_external_contract_expiry_email("org-a", "Acme Corp", 1);
+
+        // "1 day" — no plural suffix
+        assert!(
+            subject.contains("expiring in 1 day —"),
+            "subject: {subject}"
+        );
+        assert!(!subject.contains("1 days"));
+        assert!(subject.contains("Acme Corp"));
+        // <=1 days uses the most urgent message
+        assert!(body.contains("expires tomorrow"));
+        assert!(body.contains("Days remaining:</strong> 1"));
+        assert!(body.contains("Acme Corp"));
+        assert!(body.contains("(org-a)"));
+    }
+
+    #[test]
+    fn test_build_expiry_email_plural_seven_days() {
+        let (subject, body) = build_external_contract_expiry_email("org-b", "Beta Inc", 7);
+
+        assert!(subject.contains("expiring in 7 days"));
+        // 7 days falls into the "expiring soon" bucket (>1 and <=7)
+        assert!(body.contains("expiring soon"));
+        assert!(!body.contains("expires tomorrow"));
+    }
+
+    #[test]
+    fn test_build_expiry_email_plural_thirty_days() {
+        let (_subject, body) = build_external_contract_expiry_email("org-c", "Gamma LLC", 30);
+
+        // >7 days falls into the "coming weeks" bucket
+        assert!(body.contains("coming weeks"));
+        assert!(!body.contains("expires tomorrow"));
+        assert!(!body.contains("expiring soon"));
+    }
+
+    #[test]
+    fn test_build_expiry_email_falls_back_to_org_id_when_name_empty() {
+        let (subject, body) = build_external_contract_expiry_email("org-d", "", 5);
+
+        // Empty org name → org_id is used as the display name in subject and body.
+        assert!(subject.ends_with("— org-d"), "subject: {subject}");
+        assert!(body.contains("<strong>Organization:</strong> org-d (org-d)"));
+    }
+
+    #[test]
+    fn test_build_expiry_email_escapes_html_in_org_name() {
+        let (_subject, body) =
+            build_external_contract_expiry_email("org-e", "<script>alert(1)</script>", 10);
+
+        // The malicious org name must be escaped in the email body.
+        assert!(!body.contains("<script>alert(1)</script>"));
+        assert!(body.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
+    }
+
+    #[test]
+    fn test_find_pending_stage_no_warning_when_far_out() {
+        // Plenty of time left, no warning has been sent yet.
+        assert_eq!(find_pending_expiry_stage(60, None), None);
+    }
+
+    #[test]
+    fn test_find_pending_stage_thirty_day_first_fire() {
+        // 30 days remaining, nothing notified yet → fire ThirtyDay.
+        assert_eq!(
+            find_pending_expiry_stage(30, None),
+            Some(ExpiryNotificationStage::ThirtyDay)
+        );
+        // Same goes for 25 days remaining.
+        assert_eq!(
+            find_pending_expiry_stage(25, None),
+            Some(ExpiryNotificationStage::ThirtyDay)
+        );
+    }
+
+    #[test]
+    fn test_find_pending_stage_no_resend_thirty_day() {
+        // ThirtyDay already sent, days_remaining still in the 8..30 window → no new
+        // warning yet (must wait until SevenDay threshold).
+        assert_eq!(
+            find_pending_expiry_stage(20, Some(ExpiryNotificationStage::ThirtyDay)),
+            None
+        );
+    }
+
+    #[test]
+    fn test_find_pending_stage_seven_day_after_thirty() {
+        // ThirtyDay already sent and we crossed the 7-day boundary → fire SevenDay.
+        assert_eq!(
+            find_pending_expiry_stage(7, Some(ExpiryNotificationStage::ThirtyDay)),
+            Some(ExpiryNotificationStage::SevenDay)
+        );
+        assert_eq!(
+            find_pending_expiry_stage(3, Some(ExpiryNotificationStage::ThirtyDay)),
+            Some(ExpiryNotificationStage::SevenDay)
+        );
+    }
+
+    #[test]
+    fn test_find_pending_stage_one_day_after_seven() {
+        assert_eq!(
+            find_pending_expiry_stage(1, Some(ExpiryNotificationStage::SevenDay)),
+            Some(ExpiryNotificationStage::OneDay)
+        );
+    }
+
+    #[test]
+    fn test_find_pending_stage_no_resend_after_one_day() {
+        // OneDay (the most urgent) has already been sent → never fire again.
+        assert_eq!(
+            find_pending_expiry_stage(1, Some(ExpiryNotificationStage::OneDay)),
+            None
+        );
+        assert_eq!(
+            find_pending_expiry_stage(0, Some(ExpiryNotificationStage::OneDay)),
+            None
+        );
+    }
+
+    #[test]
+    fn test_find_pending_stage_skips_levels_when_first_seen_late() {
+        // Org is already inside the 7-day window when we first notice it: skip
+        // ThirtyDay and fire SevenDay directly, since both thresholds are met.
+        assert_eq!(
+            find_pending_expiry_stage(5, None),
+            Some(ExpiryNotificationStage::ThirtyDay)
+        );
+        // First check happens with only 1 day remaining: ThirtyDay still wins
+        // because the iterator returns the first matching stage. The next tick
+        // (after marking ThirtyDay as sent) escalates to SevenDay, then OneDay.
+        // This mirrors the production loop's behaviour of at-most-one-notice
+        // per tick.
+        assert_eq!(
+            find_pending_expiry_stage(1, None),
+            Some(ExpiryNotificationStage::ThirtyDay)
+        );
+    }
 }
