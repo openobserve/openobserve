@@ -7,71 +7,108 @@
   /* ---- Separator --------------------------------------------- */
 
   /* Line thickness — 1 px in both orientations */
-  --spacing-separator:       1px;
+  --spacing-separator: 1px;
   /* Line color — uses semantic border token */
-  --color-separator:         var(--color-border-default);
-  --color-separator-strong:  var(--color-border-strong);
+  --color-separator: var(--color-border-default);
+  --color-separator-strong: var(--color-border-strong);
 
   /* ---- Button ------------------------------------------------ */
 
   /* primary */
-  --color-button-primary:              var(--color-primary-600);
-  --color-button-primary-hover:        var(--color-primary-700);
-  --color-button-primary-active:       var(--color-primary-800);
-  --color-button-primary-disabled:     var(--color-primary-300);
-  --color-button-primary-foreground:   var(--color-white);
-  --color-button-primary-focus-ring:   var(--color-primary-400);
+  --color-button-primary: var(--color-primary-600);
+  --color-button-primary-hover: var(--color-primary-700);
+  --color-button-primary-active: var(--color-primary-800);
+  --color-button-primary-disabled: var(--color-primary-300);
+  --color-button-primary-foreground: var(--color-white);
+  --color-button-primary-focus-ring: var(--color-primary-400);
 
   /* secondary */
-  --color-button-secondary:            var(--color-grey-100);
-  --color-button-secondary-hover:      var(--color-grey-200);
-  --color-button-secondary-active:     var(--color-grey-300);
-  --color-button-secondary-disabled:   var(--color-grey-100);
+  --color-button-secondary: var(--color-grey-100);
+  --color-button-secondary-hover: var(--color-grey-200);
+  --color-button-secondary-active: var(--color-grey-300);
+  --color-button-secondary-disabled: var(--color-grey-100);
   --color-button-secondary-foreground: var(--color-grey-800);
   --color-button-secondary-focus-ring: var(--color-grey-400);
 
   /* outline */
-  --color-button-outline-text:         var(--color-grey-800);
-  --color-button-outline-border:       var(--color-grey-300);
-  --color-button-outline-hover-bg:     var(--color-grey-50);
+  --color-button-outline-text: var(--color-grey-800);
+  --color-button-outline-border: var(--color-grey-300);
+  --color-button-outline-hover-bg: var(--color-grey-50);
   --color-button-outline-hover-border: var(--color-grey-400);
-  --color-button-outline-active-bg:    var(--color-grey-100);
-  --color-button-outline-focus-ring:   var(--color-grey-400);
+  --color-button-outline-active-bg: var(--color-grey-100);
+  --color-button-outline-focus-ring: var(--color-grey-400);
 
   /* ghost */
-  --color-button-ghost-text:           var(--color-grey-700);
-  --color-button-ghost-hover-bg:       var(--color-grey-100);
-  --color-button-ghost-active-bg:      var(--color-grey-200);
-  --color-button-ghost-focus-ring:     var(--color-grey-400);
+  --color-button-ghost-text: var(--color-grey-700);
+  --color-button-ghost-hover-bg: var(--color-grey-100);
+  --color-button-ghost-active-bg: var(--color-grey-200);
+  --color-button-ghost-focus-ring: var(--color-grey-400);
 
   /* destructive */
-  --color-button-destructive:          var(--color-error-600);
-  --color-button-destructive-hover:    var(--color-error-700);
+  --color-button-destructive: var(--color-error-600);
+  --color-button-destructive-hover: var(--color-error-700);
   --color-button-destructive-disabled: var(--color-error-300);
   --color-button-destructive-foreground: var(--color-white);
+  --color-button-destructive-focus-ring: var(--color-error-400);
+
+  /* ---- ButtonGroup ----------------------------------------- */
+
+  /* Divider line between joined buttons */
+  --color-button-group-divider: var(--color-border-default);
+
+  /* ---- ToggleGroup ------------------------------------------ */
+
+  /* Inactive item */
+  --color-toggle-item-bg: var(--color-surface-panel);
+  --color-toggle-item-text: var(--color-text-secondary);
+  --color-toggle-item-hover-bg: var(--color-grey-100);
+  /* Active / pressed item */
+  --color-toggle-item-active-bg: var(--color-primary-600);
+  --color-toggle-item-active-text: var(--color-white);
+  /* Disabled item */
+  --color-toggle-item-disabled: var(--color-text-disabled);
+  /* Group border + divider */
+  --color-toggle-border: var(--color-border-default);
+  /* Focus ring */
+  --color-toggle-focus-ring: var(--color-primary-400);
+
+  /* ---- Dropdown -------------------------------------------- */
+
+  /* Panel surface & border */
+  --color-dropdown-bg: var(--color-surface-overlay);
+  --color-dropdown-border: var(--color-border-default);
+  /* Item states */
+  --color-dropdown-item-text: var(--color-text-primary);
+  --color-dropdown-item-hover-bg: var(--color-grey-100);
+  --color-dropdown-item-active-bg: var(--color-grey-200);
+  --color-dropdown-item-disabled: var(--color-text-disabled);
+  /* Group label */
+  --color-dropdown-label: var(--color-text-secondary);
+  /* Separator */
+  --color-dropdown-separator: var(--color-border-default);
 
   /* ---- Tabs ------------------------------------------------- */
 
   /* Indicator underline / vertical bar on active tab */
-  --color-tabs-indicator:           var(--color-primary-600);
+  --color-tabs-indicator: var(--color-primary-600);
   /* Active tab text */
-  --color-tabs-active-text:         var(--color-primary-600);
+  --color-tabs-active-text: var(--color-primary-600);
   /* Active tab background — lightest primary tint */
-  --color-tabs-active-bg:           var(--color-primary-100);
+  --color-tabs-active-bg: var(--color-primary-100);
   /* Inactive tab text */
-  --color-tabs-inactive-text:       var(--color-text-secondary);
+  --color-tabs-inactive-text: var(--color-text-secondary);
   /* Hover tab text */
-  --color-tabs-hover-text:          var(--color-text-primary);
+  --color-tabs-hover-text: var(--color-text-primary);
   /* Hover tab background */
-  --color-tabs-hover-bg:            var(--color-grey-100);
+  --color-tabs-hover-bg: var(--color-grey-100);
   /* Disabled tab text */
-  --color-tabs-disabled-text:       var(--color-text-disabled);
+  --color-tabs-disabled-text: var(--color-text-disabled);
   /* Bottom border of the tab bar row */
-  --color-tabs-bar-border:          var(--color-border-default);
+  --color-tabs-bar-border: var(--color-border-default);
   /* Focus ring color */
-  --color-tabs-focus-ring:          var(--color-primary-400);
+  --color-tabs-focus-ring: var(--color-primary-400);
   /* Tab bar standard height */
-  --spacing-tabs-height:            40px;
+  --spacing-tabs-height: 40px;
   /* Tab bar compact height */
-  --spacing-tabs-height-dense:      32px;
+  --spacing-tabs-height-dense: 32px;
 }
