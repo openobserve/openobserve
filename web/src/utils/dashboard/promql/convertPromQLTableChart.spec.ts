@@ -64,7 +64,7 @@ vi.mock("../dateTimeUtils", () => ({
   }),
 }));
 
-vi.mock("../panelValidation", () => ({
+vi.mock("../dashboardValidator", () => ({
   findFirstValidMappedValue: vi.fn((val, mappings, type) => {
     if (!mappings || mappings.length === 0) return null;
 
@@ -184,7 +184,7 @@ describe("TableConverter", () => {
 
     it("should apply value mappings in single mode", async () => {
       const { findFirstValidMappedValue } =
-        await import("../panelValidation");
+        await import("../dashboardValidator");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({
         text: "High",
       });
@@ -596,7 +596,7 @@ describe("TableConverter", () => {
 
     it("should apply value mappings to label columns in expanded_timeseries mode", async () => {
       const { findFirstValidMappedValue } =
-        await import("../panelValidation");
+        await import("../dashboardValidator");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({
         text: "Production",
       });
@@ -753,7 +753,7 @@ describe("TableConverter", () => {
 
     it("should apply value mappings in value column in expanded_timeseries mode", async () => {
       const { findFirstValidMappedValue } =
-        await import("../panelValidation");
+        await import("../dashboardValidator");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({
         text: "High",
       });
@@ -1142,7 +1142,7 @@ describe("TableConverter", () => {
 
     it("should apply value mappings to label columns in all mode", async () => {
       const { findFirstValidMappedValue } =
-        await import("../panelValidation");
+        await import("../dashboardValidator");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({
         text: "Production",
       });
@@ -1717,7 +1717,7 @@ describe("TableConverter", () => {
   describe("Value Mapping Edge Cases", () => {
     it("should handle value mapping when mapped text returns null", async () => {
       const { findFirstValidMappedValue } =
-        await import("../panelValidation");
+        await import("../dashboardValidator");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce(null);
 
       const processedData: ProcessedPromQLData[] = [
@@ -1756,7 +1756,7 @@ describe("TableConverter", () => {
 
     it("should handle value mapping without text property", async () => {
       const { findFirstValidMappedValue } =
-        await import("../panelValidation");
+        await import("../dashboardValidator");
       vi.mocked(findFirstValidMappedValue).mockReturnValueOnce({});
 
       const processedData: ProcessedPromQLData[] = [
