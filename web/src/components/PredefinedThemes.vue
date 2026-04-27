@@ -256,6 +256,8 @@ watch(activeTab, (newTab) => {
     // Update theme in store and localStorage
     store.dispatch("appTheme", newTheme);
     localStorage.setItem("theme", newTheme);
+    // Toggle .dark on <html> for the O2 component library (Tailwind dark variant)
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
     $q.dark.set(newTheme === "dark");
   }
 });
