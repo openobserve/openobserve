@@ -171,6 +171,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_time_ops_value_none_input() {
+        assert!(matches!(minute(Value::None).unwrap(), Value::None));
+        assert!(matches!(hour(Value::None).unwrap(), Value::None));
+        assert!(matches!(month(Value::None).unwrap(), Value::None));
+        assert!(matches!(year(Value::None).unwrap(), Value::None));
+        assert!(matches!(day_of_week(Value::None).unwrap(), Value::None));
+        assert!(matches!(day_of_month(Value::None).unwrap(), Value::None));
+        assert!(matches!(day_of_year(Value::None).unwrap(), Value::None));
+        assert!(matches!(days_in_month(Value::None).unwrap(), Value::None));
+        assert!(matches!(timestamp(Value::None).unwrap(), Value::None));
+    }
+
+    #[test]
+    fn test_time_ops_invalid_input_returns_err() {
+        assert!(minute(Value::Float(1.0)).is_err());
+        assert!(timestamp(Value::Float(1.0)).is_err());
+    }
+
+    #[test]
     fn test_get_component_from_ts() {
         let timestamp_micros = 1688379261000000; // Mon Jul 03 2023 10:14:21 GMT+0000
 

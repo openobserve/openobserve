@@ -79,6 +79,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_label_replace_value_none_input() {
+        let result = label_replace(Value::None, "dst", "$1", "src", ".*").unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_label_replace_invalid_input_returns_err() {
+        let result = label_replace(Value::Float(1.0), "dst", "$1", "src", ".*");
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_label_replace_function() {
         use config::meta::promql::value::{RangeValue, Sample};
 
