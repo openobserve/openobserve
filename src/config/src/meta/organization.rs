@@ -66,3 +66,85 @@ impl Display for OrganizationType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+
+    #[test]
+    fn test_organization_type_to_i16() {
+        assert_eq!(i16::from(OrganizationType::Default), 0);
+        assert_eq!(i16::from(OrganizationType::Custom), 1);
+        assert_eq!(i16::from(OrganizationType::UserDefault), 2);
+    }
+
+    #[test]
+    fn test_organization_type_from_i16() {
+        assert_eq!(OrganizationType::from(0i16), OrganizationType::Default);
+        assert_eq!(OrganizationType::from(1i16), OrganizationType::Custom);
+        assert_eq!(OrganizationType::from(2i16), OrganizationType::UserDefault);
+        // unknown value falls back to Custom
+        assert_eq!(OrganizationType::from(99i16), OrganizationType::Custom);
+        assert_eq!(OrganizationType::from(-1i16), OrganizationType::Custom);
+    }
+
+    #[test]
+    fn test_organization_type_from_str() {
+        assert_eq!(
+            OrganizationType::from_str("default").unwrap(),
+            OrganizationType::Default
+        );
+        assert_eq!(
+            OrganizationType::from_str("custom").unwrap(),
+            OrganizationType::Custom
+        );
+        assert_eq!(
+            OrganizationType::from_str("user_default").unwrap(),
+            OrganizationType::UserDefault
+        );
+        // unknown falls back to Custom
+        assert_eq!(
+            OrganizationType::from_str("unknown").unwrap(),
+            OrganizationType::Custom
+        );
+        assert_eq!(
+            OrganizationType::from_str("").unwrap(),
+            OrganizationType::Custom
+        );
+    }
+
+    #[test]
+    fn test_organization_type_display() {
+        assert_eq!(OrganizationType::Default.to_string(), "default");
+        assert_eq!(OrganizationType::Custom.to_string(), "custom");
+        assert_eq!(OrganizationType::UserDefault.to_string(), "user_default");
+    }
+
+    #[test]
+    fn test_organization_type_display_roundtrip_with_from_str() {
+        for variant in [
+            OrganizationType::Default,
+            OrganizationType::Custom,
+            OrganizationType::UserDefault,
+        ] {
+            let s = variant.to_string();
+            let parsed = OrganizationType::from_str(&s).unwrap();
+            assert_eq!(parsed, variant);
+        }
+    }
+
+    #[test]
+    fn test_organization_type_i16_roundtrip() {
+        for variant in [
+            OrganizationType::Default,
+            OrganizationType::Custom,
+            OrganizationType::UserDefault,
+        ] {
+            let n = i16::from(variant);
+            let back = OrganizationType::from(n);
+            assert_eq!(back, variant);
+        }
+    }
+}

@@ -148,8 +148,50 @@ mod tests {
     #[test]
     fn test_resolve_stream_names_with_type() {
         let sql = "select * from \"log\".default";
-        let names = resolve_stream_names_with_type(sql).unwrap();
-        println!("{names:?}");
+        let refs = resolve_stream_names_with_type(sql).unwrap();
+        assert_eq!(refs.len(), 1);
+        let r = &refs[0];
+        assert_eq!(r.stream_name(), "default");
+        assert_eq!(r.stream_type(), "log");
+        assert!(r.has_stream_type());
+    }
+
+    #[test]
+    fn test_resolve_stream_names_with_type_bare_table() {
+        let sql = "select * from mystream";
+        let refs = resolve_stream_names_with_type(sql).unwrap();
+        assert_eq!(refs.len(), 1);
+        let r = &refs[0];
+        assert_eq!(r.stream_name(), "mystream");
+        assert_eq!(r.stream_type(), "");
+        assert!(!r.has_stream_type());
+    }
+
+    #[test]
+    fn test_table_reference_get_stream_type_with_schema() {
+        let sql = "select * from \"metrics\".cpu_usage";
+        let refs = resolve_stream_names_with_type(sql).unwrap();
+        let r = &refs[0];
+        // schema present → use it
+        let st = r.get_stream_type(super::StreamType::Logs);
+        assert_eq!(st, super::StreamType::Metrics);
+    }
+
+    #[test]
+    fn test_table_reference_get_stream_type_without_schema() {
+        let sql = "select * from cpu_usage";
+        let refs = resolve_stream_names_with_type(sql).unwrap();
+        let r = &refs[0];
+        // no schema → fall back to provided default
+        let st = r.get_stream_type(super::StreamType::Logs);
+        assert_eq!(st, super::StreamType::Logs);
+    }
+
+    #[test]
+    fn test_resolve_stream_names_extracts_table_names() {
+        let sql = "select * from \"logs\".events";
+        let names = resolve_stream_names(sql).unwrap();
+        assert_eq!(names, vec!["events"]);
     }
 
     #[test]

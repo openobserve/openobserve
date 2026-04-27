@@ -146,3 +146,76 @@ impl ScheduledTriggerData {
         json::from_str(s)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trigger_module_display() {
+        assert_eq!(TriggerModule::Alert.to_string(), "alert");
+        assert_eq!(TriggerModule::Report.to_string(), "report");
+        assert_eq!(TriggerModule::DerivedStream.to_string(), "derived_stream");
+        assert_eq!(
+            TriggerModule::QueryRecommendations.to_string(),
+            "query_recommendations"
+        );
+        assert_eq!(TriggerModule::Backfill.to_string(), "backfill");
+        assert_eq!(
+            TriggerModule::AnomalyDetection.to_string(),
+            "anomaly_detection"
+        );
+    }
+
+    #[test]
+    fn test_scheduled_trigger_data_reset_preserves_last_satisfied_at() {
+        let mut data = ScheduledTriggerData {
+            period_end_time: Some(1000),
+            tolerance: 42,
+            last_satisfied_at: Some(999),
+            backfill_job: None,
+        };
+        data.reset();
+        assert!(data.period_end_time.is_none());
+        assert_eq!(data.tolerance, 0);
+        // reset must NOT clear last_satisfied_at
+        assert_eq!(data.last_satisfied_at, Some(999));
+    }
+
+    #[test]
+    fn test_scheduled_trigger_data_reset_already_default() {
+        let mut data = ScheduledTriggerData::default();
+        data.reset(); // should not panic
+        assert!(data.period_end_time.is_none());
+        assert_eq!(data.tolerance, 0);
+    }
+
+    #[test]
+    fn test_scheduled_trigger_data_json_roundtrip() {
+        let data = ScheduledTriggerData {
+            period_end_time: Some(1_234_567),
+            tolerance: 10,
+            last_satisfied_at: Some(9_999_999),
+            backfill_job: None,
+        };
+        let json = data.to_json_string();
+        let restored = ScheduledTriggerData::from_json_string(&json).unwrap();
+        assert_eq!(restored.period_end_time, data.period_end_time);
+        assert_eq!(restored.tolerance, data.tolerance);
+        assert_eq!(restored.last_satisfied_at, data.last_satisfied_at);
+    }
+
+    #[test]
+    fn test_scheduled_trigger_data_from_invalid_json() {
+        let result = ScheduledTriggerData::from_json_string("not json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_scheduled_trigger_data_json_omits_none_fields() {
+        let data = ScheduledTriggerData::default();
+        let json = data.to_json_string();
+        // period_end_time is None → skip_serializing_if omits it
+        assert!(!json.contains("period_end_time"));
+    }
+}
