@@ -327,4 +327,92 @@ mod tests {
         };
         assert_eq!(trans.trans_type, Some(0));
     }
+
+    #[test]
+    fn test_transform_is_js() {
+        let js_transform = Transform {
+            function: "function(row) { return row; }".to_string(),
+            name: "js_fn".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(1),
+            streams: None,
+        };
+        assert!(js_transform.is_js());
+        assert!(!js_transform.is_vrl());
+
+        let vrl_transform = Transform {
+            function: ". = {}".to_string(),
+            name: "vrl_fn".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0),
+            streams: None,
+        };
+        assert!(!vrl_transform.is_js());
+    }
+
+    #[test]
+    fn test_transform_is_result_array_js() {
+        // JS + starts with "#Result Array#" → is_result_array_js
+        let js_array = Transform {
+            function: "#Result Array#\nfunction(row) { return [row]; }".to_string(),
+            name: "js_arr".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(1),
+            streams: None,
+        };
+        assert!(js_array.is_result_array_js());
+
+        // JS but no RESULT_ARRAY marker → false
+        let js_plain = Transform {
+            function: "function(row) { return row; }".to_string(),
+            name: "js_plain".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(1),
+            streams: None,
+        };
+        assert!(!js_plain.is_result_array_js());
+
+        // VRL with RESULT_ARRAY marker → NOT is_result_array_js (it's not JS)
+        let vrl_fn = Transform {
+            function: "#Result Array#\n. = {}".to_string(),
+            name: "vrl_fn".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0),
+            streams: None,
+        };
+        assert!(!vrl_fn.is_result_array_js());
+    }
+
+    #[test]
+    fn test_transform_partial_eq() {
+        let a = Transform {
+            function: ". = {}".to_string(),
+            name: "fn_a".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0),
+            streams: None,
+        };
+        let b = a.clone();
+        assert_eq!(a, b);
+
+        // Different function → not equal
+        let c = Transform {
+            function: ". = {\"x\": 1}".to_string(),
+            ..a.clone()
+        };
+        assert_ne!(a, c);
+
+        // Different name → not equal
+        let d = Transform {
+            name: "fn_d".to_string(),
+            ..a.clone()
+        };
+        assert_ne!(a, d);
+    }
 }

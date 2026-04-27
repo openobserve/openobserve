@@ -1286,6 +1286,25 @@ mod tests {
             assert_eq!(variant, deserialized);
         }
     }
+
+    #[test]
+    fn test_usage_type_is_remote_pipeline() {
+        assert!(UsageType::RemotePipeline.is_remote_pipeline());
+
+        assert!(!UsageType::Pipeline.is_remote_pipeline());
+        assert!(!UsageType::Bulk.is_remote_pipeline());
+        assert!(!UsageType::Search.is_remote_pipeline());
+    }
+
+    #[test]
+    fn test_usage_type_is_incident() {
+        assert!(UsageType::NewIncident.is_incident());
+        assert!(UsageType::IncidentReAnalysis.is_incident());
+
+        assert!(!UsageType::Bulk.is_incident());
+        assert!(!UsageType::Search.is_incident());
+        assert!(!UsageType::Pipeline.is_incident());
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
