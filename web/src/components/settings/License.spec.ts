@@ -423,7 +423,7 @@ describe('License.vue', () => {
 
       expect(mockNotify).toHaveBeenCalledWith({
         type: 'negative',
-        message: 'Failed to update license',
+        message: 'Failed to update license : unexpected error',
       });
     });
 

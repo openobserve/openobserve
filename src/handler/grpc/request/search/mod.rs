@@ -19,10 +19,10 @@ use config::{
 };
 use proto::cluster_rpc::{
     CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
-    GetResultRequest, GetResultResponse, GetSourcemapFileRequest, GetSourcemapFileResponse,
-    GetTableRequest, GetTableResponse, QueryStatusRequest, QueryStatusResponse,
-    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
-    search_server::Search,
+    GetLicenseUsageRequest, GetLicenseUsageResponse, GetResultRequest, GetResultResponse,
+    GetSourcemapFileRequest, GetSourcemapFileResponse, GetTableRequest, GetTableResponse,
+    QueryStatusRequest, QueryStatusResponse, SearchPartitionRequest, SearchPartitionResponse,
+    SearchRequest, SearchResponse, search_server::Search,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -34,7 +34,7 @@ use {
     },
     proto::cluster_rpc::{
         ReleaseQueryRequest, ReleaseQueryResponse, StartQueryRequest, StartQueryResponse,
-        TryAcquireRequest, TryAcquireResponse,
+        TryAcquireRequest, TryAcquireResponse, UsageResult,
     },
     std::str::FromStr,
 };
@@ -411,7 +411,51 @@ impl Search for Searcher {
             file_data: res.to_vec(),
         }))
     }
+    async fn get_license_usage_info(
+        &self,
+        _: Request<GetLicenseUsageRequest>,
+    ) -> Result<Response<GetLicenseUsageResponse>, Status> {
+        #[cfg(not(feature = "enterprise"))]
+        let res = GetLicenseUsageResponse {
+            search_allowed: true,
+            ingestion_used: 0.0,
+            ingestion_limit_exceeded_count: 0,
+            last_reporting_successful: true,
+            last_reporting_timestamp: chrono::Utc::now().timestamp_micros(),
+            days_since_last_report: 0,
+            last_usage_response: "".into(),
+            ingestion_history: Vec::new(),
+        };
 
+        #[cfg(feature = "enterprise")]
+        let res = {
+            let ingestion_history =
+                o2_enterprise::enterprise::license::get_ingestion_history().await;
+            let ingestion_history = ingestion_history
+                .into_iter()
+                .map(|v| UsageResult {
+                    ts: v.ts,
+                    value: v.value,
+                })
+                .collect();
+            GetLicenseUsageResponse {
+                search_allowed: o2_enterprise::enterprise::license::search_allowed(),
+                ingestion_used: o2_enterprise::enterprise::license::ingestion_used(),
+                ingestion_limit_exceeded_count:
+                    o2_enterprise::enterprise::license::ingestion_limit_exceeded_count() as u32,
+                last_reporting_successful:
+                    o2_enterprise::enterprise::license::last_reporting_successful().await,
+                last_reporting_timestamp:
+                    o2_enterprise::enterprise::license::last_reported_timestamp().await,
+                days_since_last_report: o2_enterprise::enterprise::license::days_since_last_report()
+                    .await as u32,
+                last_usage_response: o2_enterprise::enterprise::license::get_usage_resp_string()
+                    .await,
+                ingestion_history,
+            }
+        };
+        Ok(Response::new(res))
+    }
     // --- Slot-based admission RPCs ---
 
     #[cfg(feature = "enterprise")]
