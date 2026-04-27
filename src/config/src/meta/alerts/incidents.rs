@@ -1251,4 +1251,76 @@ mod tests {
         let rel = DimensionRelationship::check(&existing, &new);
         assert_eq!(rel, DimensionRelationship::Equal);
     }
+
+    #[test]
+    fn test_incident_event_is_alert() {
+        let alert_event = IncidentEvent::alert("alert-1", "High CPU", 1000);
+        assert!(alert_event.is_alert());
+
+        let created_event = IncidentEvent::created();
+        assert!(!created_event.is_alert());
+
+        let resolved_event = IncidentEvent::resolved(None);
+        assert!(!resolved_event.is_alert());
+    }
+
+    #[test]
+    fn test_incident_event_is_alert_for() {
+        let event = IncidentEvent::alert("alert-abc", "High CPU", 1000);
+        assert!(event.is_alert_for("alert-abc"));
+        assert!(!event.is_alert_for("alert-xyz"));
+        assert!(!event.is_alert_for(""));
+
+        // Non-alert event is never alert_for any id
+        let created = IncidentEvent::created();
+        assert!(!created.is_alert_for("alert-abc"));
+    }
+
+    #[test]
+    fn test_incident_event_increment_alert_matching() {
+        let mut event = IncidentEvent::alert("alert-1", "CPU spike", 1000);
+
+        // First increment: count goes 1→2, last_at updated
+        let result = event.increment_alert("alert-1", 2000);
+        assert!(result);
+
+        if let IncidentEventType::Alert {
+            count, last_at, first_at, ..
+        } = &event.event_type
+        {
+            assert_eq!(*count, 2);
+            assert_eq!(*last_at, 2000);
+            assert_eq!(*first_at, 1000); // first_at unchanged
+        } else {
+            panic!("expected Alert variant");
+        }
+
+        // Second increment
+        let result2 = event.increment_alert("alert-1", 3000);
+        assert!(result2);
+        if let IncidentEventType::Alert { count, last_at, .. } = &event.event_type {
+            assert_eq!(*count, 3);
+            assert_eq!(*last_at, 3000);
+        }
+    }
+
+    #[test]
+    fn test_incident_event_increment_alert_wrong_id() {
+        let mut event = IncidentEvent::alert("alert-1", "CPU spike", 1000);
+        let result = event.increment_alert("alert-2", 2000);
+        assert!(!result);
+
+        // count unchanged
+        if let IncidentEventType::Alert { count, last_at, .. } = &event.event_type {
+            assert_eq!(*count, 1);
+            assert_eq!(*last_at, 1000);
+        }
+    }
+
+    #[test]
+    fn test_incident_event_increment_alert_non_alert_event() {
+        let mut event = IncidentEvent::created();
+        let result = event.increment_alert("alert-1", 2000);
+        assert!(!result);
+    }
 }
