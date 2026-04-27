@@ -677,3 +677,125 @@ impl From<RowTemplateTypeDb> for config::meta::alerts::alert::RowTemplateType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── TriggerFrequencyType ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_trigger_frequency_type_to_i16() {
+        assert_eq!(i16::from(TriggerFrequencyType::Cron), 0i16);
+        assert_eq!(i16::from(TriggerFrequencyType::Seconds), 1i16);
+    }
+
+    #[test]
+    fn test_trigger_frequency_type_try_from_i16() {
+        assert!(matches!(
+            TriggerFrequencyType::try_from(0i16),
+            Ok(TriggerFrequencyType::Cron)
+        ));
+        assert!(matches!(
+            TriggerFrequencyType::try_from(1i16),
+            Ok(TriggerFrequencyType::Seconds)
+        ));
+        assert!(TriggerFrequencyType::try_from(99i16).is_err());
+    }
+
+    #[test]
+    fn test_trigger_frequency_type_from_meta() {
+        assert!(matches!(
+            TriggerFrequencyType::from(MetaFrequencyType::Cron),
+            TriggerFrequencyType::Cron
+        ));
+        assert!(matches!(
+            TriggerFrequencyType::from(MetaFrequencyType::Minutes),
+            TriggerFrequencyType::Seconds
+        ));
+    }
+
+    #[test]
+    fn test_trigger_frequency_type_to_meta() {
+        assert!(matches!(
+            MetaFrequencyType::from(TriggerFrequencyType::Cron),
+            MetaFrequencyType::Cron
+        ));
+        assert!(matches!(
+            MetaFrequencyType::from(TriggerFrequencyType::Seconds),
+            MetaFrequencyType::Minutes
+        ));
+    }
+
+    // ── TriggerThresholdOperator ──────────────────────────────────────────────
+
+    #[test]
+    fn test_trigger_threshold_operator_display() {
+        assert_eq!(TriggerThresholdOperator::EqualTo.to_string(), "=");
+        assert_eq!(TriggerThresholdOperator::NotEqualTo.to_string(), "!=");
+        assert_eq!(TriggerThresholdOperator::GreaterThan.to_string(), ">");
+        assert_eq!(
+            TriggerThresholdOperator::GreaterThanEquals.to_string(),
+            ">="
+        );
+        assert_eq!(TriggerThresholdOperator::LessThan.to_string(), "<");
+        assert_eq!(TriggerThresholdOperator::LessThanEquals.to_string(), "<=");
+    }
+
+    #[test]
+    fn test_trigger_threshold_operator_from_str() {
+        assert!(matches!(
+            TriggerThresholdOperator::from_str("="),
+            Ok(TriggerThresholdOperator::EqualTo)
+        ));
+        assert!(matches!(
+            TriggerThresholdOperator::from_str("!="),
+            Ok(TriggerThresholdOperator::NotEqualTo)
+        ));
+        assert!(matches!(
+            TriggerThresholdOperator::from_str(">"),
+            Ok(TriggerThresholdOperator::GreaterThan)
+        ));
+        assert!(matches!(
+            TriggerThresholdOperator::from_str(">="),
+            Ok(TriggerThresholdOperator::GreaterThanEquals)
+        ));
+        assert!(matches!(
+            TriggerThresholdOperator::from_str("<"),
+            Ok(TriggerThresholdOperator::LessThan)
+        ));
+        assert!(matches!(
+            TriggerThresholdOperator::from_str("<="),
+            Ok(TriggerThresholdOperator::LessThanEquals)
+        ));
+        assert!(TriggerThresholdOperator::from_str("bad").is_err());
+    }
+
+    #[test]
+    fn test_trigger_threshold_operator_display_roundtrip() {
+        for op in [
+            TriggerThresholdOperator::EqualTo,
+            TriggerThresholdOperator::NotEqualTo,
+            TriggerThresholdOperator::GreaterThan,
+            TriggerThresholdOperator::GreaterThanEquals,
+            TriggerThresholdOperator::LessThan,
+            TriggerThresholdOperator::LessThanEquals,
+        ] {
+            let s = op.to_string();
+            let back = TriggerThresholdOperator::from_str(&s).unwrap();
+            assert_eq!(back.to_string(), s);
+        }
+    }
+
+    #[test]
+    fn test_trigger_threshold_operator_try_from_meta_operator() {
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::EqualTo).is_ok());
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::NotEqualTo).is_ok());
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::GreaterThan).is_ok());
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::GreaterThanEquals).is_ok());
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::LessThan).is_ok());
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::LessThanEquals).is_ok());
+        // non-threshold operators → Err
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::Contains).is_err());
+    }
+}
