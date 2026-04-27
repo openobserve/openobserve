@@ -7,7 +7,7 @@
   /* ---- Separator --------------------------------------------- */
 
   /* Line thickness — 1 px in both orientations */
-  --spacing-separator: 1px;
+  --spacing-separator: var(--spacing-px);
   /* Line color — uses semantic border token */
   --color-separator: var(--color-border-default);
   --color-separator-strong: var(--color-border-strong);
@@ -108,7 +108,7 @@
   /* Focus ring color */
   --color-tabs-focus-ring: var(--color-primary-400);
   /* Tab bar standard height */
-  --spacing-tabs-height: 40px;
+  --spacing-tabs-height: var(--spacing-10);
   /* Tab bar compact height */
-  --spacing-tabs-height-dense: 32px;
+  --spacing-tabs-height-dense: var(--spacing-8);
 }
