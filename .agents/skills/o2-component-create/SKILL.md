@@ -68,8 +68,8 @@ web/src/lib/{group}/{ComponentName}/
 **No `index.ts` per component.** Import directly by path:
 
 ```ts
-import OButton from "@/lib/core/Button/Button.vue";
-import type { ButtonProps } from "@/lib/core/Button/Button.types";
+import OButton from "@/lib/core/Button/Button.vue"
+import type { ButtonProps } from "@/lib/core/Button/Button.types"
 ```
 
 A group-level barrel (`web/src/lib/core/index.ts`) is optional and added only once a group has multiple built components.
@@ -115,7 +115,9 @@ grep_search for usage patterns in web/src/views/ and web/src/components/
 - All types in `.types.ts`, none inline in `.vue`
 - Strict TypeScript — no `any`, no implicit any
 - Every Tailwind class with `tw:` prefix
-- RTL logical properties: `tw:ps-*`/`tw:pe-*`, not `tw:pl-*`/`tw:pr-*`
+- **`tw:` prefix with variant modifiers**: write the prefix **once** before the entire `variant:utility` string. `tw:data-[state=on]:bg-token` Γ£à ΓÇö `tw:data-[state=on]:tw:bg-token` Γ¥î. Confirm against `OTab.vue` as the ground-truth reference.
+- RTL logical properties: `tw:ps-*`/`tw:pe-*`, not `tw:pl-*`/`tw:pr-*`; **and `tw:rounded-e-*`/`tw:rounded-s-*` for horizontal grouping**, not `tw:rounded-r-*`/`tw:rounded-l-*`. Vertical grouping (`rounded-t-*`/`rounded-b-*`) is fine as-is.
+- **Focus ring tokens**: `ring-*` utility classes must also go through the component token layer ΓÇö never reference base tokens directly in templates (e.g. use `ring-button-destructive-focus-ring`, not `ring-error-700`)
 - No SCSS. No `var(--*)` in templates. No hardcoded colors.
 - Variants via computed class map — see [references/component-guide.md](references/component-guide.md) § Variants
 - Accessibility: keyboard navigation, ARIA attributes, visible focus indicator
@@ -125,6 +127,8 @@ grep_search for usage patterns in web/src/views/ and web/src/components/
 
 - See [references/component-guide.md](references/component-guide.md) § Tests for template
 - Cover: props, slots, emits, keyboard navigation, ARIA
+- **Reka UI context requirement**: components that require a root context (e.g. `DropdownMenuItem` inside `DropdownMenuRoot`) cannot be mounted standalone. Wrap them inside their open parent component in tests ΓÇö create a helper like `mountItemInDropdown()` that renders an open `ODropdown` with the item as a child.
+- **`h()` import**: always import `h` from `'vue'`, never from `'vitest'`.
 
 ### Step 6 — Validate
 
@@ -155,6 +159,9 @@ Run through the checklist in [references/component-guide.md](references/componen
 - **NEVER** cross-import between library groups
 - **NEVER** import from `web/src/components/`, stores, router, or services inside `lib/`
 - **ALWAYS** use `tw:` prefix on every Tailwind utility
+- **ALWAYS** write variant modifiers with a **single** `tw:` prefix before the entire string: `tw:data-[state=on]:bg-token` Γ£à ΓÇö **never** double the prefix: `tw:data-[state=on]:tw:bg-token` Γ¥î
+- **ALWAYS** use RTL logical border-radius variants for horizontal grouped elements: `tw:rounded-e-*` / `tw:rounded-s-*`, never `tw:rounded-r-*` / `tw:rounded-l-*`
+- **NEVER** reference base tokens in templates for any utility including focus rings ΓÇö always go through the component token layer
 
 ## References
 
