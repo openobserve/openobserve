@@ -790,4 +790,52 @@ mod tests {
             assert_eq!(back, variant);
         }
     }
+
+    #[test]
+    fn test_aggregation_func_all_variants_roundtrip() {
+        let variants = [
+            AggregationFunc::Histogram,
+            AggregationFunc::Sum,
+            AggregationFunc::Min,
+            AggregationFunc::Max,
+            AggregationFunc::Avg,
+            AggregationFunc::Median,
+            AggregationFunc::P50,
+            AggregationFunc::P90,
+            AggregationFunc::P95,
+        ];
+        for variant in variants {
+            let s = serde_json::to_string(&variant).unwrap();
+            let back: AggregationFunc = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_axis_item_optional_fields_absent_when_none() {
+        let item: AxisItem = serde_json::from_value(serde_json::json!({
+            "label": "lbl",
+            "alias": "a",
+            "column": "col"
+        }))
+        .unwrap();
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(!json.contains("aggregationFunction"));
+        assert!(!json.contains("sortBy"));
+        assert!(!json.contains("isDerived"));
+    }
+
+    #[test]
+    fn test_axis_item_with_aggregation_function() {
+        let item: AxisItem = serde_json::from_value(serde_json::json!({
+            "label": "lbl",
+            "alias": "a",
+            "column": "col",
+            "aggregationFunction": "avg",
+            "isDerived": true
+        }))
+        .unwrap();
+        assert_eq!(item.aggregation_function, Some(AggregationFunc::Avg));
+        assert_eq!(item.is_derived, Some(true));
+    }
 }

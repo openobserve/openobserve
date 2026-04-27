@@ -769,4 +769,67 @@ mod tests {
         let back: AggregationFunc = serde_json::from_str(&s).unwrap();
         assert_eq!(back, AggregationFunc::CountDistinct);
     }
+
+    #[test]
+    fn test_agg_func_p50_kebab_case_serialization() {
+        let p50 = serde_json::to_string(&AggregationFunc::P50).unwrap();
+        // verify roundtrip works
+        let back: AggregationFunc = serde_json::from_str(&p50).unwrap();
+        assert_eq!(back, AggregationFunc::P50);
+    }
+
+    #[test]
+    fn test_aggregation_func_all_variants_roundtrip() {
+        let variants = [
+            AggregationFunc::Count,
+            AggregationFunc::Histogram,
+            AggregationFunc::Sum,
+            AggregationFunc::Min,
+            AggregationFunc::Max,
+            AggregationFunc::Avg,
+            AggregationFunc::Median,
+            AggregationFunc::P90,
+            AggregationFunc::P95,
+            AggregationFunc::P99,
+        ];
+        for variant in variants {
+            let s = serde_json::to_string(&variant).unwrap();
+            let back: AggregationFunc = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_axis_item_optional_fields_absent_when_none() {
+        let item: AxisItem = serde_json::from_value(serde_json::json!({
+            "label": "lbl",
+            "alias": "a",
+            "column": "col"
+        }))
+        .unwrap();
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(!json.contains("aggregationFunction"));
+        assert!(!json.contains("sortBy"));
+        assert!(!json.contains("isDerived"));
+        assert!(!json.contains("havingConditions"));
+        assert!(!json.contains("treatAsNonTimestamp"));
+    }
+
+    #[test]
+    fn test_axis_item_with_optional_fields_present() {
+        let item: AxisItem = serde_json::from_value(serde_json::json!({
+            "label": "lbl",
+            "alias": "a",
+            "column": "col",
+            "aggregationFunction": "sum",
+            "isDerived": true,
+            "treatAsNonTimestamp": false
+        }))
+        .unwrap();
+        assert_eq!(item.aggregation_function, Some(AggregationFunc::Sum));
+        assert_eq!(item.is_derived, Some(true));
+        assert_eq!(item.treat_as_non_timestamp, Some(false));
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("sum"));
+    }
 }

@@ -943,4 +943,86 @@ mod tests {
         let json = serde_json::to_value(&op).unwrap();
         assert!(!json.as_object().unwrap().contains_key("params"));
     }
+
+    #[test]
+    fn test_axis_type_all_variants_serde() {
+        let cases = [
+            (AxisType::Build, "\"build\""),
+            (AxisType::Raw, "\"raw\""),
+            (AxisType::Custom, "\"custom\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: AxisType = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_axis_item_optional_fields_absent_when_none() {
+        let item: AxisItem = serde_json::from_value(serde_json::json!({
+            "label": "lbl",
+            "alias": "a",
+            "color": null
+        }))
+        .unwrap();
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(!json.contains("column"));
+        assert!(!json.contains("type"));
+        assert!(!json.contains("functionName"));
+        assert!(!json.contains("sortBy"));
+        assert!(!json.contains("isDerived"));
+        assert!(!json.contains("rawQuery"));
+    }
+
+    #[test]
+    fn test_axis_item_with_type_and_function() {
+        let item: AxisItem = serde_json::from_value(serde_json::json!({
+            "label": "lbl",
+            "alias": "a",
+            "color": "#ff0",
+            "type": "build",
+            "functionName": "count",
+            "isDerived": false
+        }))
+        .unwrap();
+        assert_eq!(item.typ, Some(AxisType::Build));
+        assert_eq!(item.function_name, Some("count".to_string()));
+        assert_eq!(item.is_derived, Some(false));
+    }
+
+    #[test]
+    fn test_axis_arg_value_wrapper_variants() {
+        let s: AxisArgValueWrapper = serde_json::from_value(serde_json::json!("hello")).unwrap();
+        assert!(matches!(s, AxisArgValueWrapper::String(_)));
+
+        let n: AxisArgValueWrapper = serde_json::from_value(serde_json::json!(3.14)).unwrap();
+        assert!(matches!(n, AxisArgValueWrapper::Number(_)));
+    }
+
+    #[test]
+    fn test_label_position_all_variants_serde() {
+        let cases = [
+            LabelPosition::Top,
+            LabelPosition::Bottom,
+            LabelPosition::Left,
+            LabelPosition::Right,
+            LabelPosition::Inside,
+            LabelPosition::Outside,
+            LabelPosition::InsideLeft,
+            LabelPosition::InsideRight,
+            LabelPosition::InsideTop,
+            LabelPosition::InsideBottom,
+            LabelPosition::InsideTopLeft,
+            LabelPosition::InsideBottomLeft,
+            LabelPosition::InsideTopRight,
+            LabelPosition::InsideBottomRight,
+        ];
+        for variant in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            let back: LabelPosition = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
 }

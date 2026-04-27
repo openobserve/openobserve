@@ -771,4 +771,59 @@ mod tests {
         let back: AggregationFunc = serde_json::from_str(&s).unwrap();
         assert_eq!(back, AggregationFunc::CountDistinct);
     }
+
+    #[test]
+    fn test_aggregation_func_all_variants_roundtrip() {
+        let variants = [
+            AggregationFunc::Count,
+            AggregationFunc::Histogram,
+            AggregationFunc::Sum,
+            AggregationFunc::Min,
+            AggregationFunc::Max,
+            AggregationFunc::Avg,
+            AggregationFunc::Median,
+            AggregationFunc::P50,
+            AggregationFunc::P90,
+            AggregationFunc::P95,
+            AggregationFunc::P99,
+        ];
+        for variant in variants {
+            let s = serde_json::to_string(&variant).unwrap();
+            let back: AggregationFunc = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_axis_item_optional_fields_absent_when_none() {
+        let item: AxisItem = serde_json::from_value(serde_json::json!({
+            "label": "lbl",
+            "alias": "a",
+            "column": "col"
+        }))
+        .unwrap();
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(!json.contains("aggregationFunction"));
+        assert!(!json.contains("sortBy"));
+        assert!(!json.contains("isDerived"));
+        assert!(!json.contains("havingConditions"));
+        assert!(!json.contains("treatAsNonTimestamp"));
+        assert!(!json.contains("showFieldAsJson"));
+    }
+
+    #[test]
+    fn test_axis_item_with_optional_fields_present() {
+        let item: AxisItem = serde_json::from_value(serde_json::json!({
+            "label": "lbl",
+            "alias": "a",
+            "column": "col",
+            "aggregationFunction": "max",
+            "isDerived": false,
+            "showFieldAsJson": true
+        }))
+        .unwrap();
+        assert_eq!(item.aggregation_function, Some(AggregationFunc::Max));
+        assert_eq!(item.is_derived, Some(false));
+        assert_eq!(item.show_field_as_json, Some(true));
+    }
 }
