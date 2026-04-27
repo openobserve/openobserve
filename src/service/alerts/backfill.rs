@@ -624,3 +624,98 @@ pub async fn update_backfill_job(
     );
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Helpers: microsecond timestamps for known UTC times
+    // 2024-01-15T10:00:00Z  →  1705312800000000 µs
+    // 2024-01-15T10:30:00Z  →  1705314600000000 µs
+    // 2024-01-15T00:00:00Z  →  1705276800000000 µs
+    // 2024-01-16T00:00:00Z  →  1705363200000000 µs
+
+    const HOUR_ALIGNED_START: i64 = 1705312800_000000; // 2024-01-15T10:00:00Z
+    const HOUR_ALIGNED_END: i64 = 1705316400_000000; // 2024-01-15T11:00:00Z
+    const NOT_HOUR_ALIGNED: i64 = 1705314600_000000; // 2024-01-15T10:30:00Z
+    const DAY_ALIGNED_START: i64 = 1705276800_000000; // 2024-01-15T00:00:00Z
+    const DAY_ALIGNED_END: i64 = 1705363200_000000; // 2024-01-16T00:00:00Z
+
+    // ── validate_time_alignment_hourly ────────────────────────────────────────
+
+    #[test]
+    fn test_hourly_alignment_valid() {
+        assert!(validate_time_alignment_hourly(HOUR_ALIGNED_START, HOUR_ALIGNED_END).is_ok());
+    }
+
+    #[test]
+    fn test_hourly_alignment_start_not_aligned() {
+        let result = validate_time_alignment_hourly(NOT_HOUR_ALIGNED, HOUR_ALIGNED_END);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("start_time must be aligned")
+        );
+    }
+
+    #[test]
+    fn test_hourly_alignment_end_not_aligned() {
+        let result = validate_time_alignment_hourly(HOUR_ALIGNED_START, NOT_HOUR_ALIGNED);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("end_time must be aligned")
+        );
+    }
+
+    #[test]
+    fn test_hourly_alignment_both_not_aligned() {
+        assert!(validate_time_alignment_hourly(NOT_HOUR_ALIGNED, NOT_HOUR_ALIGNED).is_err());
+    }
+
+    // Day-aligned timestamps are also valid for hourly alignment (00:00:00 is on the hour)
+    #[test]
+    fn test_hourly_alignment_day_boundary_is_valid() {
+        assert!(validate_time_alignment_hourly(DAY_ALIGNED_START, DAY_ALIGNED_END).is_ok());
+    }
+
+    // ── validate_time_alignment_daily ─────────────────────────────────────────
+
+    #[test]
+    fn test_daily_alignment_valid() {
+        assert!(validate_time_alignment_daily(DAY_ALIGNED_START, DAY_ALIGNED_END).is_ok());
+    }
+
+    #[test]
+    fn test_daily_alignment_start_not_on_midnight() {
+        let result = validate_time_alignment_daily(HOUR_ALIGNED_START, DAY_ALIGNED_END);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("start_time must be aligned")
+        );
+    }
+
+    #[test]
+    fn test_daily_alignment_end_not_on_midnight() {
+        let result = validate_time_alignment_daily(DAY_ALIGNED_START, HOUR_ALIGNED_END);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("end_time must be aligned")
+        );
+    }
+
+    #[test]
+    fn test_daily_alignment_both_not_aligned() {
+        assert!(validate_time_alignment_daily(HOUR_ALIGNED_START, HOUR_ALIGNED_END).is_err());
+    }
+}
