@@ -2223,6 +2223,17 @@ export default defineComponent({
             (field) => !selectedFieldsSet.has(field),
           );
 
+        // _timestamp cannot be deselected from the UI, so if it's the only
+        // remaining field after deletion, clear the UDS entirely. An empty
+        // defined_schema_fields is treated by the backend as UDS disabled.
+        if (
+          indexData.value.defined_schema_fields.length === 1 &&
+          indexData.value.defined_schema_fields[0] ===
+            store.state.zoConfig.timestamp_column
+        ) {
+          indexData.value.defined_schema_fields = [];
+        }
+
         if (!indexData.value.defined_schema_fields.length) {
           activeTab.value = "allFields";
         }
