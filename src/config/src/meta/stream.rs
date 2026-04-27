@@ -1856,4 +1856,155 @@ mod tests {
         assert!(!key.deleted);
         assert!(key.segment_ids.is_none());
     }
+
+    #[test]
+    fn test_file_key_new() {
+        let meta = FileMeta {
+            min_ts: 100,
+            max_ts: 200,
+            records: 10,
+            original_size: 1024,
+            compressed_size: 512,
+            index_size: 0,
+            flattened: false,
+        };
+        let key = FileKey::new(42, "acc".to_string(), "files/k.parquet".to_string(), meta.clone(), false);
+        assert_eq!(key.id, 42);
+        assert_eq!(key.account, "acc");
+        assert_eq!(key.key, "files/k.parquet");
+        assert_eq!(key.meta, meta);
+        assert!(!key.deleted);
+        assert!(key.segment_ids.is_none());
+    }
+
+    #[test]
+    fn test_file_key_with_segment_ids() {
+        let mut key = FileKey::from_file_name("files/k.parquet");
+        assert!(key.segment_ids.is_none());
+        let bv = BitVec::new();
+        key.with_segment_ids(bv);
+        assert!(key.segment_ids.is_some());
+    }
+
+    #[test]
+    fn test_stream_params_is_valid() {
+        let valid = StreamParams::new("org", "stream", StreamType::Logs);
+        assert!(valid.is_valid());
+
+        let no_org = StreamParams::new("", "stream", StreamType::Logs);
+        assert!(!no_org.is_valid());
+
+        let no_stream = StreamParams::new("org", "", StreamType::Logs);
+        assert!(!no_stream.is_valid());
+    }
+
+    #[test]
+    fn test_stream_stats_format_by() {
+        let mut stats = StreamStats {
+            doc_time_min: 500,
+            doc_time_max: 1000,
+            ..Default::default()
+        };
+        let src = StreamStats {
+            file_num: 5,
+            doc_num: 100,
+            storage_size: 2048.0,
+            compressed_size: 1024.0,
+            index_size: 10.0,
+            doc_time_min: 200,
+            doc_time_max: 800,
+            ..Default::default()
+        };
+        stats.format_by(&src);
+        assert_eq!(stats.file_num, 5);
+        assert_eq!(stats.doc_num, 100);
+        assert_eq!(stats.storage_size, 2048.0);
+        // doc_time_min: min(500, 200) = 200
+        assert_eq!(stats.doc_time_min, 200);
+        // doc_time_max: max(1000, 800) = 1000
+        assert_eq!(stats.doc_time_max, 1000);
+    }
+
+    #[test]
+    fn test_stream_stats_merge() {
+        let mut a = StreamStats {
+            file_num: 3,
+            doc_num: 60,
+            storage_size: 300.0,
+            compressed_size: 150.0,
+            index_size: 5.0,
+            doc_time_min: 1000,
+            doc_time_max: 2000,
+            created_at: 100,
+            ..Default::default()
+        };
+        let b = StreamStats {
+            file_num: 2,
+            doc_num: 40,
+            storage_size: 200.0,
+            compressed_size: 100.0,
+            index_size: 3.0,
+            doc_time_min: 500,
+            doc_time_max: 3000,
+            created_at: 50,
+            ..Default::default()
+        };
+        a.merge(&b);
+        assert_eq!(a.file_num, 5);
+        assert_eq!(a.doc_num, 100);
+        assert_eq!(a.storage_size, 500.0);
+        assert_eq!(a.doc_time_min, 500);
+        assert_eq!(a.doc_time_max, 3000);
+        assert_eq!(a.created_at, 50);
+    }
+
+    #[test]
+    fn test_stream_stats_from_str_roundtrip() {
+        let stats = StreamStats {
+            file_num: 7,
+            doc_num: 200,
+            storage_size: 1024.0,
+            ..Default::default()
+        };
+        let json_str = String::from(stats.clone());
+        let restored = StreamStats::from(json_str.as_str());
+        assert_eq!(restored.file_num, stats.file_num);
+        assert_eq!(restored.doc_num, stats.doc_num);
+    }
+
+    #[test]
+    fn test_stream_stats_into_vec_and_string() {
+        let stats = StreamStats {
+            doc_num: 42,
+            ..Default::default()
+        };
+        let v: Vec<u8> = stats.clone().into();
+        assert!(!v.is_empty());
+        let s: String = stats.into();
+        assert!(s.contains("42"));
+    }
+
+    #[test]
+    fn test_stream_stats_from_usage_stats() {
+        use crate::meta::self_reporting::usage::Stats;
+        let usage = Stats {
+            records: 100,
+            stream_type: StreamType::Logs,
+            org_id: "org".to_string(),
+            stream_name: "s".to_string(),
+            original_size: 2048.0,
+            _timestamp: 0,
+            min_ts: 1000,
+            max_ts: 5000,
+            compressed_size: Some(1024.0),
+            index_size: Some(50.0),
+        };
+        let stream_stats = StreamStats::from(usage);
+        assert_eq!(stream_stats.doc_num, 100);
+        assert_eq!(stream_stats.storage_size, 2048.0);
+        assert_eq!(stream_stats.doc_time_min, 1000);
+        assert_eq!(stream_stats.doc_time_max, 5000);
+        assert_eq!(stream_stats.compressed_size, 1024.0);
+        assert_eq!(stream_stats.index_size, 50.0);
+    }
 }
