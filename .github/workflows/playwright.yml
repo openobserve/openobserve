@@ -46,8 +46,33 @@ env:
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
+  check_changes:
+    name: check_changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: check
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
+          if [ -z "$CHANGED" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          elif echo "$CHANGED" | grep -qvE '(\.md$|^docs/)'; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
   build_binary:
     name: build_binary
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on:
       labels: ubicloud-standard-30
 
@@ -64,43 +89,26 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check for relevant changes
-        id: check_changes
-        run: |
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          if [ -z "$CHANGED" ]; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          elif echo "$CHANGED" | grep -qvE '(\.md$|^docs/)'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: Setup Rust Toolchain
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2025-11-11
           targets: x86_64-unknown-linux-gnu
-      - if: steps.check_changes.outputs.has_changes == 'true'
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
           shared-key: playwright-release-ci
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           bash ./.github/protoc.sh
 
-      - if: steps.check_changes.outputs.has_changes == 'true'
-        uses: actions/setup-node@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
       - name: Build binary and frontend
-        if: steps.check_changes.outputs.has_changes == 'true'
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
           GIT_HASH_OVERRIDE: ${{ github.sha }}
@@ -111,7 +119,6 @@ jobs:
           wait
 
       - name: Upload binary artifact
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: release-ci-binary
@@ -119,7 +126,6 @@ jobs:
           retention-days: 1
 
       - name: Upload frontend artifact
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
@@ -939,11 +945,18 @@ jobs:
     runs-on:
       labels: ubicloud-standard-8
     permissions: {}
-    needs: [build_binary, ui_integration_tests, merge_and_upload_reports]
+    needs: [check_changes, build_binary, ui_integration_tests, merge_and_upload_reports]
     if: always()
     steps:
       - name: Check test results
         run: |
+          # check_changes must have succeeded — if it failed, all downstream jobs skipped
+          # and we would otherwise incorrectly report success.
+          if [ "${{ needs.check_changes.result }}" != "success" ]; then
+            echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"
+            exit 1
+          fi
+
           BUILD_OK=false
           UI_OK=false
           MERGE_OK=false
