@@ -4117,7 +4117,7 @@ describe("Convert PromQL Data Utils", () => {
         expect(dataSeries.data.length).toBe(3);
       });
 
-      it("should pin x-axis min/max to query range when metadata is available", async () => {
+      it("should pin x-axis min/max to query range during streaming (loading=true)", async () => {
         const panelSchema = {
           id: "panel1",
           type: "line",
@@ -4152,12 +4152,59 @@ describe("Convert PromQL Data Utils", () => {
           mockHoveredSeriesState,
           mockAnnotations,
           metadata,
+          undefined, // resultMetaData
+          true,      // loading — enables x-axis pinning during streaming
         );
 
         expect(result.options).toBeDefined();
-        // xAxis should have min and max set
+        // xAxis should have min and max set during streaming
         expect(result.options.xAxis.min).toBeDefined();
         expect(result.options.xAxis.max).toBeDefined();
+      });
+
+      it("should NOT pin x-axis on final render (loading=false) even with metadata", async () => {
+        const panelSchema = {
+          id: "panel1",
+          type: "line",
+          config: { show_legends: true },
+          queries: [{ config: { promql_legend: "" } }],
+        };
+
+        const searchQueryData = [
+          {
+            resultType: "matrix",
+            result: [
+              {
+                metric: { __name__: "test" },
+                values: [[1640435200, "10"]],
+              },
+            ],
+          },
+        ];
+
+        // µs timestamps
+        const startTimeUs = String(1640435000 * 1_000_000);
+        const endTimeUs = String(1640435500 * 1_000_000);
+        const metadata = {
+          queries: [{ startTime: startTimeUs, endTime: endTimeUs }],
+        };
+
+        const result = await convertPromQLData(
+          panelSchema,
+          searchQueryData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockAnnotations,
+          metadata,
+          undefined, // resultMetaData
+          false,     // loading=false — final render, no x-axis pinning
+        );
+
+        expect(result.options).toBeDefined();
+        // xAxis should NOT have min/max on final render
+        expect(result.options.xAxis.min).toBeUndefined();
+        expect(result.options.xAxis.max).toBeUndefined();
       });
 
       it("should NOT pin x-axis when metadata has no query times", async () => {
