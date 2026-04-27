@@ -970,6 +970,33 @@ export default defineComponent({
               }
             }
 
+            // Refresh _gridRect from the live chart so the overlay tracks
+            // the current grid dimensions. The snapshot captured at stream
+            // start can be stale if y-axis labels grew wider (larger values)
+            // or if bottom spacing changed during streaming.
+            if (hasFullOverlay && previousOptionsSnapshot) {
+              try {
+                const chartInstance = chartRendererRef.value?.chart;
+                if (chartInstance) {
+                  const gridModel = chartInstance
+                    ?.getModel()
+                    ?.getComponent("grid");
+                  const freshRect =
+                    gridModel?.coordinateSystem?.getRect();
+                  if (freshRect) {
+                    previousOptionsSnapshot._gridRect = {
+                      x: freshRect.x,
+                      y: freshRect.y,
+                      width: freshRect.width,
+                      height: freshRect.height,
+                    };
+                  }
+                }
+              } catch {
+                // Keep existing _gridRect if chart isn't ready
+              }
+            }
+
             result.options = overlayNewDataOnOldOptions(
               hasFullOverlay ? previousOptionsSnapshot : null,
               result.options,

@@ -569,19 +569,29 @@ export const convertPromQLData = async (
     },
     series: [],
   };
-  // Pin x-axis range to the user's full query range to prevent chart
-  // shifting during chunked data loading (replaces old anchor point approach).
-  if (metadata?.queries?.[0]?.startTime && metadata?.queries?.[0]?.endTime) {
+  // Pin x-axis range during streaming to prevent chart shifting as
+  // chunks arrive. On final render the data is complete so ECharts
+  // can auto-range with its natural padding (avoids bar clipping at
+  // the y-axis edge where gap-filled data can extend beyond the query
+  // start).
+  if (loading && metadata?.queries?.[0]?.startTime && metadata?.queries?.[0]?.endTime) {
     const queryStartMs = metadata.queries[0].startTime / 1000; // µs to ms
     const queryEndMs = metadata.queries[0].endTime / 1000;
+
+    // Add half-step padding so edge bars aren't clipped during streaming.
+    // ECharts centers bars on their timestamp, so without padding the
+    // leftmost bar's left half extends beyond the plot boundary.
+    const metaStep = resultMetaData?.[0]?.[0]?.step; // µs
+    const halfStepMs = metaStep ? metaStep / 2000 : 0; // half step in ms
+
     options.xAxis.min =
       store.state.timezone !== "UTC"
-        ? toZonedTime(queryStartMs, store.state.timezone)
-        : new Date(queryStartMs).toISOString().slice(0, -1);
+        ? toZonedTime(queryStartMs - halfStepMs, store.state.timezone)
+        : new Date(queryStartMs - halfStepMs).toISOString().slice(0, -1);
     options.xAxis.max =
       store.state.timezone !== "UTC"
-        ? toZonedTime(queryEndMs, store.state.timezone)
-        : new Date(queryEndMs).toISOString().slice(0, -1);
+        ? toZonedTime(queryEndMs + halfStepMs, store.state.timezone)
+        : new Date(queryEndMs + halfStepMs).toISOString().slice(0, -1);
   }
 
   // to pass grid index in gauge chart
