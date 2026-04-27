@@ -15,7 +15,8 @@
 
 // Matches 19+ digit integers in start_time/end_time fields — nanosecond epoch
 // values that exceed JS Number precision (safe up to ~15-16 digits).
-const NS_FIELDS_RE = /"(start_time|end_time)"\s*:\s*(\d{19,})/g;
+// (?<!\\) skips escaped-quote sequences (\"start_time\") inside JSON string values.
+const NS_FIELDS_RE = /(?<!\\)"(start_time|end_time)"\s*:\s*(\d{19,})/g;
 
 // Injects string shadow fields (_start_time_ns / _end_time_ns) into raw JSON
 // before JSON.parse so the exact nanosecond values are preserved as strings.

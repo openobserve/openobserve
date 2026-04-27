@@ -162,6 +162,23 @@ describe("patchNsFieldsInJson", () => {
     });
   });
 
+  describe("escaped-quote false match (string-literal safety)", () => {
+    it("should NOT patch start_time that appears inside a JSON string value (escaped quotes)", () => {
+      // Raw JSON: {"body":"{\"start_time\":1700000000123456789}"}
+      // The body value is the string {\"start_time\":...} — start_time is NOT a key.
+      const input = `{"body":"{\\"start_time\\":${NS_TS}}"}`;
+      const result = patchNsFieldsInJson(input);
+
+      // Must be unchanged — no shadow field injected
+      expect(result).toBe(input);
+      // Must still be valid JSON
+      expect(() => JSON.parse(result)).not.toThrow();
+      // The parsed body value must not have been corrupted
+      const parsed = JSON.parse(result);
+      expect(parsed.body).toBe(`{"start_time":${NS_TS}}`);
+    });
+  });
+
   describe("idempotency safety", () => {
     it("should produce valid JSON when called twice on the same input", () => {
       const input = `{"start_time":${NS_TS},"end_time":${NS_TS}}`;

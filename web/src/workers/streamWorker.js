@@ -8,7 +8,8 @@ let patchNsMap = {};
 
 // Regex targets only 19+ digit integers — nanosecond epoch timestamps.
 // µs (16-digit) and ms (13-digit) values are safely representable and untouched.
-const NS_FIELDS_RE = /"(start_time|end_time)"\s*:\s*(\d{19,})/g;
+// (?<!\\) skips escaped-quote sequences inside JSON string values.
+const NS_FIELDS_RE = /(?<!\\)"(start_time|end_time)"\s*:\s*(\d{19,})/g;
 
 function safeParseJson(text, patchNs) {
   if (!patchNs) return JSON.parse(text);
