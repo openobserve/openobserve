@@ -2130,4 +2130,46 @@ mod tests {
         assert_eq!(stream_stats.compressed_size, 1024.0);
         assert_eq!(stream_stats.index_size, 50.0);
     }
+
+    #[test]
+    fn test_file_list_bookkeep_mode_display() {
+        assert_eq!(FileListBookKeepMode::History.to_string(), "history");
+        assert_eq!(FileListBookKeepMode::Deleted.to_string(), "deleted");
+        assert_eq!(FileListBookKeepMode::None.to_string(), "none");
+    }
+
+    #[test]
+    fn test_file_list_bookkeep_mode_from_str() {
+        assert!(matches!(
+            FileListBookKeepMode::from("history"),
+            FileListBookKeepMode::History
+        ));
+        assert!(matches!(
+            FileListBookKeepMode::from("deleted"),
+            FileListBookKeepMode::Deleted
+        ));
+        assert!(matches!(
+            FileListBookKeepMode::from("none"),
+            FileListBookKeepMode::None
+        ));
+        // unknown → default (Deleted)
+        assert!(matches!(
+            FileListBookKeepMode::from("unknown"),
+            FileListBookKeepMode::Deleted
+        ));
+    }
+
+    #[test]
+    fn test_file_list_bookkeep_mode_default_is_deleted() {
+        let m: FileListBookKeepMode = Default::default();
+        assert!(matches!(m, FileListBookKeepMode::Deleted));
+    }
+
+    #[test]
+    fn test_enrichment_table_meta_stream_stats_default() {
+        let s = EnrichmentTableMetaStreamStats::default();
+        assert_eq!(s.start_time, 0);
+        assert_eq!(s.end_time, 0);
+        assert_eq!(s.size, 0);
+    }
 }

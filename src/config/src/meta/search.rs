@@ -3402,4 +3402,104 @@ mod tests {
         stats1.add(&stats2);
         assert_eq!(stats1.aggs_cache_ratio, 0);
     }
+
+    #[test]
+    fn test_logical_operator_serde_uppercase() {
+        let and = serde_json::to_string(&LogicalOperator::And).unwrap();
+        assert_eq!(and, "\"AND\"");
+        let or = serde_json::to_string(&LogicalOperator::Or).unwrap();
+        assert_eq!(or, "\"OR\"");
+        let back: LogicalOperator = serde_json::from_str("\"AND\"").unwrap();
+        assert!(matches!(back, LogicalOperator::And));
+        let back2: LogicalOperator = serde_json::from_str("\"OR\"").unwrap();
+        assert!(matches!(back2, LogicalOperator::Or));
+    }
+
+    #[test]
+    fn test_having_node_condition_serde() {
+        let node = HavingNode::Condition {
+            expression: "count(*)".to_string(),
+            alias: Some("cnt".to_string()),
+            operator: ">".to_string(),
+            value: "3".to_string(),
+        };
+        let s = serde_json::to_string(&node).unwrap();
+        let back: HavingNode = serde_json::from_str(&s).unwrap();
+        match back {
+            HavingNode::Condition {
+                expression,
+                alias,
+                operator,
+                value,
+            } => {
+                assert_eq!(expression, "count(*)");
+                assert_eq!(alias, Some("cnt".to_string()));
+                assert_eq!(operator, ">");
+                assert_eq!(value, "3");
+            }
+            _ => panic!("Expected Condition variant"),
+        }
+    }
+
+    #[test]
+    fn test_having_node_logical_op_serde() {
+        let node = HavingNode::LogicalOp {
+            operator: LogicalOperator::And,
+            conditions: vec![
+                HavingNode::Condition {
+                    expression: "avg(latency)".to_string(),
+                    alias: None,
+                    operator: "<".to_string(),
+                    value: "500".to_string(),
+                },
+                HavingNode::Condition {
+                    expression: "count(*)".to_string(),
+                    alias: None,
+                    operator: ">".to_string(),
+                    value: "10".to_string(),
+                },
+            ],
+        };
+        let s = serde_json::to_string(&node).unwrap();
+        let back: HavingNode = serde_json::from_str(&s).unwrap();
+        match back {
+            HavingNode::LogicalOp {
+                operator,
+                conditions,
+            } => {
+                assert!(matches!(operator, LogicalOperator::And));
+                assert_eq!(conditions.len(), 2);
+            }
+            _ => panic!("Expected LogicalOp variant"),
+        }
+    }
+
+    #[test]
+    fn test_interval_from_unknown_defaults_to_zero() {
+        let unknown = Interval::from(999_i64);
+        assert_eq!(unknown, Interval::Zero);
+        assert_eq!(unknown.get_duration_minutes(), 0);
+    }
+
+    #[test]
+    fn test_interval_all_variants_from_i64() {
+        assert_eq!(Interval::from(0_i64), Interval::Zero);
+        assert_eq!(Interval::from(5_i64), Interval::FiveMinutes);
+        assert_eq!(Interval::from(10_i64), Interval::TenMinutes);
+        assert_eq!(Interval::from(30_i64), Interval::ThirtyMinutes);
+        assert_eq!(Interval::from(60_i64), Interval::OneHour);
+        assert_eq!(Interval::from(120_i64), Interval::TwoHours);
+        assert_eq!(Interval::from(360_i64), Interval::SixHours);
+        assert_eq!(Interval::from(720_i64), Interval::TwelveHours);
+        assert_eq!(Interval::from(1440_i64), Interval::OneDay);
+    }
+
+    #[test]
+    fn test_interval_seconds_and_microseconds() {
+        let h = Interval::OneHour;
+        assert_eq!(h.get_interval_seconds(), 3600);
+        assert_eq!(h.get_interval_microseconds(), 3_600_000_000);
+        let five = Interval::FiveMinutes;
+        assert_eq!(five.get_interval_seconds(), 300);
+    }
 }
