@@ -59,4 +59,25 @@ mod tests {
         assert_eq!(h.sum64("test2"), 17808217402673344406);
         assert_eq!(h.sum64("test3"), 11977005607778562912);
     }
+
+    #[test]
+    fn test_murmur3_new_hasher_produces_consistent_hash() {
+        use std::hash::Hasher;
+        let mut hasher1 = new_hasher();
+        hasher1.write(b"test");
+        let hash1 = hasher1.finish();
+
+        let mut hasher2 = new_hasher();
+        hasher2.write(b"test");
+        let hash2 = hasher2.finish();
+
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_murmur3_empty_string() {
+        let mut h = new();
+        let sum = h.sum64("");
+        assert_eq!(sum, h.sum64(""));
+    }
 }
