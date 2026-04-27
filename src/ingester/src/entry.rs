@@ -384,4 +384,97 @@ mod tests {
         assert_eq!(s.batch_num, 0);
         assert_eq!(s.records, 0);
     }
+
+    fn make_ts_batch(values: Vec<i64>) -> RecordBatch {
+        use arrow::array::Int64Array;
+        use arrow_schema::{DataType, Field};
+        let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            config::TIMESTAMP_COL_NAME,
+            DataType::Int64,
+            false,
+        )]));
+        let col = Arc::new(Int64Array::from(values));
+        RecordBatch::try_new(schema, vec![col]).unwrap()
+    }
+
+    #[test]
+    fn test_pop_time_range_basic() {
+        let batch = make_ts_batch(vec![100i64, 50i64, 200i64]);
+        let (min_ts, max_ts) = pop_time_range(&batch, None, None);
+        assert_eq!(min_ts, 50);
+        assert_eq!(max_ts, 200);
+    }
+
+    #[test]
+    fn test_pop_time_range_single_value() {
+        let batch = make_ts_batch(vec![42i64]);
+        let (min_ts, max_ts) = pop_time_range(&batch, None, None);
+        assert_eq!(min_ts, 42);
+        assert_eq!(max_ts, 42);
+    }
+
+    #[test]
+    fn test_pop_time_range_column_not_found() {
+        use arrow::array::Int64Array;
+        use arrow_schema::{DataType, Field};
+        let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            "other_col",
+            DataType::Int64,
+            false,
+        )]));
+        let col = Arc::new(Int64Array::from(vec![100i64]));
+        let batch = RecordBatch::try_new(schema, vec![col]).unwrap();
+        let (min_ts, max_ts) = pop_time_range(&batch, None, None);
+        assert_eq!(min_ts, 0);
+        assert_eq!(max_ts, 0);
+    }
+
+    #[test]
+    fn test_pop_time_range_wrong_column_type() {
+        use arrow::array::StringArray;
+        use arrow_schema::{DataType, Field};
+        let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            config::TIMESTAMP_COL_NAME,
+            DataType::Utf8,
+            false,
+        )]));
+        let col = Arc::new(StringArray::from(vec!["abc"]));
+        let batch = RecordBatch::try_new(schema, vec![col]).unwrap();
+        let (min_ts, max_ts) = pop_time_range(&batch, None, None);
+        assert_eq!(min_ts, 0);
+        assert_eq!(max_ts, 0);
+    }
+
+    #[test]
+    fn test_pop_time_range_separate_min_max_columns() {
+        use arrow::array::Int64Array;
+        use arrow_schema::{DataType, Field};
+        let schema = Arc::new(arrow_schema::Schema::new(vec![
+            Field::new("ts_min", DataType::Int64, false),
+            Field::new("ts_max", DataType::Int64, false),
+        ]));
+        let min_col = Arc::new(Int64Array::from(vec![10i64, 5i64]));
+        let max_col = Arc::new(Int64Array::from(vec![100i64, 200i64]));
+        let batch = RecordBatch::try_new(schema, vec![min_col, max_col]).unwrap();
+        let (min_ts, max_ts) = pop_time_range(&batch, Some("ts_min"), Some("ts_max"));
+        assert_eq!(min_ts, 5);
+        assert_eq!(max_ts, 200);
+    }
+
+    #[test]
+    fn test_pop_time_range_separate_missing_min_col() {
+        use arrow::array::Int64Array;
+        use arrow_schema::{DataType, Field};
+        let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            "ts_max",
+            DataType::Int64,
+            false,
+        )]));
+        let max_col = Arc::new(Int64Array::from(vec![100i64]));
+        let batch = RecordBatch::try_new(schema, vec![max_col]).unwrap();
+        // ts_min column missing → (0, 0)
+        let (min_ts, max_ts) = pop_time_range(&batch, Some("ts_min"), Some("ts_max"));
+        assert_eq!(min_ts, 0);
+        assert_eq!(max_ts, 0);
+    }
 }
