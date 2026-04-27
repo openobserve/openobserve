@@ -428,4 +428,133 @@ mod tests {
         );
         assert_eq!(SendStrategy::from_str("").unwrap(), SendStrategy::default());
     }
+
+    #[test]
+    fn test_global_dedup_config_validate_disabled_ok() {
+        let config = GlobalDeduplicationConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_global_dedup_config_validate_cross_alert_no_groups_err() {
+        let config = GlobalDeduplicationConfig {
+            enabled: true,
+            alert_dedup_enabled: true,
+            alert_fingerprint_groups: vec![],
+            ..Default::default()
+        };
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .contains("cross_alert_fingerprint_groups")
+        );
+    }
+
+    #[test]
+    fn test_global_dedup_config_validate_cross_alert_with_groups_ok() {
+        let config = GlobalDeduplicationConfig {
+            enabled: true,
+            alert_dedup_enabled: true,
+            alert_fingerprint_groups: vec!["field1".to_string()],
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_global_dedup_config_default_with_presets() {
+        let config = GlobalDeduplicationConfig::default_with_presets();
+        assert!(!config.enabled);
+        assert!(!config.alert_dedup_enabled);
+        assert!(config.alert_fingerprint_groups.is_empty());
+        assert!(config.time_window_minutes.is_none());
+    }
+
+    #[test]
+    fn test_per_alert_dedup_config_validate_disabled_ok() {
+        let config = DeduplicationConfig {
+            enabled: false,
+            fingerprint_fields: vec!["field1".to_string(); 15], // > 10 but disabled
+            ..Default::default()
+        };
+        // disabled → skip all validation
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_per_alert_dedup_config_validate_grouping_zero_size_err() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec![],
+            time_window_minutes: None,
+            grouping: Some(GroupingConfig {
+                enabled: true,
+                max_group_size: 0,
+                send_strategy: SendStrategy::All,
+                group_wait_seconds: 10,
+            }),
+        };
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Max group size"));
+    }
+
+    #[test]
+    fn test_per_alert_dedup_config_validate_grouping_negative_wait_err() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec![],
+            time_window_minutes: None,
+            grouping: Some(GroupingConfig {
+                enabled: true,
+                max_group_size: 5,
+                send_strategy: SendStrategy::Summary,
+                group_wait_seconds: -1,
+            }),
+        };
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Group wait seconds"));
+    }
+
+    #[test]
+    fn test_per_alert_dedup_config_validate_grouping_disabled_skip() {
+        // grouping present but enabled=false → skip grouping validation
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec![],
+            time_window_minutes: None,
+            grouping: Some(GroupingConfig {
+                enabled: false,
+                max_group_size: 0, // would fail if checked
+                send_strategy: SendStrategy::All,
+                group_wait_seconds: -1, // would fail if checked
+            }),
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_deduplication_config_mem_size() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec!["host".to_string(), "service".to_string()],
+            time_window_minutes: Some(5),
+            grouping: None,
+        };
+        let size = config.mem_size();
+        assert!(size >= std::mem::size_of::<DeduplicationConfig>());
+    }
+
+    #[test]
+    fn test_grouping_config_mem_size() {
+        let config = GroupingConfig::default();
+        let size = config.mem_size();
+        assert_eq!(size, std::mem::size_of::<GroupingConfig>());
+    }
 }

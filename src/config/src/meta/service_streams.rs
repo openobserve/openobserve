@@ -632,4 +632,77 @@ mod tests {
         d.update(5000, 1, HashMap::new(), HashMap::new(), HashMap::new());
         assert!(!d.is_suitable_for_correlation());
     }
+
+    #[test]
+    fn test_cardinality_class_boundary_values() {
+        // Exact boundary cases for from_cardinality
+        assert_eq!(
+            CardinalityClass::from_cardinality(0),
+            CardinalityClass::VeryLow
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(10),
+            CardinalityClass::VeryLow
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(11),
+            CardinalityClass::Low
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(100),
+            CardinalityClass::Low
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(101),
+            CardinalityClass::Medium
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(1000),
+            CardinalityClass::Medium
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(1001),
+            CardinalityClass::High
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(10000),
+            CardinalityClass::High
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(10001),
+            CardinalityClass::VeryHigh
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(usize::MAX),
+            CardinalityClass::VeryHigh
+        );
+    }
+
+    #[test]
+    fn test_cardinality_class_ordering() {
+        // Derived PartialOrd should respect declaration order
+        assert!(CardinalityClass::VeryLow < CardinalityClass::Low);
+        assert!(CardinalityClass::Low < CardinalityClass::Medium);
+        assert!(CardinalityClass::Medium < CardinalityClass::High);
+        assert!(CardinalityClass::High < CardinalityClass::VeryHigh);
+    }
+
+    #[test]
+    fn test_dimension_analytics_update_truncates_sample_values() {
+        let mut d = DimensionAnalytics::new("pod".to_string());
+        // 15 sample values in one stream → should be truncated to 10
+        let many_values: Vec<String> = (0..15).map(|i| format!("v{i}")).collect();
+        let mut inner = HashMap::new();
+        inner.insert("stream1".to_string(), many_values);
+        let mut sample = HashMap::new();
+        sample.insert("logs".to_string(), inner);
+
+        d.update(15, 1, sample, HashMap::new(), HashMap::new());
+
+        // After update, samples should be truncated to first 10
+        let stream_samples = &d.sample_values["logs"]["stream1"];
+        assert_eq!(stream_samples.len(), 10);
+        assert_eq!(stream_samples[0], "v0");
+        assert_eq!(stream_samples[9], "v9");
+    }
 }
