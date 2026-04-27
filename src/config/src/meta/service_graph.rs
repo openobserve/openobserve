@@ -255,4 +255,98 @@ mod tests {
         let val = serde_json::to_value(&node).unwrap();
         assert_eq!(val["stream_name"], "my_stream");
     }
+
+    #[test]
+    fn test_edge_trend_data_point_serialization() {
+        let pt = EdgeTrendDataPoint {
+            timestamp: 1_000_000,
+            p50_latency_ns: 100,
+            p95_latency_ns: 500,
+            p99_latency_ns: 900,
+            total_requests: 50,
+            failed_requests: 2,
+        };
+        let val = serde_json::to_value(&pt).unwrap();
+        assert_eq!(val["timestamp"], 1_000_000_i64);
+        assert_eq!(val["p50_latency_ns"], 100_u64);
+        assert_eq!(val["total_requests"], 50_u64);
+        assert_eq!(val["failed_requests"], 2_u64);
+    }
+
+    #[test]
+    fn test_edge_trend_data_point_roundtrip() {
+        let pt = EdgeTrendDataPoint {
+            timestamp: 42,
+            p50_latency_ns: 1,
+            p95_latency_ns: 2,
+            p99_latency_ns: 3,
+            total_requests: 10,
+            failed_requests: 0,
+        };
+        let json = serde_json::to_string(&pt).unwrap();
+        let back: EdgeTrendDataPoint = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.timestamp, 42);
+        assert_eq!(back.p99_latency_ns, 3);
+        assert_eq!(back.failed_requests, 0);
+    }
+
+    #[test]
+    fn test_edge_trend_response_empty() {
+        let resp = EdgeTrendResponse {
+            data_points: Vec::new(),
+        };
+        let val = serde_json::to_value(&resp).unwrap();
+        assert!(val["data_points"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_edge_trend_response_with_points() {
+        let pt = EdgeTrendDataPoint {
+            timestamp: 1,
+            p50_latency_ns: 10,
+            p95_latency_ns: 20,
+            p99_latency_ns: 30,
+            total_requests: 5,
+            failed_requests: 1,
+        };
+        let resp = EdgeTrendResponse {
+            data_points: vec![pt],
+        };
+        let val = serde_json::to_value(&resp).unwrap();
+        assert_eq!(val["data_points"].as_array().unwrap().len(), 1);
+        assert_eq!(val["data_points"][0]["p50_latency_ns"], 10_u64);
+    }
+
+    #[test]
+    fn test_service_graph_data_nodes_and_edges() {
+        let node = ServiceNode {
+            id: "n1".to_string(),
+            label: "Node1".to_string(),
+            requests: 10,
+            errors: 0,
+            error_rate: 0.0,
+            stream_name: None,
+        };
+        let edge = ServiceEdge {
+            from: None,
+            to: "n1".to_string(),
+            total_requests: 10,
+            failed_requests: 0,
+            error_rate: 0.0,
+            p50_latency_ns: 100,
+            p95_latency_ns: 200,
+            p99_latency_ns: 300,
+            baseline_p50_latency_ns: None,
+            baseline_p95_latency_ns: None,
+            baseline_p99_latency_ns: None,
+        };
+        let graph = ServiceGraphData {
+            nodes: vec![node],
+            edges: vec![edge],
+        };
+        assert_eq!(graph.nodes.len(), 1);
+        assert_eq!(graph.edges.len(), 1);
+        assert_eq!(graph.nodes[0].id, "n1");
+        assert!(graph.edges[0].from.is_none());
+    }
 }

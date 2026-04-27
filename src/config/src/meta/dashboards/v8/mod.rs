@@ -861,4 +861,86 @@ mod tests {
         assert!(meta.v8.is_some());
         assert!(!meta.hash.is_empty());
     }
+
+    #[test]
+    fn test_dashboard_variables_skip_serializing_if_none() {
+        let d = make_dashboard();
+        assert!(d.variables.is_none());
+        assert!(d.default_datetime_duration.is_none());
+        let json = serde_json::to_value(&d).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("variables"));
+        assert!(
+            !json
+                .as_object()
+                .unwrap()
+                .contains_key("defaultDatetimeDuration")
+        );
+    }
+
+    #[test]
+    fn test_layout_default_all_zeros() {
+        let layout = Layout::default();
+        assert_eq!(layout.x, 0);
+        assert_eq!(layout.y, 0);
+        assert_eq!(layout.w, 0);
+        assert_eq!(layout.h, 0);
+        assert_eq!(layout.i, 0);
+    }
+
+    #[test]
+    fn test_layout_serde_roundtrip() {
+        let json = serde_json::json!({"x": 1, "y": 2, "w": 10, "h": 5, "i": 3});
+        let layout: Layout = serde_json::from_value(json).unwrap();
+        assert_eq!(layout.x, 1);
+        assert_eq!(layout.h, 5);
+        let back = serde_json::to_value(&layout).unwrap();
+        assert_eq!(back["w"], 10);
+    }
+
+    #[test]
+    fn test_line_interpolation_default_is_smooth() {
+        let v: LineInterpolation = Default::default();
+        assert_eq!(v, LineInterpolation::Smooth);
+        let s = serde_json::to_string(&v).unwrap();
+        assert_eq!(s, "\"smooth\"");
+    }
+
+    #[test]
+    fn test_line_interpolation_step_variants_serialize() {
+        let s = serde_json::to_string(&LineInterpolation::StepStart).unwrap();
+        assert_eq!(s, "\"step-start\"");
+        let e = serde_json::to_string(&LineInterpolation::StepEnd).unwrap();
+        assert_eq!(e, "\"step-end\"");
+        let m = serde_json::to_string(&LineInterpolation::StepMiddle).unwrap();
+        assert_eq!(m, "\"step-middle\"");
+    }
+
+    #[test]
+    fn test_label_position_default_is_top() {
+        let v: LabelPosition = Default::default();
+        assert_eq!(v, LabelPosition::Top);
+    }
+
+    #[test]
+    fn test_promql_operation_param_variants() {
+        let arr: PromQLOperationParam =
+            serde_json::from_value(serde_json::json!(["a", "b"])).unwrap();
+        assert!(matches!(arr, PromQLOperationParam::Array(_)));
+
+        let b: PromQLOperationParam = serde_json::from_value(serde_json::json!(true)).unwrap();
+        assert!(matches!(b, PromQLOperationParam::Bool(true)));
+
+        let s: PromQLOperationParam = serde_json::from_value(serde_json::json!("hello")).unwrap();
+        assert!(matches!(s, PromQLOperationParam::String(_)));
+    }
+
+    #[test]
+    fn test_promql_operation_no_params_skip_serializing() {
+        let op = PromQLOperation {
+            id: "op1".to_string(),
+            params: None,
+        };
+        let json = serde_json::to_value(&op).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("params"));
+    }
 }

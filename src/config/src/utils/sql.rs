@@ -1298,11 +1298,9 @@ mod tests {
     #[test]
     fn test_is_eligible_for_histogram_cte_not_eligible() {
         // CTE → has_cte = true → returns (false, false)
-        let (eligible, _) = is_eligible_for_histogram(
-            "WITH cte AS (SELECT x FROM t) SELECT x FROM cte",
-            false,
-        )
-        .unwrap();
+        let (eligible, _) =
+            is_eligible_for_histogram("WITH cte AS (SELECT x FROM t) SELECT x FROM cte", false)
+                .unwrap();
         assert!(!eligible);
     }
 

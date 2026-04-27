@@ -444,10 +444,12 @@ mod tests {
 
         // Both single-field order_by expressions captured
         assert_eq!(visitor.order_by.len(), 2);
-        assert!(visitor
-            .order_by
-            .iter()
-            .any(|(f, _)| f == "name" || f == "age"));
+        assert!(
+            visitor
+                .order_by
+                .iter()
+                .any(|(f, _)| f == "name" || f == "age")
+        );
     }
 
     #[test]
