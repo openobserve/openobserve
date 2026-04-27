@@ -557,4 +557,44 @@ mod tests {
         let size = config.mem_size();
         assert_eq!(size, std::mem::size_of::<GroupingConfig>());
     }
+
+    #[test]
+    fn test_deserialize_optional_i32_string_number() {
+        // time_window_minutes as a JSON string containing a number
+        let json = r#"{"enabled":false,"time_window_minutes":"15"}"#;
+        let config: GlobalDeduplicationConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.time_window_minutes, Some(15));
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_empty_string_returns_none() {
+        // Empty string → None
+        let json = r#"{"enabled":false,"time_window_minutes":""}"#;
+        let config: GlobalDeduplicationConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.time_window_minutes, None);
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_null_returns_none() {
+        // null → None
+        let json = r#"{"enabled":false,"time_window_minutes":null}"#;
+        let config: GlobalDeduplicationConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.time_window_minutes, None);
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_invalid_string_returns_error() {
+        // Invalid string → error
+        let json = r#"{"enabled":false,"time_window_minutes":"not_a_number"}"#;
+        let result: Result<GlobalDeduplicationConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_boolean_returns_error() {
+        // Boolean type → error (hits the `_ => Err` branch)
+        let json = r#"{"enabled":false,"time_window_minutes":true}"#;
+        let result: Result<GlobalDeduplicationConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
 }
