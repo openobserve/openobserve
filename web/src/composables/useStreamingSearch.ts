@@ -428,10 +428,19 @@ const useHttpStreaming = () => {
 
       // Start the stream in the worker
       if (worker) {
+        // patchNsFields: true for traces streams so the worker can inject exact
+        // string shadow fields (_start_time_ns/_end_time_ns) before JSON.parse
+        // corrupts 19-digit nanosecond timestamps. Spans mode uses type="search"
+        // with pageType="traces"; aggregation mode uses type="traces" directly.
+        const patchNsFields =
+          type === "traces" ||
+          (type === "search" && pageType === "traces");
+
         // Initialize the stream in the worker
         worker.postMessage({
           action: "startStream",
           traceId,
+          patchNsFields,
         });
 
         // For Safari compatibility: manually read the stream and send chunks to worker
