@@ -4026,4 +4026,180 @@ mod tests {
         // The final timestamp should be adjusted based on the logic
         assert!(final_timestamp >= supposed_to_run_at);
     }
+
+    // ── parse_detection_interval_to_micros ───────────────────────────────────
+
+    #[test]
+    fn test_parse_detection_interval_minutes() {
+        // "5m" → 5 * 60 * 1_000_000
+        let result = parse_detection_interval_to_micros("5m");
+        assert_eq!(result, 5 * 60 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_hours() {
+        // "2h" → 2 * 3600 * 1_000_000
+        let result = parse_detection_interval_to_micros("2h");
+        assert_eq!(result, 2 * 3600 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_one_hour() {
+        let result = parse_detection_interval_to_micros("1h");
+        assert_eq!(result, 3600 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_ten_minutes() {
+        let result = parse_detection_interval_to_micros("10m");
+        assert_eq!(result, 10 * 60 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_bare_number_treated_as_minutes() {
+        // Bare number has no suffix → treated as minutes via the fallback branch
+        let result = parse_detection_interval_to_micros("15");
+        assert_eq!(result, 15 * 60 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_invalid_suffix_defaults_to_five_minutes() {
+        // Unknown suffix falls through to the bare-number branch which tries parse().
+        // "abc" parse fails → unwrap_or(5) * 60 * 1_000_000
+        let result = parse_detection_interval_to_micros("abcm");
+        // "abcm".strip_suffix('m') = Some("abc"), parse::<i64>() fails → unwrap_or(5)
+        assert_eq!(result, 5 * 60 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_invalid_hour_defaults_to_one_hour() {
+        // "xh" → strip_suffix('h') = Some("x"), parse fails → unwrap_or(1) * 3600
+        let result = parse_detection_interval_to_micros("xh");
+        assert_eq!(result, 1 * 3600 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_empty_string_defaults() {
+        // Empty string: no suffix matches, parse fails → unwrap_or(5) * 60
+        let result = parse_detection_interval_to_micros("");
+        assert_eq!(result, 5 * 60 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_whitespace_trimmed() {
+        // Surrounding whitespace is trimmed before parsing
+        let result = parse_detection_interval_to_micros("  3m  ");
+        assert_eq!(result, 3 * 60 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_whitespace_with_hour() {
+        let result = parse_detection_interval_to_micros("  4h  ");
+        assert_eq!(result, 4 * 3600 * 1_000_000);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_zero_minutes() {
+        // "0m" → 0 * 60 * 1_000_000 = 0
+        let result = parse_detection_interval_to_micros("0m");
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_zero_hours() {
+        let result = parse_detection_interval_to_micros("0h");
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_parse_detection_interval_large_value() {
+        let result = parse_detection_interval_to_micros("100m");
+        assert_eq!(result, 100 * 60 * 1_000_000);
+    }
+
+    // ── get_pipeline_info_from_module_key additional edge cases ──────────────
+
+    #[test]
+    fn test_get_pipeline_info_pipeline_name_with_slash() {
+        // pipeline_name contains a '/' – the function takes columns[2] as the name
+        // and columns[last] as the id, so intermediate slashes become part of the name.
+        let module_key = "logs/org1/my/pipeline/name/actual_id";
+        let result = get_pipeline_info_from_module_key(module_key);
+        assert!(result.is_ok());
+        let (org_id, stream_type, pipeline_name, pipeline_id) = result.unwrap();
+        assert_eq!(org_id, "org1");
+        assert_eq!(stream_type, StreamType::Logs);
+        assert_eq!(pipeline_name, "my"); // columns[2]
+        assert_eq!(pipeline_id, "actual_id"); // columns[last]
+    }
+
+    #[test]
+    fn test_get_pipeline_info_metrics_stream_type() {
+        let module_key = "metrics/metrics_org/pipe/id999";
+        let result = get_pipeline_info_from_module_key(module_key);
+        assert!(result.is_ok());
+        let (org_id, stream_type, _, pipeline_id) = result.unwrap();
+        assert_eq!(org_id, "metrics_org");
+        assert_eq!(stream_type, StreamType::Metrics);
+        assert_eq!(pipeline_id, "id999");
+    }
+
+    #[test]
+    fn test_get_pipeline_info_traces_stream_type() {
+        let module_key = "traces/trace_org/trace_pipe/trace_id";
+        let result = get_pipeline_info_from_module_key(module_key);
+        assert!(result.is_ok());
+        let (_, stream_type, ..) = result.unwrap();
+        assert_eq!(stream_type, StreamType::Traces);
+    }
+
+    #[test]
+    fn test_get_pipeline_info_too_few_parts_one() {
+        let result = get_pipeline_info_from_module_key("onlyonepart");
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid module_key")
+        );
+    }
+
+    #[test]
+    fn test_get_pipeline_info_too_few_parts_two() {
+        let result = get_pipeline_info_from_module_key("logs/org");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_pipeline_info_too_few_parts_three() {
+        let result = get_pipeline_info_from_module_key("logs/org/pipeline");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_pipeline_info_exactly_four_parts() {
+        let module_key = "logs/org/pipe/id";
+        let result = get_pipeline_info_from_module_key(module_key);
+        assert!(result.is_ok());
+        let (org_id, _, pipeline_name, pipeline_id) = result.unwrap();
+        assert_eq!(org_id, "org");
+        assert_eq!(pipeline_name, "pipe");
+        assert_eq!(pipeline_id, "id");
+    }
+
+    #[test]
+    fn test_get_pipeline_info_unknown_stream_type_falls_back() {
+        // Unknown stream type strings fall through to the From<&str> impl which
+        // is expected to produce a value (likely a default).  The important
+        // thing is the function does NOT return Err just because the type is unknown.
+        let module_key = "unknown_type/some_org/some_pipe/some_id";
+        let result = get_pipeline_info_from_module_key(module_key);
+        // Should succeed (no length check failure)
+        assert!(result.is_ok());
+        let (org_id, _, pipeline_name, pipeline_id) = result.unwrap();
+        assert_eq!(org_id, "some_org");
+        assert_eq!(pipeline_name, "some_pipe");
+        assert_eq!(pipeline_id, "some_id");
+    }
 }
