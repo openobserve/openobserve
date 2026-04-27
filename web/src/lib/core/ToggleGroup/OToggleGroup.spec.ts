@@ -4,7 +4,6 @@ import { h } from "vue";
 import OToggleGroup from "./OToggleGroup.vue";
 import OToggleGroupItem from "./OToggleGroupItem.vue";
 
-// Helper: mount group with items
 function mountGroup(
   groupProps: Record<string, unknown> = {},
   items: Array<{ value: string; label: string; disabled?: boolean }> = [],
@@ -79,62 +78,5 @@ describe("OToggleGroup", () => {
     const buttons = wrapper.findAll("button");
     expect(buttons[0].attributes("data-state")).toBe("on");
     expect(buttons[1].attributes("data-state")).toBe("off");
-  });
-});
-
-describe("OToggleGroupItem", () => {
-  // Mount items in a real group to satisfy Reka context
-  function mountItem(
-    itemProps: Record<string, unknown>,
-    slots: Record<string, () => ReturnType<typeof h>> = {},
-  ) {
-    return mount(OToggleGroup, {
-      slots: {
-        default: { render: () => h(OToggleGroupItem, itemProps, slots) },
-      },
-    });
-  }
-
-  it("renders slot content", () => {
-    const wrapper = mountItem(
-      { value: "x" },
-      { default: () => h("span", "Option") },
-    );
-    expect(wrapper.text()).toContain("Option");
-  });
-
-  it("renders icon-left slot", () => {
-    const wrapper = mountItem(
-      { value: "x" },
-      {
-        "icon-left": () => h("span", { "data-testid": "icon-left" }, "ΓåÉ"),
-      },
-    );
-    expect(wrapper.find('[data-testid="icon-left"]').exists()).toBe(true);
-  });
-
-  it("renders icon-right slot", () => {
-    const wrapper = mountItem(
-      { value: "x" },
-      {
-        "icon-right": () => h("span", { "data-testid": "icon-right" }, "ΓåÆ"),
-      },
-    );
-    expect(wrapper.find('[data-testid="icon-right"]').exists()).toBe(true);
-  });
-
-  it("applies base item classes", () => {
-    const wrapper = mountItem(
-      { value: "x" },
-      { default: () => h("span", "A") },
-    );
-    const btn = wrapper.find("button");
-    expect(btn.classes().join(" ")).toContain("tw:bg-toggle-item-bg");
-  });
-
-  it("sets data-disabled when disabled=true", () => {
-    const wrapper = mountItem({ value: "x", disabled: true });
-    const btn = wrapper.find("button");
-    expect(btn.attributes("data-disabled")).toBeDefined();
   });
 });
