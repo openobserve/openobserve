@@ -54,4 +54,9 @@
     /* ToggleGroup */
     --color-toggle-item-hover-bg: var(--color-grey-800);
     --color-toggle-item-active-bg: var(--color-primary-500);
-}
+
+    /* Tabs */
+    --color-tabs-active-bg: var(--color-grey-800);
+    --color-tabs-hover-bg: var(--color-grey-800);
+    --color-tabs-bar-border: var(--color-grey-700);
+}

@@ -1,6 +1,12 @@
 /* ============================================================
    COMPONENT TOKENS — per-component design decisions
    Each section is owned exclusively by one component.
+   ============================================================
+   ARCHITECTURE (required for dark-mode + Tailwind prefix):
+   1. Plain `:root` block defines light-mode default values.
+   2. `@theme inline` with self-references registers tokens for
+      Tailwind utility generation. `inline` keeps `var()` refs
+      unprefixed, so dark.css overrides apply correctly.
    ============================================================ */
 
 @theme inline {
@@ -12,9 +18,7 @@
   --color-separator: var(--color-border-default);
   --color-separator-strong: var(--color-border-strong);
 
-  /* ---- Button ------------------------------------------------ */
-
-  /* primary */
+  /* Button — primary */
   --color-button-primary: var(--color-primary-600);
   --color-button-primary-hover: var(--color-primary-700);
   --color-button-primary-active: var(--color-primary-800);
@@ -22,7 +26,7 @@
   --color-button-primary-foreground: var(--color-white);
   --color-button-primary-focus-ring: var(--color-primary-400);
 
-  /* secondary */
+  /* Button — secondary */
   --color-button-secondary: var(--color-grey-100);
   --color-button-secondary-hover: var(--color-grey-200);
   --color-button-secondary-active: var(--color-grey-300);
@@ -30,7 +34,7 @@
   --color-button-secondary-foreground: var(--color-grey-800);
   --color-button-secondary-focus-ring: var(--color-grey-400);
 
-  /* outline */
+  /* Button — outline */
   --color-button-outline-text: var(--color-grey-800);
   --color-button-outline-border: var(--color-grey-300);
   --color-button-outline-hover-bg: var(--color-grey-50);
@@ -38,77 +42,135 @@
   --color-button-outline-active-bg: var(--color-grey-100);
   --color-button-outline-focus-ring: var(--color-grey-400);
 
-  /* ghost */
+  /* Button — ghost */
   --color-button-ghost-text: var(--color-grey-700);
   --color-button-ghost-hover-bg: var(--color-grey-100);
   --color-button-ghost-active-bg: var(--color-grey-200);
   --color-button-ghost-focus-ring: var(--color-grey-400);
 
-  /* destructive */
+  /* Button — destructive */
   --color-button-destructive: var(--color-error-600);
   --color-button-destructive-hover: var(--color-error-700);
   --color-button-destructive-disabled: var(--color-error-300);
   --color-button-destructive-foreground: var(--color-white);
   --color-button-destructive-focus-ring: var(--color-error-400);
 
-  /* ---- ButtonGroup ----------------------------------------- */
-
-  /* Divider line between joined buttons */
+  /* ButtonGroup */
   --color-button-group-divider: var(--color-border-default);
 
-  /* ---- ToggleGroup ------------------------------------------ */
-
-  /* Inactive item */
+  /* ToggleGroup */
   --color-toggle-item-bg: var(--color-surface-panel);
   --color-toggle-item-text: var(--color-text-secondary);
   --color-toggle-item-hover-bg: var(--color-grey-100);
-  /* Active / pressed item */
   --color-toggle-item-active-bg: var(--color-primary-600);
   --color-toggle-item-active-text: var(--color-white);
-  /* Disabled item */
   --color-toggle-item-disabled: var(--color-text-disabled);
-  /* Group border + divider */
   --color-toggle-border: var(--color-border-default);
-  /* Focus ring */
   --color-toggle-focus-ring: var(--color-primary-400);
 
-  /* ---- Dropdown -------------------------------------------- */
-
-  /* Panel surface & border */
+  /* Dropdown */
   --color-dropdown-bg: var(--color-surface-overlay);
   --color-dropdown-border: var(--color-border-default);
-  /* Item states */
   --color-dropdown-item-text: var(--color-text-primary);
   --color-dropdown-item-hover-bg: var(--color-grey-100);
   --color-dropdown-item-active-bg: var(--color-grey-200);
   --color-dropdown-item-disabled: var(--color-text-disabled);
-  /* Group label */
   --color-dropdown-label: var(--color-text-secondary);
-  /* Separator */
   --color-dropdown-separator: var(--color-border-default);
 
-  /* ---- Tabs ------------------------------------------------- */
-
-  /* Indicator underline / vertical bar on active tab */
+  /* Tabs */
   --color-tabs-indicator: var(--color-primary-600);
-  /* Active tab text */
   --color-tabs-active-text: var(--color-primary-600);
-  /* Active tab background — lightest primary tint */
   --color-tabs-active-bg: var(--color-primary-100);
-  /* Inactive tab text */
   --color-tabs-inactive-text: var(--color-text-secondary);
-  /* Hover tab text */
   --color-tabs-hover-text: var(--color-text-primary);
-  /* Hover tab background */
   --color-tabs-hover-bg: var(--color-grey-100);
-  /* Disabled tab text */
   --color-tabs-disabled-text: var(--color-text-disabled);
-  /* Bottom border of the tab bar row */
   --color-tabs-bar-border: var(--color-border-default);
-  /* Focus ring color */
   --color-tabs-focus-ring: var(--color-primary-400);
   /* Tab bar standard height */
   --spacing-tabs-height: var(--spacing-10);
   /* Tab bar compact height */
   --spacing-tabs-height-dense: var(--spacing-8);
+}
+
+/* ── Register ALL tokens for Tailwind utility generation ── */
+@theme inline {
+  /* Separator */
+  --spacing-separator: var(--spacing-separator);
+  --color-separator: var(--color-separator);
+  --color-separator-strong: var(--color-separator-strong);
+
+  /* Button — primary */
+  --color-button-primary: var(--color-button-primary);
+  --color-button-primary-hover: var(--color-button-primary-hover);
+  --color-button-primary-active: var(--color-button-primary-active);
+  --color-button-primary-disabled: var(--color-button-primary-disabled);
+  --color-button-primary-foreground: var(--color-button-primary-foreground);
+  --color-button-primary-focus-ring: var(--color-button-primary-focus-ring);
+
+  /* Button — secondary */
+  --color-button-secondary: var(--color-button-secondary);
+  --color-button-secondary-hover: var(--color-button-secondary-hover);
+  --color-button-secondary-active: var(--color-button-secondary-active);
+  --color-button-secondary-disabled: var(--color-button-secondary-disabled);
+  --color-button-secondary-foreground: var(--color-button-secondary-foreground);
+  --color-button-secondary-focus-ring: var(--color-button-secondary-focus-ring);
+
+  /* Button — outline */
+  --color-button-outline-text: var(--color-button-outline-text);
+  --color-button-outline-border: var(--color-button-outline-border);
+  --color-button-outline-hover-bg: var(--color-button-outline-hover-bg);
+  --color-button-outline-hover-border: var(--color-button-outline-hover-border);
+  --color-button-outline-active-bg: var(--color-button-outline-active-bg);
+  --color-button-outline-focus-ring: var(--color-button-outline-focus-ring);
+
+  /* Button — ghost */
+  --color-button-ghost-text: var(--color-button-ghost-text);
+  --color-button-ghost-hover-bg: var(--color-button-ghost-hover-bg);
+  --color-button-ghost-active-bg: var(--color-button-ghost-active-bg);
+  --color-button-ghost-focus-ring: var(--color-button-ghost-focus-ring);
+
+  /* Button — destructive */
+  --color-button-destructive: var(--color-button-destructive);
+  --color-button-destructive-hover: var(--color-button-destructive-hover);
+  --color-button-destructive-disabled: var(--color-button-destructive-disabled);
+  --color-button-destructive-foreground: var(--color-button-destructive-foreground);
+  --color-button-destructive-focus-ring: var(--color-button-destructive-focus-ring);
+
+  /* ButtonGroup */
+  --color-button-group-divider: var(--color-button-group-divider);
+
+  /* ToggleGroup */
+  --color-toggle-item-bg: var(--color-toggle-item-bg);
+  --color-toggle-item-text: var(--color-toggle-item-text);
+  --color-toggle-item-hover-bg: var(--color-toggle-item-hover-bg);
+  --color-toggle-item-active-bg: var(--color-toggle-item-active-bg);
+  --color-toggle-item-active-text: var(--color-toggle-item-active-text);
+  --color-toggle-item-disabled: var(--color-toggle-item-disabled);
+  --color-toggle-border: var(--color-toggle-border);
+  --color-toggle-focus-ring: var(--color-toggle-focus-ring);
+
+  /* Dropdown */
+  --color-dropdown-bg: var(--color-dropdown-bg);
+  --color-dropdown-border: var(--color-dropdown-border);
+  --color-dropdown-item-text: var(--color-dropdown-item-text);
+  --color-dropdown-item-hover-bg: var(--color-dropdown-item-hover-bg);
+  --color-dropdown-item-active-bg: var(--color-dropdown-item-active-bg);
+  --color-dropdown-item-disabled: var(--color-dropdown-item-disabled);
+  --color-dropdown-label: var(--color-dropdown-label);
+  --color-dropdown-separator: var(--color-dropdown-separator);
+
+  /* Tabs */
+  --color-tabs-indicator: var(--color-tabs-indicator);
+  --color-tabs-active-text: var(--color-tabs-active-text);
+  --color-tabs-active-bg: var(--color-tabs-active-bg);
+  --color-tabs-inactive-text: var(--color-tabs-inactive-text);
+  --color-tabs-hover-text: var(--color-tabs-hover-text);
+  --color-tabs-hover-bg: var(--color-tabs-hover-bg);
+  --color-tabs-disabled-text: var(--color-tabs-disabled-text);
+  --color-tabs-bar-border: var(--color-tabs-bar-border);
+  --color-tabs-focus-ring: var(--color-tabs-focus-ring);
+  --spacing-tabs-height: var(--spacing-tabs-height);
+  --spacing-tabs-height-dense: var(--spacing-tabs-height-dense);
 }

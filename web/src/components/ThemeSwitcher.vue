@@ -95,6 +95,8 @@ export default defineComponent({
         // Handle localStorage not available
         console.warn("localStorage not available for theme storage:", error);
       }
+      // Toggle .dark on <html> for the O2 component library (Tailwind dark variant)
+      document.documentElement.classList.toggle('dark', theme === 'dark');
       $q.dark.set(theme == "dark");
       store.dispatch("appTheme", theme);
     };
