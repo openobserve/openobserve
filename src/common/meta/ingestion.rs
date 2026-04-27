@@ -836,4 +836,80 @@ mod tests {
             "fn_num must be Some for non-Usage requests to enable usage reporting"
         );
     }
+
+    #[test]
+    fn test_system_job_type_as_email_local() {
+        assert_eq!(
+            SystemJobType::SelfMetricsPromql.as_email_local(),
+            "self_metrics_promql"
+        );
+        assert_eq!(
+            SystemJobType::ServiceGraph.as_email_local(),
+            "service_graph"
+        );
+        assert_eq!(
+            SystemJobType::SelfReporting.as_email_local(),
+            "self_reporting"
+        );
+        assert_eq!(
+            SystemJobType::InternalGrpc.as_email_local(),
+            "internal_grpc"
+        );
+        assert_eq!(
+            SystemJobType::AnomalyDetection.as_email_local(),
+            "anomaly_detection"
+        );
+    }
+
+    #[test]
+    fn test_ingest_user_to_email_user() {
+        let user = IngestUser::User("alice@example.com".to_string());
+        assert_eq!(user.to_email(), "alice@example.com");
+    }
+
+    #[test]
+    fn test_ingest_user_to_email_system_job() {
+        let user = IngestUser::SystemJob(SystemJobType::AnomalyDetection);
+        assert_eq!(user.to_email(), "anomaly_detection@system.local");
+    }
+
+    #[test]
+    fn test_ingest_user_from_user_email_normal() {
+        let user = IngestUser::from_user_email("bob@example.com");
+        assert_eq!(user, IngestUser::User("bob@example.com".to_string()));
+    }
+
+    #[test]
+    fn test_ingest_user_from_user_email_empty_becomes_unknown() {
+        let user = IngestUser::from_user_email("");
+        assert_eq!(user, IngestUser::User("unknown@system.local".to_string()));
+    }
+
+    #[test]
+    fn test_hec_status_from_success() {
+        let resp = HecResponse::from(HecStatus::Success);
+        assert_eq!(resp.text, "Success");
+        assert_eq!(resp.code, 200);
+    }
+
+    #[test]
+    fn test_hec_status_from_invalid_format() {
+        let resp = HecResponse::from(HecStatus::InvalidFormat);
+        assert_eq!(resp.text, "Invalid data format");
+        assert_eq!(resp.code, 400);
+    }
+
+    #[test]
+    fn test_hec_status_from_invalid_index() {
+        let resp = HecResponse::from(HecStatus::InvalidIndex);
+        assert_eq!(resp.text, "Incorrect index");
+        assert_eq!(resp.code, 400);
+    }
+
+    #[test]
+    fn test_hec_status_from_custom() {
+        let resp = HecResponse::from(HecStatus::Custom("my error".to_string(), 422));
+        assert_eq!(resp.text, "my error");
+        assert_eq!(resp.code, 422);
+    }
 }

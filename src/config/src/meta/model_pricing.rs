@@ -195,3 +195,87 @@ impl TierOperator {
 fn default_true() -> bool {
     true
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pricing_source_as_str() {
+        assert_eq!(PricingSource::BuiltIn.as_str(), "built_in");
+        assert_eq!(PricingSource::MetaOrg.as_str(), "meta_org");
+        assert_eq!(PricingSource::Org.as_str(), "org");
+    }
+
+    #[test]
+    fn test_pricing_source_from_str() {
+        assert_eq!(PricingSource::from("built_in"), PricingSource::BuiltIn);
+        assert_eq!(PricingSource::from("meta_org"), PricingSource::MetaOrg);
+        assert_eq!(PricingSource::from("org"), PricingSource::Org);
+        // unknown → Org (default)
+        assert_eq!(PricingSource::from("unknown"), PricingSource::Org);
+        assert_eq!(PricingSource::from(""), PricingSource::Org);
+    }
+
+    #[test]
+    fn test_pricing_source_roundtrip() {
+        for src in [
+            PricingSource::BuiltIn,
+            PricingSource::MetaOrg,
+            PricingSource::Org,
+        ] {
+            assert_eq!(PricingSource::from(src.as_str()), src);
+        }
+    }
+
+    #[test]
+    fn test_tier_operator_gt() {
+        let op = TierOperator::Gt;
+        assert!(op.evaluate(5.0, 4.0));
+        assert!(!op.evaluate(4.0, 5.0));
+        assert!(!op.evaluate(4.0, 4.0));
+    }
+
+    #[test]
+    fn test_tier_operator_gte() {
+        let op = TierOperator::Gte;
+        assert!(op.evaluate(5.0, 4.0));
+        assert!(op.evaluate(4.0, 4.0));
+        assert!(!op.evaluate(3.0, 4.0));
+    }
+
+    #[test]
+    fn test_tier_operator_lt() {
+        let op = TierOperator::Lt;
+        assert!(op.evaluate(3.0, 4.0));
+        assert!(!op.evaluate(4.0, 4.0));
+        assert!(!op.evaluate(5.0, 4.0));
+    }
+
+    #[test]
+    fn test_tier_operator_lte() {
+        let op = TierOperator::Lte;
+        assert!(op.evaluate(3.0, 4.0));
+        assert!(op.evaluate(4.0, 4.0));
+        assert!(!op.evaluate(5.0, 4.0));
+    }
+
+    #[test]
+    fn test_tier_operator_eq_tolerance() {
+        let op = TierOperator::Eq;
+        assert!(op.evaluate(100.0, 100.0));
+        // within tolerance (0.5)
+        assert!(op.evaluate(100.3, 100.0));
+        // outside tolerance
+        assert!(!op.evaluate(101.0, 100.0));
+    }
+
+    #[test]
+    fn test_tier_operator_neq_tolerance() {
+        let op = TierOperator::Neq;
+        assert!(op.evaluate(101.0, 100.0));
+        // within tolerance → NOT neq
+        assert!(!op.evaluate(100.3, 100.0));
+        assert!(!op.evaluate(100.0, 100.0));
+    }
+}
