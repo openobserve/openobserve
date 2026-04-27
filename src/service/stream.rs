@@ -665,6 +665,14 @@ pub async fn update_stream_settings(
         settings
             .defined_schema_fields
             .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
+        // _timestamp cannot be deselected from the UI, so when the user removes every
+        // UDS field they can see, _timestamp may be the only one left. Treat that as a
+        // request to disable UDS entirely.
+        if settings.defined_schema_fields.len() == 1
+            && settings.defined_schema_fields[0] == TIMESTAMP_COL_NAME
+        {
+            settings.defined_schema_fields.clear();
+        }
     }
     if !settings.defined_schema_fields.is_empty() {
         // check fields with stream type

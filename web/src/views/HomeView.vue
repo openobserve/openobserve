@@ -54,12 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="activeHomeTab === 'usage'" class="tw:h-full tw:overflow-y-auto">
     <div v-if="!no_data_ingest && !isLoadingSummary" class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container card-container--col" :class="store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 40px)]' : 'tw:h-full'">
         <!-- 1st section -->
-         <div>
-          <WebinarBanner v-if="config.isCloud === 'true'" variant="home" />
-          <TrialPeriod></TrialPeriod>
-         </div>
-          <LicensePeriod @update-license="goToLicensePage"></LicensePeriod>
-        <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
+         <div class="banners-wrapper">
+            <div>
+            <WebinarBanner v-if="config.isCloud === 'true'" variant="home" />
+            <TrialPeriod></TrialPeriod>
+          </div>
+            <LicensePeriod v-if="!showUsageReportBanner" @update-license="goToLicensePage"></LicensePeriod>
+            <UsageReportBanner></UsageReportBanner>
+            <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
+          </div>
         <div class="feature-card"
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
         role="region"
@@ -469,6 +472,7 @@ import pipelines from "@/services/pipelines";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
+import UsageReportBanner from "@/enterprise/components/billings/UsageReportBanner.vue";
 import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import { useRouter } from "vue-router";
@@ -570,6 +574,16 @@ export default defineComponent({
       draggingTab.value = null;
       dragOverTab.value = null;
     }
+
+    // Show usage report banner when last_usage_report_ts > 0 and elapsed > 1 hour
+    const showUsageReportBanner = computed(() => {
+      if (!store.state.zoConfig || !('last_usage_report_ts' in store.state.zoConfig)) return false;
+      const ts = store.state.zoConfig.last_usage_report_ts;
+      if (!ts || ts === 0) return false;
+      const reportedAtMs = ts / 1000;
+      const elapsedMs = Date.now() - reportedAtMs;
+      return elapsedMs > 60 * 60 * 1000;
+    });
 
     // Animated counters for numbers
     const animatedStreamsCount = ref(0);
@@ -1033,6 +1047,7 @@ export default defineComponent({
       animatedScheduledPipelines,
       animatedRtPipelines,
       outlinedWindow,
+      showUsageReportBanner,
       activeHomeTab,
       tabOrder,
       draggingTab,
@@ -1065,6 +1080,7 @@ export default defineComponent({
     TrialPeriod,
     LicensePeriod,
     DatabaseDeprecationBanner,
+    UsageReportBanner,
     HomeViewSkeleton,
     WebinarBanner,
     OverviewTab,
@@ -1122,11 +1138,11 @@ export default defineComponent({
 // Mixin for common tile styles
 @mixin tile-base {
   height: 100%;
-  padding: 1rem;
+  padding: 0.75rem;
   border-radius: 0.5rem;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   contain: layout style paint;
-  gap: 0.5rem;
+  gap: 0.25rem;
 }
 
 // Mixin for container base styles
@@ -1163,6 +1179,19 @@ export default defineComponent({
 
 /* ===== 3. Layout Components ===== */
 
+// Banners wrapper - keeps banners compact with spacing
+.banners-wrapper {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  // Only add bottom margin when a banner is actually visible
+  &:has(> div) {
+    margin-bottom: 0.75rem;
+  }
+}
+
 // Streams container
 .streams-container {
   @include container-base;
@@ -1180,7 +1209,7 @@ export default defineComponent({
 }
 
 .streams-header {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 .dark-stream-container,
 .light-stream-container {
@@ -1252,7 +1281,7 @@ export default defineComponent({
 .tiles-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 
 .tile {
@@ -1358,9 +1387,9 @@ export default defineComponent({
   color: #FFD6D6;
 }
 .data-to-display{
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 600;
-  line-height: 32px;
+  line-height: 28px;
 }
 // .chart-container {
 //   @include container-base;
@@ -1383,6 +1412,8 @@ export default defineComponent({
   gap: 1rem;
   margin-top: 1rem;
   align-items: stretch;
+  flex: 1;
+  min-height: 0;
 
   // Stack on smaller screens
   @media (max-width: 1400px) {
@@ -1525,8 +1556,8 @@ export default defineComponent({
   line-height: 24px;
 }
 .details-container{
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 .charts-main-container{
   gap: 12px;

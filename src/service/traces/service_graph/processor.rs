@@ -78,6 +78,7 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
         sql,
         last_updated_at,
         next_updated_at,
+        false,
     )
     .await
     {

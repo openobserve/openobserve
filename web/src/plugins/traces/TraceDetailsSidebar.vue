@@ -1145,8 +1145,6 @@ export default defineComponent({
     const store = useStore();
 
     const RAW_VALUE_FILTER_FIELDS = new Set([
-      "start_time",
-      "end_time",
       store.state?.zoConfig?.timestamp_column || "_timestamp",
     ]);
 
@@ -1156,9 +1154,19 @@ export default defineComponent({
     ];
 
     const getFilterValue = (field: string, displayValue: unknown): unknown => {
-      if (RAW_VALUE_FILTER_FIELDS.has(field)) {
-        return (props.span as Record<string, unknown>)[field] ?? displayValue;
+      const span = props.span as Record<string, unknown>;
+      if (field === "start_time") {
+        return span._start_time_ns ?? span.start_time ?? displayValue;
       }
+      if (field === "end_time") {
+        return span._end_time_ns ?? span.end_time ?? displayValue;
+      }
+      const timestampField =
+        store.state?.zoConfig?.timestamp_column || "_timestamp";
+      if (field === timestampField) {
+        return span[timestampField] ?? displayValue;
+      }
+
       return displayValue;
     };
 
@@ -1455,6 +1463,10 @@ export default defineComponent({
 
       if (spanDetails.attrs.events) delete spanDetails.attrs.events;
 
+      // These are custom meta fields for start_time and end_time so removing it from spanDetails
+      delete spanDetails.attrs._start_time_ns;
+      delete spanDetails.attrs._end_time_ns;
+
       spanDetails.attrs.duration = spanDetails.attrs.duration + "us";
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
         date.formatDate(
@@ -1495,6 +1507,8 @@ export default defineComponent({
       store.state.zoConfig.timestamp_column,
       "start_time",
       "end_time",
+      "_start_time_ns",
+      "_end_time_ns",
       "duration",
       "busy_ns",
       "idle_ns",
