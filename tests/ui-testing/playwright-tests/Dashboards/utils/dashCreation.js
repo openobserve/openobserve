@@ -7,13 +7,15 @@ import { SELECTORS } from "../../../pages/dashboardPages/dashboard-selectors.js"
 export const waitForDashboardPage = async function (page) {
   // If already on the dashboard page, skip waiting for navigation
   if (!page.url().includes("/web/dashboards")) {
-    await page.waitForURL(/\/web\/dashboards.*/, { timeout: 30000 });
+    // Use 'domcontentloaded' instead of default 'load' because SPA navigations
+    // (Vue Router's router.push) don't trigger a full page load event
+    await page.waitForURL(/\/web\/dashboards.*/, { timeout: 30000, waitUntil: 'domcontentloaded' });
   }
 
   // Additional wait for page to stabilize
   await page.waitForTimeout(1000);
 
-  // Wait for either the API response or the dashboard table to appear
+  // Wait for either the API response or dashboard UI elements to appear
   // Use Promise.race to succeed on whichever happens first
   try {
     await Promise.race([
@@ -24,13 +26,18 @@ export const waitForDashboardPage = async function (page) {
           response.status() === 200,
         { timeout: 30000 }
       ),
-      // OR wait for dashboard table to be visible
+      // OR wait for dashboard list table to be visible
       page.waitForSelector('[data-test="dashboard-table"]', {
         state: 'visible',
         timeout: 30000
       }),
       // OR wait for import button to be visible (in case we're on import page)
       page.waitForSelector('[data-test="dashboard-import"]', {
+        state: 'visible',
+        timeout: 30000
+      }),
+      // OR wait for dashboard view elements (when navigating to a specific dashboard)
+      page.waitForSelector('[data-test="dashboard-panel-bar"], [data-test="dashboard-if-no-panel-add-panel-btn"]', {
         state: 'visible',
         timeout: 30000
       }),

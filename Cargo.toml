@@ -349,6 +349,7 @@ hashbrown = { version = "0.16", features = ["serde"] }
 hex = "0.4"
 indexmap = { version = "2.8", features = ["serde"] }
 itertools = "0.14"
+jsonschema = "0.29"
 lettre = { version = "0.11", default-features = false, features = [
     "builder",
     "hostname",

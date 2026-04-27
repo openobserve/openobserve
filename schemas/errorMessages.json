@@ -1,0 +1,153 @@
+{
+  "chartErrors": {
+    "pie": {
+      "y:minItems": { "dashboard": "Add one value field for donut and pie charts", "logs": "Unable to extract value field from the query." },
+      "y:maxItems": { "dashboard": "Add one value field for donut and pie charts", "logs": "Unable to extract value field from the query." },
+      "x:minItems": { "dashboard": "Add one label field for donut and pie charts", "logs": "Unable to extract label field from the query." },
+      "x:maxItems": { "dashboard": "Add one label field for donut and pie charts", "logs": "Unable to extract label field from the query." }
+    },
+    "donut": {
+      "y:minItems": { "dashboard": "Add one value field for donut and pie charts", "logs": "Unable to extract value field from the query." },
+      "y:maxItems": { "dashboard": "Add one value field for donut and pie charts", "logs": "Unable to extract value field from the query." },
+      "x:minItems": { "dashboard": "Add one label field for donut and pie charts", "logs": "Unable to extract label field from the query." },
+      "x:maxItems": { "dashboard": "Add one label field for donut and pie charts", "logs": "Unable to extract label field from the query." }
+    },
+    "metric": {
+      "y:minItems": { "dashboard": "Add one value field for metric charts", "logs": "Unable to extract value field from the query." },
+      "y:maxItems": { "dashboard": "Add one value field for metric charts", "logs": "Unable to extract value field from the query." },
+      "x:maxItems": { "dashboard": "X-Axis field is not allowed for Metric chart", "logs": "Grouping field is not allowed for Metric chart" }
+    },
+    "gauge": {
+      "y:minItems": { "dashboard": "Add one value field for gauge chart", "logs": "Unable to extract value field from the query." },
+      "y:maxItems": { "dashboard": "Add one value field for gauge chart", "logs": "Unable to extract value field from the query." },
+      "x:maxItems": { "dashboard": "Add one label field for gauge chart", "logs": "Unable to extract grouping field from the query." }
+    },
+    "line": {
+      "y:minItems": { "dashboard": "Add at least one field for the Y-Axis", "logs": "Unable to extract value field from the query." },
+      "x:minItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." },
+      "x:maxItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." }
+    },
+    "area": {
+      "y:minItems": { "dashboard": "Add at least one field for the Y-Axis", "logs": "Unable to extract value field from the query." },
+      "x:minItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." },
+      "x:maxItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." }
+    },
+    "bar": {
+      "y:minItems": { "dashboard": "Add at least one field for the Y-Axis", "logs": "Unable to extract value field from the query." },
+      "x:minItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." },
+      "x:maxItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." }
+    },
+    "scatter": {
+      "y:minItems": { "dashboard": "Add at least one field for the Y-Axis", "logs": "Unable to extract value field from the query." },
+      "x:minItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." },
+      "x:maxItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract grouping field from the query." }
+    },
+    "h-bar": {
+      "y:minItems": { "dashboard": "Add at least one field for the X-Axis", "logs": "Unable to extract value field from the query." },
+      "x:minItems": { "dashboard": "Add one field for the Y-Axis", "logs": "Unable to extract grouping field from the query." },
+      "x:maxItems": { "dashboard": "Add one field for the Y-Axis", "logs": "Unable to extract grouping field from the query." }
+    },
+    "table": {
+      "table:minFields": { "dashboard": "Add at least one field on First Column or Other Columns", "logs": "Unable to extract fields from the query." }
+    },
+    "heatmap": {
+      "y:minItems": { "dashboard": "Add at least one field for the Y-Axis", "logs": "Unable to extract grouping field from the query." },
+      "x:minItems": { "dashboard": "Add one field for the X-Axis", "logs": "Unable to extract second level grouping field from the query." },
+      "z:minItems": { "dashboard": "Add one field for the Z-Axis", "logs": "Unable to extract value field from the query." }
+    },
+    "stacked": {
+      "y:minItems": { "dashboard": "Add at least one field for the Y-Axis", "logs": "Unable to extract value field from the query." },
+      "x:minItems": { "dashboard": "Add exactly one field on the X-Axis and breakdown for stacked and h-stacked charts", "logs": "Unable to extract grouping field from the query." },
+      "x:maxItems": { "dashboard": "Add exactly one field on the X-Axis and breakdown for stacked and h-stacked charts", "logs": "Unable to extract grouping field from the query." },
+      "breakdown:minItems": { "dashboard": "Add exactly one field on the X-Axis and breakdown for stacked and h-stacked charts", "logs": "Unable to extract grouping field from the query." },
+      "breakdown:maxItems": { "dashboard": "Add exactly one field on the X-Axis and breakdown for stacked and h-stacked charts", "logs": "Unable to extract grouping field from the query." }
+    },
+    "h-stacked": {
+      "y:minItems": { "dashboard": "Add at least one field for the Y-Axis", "logs": "Unable to extract value field from the query." },
+      "x:minItems": { "dashboard": "Add exactly one field on the X-Axis and breakdown for stacked and h-stacked charts", "logs": "Unable to extract grouping field from the query." },
+      "x:maxItems": { "dashboard": "Add exactly one field on the X-Axis and breakdown for stacked and h-stacked charts", "logs": "Unable to extract grouping field from the query." },
+      "breakdown:minItems": { "dashboard": "Add exactly one field on the X-Axis and breakdown for stacked and h-stacked charts", "logs": "Unable to extract grouping field from the query." },
+      "breakdown:maxItems": { "dashboard": "Add exactly one field on the X-Axis and breakdown for stacked and h-stacked charts", "logs": "Unable to extract grouping field from the query." }
+    },
+    "area-stacked": {
+      "y:minItems": { "dashboard": "Add exactly one field on Y-Axis for area-stacked charts", "logs": "Unable to extract value field from the query." },
+      "y:maxItems": { "dashboard": "Add exactly one field on Y-Axis for area-stacked charts", "logs": "Unable to extract value field from the query." },
+      "x:minItems": { "dashboard": "Add exactly one field on the X-Axis and breakdown for area-stacked charts", "logs": "Unable to extract grouping field from the query." },
+      "x:maxItems": { "dashboard": "Add exactly one field on the X-Axis and breakdown for area-stacked charts", "logs": "Unable to extract grouping field from the query." },
+      "breakdown:minItems": { "dashboard": "Add exactly one field on the X-Axis and breakdown for area-stacked charts", "logs": "Unable to extract grouping field from the query." },
+      "breakdown:maxItems": { "dashboard": "Add exactly one field on the X-Axis and breakdown for area-stacked charts", "logs": "Unable to extract grouping field from the query." }
+    },
+    "geomap": {
+      "latitude:required": { "dashboard": "Add one field for the latitude", "logs": "Unable to extract latitude field from the query." },
+      "longitude:required": { "dashboard": "Add one field for the longitude", "logs": "Unable to extract longitude field from the query." }
+    },
+    "sankey": {
+      "source:required": { "dashboard": "Add one field for the source", "logs": "Unable to extract source field from the query." },
+      "target:required": { "dashboard": "Add one field for the target", "logs": "Unable to extract target field from the query." },
+      "value:required": { "dashboard": "Add one field for the value", "logs": "Unable to extract value field from the query." }
+    },
+    "maps": {
+      "name:required": { "dashboard": "Add one field for the name", "logs": "Unable to extract name field from the query." },
+      "value_for_maps:required": { "dashboard": "Add one field for the value", "logs": "Unable to extract value field from the query." }
+    },
+    "html": {
+      "htmlContent:minLength": { "dashboard": "Please enter your HTML code", "logs": "Please enter your HTML code" },
+      "htmlContent:required": { "dashboard": "Please enter your HTML code", "logs": "Please enter your HTML code" }
+    },
+    "markdown": {
+      "markdownContent:minLength": { "dashboard": "Please enter your markdown code", "logs": "Please enter your markdown code" },
+      "markdownContent:required": { "dashboard": "Please enter your markdown code", "logs": "Please enter your markdown code" }
+    },
+    "custom_chart": {
+      "query:required": { "dashboard": "Please enter query for custom chart", "logs": "Please enter query for custom chart" },
+      "query:minLength": { "dashboard": "Please enter query for custom chart", "logs": "Please enter query for custom chart" }
+    }
+  },
+  "dashboardErrors": {
+    "title:required": "Dashboard title is required",
+    "title:minLength": "Dashboard title is required",
+    "dashboardId:required": "Dashboard ID is required",
+    "version:const": "Dashboard version must be 8.",
+    "tabs:minItems": "Dashboard must have at least one tab"
+  },
+  "tabErrors": {
+    "tabId:required": "Each tab must have a tabId",
+    "tabId:minLength": "Each tab must have a tabId",
+    "name:required": "Tab must have a name",
+    "name:minLength": "Tab must have a name"
+  },
+  "panelErrors": {
+    "id:required": "Panel ID is required",
+    "type:required": "Panel type is required",
+    "type:enum": "Chart type \"{value}\" is not supported.",
+    "title:required": "Panel title is required",
+    "title:minLength": "Panel title is required",
+    "layout:required": "Layout is required",
+    "layout.x:type": "Layout x must be a number",
+    "layout.y:type": "Layout y must be a number",
+    "layout.w:type": "Layout w must be a number",
+    "layout.h:type": "Layout h must be a number"
+  },
+  "joinErrors": {
+    "stream:required": "Stream is required",
+    "stream:minLength": "Stream is required",
+    "joinType:required": "Join type is required",
+    "joinType:minLength": "Join type is required",
+    "conditions:minItems": "At least one clause is required",
+    "field:required:leftField": "Left field is required",
+    "field:required:rightField": "Right field is required",
+    "operation:required": "Operation is required"
+  },
+  "promqlErrors": {
+    "x:notEmpty": "X-Axis is not supported for PromQL. Remove anything added to the X-Axis.",
+    "y:notEmpty": "Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis.",
+    "filter:notEmpty": "Filters are not supported for PromQL. Remove anything added to the Filters."
+  },
+  "contentErrors": {
+    "promql:queryEmpty": "Query-{index} is empty",
+    "geomap:queryEmpty": "Query-{index} is empty",
+    "html:contentEmpty": "Please enter your HTML code",
+    "markdown:contentEmpty": "Please enter your markdown code",
+    "custom_chart:queryEmpty": "Please enter query for custom chart"
+  }
+}

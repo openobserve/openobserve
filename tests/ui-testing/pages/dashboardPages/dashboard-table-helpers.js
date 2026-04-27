@@ -10,6 +10,22 @@ export const TABLE_HEADER_SELECTOR = `${TABLE_SELECTOR} thead tr th`;
 export const TABLE_DATA_ROW_SELECTOR = `${TABLE_SELECTOR} [data-test="dashboard-data-row"]`;
 
 /**
+ * Wait for table headers to be rendered before querying them.
+ * @param {import('@playwright/test').Page} page
+ * @param {number} [minCount=1] - Minimum number of headers expected
+ */
+export async function waitForTableHeaders(page, minCount = 1) {
+  await page.waitForFunction(
+    ({ selector, min }) => {
+      const headers = document.querySelectorAll(selector);
+      return headers.length >= min;
+    },
+    { selector: TABLE_HEADER_SELECTOR, min: minCount },
+    { timeout: 15000 }
+  );
+}
+
+/**
  * Extract header texts from the TanStack table thead via $$eval.
  * Strips sort icons (arrow_upward/arrow_downward) and copy button text.
  *
@@ -17,6 +33,7 @@ export const TABLE_DATA_ROW_SELECTOR = `${TABLE_SELECTOR} [data-test="dashboard-
  * @returns {Promise<string[]>}
  */
 export async function getTableHeaders(page) {
+  await waitForTableHeaders(page);
   return page.$$eval(TABLE_HEADER_SELECTOR, (cells) =>
     cells.map((c) =>
       c.textContent

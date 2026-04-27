@@ -17,7 +17,7 @@ import queryService from "@/services/search";
 import * as zincutils from "@/utils/zincutils";
 import * as sqlUtils from "@/utils/query/sqlUtils";
 import * as convertDataIntoUnitValue from "@/utils/dashboard/convertDataIntoUnitValue";
-import * as panelValidation from "@/utils/dashboard/panelValidation";
+import * as panelValidation from "@/utils/dashboard/dashboardValidator";
 
 // Mock Vue lifecycle hooks to avoid warnings
 vi.mock("vue", async () => {
@@ -38,7 +38,7 @@ vi.mock("@/services/search");
 vi.mock("@/utils/zincutils");
 vi.mock("@/utils/query/sqlUtils");
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue");
-vi.mock("@/utils/dashboard/panelValidation");
+vi.mock("@/utils/dashboard/dashboardValidator");
 
 // Mock SQL parser
 const mockParser = {

@@ -74,7 +74,7 @@ import TenstackTable from "@/components/TenstackTable.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
-import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
+import { findFirstValidMappedValue } from "@/utils/dashboard/dashboardValidator";
 
 export default defineComponent({
   name: "TableRenderer",

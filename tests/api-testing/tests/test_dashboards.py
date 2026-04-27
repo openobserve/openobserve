@@ -8,6 +8,83 @@ logger = logging.getLogger(__name__)
 ORG_ID = "default"
 
 
+def _minimal_dashboard(title, description="", folder_id="default", tabs=None):
+    """Return a minimal valid v8 dashboard payload."""
+    if tabs is None:
+        tabs = [{"tabId": "default", "name": "Default", "panels": []}]
+    return {
+        "version": 8,
+        "title": title,
+        "description": description,
+        "folder_id": folder_id,
+        "tabs": tabs,
+    }
+
+
+def _line_panel(panel_id, title="Test Panel", layout_i=1):
+    """Return a minimal valid line chart panel with required x/y fields."""
+    return {
+        "id": panel_id,
+        "type": "line",
+        "title": title,
+        "description": "",
+        "queryType": "sql",
+        "queries": [
+            {
+                "query": "",
+                "customQuery": False,
+                "fields": {
+                    "stream": "default",
+                    "stream_type": "logs",
+                    "x": [
+                        {
+                            "label": "_timestamp",
+                            "alias": "x_axis_1",
+                            "type": "build",
+                            "functionName": "histogram",
+                            "args": [
+                                {
+                                    "type": "field",
+                                    "value": {
+                                        "field": "_timestamp",
+                                        "streamAlias": None,
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                    "y": [
+                        {
+                            "label": "count",
+                            "alias": "y_axis_1",
+                            "type": "build",
+                            "functionName": "count",
+                            "args": [
+                                {
+                                    "type": "field",
+                                    "value": {
+                                        "field": "_timestamp",
+                                        "streamAlias": None,
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                    "z": [],
+                    "filter": {
+                        "filterType": "group",
+                        "logicalOperator": "AND",
+                        "conditions": [],
+                    },
+                },
+                "config": {"promql_legend": ""},
+            }
+        ],
+        "layout": {"x": 0, "y": 0, "w": 12, "h": 6, "i": layout_i},
+        "config": {"show_legends": True},
+    }
+
+
 @pytest.mark.parametrize("with_auth", [False, True])
 def test_list_dashboards_auth(create_session, base_url, with_auth):
     session = create_session
@@ -151,13 +228,9 @@ def test_create_dashboard(create_session, base_url):
     session = create_session
     url = f"{base_url}api/{ORG_ID}/dashboards"
 
-    dashboard_data = {
-        "version": 8,
-        "title": "Test Dashboard",
-        "description": "Dashboard created by automated test",
-        "folder_id": "default",
-        "tabs": []
-    }
+    dashboard_data = _minimal_dashboard(
+        "Test Dashboard", "Dashboard created by automated test"
+    )
 
     resp = session.post(url, json=dashboard_data)
     assert resp.status_code in [200, 201], f"Create dashboard failed: {resp.status_code} {resp.text}"
@@ -179,11 +252,7 @@ def test_get_dashboard_by_id(create_session, base_url):
 
     # First create a dashboard
     create_url = f"{base_url}api/{ORG_ID}/dashboards"
-    dashboard_data = {
-        "title": "Test Get Dashboard",
-        "description": "Test dashboard for get operation",
-        "folder_id": "default"
-    }
+    dashboard_data = _minimal_dashboard("Test Get Dashboard", "Test dashboard for get operation")
 
     create_resp = session.post(create_url, json=dashboard_data)
     assert create_resp.status_code in [200, 201], f"Setup failed: {create_resp.status_code}"
@@ -210,11 +279,7 @@ def test_update_dashboard(create_session, base_url):
 
     # Create a dashboard first
     create_url = f"{base_url}api/{ORG_ID}/dashboards"
-    dashboard_data = {
-        "title": "Dashboard for Update Test",
-        "description": "Testing dashboard lifecycle",
-        "folder_id": "default"
-    }
+    dashboard_data = _minimal_dashboard("Dashboard for Update Test", "Testing dashboard lifecycle")
 
     create_resp = session.post(create_url, json=dashboard_data)
     create_body = create_resp.json()
@@ -242,11 +307,7 @@ def test_delete_dashboard(create_session, base_url):
 
     # Create a dashboard first
     create_url = f"{base_url}api/{ORG_ID}/dashboards"
-    dashboard_data = {
-        "title": "Dashboard to Delete",
-        "description": "This dashboard will be deleted",
-        "folder_id": "default"
-    }
+    dashboard_data = _minimal_dashboard("Dashboard to Delete", "This dashboard will be deleted")
 
     create_resp = session.post(create_url, json=dashboard_data)
     dashboard_id = create_resp.json()["v8"]["dashboardId"]
@@ -266,13 +327,9 @@ def test_create_dashboard_with_empty_panels(create_session, base_url):
     session = create_session
     url = f"{base_url}api/{ORG_ID}/dashboards"
 
-    dashboard_data = {
-        "version": 8,
-        "title": "Dashboard with Empty Panels",
-        "description": "Test dashboard with empty panels",
-        "folder_id": "default",
-        "tabs": []  # Empty tabs array is valid
-    }
+    dashboard_data = _minimal_dashboard(
+        "Dashboard with Empty Panels", "Test dashboard with empty panels"
+    )
 
     resp = session.post(url, json=dashboard_data)
     assert resp.status_code in [200, 201], f"Create dashboard failed: {resp.status_code} {resp.text}"
@@ -294,11 +351,9 @@ def test_dashboard_with_custom_folder(create_session, base_url):
     session = create_session
     url = f"{base_url}api/{ORG_ID}/dashboards"
 
-    dashboard_data = {
-        "title": "Test Dashboard Custom Folder",
-        "description": "Dashboard with custom folder",
-        "folder_id": "test_custom_folder"
-    }
+    dashboard_data = _minimal_dashboard(
+        "Test Dashboard Custom Folder", "Dashboard with custom folder", "test_custom_folder"
+    )
 
     resp = session.post(url, json=dashboard_data)
     # API creates folder automatically if it doesn't exist
@@ -342,12 +397,7 @@ def test_update_nonexistent_dashboard(create_session, base_url):
     session = create_session
     url = f"{base_url}api/{ORG_ID}/dashboards/nonexistent_dashboard_id_12345"
 
-    update_data = {
-        "version": 8,
-        "title": "Updated Title",
-        "folder_id": "default",
-        "tabs": []
-    }
+    update_data = _minimal_dashboard("Updated Title")
 
     resp = session.put(url, json=update_data)
     # API currently returns 500 for updating nonexistent dashboard, accepting it for now
@@ -367,11 +417,7 @@ def test_dashboard_duplicate_title(create_session, base_url):
     session = create_session
     url = f"{base_url}api/{ORG_ID}/dashboards"
 
-    dashboard_data = {
-        "title": "Duplicate Title Test",
-        "description": "First dashboard",
-        "folder_id": "default"
-    }
+    dashboard_data = _minimal_dashboard("Duplicate Title Test", "First dashboard")
 
     # Create first dashboard
     resp1 = session.post(url, json=dashboard_data)
@@ -398,11 +444,9 @@ def test_list_dashboards_pagination(create_session, base_url):
     # Create multiple dashboards for pagination test
     created_ids = []
     for i in range(5):
-        dashboard_data = {
-            "title": f"Pagination Test Dashboard {i}",
-            "description": f"Dashboard {i} for pagination",
-            "folder_id": "default"
-        }
+        dashboard_data = _minimal_dashboard(
+            f"Pagination Test Dashboard {i}", f"Dashboard {i} for pagination"
+        )
         resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
         if resp.status_code in [200, 201]:
             dashboard_id = resp.json()["v8"]["dashboardId"]
@@ -457,11 +501,9 @@ def test_move_multiple_dashboards_batch(create_session, base_url):
     # Create multiple dashboards
     created_ids = []
     for i in range(3):
-        dashboard_data = {
-            "title": f"Dashboard Batch Move {i}",
-            "description": f"Dashboard {i} for batch move test",
-            "folder_id": "default"
-        }
+        dashboard_data = _minimal_dashboard(
+            f"Dashboard Batch Move {i}", f"Dashboard {i} for batch move test"
+        )
         resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
         if resp.status_code in [200, 201]:
             dashboard_id = resp.json()["v8"]["dashboardId"]
@@ -488,43 +530,34 @@ def test_dashboard_with_variables(create_session, base_url):
     """Test creating a dashboard with variables"""
     session = create_session
 
-    dashboard_data = {
-        "title": "Dashboard with Variables",
-        "description": "Test dashboard variables",
-        "folder_id": "default",
-        "tabs": [{
-            "tabId": "default",
-            "name": "Default",
-            "panels": []
-        }],
-        "variables": {
-            "list": [
-                {
-                    "type": "custom",
-                    "name": "environment",
-                    "label": "Environment",
-                    "value": "production",
-                    "options": [
-                        {"label": "Production", "value": "production"},
-                        {"label": "Staging", "value": "staging"},
-                        {"label": "Development", "value": "development"}
-                    ],
-                    "multiSelect": False
-                },
-                {
-                    "type": "custom",
-                    "name": "region",
-                    "label": "Region",
-                    "value": "us-east-1",
-                    "options": [
-                        {"label": "US East 1", "value": "us-east-1"},
-                        {"label": "US West 2", "value": "us-west-2"}
-                    ],
-                    "multiSelect": True
-                }
-            ],
-            "showDynamicFilters": True
-        }
+    dashboard_data = _minimal_dashboard("Dashboard with Variables", "Test dashboard variables")
+    dashboard_data["variables"] = {
+        "list": [
+            {
+                "type": "custom",
+                "name": "environment",
+                "label": "Environment",
+                "value": "production",
+                "options": [
+                    {"label": "Production", "value": "production"},
+                    {"label": "Staging", "value": "staging"},
+                    {"label": "Development", "value": "development"}
+                ],
+                "multiSelect": False
+            },
+            {
+                "type": "custom",
+                "name": "region",
+                "label": "Region",
+                "value": "us-east-1",
+                "options": [
+                    {"label": "US East 1", "value": "us-east-1"},
+                    {"label": "US West 2", "value": "us-west-2"}
+                ],
+                "multiSelect": True
+            }
+        ],
+        "showDynamicFilters": True
     }
 
     resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
@@ -547,28 +580,11 @@ def test_dashboard_with_multiple_tabs(create_session, base_url):
     """Test creating a dashboard with multiple tabs"""
     session = create_session
 
-    dashboard_data = {
-        "title": "Multi-Tab Dashboard",
-        "description": "Dashboard with multiple tabs",
-        "folder_id": "default",
-        "tabs": [
-            {
-                "tabId": "tab1",
-                "name": "Overview",
-                "panels": []
-            },
-            {
-                "tabId": "tab2",
-                "name": "Details",
-                "panels": []
-            },
-            {
-                "tabId": "tab3",
-                "name": "Analytics",
-                "panels": []
-            }
-        ]
-    }
+    dashboard_data = _minimal_dashboard("Multi-Tab Dashboard", "Dashboard with multiple tabs", tabs=[
+        {"tabId": "tab1", "name": "Overview", "panels": []},
+        {"tabId": "tab2", "name": "Details", "panels": []},
+        {"tabId": "tab3", "name": "Analytics", "panels": []},
+    ])
 
     resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
     assert resp.status_code in [200, 201], f"Create multi-tab dashboard failed: {resp.status_code} {resp.text}"
@@ -597,11 +613,7 @@ def test_list_dashboards_by_title_pattern(create_session, base_url):
     titles = ["Prod Dashboard 1", "Prod Dashboard 2", "Test Dashboard 1"]
 
     for title in titles:
-        dashboard_data = {
-            "title": title,
-            "description": "Test title filtering",
-            "folder_id": "default"
-        }
+        dashboard_data = _minimal_dashboard(title, "Test title filtering")
         resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
         if resp.status_code in [200, 201]:
             dashboard_id = resp.json()["v8"]["dashboardId"]
@@ -633,11 +645,9 @@ def test_list_dashboards_by_folder(create_session, base_url):
     created_ids = []
 
     for i in range(2):
-        dashboard_data = {
-            "title": f"Dashboard in Test Folder {i}",
-            "description": "Test folder filtering",
-            "folder_id": test_folder
-        }
+        dashboard_data = _minimal_dashboard(
+            f"Dashboard in Test Folder {i}", "Test folder filtering", test_folder
+        )
         resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
         if resp.status_code in [200, 201]:
             dashboard_id = resp.json()["v8"]["dashboardId"]
@@ -666,29 +676,11 @@ def test_create_timed_annotation(create_session, base_url):
     session = create_session
 
     # Create a dashboard with panels first
-    dashboard_data = {
-        "title": "Dashboard for Annotations",
-        "description": "Test timed annotations",
-        "folder_id": "default",
-        "tabs": [{
-            "tabId": "default",
-            "name": "Default",
-            "panels": [{
-                "id": "panel_1",
-                "type": "bar",
-                "title": "Test Panel",
-                "description": "",
-                "config": {
-                    "show_legends": True,
-                    "legends_position": None,
-                    "axis_border_show": False
-                },
-                "queryType": "sql",
-                "queries": [],
-                "layout": {"x": 0, "y": 0, "w": 12, "h": 6, "i": 1}
-            }]
-        }]
-    }
+    panel = _line_panel("panel_1", "Test Panel")
+    dashboard_data = _minimal_dashboard(
+        "Dashboard for Annotations", "Test timed annotations",
+        tabs=[{"tabId": "default", "name": "Default", "panels": [panel]}]
+    )
 
     create_resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
     assert create_resp.status_code in [200, 201], f"Create dashboard failed: {create_resp.status_code} {create_resp.text}"
@@ -722,29 +714,11 @@ def test_get_timed_annotations(create_session, base_url):
     session = create_session
 
     # Create a dashboard
-    dashboard_data = {
-        "title": "Dashboard for Annotation Retrieval",
-        "description": "Test annotation retrieval",
-        "folder_id": "default",
-        "tabs": [{
-            "tabId": "default",
-            "name": "Default",
-            "panels": [{
-                "id": "panel_1",
-                "type": "line",
-                "title": "Test Panel",
-                "description": "",
-                "config": {
-                    "show_legends": True,
-                    "legends_position": None,
-                    "axis_border_show": False
-                },
-                "queryType": "sql",
-                "queries": [],
-                "layout": {"x": 0, "y": 0, "w": 12, "h": 6, "i": 1}
-            }]
-        }]
-    }
+    panel = _line_panel("panel_1", "Test Panel")
+    dashboard_data = _minimal_dashboard(
+        "Dashboard for Annotation Retrieval", "Test annotation retrieval",
+        tabs=[{"tabId": "default", "name": "Default", "panels": [panel]}]
+    )
 
     create_resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
     assert create_resp.status_code in [200, 201], f"Create dashboard failed: {create_resp.status_code} {create_resp.text}"
@@ -788,11 +762,9 @@ def test_dashboard_hash_conflict_detection(create_session, base_url):
     session = create_session
 
     # Create a dashboard
-    dashboard_data = {
-        "title": "Dashboard for Hash Test",
-        "description": "Test hash-based conflict detection",
-        "folder_id": "default"
-    }
+    dashboard_data = _minimal_dashboard(
+        "Dashboard for Hash Test", "Test hash-based conflict detection"
+    )
 
     create_resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
     assert create_resp.status_code in [200, 201]
@@ -832,66 +804,30 @@ def test_dashboard_with_panel_filters(create_session, base_url):
     """Test creating dashboard with panel-level filters"""
     session = create_session
 
-    dashboard_data = {
-        "version": 8,
-        "title": "Dashboard with Panel Filters",
-        "description": "Test panel filters",
-        "folder_id": "default",
-        "tabs": [{
-            "tabId": "default",
-            "name": "Default",
-            "panels": [{
-                "id": "panel_1",
-                "type": "bar",
-                "title": "Filtered Panel",
-                "description": "",
-                "config": {
-                    "show_legends": True,
-                    "legends_position": None,
-                    "axis_border_show": False
+    panel = _line_panel("panel_1", "Filtered Panel")
+    # Add a filter condition to the panel's query
+    panel["queries"][0]["fields"]["filter"] = {
+        "filterType": "group",
+        "logicalOperator": "AND",
+        "conditions": [
+            {
+                "type": "list",
+                "column": {
+                    "field": "status",
+                    "streamAlias": ""
                 },
-                "queryType": "sql",
-                "queries": [{
-                    "query": "SELECT * FROM default",
-                    "customQuery": False,
-                    "fields": {
-                        "stream": "default",
-                        "stream_type": "logs",
-                        "x": [],
-                        "y": [],
-                        "filter": {
-                            "filterType": "group",
-                            "logicalOperator": "AND",
-                            "conditions": [
-                                {
-                                    "type": "list",
-                                    "column": {
-                                        "field": "status",
-                                        "streamAlias": ""
-                                    },
-                                    "operator": "=",
-                                    "value": "200",
-                                    "values": ["200", "201"],
-                                    "logicalOperator": "AND",
-                                    "filterType": "condition"
-                                }
-                            ]
-                        }
-                    },
-                    "config": {
-                        "promql_legend": "",
-                        "layer_type": "scatter",
-                        "weight_fixed": 1,
-                        "limit": 0,
-                        "min": 0,
-                        "max": 100,
-                        "time_shift": []
-                    }
-                }],
-                "layout": {"x": 0, "y": 0, "w": 12, "h": 6, "i": 1}
-            }]
-        }]
+                "operator": "=",
+                "value": "200",
+                "values": ["200", "201"],
+                "logicalOperator": "AND",
+                "filterType": "condition"
+            }
+        ]
     }
+    dashboard_data = _minimal_dashboard(
+        "Dashboard with Panel Filters", "Test panel filters",
+        tabs=[{"tabId": "default", "name": "Default", "panels": [panel]}]
+    )
 
     resp = session.post(f"{base_url}api/{ORG_ID}/dashboards", json=dashboard_data)
     assert resp.status_code in [200, 201], f"Create dashboard with filters failed: {resp.status_code} {resp.text}"

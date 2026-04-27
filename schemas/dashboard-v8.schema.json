@@ -1,0 +1,437 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["title", "version", "tabs"],
+  "additionalProperties": true,
+  "properties": {
+    "dashboardId": { "type": "string" },
+    "title": { "type": "string", "minLength": 1 },
+    "version": { "const": 8 },
+    "description": { "type": "string" },
+    "tabs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueTabIds": true,
+      "uniquePanelIds": true,
+      "items": {
+        "type": "object",
+        "required": ["tabId", "name"],
+        "additionalProperties": true,
+        "properties": {
+          "tabId": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "panels": {
+            "type": "array",
+            "uniqueLayoutI": true,
+            "items": { "$ref": "#/definitions/panel" }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "panel": {
+      "type": "object",
+      "required": ["id", "type", "title", "layout"],
+      "additionalProperties": true,
+      "tableMinFields": true,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": {
+          "enum": [
+            "area", "line", "bar", "scatter", "area-stacked",
+            "donut", "pie", "h-bar", "stacked", "h-stacked",
+            "heatmap", "metric", "gauge", "geomap", "maps",
+            "table", "sankey", "custom_chart", "html", "markdown"
+          ]
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "queryType": { "type": "string" },
+        "layout": {
+          "type": "object",
+          "required": ["x", "y", "w", "h"],
+          "additionalProperties": true,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "w": { "type": "number" },
+            "h": { "type": "number" },
+            "i": {}
+          }
+        },
+        "queries": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/query" }
+        },
+        "htmlContent": { "type": "string" },
+        "markdownContent": { "type": "string" },
+        "config": { "type": "object", "additionalProperties": true }
+      },
+      "allOf": [
+        {
+          "$comment": "pie/donut: exactly 1 x, exactly 1 y (non-promql only)",
+          "if": { "properties": { "type": { "enum": ["pie", "donut"] }, "queryType": { "not": { "const": "promql" } } } },
+          "then": {
+            "properties": {
+              "queries": {
+                "items": {
+                  "if": { "properties": { "customQuery": { "const": false } } },
+                  "then": {
+                    "properties": {
+                      "fields": {
+                        "properties": {
+                          "x": { "minItems": 1, "maxItems": 1 },
+                          "y": { "minItems": 1, "maxItems": 1 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "metric: 0 x, exactly 1 y (non-promql only)",
+          "if": { "properties": { "type": { "const": "metric" }, "queryType": { "not": { "const": "promql" } } } },
+          "then": {
+            "properties": {
+              "queries": {
+                "items": {
+                  "if": { "properties": { "customQuery": { "const": false } } },
+                  "then": {
+                    "properties": {
+                      "fields": {
+                        "properties": {
+                          "x": { "maxItems": 0 },
+                          "y": { "minItems": 1, "maxItems": 1 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "gauge: 0 or 1 x, exactly 1 y (non-promql only)",
+          "if": { "properties": { "type": { "const": "gauge" }, "queryType": { "not": { "const": "promql" } } } },
+          "then": {
+            "properties": {
+              "queries": {
+                "items": {
+                  "if": { "properties": { "customQuery": { "const": false } } },
+                  "then": {
+                    "properties": {
+                      "fields": {
+                        "properties": {
+                          "x": { "maxItems": 1 },
+                          "y": { "minItems": 1, "maxItems": 1 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "line/area/bar/scatter/h-bar: exactly 1 x, at least 1 y (non-promql only)",
+          "if": { "properties": { "type": { "enum": ["line", "area", "bar", "scatter", "h-bar"] }, "queryType": { "not": { "const": "promql" } } } },
+          "then": {
+            "properties": {
+              "queries": {
+                "items": {
+                  "if": { "properties": { "customQuery": { "const": false } } },
+                  "then": {
+                    "properties": {
+                      "fields": {
+                        "properties": {
+                          "x": { "minItems": 1, "maxItems": 1 },
+                          "y": { "minItems": 1 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "heatmap: at least 1 x, at least 1 y, at least 1 z (non-promql only)",
+          "if": { "properties": { "type": { "const": "heatmap" }, "queryType": { "not": { "const": "promql" } } } },
+          "then": {
+            "properties": {
+              "queries": {
+                "items": {
+                  "if": { "properties": { "customQuery": { "const": false } } },
+                  "then": {
+                    "properties": {
+                      "fields": {
+                        "properties": {
+                          "x": { "minItems": 1 },
+                          "y": { "minItems": 1 },
+                          "z": { "minItems": 1 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "stacked/h-stacked: exactly 1 x, at least 1 y, exactly 1 breakdown (non-promql only)",
+          "if": { "properties": { "type": { "enum": ["stacked", "h-stacked"] }, "queryType": { "not": { "const": "promql" } } } },
+          "then": {
+            "properties": {
+              "queries": {
+                "items": {
+                  "if": { "properties": { "customQuery": { "const": false } } },
+                  "then": {
+                    "properties": {
+                      "fields": {
+                        "properties": {
+                          "x": { "minItems": 1, "maxItems": 1 },
+                          "y": { "minItems": 1 },
+                          "breakdown": { "minItems": 1, "maxItems": 1 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "area-stacked: exactly 1 x, exactly 1 y, exactly 1 breakdown (non-promql only)",
+          "if": { "properties": { "type": { "const": "area-stacked" }, "queryType": { "not": { "const": "promql" } } } },
+          "then": {
+            "properties": {
+              "queries": {
+                "items": {
+                  "if": { "properties": { "customQuery": { "const": false } } },
+                  "then": {
+                    "properties": {
+                      "fields": {
+                        "properties": {
+                          "x": { "minItems": 1, "maxItems": 1 },
+                          "y": { "minItems": 1, "maxItems": 1 },
+                          "breakdown": { "minItems": 1, "maxItems": 1 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "geomap: latitude and longitude required (non-promql only)",
+          "if": { "properties": { "type": { "const": "geomap" }, "queryType": { "not": { "const": "promql" } } } },
+          "then": {
+            "properties": {
+              "queries": {
+                "items": {
+                  "if": { "properties": { "customQuery": { "const": false } } },
+                  "then": {
+                    "properties": {
+                      "fields": {
+                        "required": ["latitude", "longitude"],
+                        "properties": {
+                          "latitude": { "type": "object" },
+                          "longitude": { "type": "object" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "sankey: source, target, value required (non-promql only)",
+          "if": { "properties": { "type": { "const": "sankey" }, "queryType": { "not": { "const": "promql" } } } },
+          "then": {
+            "properties": {
+              "queries": {
+                "items": {
+                  "if": { "properties": { "customQuery": { "const": false } } },
+                  "then": {
+                    "properties": {
+                      "fields": {
+                        "required": ["source", "target", "value"],
+                        "properties": {
+                          "source": { "type": "object" },
+                          "target": { "type": "object" },
+                          "value": { "type": "object" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "maps: name and value_for_maps required (non-promql only)",
+          "if": { "properties": { "type": { "const": "maps" }, "queryType": { "not": { "const": "promql" } } } },
+          "then": {
+            "properties": {
+              "queries": {
+                "items": {
+                  "if": { "properties": { "customQuery": { "const": false } } },
+                  "then": {
+                    "properties": {
+                      "fields": {
+                        "required": ["name", "value_for_maps"],
+                        "properties": {
+                          "name": { "type": "object" },
+                          "value_for_maps": { "type": "object" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "html: htmlContent non-empty",
+          "if": { "properties": { "type": { "const": "html" } } },
+          "then": {
+            "required": ["htmlContent"],
+            "properties": {
+              "htmlContent": { "minLength": 1 }
+            }
+          }
+        },
+        {
+          "$comment": "markdown: markdownContent non-empty",
+          "if": { "properties": { "type": { "const": "markdown" } } },
+          "then": {
+            "required": ["markdownContent"],
+            "properties": {
+              "markdownContent": { "minLength": 1 }
+            }
+          }
+        },
+        {
+          "$comment": "custom_chart: query non-empty",
+          "if": { "properties": { "type": { "const": "custom_chart" } } },
+          "then": {
+            "properties": {
+              "queries": {
+                "minItems": 1,
+                "items": {
+                  "required": ["query"],
+                  "properties": {
+                    "query": { "type": "string", "minLength": 1 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "query": { "type": ["string", "null"] },
+        "customQuery": { "type": "boolean" },
+        "fields": { "$ref": "#/definitions/panelFields" },
+        "config": { "type": "object", "additionalProperties": true },
+        "joins": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/join" }
+        }
+      }
+    },
+    "panelFields": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "stream": { "type": "string" },
+        "stream_type": { "type": "string" },
+        "x": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true, "validateFunctionArgs": true }
+        },
+        "y": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true, "validateFunctionArgs": true }
+        },
+        "z": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true, "validateFunctionArgs": true }
+        },
+        "breakdown": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true, "validateFunctionArgs": true }
+        },
+        "latitude": { "type": ["object", "null"], "additionalProperties": true },
+        "longitude": { "type": ["object", "null"], "additionalProperties": true },
+        "source": { "type": ["object", "null"], "additionalProperties": true },
+        "target": { "type": ["object", "null"], "additionalProperties": true },
+        "value": { "type": ["object", "null"], "additionalProperties": true },
+        "name": { "type": ["object", "null"], "additionalProperties": true },
+        "value_for_maps": { "type": ["object", "null"], "additionalProperties": true },
+        "filter": {
+          "type": "object",
+          "additionalProperties": true,
+          "validateFilterValues": true
+        }
+      }
+    },
+    "join": {
+      "type": "object",
+      "required": ["stream", "joinType", "conditions"],
+      "additionalProperties": true,
+      "properties": {
+        "stream": { "type": "string", "minLength": 1 },
+        "streamAlias": { "type": "string" },
+        "joinType": { "type": "string", "minLength": 1 },
+        "conditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["leftField", "rightField", "operation"],
+            "additionalProperties": true,
+            "properties": {
+              "leftField": {
+                "type": "object",
+                "required": ["field"],
+                "additionalProperties": true,
+                "properties": {
+                  "field": { "type": "string", "minLength": 1 }
+                }
+              },
+              "rightField": {
+                "type": "object",
+                "required": ["field"],
+                "additionalProperties": true,
+                "properties": {
+                  "field": { "type": "string", "minLength": 1 }
+                }
+              },
+              "operation": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

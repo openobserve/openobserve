@@ -1,5 +1,5 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
-import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
+import functionValidation from "@schemas/functions/functionValidation.json";
 
 export function buildSQLQueryFromInput(
   fields: any,
@@ -778,6 +778,8 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
  * @returns {string} - the WHERE clause as a string.
  */
 const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
+  if (!filterData?.length) return "";
+
   const whereConditions = filterData
     ?.map((condition) => buildCondition(condition, dashboardPanelData))
     ?.filter(Boolean);

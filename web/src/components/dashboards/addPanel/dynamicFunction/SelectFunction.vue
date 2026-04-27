@@ -177,7 +177,7 @@
 
 <script lang="ts">
 import { ref, watch, toRef, computed, inject } from "vue";
-import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
+import functionValidation from "@schemas/functions/functionValidation.json";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
 import { addMissingArgs } from "@/utils/dashboard/dashboardAutoQueryBuilder";

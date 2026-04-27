@@ -41,6 +41,7 @@
     "@vue-flow/core": "^1.48.1",
     "acorn": "^8.15.0",
     "acorn-walk": "^8.3.4",
+    "ajv": "^8.18.0",
     "cron-parser": "^5.4.0",
     "d3-force": "^3.0.0",
     "d3-scale": "^4.0.2",

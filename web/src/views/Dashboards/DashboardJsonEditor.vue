@@ -83,6 +83,7 @@ const QueryEditor = defineAsyncComponent(
 import { getImageURL } from "@/utils/zincutils";
 import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { validateDashboardJson } from "@/utils/dashboard/dashboardValidator";
 
 export default defineComponent({
   name: "DashboardJsonEditor",

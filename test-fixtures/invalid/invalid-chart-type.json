@@ -1,0 +1,23 @@
+{
+  "_description": "Panel with invalid chart type 'piechart' — should fail enum",
+  "dashboardId": "test-bad-type",
+  "title": "Bad Chart Type",
+  "version": 8,
+  "tabs": [
+    {
+      "tabId": "tab-1",
+      "name": "Default",
+      "panels": [
+        {
+          "id": "panel-1",
+          "type": "piechart",
+          "title": "Invalid Type Panel",
+          "layout": { "x": 0, "y": 0, "w": 96, "h": 20, "i": 1 },
+          "queryType": "sql",
+          "queries": [],
+          "config": {}
+        }
+      ]
+    }
+  ]
+}
