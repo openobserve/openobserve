@@ -23,21 +23,21 @@ const animated = computed<boolean>(() => context?.value.animated ?? false)
   -->
   <template v-if="keepAlive">
     <Transition v-if="animated" name="o-tab-panel">
-      <div v-show="isActive" role="tabpanel" class="o-tab-panel">
+      <div v-show="isActive" role="tabpanel" tabindex="0" class="o-tab-panel">
         <slot />
       </div>
     </Transition>
-    <div v-else v-show="isActive" role="tabpanel" class="o-tab-panel">
+    <div v-else v-show="isActive" role="tabpanel" tabindex="0" class="o-tab-panel">
       <slot />
     </div>
   </template>
   <template v-else>
     <Transition v-if="animated && isActive" name="o-tab-panel">
-      <div role="tabpanel" class="o-tab-panel">
+      <div role="tabpanel" tabindex="0" class="o-tab-panel">
         <slot />
       </div>
     </Transition>
-    <div v-else-if="isActive" role="tabpanel" class="o-tab-panel">
+    <div v-else-if="isActive" role="tabpanel" tabindex="0" class="o-tab-panel">
       <slot />
     </div>
   </template>
