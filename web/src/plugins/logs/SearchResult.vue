@@ -403,6 +403,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
             :scroll-el="scrollContainerRef"
             :scroll-margin="0"
+            :class="[
+              !searchObj.meta.showHistogram ||
+              (searchObj.meta.showHistogram &&
+                searchObj.data.histogram.errorCode == -1)
+                ? 'table-container--without-histogram'
+                : 'table-container--with-histogram',
+            ]"
             @update:columnSizes="handleColumnSizesUpdate"
             @update:columnOrder="handleColumnOrderUpdate"
             @copy="copyLogToClipboard"
