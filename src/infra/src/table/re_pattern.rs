@@ -66,6 +66,29 @@ impl PatternEntry {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pattern_entry_new_sets_all_fields() {
+        let entry = PatternEntry::new("myorg", "pat1", "a description", r"\d+", "alice");
+        assert_eq!(entry.org, "myorg");
+        assert_eq!(entry.name, "pat1");
+        assert_eq!(entry.description, "a description");
+        assert_eq!(entry.pattern, r"\d+");
+        assert_eq!(entry.created_by, "alice");
+        assert!(!entry.id.is_empty());
+    }
+
+    #[test]
+    fn test_pattern_entry_new_timestamps_equal_at_creation() {
+        let entry = PatternEntry::new("org", "name", "desc", "pat", "user");
+        assert_eq!(entry.created_at, entry.updated_at);
+        assert!(entry.created_at > 0);
+    }
+}
+
 pub async fn add(entry: PatternEntry) -> Result<(), errors::Error> {
     let record = ActiveModel {
         id: Set(entry.id),

@@ -80,6 +80,27 @@ impl From<i32> for FileType {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file_type_to_i32() {
+        assert_eq!(i32::from(FileType::SourceMap), 0);
+    }
+
+    #[test]
+    fn test_i32_to_file_type_zero() {
+        assert!(matches!(FileType::from(0), FileType::SourceMap));
+    }
+
+    #[test]
+    fn test_i32_to_file_type_unknown_defaults_to_source_map() {
+        assert!(matches!(FileType::from(99), FileType::SourceMap));
+        assert!(matches!(FileType::from(-1), FileType::SourceMap));
+    }
+}
+
 #[derive(FromQueryResult)]
 struct Value {
     value: Option<String>,
