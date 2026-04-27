@@ -258,3 +258,71 @@ pub async fn clear() -> Result<(), errors::Error> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pattern_policy_from_str_all_variants() {
+        assert_eq!(PatternPolicy::from("DropField"), PatternPolicy::DropField);
+        assert_eq!(PatternPolicy::from("Redact"), PatternPolicy::Redact);
+        assert_eq!(PatternPolicy::from("Hash"), PatternPolicy::Hash);
+    }
+
+    #[test]
+    fn test_pattern_policy_from_unknown_defaults_to_redact() {
+        assert_eq!(PatternPolicy::from("Unknown"), PatternPolicy::Redact);
+        assert_eq!(PatternPolicy::from(""), PatternPolicy::Redact);
+    }
+
+    #[test]
+    fn test_pattern_policy_display() {
+        assert_eq!(PatternPolicy::DropField.to_string(), "DropField");
+        assert_eq!(PatternPolicy::Redact.to_string(), "Redact");
+        assert_eq!(PatternPolicy::Hash.to_string(), "Hash");
+    }
+
+    #[test]
+    fn test_apply_policy_from_str_all_variants() {
+        assert_eq!(ApplyPolicy::from("AtIngestion"), ApplyPolicy::AtIngestion);
+        assert_eq!(ApplyPolicy::from("AtSearch"), ApplyPolicy::AtSearch);
+        assert_eq!(ApplyPolicy::from("Both"), ApplyPolicy::Both);
+    }
+
+    #[test]
+    fn test_apply_policy_from_unknown_defaults_to_at_ingestion() {
+        assert_eq!(ApplyPolicy::from("unknown"), ApplyPolicy::AtIngestion);
+    }
+
+    #[test]
+    fn test_apply_policy_display() {
+        assert_eq!(ApplyPolicy::AtIngestion.to_string(), "AtIngestion");
+        assert_eq!(ApplyPolicy::AtSearch.to_string(), "AtSearch");
+        assert_eq!(ApplyPolicy::Both.to_string(), "Both");
+    }
+
+    #[test]
+    fn test_pattern_policy_roundtrip_via_string() {
+        for policy in [
+            PatternPolicy::DropField,
+            PatternPolicy::Redact,
+            PatternPolicy::Hash,
+        ] {
+            let s = policy.to_string();
+            assert_eq!(PatternPolicy::from(s.as_str()), policy);
+        }
+    }
+
+    #[test]
+    fn test_apply_policy_roundtrip_via_string() {
+        for policy in [
+            ApplyPolicy::AtIngestion,
+            ApplyPolicy::AtSearch,
+            ApplyPolicy::Both,
+        ] {
+            let s = policy.to_string();
+            assert_eq!(ApplyPolicy::from(s.as_str()), policy);
+        }
+    }
+}
