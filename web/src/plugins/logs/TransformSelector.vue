@@ -15,150 +15,195 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn-group
+  <div
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="q-pa-none float-left q-mr-xs tw:h-[32px] transform-selector element-box-shadow el-border"
+    class="transform-selector tw:inline-flex tw:items-center tw:h-[30px] tw:rounded-[5px] tw:border tw:border-[var(--o2-border-color)] tw:shrink-0"
+    data-test="logs-search-bar-function-selector"
   >
-    <div class="tw:flex tw:items-center">
+    <!-- Editor toggle -->
+    <div
+      class="tw:flex tw:items-center tw:px-1 tw:h-full tw:border-r tw:border-[var(--o2-border-color)] tw:cursor-pointer fn-toggle-section"
+    >
       <q-toggle
         data-test="logs-search-bar-show-query-toggle-btn"
         v-model="searchObj.meta.showTransformEditor"
         class="o2-toggle-button-xs"
         size="xs"
         flat
-        :disable="!searchObj.data.transformType"
         :class="
           store.state.theme === 'dark'
             ? 'o2-toggle-button-xs-dark'
             : 'o2-toggle-button-xs-light'
         "
       >
-        <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
+        <q-tooltip class="tw:text-[12px]" :offset="[0, 4]">
           {{ getTransformLabelTooltip }}
         </q-tooltip>
       </q-toggle>
     </div>
-    <div style="border-right: 1px solid var(--o2-border-color)">
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
-        transformsLabel
-      }}</q-tooltip>
-      <q-btn-dropdown
-        data-test="logs-search-bar-function-dropdown"
-        v-model="functionModel"
-        size="12px"
-        :icon="transformIcon"
-        no-caps
-        class="btn-function no-case q-pr-none no-border no-outline tw:border-none"
-        :class="`${searchObj.data.transformType || 'transform'}-icon`"
-        label-class="no-case"
-      >
-        <q-tooltip :delay="0">
-          {{ transformsLabel }}
-        </q-tooltip>
-        <q-list data-test="logs-search-saved-function-list">
-          <!-- Search Input -->
-          <div
-            data-test="logs-search-bar-transform-type-select"
-            class="logs-transform-type o2-input q-mx-sm"
-            style="padding-top: 0"
-          >
-            <q-select
-              v-if="isActionsEnabled"
-              v-model="searchObj.data.transformType"
-              :options="transformTypes"
-              :label="t('search.transformType')"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-sm showLabelOnTop no-case"
-              stack-label
-              outlined
-              emit-value
-              filled
-              dense
-              clearable
-              @update:model-value="updateTransforms()"
-            />
-          </div>
-          <div>
-            <q-input
-              v-model="searchTerm"
-              dense
-              filled
-              borderless
-              clearable
-              debounce="300"
-              :placeholder="t('search.searchSavedFunction')"
-              data-test="function-search-input"
-            >
-              <template #prepend>
-                <q-icon name="search" />
-              </template>
-            </q-input>
-          </div>
 
-          <div v-if="filteredTransformOptions.length">
-            <q-item
-              class="tw:border-b saved-view-item"
-              clickable
-              v-for="(item, i) in filteredTransformOptions"
-              :key="'transform-' + item?.name"
-              v-close-popup
-            >
-              <q-item-section
-                @click.stop="selectTransform(item, true)"
-                v-close-popup
-              >
-                <q-item-label>{{ item.name }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </div>
-          <div v-else>
-            <q-item>
-              <q-item-section>
-                <q-item-label
-                  v-if="searchObj.data.transformType === 'function'"
-                  >{{ t("search.savedFunctionNotFound") }}</q-item-label
-                >
-                <q-item-label
-                  v-if="searchObj.data.transformType === 'action'"
-                  >{{ t("search.actionsNotFound") }}</q-item-label
-                >
-                <q-item-label v-if="!searchObj.data.transformType">{{
-                  t("search.selectTransformType")
-                }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </div>
-        </q-list>
-      </q-btn-dropdown>
-    </div>
-    <q-btn
-      data-test="logs-search-bar-save-transform-btn"
-      class=" save-transform-btn q-px-sm"
-      icon="save"
-      :disable="searchObj.data.transformType !== 'function'"
-      @click="fnSavedFunctionDialog"
-
+    <!-- Trigger button — opens rich panel -->
+    <button
+      class="fn-trigger tw:inline-flex tw:items-center tw:gap-1 tw:px-2 tw:h-full tw:text-[11px] tw:font-medium tw:cursor-pointer tw:bg-transparent tw:border-none tw:outline-none tw:min-w-0 tw:max-w-[140px]"
+      data-test="logs-search-bar-function-dropdown"
     >
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
-        {{
-          searchObj.data.transformType === "action"
-            ? t("search.saveActionDisabled")
-            : t("common.save")
-        }}
+      <img :src="transformIconImg" class="tw:size-3.5 tw:shrink-0 tw:opacity-80" alt="transform" />
+      <span class="tw:truncate tw:max-w-[90px]">{{ transformsLabel }}</span>
+      <ChevronDown class="tw:size-3 tw:shrink-0 tw:opacity-40" />
+      <q-tooltip class="tw:text-[12px]">{{ transformsLabel }}</q-tooltip>
+
+      <!-- Rich dropdown panel -->
+      <q-menu
+        anchor="bottom left"
+        self="top left"
+        class="fn-dropdown-panel"
+        :offset="[0, 4]"
+        style="min-width: 500px; border-radius: 8px; overflow: hidden"
+      >
+        <div class="tw:flex" style="min-height: 260px">
+
+          <!-- Left: info column -->
+          <div
+            class="fn-panel-info tw:flex tw:flex-col tw:gap-3 tw:p-4 tw:shrink-0"
+            style="width: 160px; border-right: 1px solid var(--o2-border-color)"
+          >
+            <div>
+              <div class="tw:font-semibold tw:text-[12px] tw:mb-1.5">
+                {{ t('search.functionLabel') }}
+              </div>
+              <div class="tw:text-[11px] tw:leading-relaxed fn-panel-desc">
+                Use <strong class="tw:font-semibold" style="opacity: 0.9">Vector Remap Language (VRL)</strong> to parse, transform, and enrich your data before it's queried.
+              </div>
+              <div class="tw:flex tw:flex-col tw:gap-1.5 tw:mt-2">
+                <a
+                  href="https://vector.dev/docs/reference/vrl/examples/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="fn-panel-doc-link tw:inline-flex tw:items-center tw:gap-1 tw:text-[11px] tw:font-medium tw:px-2.5 tw:py-1 tw:rounded-[4px] tw:whitespace-nowrap fn-panel-doc-link--primary"
+                >
+                  VRL examples
+                  <svg xmlns="http://www.w3.org/2000/svg" class="tw:size-3 tw:shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                </a>
+                <a
+                  href="https://openobserve.ai/docs/user-guide/data-processing/functions/functions-in-openobserve/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="fn-panel-doc-link tw:inline-flex tw:items-center tw:gap-1 tw:text-[11px] tw:font-medium tw:px-2.5 tw:py-1 tw:rounded-[4px] tw:whitespace-nowrap"
+                >
+                  Functions docs
+                  <svg xmlns="http://www.w3.org/2000/svg" class="tw:size-3 tw:shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                </a>
+                <a
+                  href="https://openobserve.ai/docs/user-guide/data-processing/pipelines/pipelines/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="fn-panel-doc-link tw:inline-flex tw:items-center tw:gap-1 tw:text-[11px] tw:font-medium tw:px-2.5 tw:py-1 tw:rounded-[4px] tw:whitespace-nowrap"
+                >
+                  Pipelines docs
+                  <svg xmlns="http://www.w3.org/2000/svg" class="tw:size-3 tw:shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                </a>
+              </div>
+            </div>
+
+            <!-- Editor toggle inside panel too -->
+            <div class="tw:flex tw:items-center tw:gap-2 tw:mt-auto tw:pb-1">
+              <q-toggle
+                v-model="searchObj.meta.showTransformEditor"
+                size="xs"
+                class="o2-toggle-button-xs"
+                :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
+                @click.stop
+              />
+              <span class="tw:text-[11px] fn-panel-desc">Show editor</span>
+            </div>
+          </div>
+
+          <!-- Right: transform list -->
+          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+
+            <!-- Search -->
+            <div style="border-bottom: 1px solid var(--o2-border-color); padding: 6px 8px">
+              <q-input
+                v-model="searchTerm"
+                dense
+                filled
+                borderless
+                clearable
+                debounce="300"
+                :placeholder="t('search.searchSavedFunction')"
+                data-test="function-search-input"
+                style="font-size: 11px"
+                @click.stop
+              >
+                <template #prepend>
+                  <q-icon name="search" size="14px" />
+                </template>
+              </q-input>
+            </div>
+
+            <!-- Transform list -->
+            <div
+              class="fn-list tw:flex-1 tw:overflow-y-auto"
+              style="max-height: 195px"
+              data-test="logs-search-saved-function-list"
+            >
+              <template v-if="filteredTransformOptions.length">
+                <div
+                  v-for="item in filteredTransformOptions"
+                  :key="item.name"
+                  v-close-popup
+                  class="fn-list-item tw:flex tw:items-center tw:px-3 tw:py-2 tw:cursor-pointer tw:text-[12px]"
+                  @click.stop="selectTransform(item, true)"
+                >
+                  <span class="tw:flex-1 tw:truncate">{{ item.name }}</span>
+                </div>
+              </template>
+              <div v-else class="tw:px-3 tw:py-6 tw:text-[11px] tw:text-center fn-panel-desc">
+                {{ t("search.savedFunctionNotFound") }}
+              </div>
+            </div>
+
+            <!-- Footer: Save (only for functions) -->
+            <div style="border-top: 1px solid var(--o2-border-color); padding: 6px 8px">
+              <button
+                data-test="logs-search-bar-save-transform-btn"
+                class="fn-save-btn tw:flex tw:items-center tw:gap-1.5 tw:w-full tw:px-2.5 tw:py-1.5 tw:text-[11px] tw:font-medium tw:rounded-[5px] tw:cursor-pointer tw:transition-colors"
+                @click.stop="fnSavedFunctionDialog"
+              >
+                <q-icon name="save" size="13px" />
+                {{ t('common.save') }} {{ t('search.functionLabel').toLowerCase() }}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </q-menu>
+    </button>
+
+    <!-- Inline save button — visible when editor is open -->
+    <button
+      v-if="searchObj.meta.showTransformEditor"
+      data-test="logs-search-bar-save-transform-btn-inline"
+      class="fn-save-inline tw:inline-flex tw:items-center tw:justify-center tw:h-full tw:px-2 tw:cursor-pointer tw:bg-transparent tw:border-none tw:outline-none"
+      style="border-left: 1px solid var(--o2-border-color)"
+      :title="t('common.save')"
+      @click="fnSavedFunctionDialog"
+    >
+      <q-icon name="save" size="14px" />
+      <q-tooltip class="tw:text-[12px]" :offset="[0, 4]">
+        {{ t('common.save') }} {{ t('search.functionLabel').toLowerCase() }}
       </q-tooltip>
-    </q-btn>
-  </q-btn-group>
+    </button>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
-import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
+import { ChevronDown } from "lucide-vue-next";
 
 const props = defineProps<{
   functionOptions: { name: string; function: string }[];
@@ -170,166 +215,115 @@ const { t } = useI18n();
 
 const { searchObj } = searchState();
 
-const { isActionsEnabled } = logsUtils();
-
 const store = useStore();
-
-const functionModel = ref(false);
-
-const $q = useQuasar();
-
-const transformTypes = computed(() => {
-  return [
-    { label: "Function", value: "function" },
-    { label: "Action", value: "action" },
-  ];
-});
 
 const searchTerm = ref("");
 
-const filteredFunctionOptions = computed(() => {
-  if (searchObj.data.transformType !== "function") return [];
+const filteredTransformOptions = computed(() => {
   if (!searchTerm.value) return props.functionOptions;
   return props.functionOptions.filter((item) =>
     item.name.toLowerCase().includes(searchTerm.value.toLowerCase()),
   );
 });
 
-const filteredActionOptions = computed(() => {
-  if (searchObj.data.transformType !== "action") return [];
-  if (!searchTerm.value) return searchObj.data.actions;
-  return searchObj.data.actions.filter((item: { name: string }) =>
-    item.name.toLowerCase().includes(searchTerm.value.toLowerCase()),
-  );
-});
+const transformIconImg = computed(() =>
+  getImageURL(
+    store.state.theme === "dark"
+      ? "images/common/function_dark.svg"
+      : "images/common/function.svg",
+  ),
+);
 
-const filteredTransformOptions = computed(() => {
-  if (!searchObj.data.transformType) return [];
-
-  if (searchObj.data.transformType === "action")
-    return filteredActionOptions.value;
-
-  if (searchObj.data.transformType === "function")
-    return filteredFunctionOptions.value;
-
-  return [];
-});
-
-const functionToggleIcon = computed(() => {
-  return (
-    "img:" +
-    getImageURL(
-      searchObj.meta.toggleFunction
-        ? "images/common/function_dark.svg"
-        : "images/common/function.svg",
-    )
-  );
-});
-
-const iconRight = computed(() => {
-  return (
-    "img:" +
-    getImageURL(
-      store.state.theme === "dark"
-        ? "images/common/function_dark.svg"
-        : "images/common/function.svg",
-    )
-  );
-});
-
-const transformsLabel = computed(() => {
-  if (
-    searchObj.data.selectedTransform?.type === searchObj.data.transformType &&
-    searchObj.data.transformType
-  ) {
-    return searchObj.data.selectedTransform.name;
-  }
-
-  if (!isActionsEnabled.value) return t("search.functionLabel");
-
-  return searchObj.data.transformType === "action"
-    ? t("search.actionLabel")
-    : searchObj.data.transformType === "function"
-      ? t("search.functionLabel")
-      : t("search.transformLabel");
-});
-
-const transformIcon = computed(() => {
-  if (!isActionsEnabled.value)
-    return "img:" + getImageURL("images/common/function.svg");
-
-  if (searchObj.data.transformType === "function")
-    return "img:" + getImageURL("images/common/function.svg");
-
-  if (searchObj.data.transformType === "action") return "code";
-
-  if (!searchObj.data.transformType)
-    return "img:" + getImageURL("images/common/transform.svg");
-});
-
-const updateTransforms = () => {
-  updateEditorWidth();
-};
-
-const updateEditorWidth = () => {
-  if (searchObj.data.transformType) {
-    if (searchObj.meta.showTransformEditor) {
-      searchObj.config.fnSplitterModel = 60;
-    } else {
-      searchObj.config.fnSplitterModel = 99.5;
-    }
-  } else {
-    searchObj.config.fnSplitterModel = 99.5;
-  }
-};
+const transformsLabel = computed(() => t("search.functionLabel"));
 
 const selectTransform = (item: any, isSelected: boolean) => {
-  if (searchObj.data.transformType === "function") {
-    emit("select:function", item, isSelected);
+  emit("select:function", item, isSelected);
+  if (typeof item === "object") {
+    searchObj.data.selectedTransform = { ...item, type: "function" };
   }
-
-  // If action is selected notify the user
-  if (searchObj.data.transformType === "action") {
-    updateActionSelection(item);
-  }
-
-  if (typeof item === "object")
-    searchObj.data.selectedTransform = {
-      ...item,
-      type: searchObj.data.transformType,
-    };
-};
-
-const updateActionSelection = (item: any) => {
-  $q.notify({
-    message: `${item?.name} action applied successfully`,
-    timeout: 3000,
-    color: "secondary",
-  });
 };
 
 const fnSavedFunctionDialog = () => {
   emit("save:function");
 };
 
-const getTransformLabelTooltip = computed(() => {
-  if (!isActionsEnabled.value) return t("search.toggleFunctionEditor");
-
-  const editorType = searchObj.data.transformType === "action"
-    ? t("search.actionLabel")
-    : searchObj.data.transformType === "function"
-      ? t("search.functionLabel")
-      : t("search.transformLabel");
-
-  return searchObj.meta.showTransformEditor
-    ? t("search.hide")
-    : `${t("search.show")} ${editorType} ${t("search.editor")}`;
-});
+const getTransformLabelTooltip = computed(() =>
+  t("search.toggleFunctionEditor"),
+);
 </script>
 
 <style scoped lang="scss">
-@import '@/styles/logs/transform-selector.scss';
-.save-transform-btn{
-  border-left: 1px solid var(--o2-border-color);
+.fn-trigger {
+  color: var(--o2-tab-text-color, #374151);
+  &:hover {
+    background-color: var(--o2-hover-accent, rgba(0, 0, 0, 0.04));
+    border-radius: 4px;
+  }
+}
+
+.fn-toggle-section:hover {
+  background-color: var(--o2-hover-accent, rgba(0, 0, 0, 0.04));
+}
+
+.fn-panel-desc {
+  color: var(--o2-tab-text-color, #374151);
+  opacity: 0.6;
+}
+
+.fn-panel-doc-link {
+  text-decoration: none;
+  border: 1px solid var(--o2-border-color);
+  color: var(--o2-tab-text-color, #374151);
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background-color: var(--o2-hover-accent, rgba(0, 0, 0, 0.04));
+  }
+
+  &--primary {
+    background-color: var(--o2-primary-btn-bg, var(--q-primary));
+    color: var(--o2-primary-btn-text, #fff);
+    border-color: transparent;
+
+    &:hover {
+      opacity: 0.88;
+      background-color: var(--o2-primary-btn-bg, var(--q-primary));
+    }
+  }
+}
+
+.fn-list-item {
+  color: var(--o2-tab-text-color, #374151);
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid var(--o2-border-color);
+
+  &:hover {
+    background-color: var(--o2-hover-accent, rgba(0, 0, 0, 0.04));
+  }
+}
+
+.fn-save-btn {
+  background: transparent;
+  border: 1px solid var(--o2-border-color);
+  color: var(--o2-tab-text-color, #374151);
+
+  &:hover:not(:disabled) {
+    background-color: var(--o2-hover-accent, rgba(0, 0, 0, 0.04));
+  }
+}
+
+.fn-save-inline {
+  color: var(--o2-tab-text-color, #374151);
+  border-radius: 0 5px 5px 0;
+
+  &:hover {
+    background-color: var(--o2-hover-accent, rgba(0, 0, 0, 0.04));
+  }
+}
+
+// Dark theme panel background
+.dark-theme .fn-dropdown-panel,
+.body--dark .fn-dropdown-panel {
+  background-color: var(--o2-card-background);
 }
 </style>

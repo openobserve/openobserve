@@ -101,10 +101,14 @@
 .logs-search-bar-component {
   padding-bottom: 0.0625rem; // 1px
   height: 100%;
-  overflow: visible;
+  overflow: auto;
 
-  // Align all top bar elements vertically
+  // Toolbar row — always pinned at top; query editor scrolls away when panel shrinks
   > .row:first-child {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: inherit;
     align-items: center;
     padding: 0.25rem 0;
 
@@ -453,6 +457,35 @@
         font-size: 16px;
       }
     }
+  }
+
+  // Transform selector (q-btn-group) — neutralise Quasar shadow + clean border
+  .transform-selector {
+    box-shadow: none !important;
+    background: transparent;
+    border: 1px solid var(--o2-border-color) !important;
+    color: var(--o2-tab-text-color, #374151);
+    font-size: 0.6875rem;
+
+    .q-btn, .q-toggle {
+      color: inherit;
+    }
+
+    &:hover {
+      background-color: var(--o2-hover-accent, rgba(0,0,0,0.04));
+    }
+
+    // Internal divider between toggle and dropdown
+    > div[style*="border-right"] {
+      border-right-color: var(--o2-border-color) !important;
+    }
+  }
+
+  // Function selector (custom div) — panel background for dark mode
+  .fn-dropdown-panel {
+    background-color: var(--o2-card-background, #fff);
+    border: 1px solid var(--o2-border-color);
+    border-radius: 8px;
   }
 
   .q-pagination__middle > .q-btn {

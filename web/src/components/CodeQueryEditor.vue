@@ -22,6 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="editorRef"
       :id="editorId"
     />
+    <!-- Empty-state placeholder shown when editor is empty and unfocused -->
+    <div
+      v-if="placeholder && !query?.trim() && !isFocused"
+      class="query-editor-placeholder"
+      aria-hidden="true"
+    >
+      {{ placeholder }}
+    </div>
     <!-- AI Icon Button -->
     <q-btn
       v-if="showAiIcon && !disableAi"
@@ -140,6 +148,10 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    placeholder: {
+      type: String,
+      default: "",
+    },
   },
   emits: [
     "update-query",
@@ -160,6 +172,7 @@ export default defineComponent({
     const editorRef: any = ref();
     // editor object is used to interact with the monaco editor instance
     let editorObj: any = null;
+    const isFocused = ref(false);
     const { searchObj } = searchState();
     const {
       detectNaturalLanguage,
@@ -659,7 +672,7 @@ export default defineComponent({
         folding: enableCodeFolding.value,
         wordWrap: "on",
         automaticLayout: true,
-        lineNumbers: "on",
+        lineNumbers: (props.query?.trim() ?? '').includes('\n') ? 'on' : 'off',
         lineNumbersMinChars: 0,
         overviewRulerLanes: 0,
         fixedOverflowWidgets: true,
@@ -684,9 +697,15 @@ export default defineComponent({
         renderValidationDecorations: "on",
       });
 
+      const syncLineNumbers = () => {
+        const lines = editorObj?.getModel()?.getLineCount() ?? 1;
+        editorObj?.updateOptions({ lineNumbers: lines > 1 ? 'on' : 'off' });
+      };
+
       editorObj.onDidChangeModelContent(
         debounce((e: any) => {
           const newValue = editorObj?.getValue()?.trim();
+          syncLineNumbers();
           emit("update-query", newValue, e);
           emit("update:query", newValue, e);
 
@@ -705,6 +724,7 @@ export default defineComponent({
         "ctrlenter",
       );
       editorObj.onDidFocusEditorWidget(() => {
+        isFocused.value = true;
         emit("focus");
 
         // added hack to handle case where ctrl+enter / cmd+enter stops working after
@@ -721,6 +741,7 @@ export default defineComponent({
       });
 
       editorObj.onDidBlurEditorWidget(() => {
+        isFocused.value = false;
         const model = editorObj?.getModel();
         const value = model?.getValue();
         const trimmedValue = value?.trim();
@@ -1104,6 +1125,7 @@ export default defineComponent({
       t,
       aiIcon,
       toggleNlpMode,
+      isFocused,
     };
   },
 });
@@ -1125,6 +1147,27 @@ export default defineComponent({
 }
 
 /* AI Icon Button Styling */
+/* Empty-state placeholder overlay */
+.query-editor-placeholder {
+  position: absolute;
+  top: 3px;
+  /* Monaco's line-numbers gutter is ~26px wide; 26px + 8px content padding = 34px */
+  left: 34px;
+  pointer-events: none;
+  user-select: none;
+  color: #9ca3af;
+  font-size: 13px;
+  font-family: "Menlo", "Monaco", "Courier New", monospace;
+  line-height: 1.5;
+  white-space: pre;
+  z-index: 1;
+}
+
+.body--dark .query-editor-placeholder,
+.dark-theme .query-editor-placeholder {
+  color: #4b5563;
+}
+
 .ai-icon-button {
   position: absolute;
   top: 8px;

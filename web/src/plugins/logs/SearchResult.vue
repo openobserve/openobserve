@@ -386,6 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @send-to-ai-chat="sendToAiChat"
           @view-trace="redirectToTraces"
           @show-correlation="openLogDetailsWithCorrelation"
+          @scroll-direction="$emit('scroll-direction', $event)"
         />
       </template>
 
@@ -591,6 +592,7 @@ export default defineComponent({
     "update:columnSizes",
     "sendToAiChat",
     "run-query",
+    "scroll-direction",
   ],
   props: {
     expandedLogs: {

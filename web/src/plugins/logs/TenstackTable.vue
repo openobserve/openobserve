@@ -516,6 +516,7 @@ const emits = defineEmits([
   "view-trace",
   "sendToAiChat",
   "show-correlation",
+  "scroll-direction",
 ]);
 
 const sorting = ref<SortingState>([]);
@@ -693,9 +694,37 @@ watch(columnSizeVars, (newColSizes) => {
 
 onMounted(() => {
   setExpandedRows();
+
+  // Emit scroll direction so parent can collapse/expand the query editor
+  // Use rAF throttle so we fire at most once per paint frame, preventing layout thrashing
+  let _lastST = 0;
+  let _isCollapsed = false;
+  let _rafPending = false;
+  const _onScroll = () => {
+    if (_rafPending) return;
+    _rafPending = true;
+    requestAnimationFrame(() => {
+      _rafPending = false;
+      const st = parentRef.value?.scrollTop ?? 0;
+      const delta = st - _lastST;
+      _lastST = st;
+      if (delta > 4 && !_isCollapsed) {
+        _isCollapsed = true;
+        emits("scroll-direction", "down");
+      } else if (delta < -4 && _isCollapsed) {
+        _isCollapsed = false;
+        emits("scroll-direction", "up");
+      }
+    });
+  };
+  parentRef.value?.addEventListener("scroll", _onScroll, { passive: true });
+  (parentRef.value as any).__o2dir = _onScroll;
 });
 
 onBeforeUnmount(() => {
+  if (parentRef.value && (parentRef.value as any).__o2dir) {
+    parentRef.value.removeEventListener("scroll", (parentRef.value as any).__o2dir);
+  }
   tableRows.value.length = 0;
   tableRows.value = [];
   tableBodyRef.value = null;

@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="searchBarRef"
               class="card-container"
               :fieldValues="fieldValues"
+              :editorCollapsed="isEditorCollapsed"
               @searchdata="searchData"
               @onChangeInterval="onChangeInterval"
               @onChangeTimezone="refreshTimezone"
@@ -48,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @extractPatterns="extractPatternsForCurrentQuery"
               @buildModeToggle="onBuildModeToggle"
               @sendToAiChat="sendToAiChat"
+              @toggle-editor="toggleEditor"
             />
           </div>
         </template>
@@ -290,6 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @expandlog="toggleExpandLog"
                         @send-to-ai-chat="sendToAiChat"
                         @run-query="searchData"
+                        @scroll-direction="onLogsScrollDirection"
                       />
                     </div>
                     <div class="text-center col-10 q-ma-none">
@@ -718,6 +721,31 @@ export default defineComponent({
 
     const expandedLogs = ref([]);
     const splitterModel = ref(15);
+    const _splitterBeforeScroll = ref(15);
+    const isEditorCollapsed = ref(false);
+
+    const onLogsScrollDirection = (direction: "up" | "down") => {
+      if (direction === "down" && !isEditorCollapsed.value) {
+        _splitterBeforeScroll.value = splitterModel.value;
+        splitterModel.value = 0;
+        isEditorCollapsed.value = true;
+      } else if (direction === "up" && isEditorCollapsed.value) {
+        splitterModel.value = _splitterBeforeScroll.value;
+        isEditorCollapsed.value = false;
+      }
+    };
+
+    const toggleEditor = () => {
+      if (isEditorCollapsed.value) {
+        splitterModel.value = _splitterBeforeScroll.value || 15;
+        isEditorCollapsed.value = false;
+      } else {
+        _splitterBeforeScroll.value = splitterModel.value;
+        splitterModel.value = 0;
+        isEditorCollapsed.value = true;
+      }
+    };
+
     const chartRedrawTimeout = ref(null);
     const updateColumnsTimeout = ref(null);
 
@@ -798,6 +826,7 @@ export default defineComponent({
 
       registerAiContextHandler();
       setupContextProvider();
+
     });
 
     onBeforeUnmount(async () => {
@@ -3055,6 +3084,9 @@ export default defineComponent({
       searchObj,
       searchBarRef,
       splitterModel,
+      isEditorCollapsed,
+      onLogsScrollDirection,
+      toggleEditor,
       // loadPageData,
       getQueryData,
       getJobData,
@@ -3389,7 +3421,15 @@ export default defineComponent({
 
   .logs-horizontal-splitter .q-splitter__before {
     z-index: auto;
-    overflow: visible;
+    overflow: hidden;
+    min-height: 42px !important;
+    will-change: flex-basis;
+    transition: flex-basis 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+
+  .logs-horizontal-splitter .q-splitter__after {
+    will-change: flex-basis;
+    transition: flex-basis 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
   }
 
   // .search-result-container {

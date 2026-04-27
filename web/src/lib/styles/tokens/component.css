@@ -41,4 +41,13 @@
   --color-button-destructive-hover:    var(--color-error-700);
   --color-button-destructive-disabled: var(--color-error-300);
   --color-button-destructive-foreground: var(--color-white);
+
+  /* ---- ToggleGroup ----------------------------------------------- */
+  --color-toggle-group-bg:              var(--color-grey-100);
+  --color-toggle-group-border:          var(--color-grey-200);
+  --color-toggle-group-item-active-bg:  var(--color-white);
+  --color-toggle-group-item-active-text: var(--color-grey-900);
+  --color-toggle-group-item-text:       var(--color-grey-700);
+  --color-toggle-group-item-hover-text: var(--color-grey-700);
+  --color-toggle-group-item-disabled-text: var(--color-grey-300);
 }

@@ -20,440 +20,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="row tw:m-0! tw:p-[0.375rem]! tw:items-start!">
-      <div class="float-right col flex tw:flex-wrap tw:items-center tw:gap-y-1">
-        <div class="button-group logs-visualize-toggle element-box-shadow">
-          <div class="row">
-            <div>
-              <q-btn
-                data-test="logs-logs-toggle"
-                :class="
-                  searchObj.meta.logsVisualizeToggle === 'logs'
-                    ? 'selected'
-                    : ''
-                "
-                @click="onLogsVisualizeToggleUpdate('logs')"
-                no-caps
-                size="sm"
-                icon="search"
-                class="button button-left tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-r-none! q-px-sm btn-height-32"
-              >
-                <q-tooltip>
-                  {{ t("common.search") }}
-                </q-tooltip>
-              </q-btn>
-            </div>
-            <div>
-              <q-btn
-                data-test="logs-visualize-toggle"
-                :class="[
-                  searchObj.meta.logsVisualizeToggle === 'visualize'
-                    ? 'selected'
-                    : '',
-                  'button button-center tw:rounded-none',
-                  'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32',
-                ]"
-                @click="onLogsVisualizeToggleUpdate('visualize')"
-                :disable="isVisualizeDisabled"
-                no-caps
-                size="sm"
-                :icon="outlinedShowChart"
-              >
-                <q-tooltip v-if="isVisualizeDisabled">
-                  {{ t("search.enableSqlModeOrSelectSingleStream") }}
-                </q-tooltip>
-                <q-tooltip v-else>
-                  {{ t("search.visualize") }}
-                </q-tooltip>
-              </q-btn>
-            </div>
-            <div>
-              <!-- DEBUG: Build button should render here -->
-              <q-btn
-                data-test="logs-build-toggle"
-                :class="[
-                  searchObj.meta.logsVisualizeToggle === 'build'
-                    ? 'selected'
-                    : '',
-                  config.isEnterprise == 'true'
-                    ? 'button button-center tw:rounded-none'
-                    : 'button button-right tw:rounded-l-none!',
-                  'tw:flex tw:justify-center tw:items-center no-border no-outline q-px-sm btn-height-32',
-                ]"
-                @click="onLogsVisualizeToggleUpdate('build')"
-                no-caps
-                size="sm"
-                icon="construction"
-              >
-                <q-tooltip>
-                  {{ t("search.buildQuery") }}
-                </q-tooltip>
-              </q-btn>
-            </div>
-            <div v-if="config.isEnterprise == 'true'">
-              <q-btn
-                data-test="logs-patterns-toggle"
-                :class="
-                  searchObj.meta.logsVisualizeToggle === 'patterns'
-                    ? 'selected'
-                    : ''
-                "
-                class="button button-right tw:flex tw:justify-center tw:items-center no-border no-outline tw:rounded-l-none! q-px-sm btn-height-32"
-                @click="onLogsVisualizeToggleUpdate('patterns')"
-                no-caps
-                size="sm"
-                icon="pattern"
-              >
-                <q-tooltip>
-                  {{ t("search.showPatternsLabel") }}
-                </q-tooltip>
-              </q-btn>
-            </div>
-          </div>
-        </div>
-        <div
-          v-if="!shouldMoveSqlToggleToMenu"
-          class="toolbar-toggle-container element-box-shadow"
+    <div class="row tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:flex-nowrap! tw:overflow-hidden">
+      <div class="float-right col flex tw:flex-wrap tw:items-center tw:gap-1">
+        <!-- View Mode Toggle Group -->
+        <ToggleGroup
+          :label="t('common.search')"
+          :model-value="searchObj.meta.logsVisualizeToggle"
+          @update:model-value="onLogsVisualizeToggleUpdate($event)"
         >
-          <q-toggle
-            data-test="logs-search-bar-show-histogram-toggle-btn"
-            v-model="searchObj.meta.showHistogram"
-            class="o2-toggle-button-xs"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
-          >
-            <q-icon name="bar_chart" size="14px" />
-            <q-tooltip>{{ t("search.showHistogramLabel") }}</q-tooltip>
-          </q-toggle>
-        </div>
-        <div
-          v-if="!shouldMoveSqlToggleToMenu"
-          class="toolbar-toggle-container element-box-shadow"
-        >
-          <q-toggle
-            data-test="logs-search-bar-sql-mode-toggle-btn"
-            v-model="searchObj.meta.sqlMode"
-            :disable="isSqlModeDisabled"
-            class="o2-toggle-button-xs"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
-          >
-            <img :src="sqlIcon" alt="SQL Mode" class="toolbar-icon" />
-            <q-tooltip v-if="isSqlModeDisabled">
-              {{ t("search.sqlModeDisabledForVisualization") }}
-            </q-tooltip>
-            <q-tooltip v-else>
-              {{ t("search.sqlModeLabel") }}
-            </q-tooltip>
-          </q-toggle>
-        </div>
-        <q-btn-group
-          v-if="!shouldMoveSavedViewToMenu"
-          class="q-ml-xs q-pa-none element-box-shadow el-border"
-        >
-          <q-btn-dropdown
-            data-test="logs-search-saved-views-btn"
-            v-model="savedViewDropdownModel"
-            @click="fnSavedView"
-            @show="loadSavedView"
-            split
-            icon="save"
-            icon-right="saved_search"
-            class="saved-views-dropdown no-border"
-            content-class="saved-views-dropdown-menu"
-          >
-            <q-list
-              :style="
-                localSavedViews.length > 0 ? 'width: 500px' : 'width: 250px'
-              "
-              data-test="logs-search-saved-view-list"
-            >
-              <q-item style="padding: 0px 0px 0px 0px">
-                <q-item-section
-                  class="column"
-                  no-hover
-                  style="width: 60%; border-right: 1px solid lightgray"
-                >
-                  <q-table
-                    data-test="log-search-saved-view-list-fields-table"
-                    :visible-columns="['view_name']"
-                    :rows="searchObj.data.savedViews"
-                    :row-key="(row) => 'saved_view_' + row.view_id"
-                    :filter="searchObj.data.savedViewFilterFields"
-                    :filter-method="filterSavedViewFn"
-                    :pagination="{ rowsPerPage }"
-                    hide-header
-                    :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-                    class="saved-view-table full-height"
-                    no-hover
-                    id="savedViewList"
-                    :rows-per-page-options="[]"
-                    :hide-bottom="
-                      searchObj.data.savedViews.length <= rowsPerPage ||
-                      searchObj.data.savedViews.length == 0
-                    "
-                  >
-                    <template #top-right>
-                      <div class="full-width">
-                        <q-input
-                          data-test="log-search-saved-view-field-search-input"
-                          v-model="searchObj.data.savedViewFilterFields"
-                          data-cy="index-field-search-input"
-                          borderless
-                          dense
-                          clearable
-                          debounce="1"
-                          class="tw:mx-2 tw:my-2"
-                          :placeholder="t('search.searchSavedView')"
-                        >
-                          <template #prepend>
-                            <q-icon name="search" />
-                          </template>
-                        </q-input>
-                      </div>
-                      <div
-                        v-if="searchObj.loadingSavedView == true"
-                        class="full-width float-left"
-                      >
-                        <div class="text-subtitle2 text-weight-bold float-left">
-                          <q-spinner-hourglass size="20px" />
-                          {{ t("confirmDialog.loading") }}
-                        </div>
-                      </div>
-                      <q-tr>
-                        <q-td
-                          v-if="
-                            searchObj.data.savedViews.length == 0 &&
-                            searchObj.loadingSavedView == false
-                          "
-                        >
-                          <q-item-label class="q-pl-sm q-pt-sm">{{
-                            t("search.savedViewsNotFound")
-                          }}</q-item-label>
-                        </q-td>
-                      </q-tr>
-                    </template>
-                    <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props" class="field_list" no-hover>
-                        <q-item
-                          class="q-pa-xs saved-view-item"
-                          clickable
-                          v-close-popup
-                        >
-                          <q-item-section
-                            @click.stop="applySavedView(props.row)"
-                            v-close-popup
-                            :title="props.row.view_name"
-                          >
-                            <q-item-label
-                              class="ellipsis"
-                              style="max-width: 140px"
-                              >{{ props.row.view_name }}</q-item-label
-                            >
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
-                            side
-                            @click.stop="
-                              handleFavoriteSavedView(
-                                props.row,
-                                favoriteViews.includes(props.row.view_id),
-                              )
-                            "
-                          >
-                            <q-btn
-                              :icon="
-                                favoriteViews.includes(props.row.view_id)
-                                  ? 'favorite'
-                                  : 'favorite_border'
-                              "
-                              :title="t('common.favourite')"
-                              class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-update-${props.row.view_name}-saved-view-btn`"
-                            side
-                            @click.stop="handleUpdateSavedView(props.row)"
-                          >
-                            <q-btn
-                              icon="edit"
-                              :title="t('common.edit')"
-                              class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
-                            side
-                            @click.stop="handleDeleteSavedView(props.row)"
-                          >
-                            <q-btn
-                              icon="delete"
-                              :title="t('common.delete')"
-                              class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
-                          </q-item-section>
-                        </q-item>
-                      </q-td>
-                    </template>
-                  </q-table>
-                </q-item-section>
+          <ToggleGroupItem data-test="logs-logs-toggle" value="logs">
+            <ScanSearch class="tw:size-3.5 tw:shrink-0" />
+            {{ t("common.search") }}
+          </ToggleGroupItem>
 
-                <q-item-section
-                  class="column"
-                  style="width: 40%; margin-left: 0px"
-                  v-if="localSavedViews.length > 0"
-                >
-                  <q-table
-                    data-test="log-search-saved-view-favorite-list-fields-table"
-                    :visible-columns="['view_name']"
-                    :rows="localSavedViews"
-                    :row-key="(row) => 'favorite_saved_view_' + row.view_name"
-                    hide-header
-                    hide-bottom
-                    :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-                    class="saved-view-table full-height"
-                    id="savedViewFavoriteList"
-                    :rows-per-page-options="[0]"
-                  >
-                    <template #top-right>
-                      <q-item style="padding: 0px">
-                        <q-item-label
-                          header
-                          class="q-pa-sm text-bold favorite-label"
-                          >{{ t("search.favoriteViews") }}</q-item-label
-                        >
-                      </q-item>
-                      <q-separator horizontal inset></q-separator>
-                    </template>
-                    <template v-slot:body-cell-view_name="props">
-                      <q-td :props="props" class="field_list q-pa-xs">
-                        <q-item
-                          class="q-pa-xs saved-view-item"
-                          clickable
-                          v-close-popup
-                        >
-                          <q-item-section
-                            @click.stop="applySavedView(props.row)"
-                            v-close-popup
-                          >
-                            <q-item-label
-                              class="ellipsis"
-                              style="max-width: 90px"
-                              >{{ props.row.view_name }}</q-item-label
-                            >
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
-                            side
-                            @click.stop="
-                              handleFavoriteSavedView(
-                                props.row,
-                                favoriteViews.includes(props.row.view_id),
-                              )
-                            "
-                          >
-                            <q-icon
-                              :name="
-                                favoriteViews.includes(props.row.view_id)
-                                  ? 'favorite'
-                                  : 'favorite_border'
-                              "
-                              color="grey"
-                              size="xs"
-                            />
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-update-${props.row.view_name}-favorite-saved-view-btn`"
-                            side
-                            @click.stop="handleUpdateSavedView(props.row)"
-                          >
-                            <q-btn
-                              icon="edit"
-                              :title="t('common.edit')"
-                              class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
-                          </q-item-section>
-                          <q-item-section
-                            :data-test="`logs-search-bar-delete-${props.row.view_name}-favorite-saved-view-btn`"
-                            side
-                            @click.stop="handleDeleteSavedView(props.row)"
-                          >
-                            <q-btn
-                              icon="delete"
-                              :title="t('common.delete')"
-                              class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
-                          </q-item-section>
-                        </q-item>
-                      </q-td>
-                    </template>
-                  </q-table>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-btn-dropdown>
-          <q-tooltip>
-            {{ t("search.savedViewsLabel") }}
-          </q-tooltip>
-        </q-btn-group>
-        <!-- reset filters button - directly on toolbar (hidden when moved to menu) -->
-        <q-btn
-          v-if="!shouldMoveSavedViewToMenu"
-          data-test="logs-search-bar-reset-filters-btn"
-          class="group-menu-btn element-box-shadow q-ml-xs"
-          no-caps
-          flat
-          icon="restart_alt"
-          @click="resetFilters"
+          <ToggleGroupItem
+            data-test="logs-visualize-toggle"
+            :disabled="isVisualizeDisabled"
+            value="visualize"
+          >
+            <ChartLine class="tw:size-3.5 tw:shrink-0" />
+            {{ t("search.visualize") }}
+            <q-tooltip v-if="isVisualizeDisabled">
+              {{ t("search.enableSqlModeOrSelectSingleStream") }}
+            </q-tooltip>
+          </ToggleGroupItem>
+
+          <ToggleGroupItem data-test="logs-build-toggle" value="build">
+            <Wrench class="tw:size-3.5 tw:shrink-0" />
+            {{ t("search.buildQuery") }}
+          </ToggleGroupItem>
+
+          <ToggleGroupItem
+            v-if="config.isEnterprise == 'true'"
+            data-test="logs-patterns-toggle"
+            value="patterns"
+          >
+            <Layers class="tw:size-3.5 tw:shrink-0" />
+            {{ t("search.showPatternsLabel") }}
+          </ToggleGroupItem>
+        </ToggleGroup>
+
+        <!-- Histogram toggle -->
+        <ToolbarSwitch
+          v-if="!shouldMoveSqlToggleToMenu"
+          data-test="logs-search-bar-show-histogram-toggle-btn"
+          :checked="searchObj.meta.showHistogram"
+          @update:checked="searchObj.meta.showHistogram = $event"
         >
-          <q-tooltip>{{ t("search.resetFilters") }}</q-tooltip>
-        </q-btn>
-        <!-- this is the button group responsible for showing all the utilities -->
+          <ChartNoAxesColumn class="tw:size-3.5 tw:shrink-0" />
+          {{ t("search.showHistogramLabel") }}
+        </ToolbarSwitch>
+
+        <!-- SQL Mode toggle -->
+        <ToolbarSwitch
+          v-if="!shouldMoveSqlToggleToMenu"
+          data-test="logs-search-bar-sql-mode-toggle-btn"
+          :checked="searchObj.meta.sqlMode"
+          :disabled="isSqlModeDisabled"
+          @update:checked="searchObj.meta.sqlMode = $event"
+        >
+          <Database class="tw:size-3.5 tw:shrink-0" />
+          {{ t("search.sqlModeLabel") }}
+          <q-tooltip v-if="isSqlModeDisabled" class="tw:text-[12px]" :offset="[0, 4]">
+            {{ t("search.sqlModeDisabledForVisualization") }}
+          </q-tooltip>
+        </ToolbarSwitch>
+        <!-- utilities menu -->
         <q-btn
           data-test="logs-search-bar-utilities-menu-btn"
-          class="group-menu-btn element-box-shadow"
+          class="group-menu-btn toolbar-ghost-btn"
           no-caps
           menu-anchor="bottom left"
           menu-self="top left"
-          icon="menu"
           flat
+          style="height: 26px; min-height: 26px; padding: 0 10px; font-size: 11px; font-weight: 500; border-radius: 5px;"
         >
+          <div class="tw:flex tw:items-center tw:gap-1">
+            <MoreHorizontal class="tw:size-3 tw:shrink-0" />
+            <span>{{ t("search.moreActions") }}</span>
+          </div>
           <q-menu>
             <q-list>
               <!-- Histogram Toggle -->
@@ -571,11 +216,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <q-separator />
 
-              <!-- === SAVED VIEWS GROUP (moved from toolbar at <= 1500px) === -->
+              <!-- === SAVED VIEWS GROUP === -->
 
               <!-- List Saved Views -->
               <q-item
-                v-if="shouldMoveSavedViewToMenu"
                 clickable
                 v-close-popup
                 @click="openSavedViewsList"
@@ -592,7 +236,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Create Saved View -->
               <q-item
-                v-if="shouldMoveSavedViewToMenu"
                 clickable
                 v-close-popup
                 @click="fnSavedView"
@@ -607,13 +250,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
 
-              <q-separator v-if="shouldMoveSavedViewToMenu" />
+              <q-separator />
 
-              <!-- === ACTIONS GROUP === -->
-
-              <!-- Reset Filters (moved from toolbar at <= 1500px) -->
+              <!-- Reset Filters -->
               <q-item
-                v-if="shouldMoveSavedViewToMenu"
                 clickable
                 v-close-popup
                 @click="resetFilters"
@@ -628,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
 
-              <q-separator v-if="shouldMoveSavedViewToMenu" />
+              <q-separator />
 
               <!-- Syntax Guide -->
               <q-item class="q-pa-sm saved-view-item syntax-guide-menu-item">
@@ -648,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
       </div>
 
-      <div class="float-right col-auto">
+      <div class="float-right col-auto tw:flex tw:items-center tw:gap-1.5">
         <transform-selector
           v-if="isActionsEnabled && !shouldMoveShareToMenu"
           :function-options="functionOptions"
@@ -661,247 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select:function="populateFunctionImplementation"
           @save:function="fnSavedFunctionDialog"
         />
-        <share-button
-          v-if="!shouldMoveShareToMenu"
-          data-test="logs-search-bar-share-link-btn"
-          :url="shareURL"
-          button-class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
-          button-size="xs"
-        />
-
-        <q-btn
-          data-test="logs-search-bar-more-options-btn"
-          class="download-logs-btn q-px-sm element-box-shadow el-border"
-          style="padding: 0.25rem 0.25rem !important"
-          icon="menu"
-        >
-          <q-menu>
-            <q-list>
-              <!-- Share Link (moved from toolbar at <= 1100px) -->
-              <q-item
-                v-if="shouldMoveShareToMenu"
-                clickable
-                v-close-popup
-                data-test="logs-search-bar-menu-share-link-btn"
-                class="q-pa-sm saved-view-item"
-              >
-                <q-item-section>
-                  <share-button
-                    :url="shareURL"
-                    button-class="tw:w-full"
-                    button-size="xs"
-                    :flat="true"
-                  />
-                </q-item-section>
-              </q-item>
-
-              <q-separator v-if="shouldMoveShareToMenu" />
-
-              <q-item
-                data-test="search-history-item-btn"
-                class="q-pa-sm saved-view-item"
-                clickable
-                v-close-popup
-              >
-                <q-item-section @click.stop="showSearchHistoryfn">
-                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                    <img
-                      :src="searchHistoryIcon"
-                      alt="Search History"
-                      style="width: 20px; height: 20px"
-                    />
-                    {{ t("search.searchHistory") }}</q-item-label
-                  >
-                </q-item-section>
-              </q-item>
-              <q-separator />
-              <q-item
-                style="min-width: 150px"
-                class="q-pa-sm saved-view-item download-menu-parent"
-                clickable
-                v-close-popup
-                @mouseenter="showDownloadMenu = true"
-              >
-                <q-item-section class="cursor-pointer">
-                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                    <img
-                      :src="downloadTableIcon"
-                      alt="Download Table"
-                      style="width: 20px; height: 20px"
-                    />
-                    {{ t("search.downloadTable") }}</q-item-label
-                  >
-                </q-item-section>
-                <q-item-section side>
-                  <q-icon name="keyboard_arrow_right" />
-                </q-item-section>
-                <q-menu
-                  v-model="showDownloadMenu"
-                  anchor="top end"
-                  self="top start"
-                  :offset="[0, 0]"
-                  @mouseenter="showDownloadMenu = true"
-                  @mouseleave="showDownloadMenu = false"
-                >
-                  <q-list>
-                    <q-item
-                      data-test="search-download-csv-btn"
-                      class="q-pa-sm saved-view-item"
-                      clickable
-                      v-close-popup
-                      @click="
-                        downloadLogs(searchObj.data.queryResults.hits, 'csv')
-                      "
-                    >
-                      <q-icon
-                        name="grid_on"
-                        size="14px"
-                        class="q-pr-sm q-pt-xs"
-                      />
-                      <q-item-section>
-                        <q-item-label
-                          class="tw:flex tw:items-center tw:gap-2 q-mr-md"
-                        >
-                          {{ t("search.downloadCSV") }}
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
-                    <q-item
-                      data-test="search-download-json-btn"
-                      class="q-pa-sm saved-view-item"
-                      clickable
-                      v-close-popup
-                      @click="
-                        downloadLogs(searchObj.data.queryResults.hits, 'json')
-                      "
-                    >
-                      <q-icon
-                        name="data_object"
-                        size="14px"
-                        class="q-pr-sm q-pt-xs"
-                      />
-                      <q-item-section>
-                        <q-item-label
-                          class="tw:flex tw:items-center tw:gap-2 q-mr-md"
-                        >
-                          {{ t("search.downloadJSON") }}
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </q-menu>
-              </q-item>
-              <q-item
-                class="q-pa-sm saved-view-item"
-                style="min-width: 150px"
-                clickable
-                v-close-popup
-              >
-                <q-item-section
-                  @click.stop="toggleCustomDownloadDialog"
-                  v-close-popup
-                >
-                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                    <img
-                      :src="customRangeIcon"
-                      alt="Custom Range"
-                      style="width: 20px; height: 20px"
-                    />
-
-                    {{ t("search.customRange") }}</q-item-label
-                  >
-                </q-item-section>
-              </q-item>
-              <q-separator />
-              <q-item
-                v-if="searchObj.meta.sqlMode"
-                data-test="logs-search-bar-explain-query-menu-btn"
-                class="q-pa-sm saved-view-item"
-                clickable
-                v-close-popup
-                :disable="
-                  !searchObj.data.query || searchObj.data.query.trim() === ''
-                "
-                @click="openExplainDialog"
-              >
-                <q-item-section v-close-popup>
-                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon name="lightbulb" size="20px" />
-                    {{ t("search.explainQuery") }}</q-item-label
-                  >
-                </q-item-section>
-              </q-item>
-              <q-separator v-if="searchObj.meta.sqlMode" />
-              <q-item
-                v-if="config.isEnterprise == 'true'"
-                data-test="search-scheduler-create-new-btn"
-                class="q-pa-sm saved-view-item"
-                clickable
-                v-close-popup
-                @click="createScheduleJob"
-              >
-                <q-item-section v-close-popup>
-                  <q-item-label
-                    class="tw:flex tw:items-center tw:gap-2"
-                    data-test="search-scheduler-create-new-label"
-                  >
-                    <img
-                      :src="createScheduledSearchIcon"
-                      alt="Create Scheduled Search"
-                      style="width: 20px; height: 20px"
-                    />
-                    {{ t("search.createScheduledSearch") }}</q-item-label
-                  >
-                </q-item-section>
-              </q-item>
-              <q-item
-                v-if="config.isEnterprise == 'true'"
-                data-test="search-scheduler-list-btn"
-                class="q-pa-sm saved-view-item"
-                clickable
-                v-close-popup
-                @click="routeToSearchSchedule"
-              >
-                <q-item-section v-close-popup>
-                  <q-item-label
-                    class="tw:flex tw:items-center tw:gap-2"
-                    data-test="search-scheduler-list-label"
-                  >
-                    <img
-                      :src="listScheduledSearchIcon"
-                      alt="List Scheduled Search"
-                      style="width: 20px; height: 20px"
-                    />
-                    {{ t("search.listScheduledSearch") }}</q-item-label
-                  >
-                </q-item-section>
-              </q-item>
-              <q-separator v-if="config.isEnterprise == 'true'" />
-              <q-item
-                v-if="config.isEnterprise == 'true' && config.isCloud == 'false' && store.state.zoConfig.search_inspector_enabled"
-                data-test="search-inspect-btn"
-                class="q-pa-sm saved-view-item"
-                clickable
-                v-close-popup
-                @click="openSearchInspectDialog"
-              >
-                <q-item-section v-close-popup>
-                  <q-item-label
-                    class="tw:flex tw:items-center tw:gap-2"
-                    data-test="search-inspect-label"
-                  >
-                    <q-icon name="troubleshoot" size="20px" />
-                    Search Inspect
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-menu>
-          <q-tooltip style="width: 110px">
-            {{ t("search.moreActions") }}
-          </q-tooltip>
-        </q-btn>
-        <div class="float-left tw:mr-[4px]">
+        <div>
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -921,7 +321,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
             :disable="disable"
-            class="element-box-shadow"
           />
         </div>
         <div class="search-time float-left q-mr-xs">
@@ -1421,6 +820,256 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+        <share-button
+          v-if="!shouldMoveShareToMenu"
+          data-test="logs-search-bar-share-link-btn"
+          :url="shareURL"
+          button-class="toolbar-ghost-btn tw:inline-flex tw:items-center tw:h-[26px] tw:w-[26px] tw:justify-center tw:rounded-[5px] tw:transition-colors tw:duration-150 tw:cursor-pointer"
+          button-size="xs"
+        />
+        <q-btn
+          data-test="logs-search-bar-more-options-btn"
+          class="toolbar-ghost-btn"
+          style="height: 26px; width: 26px; padding: 0 !important; min-height: unset;"
+          flat
+          dense
+          icon="menu"
+        >
+          <q-menu>
+            <q-list>
+              <!-- Share Link (moved from toolbar at <= 1100px) -->
+              <q-item
+                v-if="shouldMoveShareToMenu"
+                clickable
+                v-close-popup
+                data-test="logs-search-bar-menu-share-link-btn"
+                class="q-pa-sm saved-view-item"
+              >
+                <q-item-section>
+                  <share-button
+                    :url="shareURL"
+                    button-class="tw:w-full"
+                    button-size="xs"
+                    :flat="true"
+                  />
+                </q-item-section>
+              </q-item>
+
+              <q-separator v-if="shouldMoveShareToMenu" />
+
+              <q-item
+                data-test="search-history-item-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+              >
+                <q-item-section @click.stop="showSearchHistoryfn">
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
+                    <img
+                      :src="searchHistoryIcon"
+                      alt="Search History"
+                      style="width: 20px; height: 20px"
+                    />
+                    {{ t("search.searchHistory") }}</q-item-label
+                  >
+                </q-item-section>
+              </q-item>
+              <q-separator />
+              <q-item
+                style="min-width: 150px"
+                class="q-pa-sm saved-view-item download-menu-parent"
+                clickable
+                v-close-popup
+                @mouseenter="showDownloadMenu = true"
+              >
+                <q-item-section class="cursor-pointer">
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
+                    <img
+                      :src="downloadTableIcon"
+                      alt="Download Table"
+                      style="width: 20px; height: 20px"
+                    />
+                    {{ t("search.downloadTable") }}</q-item-label
+                  >
+                </q-item-section>
+                <q-item-section side>
+                  <q-icon name="keyboard_arrow_right" />
+                </q-item-section>
+                <q-menu
+                  v-model="showDownloadMenu"
+                  anchor="top end"
+                  self="top start"
+                  :offset="[0, 0]"
+                  @mouseenter="showDownloadMenu = true"
+                  @mouseleave="showDownloadMenu = false"
+                >
+                  <q-list>
+                    <q-item
+                      data-test="search-download-csv-btn"
+                      class="q-pa-sm saved-view-item"
+                      clickable
+                      v-close-popup
+                      @click="
+                        downloadLogs(searchObj.data.queryResults.hits, 'csv')
+                      "
+                    >
+                      <q-icon
+                        name="grid_on"
+                        size="14px"
+                        class="q-pr-sm q-pt-xs"
+                      />
+                      <q-item-section>
+                        <q-item-label
+                          class="tw:flex tw:items-center tw:gap-2 q-mr-md"
+                        >
+                          {{ t("search.downloadCSV") }}
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                    <q-item
+                      data-test="search-download-json-btn"
+                      class="q-pa-sm saved-view-item"
+                      clickable
+                      v-close-popup
+                      @click="
+                        downloadLogs(searchObj.data.queryResults.hits, 'json')
+                      "
+                    >
+                      <q-icon
+                        name="data_object"
+                        size="14px"
+                        class="q-pr-sm q-pt-xs"
+                      />
+                      <q-item-section>
+                        <q-item-label
+                          class="tw:flex tw:items-center tw:gap-2 q-mr-md"
+                        >
+                          {{ t("search.downloadJSON") }}
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-menu>
+              </q-item>
+              <q-item
+                class="q-pa-sm saved-view-item"
+                style="min-width: 150px"
+                clickable
+                v-close-popup
+              >
+                <q-item-section
+                  @click.stop="toggleCustomDownloadDialog"
+                  v-close-popup
+                >
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
+                    <img
+                      :src="customRangeIcon"
+                      alt="Custom Range"
+                      style="width: 20px; height: 20px"
+                    />
+
+                    {{ t("search.customRange") }}</q-item-label
+                  >
+                </q-item-section>
+              </q-item>
+              <q-separator />
+              <q-item
+                v-if="searchObj.meta.sqlMode"
+                data-test="logs-search-bar-explain-query-menu-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                :disable="
+                  !searchObj.data.query || searchObj.data.query.trim() === ''
+                "
+                @click="openExplainDialog"
+              >
+                <q-item-section v-close-popup>
+                  <q-item-label class="tw:flex tw:items-center tw:gap-2">
+                    <q-icon name="lightbulb" size="20px" />
+                    {{ t("search.explainQuery") }}</q-item-label
+                  >
+                </q-item-section>
+              </q-item>
+              <q-separator v-if="searchObj.meta.sqlMode" />
+              <q-item
+                v-if="config.isEnterprise == 'true'"
+                data-test="search-scheduler-create-new-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                @click="createScheduleJob"
+              >
+                <q-item-section v-close-popup>
+                  <q-item-label
+                    class="tw:flex tw:items-center tw:gap-2"
+                    data-test="search-scheduler-create-new-label"
+                  >
+                    <img
+                      :src="createScheduledSearchIcon"
+                      alt="Create Scheduled Search"
+                      style="width: 20px; height: 20px"
+                    />
+                    {{ t("search.createScheduledSearch") }}</q-item-label
+                  >
+                </q-item-section>
+              </q-item>
+              <q-item
+                v-if="config.isEnterprise == 'true'"
+                data-test="search-scheduler-list-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                @click="routeToSearchSchedule"
+              >
+                <q-item-section v-close-popup>
+                  <q-item-label
+                    class="tw:flex tw:items-center tw:gap-2"
+                    data-test="search-scheduler-list-label"
+                  >
+                    <img
+                      :src="listScheduledSearchIcon"
+                      alt="List Scheduled Search"
+                      style="width: 20px; height: 20px"
+                    />
+                    {{ t("search.listScheduledSearch") }}</q-item-label
+                  >
+                </q-item-section>
+              </q-item>
+              <q-separator v-if="config.isEnterprise == 'true'" />
+              <q-item
+                v-if="config.isEnterprise == 'true' && config.isCloud == 'false' && store.state.zoConfig.search_inspector_enabled"
+                data-test="search-inspect-btn"
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                @click="openSearchInspectDialog"
+              >
+                <q-item-section v-close-popup>
+                  <q-item-label
+                    class="tw:flex tw:items-center tw:gap-2"
+                    data-test="search-inspect-label"
+                  >
+                    <q-icon name="troubleshoot" size="20px" />
+                    Search Inspect
+                  </q-item-label>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+          <q-tooltip style="width: 110px">
+            {{ t("search.moreActions") }}
+          </q-tooltip>
+        </q-btn>
+        <!-- Editor collapse / expand toggle — last item in toolbar flex row -->
+        <button
+          class="editor-toggle-btn"
+          :title="editorCollapsed ? 'Show query editor' : 'Hide query editor'"
+          @click="$emit('toggle-editor')"
+        >
+          <ChevronDown v-if="!editorCollapsed" class="tw:size-3.5" />
+          <ChevronUp v-else class="tw:size-3.5" />
+        </button>
       </div>
     </div>
     <div class="row query-editor-container">
@@ -1445,6 +1094,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:ml-[0.375rem]'
               "
             >
+              <!-- Empty-state placeholder overlay -->
+              <div
+                v-if="
+                  searchObj.data.editorValue == '' &&
+                  searchObj.meta.queryEditorPlaceholderFlag
+                "
+                class="query-editor-placeholder-overlay"
+                aria-hidden="true"
+              >
+                {{ t("search.queryEditorPlaceholder") }}
+                <kbd class="query-editor-placeholder-kbd">{{ isMac ? '⌘↵' : 'Ctrl+↵' }}</kbd>
+              </div>
               <!-- Unified Query Editor (with built-in AI bar) -->
               <unified-query-editor
                 v-if="router.currentRoute.value.name === 'logs'"
@@ -1472,12 +1133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test-prefix="logs-search-bar"
                 editor-height="100%"
                 :style="editorWidthToggleFunction"
-                :class="
-                  searchObj.data.editorValue == '' &&
-                  searchObj.meta.queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
                 language="sql"
                 :readOnly="
                   searchObj.meta.logsVisualizeToggle === 'build' &&
@@ -2448,8 +2103,20 @@ import {
   Menu,
   Maximize,
   Minimize,
+  Wrench,
+  Layers,
+  RotateCcw,
+  MoreHorizontal,
+  ChevronDown,
+  ChevronUp,
+  Database,
 } from "lucide-vue-next";
-import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/lib/core/ToggleGroup";
+import { Toggle } from "@/lib/core/Toggle";
+import { ToolbarSwitch } from "@/lib/core/Switch";
 import {
   getFieldFromExpression,
   hasFieldCondition,
@@ -2535,6 +2202,17 @@ export default defineComponent({
     Menu,
     Maximize,
     Minimize,
+    Wrench,
+    Layers,
+    RotateCcw,
+    MoreHorizontal,
+    ChevronDown,
+    ChevronUp,
+    Database,
+    ToggleGroup,
+    ToggleGroupItem,
+    Toggle,
+    ToolbarSwitch,
   },
   emits: [
     "searchdata",
@@ -2546,6 +2224,7 @@ export default defineComponent({
     "showSearchHistory",
     "extractPatterns",
     "buildModeToggle",
+    "toggle-editor",
   ],
   methods: {
     searchData() {
@@ -2667,6 +2346,10 @@ export default defineComponent({
     fieldValues: {
       type: Object,
       default: () => ({}),
+    },
+    editorCollapsed: {
+      type: Boolean,
+      default: false,
     },
   },
   setup(props, { emit }) {
@@ -2833,23 +2516,27 @@ export default defineComponent({
     const hasInteractedWithAI = ref(false); // Track if user has used AI in non-NLP mode
     const isNaturalLanguageDetected = ref(false); // Track NL detection without switching modes
 
-    // Track window width for responsive toolbar layout
+    // Track toolbar container width via ResizeObserver so breakpoints
+    // respond correctly to browser zoom as well as window resize
     const windowWidth = ref(window.innerWidth);
+    let _toolbarResizeObserver: ResizeObserver | null = null;
     const onWindowResize = () => {
       windowWidth.value = window.innerWidth;
     };
 
     // Responsive breakpoints: progressively move items into menus
-    // <= 1440px: saved views + reset → left hamburger menu
-    // <= 1280px: also histogram + SQL toggles → left hamburger menu
-    // <= 1024px: also share + transform selector → right overflow menu
+    // <= 1100px: saved views + reset → left hamburger menu
+    // <= 960px:  also histogram + SQL toggles → left hamburger menu
+    // <= 800px:  also share + transform selector → right overflow menu
+    const isMac = navigator.platform.toUpperCase().includes("MAC");
+
     const shouldMoveSavedViewToMenu = computed(
-      () => windowWidth.value <= 1440,
+      () => windowWidth.value <= 1400,
     );
     const shouldMoveSqlToggleToMenu = computed(
-      () => windowWidth.value <= 1280,
+      () => windowWidth.value <= 1200,
     );
-    const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
+    const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1000);
     const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
 
     const confirmUpdate = ref(false);
@@ -3427,6 +3114,16 @@ export default defineComponent({
 
       window.addEventListener("keydown", handleEscKey);
       window.addEventListener("resize", onWindowResize);
+
+      // ResizeObserver gives accurate width under browser zoom (window resize alone doesn't)
+      const toolbarEl = document.getElementById("searchBarComponent");
+      if (toolbarEl && typeof ResizeObserver !== "undefined") {
+        _toolbarResizeObserver = new ResizeObserver((entries) => {
+          const width = entries[0]?.contentRect?.width;
+          if (width) windowWidth.value = width;
+        });
+        _toolbarResizeObserver.observe(toolbarEl);
+      }
     });
 
     onUnmounted(() => {
@@ -3435,6 +3132,8 @@ export default defineComponent({
       });
       window.removeEventListener("keydown", handleEscKey);
       window.removeEventListener("resize", onWindowResize);
+      _toolbarResizeObserver?.disconnect();
+      _toolbarResizeObserver = null;
     });
 
     onActivated(() => {
@@ -5442,13 +5141,13 @@ export default defineComponent({
       updateEditorWidth,
       showExplainDialog,
       openExplainDialog,
-      outlinedShowChart,
       isNaturalLanguageDetected,
       isGeneratingSQL,
       vrlEditorNlpMode,
       shouldMoveSavedViewToMenu,
       shouldMoveSqlToggleToMenu,
       shouldMoveShareToMenu,
+      isMac,
       toggleLiveMode,
     };
   },
@@ -5729,6 +5428,77 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+// Ghost toolbar buttons (Saved View, Reset Filters, More)
+.toolbar-ghost-btn {
+  background: transparent;
+  color: var(--o2-tab-text-color, #374151);
+  border: none;
+  &:hover {
+    background-color: var(--o2-border-color, rgba(0, 0, 0, 0.08));
+  }
+}
+
+.editor-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--o2-tab-text-color, #374151);
+  cursor: pointer;
+  margin-left: 2px;
+  &:hover {
+    background-color: var(--o2-border-color, rgba(0, 0, 0, 0.08));
+    border-color: var(--o2-border-color, rgba(0, 0, 0, 0.15));
+  }
+}
+
+// Query editor empty-state placeholder
+.query-editor-placeholder-overlay {
+  position: absolute;
+  // Align with Monaco's content area: line-number gutter (~26px) + 8px left padding
+  top: 4px;
+  left: 34px;
+  pointer-events: none;
+  user-select: none;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #9ca3af;
+  font-size: 13px;
+  font-family: "Menlo", "Monaco", "Courier New", monospace;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.query-editor-placeholder-kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #f9fafb;
+  font-size: 11px;
+  font-family: inherit;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.dark-theme .query-editor-placeholder-overlay {
+  color: #4b5563;
+}
+
+.dark-theme .query-editor-placeholder-kbd {
+  border-color: #374151;
+  background: #1f2937;
+  color: #6b7280;
+}
+
 .expand-on-focus {
   position: fixed !important;
   height: calc(100vh - 12.5rem) !important;
@@ -5854,18 +5624,34 @@ export default defineComponent({
   border-color: var(--o2-border-color);
 }
 
+// Saved Views dropdown — match new toolbar button sizing
+.toolbar-saved-views-btn {
+  min-height: 2rem !important;   // 32px
+  font-size: 0.75rem !important; // 12px
+  font-weight: 500 !important;
+  padding: 0 0.5rem !important;
+
+  :deep(.q-btn__content) {
+    gap: 0.375rem;
+    font-size: 0.75rem;
+  }
+
+  :deep(.q-icon) {
+    font-size: 0.875rem !important; // 14px
+  }
+}
+
 .group-menu-btn {
-  padding: 0.25rem 0.25rem !important; // 4px 8px
-  margin-left: 0.25rem; // 8px
+  padding: 0 0.625rem !important; // 0 10px
   border: 0.0625rem solid rgba(0, 0, 0, 0.12) !important; // 1px
   border-radius: 0.375rem; // 6px
   transition: all 0.2s ease;
-  min-height: 1.875rem !important; // 30px
+  min-height: 2rem !important; // 32px
   font-size: 0.75rem; // 12px
   font-weight: 500;
 
   .q-icon {
-    font-size: 1.125rem; // 18px
+    font-size: 1rem; // 16px
   }
 
   &:hover {

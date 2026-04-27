@@ -3,9 +3,10 @@
    Overrides semantic (and component) tokens for dark themes.
    ============================================================ */
 
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where(.dark, .dark *, .dark-theme, .dark-theme *));
 
-.dark {
+.dark,
+.dark-theme {
   :root, & {
     /* --- Text --- */
     --color-text-primary:   var(--color-grey-50);
@@ -42,5 +43,14 @@
     --color-button-ghost-text:           var(--color-grey-200);
     --color-button-ghost-hover-bg:       var(--color-grey-800);
     --color-button-ghost-active-bg:      var(--color-grey-700);
+
+    /* ToggleGroup */
+    --color-toggle-group-bg:              var(--color-grey-900);
+    --color-toggle-group-border:          var(--color-grey-700);
+    --color-toggle-group-item-active-bg:  var(--color-grey-700);
+    --color-toggle-group-item-active-text: var(--color-grey-100);
+    --color-toggle-group-item-text:       var(--color-grey-500);
+    --color-toggle-group-item-hover-text: var(--color-grey-300);
+    --color-toggle-group-item-disabled-text: var(--color-grey-700);
   }
 }
