@@ -22,7 +22,7 @@ use proto::cluster_rpc::{
     GetLicenseUsageRequest, GetLicenseUsageResponse, GetResultRequest, GetResultResponse,
     GetSourcemapFileRequest, GetSourcemapFileResponse, GetTableRequest, GetTableResponse,
     QueryStatusRequest, QueryStatusResponse, SearchPartitionRequest, SearchPartitionResponse,
-    SearchRequest, SearchResponse, UsageResult, search_server::Search,
+    SearchRequest, SearchResponse, search_server::Search,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -34,7 +34,7 @@ use {
     },
     proto::cluster_rpc::{
         ReleaseQueryRequest, ReleaseQueryResponse, StartQueryRequest, StartQueryResponse,
-        TryAcquireRequest, TryAcquireResponse,
+        TryAcquireRequest, TryAcquireResponse, UsageResult,
     },
     std::str::FromStr,
 };
