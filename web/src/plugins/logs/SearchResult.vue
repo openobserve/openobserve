@@ -402,6 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="col-12"
             :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
             :scroll-el="scrollContainerRef"
+            :scroll-margin="0"
             @update:columnSizes="handleColumnSizesUpdate"
             @update:columnOrder="handleColumnOrderUpdate"
             @copy="copyLogToClipboard"
@@ -884,7 +885,6 @@ export default defineComponent({
     const searchTableRef: any = ref(null);
     const scrollContainerRef = ref(null);
     const histogramRef = ref(null);
-    const scrollMargin = computed(() => histogramRef.value?.clientHeight ?? 0);
 
     // Correlation dashboard state
     const showCorrelation = ref(false);
@@ -1667,7 +1667,6 @@ export default defineComponent({
       searchTableRef,
       scrollContainerRef,
       histogramRef,
-      scrollMargin,
       searchAroundData,
       addSearchTerm,
       removeSearchTerm,
