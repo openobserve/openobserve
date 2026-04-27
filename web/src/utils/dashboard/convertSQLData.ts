@@ -34,6 +34,7 @@ export const convertMultiSQLData = async (
   metadata: any,
   chartPanelStyle: any,
   annotations: any,
+  loading?: any,
 ) => {
   if (!Array.isArray(searchQueryData) || searchQueryData.length === 0) {
     // this sets a blank object until it loads
@@ -56,6 +57,7 @@ export const convertMultiSQLData = async (
         { queries: [metadata.queries[i]] },
         chartPanelStyle,
         annotations,
+        loading,
       ),
     );
   }
@@ -110,6 +112,7 @@ export const convertSQLData = async (
   metadata: any,
   chartPanelStyle: any,
   annotations: any,
+  loading?: any,
 ) => {
   return convertSQLChartData(
     panelSchema,
@@ -121,6 +124,7 @@ export const convertSQLData = async (
     metadata,
     chartPanelStyle,
     annotations,
+    loading,
   );
 
 };

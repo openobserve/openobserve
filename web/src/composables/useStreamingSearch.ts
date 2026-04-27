@@ -68,7 +68,8 @@ type StreamResponseType =
   | "error"
   | "end"
   | "pattern_extraction_result"
-  | "promql_response";
+  | "promql_response"
+  | "promql_metadata";
 
 const useHttpStreaming = () => {
   const onData = (
@@ -391,6 +392,9 @@ const useHttpStreaming = () => {
             case "promql_response":
               onData(eventTraceId, "promql_response", data);
               break;
+            case "promql_metadata":
+              onData(eventTraceId, "promql_metadata", data);
+              break;
             case "progress":
               onData(eventTraceId, "progress", data);
               break;
@@ -688,11 +692,25 @@ const useHttpStreaming = () => {
     };
   };
 
+  const convertToPromQLMetadata = (
+    traceId: string,
+    response: any,
+  ) => {
+    return {
+      content: {
+        ...response,
+        trace_id: response.trace_id || traceId,
+      },
+      type: "promql_metadata",
+    };
+  };
+
   const wsMapper = {
     search_response_metadata: convertToWsResponse,
     search_response_hits: convertToWsResponse,
     pattern_extraction_result: convertToPatternResult,
     promql_response: convertToPromQLResponse,
+    promql_metadata: convertToPromQLMetadata,
     progress: convertToWsEventProgress,
     error: convertToWsError,
     end: convertToWsEnd,

@@ -899,13 +899,15 @@ describe("handleSearchResponse", () => {
     expect(saveCurrentStateToCache).toHaveBeenCalled();
   });
 
-  it("updates loadingProgressPercentage on event_progress", () => {
+  it("updates loadingProgressPercentage on event_progress", async () => {
     const { state, handlers } = makeHandlers();
 
     handlers.handleSearchResponse(
       {},
       { type: "event_progress", content: { percent: 55 } },
     );
+
+    await Promise.resolve();
 
     expect(state.loadingProgressPercentage).toBe(55);
     expect(state.isPartialData).toBe(true);
