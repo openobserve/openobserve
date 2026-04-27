@@ -178,6 +178,8 @@ pub async fn get_for_org(org_id: &str) -> Result<Option<OrgStorageProvider>, err
         .filter(Column::OrgId.eq(org_id))
         .one(client)
         .await?;
+    // we must drop lock here, as the get_dek itself can attempt lock, which results in deadlock
+    drop(_lock);
 
     let dek = cipher::get_dek(org_id).await?;
     let ret = res
@@ -224,7 +226,6 @@ pub fn remove_from_cache(org_id: &str) {
 
 pub async fn list_all() -> Result<Vec<OrgStorageProvider>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
 
     let res = Entity::find().all(client).await?;
     let temp: Vec<OrgStorageProvider> = res.into_iter().map(|v| v.into()).collect();

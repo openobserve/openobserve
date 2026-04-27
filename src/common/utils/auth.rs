@@ -357,6 +357,7 @@ where
             // - /org/settings (v1 settings API)
             // - /org/settings/logo, /org/settings/text (logo/text endpoints)
             // - /org/settings/v2/... (v2 multi-level settings API)
+            // - /org/storage deals with GET/POST/PUT for org storage, and should follow settings rbac
             //
             // Settings v2 API paths:
             // - GET /{org_id}/settings/v2/{key} - get setting
@@ -365,7 +366,7 @@ where
             // - POST /{org_id}/settings/v2/user/{user_id} - set user setting
             // - DELETE /{org_id}/settings/v2/org/{key} - delete org setting
             // - DELETE /{org_id}/settings/v2/user/{user_id}/{key} - delete user setting
-            if path_columns[1].eq("settings") {
+            if path_columns[1].eq("settings") || path_columns[1].eq("storage") {
                 if method.eq("POST") || method.eq("DELETE") {
                     method = "PUT".to_string();
                 }
@@ -395,6 +396,9 @@ where
                 || path_columns[1].eq("external_contract")
             {
                 "organizations"
+            } else if path_columns[1].eq("storage") {
+                // org storage needs permission on settings
+                "settings"
             } else {
                 path_columns[1]
             };
