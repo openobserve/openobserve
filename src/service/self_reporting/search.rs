@@ -17,7 +17,7 @@ use anyhow::{Result, anyhow};
 use config::{
     META_ORG_ID, ider,
     meta::{
-        cluster::RoleGroup,
+        cluster::{NodeInfo, RoleGroup},
         search::{
             Query, Request as SearchRequest, RequestEncoding, SearchEventType, default_use_cache,
         },
@@ -25,10 +25,23 @@ use config::{
     },
     utils::json,
 };
+use infra::{client::grpc::make_grpc_search_client, cluster::get_node_by_uuid, errors::ErrorCodes};
+use proto::cluster_rpc::GetLicenseUsageResponse;
 
 use crate::service::search as SearchService;
 
-pub async fn get_usage(sql: String, start_time: i64, end_time: i64) -> Result<Vec<json::Value>> {
+pub async fn get_usage(
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+    local: bool,
+) -> Result<Vec<json::Value>> {
+    let (clusters, regions) = if local {
+        (vec!["local".into()], vec!["local".into()])
+    } else {
+        (vec![], vec![])
+    };
+
     let req = SearchRequest {
         query: Query {
             sql,
@@ -50,8 +63,8 @@ pub async fn get_usage(sql: String, start_time: i64, end_time: i64) -> Result<Ve
             histogram_interval: 0,
         },
         encoding: RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
+        regions,
+        clusters,
         timeout: 0,
         search_type: Some(SearchEventType::Other),
         search_event_context: None,
@@ -79,4 +92,33 @@ pub async fn get_usage(sql: String, start_time: i64, end_time: i64) -> Result<Ve
     }
 
     Ok(resp.hits)
+}
+
+pub async fn get_license_usage_data_from_node(node_id: String) -> Result<GetLicenseUsageResponse> {
+    let node = get_node_by_uuid(&node_id)
+        .await
+        .ok_or(anyhow::anyhow!("node {node_id} not found"))?;
+    let node = std::sync::Arc::new(node) as std::sync::Arc<dyn NodeInfo>;
+
+    let task = tokio::task::spawn(async move {
+        let mut request = tonic::Request::new(proto::cluster_rpc::GetLicenseUsageRequest {});
+        let mut client =
+            make_grpc_search_client("license-usage-grpc-request", &mut request, &node, 0).await?;
+        match client.get_license_usage_info(request).await {
+            Ok(res) => {
+                let response = res.into_inner();
+                Ok(response)
+            }
+            Err(err) => {
+                log::error!(
+                    "[trace_id: license-usage-grpc-request] error getting license usage info node {} : {err:?}",
+                    &node.get_grpc_addr(),
+                );
+                let err = ErrorCodes::from_json(err.message())?;
+                Err(anyhow::anyhow!("error getting license usage info : {err}"))
+            }
+        }
+    });
+    task.await
+        .map_err(|e| anyhow::anyhow!("internal error : {e}"))?
 }

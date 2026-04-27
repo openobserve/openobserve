@@ -143,7 +143,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
         );
         let end_time = time::now_micros();
         let start_time = end_time - time::second_micros(900); // 15 mins
-        self_reporting::search::get_usage(sql, start_time, end_time)
+        self_reporting::search::get_usage(sql, start_time, end_time, false)
             .await
             .unwrap_or_default()
             .into_iter()

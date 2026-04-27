@@ -31,11 +31,9 @@ pub async fn update() -> Result<(), anyhow::Error> {
             None,
         )
         .await?;
-
-    o2_enterprise::enterprise::license::update_license(
-        crate::service::self_reporting::search::get_usage,
-    )
-    .await?;
+    // we do not manually trigger the update here, as the coordinator event handler
+    // does that for us, if we do it here, there is a chance of deadlock or very slow update
+    // due to lock contention
     Ok(())
 }
 
@@ -56,11 +54,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
 
         match ev {
-            Event::Put(_) => match o2_enterprise::enterprise::license::update_license(
-                crate::service::self_reporting::search::get_usage,
-            )
-            .await
-            {
+            Event::Put(_) => match o2_enterprise::enterprise::license::update_license().await {
                 Ok(_) => {
                     log::info!("successfully updated local license")
                 }

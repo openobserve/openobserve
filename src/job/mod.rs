@@ -313,6 +313,50 @@ async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
     Ok(Some(()))
 }
 
+// TODO: in a separate PR, replace the metering lock fn with this one instead
+#[cfg(feature = "enterprise")]
+async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
+    use infra::{cluster::get_node_by_uuid, dist_lock};
+
+    let db = infra::db::get_db().await;
+    let node = db.get(&key).await.ok().unwrap_or_default();
+    let node = String::from_utf8_lossy(&node);
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+        return Ok(node.to_string());
+    }
+
+    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
+        let locker = infra::dist_lock::lock(&key, 0).await?;
+        // check the working node again, maybe other node locked it first
+        let node = db.get(&key).await.ok().unwrap_or_default();
+        let node = String::from_utf8_lossy(&node);
+        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
+            dist_lock::unlock(&locker).await?;
+            return Ok(node.to_string());
+        }
+        // set to current node
+        let ret = db
+            .put(
+                &key,
+                LOCAL_NODE.uuid.clone().into(),
+                infra::db::NO_NEED_WATCH,
+                None,
+            )
+            .await;
+        // Check db.put result before releasing the lock to ensure consistent state
+        if let Err(e) = ret {
+            dist_lock::unlock(&locker).await?;
+            drop(locker);
+            return Err(e.into());
+        }
+        dist_lock::unlock(&locker).await?;
+        drop(locker);
+    }
+
+    Ok(LOCAL_NODE.uuid.clone())
+}
+
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
@@ -885,7 +929,9 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
     {
         o2_enterprise::enterprise::license::start_license_check(
             crate::service::self_reporting::search::get_usage,
-            LOCAL_NODE.is_single_role(),
+            get_nats_lock,
+            crate::service::self_reporting::search::get_license_usage_data_from_node,
+            LOCAL_NODE.is_router() || LOCAL_NODE.is_single_role(),
         )
         .await;
         tokio::task::spawn(db::license::watch());
