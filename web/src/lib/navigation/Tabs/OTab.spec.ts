@@ -1,13 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { computed, provide } from 'vue'
+import { defineComponent, provide, computed } from 'vue'
+import { TabsRoot, TabsList } from 'reka-ui'
 import OTab from './OTab.vue'
 import { TABS_CONTEXT_KEY } from './OTabs.types'
 import type { TabsContext } from './OTabs.types'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/** Mount OTab with a simulated parent OTabs context */
+/**
+ * Mount OTab inside the required TabsRoot > TabsList ancestor chain that
+ * TabsTrigger (used internally) needs for its context injection.
+ * The TABS_CONTEXT_KEY context is also provided so OTab's isDense /
+ * isVertical / isActive computed properties work correctly.
+ */
 function mountTab(options: {
   name?: string | number
   label?: string
@@ -18,39 +24,47 @@ function mountTab(options: {
   dense?: boolean
   slots?: Record<string, string>
 } = {}) {
-  const activeTab = options.activeTab ?? 'tab1'
-  const isVertical = options.isVertical ?? false
-  const dense = options.dense ?? false
-  const onTabClickMock = { calls: [] as Array<string | number> }
+  const {
+    name = 'tab1',
+    label,
+    icon,
+    disable = false,
+    activeTab = 'tab1',
+    isVertical = false,
+    dense = false,
+    slots = {},
+  } = options
 
-  return mount(OTab, {
-    props: {
-      name: options.name ?? 'tab1',
-      label: options.label,
-      icon: options.icon,
-      disable: options.disable,
+  const Wrapper = defineComponent({
+    name: 'TabTestWrapper',
+    components: { TabsRoot, TabsList, OTab },
+    setup() {
+      provide(
+        TABS_CONTEXT_KEY,
+        computed<TabsContext>(() => ({
+          modelValue: activeTab,
+          isVertical,
+          dense,
+          onTabClick: () => {},
+        }))
+      )
+      return {
+        tabProps: { name, label, icon, disable },
+        modelValue: activeTab,
+        orientation: isVertical ? 'vertical' : 'horizontal',
+      }
     },
-    slots: options.slots,
-    global: {
-      plugins: [
-        {
-          install(app) {
-            // Simulate OTabs providing context as a computed ref
-            app.provide(
-              TABS_CONTEXT_KEY,
-              computed<TabsContext>(() => ({
-                modelValue: activeTab,
-                isVertical,
-                dense,
-                onTabClick: (name: string | number) => {
-                  onTabClickMock.calls.push(name)
-                },
-              }))
-            )
-          },
-        },
-      ],
-    },
+    template: `
+      <TabsRoot :model-value="modelValue" :orientation="orientation">
+        <TabsList>
+          <OTab v-bind="tabProps"><slot /></OTab>
+        </TabsList>
+      </TabsRoot>
+    `,
+  })
+
+  return mount(Wrapper, {
+    slots,
     attachTo: document.body,
   })
 }
@@ -62,39 +76,39 @@ describe('OTab', () => {
 
   it('renders with role="tab"', () => {
     const wrapper = mountTab()
-    expect(wrapper.attributes('role')).toBe('tab')
+    expect(wrapper.find('[role="tab"]').attributes('role')).toBe('tab')
   })
 
   it('sets aria-selected="true" when it is the active tab', () => {
     const wrapper = mountTab({ name: 'tab1', activeTab: 'tab1' })
-    expect(wrapper.attributes('aria-selected')).toBe('true')
+    expect(wrapper.find('[role="tab"]').attributes('aria-selected')).toBe('true')
   })
 
   it('sets aria-selected="false" when it is not the active tab', () => {
     const wrapper = mountTab({ name: 'tab2', activeTab: 'tab1' })
-    expect(wrapper.attributes('aria-selected')).toBe('false')
+    expect(wrapper.find('[role="tab"]').attributes('aria-selected')).toBe('false')
   })
 
-  it('sets tabindex=0 on the active tab', () => {
+  it('has data-state="active" on the active tab', () => {
     const wrapper = mountTab({ name: 'tab1', activeTab: 'tab1' })
-    expect(wrapper.attributes('tabindex')).toBe('0')
+    expect(wrapper.find('[role="tab"]').attributes('data-state')).toBe('active')
   })
 
-  it('sets tabindex=-1 on inactive tabs', () => {
+  it('has data-state="inactive" on inactive tabs', () => {
     const wrapper = mountTab({ name: 'tab2', activeTab: 'tab1' })
-    expect(wrapper.attributes('tabindex')).toBe('-1')
+    expect(wrapper.find('[role="tab"]').attributes('data-state')).toBe('inactive')
   })
 
   it('sets aria-disabled when disable is true', () => {
     const wrapper = mountTab({ disable: true })
-    expect(wrapper.attributes('aria-disabled')).toBe('true')
+    expect(wrapper.find('[role="tab"]').attributes('aria-disabled')).toBe('true')
   })
 
   // --- Label prop ---
 
   it('renders the label prop as text', () => {
     const wrapper = mountTab({ label: 'Overview' })
-    expect(wrapper.text()).toContain('Overview')
+    expect(wrapper.find('[role="tab"]').text()).toContain('Overview')
   })
 
   it('does not render label span when label is not provided', () => {
@@ -129,25 +143,25 @@ describe('OTab', () => {
     expect(wrapper.find('.badge').text()).toBe('3')
   })
 
-  // --- Click / disable ---
+  // --- Element type + CSS class ---
 
   it('has o-tab class', () => {
     const wrapper = mountTab()
-    expect(wrapper.classes()).toContain('o-tab')
+    expect(wrapper.find('[role="tab"]').classes()).toContain('o-tab')
   })
 
   it('is a native button element', () => {
     const wrapper = mountTab()
-    expect(wrapper.element.tagName).toBe('BUTTON')
+    expect(wrapper.find('[role="tab"]').element.tagName).toBe('BUTTON')
   })
 
   it('is disabled when disable is true', () => {
     const wrapper = mountTab({ disable: true })
-    expect(wrapper.attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[role="tab"]').attributes('disabled')).toBeDefined()
   })
 
   it('is not disabled by default', () => {
     const wrapper = mountTab()
-    expect(wrapper.attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('[role="tab"]').attributes('disabled')).toBeUndefined()
   })
 })

@@ -81,6 +81,11 @@ describe('OTabPanel', () => {
     expect(wrapper.find('[role="tabpanel"]').exists()).toBe(true)
   })
 
+  it('has tabindex="0" so the panel is reachable by keyboard', () => {
+    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
+    expect(wrapper.find('[role="tabpanel"]').attributes('tabindex')).toBe('0')
+  })
+
   // --- Class ---
 
   it('has o-tab-panel class', () => {
