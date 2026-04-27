@@ -347,6 +347,28 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_url_with_config_safe_url() {
+        // validate_url_with_config reads ssrf_allow_loopback from config (default false)
+        // A safe external URL should pass
+        let result = SsrfGuard::validate_url_with_config("https://example.com/webhook");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_block_host_containing_local_in_middle() {
+        // .contains(".local.") branch — subdomain with .local. in the middle
+        assert!(SsrfGuard::validate_url("http://svc.local.cluster.example.com/webhook").is_err());
+    }
+
+    #[test]
+    fn test_ipv6_loopback_is_private() {
+        // ::1 is loopback; is_private_ip uses allow_loopback=false so it IS private
+        assert!(SsrfGuard::is_private_ip(
+            &"::1".parse::<std::net::IpAddr>().unwrap()
+        ));
+    }
+
+    #[test]
     fn test_block_reserved_ips() {
         assert!(SsrfGuard::validate_url("http://240.0.0.1/webhook").is_err());
         // 255.255.255.255 is broadcast, not blocked by this implementation

@@ -262,4 +262,25 @@ mod tests {
         let uri = redirect_response.build_full_redirect_uri();
         assert_eq!(uri, DEFAULT_REDIRECT_RELATIVE_URI);
     }
+
+    #[test]
+    fn test_into_response_trait_impl() {
+        use axum::response::IntoResponse;
+        let redirect_response = RedirectResponseBuilder::new("/web").build();
+        // Covers the IntoResponse impl (line 99-102) which calls build_redirect_response
+        let response = redirect_response.into_response();
+        assert_eq!(response.status(), StatusCode::FOUND);
+    }
+
+    #[test]
+    fn test_url_with_quotes_trimmed() {
+        // build_redirect_response trims '"' from both ends (line 60)
+        let redirect_response = RedirectResponseBuilder::new(r#""/web""#).build();
+        let response = redirect_response.redirect_http();
+        // After trim, location should be /web
+        assert_eq!(
+            response.headers().get(LOCATION).unwrap().to_str().unwrap(),
+            "/web"
+        );
+    }
 }
