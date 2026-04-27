@@ -275,9 +275,11 @@ mod tests {
             "schedule_interval": "2m",
         });
         let item = anomaly_config_to_list_item(&v).expect("should parse");
-        let tc = item.trigger_condition.expect("trigger_condition should be set");
-        assert_eq!(tc.period_minutes, 2);     // 120 / 60
-        assert_eq!(tc.frequency_minutes, 2);  // "2m" → 2
+        let tc = item
+            .trigger_condition
+            .expect("trigger_condition should be set");
+        assert_eq!(tc.period_minutes, 2); // 120 / 60
+        assert_eq!(tc.frequency_minutes, 2); // "2m" → 2
     }
 }
 
