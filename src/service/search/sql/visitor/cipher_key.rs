@@ -117,3 +117,50 @@ impl VisitorMut for ExtractKeyNamesVisitor {
         ControlFlow::Continue(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_cipher_key_names_no_cipher_functions() {
+        let sql = "SELECT a, b FROM t WHERE a = 1";
+        let keys = get_cipher_key_names(sql).unwrap();
+        assert!(keys.is_empty());
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_encrypt() {
+        let sql = "SELECT encrypt(col, 'mykey') FROM t";
+        let keys = get_cipher_key_names(sql).unwrap();
+        assert_eq!(keys, vec!["mykey"]);
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_decrypt() {
+        let sql = "SELECT decrypt(col, 'secret') FROM t";
+        let keys = get_cipher_key_names(sql).unwrap();
+        assert_eq!(keys, vec!["secret"]);
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_decrypt_path() {
+        let sql = "SELECT decrypt_path(col, 'pathkey') FROM t";
+        let keys = get_cipher_key_names(sql).unwrap();
+        assert_eq!(keys, vec!["pathkey"]);
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_multiple_cipher_calls() {
+        let sql = "SELECT encrypt(a, 'k1'), decrypt(b, 'k2') FROM t";
+        let mut keys = get_cipher_key_names(sql).unwrap();
+        keys.sort();
+        assert_eq!(keys, vec!["k1", "k2"]);
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_invalid_sql_returns_error() {
+        let result = get_cipher_key_names("NOT VALID SQL @@@@");
+        assert!(result.is_err());
+    }
+}
