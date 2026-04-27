@@ -275,3 +275,64 @@ pub struct LegendWidth {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unit: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_dashboard() -> Dashboard {
+        serde_json::from_value(serde_json::json!({
+            "version": 2,
+            "title": "My Dashboard",
+            "description": "A test dashboard"
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn test_dashboard_title_and_description() {
+        let d = make_dashboard();
+        assert_eq!(d.title, "My Dashboard");
+        assert_eq!(d.description, "A test dashboard");
+    }
+
+    #[test]
+    fn test_dashboard_default_fields_empty() {
+        let d = make_dashboard();
+        assert!(d.dashboard_id.is_empty());
+        assert!(d.panels.is_empty());
+        assert!(d.variables.is_none());
+    }
+
+    #[test]
+    fn test_dashboard_into_meta_version_is_2() {
+        let d = make_dashboard();
+        let meta: super::super::Dashboard = d.into();
+        assert_eq!(meta.version, 2);
+        assert!(meta.v2.is_some());
+        assert!(meta.v1.is_none());
+        assert!(meta.v3.is_none());
+    }
+
+    #[test]
+    fn test_aggregation_func_serde_roundtrip() {
+        for func in [
+            AggregationFunc::Count,
+            AggregationFunc::Sum,
+            AggregationFunc::Min,
+            AggregationFunc::Max,
+            AggregationFunc::Avg,
+        ] {
+            let json = serde_json::to_string(&func).unwrap();
+            let back: AggregationFunc = serde_json::from_str(&json).unwrap();
+            assert_eq!(func, back);
+        }
+    }
+
+    #[test]
+    fn test_dashboard_hash_is_not_empty() {
+        let d = make_dashboard();
+        let meta: super::super::Dashboard = d.into();
+        assert!(!meta.hash.is_empty());
+    }
+}

@@ -697,3 +697,33 @@ pub enum LabelPosition {
     InsideBottomRight,
     Outside,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_dashboard() -> Dashboard {
+        serde_json::from_value(serde_json::json!({
+            "version": 7,
+            "title": "V7 Dashboard",
+            "description": "A v7 test dashboard"
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn test_dashboard_fields() {
+        let d = make_dashboard();
+        assert_eq!(d.title, "V7 Dashboard");
+        assert!(d.tabs.is_empty());
+    }
+
+    #[test]
+    fn test_dashboard_into_meta_version_is_7() {
+        let d = make_dashboard();
+        let meta: super::super::Dashboard = d.into();
+        assert_eq!(meta.version, 7);
+        assert!(meta.v7.is_some());
+        assert!(!meta.hash.is_empty());
+    }
+}

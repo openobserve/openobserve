@@ -382,3 +382,35 @@ pub struct LegendWidth {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unit: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_dashboard() -> Dashboard {
+        serde_json::from_value(serde_json::json!({
+            "version": 3,
+            "title": "V3 Dashboard",
+            "description": "A v3 test dashboard"
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn test_dashboard_fields() {
+        let d = make_dashboard();
+        assert_eq!(d.title, "V3 Dashboard");
+        assert_eq!(d.description, "A v3 test dashboard");
+        assert!(d.tabs.is_empty());
+    }
+
+    #[test]
+    fn test_dashboard_into_meta_version_is_3() {
+        let d = make_dashboard();
+        let meta: super::super::Dashboard = d.into();
+        assert_eq!(meta.version, 3);
+        assert!(meta.v3.is_some());
+        assert!(meta.v2.is_none());
+        assert!(!meta.hash.is_empty());
+    }
+}
