@@ -414,5 +414,27 @@ mod tests {
             ..a.clone()
         };
         assert_ne!(a, d);
+
+        // Different params only → not equal
+        let e = Transform {
+            params: "event".to_string(),
+            ..a.clone()
+        };
+        assert_ne!(a, e);
+    }
+
+    #[test]
+    fn test_is_result_array_vrl_trans_type_none() {
+        // trans_type = None → is_vrl() is false → short-circuits to false
+        let t = Transform {
+            function: "#ResultArray#\n. = {}".to_string(),
+            name: "test".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: None,
+            streams: None,
+        };
+        assert!(!t.is_result_array_vrl());
+        assert!(!t.is_vrl());
     }
 }

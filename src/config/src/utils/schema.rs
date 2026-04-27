@@ -611,4 +611,28 @@ mod tests {
         assert!(result.len() <= super::MAX_PARTITION_KEY_LENGTH + 1);
         assert!(result.len() < 200);
     }
+
+    #[test]
+    fn test_infer_json_schema_from_values_non_object_returns_error() {
+        use serde_json::Value;
+        // Passing a non-Object value (Array) should hit the `_` branch → error
+        let vals = vec![Value::Array(vec![Value::from(1), Value::from(2)])];
+        let result = infer_json_schema_from_values("test_stream", StreamType::Logs, vals.iter());
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("non-object"), "unexpected error: {msg}");
+    }
+
+    #[test]
+    fn test_infer_json_schema_from_values_object_with_array_field_returns_error() {
+        use serde_json::{Map, Value};
+        // An object containing an array field hits `_` in infer_json_schema_from_object
+        let mut obj = Map::new();
+        obj.insert("items".to_string(), Value::Array(vec![Value::from(1)]));
+        let vals = vec![Value::Object(obj)];
+        let result = infer_json_schema_from_values("test_stream", StreamType::Logs, vals.iter());
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("non-basic type"), "unexpected error: {msg}");
+    }
 }
