@@ -252,12 +252,8 @@ impl OtelIngestionProcessor {
 
         // Ensure cost has a total if it has any data — sum all component costs
         // (not just input+output) so cache token costs are included.
-        if !cost.contains_key("total") {
-            let total: f64 = cost
-                .iter()
-                .filter(|(k, _)| k.as_str() != "total")
-                .map(|(_, &v)| v)
-                .sum();
+        if !cost.is_empty() && !cost.contains_key("total") {
+            let total: f64 = cost.values().sum();
             cost.insert("total".to_string(), total);
         }
 
