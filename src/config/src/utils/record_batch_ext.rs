@@ -3234,4 +3234,46 @@ mod test {
         assert_eq!(ts_col.value(3), 100);
         assert_eq!(out_schema, merged.schema());
     }
+
+    // ── format_recordbatch_by_schema fast paths ──────────────────────────
+
+    #[test]
+    fn test_format_recordbatch_empty_target_schema_returns_batch_unchanged() {
+        // schema.fields().is_empty() → return batch immediately
+        let target_schema = Arc::new(Schema::empty());
+        let src_schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
+        let batch = RecordBatch::try_new(
+            src_schema.clone(),
+            vec![Arc::new(StringArray::from(vec!["x"])) as ArrayRef],
+        )
+        .unwrap();
+        let result = format_recordbatch_by_schema(target_schema, batch.clone());
+        assert_eq!(result.num_rows(), batch.num_rows());
+        assert_eq!(result.schema(), batch.schema());
+    }
+
+    #[test]
+    fn test_format_recordbatch_identical_schemas_returns_batch_unchanged() {
+        // schema.fields() == batch.schema().fields() → return batch immediately
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, true),
+            Field::new("b", DataType::Int64, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["hello"])) as ArrayRef,
+                Arc::new(Int64Array::from(vec![42_i64])) as ArrayRef,
+            ],
+        )
+        .unwrap();
+        let result = format_recordbatch_by_schema(schema.clone(), batch.clone());
+        assert_eq!(result.schema(), batch.schema());
+        assert_eq!(result.num_rows(), 1);
+        let col = result.column_by_name("a").unwrap();
+        assert_eq!(
+            col.as_any().downcast_ref::<StringArray>().unwrap().value(0),
+            "hello"
+        );
+    }
 }
