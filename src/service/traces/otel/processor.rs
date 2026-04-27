@@ -180,20 +180,6 @@ impl OtelIngestionProcessor {
                 usage.insert("output".to_string(), output_tokens);
             }
 
-            // Ensure usage has a input,output,total
-            if !usage.contains_key("input") {
-                usage.insert("input".to_string(), 0);
-            }
-            if !usage.contains_key("output") {
-                usage.insert("output".to_string(), 0);
-            }
-            if !usage.contains_key("total") {
-                let input = usage.get("input").cloned().unwrap_or_default();
-                let output = usage.get("output").cloned().unwrap_or_default();
-                let total = input + output;
-                usage.insert("total".to_string(), total);
-            }
-
             // Calculate cost from tokens if cost is missing but we have model and usage
             if let Some(ref model_name) = model_name
                 && cost.is_empty()
@@ -213,14 +199,32 @@ impl OtelIngestionProcessor {
                     cost.insert("total".to_string(), total_cost);
                 }
             }
+        }
 
-            // Ensure cost has a total if it has any data
-            if !cost.contains_key("total") {
-                let input = cost.get("input").cloned().unwrap_or_default();
-                let output = cost.get("output").cloned().unwrap_or_default();
-                let total = input + output;
-                cost.insert("total".to_string(), total);
-            }
+        // Ensure usage has a input,output,total
+        if !usage.contains_key("input") {
+            usage.insert("input".to_string(), 0);
+        }
+        if !usage.contains_key("output") {
+            usage.insert("output".to_string(), 0);
+        }
+        if !usage.contains_key("total") {
+            // Total = input + output only. Cache tokens (cache_read_input_tokens,
+            // cache_creation_input_tokens) are subsets of input, not additive.
+            let input = usage.get("input").copied().unwrap_or(0);
+            let output = usage.get("output").copied().unwrap_or(0);
+            usage.insert("total".to_string(), input + output);
+        }
+
+        // Ensure cost has a total if it has any data — sum all component costs
+        // (not just input+output) so cache token costs are included.
+        if !cost.contains_key("total") {
+            let total: f64 = cost
+                .iter()
+                .filter(|(k, _)| k.as_str() != "total")
+                .map(|(_, &v)| v)
+                .sum();
+            cost.insert("total".to_string(), total);
         }
 
         // Add enriched fields
