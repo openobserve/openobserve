@@ -568,4 +568,55 @@ mod tests {
         assert_eq!(NodeStatus::from(99), NodeStatus::Prepare);
         assert_eq!(NodeStatus::from(-1), NodeStatus::Prepare);
     }
+
+    #[test]
+    fn test_role_group_from_search_event_type_background() {
+        // Reports, Alerts, DerivedStream, SearchJob → Background
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Reports),
+            RoleGroup::Background
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Alerts),
+            RoleGroup::Background
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::DerivedStream),
+            RoleGroup::Background
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::SearchJob),
+            RoleGroup::Background
+        );
+    }
+
+    #[test]
+    fn test_role_group_from_search_event_type_interactive() {
+        // All other SearchEventType variants → Interactive
+        assert_eq!(RoleGroup::from(SearchEventType::UI), RoleGroup::Interactive);
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Dashboards),
+            RoleGroup::Interactive
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Values),
+            RoleGroup::Interactive
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Other),
+            RoleGroup::Interactive
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::RUM),
+            RoleGroup::Interactive
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Download),
+            RoleGroup::Interactive
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Insights),
+            RoleGroup::Interactive
+        );
+    }
 }
