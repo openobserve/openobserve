@@ -39,3 +39,53 @@ impl PromptExtractor {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_extract_prompt_name_from_gen_ai_attribute() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.prompt.name".to_string(),
+            config::utils::json::json!("my_prompt"),
+        );
+        let result = PromptExtractor.extract_name(&attrs);
+        assert_eq!(result, Some("my_prompt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_prompt_name_from_langfuse_attribute() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "langfuse.observation.prompt.name".to_string(),
+            config::utils::json::json!("langfuse_prompt"),
+        );
+        let result = PromptExtractor.extract_name(&attrs);
+        assert_eq!(result, Some("langfuse_prompt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_prompt_name_gen_ai_takes_priority_over_langfuse() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.prompt.name".to_string(),
+            config::utils::json::json!("gen_ai_prompt"),
+        );
+        attrs.insert(
+            "langfuse.observation.prompt.name".to_string(),
+            config::utils::json::json!("langfuse_prompt"),
+        );
+        let result = PromptExtractor.extract_name(&attrs);
+        assert_eq!(result, Some("gen_ai_prompt".to_string()));
+    }
+
+    #[test]
+    fn test_extract_prompt_name_absent_returns_none() {
+        let result = PromptExtractor.extract_name(&HashMap::new());
+        assert!(result.is_none());
+    }
+}

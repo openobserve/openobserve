@@ -91,3 +91,64 @@ impl MetadataExtractor {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_extract_user_id_from_span_attributes() {
+        let mut attrs = HashMap::new();
+        attrs.insert("user.id".to_string(), json::json!("user_123"));
+        let result = MetadataExtractor.extract_user_id(&attrs, &HashMap::new());
+        assert_eq!(result, Some("user_123".to_string()));
+    }
+
+    #[test]
+    fn test_extract_user_id_falls_back_to_resource_attributes() {
+        let mut resource = HashMap::new();
+        resource.insert("user.id".to_string(), json::json!("res_user"));
+        let result = MetadataExtractor.extract_user_id(&HashMap::new(), &resource);
+        assert_eq!(result, Some("res_user".to_string()));
+    }
+
+    #[test]
+    fn test_extract_user_id_span_takes_priority_over_resource() {
+        let mut attrs = HashMap::new();
+        attrs.insert("user.id".to_string(), json::json!("span_user"));
+        let mut resource = HashMap::new();
+        resource.insert("user.id".to_string(), json::json!("res_user"));
+        let result = MetadataExtractor.extract_user_id(&attrs, &resource);
+        assert_eq!(result, Some("span_user".to_string()));
+    }
+
+    #[test]
+    fn test_extract_user_id_returns_none_when_absent() {
+        let result = MetadataExtractor.extract_user_id(&HashMap::new(), &HashMap::new());
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_session_id_from_span_attributes() {
+        let mut attrs = HashMap::new();
+        attrs.insert("session.id".to_string(), json::json!("session_abc"));
+        let result = MetadataExtractor.extract_session_id(&attrs, &HashMap::new());
+        assert_eq!(result, Some("session_abc".to_string()));
+    }
+
+    #[test]
+    fn test_extract_session_id_falls_back_to_resource_attributes() {
+        let mut resource = HashMap::new();
+        resource.insert("session.id".to_string(), json::json!("res_session"));
+        let result = MetadataExtractor.extract_session_id(&HashMap::new(), &resource);
+        assert_eq!(result, Some("res_session".to_string()));
+    }
+
+    #[test]
+    fn test_extract_session_id_returns_none_when_absent() {
+        let result = MetadataExtractor.extract_session_id(&HashMap::new(), &HashMap::new());
+        assert!(result.is_none());
+    }
+}
