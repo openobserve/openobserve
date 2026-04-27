@@ -1153,4 +1153,56 @@ mod tests {
         // Test invalid SQL
         assert!(!is_explain_query("INVALID SQL"));
     }
+
+    #[test]
+    fn test_is_aggregate_query() {
+        assert!(is_aggregate_query("SELECT count(*) FROM t").unwrap());
+        assert!(is_aggregate_query("SELECT max(val), min(val) FROM t").unwrap());
+        assert!(is_aggregate_query("SELECT x FROM t GROUP BY x").unwrap());
+        assert!(is_aggregate_query("SELECT DISTINCT x FROM t").unwrap());
+        assert!(!is_aggregate_query("SELECT x FROM t").unwrap());
+        assert!(!is_aggregate_query("SELECT x, y FROM t WHERE x > 1").unwrap());
+    }
+
+    #[test]
+    fn test_is_simple_aggregate_query() {
+        assert!(is_simple_aggregate_query("SELECT count(*) FROM t").unwrap());
+        assert!(is_simple_aggregate_query("SELECT sum(val) FROM t GROUP BY x").unwrap());
+        // subquery makes it not simple
+        assert!(!is_simple_aggregate_query("SELECT x FROM (SELECT x FROM t)").unwrap());
+        // no aggregation — still returns true per logic (no false condition hit)
+        // JOIN makes it not simple
+        assert!(
+            !is_simple_aggregate_query("SELECT count(*) FROM t JOIN t2 ON t.id = t2.id").unwrap()
+        );
+    }
+
+    #[test]
+    fn test_is_simple_distinct_query() {
+        assert!(is_simple_distinct_query("SELECT DISTINCT x FROM t").unwrap());
+        assert!(!is_simple_distinct_query("SELECT x FROM t").unwrap());
+        assert!(!is_simple_distinct_query("SELECT DISTINCT x FROM t GROUP BY x").unwrap());
+    }
+
+    #[test]
+    fn test_is_eligible_for_histogram_basic() {
+        // Simple query — eligible
+        let (eligible, is_sub) = is_eligible_for_histogram("SELECT x FROM t", false).unwrap();
+        assert!(eligible);
+        assert!(!is_sub);
+
+        // DISTINCT — not eligible
+        let (eligible, _) = is_eligible_for_histogram("SELECT DISTINCT x FROM t", false).unwrap();
+        assert!(!eligible);
+
+        // LIMIT — not eligible
+        let (eligible, _) = is_eligible_for_histogram("SELECT x FROM t LIMIT 10", false).unwrap();
+        assert!(!eligible);
+
+        // Subquery — eligible as sub
+        let (eligible, is_sub) =
+            is_eligible_for_histogram("SELECT x FROM (SELECT x FROM t)", false).unwrap();
+        assert!(eligible);
+        assert!(is_sub);
+    }
 }

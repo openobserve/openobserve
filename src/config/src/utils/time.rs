@@ -581,4 +581,14 @@ mod tests {
         assert!(t2 > t1);
         assert!(t2 - t1 >= 10000); // At least 10ms difference
     }
+
+    #[test]
+    fn test_parse_interval_to_minutes() {
+        assert_eq!(parse_interval_to_minutes("30m"), 30);
+        assert_eq!(parse_interval_to_minutes("2h"), 120);
+        assert_eq!(parse_interval_to_minutes("90s"), 1);
+        assert_eq!(parse_interval_to_minutes("1d"), 1440);
+        assert_eq!(parse_interval_to_minutes("60"), 60);
+        assert_eq!(parse_interval_to_minutes("invalid"), 0);
+    }
 }

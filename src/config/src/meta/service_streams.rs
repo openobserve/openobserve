@@ -559,4 +559,77 @@ mod tests {
             CardinalityClass::VeryHigh
         );
     }
+
+    #[test]
+    fn test_stream_info_new() {
+        let s = StreamInfo::new("my_stream".to_string());
+        assert_eq!(s.stream_name, "my_stream");
+        assert_eq!(s.stream_type, StreamType::default());
+        assert!(s.filters.is_empty());
+    }
+
+    #[test]
+    fn test_stream_info_with_filters() {
+        let mut filters = HashMap::new();
+        filters.insert("env".to_string(), "prod".to_string());
+        let s = StreamInfo::with_filters("s".to_string(), filters.clone());
+        assert_eq!(s.filters, filters);
+        assert_eq!(s.stream_type, StreamType::default());
+    }
+
+    #[test]
+    fn test_stream_info_set_stream_type() {
+        let s = StreamInfo::new("s".to_string()).set_stream_type(StreamType::Metrics);
+        assert_eq!(s.stream_type, StreamType::Metrics);
+    }
+
+    #[test]
+    fn test_cardinality_class_is_suitable_for_correlation() {
+        assert!(CardinalityClass::VeryLow.is_suitable_for_correlation());
+        assert!(CardinalityClass::Low.is_suitable_for_correlation());
+        assert!(CardinalityClass::Medium.is_suitable_for_correlation());
+        assert!(!CardinalityClass::High.is_suitable_for_correlation());
+        assert!(!CardinalityClass::VeryHigh.is_suitable_for_correlation());
+    }
+
+    #[test]
+    fn test_cardinality_class_priority_score() {
+        assert_eq!(CardinalityClass::VeryLow.priority_score(), 1);
+        assert_eq!(CardinalityClass::Low.priority_score(), 2);
+        assert_eq!(CardinalityClass::Medium.priority_score(), 3);
+        assert_eq!(CardinalityClass::High.priority_score(), 4);
+        assert_eq!(CardinalityClass::VeryHigh.priority_score(), 5);
+    }
+
+    #[test]
+    fn test_dimension_analytics_new() {
+        let d = DimensionAnalytics::new("namespace".to_string());
+        assert_eq!(d.dimension_name, "namespace");
+        assert_eq!(d.cardinality, 0);
+        assert_eq!(d.service_count, 0);
+        assert_eq!(d.cardinality_class, CardinalityClass::VeryLow);
+        assert!(d.sample_values.is_empty());
+    }
+
+    #[test]
+    fn test_dimension_analytics_update() {
+        let mut d = DimensionAnalytics::new("env".to_string());
+        let mut sample = HashMap::new();
+        sample.insert("logs".to_string(), HashMap::new());
+        d.update(5, 2, sample, HashMap::new(), HashMap::new());
+        assert_eq!(d.cardinality, 5);
+        assert_eq!(d.service_count, 2);
+        assert_eq!(d.cardinality_class, CardinalityClass::VeryLow);
+    }
+
+    #[test]
+    fn test_dimension_analytics_is_suitable_for_correlation() {
+        let mut d = DimensionAnalytics::new("region".to_string());
+        d.update(3, 1, HashMap::new(), HashMap::new(), HashMap::new());
+        assert!(d.is_suitable_for_correlation());
+
+        // high cardinality — not suitable
+        d.update(5000, 1, HashMap::new(), HashMap::new(), HashMap::new());
+        assert!(!d.is_suitable_for_correlation());
+    }
 }
