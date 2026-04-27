@@ -724,4 +724,70 @@ mod tests {
         assert!(meta.v5.is_some());
         assert!(!meta.hash.is_empty());
     }
+
+    #[test]
+    fn test_line_interpolation_default_is_smooth() {
+        let li: LineInterpolation = Default::default();
+        assert_eq!(li, LineInterpolation::Smooth);
+    }
+
+    #[test]
+    fn test_line_interpolation_kebab_case_serde() {
+        let cases = [
+            (LineInterpolation::Smooth, "\"smooth\""),
+            (LineInterpolation::Linear, "\"linear\""),
+            (LineInterpolation::StepStart, "\"step-start\""),
+            (LineInterpolation::StepEnd, "\"step-end\""),
+            (LineInterpolation::StepMiddle, "\"step-middle\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: LineInterpolation = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_label_position_default_is_top() {
+        let lp: LabelPosition = Default::default();
+        assert_eq!(lp, LabelPosition::Top);
+    }
+
+    #[test]
+    fn test_label_position_camel_case_serde() {
+        let cases = [
+            (LabelPosition::Top, "\"top\""),
+            (LabelPosition::InsideLeft, "\"insideLeft\""),
+            (LabelPosition::InsideTopRight, "\"insideTopRight\""),
+            (LabelPosition::Outside, "\"outside\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: LabelPosition = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_aggregation_func_default_is_count() {
+        let af: AggregationFunc = Default::default();
+        assert_eq!(af, AggregationFunc::Count);
+    }
+
+    #[test]
+    fn test_aggregation_func_kebab_case_serde() {
+        let cases = [
+            (AggregationFunc::Count, "\"count\""),
+            (AggregationFunc::CountDistinct, "\"count-distinct\""),
+            (AggregationFunc::P99, "\"p99\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: AggregationFunc = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
 }

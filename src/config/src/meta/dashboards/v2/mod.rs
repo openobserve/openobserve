@@ -335,4 +335,16 @@ mod tests {
         let meta: super::super::Dashboard = d.into();
         assert!(!meta.hash.is_empty());
     }
+
+    #[test]
+    fn test_aggregation_func_count_distinct_serde() {
+        let s = serde_json::to_string(&AggregationFunc::CountDistinct).unwrap();
+        assert_eq!(s, "\"count-distinct\"");
+        let back: AggregationFunc = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, AggregationFunc::CountDistinct);
+        let hist = serde_json::to_string(&AggregationFunc::Histogram).unwrap();
+        assert_eq!(hist, "\"histogram\"");
+        let med = serde_json::to_string(&AggregationFunc::Median).unwrap();
+        assert_eq!(med, "\"median\"");
+    }
 }

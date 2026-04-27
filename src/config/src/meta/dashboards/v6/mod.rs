@@ -724,4 +724,49 @@ mod tests {
         assert!(meta.v6.is_some());
         assert!(!meta.hash.is_empty());
     }
+
+    #[test]
+    fn test_line_interpolation_default_and_kebab_serde() {
+        let li: LineInterpolation = Default::default();
+        assert_eq!(li, LineInterpolation::Smooth);
+        let cases = [
+            (LineInterpolation::Smooth, "\"smooth\""),
+            (LineInterpolation::StepStart, "\"step-start\""),
+            (LineInterpolation::StepEnd, "\"step-end\""),
+            (LineInterpolation::StepMiddle, "\"step-middle\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: LineInterpolation = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_label_position_default_and_camel_serde() {
+        let lp: LabelPosition = Default::default();
+        assert_eq!(lp, LabelPosition::Top);
+        let cases = [
+            (LabelPosition::InsideLeft, "\"insideLeft\""),
+            (LabelPosition::InsideTopRight, "\"insideTopRight\""),
+            (LabelPosition::Outside, "\"outside\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: LabelPosition = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_aggregation_func_default_and_serde() {
+        let af: AggregationFunc = Default::default();
+        assert_eq!(af, AggregationFunc::Count);
+        let s = serde_json::to_string(&AggregationFunc::CountDistinct).unwrap();
+        assert_eq!(s, "\"count-distinct\"");
+        let back: AggregationFunc = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, AggregationFunc::CountDistinct);
+    }
 }

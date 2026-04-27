@@ -463,4 +463,26 @@ mod tests {
         assert!(meta.v3.is_none());
         assert!(!meta.hash.is_empty());
     }
+
+    #[test]
+    fn test_aggregation_func_default_and_serde() {
+        let af: AggregationFunc = Default::default();
+        assert_eq!(af, AggregationFunc::Count);
+        // CountDistinct has an explicit rename
+        let s = serde_json::to_string(&AggregationFunc::CountDistinct).unwrap();
+        assert_eq!(s, "\"count-distinct\"");
+        let back: AggregationFunc = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, AggregationFunc::CountDistinct);
+        // Regular lowercase
+        let p99 = serde_json::to_string(&AggregationFunc::P99).unwrap();
+        assert_eq!(p99, "\"p99\"");
+    }
+
+    #[test]
+    fn test_legend_width_optional_fields_absent_when_none() {
+        let lw = LegendWidth::default();
+        let json = serde_json::to_string(&lw).unwrap();
+        assert!(!json.contains("\"value\""));
+        assert!(!json.contains("\"unit\""));
+    }
 }

@@ -530,4 +530,16 @@ mod tests {
             }
         "##]].assert_debug_eq(&dashboard);
     }
+
+    #[test]
+    fn test_aggregation_func_serde() {
+        let s = serde_json::to_string(&AggregationFunc::Count).unwrap();
+        assert_eq!(s, "\"count\"");
+        let s2 = serde_json::to_string(&AggregationFunc::CountDistinct).unwrap();
+        assert_eq!(s2, "\"count-distinct\"");
+        let back: AggregationFunc = serde_json::from_str(&s2).unwrap();
+        assert_eq!(back, AggregationFunc::CountDistinct);
+        let sum = serde_json::to_string(&AggregationFunc::Sum).unwrap();
+        assert_eq!(sum, "\"sum\"");
+    }
 }

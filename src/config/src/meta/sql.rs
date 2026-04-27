@@ -225,4 +225,31 @@ mod tests {
         assert!(reserved.contains(&"user".to_string()));
         assert!(!reserved.contains(&"message".to_string()));
     }
+
+    #[test]
+    fn test_order_by_default_is_desc() {
+        let o: OrderBy = Default::default();
+        assert_eq!(o, OrderBy::Desc);
+    }
+
+    #[test]
+    fn test_order_by_serde_roundtrip() {
+        let desc = serde_json::to_string(&OrderBy::Desc).unwrap();
+        let asc = serde_json::to_string(&OrderBy::Asc).unwrap();
+        assert_eq!(desc, "\"desc\"");
+        assert_eq!(asc, "\"asc\"");
+        let back_desc: OrderBy = serde_json::from_str(&desc).unwrap();
+        let back_asc: OrderBy = serde_json::from_str(&asc).unwrap();
+        assert_eq!(back_desc, OrderBy::Desc);
+        assert_eq!(back_asc, OrderBy::Asc);
+    }
+
+    #[test]
+    fn test_resolve_stream_names_join() {
+        let sql = "select a.x, b.y from \"logs\".events a join \"logs\".alerts b on a.id = b.id";
+        let names = resolve_stream_names(sql).unwrap();
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"events".to_string()));
+        assert!(names.contains(&"alerts".to_string()));
+    }
 }
