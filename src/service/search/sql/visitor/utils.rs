@@ -441,14 +441,35 @@ pub fn generate_table_reference(idents: &[Ident]) -> (TableReference, String) {
 
 #[cfg(test)]
 mod tests {
-    use sqlparser::{ast::VisitMut, dialect::GenericDialect};
+    use sqlparser::{
+        ast::{SetExpr, Statement, VisitMut},
+        dialect::GenericDialect,
+        parser::Parser,
+    };
 
     use super::*;
+
+    fn parse_stmt(sql: &str) -> Statement {
+        Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap()
+    }
+
+    fn parse_query_body(sql: &str) -> (Box<Query>, Box<Select>) {
+        let stmt = parse_stmt(sql);
+        if let Statement::Query(q) = stmt {
+            if let SetExpr::Select(s) = *q.body.clone() {
+                return (q, s);
+            }
+        }
+        panic!("expected SELECT query");
+    }
 
     #[test]
     fn test_field_name_visitor() {
         let sql = "SELECT name, age FROM users";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -456,20 +477,14 @@ mod tests {
         let mut field_visitor = FieldNameVisitor::new();
         let _ = statement.visit(&mut field_visitor);
 
-        // Should extract field names
         assert!(field_visitor.field_names.contains("name"));
         assert!(field_visitor.field_names.contains("age"));
     }
 
     #[test]
     fn test_field_matches_with_alias() {
-        // Test direct field name match
         assert!(field_matches_with_alias("field1", None, "field1"));
-
-        // Test alias match
         assert!(field_matches_with_alias("field1", Some("alias1"), "alias1"));
-
-        // Test no match
         assert!(!field_matches_with_alias("field1", None, "field2"));
         assert!(!field_matches_with_alias(
             "field1",
@@ -486,7 +501,7 @@ mod tests {
     #[test]
     fn test_complex_query_visitor() {
         let sql = "SELECT * FROM users WHERE name IN (SELECT name FROM admins)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+        let mut statement = Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -494,7 +509,121 @@ mod tests {
         let mut complex_visitor = ComplexQueryVisitor::new();
         let _ = statement.visit(&mut complex_visitor);
 
-        // Should detect complex query due to subquery
         assert!(complex_visitor.is_complex);
+    }
+
+    #[test]
+    fn test_is_complex_query_simple_select_is_not_complex() {
+        let mut stmt = parse_stmt("SELECT a, b FROM t WHERE a = 1");
+        assert!(!is_complex_query(&mut stmt));
+    }
+
+    #[test]
+    fn test_is_complex_query_group_by_is_complex() {
+        let mut stmt = parse_stmt("SELECT a, count(a) FROM t GROUP BY a");
+        assert!(is_complex_query(&mut stmt));
+    }
+
+    #[test]
+    fn test_is_complex_query_distinct_is_complex() {
+        let mut stmt = parse_stmt("SELECT DISTINCT a FROM t");
+        assert!(is_complex_query(&mut stmt));
+    }
+
+    #[test]
+    fn test_is_complex_query_union_is_complex() {
+        let mut stmt = parse_stmt("SELECT a FROM t1 UNION SELECT a FROM t2");
+        assert!(is_complex_query(&mut stmt));
+    }
+
+    #[test]
+    fn test_is_complex_query_subquery_is_complex() {
+        let mut stmt = parse_stmt("SELECT a FROM t WHERE a IN (SELECT a FROM t2)");
+        assert!(is_complex_query(&mut stmt));
+    }
+
+    #[test]
+    fn test_is_simple_count_query_true() {
+        let (_, select) = parse_query_body("SELECT count(*) FROM t");
+        assert!(is_simple_count_query(&select));
+    }
+
+    #[test]
+    fn test_is_simple_count_query_false_extra_projection() {
+        let (_, select) = parse_query_body("SELECT a, count(*) FROM t");
+        assert!(!is_simple_count_query(&select));
+    }
+
+    #[test]
+    fn test_is_simple_count_query_false_non_star_arg() {
+        let (_, select) = parse_query_body("SELECT count(a) FROM t");
+        assert!(!is_simple_count_query(&select));
+    }
+
+    #[test]
+    fn test_is_simple_histogram_query_true() {
+        let (_, select) = parse_query_body("SELECT histogram(_timestamp), count(*) FROM t");
+        assert!(is_simple_histogram_query(&select));
+    }
+
+    #[test]
+    fn test_is_simple_histogram_query_false_wrong_order() {
+        let (_, select) = parse_query_body("SELECT count(*), histogram(_timestamp) FROM t");
+        assert!(!is_simple_histogram_query(&select));
+    }
+
+    #[test]
+    fn test_is_simple_histogram_query_false_too_many_projections() {
+        let (_, select) = parse_query_body("SELECT histogram(_timestamp), count(*), extra FROM t");
+        assert!(!is_simple_histogram_query(&select));
+    }
+
+    #[test]
+    fn test_is_simple_topn_query_valid() {
+        let stmt =
+            parse_stmt("SELECT id, count(*) as cnt FROM t GROUP BY id ORDER BY cnt DESC LIMIT 10");
+        if let Statement::Query(q) = stmt {
+            let result = is_simple_topn_query(&q);
+            assert!(result.is_some());
+            let (field, limit, order_by_count) = result.unwrap();
+            assert_eq!(field, "id");
+            assert_eq!(limit, 10);
+            assert!(order_by_count);
+        }
+    }
+
+    #[test]
+    fn test_is_simple_topn_query_no_limit_returns_none() {
+        let stmt = parse_stmt("SELECT id, count(*) as cnt FROM t GROUP BY id ORDER BY cnt DESC");
+        if let Statement::Query(q) = stmt {
+            assert!(is_simple_topn_query(&q).is_none());
+        }
+    }
+
+    #[test]
+    fn test_is_simple_topn_query_ascending_order_returns_none() {
+        let stmt =
+            parse_stmt("SELECT id, count(*) as cnt FROM t GROUP BY id ORDER BY cnt ASC LIMIT 10");
+        if let Statement::Query(q) = stmt {
+            assert!(is_simple_topn_query(&q).is_none());
+        }
+    }
+
+    #[test]
+    fn test_generate_table_reference_two_idents() {
+        use sqlparser::ast::Ident;
+        let idents = vec![Ident::new("mytable"), Ident::new("myfield")];
+        let (table_ref, field) = generate_table_reference(&idents);
+        assert_eq!(field, "myfield");
+        assert_eq!(table_ref.table(), "mytable");
+    }
+
+    #[test]
+    fn test_generate_table_reference_three_idents() {
+        use sqlparser::ast::Ident;
+        let idents = vec![Ident::new("logs"), Ident::new("stream1"), Ident::new("col")];
+        let (table_ref, field) = generate_table_reference(&idents);
+        assert_eq!(field, "col");
+        assert_eq!(table_ref.table(), "stream1");
     }
 }

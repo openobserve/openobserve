@@ -381,6 +381,153 @@ mod tests {
     }
 
     #[test]
+    fn test_setting_scope_as_str() {
+        assert_eq!(SettingScope::System.as_str(), "system");
+        assert_eq!(SettingScope::Org.as_str(), "org");
+        assert_eq!(SettingScope::User.as_str(), "user");
+    }
+
+    #[test]
+    fn test_setting_scope_display() {
+        assert_eq!(SettingScope::System.to_string(), "system");
+        assert_eq!(SettingScope::Org.to_string(), "org");
+        assert_eq!(SettingScope::User.to_string(), "user");
+    }
+
+    #[test]
+    fn test_setting_scope_from_str_case_insensitive() {
+        assert_eq!(
+            "SYSTEM".parse::<SettingScope>().unwrap(),
+            SettingScope::System
+        );
+        assert_eq!("ORG".parse::<SettingScope>().unwrap(), SettingScope::Org);
+        assert_eq!("USER".parse::<SettingScope>().unwrap(), SettingScope::User);
+    }
+
+    #[test]
+    fn test_setting_category_as_str() {
+        assert_eq!(SettingCategory::Correlation.as_str(), "correlation");
+        assert_eq!(SettingCategory::Ui.as_str(), "ui");
+        assert_eq!(SettingCategory::Alerts.as_str(), "alerts");
+        assert_eq!(SettingCategory::Retention.as_str(), "retention");
+        assert_eq!(SettingCategory::Search.as_str(), "search");
+        assert_eq!(SettingCategory::Ingestion.as_str(), "ingestion");
+        assert_eq!(SettingCategory::General.as_str(), "general");
+    }
+
+    #[test]
+    fn test_setting_category_display() {
+        assert_eq!(SettingCategory::Correlation.to_string(), "correlation");
+        assert_eq!(SettingCategory::Ui.to_string(), "ui");
+    }
+
+    #[test]
+    fn test_setting_category_from_str() {
+        assert_eq!(
+            "correlation".parse::<SettingCategory>().unwrap(),
+            SettingCategory::Correlation
+        );
+        assert_eq!(
+            "ui".parse::<SettingCategory>().unwrap(),
+            SettingCategory::Ui
+        );
+        assert_eq!(
+            "alerts".parse::<SettingCategory>().unwrap(),
+            SettingCategory::Alerts
+        );
+        assert_eq!(
+            "retention".parse::<SettingCategory>().unwrap(),
+            SettingCategory::Retention
+        );
+        assert_eq!(
+            "search".parse::<SettingCategory>().unwrap(),
+            SettingCategory::Search
+        );
+        assert_eq!(
+            "ingestion".parse::<SettingCategory>().unwrap(),
+            SettingCategory::Ingestion
+        );
+        assert_eq!(
+            "general".parse::<SettingCategory>().unwrap(),
+            SettingCategory::General
+        );
+        assert!("unknown".parse::<SettingCategory>().is_err());
+    }
+
+    #[test]
+    fn test_setting_category_from_str_case_insensitive() {
+        assert_eq!(
+            "SEARCH".parse::<SettingCategory>().unwrap(),
+            SettingCategory::Search
+        );
+    }
+
+    #[test]
+    fn test_new_system_fields() {
+        let s = SystemSetting::new_system("mykey", serde_json::json!(42));
+        assert_eq!(s.scope, SettingScope::System);
+        assert_eq!(s.setting_key, "mykey");
+        assert_eq!(s.setting_value, serde_json::json!(42));
+        assert!(s.org_id.is_none());
+        assert!(s.user_id.is_none());
+        assert!(s.id.is_none());
+        assert!(s.setting_category.is_none());
+        assert!(s.description.is_none());
+    }
+
+    #[test]
+    fn test_new_org_fields() {
+        let s = SystemSetting::new_org("myorg", "mykey", serde_json::json!(true));
+        assert_eq!(s.scope, SettingScope::Org);
+        assert_eq!(s.org_id.as_deref(), Some("myorg"));
+        assert_eq!(s.setting_key, "mykey");
+        assert!(s.user_id.is_none());
+    }
+
+    #[test]
+    fn test_new_user_fields() {
+        let s = SystemSetting::new_user("myorg", "myuser", "mykey", serde_json::json!("val"));
+        assert_eq!(s.scope, SettingScope::User);
+        assert_eq!(s.org_id.as_deref(), Some("myorg"));
+        assert_eq!(s.user_id.as_deref(), Some("myuser"));
+        assert_eq!(s.setting_key, "mykey");
+    }
+
+    #[test]
+    fn test_with_category() {
+        let s = SystemSetting::new_system("k", serde_json::json!(1))
+            .with_category(SettingCategory::Search);
+        assert_eq!(s.setting_category.as_deref(), Some("search"));
+    }
+
+    #[test]
+    fn test_with_description() {
+        let s = SystemSetting::new_system("k", serde_json::json!(1)).with_description("my desc");
+        assert_eq!(s.description.as_deref(), Some("my desc"));
+    }
+
+    #[test]
+    fn test_validate_system_with_user_id_fails() {
+        let mut s = SystemSetting::new_system("k", serde_json::json!(1));
+        s.user_id = Some("u".to_string());
+        assert!(s.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_org_with_user_id_fails() {
+        let mut s = SystemSetting::new_org("org", "k", serde_json::json!(1));
+        s.user_id = Some("u".to_string());
+        assert!(s.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_user_without_org_fails() {
+        let mut s = SystemSetting::new_user("org", "u", "k", serde_json::json!(1));
+        s.org_id = None;
+        assert!(s.validate().is_err());
+    }
+
+    #[test]
     fn test_system_setting_validation() {
         // Valid system setting
         let system_setting = SystemSetting::new_system("test_key", serde_json::json!("value"));
