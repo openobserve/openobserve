@@ -601,9 +601,13 @@ pub async fn update_stream_settings(
                         "user defined schema is not allowed, you need to set ZO_ALLOW_USER_DEFINED_SCHEMAS=true",
                     )));
         }
-        settings
+        let new_defined: Vec<_> = new_settings
             .defined_schema_fields
-            .extend(new_settings.defined_schema_fields.add);
+            .add
+            .into_iter()
+            .filter(|f| !settings.defined_schema_fields.contains(f))
+            .collect();
+        settings.defined_schema_fields.extend(new_defined);
     }
     if !new_settings.defined_schema_fields.remove.is_empty() {
         settings
@@ -625,6 +629,7 @@ pub async fn update_stream_settings(
             .collect::<HashSet<_>>();
         let mut fields: Vec<_> = fields.into_iter().collect();
         fields.sort();
+        fields.dedup();
         fields.retain(|field| schema_fields.contains(field));
         settings.defined_schema_fields = fields;
     }
@@ -640,9 +645,13 @@ pub async fn update_stream_settings(
 
     // check for bloom filter fields
     if !new_settings.bloom_filter_fields.add.is_empty() {
-        settings
+        let new_bloom: Vec<_> = new_settings
             .bloom_filter_fields
-            .extend(new_settings.bloom_filter_fields.add);
+            .add
+            .into_iter()
+            .filter(|f| !settings.bloom_filter_fields.contains(f))
+            .collect();
+        settings.bloom_filter_fields.extend(new_bloom);
     }
     if !new_settings.bloom_filter_fields.remove.is_empty() {
         settings
@@ -652,7 +661,13 @@ pub async fn update_stream_settings(
 
     // check for index fields
     if !new_settings.index_fields.add.is_empty() {
-        settings.index_fields.extend(new_settings.index_fields.add);
+        let new_index: Vec<_> = new_settings
+            .index_fields
+            .add
+            .into_iter()
+            .filter(|f| !settings.index_fields.contains(f))
+            .collect();
+        settings.index_fields.extend(new_index);
         settings.index_updated_at = now_micros();
     }
     if !new_settings.index_fields.remove.is_empty() {
@@ -662,9 +677,13 @@ pub async fn update_stream_settings(
     }
 
     if !new_settings.extended_retention_days.add.is_empty() {
-        settings
+        let new_retention: Vec<_> = new_settings
             .extended_retention_days
-            .extend(new_settings.extended_retention_days.add);
+            .add
+            .into_iter()
+            .filter(|r| !settings.extended_retention_days.contains(r))
+            .collect();
+        settings.extended_retention_days.extend(new_retention);
     }
 
     if !new_settings.extended_retention_days.remove.is_empty() {
@@ -786,9 +805,13 @@ pub async fn update_stream_settings(
     }
 
     if !new_settings.full_text_search_keys.add.is_empty() {
-        settings
+        let new_fts: Vec<_> = new_settings
             .full_text_search_keys
-            .extend(new_settings.full_text_search_keys.add);
+            .add
+            .into_iter()
+            .filter(|f| !settings.full_text_search_keys.contains(f))
+            .collect();
+        settings.full_text_search_keys.extend(new_fts);
         settings.index_updated_at = now_micros();
     }
 
@@ -831,7 +854,13 @@ pub async fn update_stream_settings(
                     "Cross-link name must be 256 characters or less",
                 ));
             }
-            settings.cross_links.push(link_to_add);
+            if !settings
+                .cross_links
+                .iter()
+                .any(|l| l.name == link_to_add.name)
+            {
+                settings.cross_links.push(link_to_add);
+            }
         }
 
         // Enforce max limit
