@@ -2278,4 +2278,70 @@ mod test {
         };
         assert!(group.validate().is_ok());
     }
+
+    #[test]
+    fn test_alert_condition_params_unsupported_version_returns_error() {
+        // version 3 → _ => Err branch in Deserialize
+        let json = r#"{"version": 3, "conditions": {}}"#;
+        let result: Result<AlertConditionParams, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("Unsupported version"), "unexpected: {msg}");
+    }
+
+    #[test]
+    fn test_alert_condition_params_v2_missing_conditions_returns_error() {
+        // version 2 without "conditions" field → error
+        let json = r#"{"version": 2}"#;
+        let result: Result<AlertConditionParams, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("conditions field missing"),
+            "unexpected: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_alert_condition_params_v1_serialize_roundtrip() {
+        // V1 serialize → delegates to ConditionList::serialize
+        let conditions = ConditionList::AndNode {
+            and: vec![ConditionList::EndCondition(Condition {
+                column: "level".to_string(),
+                operator: Operator::EqualTo,
+                value: serde_json::Value::String("error".to_string()),
+                ignore_case: false,
+            })],
+        };
+        let params = AlertConditionParams::V1(conditions);
+        let serialized = serde_json::to_string(&params).unwrap();
+        assert!(
+            serialized.contains("\"and\""),
+            "V1 should serialize as ConditionList"
+        );
+        assert!(
+            !serialized.contains("\"version\""),
+            "V1 should have no version field"
+        );
+    }
+
+    #[test]
+    fn test_alert_condition_params_v2_serialize_includes_version() {
+        // V2 serialize → includes version:2 field
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![],
+        };
+        let params = AlertConditionParams::V2(group);
+        let serialized = serde_json::to_string(&params).unwrap();
+        assert!(
+            serialized.contains("\"version\":2"),
+            "V2 should include version:2"
+        );
+        assert!(
+            serialized.contains("\"conditions\""),
+            "V2 should include conditions field"
+        );
+    }
 }
