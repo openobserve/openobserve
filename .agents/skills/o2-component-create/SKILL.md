@@ -58,18 +58,46 @@ All family members co-locate in the same folder. See [references/component-guide
 
 ## Folder Contract
 
+**Every component in a family gets its own `.types.ts` and `.spec.ts` file — never share them across components.**
+
 ```
-web/src/lib/{group}/{ComponentName}/
-├── {ComponentName}.vue          # SFC: template + script setup (no <style> unless pseudo-element CSS is unavoidable)
-├── {ComponentName}.types.ts     # ALL public props, emits, slots — single source of truth
-└── {ComponentName}.spec.ts      # Vitest + @vue/test-utils tests
+web/src/lib/{group}/{FamilyName}/
+├── OFoo.vue                  # Root component
+├── OFoo.types.ts             # OFoo types only — re-exports sub-component types for convenience
+├── OFoo.spec.ts              # OFoo tests only
+├── OFooItem.vue              # Sub-component
+├── OFooItem.types.ts         # OFooItem types only (NEW — separate file)
+├── OFooItem.spec.ts          # OFooItem tests only (NEW — separate file)
+├── OFooGroup.vue
+├── OFooGroup.types.ts        # OFooGroup types only
+├── OFooGroup.spec.ts         # OFooGroup tests only
+└── OFooSeparator.vue
+    OFooSeparator.types.ts    # OFooSeparator types only
+    OFooSeparator.spec.ts     # OFooSeparator tests only
 ```
+
+The root `.types.ts` re-exports sub-component types so callers can still import everything from one place if needed:
+
+```ts
+// ODropdown.types.ts
+export type {
+  DropdownItemProps,
+  DropdownItemEmits,
+  DropdownItemSlots,
+} from "./ODropdownItem.types"
+export type {
+  DropdownGroupProps,
+  DropdownGroupSlots,
+} from "./ODropdownGroup.types"
+```
+
+**Why one file per component?** When a sub-component changes (e.g. new prop on `ODropdownItem`), you edit only `ODropdownItem.types.ts` and `ODropdownItem.spec.ts` — no risk of accidentally breaking the root component's types or tests.
 
 **No `index.ts` per component.** Import directly by path:
 
 ```ts
-import OButton from "@/lib/core/Button/Button.vue"
-import type { ButtonProps } from "@/lib/core/Button/Button.types"
+import OButton from "@/lib/core/Button/OButton.vue"
+import type { ButtonProps } from "@/lib/core/Button/OButton.types"
 ```
 
 A group-level barrel (`web/src/lib/core/index.ts`) is optional and added only once a group has multiple built components.
