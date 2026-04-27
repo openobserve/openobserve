@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #cell-actions="{ row, column, active }">
             <CellActions
-              v-if="active && !column.columnDef.meta.disableCellAction"
+              v-if="showCellActions && active && !column.columnDef.meta.disableCellAction"
               :column="column"
               :row="row"
               :selected-stream-fields="
@@ -253,6 +253,8 @@ interface Props {
   sortOrder?: "asc" | "desc";
   /** Current search mode */
   searchMode?: TraceSearchMode;
+  /** Whether to show CellActions overlay on table cells. Default: true */
+  showCellActions?: boolean;
 }
 
 const { t } = useI18n();
@@ -269,6 +271,7 @@ const props = withDefaults(defineProps<Props>(), {
   sortBy: undefined,
   sortOrder: undefined,
   searchMode: "traces",
+  showCellActions: true,
 });
 
 const emit = defineEmits<{

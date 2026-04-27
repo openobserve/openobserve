@@ -2,6 +2,7 @@ import { expect } from '@playwright/test';
 const { waitUtils } = require('../../playwright-tests/utils/wait-helpers.js');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 
 export class SanityPage {
     constructor(page) {
@@ -288,14 +289,13 @@ export class SanityPage {
         
         const queryEditor = this.page.locator(this.queryEditorContent);
         await expect(queryEditor).toBeVisible({ timeout: 10000 });
-        
-        await queryEditor.getByRole('code').click();
-        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.keyboard.press("Backspace");
-        await this.page.waitForTimeout(300);
-        await queryEditor.locator('.inputarea').fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
-        
-        await this.page.waitForLoadState('domcontentloaded');
+
+        // Use MonacoEditorHelper to replace editor content via keyboard events.
+        // .fill() on Monaco's .inputarea appends instead of replacing, producing an
+        // invalid concatenated query that causes the server to abort the stream.
+        const monacoHelper = new MonacoEditorHelper(this.page);
+        await monacoHelper.setContent(queryEditor, 'SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+
         const limitSearchPromise = this.page.waitForResponse(resp => resp.url().includes('/_search'), { timeout: 30000 });
         await this.page.locator(this.refreshButton).click({ force: true });
         await limitSearchPromise;

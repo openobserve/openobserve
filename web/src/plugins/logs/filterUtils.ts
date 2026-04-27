@@ -63,8 +63,9 @@ export const removeFieldCondition = (
   fieldName: string,
 ): string => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const fieldPattern = new RegExp(`^"?${esc}"?\\s*[=!<>]`, "i");
-  const multiPattern = new RegExp(`^\\(\\s*"?${esc}"?\\s*[=!<>]`, "i");
+  // Match both comparison operators (=, !=, <, >) and IS / IS NOT (for null checks)
+  const fieldPattern = new RegExp(`^"?${esc}"?\\s*(?:[=!<>]|is\\s)`, "i");
+  const multiPattern = new RegExp(`^\\(\\s*"?${esc}"?\\s*(?:[=!<>]|is\\s)`, "i");
 
   const remaining = queryStr
     .trim()

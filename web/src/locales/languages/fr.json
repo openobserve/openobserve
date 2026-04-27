@@ -1691,7 +1691,10 @@
     "streamTotal": "Ruisseaux",
     "totalDashboard": "Tableaux de bord",
     "viewButton": "Afficher",
-    "noDataAvailable": "Aucune donnée disponible"
+    "noDataAvailable": "Aucune donnée disponible",
+    "tabAiAssistant": "Assistant O2 AI",
+    "tabOverview": "Vue d'ensemble",
+    "tabUsage": "Utilisation"
   },
   "billing": {
     "header": "Utilisation et facturation",
@@ -3274,7 +3277,8 @@
     "metricsErrorDetails": "Une erreur s'est produite lors de la récupération des données des métriques. Veuillez réessayer.",
     "noMetricsDescription": "Aucune métrique n'a été trouvée pour cette corrélation dans la plage de temps sélectionnée.",
     "errorRetrievingTraces": "Une erreur s'est produite lors de la récupération des traces.",
-    "serviceGroupProtected": "Le groupe de services ne peut pas être supprimé. Vous ne pouvez modifier que les champs mappés."
+    "serviceGroupProtected": "Le groupe de services ne peut pas être supprimé. Vous ne pouvez modifier que les champs mappés.",
+    "noDataFound": "Aucune donnée trouvée"
   },
   "sreChat": {
     "emptyMessage": "Demandez-moi tout ce que vous voulez savoir sur vos alertes et incidents",
@@ -3612,5 +3616,30 @@
     "errLoadModel": "Impossible de charger le modèle",
     "tierDefaultName": "Par défaut",
     "tierConditionalName": "Niveau conditionnel"
+  },
+  "overview": {
+    "title": "Vue d'ensemble du système",
+    "activeAnomalies": "Anomalies actives",
+    "activeIncidents": "Incidents actifs",
+    "services": "Des services",
+    "recentEvents": "Évènements récents",
+    "investigate": "Enquêter →",
+    "untitledIncident": "Incident sans titre",
+    "viewLatencyCharts": "Afficher les graphiques de latence et RED",
+    "elevatedErrorRate": "Taux d'erreur élevé",
+    "reqPerSec": "reque/s",
+    "allClear": "Tout est clair",
+    "allClearDesc": "Aucune anomalie active, aucun incident ou service dégradé dans la fenêtre de temps sélectionnée."
+  },
+  "chatHistory": {
+    "title": "Discussions",
+    "newChat": "Nouveau chat",
+    "search": "Rechercher",
+    "noMatches": "Aucune allumette",
+    "noHistory": "Pas d'historique des discussions",
+    "delete": "Supprimer",
+    "clearAll": "Tout effacer",
+    "clearAllTitle": "Effacer tous les chats",
+    "clearAllMessage": "Cela supprimera définitivement tout l'historique des discussions. Cette action ne peut pas être annulée."
   }
 }

@@ -149,7 +149,7 @@ export const DEFAULT_LOGS_CONFIG = {
     isActionsEnabled: false,
     resetPlotChart: false,
     clearCache: false,
-    liveMode: localStorage.getItem("oo_live_mode_logs") === "true",
+    liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
   },
   data: {
     query: "" as any,

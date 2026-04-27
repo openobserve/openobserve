@@ -40,7 +40,10 @@ vi.mock("../../aws-exports", () => ({
 vi.mock("../../utils/zincutils", () => ({
   formatSizeFromMB: vi.fn((size) => `${size}MB`),
   addCommasToNumber: vi.fn((num) => num?.toLocaleString() || "0"),
-  getImageURL: vi.fn((url) => url)
+  getImageURL: vi.fn((url) => url),
+  useLocalOrganization: vi.fn(() => null),
+  useLocalCurrentUser: vi.fn(() => null),
+  useLocalTimezone: vi.fn(() => null)
 }));
 
 vi.mock("../../composables/useStreams", () => ({

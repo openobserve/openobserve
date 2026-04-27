@@ -17,7 +17,9 @@ import { describe, it, expect } from "vitest";
 import {
   classifyMetric,
   groupMetricsByCategory,
+  getDefaultMetricSelections,
   DEFAULT_METRIC_GROUP_DEFINITIONS,
+  K8S_METRIC_GROUP_DEFINITIONS,
   type MetricGroupDefinition,
   type MetricGroupConfig,
 } from "./metricGrouping";
@@ -592,6 +594,199 @@ describe("groupMetricsByCategory — custom groupDefs", () => {
     const podsGroup = result.groups.find((g) => g.id === "pods");
     expect(podsGroup?.label).toBe("Pods");
     expect(podsGroup?.icon).toBe("bubble_chart");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// K8S_METRIC_GROUP_DEFINITIONS
+// ---------------------------------------------------------------------------
+
+describe("K8S_METRIC_GROUP_DEFINITIONS", () => {
+  it("should contain exactly 4 entries in order: pods, nodes, network, others", () => {
+    expect(K8S_METRIC_GROUP_DEFINITIONS).toHaveLength(4);
+    expect(K8S_METRIC_GROUP_DEFINITIONS.map((d) => d.id)).toEqual([
+      "pods",
+      "nodes",
+      "network",
+      "others",
+    ]);
+  });
+
+  it("should have label and icon for every entry", () => {
+    for (const def of K8S_METRIC_GROUP_DEFINITIONS) {
+      expect(def.label).toBeTruthy();
+      expect(def.icon).toBeTruthy();
+    }
+  });
+
+  it("should have defaultMetrics defined for pods and nodes but not for network", () => {
+    const pods = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "pods");
+    const nodes = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "nodes");
+    const network = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "network");
+    expect(pods?.defaultMetrics?.length).toBeGreaterThan(0);
+    expect(nodes?.defaultMetrics?.length).toBeGreaterThan(0);
+    expect(network?.defaultMetrics ?? []).toHaveLength(0);
+  });
+
+  it("should have no defaultMetrics on the others group", () => {
+    const others = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "others");
+    expect(others?.defaultMetrics ?? []).toHaveLength(0);
+  });
+
+  it("should list all 6 pod CPU/memory metrics and pod network IO in pods defaults", () => {
+    const pods = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "pods");
+    const names = pods!.defaultMetrics!.map((m) => m.streamName);
+    expect(names).toContain("k8s_pod_cpu_usage");
+    expect(names).toContain("k8s_pod_memory_usage");
+    expect(names).toContain("k8s_pod_cpu_request_utilization");
+    expect(names).toContain("k8s_pod_memory_request_utilization");
+    expect(names).toContain("k8s_pod_cpu_limit_utilization");
+    expect(names).toContain("k8s_pod_memory_limit_utilization");
+    expect(names).toContain("k8s_pod_network_io");
+  });
+
+  it("should list k8s_node_cpu_usage, k8s_node_memory_rss, and k8s_node_network_io in nodes defaults", () => {
+    const nodes = K8S_METRIC_GROUP_DEFINITIONS.find((d) => d.id === "nodes");
+    const names = nodes!.defaultMetrics!.map((m) => m.streamName);
+    expect(names).toContain("k8s_node_cpu_usage");
+    expect(names).toContain("k8s_node_memory_rss");
+    expect(names).toContain("k8s_node_network_io");
+  });
+
+  it("should have no direction filters on any default metric config", () => {
+    for (const group of K8S_METRIC_GROUP_DEFINITIONS) {
+      for (const m of group.defaultMetrics ?? []) {
+        expect(m.filters?.direction).toBeUndefined();
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getDefaultMetricSelections
+// ---------------------------------------------------------------------------
+
+describe("getDefaultMetricSelections", () => {
+  function makeStream(
+    stream_name: string,
+    filters: Record<string, string> = {},
+  ): StreamInfo {
+    return { stream_name, stream_type: "metrics", filters };
+  }
+
+  it("should return an empty array when no group has defaultMetrics", () => {
+    const defs: MetricGroupDefinition[] = [
+      { id: "others", label: "Others", icon: "category" },
+    ];
+    const streams = [makeStream("k8s_pod_cpu_usage")];
+    expect(getDefaultMetricSelections(defs, streams)).toEqual([]);
+  });
+
+  it("should return an empty array when none of the default streams are available", () => {
+    const result = getDefaultMetricSelections(K8S_METRIC_GROUP_DEFINITIONS, []);
+    expect(result).toEqual([]);
+  });
+
+  it("should match a default metric by stream_name alone when no filters defined", () => {
+    const streams = [makeStream("k8s_pod_cpu_usage")];
+    const result = getDefaultMetricSelections(K8S_METRIC_GROUP_DEFINITIONS, streams);
+    expect(result).toHaveLength(1);
+    expect(result[0].stream_name).toBe("k8s_pod_cpu_usage");
+  });
+
+  it("should match all 6 pod CPU/memory defaults when all are present", () => {
+    const podStreams = [
+      "k8s_pod_cpu_usage",
+      "k8s_pod_memory_usage",
+      "k8s_pod_cpu_request_utilization",
+      "k8s_pod_memory_request_utilization",
+      "k8s_pod_cpu_limit_utilization",
+      "k8s_pod_memory_limit_utilization",
+    ].map((n) => makeStream(n));
+    const result = getDefaultMetricSelections(
+      K8S_METRIC_GROUP_DEFINITIONS,
+      podStreams,
+    );
+    expect(result).toHaveLength(6);
+  });
+
+  it("should skip defaults whose stream_name is not in availableStreams", () => {
+    const streams = [makeStream("k8s_pod_cpu_usage")];
+    const result = getDefaultMetricSelections(K8S_METRIC_GROUP_DEFINITIONS, streams);
+    // Only 1 of many defaults is available
+    expect(result).toHaveLength(1);
+    expect(result[0].stream_name).toBe("k8s_pod_cpu_usage");
+  });
+
+  it("should match k8s_pod_network_io without requiring any direction filter", () => {
+    // K8S_METRIC_GROUP_DEFINITIONS has no direction filter — any network_io stream matches
+    const streams = [makeStream("k8s_pod_network_io")];
+    const result = getDefaultMetricSelections(K8S_METRIC_GROUP_DEFINITIONS, streams);
+    const matched = result.filter((s) => s.stream_name === "k8s_pod_network_io");
+    expect(matched).toHaveLength(1);
+  });
+
+  it("should require all declared filters to match when a custom definition uses filters", () => {
+    const defs: MetricGroupDefinition[] = [
+      {
+        id: "custom",
+        label: "Custom",
+        icon: "star",
+        defaultMetrics: [{ streamName: "my_metric", filters: { env: "prod" } }],
+      },
+    ];
+    const streams = [
+      makeStream("my_metric", { env: "staging" }),
+      makeStream("my_metric", { env: "prod" }),
+    ];
+    const result = getDefaultMetricSelections(defs, streams);
+    expect(result).toHaveLength(1);
+    expect(result[0].filters?.env).toBe("prod");
+  });
+
+  it("should return no match when a custom filter requirement is not satisfied by any stream", () => {
+    const defs: MetricGroupDefinition[] = [
+      {
+        id: "custom",
+        label: "Custom",
+        icon: "star",
+        defaultMetrics: [{ streamName: "my_metric", filters: { env: "prod" } }],
+      },
+    ];
+    const streams = [makeStream("my_metric", { env: "staging" })];
+    const result = getDefaultMetricSelections(defs, streams);
+    expect(result).toHaveLength(0);
+  });
+
+  it("should return streams in group definition order (pods → nodes)", () => {
+    const streams = [
+      makeStream("k8s_node_cpu_usage"),
+      makeStream("k8s_pod_cpu_usage"),
+      makeStream("k8s_pod_network_io"),
+    ];
+    const result = getDefaultMetricSelections(K8S_METRIC_GROUP_DEFINITIONS, streams);
+    // pods group is first: k8s_pod_cpu_usage (first pod default) then k8s_pod_network_io (last pod default)
+    expect(result[0].stream_name).toBe("k8s_pod_cpu_usage");
+    expect(result[1].stream_name).toBe("k8s_pod_network_io");
+    // nodes group is second
+    expect(result[2].stream_name).toBe("k8s_node_cpu_usage");
+  });
+
+  it("should return the same StreamInfo reference from availableStreams", () => {
+    const stream = makeStream("k8s_pod_cpu_usage");
+    const result = getDefaultMetricSelections(K8S_METRIC_GROUP_DEFINITIONS, [stream]);
+    expect(result[0]).toBe(stream);
+  });
+
+  it("should not include duplicates when the same stream appears multiple times in availableStreams", () => {
+    const streams = [
+      makeStream("k8s_pod_cpu_usage"),
+      makeStream("k8s_pod_cpu_usage"),
+    ];
+    const result = getDefaultMetricSelections(K8S_METRIC_GROUP_DEFINITIONS, streams);
+    // getDefaultMetricSelections uses Array.find — picks first match per default entry
+    const cpuMatches = result.filter((s) => s.stream_name === "k8s_pod_cpu_usage");
+    expect(cpuMatches).toHaveLength(1);
   });
 });
 

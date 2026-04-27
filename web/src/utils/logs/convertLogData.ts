@@ -3,6 +3,10 @@ import {
   classicColorPaletteLightTheme,
   classicColorPaletteDarkTheme,
 } from "@/utils/dashboard/colorPalette";
+import {
+  formatUnitValue,
+  getUnitValue,
+} from "@/utils/dashboard/convertDataIntoUnitValue";
 
 export const convertLogData = (
   x: any,
@@ -57,11 +61,10 @@ export const convertLogData = (
           precision: 0,
         },
       },
-      // show three tick marks: 0, mid, max
-      interval: y.reduce((a: number, b: number) => Math.max(a, b), 0) / 2,
+      splitNumber: 3,
       axisLabel: {
         formatter: function (value: any) {
-          return Math.round(value);
+          return formatUnitValue(getUnitValue(value, "numbers", "", 2));
         },
       },
     },
@@ -202,10 +205,11 @@ export const convertStackedLogData = (
   const series = [...breakdownSeries.entries()].map(([category, values]) => {
     // Use explicit check so numeric 0 is treated as a real value, not empty.
     // `category || "(empty)"` would incorrectly map 0 → "(empty)" because 0 is falsy.
+    // Case is preserved from the source data — "INFO", "Info", "info" render as
+    // three distinct series instead of being collapsed to one normalized label.
     const label = (category === null || category === undefined || category === "") ? "(empty)" : String(category);
-    const displayLabel = label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
     return {
-      name: displayLabel,
+      name: label,
       type: "bar",
       stack: "total",
       emphasis: { focus: "series" },
@@ -240,6 +244,11 @@ export const convertStackedLogData = (
         appendToBody: true,
         confine: false,
         enterable: true,
+        // Cap the ECharts tooltip container at 20vh and let it scroll
+        // vertically when a high-cardinality breakdown overflows.
+        // !important is required because ECharts writes inline styles.
+        extraCssText:
+          "max-height: 20vh !important; overflow-y: auto !important; overflow-x: hidden !important; white-space: normal !important;",
         backgroundColor: isDarkTheme ? "#1e1e2e" : "#ffffff",
         borderColor: isDarkTheme ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)",
         textStyle: { fontSize: 12, color: textColor },
@@ -278,8 +287,10 @@ export const convertStackedLogData = (
         type: "value",
         axisLine: { show: true },
         axisPointer: { label: { precision: 0 } },
+        splitNumber: 3,
         axisLabel: {
-          formatter: (value: number) => Math.round(value).toString(),
+          formatter: (value: number) =>
+            formatUnitValue(getUnitValue(value, "numbers", "", 2)),
         },
       },
       toolbox: {

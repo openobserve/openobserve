@@ -158,6 +158,10 @@ pub struct AllOrgListDetails {
     #[serde(default)]
     pub plan: i32,
     pub trial_expires_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contract_end_date: Option<i64>,
+    #[serde(default)]
+    pub billing_provider: String,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -173,6 +177,20 @@ pub struct AllOrganizationResponse {
 #[cfg(feature = "cloud")]
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct ExtendTrialPeriodRequest {
+    pub org_id: String,
+    pub new_end_date: i64,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct CreateExternalContractRequest {
+    pub org_id: String,
+    pub end_date: i64,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ExtendExternalContractRequest {
     pub org_id: String,
     pub new_end_date: i64,
 }
@@ -683,6 +701,8 @@ mod tests {
             org_type: "standard".to_string(),
             plan: Default::default(),
             trial_expires_at: None,
+            contract_end_date: None,
+            billing_provider: String::new(),
         };
 
         assert_eq!(details.plan, 0);
@@ -729,6 +749,8 @@ mod tests {
             org_type: "basic".to_string(),
             plan: 0,
             trial_expires_at: None,
+            contract_end_date: None,
+            billing_provider: String::new(),
         };
 
         let details2 = AllOrgListDetails {
@@ -740,6 +762,8 @@ mod tests {
             org_type: "premium".to_string(),
             plan: 1,
             trial_expires_at: Some(1641081600),
+            contract_end_date: None,
+            billing_provider: String::new(),
         };
 
         let response = AllOrganizationResponse {
@@ -761,6 +785,79 @@ mod tests {
 
         assert_eq!(request.org_id, "org-trial");
         assert_eq!(request.new_end_date, 1641081600);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_create_external_contract_request_roundtrip() {
+        let json = r#"{"org_id":"org-ext","end_date":1893456000000000}"#;
+        let req: CreateExternalContractRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.org_id, "org-ext");
+        assert_eq!(req.end_date, 1893456000000000);
+
+        // Round-trip through serialize to ensure both directions agree on the
+        // wire format used by the /external_contract endpoint.
+        let serialized = serde_json::to_string(&req).unwrap();
+        let req2: CreateExternalContractRequest = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req2.org_id, req.org_id);
+        assert_eq!(req2.end_date, req.end_date);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_extend_external_contract_request_roundtrip() {
+        let json = r#"{"org_id":"org-ext","new_end_date":1893456000000000}"#;
+        let req: ExtendExternalContractRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.org_id, "org-ext");
+        assert_eq!(req.new_end_date, 1893456000000000);
+
+        let serialized = serde_json::to_string(&req).unwrap();
+        let req2: ExtendExternalContractRequest = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req2.org_id, req.org_id);
+        assert_eq!(req2.new_end_date, req.new_end_date);
+    }
+
+    #[test]
+    fn test_all_org_list_details_with_contract_fields_serialization() {
+        // External-contract orgs surface contract_end_date + billing_provider,
+        // and contract_end_date must be omitted when null.
+        let with_contract = AllOrgListDetails {
+            id: 7,
+            identifier: "org-ext".to_string(),
+            name: "External Org".to_string(),
+            created_at: 1640995200,
+            updated_at: 1640995260,
+            org_type: "custom".to_string(),
+            plan: 3, // ExternalContract
+            trial_expires_at: Some(1641081600),
+            contract_end_date: Some(1893456000000000),
+            billing_provider: "no_op".to_string(),
+        };
+
+        let v = serde_json::to_value(&with_contract).unwrap();
+        assert_eq!(v["contract_end_date"], 1893456000000000_i64);
+        assert_eq!(v["billing_provider"], "no_op");
+        assert_eq!(v["plan"], 3);
+
+        let without_contract = AllOrgListDetails {
+            id: 8,
+            identifier: "org-free".to_string(),
+            name: "Free Org".to_string(),
+            created_at: 1640995200,
+            updated_at: 1640995260,
+            org_type: "custom".to_string(),
+            plan: 0,
+            trial_expires_at: Some(1641081600),
+            contract_end_date: None,
+            billing_provider: String::new(),
+        };
+
+        let v = serde_json::to_value(&without_contract).unwrap();
+        assert!(
+            v.get("contract_end_date").is_none(),
+            "contract_end_date should be omitted when None: {v}"
+        );
+        assert_eq!(v["billing_provider"], "");
     }
 
     #[test]

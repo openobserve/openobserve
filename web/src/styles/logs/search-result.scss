@@ -16,7 +16,8 @@
 }
 
 .inspect-button{
-  margin-left: 4px;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
 }
 
 .pagination-block {
@@ -362,6 +363,11 @@
   position: fixed;
   z-index: 9999;
   min-width: 200px;
+  // Cap at viewport so high-cardinality breakdowns (50+ rows) scroll
+  // instead of overflowing off-screen.
+  max-height: 20vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: var(--q-color-dark, #1e1e2e);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;

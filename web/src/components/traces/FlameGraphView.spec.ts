@@ -420,11 +420,11 @@ describe("FlameGraphView", () => {
       expect(normalSpan.itemStyle.borderWidth).toBe(1);
     });
 
-    it("should filter out spans below threshold width", async () => {
+    it("should include spans with tiny duration using minimum 0.1% width", async () => {
       const tinySpan = [
         createMockSpan({
           span_id: "tiny",
-          durationMs: 0.01, // Very small duration
+          durationMs: 0.01, // Very small duration: 0.01/10000 * 100 = 0.00001%
           startOffsetMs: 0,
         }),
       ];
@@ -441,8 +441,9 @@ describe("FlameGraphView", () => {
 
       const { data } = wrapper.vm.flameGraphDataAndDepth;
 
-      // Should be filtered out due to < 0.1% threshold
-      expect(data.length).toBe(0);
+      // Tiny spans are included with a minimum 0.1% width so they remain visible
+      expect(data.length).toBe(1);
+      expect(data[0].value[2]).toBe(0.1);
     });
   });
 
@@ -690,8 +691,9 @@ describe("FlameGraphView", () => {
 
       const { data } = wrapper.vm.flameGraphDataAndDepth;
 
-      // Should be filtered out due to 0% width
-      expect(data.length).toBe(0);
+      // Zero-duration spans are included with the minimum 0.1% width
+      expect(data.length).toBe(1);
+      expect(data[0].value[2]).toBe(0.1);
     });
 
     it("should handle negative start offset gracefully", async () => {
@@ -729,8 +731,10 @@ describe("FlameGraphView", () => {
 
       const { data } = wrapper.vm.flameGraphDataAndDepth;
 
-      // All spans should be filtered due to tiny percentage
-      expect(data.length).toBe(0);
+      // All spans are included; each gets the minimum 0.1% width since their natural
+      // percentage is far below the threshold against a 1,000,000ms trace duration
+      expect(data.length).toBe(mockSpans.length);
+      data.forEach((d: any) => expect(d.value[2]).toBe(0.1));
     });
 
     it("should handle undefined selectedSpanId", () => {

@@ -1689,7 +1689,10 @@
     "streamTotal": "Stream",
     "totalDashboard": "Dashboard",
     "viewButton": "Visualizza",
-    "noDataAvailable": "Nessun dato disponibile"
+    "noDataAvailable": "Nessun dato disponibile",
+    "tabAiAssistant": "Assistente AI O2",
+    "tabOverview": "Panoramica",
+    "tabUsage": "Utilizzo"
   },
   "billing": {
     "header": "Utilizzo e fatturazione",
@@ -3283,7 +3286,8 @@
     "metricsErrorDetails": "Si è verificato un errore durante il recupero dei dati delle metriche. Riprova.",
     "noMetricsDescription": "Nessuna metrica trovata per questa correlazione nell'intervallo di tempo selezionato.",
     "errorRetrievingTraces": "Si è verificato un errore durante il recupero delle tracce.",
-    "serviceGroupProtected": "Il gruppo di servizi non può essere rimosso. È possibile modificare solo i campi mappati."
+    "serviceGroupProtected": "Il gruppo di servizi non può essere rimosso. È possibile modificare solo i campi mappati.",
+    "noDataFound": "Nessun dato trovato"
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",
@@ -3621,5 +3625,30 @@
     "errLoadModel": "Caricamento del modello non riuscito",
     "tierDefaultName": "Predefinito",
     "tierConditionalName": "Livello condizionale"
+  },
+  "overview": {
+    "title": "Panoramica del sistema",
+    "activeAnomalies": "Anomalie attive",
+    "activeIncidents": "Incidenti attivi",
+    "services": "Servizi",
+    "recentEvents": "Eventi recenti",
+    "investigate": "Indaga →",
+    "untitledIncident": "Incidente senza titolo",
+    "viewLatencyCharts": "Visualizza latenza e grafici RED",
+    "elevatedErrorRate": "Tasso di errore elevato",
+    "reqPerSec": "richiesta/s",
+    "allClear": "Tutto chiaro",
+    "allClearDesc": "Nessuna anomalia attiva, incidente o servizio degradato nella finestra temporale selezionata."
+  },
+  "chatHistory": {
+    "title": "Chat",
+    "newChat": "Nuova chat",
+    "search": "Cerca",
+    "noMatches": "Nessuna corrispondenza",
+    "noHistory": "Nessuna cronologia chat",
+    "delete": "Elimina",
+    "clearAll": "Cancella tutto",
+    "clearAllTitle": "Cancella tutte le chat",
+    "clearAllMessage": "Ciò eliminerà definitivamente tutta la cronologia chat. Questa azione non può essere annullata."
   }
 }

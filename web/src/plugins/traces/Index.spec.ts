@@ -2142,6 +2142,51 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
+  describe("extractFields — field labels", () => {
+    it("should label the duration field with the plain field name without unit suffix", async () => {
+      // Ensure a stream is available so getStreamList selects one and extractFields runs.
+      // The outer beforeEach already configures mockGetStreams → mockStreamList (which
+      // includes the "default" stream with a `duration` field in its schema) and
+      // mockGetStream to return stream details by name.
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      // getStreamList uses an un-awaited .then() chain; poll until extractFields
+      // has pushed fields into selectedStreamFields.
+      await vi.waitFor(
+        () => {
+          expect(
+            mockSearchObj.data.stream.selectedStreamFields.length,
+          ).toBeGreaterThan(0);
+        },
+        { timeout: 2000 },
+      );
+
+      const durationField = mockSearchObj.data.stream.selectedStreamFields.find(
+        (f: any) => f.name === "duration",
+      );
+
+      expect(durationField).toBeDefined();
+      expect(durationField!.label).toBe("duration");
+      expect(durationField!.label).not.toBe("duration (µs)");
+    });
+  });
+
   describe("parseSpanKindWhereClause integration", () => {
     // Shared mount factory — keeps stub config in one place.
     function mountIndexStubbed() {

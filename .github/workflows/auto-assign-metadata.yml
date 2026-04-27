@@ -1,0 +1,165 @@
+name: Auto Assign Metadata
+
+on:
+  issues:
+    types: [opened]
+  # pull_request_target runs with base-repo secrets for fork PRs — safe as long
+  # as no actions/checkout step is added without pinning ref to the base branch.
+  pull_request_target:
+    types: [opened, ready_for_review]
+
+permissions: {}
+
+env:
+  PROJECT_NUMBER: "19"
+
+jobs:
+  auto-assign:
+    runs-on: ubuntu-latest
+    steps:
+      # ── PR: assign creator ──
+      - name: Assign PR creator
+        if: github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          CREATOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          gh pr edit "$NUMBER" --add-assignee "$CREATOR" \
+            && echo "Assigned $CREATOR to PR #$NUMBER" \
+            || echo "::warning::Could not assign $CREATOR to PR #$NUMBER"
+
+      # ── PR: add lowest open milestone (skip drafts) ──
+      - name: Add milestone to PR
+        if: github.event_name == 'pull_request_target' && github.event.pull_request.draft == false
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          CURRENT=$(gh api "repos/$GH_REPO/pulls/$NUMBER" --jq '.milestone.title // empty')
+          if [ -n "$CURRENT" ]; then
+            echo "Milestone already set to '$CURRENT' — skipping"
+            exit 0
+          fi
+
+          MILESTONE=$(gh api "repos/$GH_REPO/milestones?state=open&per_page=100" --jq '
+            [.[] | select(.title != "Backlog")] |
+            map({
+              title: .title,
+              due_ts: (if .due_on then (.due_on | fromdateiso8601) else null end),
+              sort_key: ([.title | scan("[0-9]+")] | map(tonumber))
+            }) |
+            map(select(.sort_key | length > 0)) |
+            sort_by(.sort_key) |
+            if length == 0 then empty
+            elif (.[0].due_ts != null and .[0].due_ts < now) then (.[1].title // .[0].title)
+            else .[0].title
+            end')
+
+          if [ -n "$MILESTONE" ]; then
+            gh pr edit "$NUMBER" -m "$MILESTONE" \
+              && echo "Set milestone: $MILESTONE" \
+              || echo "::warning::Could not set milestone $MILESTONE"
+          else
+            echo "::warning::No open milestones found"
+          fi
+
+      # ── PR: add to project ──
+      - name: Add PR to project
+        if: github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          NODE_ID: ${{ github.event.pull_request.node_id }}
+          ORG: ${{ github.repository_owner }}
+        run: |
+          PROJECT_ID=$(gh api graphql \
+            -f query='query($org:String!,$num:Int!){organization(login:$org){projectV2(number:$num){id}}}' \
+            -F org="$ORG" -F num="$PROJECT_NUMBER" \
+            --jq '.data.organization.projectV2.id')
+
+          [ -n "$PROJECT_ID" ] || { echo "::warning::Project not found — check PROJECT_NUMBER and token scope"; exit 0; }
+
+          gh api graphql \
+            -f query='mutation($project:ID!,$content:ID!){addProjectV2ItemById(input:{projectId:$project,contentId:$content}){item{id}}}' \
+            -f project="$PROJECT_ID" \
+            -f content="$NODE_ID" \
+            && echo "Added PR to project" \
+            || echo "::warning::Could not add PR to project"
+
+      # ── Issue: assign creator if unassigned ──
+      - name: Assign issue creator
+        if: github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          CREATOR: ${{ github.event.issue.user.login }}
+        run: |
+          ASSIGNEE_COUNT=$(gh api "repos/$GH_REPO/issues/$NUMBER" --jq '.assignees | length')
+          if [ "$ASSIGNEE_COUNT" -eq 0 ]; then
+            gh issue edit "$NUMBER" --add-assignee "$CREATOR" \
+              && echo "Assigned $CREATOR to issue #$NUMBER" \
+              || echo "::warning::Could not assign $CREATOR to issue #$NUMBER"
+          else
+            echo "Issue already has assignees — skipping"
+          fi
+
+      # ── Issue: add lowest open milestone ──
+      - name: Add milestone to issue
+        if: github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          CURRENT=$(gh api "repos/$GH_REPO/issues/$NUMBER" --jq '.milestone.title // empty')
+          if [ -n "$CURRENT" ]; then
+            echo "Milestone already set to '$CURRENT' — skipping"
+            exit 0
+          fi
+
+          MILESTONE=$(gh api "repos/$GH_REPO/milestones?state=open&per_page=100" --jq '
+            [.[] | select(.title != "Backlog")] |
+            map({
+              title: .title,
+              due_ts: (if .due_on then (.due_on | fromdateiso8601) else null end),
+              sort_key: ([.title | scan("[0-9]+")] | map(tonumber))
+            }) |
+            map(select(.sort_key | length > 0)) |
+            sort_by(.sort_key) |
+            if length == 0 then empty
+            elif (.[0].due_ts != null and .[0].due_ts < now) then (.[1].title // .[0].title)
+            else .[0].title
+            end')
+
+          if [ -n "$MILESTONE" ]; then
+            gh issue edit "$NUMBER" -m "$MILESTONE" \
+              && echo "Set milestone: $MILESTONE" \
+              || echo "::warning::Could not set milestone $MILESTONE"
+          else
+            echo "::warning::No open milestones found"
+          fi
+
+      # ── Issue: add to project ──
+      - name: Add issue to project
+        if: github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          NODE_ID: ${{ github.event.issue.node_id }}
+          ORG: ${{ github.repository_owner }}
+        run: |
+          PROJECT_ID=$(gh api graphql \
+            -f query='query($org:String!,$num:Int!){organization(login:$org){projectV2(number:$num){id}}}' \
+            -F org="$ORG" -F num="$PROJECT_NUMBER" \
+            --jq '.data.organization.projectV2.id')
+
+          [ -n "$PROJECT_ID" ] || { echo "::warning::Project not found — check PROJECT_NUMBER and token scope"; exit 0; }
+
+          gh api graphql \
+            -f query='mutation($project:ID!,$content:ID!){addProjectV2ItemById(input:{projectId:$project,contentId:$content}){item{id}}}' \
+            -f project="$PROJECT_ID" \
+            -f content="$NODE_ID" \
+            && echo "Added issue to project" \
+            || echo "::warning::Could not add issue to project"

@@ -466,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="
                   $emit('apply-filter-immediately', {
                     field,
-                    value: fieldValue,
+                    value: getFilterValue(field, fieldValue),
                     operator: action.operator,
                   })
                 "
@@ -527,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click.stop="
                       $emit('apply-filter-immediately', {
                         field,
-                        value: fieldValue,
+                        value: getFilterValue(field, fieldValue),
                         operator: action.operator,
                       })
                     "
@@ -883,7 +883,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-else-if="correlationError"
-              class="tw:text-base tw:text-red-500"
+              class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
             >
               {{ correlationError }}
             </div>
@@ -915,6 +915,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :fts-fields="correlationProps.ftsFields"
           :time-range="correlationProps.timeRange"
           :hide-dimension-filters="true"
+          :metric-group-definitions="metricGroupResources"
+          :panelHeight="12"
+          :panelWidth="96"
           @close="activeTab = 'attributes'"
         />
         <!-- Loading/Empty state when no data -->
@@ -936,7 +939,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-else-if="correlationError"
-              class="tw:text-base tw:text-red-500"
+              class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
             >
               {{ correlationError }}
             </div>
@@ -972,6 +975,11 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import {
+  type MetricGroupDefinition,
+  K8S_METRIC_GROUP_DEFINITIONS,
+} from "@/utils/metrics/metricGrouping";
+import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import TenstackTable from "@/components/TenstackTable.vue";
@@ -1028,6 +1036,7 @@ export default defineComponent({
     EqualIcon,
     NotEqualIcon,
     AttributeValueCell,
+    DeployedCode,
   },
   emits: [
     "close",
@@ -1133,10 +1142,25 @@ export default defineComponent({
       return lines.join("\n");
     };
 
+    const store = useStore();
+
+    const RAW_VALUE_FILTER_FIELDS = new Set([
+      "start_time",
+      "end_time",
+      store.state?.zoConfig?.timestamp_column || "_timestamp",
+    ]);
+
     const filterActions = [
       { operator: "=" as const, iconComponent: EqualIcon },
       { operator: "!=" as const, iconComponent: NotEqualIcon },
     ];
+
+    const getFilterValue = (field: string, displayValue: unknown): unknown => {
+      if (RAW_VALUE_FILTER_FIELDS.has(field)) {
+        return (props.span as Record<string, unknown>)[field] ?? displayValue;
+      }
+      return displayValue;
+    };
 
     const attributesForDisplay = computed(() => {
       const attrs = { ...spanDetails.value.attrs };
@@ -1235,8 +1259,6 @@ export default defineComponent({
     onBeforeMount(() => {
       spanDetails.value = getFormattedSpanDetails();
     });
-
-    const store = useStore();
 
     // Get current theme from store
     const isDarkMode = computed(() => store.state.theme === "dark");
@@ -1698,6 +1720,15 @@ export default defineComponent({
       }
     });
 
+    // Metric group definitions — controls which category tabs and default selections
+    // appear in the metrics dashboard. Uses K8S_METRIC_GROUP_DEFINITIONS for OTel
+    // semantic defaults; overrides the pods icon with the project-specific component.
+    const metricGroupResources = ref<MetricGroupDefinition[]>(
+      K8S_METRIC_GROUP_DEFINITIONS.map((g) =>
+        g.id === "pods" ? { ...g, icon: DeployedCode } : g,
+      ),
+    );
+
     // Correlation state
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
@@ -1888,7 +1919,7 @@ export default defineComponent({
             },
           };
         } else {
-          correlationError.value = t("correlation.noLogsFound");
+          correlationError.value = t("correlation.noDataFound");
         }
       } catch (err: any) {
         console.error("[TraceDetailsSidebar] Correlation failed:", err);
@@ -2123,6 +2154,7 @@ export default defineComponent({
       linkColumns,
       getTagRows,
       tagColumns,
+      getFilterValue,
       attributesForDisplay,
       attributesViewMode,
       attributesTableColumns,
@@ -2133,6 +2165,7 @@ export default defineComponent({
       correlationLoading,
       correlationError,
       correlationProps,
+      metricGroupResources,
       config,
       // LLM
       isLLMSpan,
@@ -2164,6 +2197,23 @@ export default defineComponent({
 :deep(.traces-correlated-metrics-container) {
   .q-splitter--vertical .q-splitter__separator {
     height: 100% !important;
+  }
+
+  .q-card {
+    box-shadow: none !important;
+    border: 1px solid var(--o2-border) !important;
+  }
+
+  .card-container {
+    box-shadow: none !important;
+  }
+
+  .dimension-sidebar {
+    padding-left: 0.25rem;
+  }
+
+  .dimension-sidebar-search-container {
+    padding: 0.375rem 0.2rem !important;
   }
 }
 

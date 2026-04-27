@@ -28,7 +28,6 @@ use super::stream::SchemaRecords;
 /// System job types for backend ingestion processes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SystemJobType {
-    LogPatterns,
     SelfMetricsPromql,
     ServiceGraph,
     SelfReporting,
@@ -40,7 +39,6 @@ impl SystemJobType {
     /// Format as email local part (before @system.local)
     pub fn as_email_local(&self) -> &'static str {
         match self {
-            SystemJobType::LogPatterns => "log_patterns",
             SystemJobType::SelfMetricsPromql => "self_metrics_promql",
             SystemJobType::ServiceGraph => "service_graph",
             SystemJobType::SelfReporting => "self_reporting",
