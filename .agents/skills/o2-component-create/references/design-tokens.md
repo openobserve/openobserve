@@ -87,6 +87,12 @@ Semantic tokens:
 --color-success-{50..900}
 --radius-sm, --radius-md, --radius-lg, --radius-full
 --shadow-sm, --shadow-md, --shadow-lg
+
+Base spacing primitives (reference via var() in component.css — never write raw px):
+--spacing-px   → 1px
+--spacing-8    → 2rem  (32px)
+--spacing-10   → 2.5rem (40px)
+Add more to base.css as needed — never hardcode px in component.css directly
 ```
 
 ---
@@ -109,6 +115,16 @@ Semantic tokens:
 
 <!-- ❌ Missing tw: prefix -->
 <div class="flex items-center">
+```
+
+```css
+/* ❌ Hardcoded px value in component.css token definition */
+--spacing-tabs-height: 40px;
+--spacing-separator: 1px;
+
+/* ✅ Reference a base spacing primitive via var() */
+--spacing-tabs-height: var(--spacing-10);
+--spacing-separator: var(--spacing-px);
 ```
 
 ```vue
