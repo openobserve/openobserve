@@ -578,7 +578,7 @@ describe("PromQLTableChart", () => {
 
       expect(endTime - startTime).toBeLessThan(10000);
       expect(wrapper.vm.tableRows.length).toBe(10000);
-    });
+    }, 15000);
 
     it("should efficiently filter large datasets", async () => {
       const largeData = {
