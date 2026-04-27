@@ -270,38 +270,40 @@ const flameGraphDataAndDepth = computed(() => {
 
   props.spans.forEach((span) => {
     const startPercent = (span.startOffsetMs / traceDuration) * 100;
-    const durationPercent = (span.durationMs / traceDuration) * 100;
+    let durationPercent = (span.durationMs / traceDuration) * 100;
 
-    if (durationPercent > 0.1) {
-      const visualRow = rowMap.get(span.span_id) ?? span.depth;
-      const isSelected = span.span_id === props.selectedSpanId;
-      data.push({
-        value: [
-          startPercent, // x position (percentage)
-          visualRow, // y position (collision-free visual row)
-          durationPercent, // width (percentage of trace)
-          span.durationMs, // actual duration in ms
-        ],
+    // Spans with durationPercent less than 0.1% are invisble in chart
+    // Added min 0.1% durationPercent
+    if (durationPercent < 0.1) durationPercent = 0.1;
+
+    const visualRow = rowMap.get(span.span_id) ?? span.depth;
+    const isSelected = span.span_id === props.selectedSpanId;
+    data.push({
+      value: [
+        startPercent, // x position (percentage)
+        visualRow, // y position (collision-free visual row)
+        durationPercent, // width (percentage of trace)
+        span.durationMs, // actual duration in ms
+      ],
+      itemStyle: {
+        color: searchObj.meta.serviceColors[span.serviceName] || "#9CA3AF",
+        borderColor: isSelected
+          ? "#2563EB"
+          : span.hasError
+            ? "#EF4444"
+            : "#ffffff",
+        borderWidth: isSelected ? 3 : span.hasError ? 2 : 1,
+      },
+      emphasis: {
         itemStyle: {
-          color: searchObj.meta.serviceColors[span.serviceName] || "#9CA3AF",
-          borderColor: isSelected
-            ? "#2563EB"
-            : span.hasError
-              ? "#EF4444"
-              : "#ffffff",
-          borderWidth: isSelected ? 3 : span.hasError ? 2 : 1,
+          borderColor: "#2563EB",
+          borderWidth: 3,
+          shadowBlur: 10,
+          shadowColor: "rgba(37, 99, 235, 0.5)",
         },
-        emphasis: {
-          itemStyle: {
-            borderColor: "#2563EB",
-            borderWidth: 3,
-            shadowBlur: 10,
-            shadowColor: "rgba(37, 99, 235, 0.5)",
-          },
-        },
-        spanData: span,
-      });
-    }
+      },
+      spanData: span,
+    });
   });
 
   return { data, maxRow };

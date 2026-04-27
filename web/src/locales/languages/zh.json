@@ -1691,7 +1691,10 @@
     "streamTotal": "数据流",
     "totalDashboard": "仪表板",
     "viewButton": "查看",
-    "noDataAvailable": "无可用数据"
+    "noDataAvailable": "无可用数据",
+    "tabAiAssistant": "O2 AI 助手",
+    "tabOverview": "概述",
+    "tabUsage": "用法"
   },
   "billing": {
     "header": "用量和账单",
@@ -3617,5 +3620,30 @@
     "errLoadModel": "加载模型失败",
     "tierDefaultName": "默认",
     "tierConditionalName": "有条件的等级"
+  },
+  "overview": {
+    "title": "系统概述",
+    "activeAnomalies": "活跃异常",
+    "activeIncidents": "活跃事件",
+    "services": "服务",
+    "recentEvents": "最近的事件",
+    "investigate": "调查 →",
+    "untitledIncident": "无题事件",
+    "viewLatencyCharts": "查看延迟和 RED 图表",
+    "elevatedErrorRate": "错误率升高",
+    "reqPerSec": "req/s",
+    "allClear": "全部清除",
+    "allClearDesc": "在所选时间窗口内没有活跃的异常、事件或降级的服务。"
+  },
+  "chatHistory": {
+    "title": "聊天",
+    "newChat": "新聊天",
+    "search": "搜寻",
+    "noMatches": "没有匹配项",
+    "noHistory": "没有聊天记录",
+    "delete": "删除",
+    "clearAll": "全部清除",
+    "clearAllTitle": "清除所有聊天",
+    "clearAllMessage": "这将永久删除所有聊天记录。此操作无法撤消。"
   }
 }

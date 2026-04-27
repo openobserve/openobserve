@@ -1708,7 +1708,10 @@
     "streamTotal": "ストリーム",
     "totalDashboard": "ダッシュボード",
     "viewButton": "ビュー",
-    "noDataAvailable": "データはありません"
+    "noDataAvailable": "データはありません",
+    "tabAiAssistant": "O2 人工知能アシスタント",
+    "tabOverview": "概要",
+    "tabUsage": "使い方"
   },
   "billing": {
     "header": "使用状況と請求",
@@ -3613,5 +3616,30 @@
     "errLoadModel": "モデルを読み込めませんでした",
     "tierDefaultName": "デフォルト",
     "tierConditionalName": "条件付き階層"
+  },
+  "overview": {
+    "title": "システム概要",
+    "activeAnomalies": "アクティブ・アノマリー",
+    "activeIncidents": "アクティブインシデント",
+    "services": "サービス",
+    "recentEvents": "最近のイベント",
+    "investigate": "調査する →",
+    "untitledIncident": "無題の事件",
+    "viewLatencyCharts": "レイテンシーチャートと RED チャートを表示",
+    "elevatedErrorRate": "エラー率の上昇",
+    "reqPerSec": "要求/秒",
+    "allClear": "すべてクリア",
+    "allClearDesc": "選択した時間枠には、アクティブな異常、インシデント、または低下したサービスはありません。"
+  },
+  "chatHistory": {
+    "title": "チャット",
+    "newChat": "新しいチャット",
+    "search": "検索",
+    "noMatches": "一致なし",
+    "noHistory": "チャット履歴なし",
+    "delete": "[削除]",
+    "clearAll": "すべてクリア",
+    "clearAllTitle": "すべてのチャットをクリア",
+    "clearAllMessage": "これにより、すべてのチャット履歴が完全に削除されます。このアクションは元に戻せません。"
   }
 }

@@ -21,6 +21,16 @@ import TelemetryCorrelationDashboard from "./TelemetryCorrelationDashboard.vue";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
 
+const mockFetchQueryDataWithHttpStream = vi.fn();
+const mockCancelStreamQueryBasedOnRequestId = vi.fn();
+
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: mockFetchQueryDataWithHttpStream,
+    cancelStreamQueryBasedOnRequestId: mockCancelStreamQueryBasedOnRequestId,
+  }),
+}));
+
 // Mock composables
 vi.mock("@/composables/useNotifications", () => ({
   default: vi.fn(() => ({
@@ -80,12 +90,19 @@ vi.mock("@/services/search", () => ({
     search: vi.fn(() =>
       Promise.resolve({ data: { hits: [], total: 0, took: 0 } })
     ),
+    get_traces: vi.fn(() =>
+      Promise.resolve({ data: { hits: [], total: 0 } })
+    ),
   },
 }));
 
-vi.mock("@/utils/zincutils", () => ({
-  b64EncodeUnicode: vi.fn((str: string) => btoa(str)),
-}));
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    b64EncodeUnicode: vi.fn((str: string) => btoa(str)),
+  };
+});
 
 vi.mock("@/utils/dashboard/constants", () => ({
   SELECT_ALL_VALUE: "*",
@@ -555,6 +572,92 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       expect(timeObj.__global).toBeDefined();
       expect(timeObj.__global.start_time).toBeInstanceOf(Date);
       expect(timeObj.__global.end_time).toBeInstanceOf(Date);
+    });
+  });
+
+  describe("fetchTracesByDimensions", () => {
+    beforeEach(() => {
+      mockFetchQueryDataWithHttpStream.mockReset();
+      mockCancelStreamQueryBasedOnRequestId.mockReset();
+    });
+
+    it("should return empty array when traceStreams is empty", async () => {
+      wrapper = createWrapper({ traceStreams: [] });
+      const result = await wrapper.vm.fetchTracesByDimensions();
+      expect(result).toEqual([]);
+    });
+
+    it("should call fetchQueryDataWithHttpStream with correct stream params", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_payload: any, handlers: any) => {
+        handlers.complete();
+      });
+
+      wrapper = createWrapper({
+        traceStreams: [{ stream_name: "traces", stream_type: "traces", filters: { service: "api" } }],
+      });
+
+      await wrapper.vm.fetchTracesByDimensions();
+
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledOnce();
+      const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
+      expect(callArg.queryReq.stream_name).toBe("traces");
+      expect(callArg.queryReq.start_time).toBe(defaultProps.timeRange.startTime);
+      expect(callArg.queryReq.end_time).toBe(defaultProps.timeRange.endTime);
+      expect(callArg.type).toBe("traces");
+    });
+
+    it("should build filter string from traceStream filters", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_payload: any, handlers: any) => {
+        handlers.complete();
+      });
+
+      wrapper = createWrapper({
+        traceStreams: [{ stream_name: "traces", stream_type: "traces", filters: { service: "api", env: "prod" } }],
+      });
+
+      await wrapper.vm.fetchTracesByDimensions();
+
+      const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
+      expect(callArg.queryReq.filter).toContain("service='api'");
+      expect(callArg.queryReq.filter).toContain("env='prod'");
+    });
+
+    it("should accumulate and return hits from streaming data callback", async () => {
+      const mockHit = { traceId: "abc123", trace_id: "abc123" };
+      mockFetchQueryDataWithHttpStream.mockImplementation((_payload: any, handlers: any) => {
+        handlers.data(_payload, { content: { results: { hits: [mockHit] } } });
+        handlers.complete();
+      });
+
+      wrapper = createWrapper({
+        traceStreams: [{ stream_name: "traces", stream_type: "traces", filters: {} }],
+      });
+
+      const result = await wrapper.vm.fetchTracesByDimensions();
+
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(1);
+    });
+
+    it("should cancel in-flight stream before starting a new one", async () => {
+      // First call never completes (simulates in-flight)
+      mockFetchQueryDataWithHttpStream.mockImplementationOnce(() => {
+        // no-op: never calls complete/error
+      });
+      mockFetchQueryDataWithHttpStream.mockImplementationOnce((_payload: any, handlers: any) => {
+        handlers.complete();
+      });
+
+      wrapper = createWrapper({
+        traceStreams: [{ stream_name: "traces", stream_type: "traces", filters: {} }],
+      });
+
+      // First call — sets currentTracesStreamTraceId
+      wrapper.vm.fetchTracesByDimensions();
+      // Second call — should cancel first before starting
+      await wrapper.vm.fetchTracesByDimensions();
+
+      expect(mockCancelStreamQueryBasedOnRequestId).toHaveBeenCalledOnce();
     });
   });
 });
