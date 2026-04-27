@@ -78,7 +78,8 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 ) -> Result<(), anyhow::Error> {
     let org_id = report.org_id.clone();
     let next_run_at = if report.frequency.frequency_type == ReportFrequencyType::Cron {
-        let tz_offset = FixedOffset::east_opt(report.tz_offset * 60).unwrap_or(FixedOffset::east_opt(0).unwrap());
+        let tz_offset = FixedOffset::east_opt(report.tz_offset * 60)
+            .unwrap_or(FixedOffset::east_opt(0).unwrap());
         match Schedule::from_str(&report.frequency.cron) {
             Ok(schedule) => schedule
                 .upcoming(tz_offset)
