@@ -160,16 +160,18 @@ export default defineConfig({
       ],
       output: {
         manualChunks(id: string) {
-          // Node polyfills used by axios (Buffer for FormData) — keep them in
-          // their own small chunk so they don't piggyback on echarts and force
-          // a 1 MB preload on every cold visit. Match by resolved path so
-          // rollup-plugin-node-polyfills' virtual modules are also captured.
-          if (
-            /node_modules\/(buffer|base64-js|ieee754)\//.test(id) ||
-            /rollup-plugin-node-polyfills\/polyfills\/(buffer|base64-js|ieee754)/.test(id)
-          ) {
+          // Node polyfills (buffer, base64-js, ieee754) get tree-shaken into
+          // whichever vendor chunk Rollup picks first — historically that was
+          // the echarts chunk, which forced a 1 MB modulepreload on every cold
+          // visit even when no charts rendered. Match by resolved path so they
+          // land in their own small chunk regardless of the polyfill plugin's
+          // virtual-module injection.
+          if (/node_modules\/(buffer|base64-js|ieee754)\//.test(id)) {
             return "node-polyfills";
           }
+          // The remaining rules mirror the original object-form manualChunks.
+          // We had to convert to function form because the object form doesn't
+          // match modules injected as virtuals by rollup-plugin-node-polyfills.
           if (id.includes("@rudderstack/analytics-js")) return "o2cs-analytics";
           if (
             id.includes("@openobserve/browser-logs") ||
