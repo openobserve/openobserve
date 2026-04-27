@@ -1294,4 +1294,35 @@ mod tests {
             is_aggregate_query("SELECT CASE WHEN 1=1 THEN count(*) ELSE 0 END FROM t").unwrap()
         );
     }
+
+    #[test]
+    fn test_is_eligible_for_histogram_cte_not_eligible() {
+        // CTE → has_cte = true → returns (false, false)
+        let (eligible, _) = is_eligible_for_histogram(
+            "WITH cte AS (SELECT x FROM t) SELECT x FROM cte",
+            false,
+        )
+        .unwrap();
+        assert!(!eligible);
+    }
+
+    #[test]
+    fn test_is_aggregate_query_count_distinct_function() {
+        // COUNT(DISTINCT x) → DistinctVisitor::pre_visit_expr branch
+        assert!(is_aggregate_query("SELECT count(DISTINCT x) FROM t").unwrap());
+    }
+
+    #[test]
+    fn test_is_aggregate_expression_unary_op_with_aggregate() {
+        // Unary negation of aggregate → UnaryOp branch in is_aggregate_expression
+        assert!(is_aggregate_query("SELECT -count(*) FROM t").unwrap());
+    }
+
+    #[test]
+    fn test_is_aggregate_expression_case_else_result_aggregate() {
+        // Aggregate in ELSE clause → else_result branch in Case matching
+        assert!(
+            is_aggregate_query("SELECT CASE WHEN 1=0 THEN 0 ELSE count(*) END FROM t").unwrap()
+        );
+    }
 }
