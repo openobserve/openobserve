@@ -1587,4 +1587,249 @@ mod tests {
         let expected_res = vec![TimeRange::new(0, 199), TimeRange::new(200, 300)];
         assert_eq!(TimeRange::flatten_overlapping_ranges(ranges), expected_res);
     }
+
+    // ── DataType Display / FromStr / From<DataType> for arrow_schema::DataType ─
+
+    #[test]
+    fn test_data_type_display() {
+        assert_eq!(DataType::Utf8.to_string(), "Utf8");
+        assert_eq!(DataType::LargeUtf8.to_string(), "LargeUtf8");
+        assert_eq!(DataType::Int64.to_string(), "Int64");
+        assert_eq!(DataType::Uint64.to_string(), "Uint64");
+        assert_eq!(DataType::Float64.to_string(), "Float64");
+        assert_eq!(DataType::Boolean.to_string(), "Boolean");
+    }
+
+    #[test]
+    fn test_data_type_from_str() {
+        assert_eq!("utf8".parse::<DataType>().unwrap(), DataType::Utf8);
+        assert_eq!("UTF8".parse::<DataType>().unwrap(), DataType::Utf8);
+        assert_eq!("largeutf8".parse::<DataType>().unwrap(), DataType::LargeUtf8);
+        assert_eq!("int64".parse::<DataType>().unwrap(), DataType::Int64);
+        assert_eq!("uint64".parse::<DataType>().unwrap(), DataType::Uint64);
+        assert_eq!("float64".parse::<DataType>().unwrap(), DataType::Float64);
+        assert_eq!("boolean".parse::<DataType>().unwrap(), DataType::Boolean);
+        assert!("unknown_type".parse::<DataType>().is_err());
+    }
+
+    #[test]
+    fn test_data_type_into_arrow() {
+        use arrow_schema::DataType as ArrowDT;
+        assert_eq!(ArrowDT::from(DataType::Utf8), ArrowDT::Utf8);
+        assert_eq!(ArrowDT::from(DataType::LargeUtf8), ArrowDT::LargeUtf8);
+        assert_eq!(ArrowDT::from(DataType::Int64), ArrowDT::Int64);
+        assert_eq!(ArrowDT::from(DataType::Uint64), ArrowDT::UInt64);
+        assert_eq!(ArrowDT::from(DataType::Float64), ArrowDT::Float64);
+        assert_eq!(ArrowDT::from(DataType::Boolean), ArrowDT::Boolean);
+    }
+
+    // ── StreamType methods ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_stream_type_support_index() {
+        assert!(StreamType::Logs.support_index());
+        assert!(StreamType::Metrics.support_index());
+        assert!(StreamType::Traces.support_index());
+        assert!(StreamType::Metadata.support_index());
+        assert!(!StreamType::EnrichmentTables.support_index());
+        assert!(!StreamType::Filelist.support_index());
+        assert!(!StreamType::ServiceGraph.support_index());
+        assert!(!StreamType::Index.support_index());
+    }
+
+    #[test]
+    fn test_stream_type_support_uds() {
+        assert!(StreamType::Logs.support_uds());
+        assert!(StreamType::Metrics.support_uds());
+        assert!(StreamType::Traces.support_uds());
+        assert!(!StreamType::EnrichmentTables.support_uds());
+        assert!(!StreamType::Filelist.support_uds());
+        assert!(!StreamType::Metadata.support_uds());
+        assert!(!StreamType::Index.support_uds());
+        assert!(!StreamType::ServiceGraph.support_uds());
+    }
+
+    #[test]
+    fn test_stream_type_as_str() {
+        assert_eq!(StreamType::Logs.as_str(), "logs");
+        assert_eq!(StreamType::Metrics.as_str(), "metrics");
+        assert_eq!(StreamType::Traces.as_str(), "traces");
+        assert_eq!(StreamType::ServiceGraph.as_str(), "service_graph");
+        assert_eq!(StreamType::EnrichmentTables.as_str(), "enrichment_tables");
+        assert_eq!(StreamType::Filelist.as_str(), "file_list");
+        assert_eq!(StreamType::Metadata.as_str(), "metadata");
+        assert_eq!(StreamType::Index.as_str(), "index");
+    }
+
+    #[test]
+    fn test_stream_type_from_string_owned() {
+        assert_eq!(StreamType::from("logs".to_string()), StreamType::Logs);
+        assert_eq!(
+            StreamType::from("enrichment_tables".to_string()),
+            StreamType::EnrichmentTables
+        );
+        assert_eq!(
+            StreamType::from("enrich".to_string()),
+            StreamType::EnrichmentTables
+        );
+        // unknown maps to default
+        assert_eq!(
+            StreamType::from("unknown".to_string()),
+            StreamType::default()
+        );
+    }
+
+    // ── StorageType ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_storage_type_display() {
+        assert_eq!(StorageType::Normal.to_string(), "normal");
+        assert_eq!(StorageType::Compliance.to_string(), "compliance");
+    }
+
+    #[test]
+    fn test_storage_type_from_str() {
+        assert_eq!("compliance".parse::<StorageType>().unwrap(), StorageType::Compliance);
+        assert_eq!("COMPLIANCE".parse::<StorageType>().unwrap(), StorageType::Compliance);
+        assert_eq!("normal".parse::<StorageType>().unwrap(), StorageType::Normal);
+        // unknown maps to Normal
+        assert_eq!("anything".parse::<StorageType>().unwrap(), StorageType::Normal);
+    }
+
+    #[test]
+    fn test_storage_type_is_compliance() {
+        assert!(StorageType::Compliance.is_compliance());
+        assert!(!StorageType::Normal.is_compliance());
+    }
+
+    // ── QueryPartitionStrategy FromStr ────────────────────────────────────────
+
+    #[test]
+    fn test_query_partition_strategy_from_str() {
+        assert_eq!(
+            "file_num".parse::<QueryPartitionStrategy>().unwrap(),
+            QueryPartitionStrategy::FileNum
+        );
+        assert_eq!(
+            "file_size".parse::<QueryPartitionStrategy>().unwrap(),
+            QueryPartitionStrategy::FileSize
+        );
+        assert_eq!(
+            "file_hash".parse::<QueryPartitionStrategy>().unwrap(),
+            QueryPartitionStrategy::FileHash
+        );
+        // unknown maps to default FileNum
+        assert_eq!(
+            "unknown".parse::<QueryPartitionStrategy>().unwrap(),
+            QueryPartitionStrategy::FileNum
+        );
+    }
+
+    // ── MergeStrategy From<&String> ───────────────────────────────────────────
+
+    #[test]
+    fn test_merge_strategy_from_string() {
+        assert_eq!(
+            MergeStrategy::from(&"file_size".to_string()),
+            MergeStrategy::FileSize
+        );
+        assert_eq!(
+            MergeStrategy::from(&"file_time".to_string()),
+            MergeStrategy::FileTime
+        );
+        assert_eq!(
+            MergeStrategy::from(&"time_range".to_string()),
+            MergeStrategy::TimeRange
+        );
+        assert_eq!(
+            MergeStrategy::from(&"FILE_SIZE".to_string()),
+            MergeStrategy::FileSize
+        );
+        // unknown maps to FileSize
+        assert_eq!(
+            MergeStrategy::from(&"unknown".to_string()),
+            MergeStrategy::FileSize
+        );
+    }
+
+    // ── StreamStats::time_range_intersects ────────────────────────────────────
+
+    #[test]
+    fn test_stream_stats_time_range_intersects() {
+        // Use large timestamps so file_push_interval (10s = 10_000_000 µs) doesn't confuse results
+        let base: i64 = 1_700_000_000_000_000; // ~2023-11-14 in µs
+        let stats = StreamStats {
+            doc_time_min: base,
+            doc_time_max: base + 1_000_000, // +1 second
+            ..Default::default()
+        };
+        // query fully within stream range
+        assert!(stats.time_range_intersects(base + 200_000, base + 800_000));
+        // query starts before, ends within
+        assert!(stats.time_range_intersects(base - 500_000, base + 500_000));
+        // query starts within, ends after
+        assert!(stats.time_range_intersects(base + 500_000, base + 2_000_000));
+        // query fully contains stream range
+        assert!(stats.time_range_intersects(base - 1_000_000, base + 5_000_000));
+        // query ends exactly at stream min — no intersection (min < end: base < base is false)
+        assert!(!stats.time_range_intersects(base - 1_000_000, base));
+        // query starts well after effective max (doc_time_max + file_push_interval ~10s)
+        assert!(!stats.time_range_intersects(base + 20_000_000, base + 30_000_000));
+    }
+
+    // ── PartitionTimeLevel ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_partition_time_level_duration() {
+        assert_eq!(PartitionTimeLevel::Unset.duration(), 0);
+        assert_eq!(PartitionTimeLevel::Hourly.duration(), 3600);
+        assert_eq!(PartitionTimeLevel::Daily.duration(), 86400);
+    }
+
+    #[test]
+    fn test_partition_time_level_from_str() {
+        assert_eq!(PartitionTimeLevel::from("hourly"), PartitionTimeLevel::Hourly);
+        assert_eq!(PartitionTimeLevel::from("HOURLY"), PartitionTimeLevel::Hourly);
+        assert_eq!(PartitionTimeLevel::from("daily"), PartitionTimeLevel::Daily);
+        assert_eq!(PartitionTimeLevel::from("unset"), PartitionTimeLevel::Unset);
+        assert_eq!(PartitionTimeLevel::from("unknown"), PartitionTimeLevel::Unset);
+    }
+
+    #[test]
+    fn test_partition_time_level_display() {
+        assert_eq!(PartitionTimeLevel::Unset.to_string(), "unset");
+        assert_eq!(PartitionTimeLevel::Hourly.to_string(), "hourly");
+        assert_eq!(PartitionTimeLevel::Daily.to_string(), "daily");
+    }
+
+    // ── FileMeta::is_empty ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_file_meta_is_empty() {
+        assert!(FileMeta::default().is_empty());
+        let non_empty = FileMeta {
+            records: 100,
+            original_size: 1024,
+            ..Default::default()
+        };
+        assert!(!non_empty.is_empty());
+        // has records but no size
+        let records_only = FileMeta {
+            records: 1,
+            ..Default::default()
+        };
+        assert!(!records_only.is_empty());
+    }
+
+    // ── FileKey::from_file_name ───────────────────────────────────────────────
+
+    #[test]
+    fn test_file_key_from_file_name() {
+        let key = FileKey::from_file_name("files/default/logs/test/2024-01-01/chunk.parquet");
+        assert_eq!(key.key, "files/default/logs/test/2024-01-01/chunk.parquet");
+        assert_eq!(key.id, 0);
+        assert!(key.account.is_empty());
+        assert!(!key.deleted);
+        assert!(key.segment_ids.is_none());
+    }
 }
