@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { generateTraceContext, getWebSocketUrl } from "@/utils/zincutils";
+import { patchNsFieldsInJson } from "@/utils/nsFieldsPatch";
 import http from "./http";
 import stream from "./stream";
 
@@ -97,7 +98,21 @@ const search = {
         return http({ headers: { traceparent } }).post(url, query.query);
       }
     }
-    return http({ headers: { traceparent } }).post(url, query);
+    const axiosConfig =
+      page_type === "traces"
+        ? {
+            transformResponse: [
+              (data: string) => {
+                try {
+                  return JSON.parse(patchNsFieldsInJson(data));
+                } catch {
+                  return JSON.parse(data);
+                }
+              },
+            ],
+          }
+        : undefined;
+    return http({ headers: { traceparent } }).post(url, query, axiosConfig);
   },
 
   result_schema: (
