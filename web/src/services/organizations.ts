@@ -92,7 +92,16 @@ const organizations = {
     return http().put(`/api/${orgIdentifier}/rename`, {
       new_name: newOrgName,
     });
-  }
+  },
+  create_external_contract: (orgIdentifier: string, data: any) => {
+    return http().post(`/api/${orgIdentifier}/external_contract`, data);
+  },
+  extend_external_contract: (orgIdentifier: string, data: any) => {
+    return http().put(`/api/${orgIdentifier}/external_contract`, data);
+  },
+  revoke_external_contract: (orgIdentifier: string, targetOrgId: string) => {
+    return http().delete(`/api/${orgIdentifier}/external_contract/${targetOrgId}`);
+  },
 };
 
 export default organizations;
