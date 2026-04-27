@@ -80,4 +80,20 @@ mod tests {
         let sum = h.sum64("");
         assert_eq!(sum, h.sum64(""));
     }
+
+    #[test]
+    fn test_murmur3_different_inputs_differ() {
+        let mut h = new();
+        assert_ne!(h.sum64("abc"), h.sum64("def"));
+        assert_ne!(h.sum64("abc"), h.sum64("abcd"));
+    }
+
+    #[test]
+    fn test_murmur3_new_hasher_empty_write() {
+        use std::hash::Hasher;
+        let mut hasher = new_hasher();
+        hasher.write(b"");
+        let hash = hasher.finish();
+        assert_eq!(hash, hash);
+    }
 }

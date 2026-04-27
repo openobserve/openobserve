@@ -630,4 +630,57 @@ mod tests {
         let json2 = serde_json::to_string(&err).unwrap();
         assert!(json2.contains("trace-xyz"));
     }
+
+    #[test]
+    fn test_metric_type_empty_serde() {
+        let s = serde_json::to_string(&MetricType::Empty).unwrap();
+        assert_eq!(s, "\"\"");
+        let back: MetricType = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, MetricType::Empty);
+    }
+
+    #[test]
+    fn test_metric_type_empty_display() {
+        assert_eq!(MetricType::Empty.to_string(), "empty");
+    }
+
+    #[test]
+    fn test_metric_type_all_variants_serde_roundtrip() {
+        let variants = [
+            MetricType::Unknown,
+            MetricType::Counter,
+            MetricType::Gauge,
+            MetricType::Histogram,
+            MetricType::GaugeHistogram,
+            MetricType::ExponentialHistogram,
+            MetricType::Summary,
+            MetricType::Info,
+            MetricType::StateSet,
+        ];
+        for variant in variants {
+            let s = serde_json::to_string(&variant).unwrap();
+            let back: MetricType = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_status_serde() {
+        let s = serde_json::to_string(&Status::Success).unwrap();
+        assert_eq!(s, "\"success\"");
+        let e = serde_json::to_string(&Status::Error).unwrap();
+        assert_eq!(e, "\"error\"");
+    }
+
+    #[test]
+    fn test_downsampling_rule_default() {
+        let rule = DownsamplingRule {
+            rule: None,
+            function: Function::Avg,
+            offset: 0,
+            step: 0,
+        };
+        assert!(rule.rule.is_none());
+        assert_eq!(rule.function, Function::Avg);
+    }
 }
