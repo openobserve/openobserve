@@ -163,4 +163,27 @@ mod tests {
         let result = get_cipher_key_names("NOT VALID SQL @@@@");
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_get_cipher_key_names_too_few_args_returns_err() {
+        // encrypt with only 1 arg → "invalid number of arguments" error
+        let sql = "SELECT encrypt(col) FROM t";
+        let result = get_cipher_key_names(sql);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("invalid number of arguments"), "got: {msg}");
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_non_string_key_returns_err() {
+        // key arg is a column reference instead of string literal
+        let sql = "SELECT encrypt(col, other_col) FROM t";
+        let result = get_cipher_key_names(sql);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("key name must be a static string"),
+            "got: {msg}"
+        );
+    }
 }

@@ -626,4 +626,102 @@ mod tests {
         assert_eq!(field, "col");
         assert_eq!(table_ref.table(), "stream1");
     }
+
+    #[test]
+    fn test_is_simple_distinct_query_valid() {
+        let stmt = parse_stmt("SELECT id FROM t GROUP BY id ORDER BY id ASC LIMIT 10");
+        if let Statement::Query(q) = stmt {
+            let result = is_simple_distinct_query(&q);
+            assert!(result.is_some());
+            let (field, limit, is_asc) = result.unwrap();
+            assert_eq!(field, "id");
+            assert_eq!(limit, 10);
+            assert!(is_asc);
+        }
+    }
+
+    #[test]
+    fn test_is_simple_distinct_query_desc_order() {
+        let stmt = parse_stmt("SELECT id FROM t GROUP BY id ORDER BY id DESC LIMIT 5");
+        if let Statement::Query(q) = stmt {
+            let result = is_simple_distinct_query(&q);
+            assert!(result.is_some());
+            let (field, limit, is_asc) = result.unwrap();
+            assert_eq!(field, "id");
+            assert_eq!(limit, 5);
+            assert!(!is_asc);
+        }
+    }
+
+    #[test]
+    fn test_is_simple_distinct_query_no_limit_returns_none() {
+        let stmt = parse_stmt("SELECT id FROM t GROUP BY id ORDER BY id ASC");
+        if let Statement::Query(q) = stmt {
+            assert!(is_simple_distinct_query(&q).is_none());
+        }
+    }
+
+    #[test]
+    fn test_is_simple_distinct_query_no_order_by_returns_none() {
+        let stmt = parse_stmt("SELECT id FROM t GROUP BY id LIMIT 10");
+        if let Statement::Query(q) = stmt {
+            assert!(is_simple_distinct_query(&q).is_none());
+        }
+    }
+
+    #[test]
+    fn test_is_simple_distinct_query_multiple_projections_returns_none() {
+        let stmt = parse_stmt("SELECT id, name FROM t GROUP BY id, name ORDER BY id ASC LIMIT 10");
+        if let Statement::Query(q) = stmt {
+            assert!(is_simple_distinct_query(&q).is_none());
+        }
+    }
+
+    #[test]
+    fn test_is_simple_distinct_query_nonselect_body_returns_none() {
+        let stmt = parse_stmt("SELECT id FROM t1 UNION SELECT id FROM t2");
+        if let Statement::Query(q) = stmt {
+            assert!(is_simple_distinct_query(&q).is_none());
+        }
+    }
+
+    #[test]
+    fn test_is_simple_distinct_query_group_by_different_field_returns_none() {
+        // GROUP BY uses different field than SELECT
+        let stmt = parse_stmt("SELECT id FROM t GROUP BY name ORDER BY id ASC LIMIT 10");
+        if let Statement::Query(q) = stmt {
+            assert!(is_simple_distinct_query(&q).is_none());
+        }
+    }
+
+    #[test]
+    fn test_is_complex_query_join_is_complex() {
+        let mut stmt = parse_stmt("SELECT a FROM t1 JOIN t2 ON t1.id = t2.id");
+        assert!(is_complex_query(&mut stmt));
+    }
+
+    #[test]
+    fn test_is_complex_query_multi_from_is_complex() {
+        let mut stmt = parse_stmt("SELECT a FROM t1, t2 WHERE t1.id = t2.id");
+        assert!(is_complex_query(&mut stmt));
+    }
+
+    #[test]
+    fn test_is_simple_topn_query_extra_projection_returns_none() {
+        // 3 projections → None
+        let stmt = parse_stmt(
+            "SELECT id, name, count(*) FROM t GROUP BY id ORDER BY count(*) DESC LIMIT 10",
+        );
+        if let Statement::Query(q) = stmt {
+            assert!(is_simple_topn_query(&q).is_none());
+        }
+    }
+
+    #[test]
+    fn test_is_simple_topn_query_nonselect_body_returns_none() {
+        let stmt = parse_stmt("SELECT id FROM t1 UNION SELECT id FROM t2");
+        if let Statement::Query(q) = stmt {
+            assert!(is_simple_topn_query(&q).is_none());
+        }
+    }
 }
