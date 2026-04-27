@@ -3,34 +3,41 @@
  * No types should be defined inline in Button.vue.
  */
 
+import type { PrimitiveProps } from "reka-ui";
+
 /** Visual style variant — design is baked in, no style override props */
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive'
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "outline"
+  | "ghost"
+  | "destructive";
 
 /** Size controls height, padding, and font-size only */
-export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon'
+export type ButtonSize = "sm" | "md" | "lg" | "icon";
 
-export interface ButtonProps {
+export interface ButtonProps extends PrimitiveProps {
   /** Visual style variant */
-  variant?: ButtonVariant
+  variant?: ButtonVariant;
   /** Component size */
-  size?: ButtonSize
+  size?: ButtonSize;
   /** Disables the button and all interaction */
-  disabled?: boolean
+  disabled?: boolean;
   /** Shows loading state and disables interaction */
-  loading?: boolean
-  /** Native button type attribute */
-  type?: 'button' | 'submit' | 'reset'
+  loading?: boolean;
+  /** Native button type attribute — only meaningful when as="button" */
+  type?: "button" | "submit" | "reset";
 }
 
 export interface ButtonEmits {
-  (e: 'click', event: MouseEvent): void
+  (e: "click", event: MouseEvent): void;
 }
 
 export interface ButtonSlots {
   /** Main label / content */
-  default?: () => unknown
+  default?: () => unknown;
   /** Icon placed before the label */
-  'icon-left'?: () => unknown
+  "icon-left"?: () => unknown;
   /** Icon placed after the label */
-  'icon-right'?: () => unknown
+  "icon-right"?: () => unknown;
 }
