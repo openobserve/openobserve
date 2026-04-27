@@ -16,26 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
-    <q-bar
-      class="row sql-bar"
-      style="display: flex; justify-content: space-between; align-items: center"
+    <div
+      class="sql-bar tw:flex tw:flex-row tw:items-center tw:justify-between"
+      :style="{ backgroundColor: store.state.theme === 'dark' ? 'transparent' : 'var(--color-primary-100)' }"
       @click.stop="onDropDownClick"
     >
       <div
-        style="display: flex; flex-direction: row; align-items: center"
-        :style="
-          promqlMode || dashboardPanelData.data.type == 'geomap'
-            ? 'flex: 1; min-width: 0'
-            : ''
-        "
+        class="tw:flex tw:flex-row tw:items-center tw:flex-1 tw:min-w-0"
         data-test="dashboard-query-data"
       >
-        <q-space
-          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
-        />
         <span
           v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
-          class="text-subtitle2 text-weight-bold"
+          class="text-subtitle2 text-weight-bold tw:ml-2"
           >{{ t("panel.sql") }}</span
         >
         <div
@@ -91,14 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OTab>
           </OTabs>
-          <!-- <div v-if="promqlMode" class="query-tabs-container">
-                    <div v-for="(tab, index) in dashboardPanelData.data.queries" :key="index" class="query-tab" :class="{ 'active': index === activeTab }" @click="handleActiveTab(index)">
-                        <div class="tab-label">{{ 'Query ' + (index + 1) }}</div>
-                        <div v-if="index > 0 || (index === 0 && dashboardPanelData.data.queries.length > 1)" @click.stop="removeTab(index)">
-                            <i class="material-icons">cancel</i>
-                        </div>
-                    </div>
-                </div> -->
         </div>
         <q-btn
           v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
@@ -110,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="`dashboard-panel-query-tab-add`"
         ></q-btn>
       </div>
-      <div style="display: flex; gap: 4px; flex-shrink: 0">
+      <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
         <q-toggle
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
@@ -128,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <QueryTypeSelector></QueryTypeSelector>
       </div>
-    </q-bar>
+    </div>
   </div>
   <div
     class="col"
@@ -808,9 +792,7 @@ export default defineComponent({
 <!-- removed scope due to VRL background image issue-->
 <style lang="scss">
 .sql-bar {
-  height: 40px !important;
-  // overflow: hidden;
-  // cursor: pointer;
+  height: 40px;
 }
 
 .dashboard-query-remove-icon:hover {
