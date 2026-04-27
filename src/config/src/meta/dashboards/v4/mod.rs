@@ -485,4 +485,68 @@ mod tests {
         assert!(!json.contains("\"value\""));
         assert!(!json.contains("\"unit\""));
     }
+
+    #[test]
+    fn test_aggregation_func_all_variants() {
+        let cases = [
+            (AggregationFunc::Histogram, "\"histogram\""),
+            (AggregationFunc::Sum, "\"sum\""),
+            (AggregationFunc::Min, "\"min\""),
+            (AggregationFunc::Max, "\"max\""),
+            (AggregationFunc::Avg, "\"avg\""),
+            (AggregationFunc::Median, "\"median\""),
+            (AggregationFunc::P50, "\"p50\""),
+            (AggregationFunc::P90, "\"p90\""),
+            (AggregationFunc::P95, "\"p95\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: AggregationFunc = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_axis_item_optional_fields_absent_when_none() {
+        let item: AxisItem = serde_json::from_value(serde_json::json!({
+            "label": "x",
+            "alias": "a",
+            "column": "col"
+        }))
+        .unwrap();
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(!json.contains("aggregationFunction"));
+        assert!(!json.contains("sortBy"));
+        assert!(!json.contains("args"));
+        assert!(!json.contains("isDerived"));
+    }
+
+    #[test]
+    fn test_axis_item_with_optional_fields_present() {
+        let item: AxisItem = serde_json::from_value(serde_json::json!({
+            "label": "lbl",
+            "alias": "a",
+            "column": "col",
+            "color": "#ff0000",
+            "aggregationFunction": "p95",
+            "sortBy": "desc",
+            "isDerived": true
+        }))
+        .unwrap();
+        assert_eq!(item.aggregation_function, Some(AggregationFunc::P95));
+        assert_eq!(item.sort_by, Some("desc".to_string()));
+        assert_eq!(item.is_derived, Some(true));
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("\"p95\""));
+    }
+
+    #[test]
+    fn test_panel_filter_default_has_empty_fields() {
+        let filter = PanelFilter::default();
+        assert!(filter.typ.is_empty());
+        assert!(filter.values.is_empty());
+        assert!(filter.operator.is_none());
+        assert!(filter.value.is_none());
+    }
 }

@@ -436,4 +436,77 @@ mod tests {
         assert!(!json.contains("\"value\""));
         assert!(!json.contains("\"unit\""));
     }
+
+    #[test]
+    fn test_aggregation_func_all_variants() {
+        let cases = [
+            (AggregationFunc::Histogram, "\"histogram\""),
+            (AggregationFunc::Sum, "\"sum\""),
+            (AggregationFunc::Min, "\"min\""),
+            (AggregationFunc::Max, "\"max\""),
+            (AggregationFunc::Avg, "\"avg\""),
+            (AggregationFunc::Median, "\"median\""),
+            (AggregationFunc::P50, "\"p50\""),
+            (AggregationFunc::P90, "\"p90\""),
+            (AggregationFunc::P95, "\"p95\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: AggregationFunc = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_axis_item_optional_fields_absent_when_none() {
+        let item = AxisItem {
+            label: "x".to_string(),
+            alias: "a".to_string(),
+            column: "col".to_string(),
+            color: None,
+            aggregation_function: None,
+            sort_by: None,
+            args: None,
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(!json.contains("aggregation_function"));
+        assert!(!json.contains("sort_by"));
+        assert!(!json.contains("args"));
+    }
+
+    #[test]
+    fn test_axis_item_with_optional_fields_present() {
+        let item: AxisItem = serde_json::from_value(serde_json::json!({
+            "label": "lbl",
+            "alias": "a",
+            "column": "col",
+            "color": "#aabbcc",
+            "aggregationFunction": "p50",
+            "sortBy": "asc",
+            "args": [{"value": "v1"}]
+        }))
+        .unwrap();
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("\"p50\""));
+        assert!(json.contains("asc"));
+        assert_eq!(item.aggregation_function, Some(AggregationFunc::P50));
+        assert_eq!(item.sort_by, Some("asc".to_string()));
+    }
+
+    #[test]
+    fn test_panel_filter_serde_with_optional_none() {
+        let filter = PanelFilter {
+            typ: "condition".to_string(),
+            values: vec![],
+            column: "level".to_string(),
+            operator: None,
+            value: None,
+        };
+        let json = serde_json::to_string(&filter).unwrap();
+        let back: PanelFilter = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.typ, "condition");
+        assert!(back.operator.is_none());
+        assert!(back.value.is_none());
+    }
 }
