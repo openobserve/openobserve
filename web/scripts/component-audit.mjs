@@ -4,11 +4,16 @@
  * Audit and analyze O2 component usage and migration progress.
  *
  * Usage:
- *   node scripts/component-audit.mjs find   --pattern "OTabs|OTab" [--dir src] [--output file.txt]
- *   node scripts/component-audit.mjs diff   --from "q-tabs|q-tab" --to "OTabs|OTab" [--format markdown]
- *   node scripts/component-audit.mjs status --from "q-tabs" --to "OTabs"
+ *   node scripts/component-audit.mjs find   --pattern "OTabs|OTab" [--dir src] [--format csv] [--output file.csv]
+ *   node scripts/component-audit.mjs diff   --from "q-tabs|q-tab" --to "OTabs|OTab" [--format csv|markdown] [--output file.csv]
+ *   node scripts/component-audit.mjs status --from "q-tabs" --to "OTabs" [--format csv] [--output file.csv]
  *
  * Run from the web/ directory.
+ *
+ * TIP — pipe straight to a CSV for Excel:
+ *   node scripts/component-audit.mjs diff  --from "q-tabs|q-tab" --to "OTabs|OTab" --format csv --output migration.csv
+ *   node scripts/component-audit.mjs find  --pattern "q-tabs|q-tab" --format csv --output todo.csv
+ *   node scripts/component-audit.mjs status --from "q-tabs" --to "OTabs" --format csv --output status.csv
  */
 
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs'
@@ -44,7 +49,7 @@ if (!command || command === 'help' || args.help) {
 
 // ── File walker ───────────────────────────────────────────────────────────────
 
-const VUE_EXTENSIONS = new Set(['.vue', '.ts', '.tsx', '.js', '.jsx'])
+const VUE_EXTENSIONS = new Set(['.vue'])
 
 function walk(dir, fileList = []) {
   if (!existsSync(dir)) return fileList
@@ -61,9 +66,52 @@ function walk(dir, fileList = []) {
   return fileList
 }
 
+/**
+ * Strip comments from Vue SFC content before pattern matching so that
+ * commented-out usages are not counted.
+ *   <!-- HTML comments -->
+ *   // single-line JS/TS comments
+ *   /* block JS\/TS comments *\/
+ */
+function stripComments(content) {
+  // HTML comments (<!-- ... -->), including multiline
+  content = content.replace(/<!--[\s\S]*?-->/g, '')
+  // Block JS/TS comments (/* ... */)
+  content = content.replace(/\/\*[\s\S]*?\*\//g, '')
+  // Single-line JS/TS comments (// ...) — only outside strings (best-effort)
+  content = content.replace(/\/\/[^\n]*/g, '')
+  return content
+}
+
+/**
+ * Strip <style> blocks from Vue SFC content so CSS class names like
+ * ".q-tab", "q-tabs { }" etc. in scoped/global styles are not counted.
+ * <script> is intentionally kept — component-name boundary regexes
+ * already prevent spurious matches on import strings.
+ */
+function templateOnly(content) {
+  return content.replace(/<style[\s\S]*?<\/style>/gi, '')
+}
+
 function countMatches(content, pattern) {
-  const re = new RegExp(pattern, 'g')
-  return (content.match(re) || []).length
+  const re = toComponentRe(pattern)
+  return (stripComments(templateOnly(content)).match(re) || []).length
+}
+
+/**
+ * Convert a raw component pattern string into a regex that only matches
+ * complete component names — not substrings of longer names.
+ *
+ * Each |-separated part gets a negative lookahead so that e.g.
+ *   "q-tab"  does NOT match inside "q-table" or "q-tabs"
+ *   "q-tabs" does NOT match inside "q-tab-panels"
+ *
+ * Boundary rule: the match must NOT be followed by a letter or hyphen.
+ */
+function toComponentRe(pattern) {
+  const parts = pattern.split('|').map(p => p.trim()).filter(Boolean)
+  const bounded = parts.map(p => `${p}(?![a-zA-Z-])`)
+  return new RegExp(bounded.join('|'), 'g')
 }
 
 function resolveDir(dir) {
@@ -116,8 +164,27 @@ function cmdFind() {
 
   const totalFiles = results.length
   const totalUsages = results.reduce((s, r) => s + r.count, 0)
-  const COL = 50
+  const format = args.format || 'text'
 
+  if (format === 'csv') {
+    const rows = [
+      ['File', 'Module', 'Usages'],
+      ...results
+        .sort((a, b) => a.rel.localeCompare(b.rel))
+        .map(r => [csvEscape(r.rel), csvEscape(moduleKey(r.file, dir)), r.count]),
+      ['TOTAL', '', totalUsages],
+    ]
+    const csv = rows.map(r => r.join(',')).join('\n')
+    if (args.output) {
+      writeFileSync(args.output, csv)
+      console.error(`CSV written to: ${args.output}`)
+    } else {
+      console.log(csv)
+    }
+    return
+  }
+
+  const COL = 50
   console.log(`\nComponent usage: ${pattern}`)
   console.log('─'.repeat(72))
   console.log(` ${'Module'.padEnd(COL)}| Files | Usages`)
@@ -144,6 +211,31 @@ function cmdFind() {
     writeFileSync(args.output, lines.join('\n'))
     console.log(`Results written to: ${args.output}\n`)
   }
+}
+
+// ── Module name helper ──────────────────────────────────────────────────────
+
+function capitalize(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
+}
+
+/**
+ * Derive a human-readable module name from a repo-relative file path.
+ * web/src/components/ingestion/Custom.vue  -> Ingestion
+ * web/src/views/Dashboards/DashboardSettings.vue -> Dashboards
+ * web/src/enterprise/components/billings/Billing.vue -> Billings
+ */
+function moduleName(relFilePath) {
+  const parts = relFilePath.replace(/\\/g, '/').split('/')
+  const srcIdx = parts.indexOf('src')
+  if (srcIdx >= 0) {
+    const layer = parts[srcIdx + 1] // components, views, plugins, enterprise
+    if (layer === 'enterprise') {
+      return capitalize(parts[srcIdx + 3] || parts[srcIdx + 2] || layer)
+    }
+    return capitalize(parts[srcIdx + 2] || layer)
+  }
+  return parts.slice(0, 3).join('/')
 }
 
 // ── diff command ──────────────────────────────────────────────────────────────
@@ -186,8 +278,12 @@ function cmdDiff() {
   }
 
   // Analyze from patterns removed and to patterns added
-  const fromRe = new RegExp(from, 'g')
-  const toRe = new RegExp(to, 'g')
+  const fromRe = toComponentRe(from)
+  const toRe = toComponentRe(to)
+
+  // Individual component names for per-column breakdown
+  const fromParts = from.split('|').map(p => p.trim())
+  const toParts = to.split('|').map(p => p.trim())
 
   const migratedFiles = []
   const mixedFiles = []
@@ -211,10 +307,33 @@ function cmdDiff() {
       headContent = readFileSync(absFile, 'utf8')
     } catch (_) { /* deleted file */ }
 
-    const fromInBase = (baseContent.match(fromRe) || []).length
-    const fromInHead = (headContent.match(fromRe) || []).length
-    const toInBase = (baseContent.match(toRe) || []).length
-    const toInHead = (headContent.match(toRe) || []).length
+    // Strip comments before counting so commented-out usages are ignored
+    const baseStripped = stripComments(templateOnly(baseContent))
+    const headStripped = stripComments(templateOnly(headContent))
+
+    const fromInBase = (baseStripped.match(fromRe) || []).length
+    const fromInHead = (headStripped.match(fromRe) || []).length
+    const toInBase = (baseStripped.match(toRe) || []).length
+    const toInHead = (headStripped.match(toRe) || []).length
+
+    // Per-component counts for detailed CSV output
+    const fromByPart = {}
+    for (const p of fromParts) {
+      const re = toComponentRe(p)
+      fromByPart[p] = {
+        base: (baseStripped.match(re) || []).length,
+        head: (headStripped.match(re) || []).length,
+      }
+    }
+    const toByPart = {}
+    for (const p of toParts) {
+      const re = toComponentRe(p)
+      toByPart[p] = {
+        base: (baseStripped.match(re) || []).length,
+        head: (headStripped.match(re) || []).length,
+      }
+    }
+    const components = { fromByPart, toByPart }
 
     const fromRemoved = Math.max(0, fromInBase - fromInHead)
     const toAdded = Math.max(0, toInHead - toInBase)
@@ -229,23 +348,112 @@ function cmdDiff() {
 
     if (fromRemoved > 0 && toAdded > 0) {
       if (hasOldNow) {
-        mixedFiles.push({ file: relFile, fromRemoved, toAdded, remainingOld: fromInHead })
+        mixedFiles.push({ file: relFile, fromRemoved, toAdded, remainingOld: fromInHead, components })
       } else {
-        migratedFiles.push({ file: relFile, fromRemoved, toAdded })
+        migratedFiles.push({ file: relFile, fromRemoved, toAdded, remainingOld: 0, components })
       }
     } else if (fromRemoved > 0 && !hasOldNow && !hasNewNow) {
       // Old removed, nothing new
-      onlyOldFiles.push({ file: relFile, fromRemoved, toAdded: 0 })
+      onlyOldFiles.push({ file: relFile, fromRemoved, toAdded: 0, remainingOld: 0, components })
     } else if (toAdded > 0) {
-      onlyNewFiles.push({ file: relFile, fromRemoved: 0, toAdded })
+      onlyNewFiles.push({ file: relFile, fromRemoved: 0, toAdded, remainingOld: 0, components })
     }
   }
 
-  if (format === 'markdown') {
+  if (format === 'csv') {
+    outputDiffCsv({ branch, baseBranch, from, to, fromParts, toParts, migratedFiles, mixedFiles, onlyOldFiles, totalFromRemoved, totalToAdded })
+  } else if (format === 'markdown') {
     outputDiffMarkdown({ branch, baseBranch, from, to, migratedFiles, mixedFiles, onlyOldFiles, totalFromRemoved, totalToAdded })
   } else {
     outputDiffText({ branch, baseBranch, from, to, migratedFiles, mixedFiles, onlyOldFiles, totalFromRemoved, totalToAdded })
   }
+}
+
+// ── CSV helper ───────────────────────────────────────────────────────────────
+
+function csvEscape(val) {
+  const s = String(val)
+  // Wrap in quotes if value contains comma, quote, or newline
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g, '""') + '"'
+  }
+  return s
+}
+
+function writeCsv(rows, outputPath) {
+  const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n')
+  if (outputPath) {
+    writeFileSync(outputPath, csv)
+    console.error(`CSV written to: ${outputPath}`)
+  } else {
+    console.log(csv)
+  }
+}
+
+function outputDiffCsv({ branch, baseBranch, from, to, fromParts, toParts, migratedFiles, mixedFiles, onlyOldFiles, totalFromRemoved, totalToAdded }) {
+  // ── Summary block ──
+  const summaryBlock = [
+    ['Migration Report'],
+    ['Branch', branch, 'vs', baseBranch],
+    ['Old Pattern', from],
+    ['New Pattern', to],
+    [],
+    ['Metric', 'Count'],
+    ['Fully migrated files', migratedFiles.length],
+    ['Partially migrated files (old still present)', mixedFiles.length],
+    ['Old-only removed (no new added)', onlyOldFiles.length],
+    ['Total old usages removed', totalFromRemoved],
+    ['Total new usages added', totalToAdded],
+    [],
+  ]
+
+  // ── File detail block ──
+  // Columns: Module | File | Old Components Used | <one col per old part (before)> | New Components Added | <one col per new part (after)> | Status | Old Remaining
+  const header = [
+    'Module',
+    'File',
+    'Old Components Used',
+    ...fromParts.map(p => `${p} (before)`),
+    'New Components Added',
+    ...toParts.map(p => `${p} (after)`),
+    'Status',
+    'Old Remaining',
+  ]
+
+  const allFiles = [
+    ...migratedFiles.map(f => ({ ...f, status: 'Fully Migrated' })),
+    ...mixedFiles.map(f => ({ ...f, status: 'Partially Migrated' })),
+    ...onlyOldFiles.map(f => ({ ...f, status: 'Old Removed (no new)' })),
+  ].sort((a, b) => a.file.localeCompare(b.file))
+
+  const fileRows = allFiles.map(f => {
+    const mod = moduleName(f.file)
+    const shortFile = f.file.replace(/^web\/src\//, '')
+    const { fromByPart = {}, toByPart = {} } = f.components || {}
+
+    // Which old components existed in base (non-zero before)
+    const oldUsed = fromParts
+      .filter(p => fromByPart[p] && fromByPart[p].base > 0)
+      .join(', ') || '—'
+
+    // Which new components exist in head (non-zero after)
+    const newUsed = toParts
+      .filter(p => toByPart[p] && toByPart[p].head > 0)
+      .join(', ') || '—'
+
+    return [
+      mod,
+      shortFile,
+      oldUsed,
+      ...fromParts.map(p => (fromByPart[p] && fromByPart[p].base) || 0),
+      newUsed,
+      ...toParts.map(p => (toByPart[p] && toByPart[p].head) || 0),
+      f.status,
+      f.remainingOld != null ? f.remainingOld : 0,
+    ]
+  })
+
+  writeCsv([...summaryBlock, header, ...fileRows], args.output)
 }
 
 function outputDiffText({ branch, baseBranch, from, to, migratedFiles, mixedFiles, onlyOldFiles, totalFromRemoved, totalToAdded }) {
@@ -329,15 +537,16 @@ function cmdStatus() {
 
   const dir = resolveDir(args.dir)
   const files = walk(dir)
-  const fromRe = new RegExp(from)
-  const toRe = new RegExp(to)
+  const fromRe = toComponentRe(from)
+  const toRe = toComponentRe(to)
 
   const migrated = []
   const mixed = []
   const notStarted = []
 
   for (const file of files) {
-    const content = readFileSync(file, 'utf8')
+    const raw = readFileSync(file, 'utf8')
+    const content = stripComments(templateOnly(raw))
     const hasOld = fromRe.test(content)
     const hasNew = toRe.test(content)
     const rel = relative(ROOT, file)
@@ -345,6 +554,24 @@ function cmdStatus() {
     if (hasOld && hasNew) mixed.push(rel)
     else if (hasOld) notStarted.push(rel)
     else if (hasNew) migrated.push(rel)
+  }
+
+  const format = args.format || 'text'
+
+  if (format === 'csv') {
+    const rows = [
+      ['File', 'Module', 'Status'],
+      ...migrated.map(f   => [f, f.split('/').slice(0, 3).join('/'), 'Migrated']),
+      ...mixed.map(f      => [f, f.split('/').slice(0, 3).join('/'), 'Mixed (old + new)']),
+      ...notStarted.map(f => [f, f.split('/').slice(0, 3).join('/'), 'Not Started']),
+      [],
+      ['Summary', '', ''],
+      ['Migrated', migrated.length, ''],
+      ['Mixed', mixed.length, ''],
+      ['Not Started', notStarted.length, ''],
+    ]
+    writeCsv(rows, args.output)
+    return
   }
 
   console.log(`\nMigration status: ${from} → ${to}`)
@@ -363,21 +590,25 @@ function printHelp() {
 component-audit.mjs — O2 component usage analyzer
 
 Commands:
-  find   --pattern <regex> [--dir <path>] [--output <file>]
+  find   --pattern <regex> [--dir <path>] [--format text|csv] [--output file.csv]
          Find all usages of a component pattern in the codebase.
 
-  diff   --from <regex> --to <regex> [--format text|markdown]
+  diff   --from <regex> --to <regex> [--format text|markdown|csv] [--output file.csv]
          Analyze migration progress between old and new component in the current git branch.
 
-  status --from <regex> --to <regex> [--dir <path>]
+  status --from <regex> --to <regex> [--dir <path>] [--format text|csv] [--output file.csv]
          Show migration status (migrated / mixed / not started) per file.
 
 Examples:
-  node scripts/component-audit.mjs find --pattern "OTabs|OTab" --dir src
-  node scripts/component-audit.mjs find --pattern "q-tabs" --dir src --output todo.txt
-  node scripts/component-audit.mjs diff --from "q-tabs|q-tab" --to "OTabs|OTab"
-  node scripts/component-audit.mjs diff --from "q-tabs" --to "OTabs" --format markdown
+  # Print to console
+  node scripts/component-audit.mjs diff   --from "q-tabs|q-tab" --to "OTabs|OTab"
+  node scripts/component-audit.mjs find   --pattern "q-tabs|q-tab" --dir src
   node scripts/component-audit.mjs status --from "q-tabs" --to "OTabs"
+
+  # Save CSV for Excel / team sharing
+  node scripts/component-audit.mjs diff   --from "q-tabs|q-tab" --to "OTabs|OTab"   --format csv --output migration.csv
+  node scripts/component-audit.mjs find   --pattern "q-tabs|q-tab"                   --format csv --output todo.csv
+  node scripts/component-audit.mjs status --from "q-tabs" --to "OTabs"               --format csv --output status.csv
 `)
 }
 
