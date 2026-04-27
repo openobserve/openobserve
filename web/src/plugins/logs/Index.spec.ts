@@ -1484,6 +1484,7 @@ describe("Logs Index — stream selection persistence", () => {
       streamName: "",
     });
     mockSaveLogsStream.mockClear();
+    mockRestoreLogsStream.mockClear();
     mockRestoreLogsStream.mockReturnValue([]);
     localStorage.removeItem("oo_toggle_auto_run");
   });
@@ -1506,12 +1507,12 @@ describe("Logs Index — stream selection persistence", () => {
 
   it("should apply persisted streams to selectedStream when restoreLogsStream returns a non-empty list", async () => {
     (store.state.zoConfig as any).auto_query_enabled = true;
-    mockRestoreLogsStream.mockReturnValue(["persisted-stream"]);
+    mockRestoreLogsStream.mockReturnValue(["k8s_json"]);
     searchState().searchObj.data.stream.selectedStream = [];
     localWrapper = mountFresh();
     await flushPromises();
     expect(searchState().searchObj.data.stream.selectedStream).toEqual([
-      "persisted-stream",
+      "k8s_json",
     ]);
   });
 
