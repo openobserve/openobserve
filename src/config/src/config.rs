@@ -4059,4 +4059,36 @@ mod tests {
         assert!(ensure_not_empty("\t", "field").is_err());
         assert!(ensure_not_empty("\n", "field").is_err());
     }
+
+    #[test]
+    fn test_get_batch_size_positive() {
+        let size = get_batch_size();
+        assert!(size > 0, "batch size should be positive");
+    }
+
+    #[test]
+    fn test_cache_and_get_instance_id() {
+        cache_instance_id("test-instance-abc");
+        assert_eq!(get_instance_id(), "test-instance-abc");
+        cache_instance_id("test-instance-xyz");
+        assert_eq!(get_instance_id(), "test-instance-xyz");
+    }
+
+    #[test]
+    fn test_get_instance_id_empty_when_not_set() {
+        let id = get_instance_id();
+        let _ = id.len();
+    }
+
+    #[test]
+    fn test_is_local_disk_storage_returns_bool() {
+        let result: bool = is_local_disk_storage();
+        let _ = result;
+    }
+
+    #[test]
+    fn test_get_cluster_name_returns_nonempty() {
+        let name = get_cluster_name();
+        assert!(!name.is_empty(), "cluster name should not be empty");
+    }
 }

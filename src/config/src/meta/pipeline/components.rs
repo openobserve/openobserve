@@ -880,4 +880,80 @@ mod tests {
         );
         assert_ne!(node_a, node_c);
     }
+
+    #[test]
+    fn test_pipeline_source_mem_size_realtime() {
+        let src = PipelineSource::Realtime(StreamParams::new("org", "stream", StreamType::Logs));
+        assert!(src.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_pipeline_source_mem_size_scheduled() {
+        let src = PipelineSource::Scheduled(DerivedStream::default());
+        assert!(src.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_pipeline_source_default_is_realtime() {
+        let src = PipelineSource::default();
+        assert!(src.is_realtime());
+        assert!(!src.is_scheduled());
+        assert!(src.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_derived_stream_mem_size() {
+        let ds = DerivedStream {
+            org_id: "myorg".to_string(),
+            stream_type: StreamType::Logs,
+            ..Default::default()
+        };
+        assert!(ds.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_node_mem_size() {
+        let node = Node::new(
+            "n1".to_string(),
+            NodeData::Stream(StreamParams::new("org", "logs", StreamType::Logs)),
+            1.0,
+            2.0,
+            "input".to_string(),
+        );
+        assert!(node.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_node_data_mem_size_stream() {
+        let data = NodeData::Stream(StreamParams::new("org", "logs", StreamType::Logs));
+        assert!(data.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_node_data_mem_size_function() {
+        let data = NodeData::Function(FunctionParams {
+            name: "my_fn".to_string(),
+            after_flatten: false,
+            num_args: 0,
+        });
+        assert!(data.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_function_params_mem_size() {
+        let p = FunctionParams {
+            name: "fn".to_string(),
+            after_flatten: true,
+            num_args: 2,
+        };
+        assert!(p.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_edge_mem_size() {
+        let edge = Edge::new("src-1".to_string(), "dst-1".to_string());
+        assert!(edge.mem_size() > 0);
+        assert_eq!(edge.source, "src-1");
+        assert_eq!(edge.target, "dst-1");
+    }
 }
