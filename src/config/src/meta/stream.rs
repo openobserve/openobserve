@@ -1991,6 +1991,123 @@ mod tests {
     }
 
     #[test]
+    fn test_stream_stats_format_by_self_zero_doc_time_min() {
+        // self.doc_time_min == 0 → take stats.doc_time_min
+        let mut stats = StreamStats {
+            doc_time_min: 0,
+            ..Default::default()
+        };
+        let src = StreamStats {
+            doc_time_min: 300,
+            ..Default::default()
+        };
+        stats.format_by(&src);
+        assert_eq!(stats.doc_time_min, 300);
+    }
+
+    #[test]
+    fn test_stream_stats_format_by_src_zero_doc_time_min() {
+        // stats.doc_time_min == 0 → keep self.doc_time_min
+        let mut stats = StreamStats {
+            doc_time_min: 400,
+            ..Default::default()
+        };
+        let src = StreamStats {
+            doc_time_min: 0,
+            ..Default::default()
+        };
+        stats.format_by(&src);
+        assert_eq!(stats.doc_time_min, 400);
+    }
+
+    #[test]
+    fn test_stream_stats_merge_self_zero_doc_time_min() {
+        // self.doc_time_min == 0 → take other.doc_time_min
+        let mut a = StreamStats {
+            doc_time_min: 0,
+            ..Default::default()
+        };
+        let b = StreamStats {
+            doc_time_min: 1500,
+            ..Default::default()
+        };
+        a.merge(&b);
+        assert_eq!(a.doc_time_min, 1500);
+    }
+
+    #[test]
+    fn test_stream_stats_merge_other_zero_doc_time_min() {
+        // other.doc_time_min == 0 → keep self.doc_time_min
+        let mut a = StreamStats {
+            doc_time_min: 800,
+            ..Default::default()
+        };
+        let b = StreamStats {
+            doc_time_min: 0,
+            ..Default::default()
+        };
+        a.merge(&b);
+        assert_eq!(a.doc_time_min, 800);
+    }
+
+    #[test]
+    fn test_stream_stats_sub_zero_self_doc_time_min() {
+        // self.doc_time_min == 0 → take rhs.doc_time_min
+        let a = StreamStats {
+            doc_time_min: 0,
+            doc_num: 10,
+            ..Default::default()
+        };
+        let b = StreamStats {
+            doc_time_min: 500,
+            doc_num: 3,
+            ..Default::default()
+        };
+        let result = &a - &b;
+        assert_eq!(result.doc_time_min, 500);
+        assert_eq!(result.doc_num, 7);
+    }
+
+    #[test]
+    fn test_stream_stats_sub_zero_rhs_doc_time_min() {
+        // rhs.doc_time_min == 0 → keep self.doc_time_min
+        let a = StreamStats {
+            doc_time_min: 600,
+            doc_num: 20,
+            ..Default::default()
+        };
+        let b = StreamStats {
+            doc_time_min: 0,
+            doc_num: 5,
+            ..Default::default()
+        };
+        let result = &a - &b;
+        assert_eq!(result.doc_time_min, 600);
+        assert_eq!(result.doc_num, 15);
+    }
+
+    #[test]
+    fn test_stream_stats_from_usage_stats_none_compressed_index() {
+        use crate::meta::self_reporting::usage::Stats;
+        let usage = Stats {
+            records: 50,
+            stream_type: StreamType::Logs,
+            org_id: "org".to_string(),
+            stream_name: "s".to_string(),
+            original_size: 1024.0,
+            _timestamp: 0,
+            min_ts: 100,
+            max_ts: 200,
+            compressed_size: None,
+            index_size: None,
+        };
+        let stream_stats = StreamStats::from(usage);
+        assert_eq!(stream_stats.doc_num, 50);
+        assert_eq!(stream_stats.compressed_size, 0.0);
+        assert_eq!(stream_stats.index_size, 0.0);
+    }
+
+    #[test]
     fn test_stream_stats_from_usage_stats() {
         use crate::meta::self_reporting::usage::Stats;
         let usage = Stats {

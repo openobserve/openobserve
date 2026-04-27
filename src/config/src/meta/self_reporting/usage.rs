@@ -1305,6 +1305,40 @@ mod tests {
         assert!(!UsageType::Search.is_incident());
         assert!(!UsageType::Pipeline.is_incident());
     }
+
+    #[test]
+    fn test_usage_type_display_pipeline_and_incident_variants() {
+        assert_eq!(UsageType::Pipeline.to_string(), "pipeline");
+        assert_eq!(UsageType::RemotePipeline.to_string(), "remote_pipeline");
+        assert_eq!(UsageType::NewIncident.to_string(), "new_incident");
+        assert_eq!(
+            UsageType::IncidentReAnalysis.to_string(),
+            "incident_reanalysis"
+        );
+    }
+
+    #[test]
+    fn test_usage_type_is_pipeline() {
+        assert!(UsageType::Pipeline.is_pipeline());
+
+        assert!(!UsageType::RemotePipeline.is_pipeline());
+        assert!(!UsageType::Bulk.is_pipeline());
+        assert!(!UsageType::Search.is_pipeline());
+    }
+
+    #[test]
+    fn test_usage_type_serde_pipeline_and_incident() {
+        // Pipeline and Incident variants serialize to their serde rename strings
+        let pipeline_json = serde_json::to_string(&UsageType::Pipeline).unwrap();
+        assert_eq!(pipeline_json, "\"pipeline\"");
+
+        let incident_json = serde_json::to_string(&UsageType::NewIncident).unwrap();
+        assert_eq!(incident_json, "\"new_incident\"");
+
+        // Round trip
+        let back: UsageType = serde_json::from_str(&pipeline_json).unwrap();
+        assert_eq!(back, UsageType::Pipeline);
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
