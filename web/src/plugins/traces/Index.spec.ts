@@ -2659,7 +2659,19 @@ describe("Traces Index — stream selection persistence", () => {
     });
   }
 
+  const plainStream = () => ({
+    streamLists: [],
+    selectedStream: { label: "", value: "" },
+    selectedStreamFields: [],
+    selectedFields: [],
+    functions: [],
+  });
+
   beforeEach(() => {
+    // Wrap data.stream in reactive() so the save watcher fires when selectedStream
+    // is reassigned by the component or by the test itself.
+    mockSearchObj.data.stream = reactive(plainStream());
+
     mockGetStreams.mockResolvedValue(mockStreamList);
     mockGetStream.mockImplementation((streamName: string) =>
       Promise.resolve(
@@ -2671,8 +2683,6 @@ describe("Traces Index — stream selection persistence", () => {
     mockSearchObj.loading = false;
     mockSearchObj.loadingStream = false;
     mockSearchObj.meta.liveMode = false;
-    mockSearchObj.data.stream.streamLists = [];
-    mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
     localStorage.removeItem("oo_toggle_auto_run");
     vi.spyOn(router, "currentRoute", "get").mockReturnValue({
       value: { query: {}, name: "traces", path: "/traces" },
@@ -2681,6 +2691,8 @@ describe("Traces Index — stream selection persistence", () => {
 
   afterEach(() => {
     localWrapper?.unmount();
+    // Reset data.stream to a plain object so other describe blocks are unaffected
+    mockSearchObj.data.stream = plainStream();
     (store.state.zoConfig as any).auto_query_enabled = false;
     vi.clearAllMocks();
   });
