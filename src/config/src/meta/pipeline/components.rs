@@ -757,7 +757,8 @@ mod tests {
         assert!(scheduled.is_scheduled());
         assert!(!scheduled.is_realtime());
 
-        let realtime = PipelineSource::Realtime(StreamParams::new("org", "stream", StreamType::Logs));
+        let realtime =
+            PipelineSource::Realtime(StreamParams::new("org", "stream", StreamType::Logs));
         assert!(realtime.is_realtime());
         assert!(!realtime.is_scheduled());
     }

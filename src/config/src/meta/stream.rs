@@ -1604,7 +1604,10 @@ mod tests {
     fn test_data_type_from_str() {
         assert_eq!("utf8".parse::<DataType>().unwrap(), DataType::Utf8);
         assert_eq!("UTF8".parse::<DataType>().unwrap(), DataType::Utf8);
-        assert_eq!("largeutf8".parse::<DataType>().unwrap(), DataType::LargeUtf8);
+        assert_eq!(
+            "largeutf8".parse::<DataType>().unwrap(),
+            DataType::LargeUtf8
+        );
         assert_eq!("int64".parse::<DataType>().unwrap(), DataType::Int64);
         assert_eq!("uint64".parse::<DataType>().unwrap(), DataType::Uint64);
         assert_eq!("float64".parse::<DataType>().unwrap(), DataType::Float64);
@@ -1689,11 +1692,23 @@ mod tests {
 
     #[test]
     fn test_storage_type_from_str() {
-        assert_eq!("compliance".parse::<StorageType>().unwrap(), StorageType::Compliance);
-        assert_eq!("COMPLIANCE".parse::<StorageType>().unwrap(), StorageType::Compliance);
-        assert_eq!("normal".parse::<StorageType>().unwrap(), StorageType::Normal);
+        assert_eq!(
+            "compliance".parse::<StorageType>().unwrap(),
+            StorageType::Compliance
+        );
+        assert_eq!(
+            "COMPLIANCE".parse::<StorageType>().unwrap(),
+            StorageType::Compliance
+        );
+        assert_eq!(
+            "normal".parse::<StorageType>().unwrap(),
+            StorageType::Normal
+        );
         // unknown maps to Normal
-        assert_eq!("anything".parse::<StorageType>().unwrap(), StorageType::Normal);
+        assert_eq!(
+            "anything".parse::<StorageType>().unwrap(),
+            StorageType::Normal
+        );
     }
 
     #[test]
@@ -1788,11 +1803,20 @@ mod tests {
 
     #[test]
     fn test_partition_time_level_from_str() {
-        assert_eq!(PartitionTimeLevel::from("hourly"), PartitionTimeLevel::Hourly);
-        assert_eq!(PartitionTimeLevel::from("HOURLY"), PartitionTimeLevel::Hourly);
+        assert_eq!(
+            PartitionTimeLevel::from("hourly"),
+            PartitionTimeLevel::Hourly
+        );
+        assert_eq!(
+            PartitionTimeLevel::from("HOURLY"),
+            PartitionTimeLevel::Hourly
+        );
         assert_eq!(PartitionTimeLevel::from("daily"), PartitionTimeLevel::Daily);
         assert_eq!(PartitionTimeLevel::from("unset"), PartitionTimeLevel::Unset);
-        assert_eq!(PartitionTimeLevel::from("unknown"), PartitionTimeLevel::Unset);
+        assert_eq!(
+            PartitionTimeLevel::from("unknown"),
+            PartitionTimeLevel::Unset
+        );
     }
 
     #[test]

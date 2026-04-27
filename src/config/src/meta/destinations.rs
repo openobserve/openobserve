@@ -606,7 +606,10 @@ mod tests {
 
     #[test]
     fn test_http_output_format_content_type() {
-        assert_eq!(HTTPOutputFormat::JSON.get_content_type(), "application/json");
+        assert_eq!(
+            HTTPOutputFormat::JSON.get_content_type(),
+            "application/json"
+        );
         assert_eq!(
             HTTPOutputFormat::NDJSON.get_content_type(),
             "application/x-ndjson"
@@ -644,7 +647,9 @@ mod tests {
     #[test]
     fn test_http_output_format_get_body_json() {
         let fmt = HTTPOutputFormat::JSON;
-        let data = vec![JsonRow(serde_json::json!({"level": "info", "msg": "hello"}))];
+        let data = vec![JsonRow(
+            serde_json::json!({"level": "info", "msg": "hello"}),
+        )];
         let meta = HashMap::new();
         let body = fmt.get_body_from_data(&data, &meta);
         let parsed: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();

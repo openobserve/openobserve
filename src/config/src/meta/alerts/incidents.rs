@@ -1285,7 +1285,10 @@ mod tests {
         assert!(result);
 
         if let IncidentEventType::Alert {
-            count, last_at, first_at, ..
+            count,
+            last_at,
+            first_at,
+            ..
         } = &event.event_type
         {
             assert_eq!(*count, 2);

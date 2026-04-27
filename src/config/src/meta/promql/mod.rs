@@ -500,7 +500,10 @@ mod tests {
         assert_eq!(MetricType::from("COUNTER"), MetricType::Counter);
         assert_eq!(MetricType::from("gauge"), MetricType::Gauge);
         assert_eq!(MetricType::from("histogram"), MetricType::Histogram);
-        assert_eq!(MetricType::from("gaugehistogram"), MetricType::GaugeHistogram);
+        assert_eq!(
+            MetricType::from("gaugehistogram"),
+            MetricType::GaugeHistogram
+        );
         assert_eq!(
             MetricType::from("exponentialhistogram"),
             MetricType::ExponentialHistogram

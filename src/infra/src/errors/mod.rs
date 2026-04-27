@@ -407,11 +407,20 @@ mod tests {
 
     #[test]
     fn test_error_codes_get_code() {
-        assert_eq!(ErrorCodes::ServerInternalError("x".into()).get_code(), 10001);
+        assert_eq!(
+            ErrorCodes::ServerInternalError("x".into()).get_code(),
+            10001
+        );
         assert_eq!(ErrorCodes::SearchSQLNotValid("x".into()).get_code(), 20001);
-        assert_eq!(ErrorCodes::SearchStreamNotFound("x".into()).get_code(), 20002);
+        assert_eq!(
+            ErrorCodes::SearchStreamNotFound("x".into()).get_code(),
+            20002
+        );
         assert_eq!(ErrorCodes::FullTextSearchFieldNotFound.get_code(), 20003);
-        assert_eq!(ErrorCodes::SearchFieldNotFound("x".into()).get_code(), 20004);
+        assert_eq!(
+            ErrorCodes::SearchFieldNotFound("x".into()).get_code(),
+            20004
+        );
         assert_eq!(
             ErrorCodes::SearchFunctionNotDefined("x".into()).get_code(),
             20005
@@ -421,7 +430,10 @@ mod tests {
             ErrorCodes::SearchFieldHasNoCompatibleDataType("x".into()).get_code(),
             20007
         );
-        assert_eq!(ErrorCodes::SearchSQLExecuteError("x".into()).get_code(), 20008);
+        assert_eq!(
+            ErrorCodes::SearchSQLExecuteError("x".into()).get_code(),
+            20008
+        );
         assert_eq!(ErrorCodes::SearchCancelQuery("x".into()).get_code(), 20009);
         assert_eq!(ErrorCodes::SearchTimeout("x".into()).get_code(), 20010);
         assert_eq!(ErrorCodes::InvalidParams("x".into()).get_code(), 20011);
@@ -484,7 +496,10 @@ mod tests {
             ErrorCodes::SearchStreamNotFound("stream".into()).get_error_detail(),
             ""
         );
-        assert_eq!(ErrorCodes::FullTextSearchFieldNotFound.get_error_detail(), "");
+        assert_eq!(
+            ErrorCodes::FullTextSearchFieldNotFound.get_error_detail(),
+            ""
+        );
     }
 
     #[test]

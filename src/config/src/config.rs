@@ -3615,8 +3615,14 @@ mod tests {
 
     #[test]
     fn test_file_format_from_str() {
-        assert_eq!("parquet".parse::<FileFormat>().unwrap(), FileFormat::Parquet);
-        assert_eq!("PARQUET".parse::<FileFormat>().unwrap(), FileFormat::Parquet);
+        assert_eq!(
+            "parquet".parse::<FileFormat>().unwrap(),
+            FileFormat::Parquet
+        );
+        assert_eq!(
+            "PARQUET".parse::<FileFormat>().unwrap(),
+            FileFormat::Parquet
+        );
         assert_eq!("vortex".parse::<FileFormat>().unwrap(), FileFormat::Vortex);
         assert_eq!("VORTEX".parse::<FileFormat>().unwrap(), FileFormat::Vortex);
         assert!("unknown".parse::<FileFormat>().is_err());

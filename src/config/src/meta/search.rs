@@ -3317,5 +3317,4 @@ mod tests {
         resp.set_peak_memory_usage(2048.0);
         assert_eq!(resp.peak_memory_usage, Some(2048.0));
     }
-
 }

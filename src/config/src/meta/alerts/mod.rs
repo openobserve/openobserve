@@ -2170,7 +2170,10 @@ mod test {
         assert_eq!(AggFunction::try_from("max").unwrap(), AggFunction::Max);
         assert_eq!(AggFunction::try_from("sum").unwrap(), AggFunction::Sum);
         assert_eq!(AggFunction::try_from("count").unwrap(), AggFunction::Count);
-        assert_eq!(AggFunction::try_from("median").unwrap(), AggFunction::Median);
+        assert_eq!(
+            AggFunction::try_from("median").unwrap(),
+            AggFunction::Median
+        );
         assert_eq!(AggFunction::try_from("p50").unwrap(), AggFunction::P50);
         assert_eq!(AggFunction::try_from("p75").unwrap(), AggFunction::P75);
         assert_eq!(AggFunction::try_from("p90").unwrap(), AggFunction::P90);
