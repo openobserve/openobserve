@@ -1689,7 +1689,10 @@
     "streamTotal": "Akışlar",
     "totalDashboard": "Gösterge panoları",
     "viewButton": "Görünüm",
-    "noDataAvailable": "Veri yok"
+    "noDataAvailable": "Veri yok",
+    "tabAiAssistant": "O2 AI Asistanı",
+    "tabOverview": "Genel Bakış",
+    "tabUsage": "Kullanımı"
   },
   "billing": {
     "header": "Kullanım ve Faturalandırma",
@@ -3624,5 +3627,30 @@
     "errLoadModel": "Model yüklenemedi",
     "tierDefaultName": "Varsayılan",
     "tierConditionalName": "Koşullu Katman"
+  },
+  "overview": {
+    "title": "Sisteme Genel Bakış",
+    "activeAnomalies": "Aktif Anomaliler",
+    "activeIncidents": "Aktif Olaylar",
+    "services": "HİZMETLER",
+    "recentEvents": "Son Olaylar",
+    "investigate": "Araştırın→",
+    "untitledIncident": "İsimsiz Olay",
+    "viewLatencyCharts": "Gecikme ve RED grafiklerini görüntüleyin",
+    "elevatedErrorRate": "Yükseltilmiş hata oranı",
+    "reqPerSec": "istek/s",
+    "allClear": "Hepsi temiz",
+    "allClearDesc": "Seçilen zaman aralığında etkin anormallikler, olaylar veya bozulmuş hizmetler yok."
+  },
+  "chatHistory": {
+    "title": "Sohbetler",
+    "newChat": "Yeni sohbet",
+    "search": "Arama",
+    "noMatches": "Eşleşme yok",
+    "noHistory": "Sohbet geçmişi yok",
+    "delete": "Sil",
+    "clearAll": "Tümünü temizle",
+    "clearAllTitle": "Tüm sohbetleri temizle",
+    "clearAllMessage": "Bu, tüm sohbet geçmişini kalıcı olarak silecektir. Bu işlem geri alınamaz."
   }
 }

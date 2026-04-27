@@ -1035,11 +1035,11 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     const queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
     await queryEditor.waitFor({ state: "visible", timeout: 10000 });
 
-    // Focus on the editor and enter a simple PromQL query using keyboard.type for reliable Monaco input
+    // Use .inputarea.fill() to directly set Monaco's textarea value — same pattern as
+    // the passing custom SQL test (line 934). keyboard.type() leaves autocomplete open
+    // and doesn't reliably trigger Vue's reactive model update, causing "Query-1 is empty".
     await queryEditor.getByRole('code').click();
-    await page.keyboard.press('Control+a');
-    await page.keyboard.type('cpu_usage{}');
-    await page.keyboard.press('Escape'); // Dismiss any Monaco autocomplete suggestions
+    await queryEditor.locator('.inputarea').fill('cpu_usage{}');
 
     // Apply
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1070,8 +1070,10 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
 
     testLogger.info('Verified pagination works for PromQL table chart');
 
-    // Clean up - save panel first before navigating back
-    await pm.dashboardPanelActions.savePanel();
+    // The router guard (onBeforeRouteLeave) fires window.confirm when leaving with
+    // unsaved changes. Accept it so navigation to ViewDashboard completes.
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('[data-test="dashboard-panel-discard"]').click();
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });

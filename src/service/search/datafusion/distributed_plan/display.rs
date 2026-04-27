@@ -118,6 +118,48 @@ impl ExecutionPlanVisitor for IndentVisitor<'_, '_> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use datafusion::{arrow::datatypes::Schema, physical_plan::empty::EmptyExec};
+
+    use super::*;
+
+    fn empty_plan() -> Arc<dyn ExecutionPlan> {
+        Arc::new(EmptyExec::new(Arc::new(Schema::empty())))
+    }
+
+    #[test]
+    fn test_new_aggregated_output() {
+        let plan = empty_plan();
+        let d = DisplayableExecutionPlan::new(plan.as_ref());
+        let s = format!("{}", d.indent(false));
+        assert!(s.contains("EmptyExec"));
+        // EmptyExec has no metrics, so the aggregated branch writes "metrics=[]"
+        assert!(s.contains("metrics=[]"));
+    }
+
+    #[test]
+    fn test_with_full_metrics_output() {
+        let plan = empty_plan();
+        let d = DisplayableExecutionPlan::with_full_metrics(plan.as_ref());
+        let s = format!("{}", d.indent(false));
+        assert!(s.contains("EmptyExec"));
+        assert!(s.contains("metrics=[]"));
+    }
+
+    #[test]
+    fn test_indent_verbose_vs_default() {
+        let plan = empty_plan();
+        let d = DisplayableExecutionPlan::new(plan.as_ref());
+        let default_out = format!("{}", d.indent(false));
+        let verbose_out = format!("{}", d.indent(true));
+        assert!(!default_out.is_empty());
+        assert!(!verbose_out.is_empty());
+    }
+}
+
 // stop check the childern if it is the RemoteScanExec
 fn visit_plan<V: ExecutionPlanVisitor>(
     plan: &dyn ExecutionPlan,

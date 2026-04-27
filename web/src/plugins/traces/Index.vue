@@ -1214,7 +1214,7 @@ async function extractFields() {
             name: rowName,
             ftsKey: ftsKeys.has(rowName),
             showValues: !idFields[rowName],
-            label: rowName === "duration" ? "duration (µs)" : rowName,
+            label: rowName,
             dataType: schemaTypeMap.get(rowName),
             isSchemaField: true,
           });
@@ -1420,6 +1420,12 @@ onUnmounted(() => {
 
 onActivated(async () => {
   setupContextProvider();
+
+  const savedAutoRun = localStorage.getItem("oo_toggle_auto_run");
+  if (savedAutoRun !== null) {
+    searchObj.meta.liveMode = savedAutoRun === "true";
+  }
+
   const params = router.currentRoute.value.query;
   if (params.reload === "true") {
     restoreUrlQueryParams();
@@ -1866,13 +1872,17 @@ watch(moveSplitter, () => {
   }
 });
 
-// Live mode: enable by default when auto_query_enabled flag is on.
-// zoConfig may not be populated yet at mount time; watch for it to arrive.
+// Live mode: when auto_query_enabled is true in zoConfig, always sync from
+// localStorage so the module-level singleton reflects the user's preference
+// even after navigating between pages. Defaults to true when no preference
+// has been saved yet. zoConfig may not be populated yet at mount time;
+// watch for it to arrive.
 watch(
   () => store.state.zoConfig?.auto_query_enabled,
   (enabled) => {
-    if (enabled && !searchObj.meta.liveMode) {
-      searchObj.meta.liveMode = true;
+    if (enabled) {
+      const saved = localStorage.getItem("oo_toggle_auto_run");
+      searchObj.meta.liveMode = saved === null ? true : saved === "true";
     }
   },
   { immediate: true },
@@ -1892,7 +1902,10 @@ const debouncedAutoRunOnQuery = debounce(() => {
 // Debounced auto-run on datetime changes in live mode.
 // Traces has no existing auto-run on datetime, so no guard needed.
 const debouncedAutoRunOnDatetime = debounce(() => {
+  // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (2500ms).
+  // Only auto-run here for relative time to avoid double-triggering.
   if (
+    searchObj.data.datetime.type === "relative" &&
     searchObj.meta.liveMode &&
     store.state.zoConfig?.auto_query_enabled &&
     !searchObj.loading
