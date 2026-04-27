@@ -218,4 +218,111 @@ mod tests {
         // period_end_time is None → skip_serializing_if omits it
         assert!(!json.contains("period_end_time"));
     }
+
+    #[test]
+    fn test_deletion_status_default_is_not_required() {
+        let s: DeletionStatus = Default::default();
+        assert_eq!(s, DeletionStatus::NotRequired);
+    }
+
+    #[test]
+    fn test_deletion_status_serde_roundtrip_all_variants() {
+        for (variant, expected) in [
+            (DeletionStatus::NotRequired, "\"not_required\""),
+            (DeletionStatus::Pending, "\"pending\""),
+            (DeletionStatus::InProgress, "\"in_progress\""),
+            (DeletionStatus::Completed, "\"completed\""),
+        ] {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: DeletionStatus = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_backfill_job_deletion_job_ids_skip_serializing_when_empty() {
+        let job = BackfillJob {
+            current_position: 100,
+            deletion_status: DeletionStatus::NotRequired,
+            deletion_job_ids: vec![],
+            error: None,
+        };
+        let val = serde_json::to_value(&job).unwrap();
+        assert!(!val.as_object().unwrap().contains_key("deletion_job_ids"));
+        assert!(!val.as_object().unwrap().contains_key("error"));
+    }
+
+    #[test]
+    fn test_backfill_job_with_ids_and_error_serializes() {
+        let job = BackfillJob {
+            current_position: 999,
+            deletion_status: DeletionStatus::InProgress,
+            deletion_job_ids: vec!["job1".to_string(), "job2".to_string()],
+            error: Some("oops".to_string()),
+        };
+        let val = serde_json::to_value(&job).unwrap();
+        assert_eq!(val["deletion_job_ids"].as_array().unwrap().len(), 2);
+        assert_eq!(val["error"], "oops");
+        assert_eq!(val["current_position"], 999_i64);
+    }
+
+    #[test]
+    fn test_trigger_status_default_is_waiting() {
+        let s: TriggerStatus = Default::default();
+        assert_eq!(s, TriggerStatus::Waiting);
+    }
+
+    #[test]
+    fn test_trigger_status_serde_roundtrip() {
+        for variant in [
+            TriggerStatus::Waiting,
+            TriggerStatus::Processing,
+            TriggerStatus::Completed,
+        ] {
+            let s = serde_json::to_string(&variant).unwrap();
+            let back: TriggerStatus = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_trigger_mem_size_at_least_struct_size() {
+        let t = Trigger {
+            id: 1,
+            org: "myorg".to_string(),
+            module: TriggerModule::Alert,
+            module_key: "key".to_string(),
+            next_run_at: 0,
+            is_realtime: false,
+            is_silenced: false,
+            status: TriggerStatus::Waiting,
+            start_time: None,
+            end_time: None,
+            retries: 0,
+            data: "{}".to_string(),
+        };
+        assert!(t.mem_size() >= std::mem::size_of::<Trigger>());
+    }
+
+    #[test]
+    fn test_scheduled_trigger_data_with_backfill_job_json_roundtrip() {
+        let data = ScheduledTriggerData {
+            period_end_time: Some(500),
+            tolerance: 5,
+            last_satisfied_at: None,
+            backfill_job: Some(BackfillJob {
+                current_position: 42,
+                deletion_status: DeletionStatus::Pending,
+                deletion_job_ids: vec!["j1".to_string()],
+                error: None,
+            }),
+        };
+        let json = data.to_json_string();
+        let restored = ScheduledTriggerData::from_json_string(&json).unwrap();
+        let bj = restored.backfill_job.unwrap();
+        assert_eq!(bj.current_position, 42);
+        assert_eq!(bj.deletion_status, DeletionStatus::Pending);
+        assert_eq!(bj.deletion_job_ids.len(), 1);
+    }
 }
