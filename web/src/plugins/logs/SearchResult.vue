@@ -332,6 +332,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </h6>
         </div>
 
+        <!-- Pinned breakdown tooltip — teleported to body to avoid stacking context issues -->
+        <Teleport to="body">
+          <div
+            v-if="pinnedTooltip.visible"
+            class="oo-pin-backdrop"
+            @click="closePinnedTooltip"
+          />
+          <div
+            v-if="pinnedTooltip.visible"
+            class="oo-pin-tooltip"
+            :style="{
+              top: pinnedTooltip.y + 'px',
+              left: pinnedTooltip.x + 'px',
+            }"
+            @keydown.esc="closePinnedTooltip"
+            tabindex="-1"
+          >
+            <div class="oo-pin-tooltip__time">
+              {{ pinnedTooltip.timestamp }}
+            </div>
+            <div
+              v-for="row in pinnedTooltip.rows"
+              :key="row.rawValue"
+              class="oo-pin-tooltip__row"
+            >
+              <span
+                class="oo-pin-tooltip__dot"
+                :style="{ background: row.color }"
+              />
+              <span class="oo-pin-tooltip__name">{{ row.displayLabel }}</span>
+              <span class="oo-pin-tooltip__count">{{
+                formatCount(row.count)
+              }}</span>
+              <span class="oo-pin-tooltip__row-actions">
+                <span
+                  class="oo-pin-tooltip__action oo-pin-tooltip__action--include"
+                  title="include"
+                  @click.stop="applyPinnedFilter(row.rawValue, 'include')"
+                  >=</span
+                >
+                <span
+                  class="oo-pin-tooltip__action oo-pin-tooltip__action--exclude"
+                  title="exclude"
+                  @click.stop="applyPinnedFilter(row.rawValue, 'exclude')"
+                  >≠</span
+                >
+              </span>
+            </div>
+          </div>
+        </Teleport>
+
         <!-- Logs View -->
         <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
           <tenstack-table
