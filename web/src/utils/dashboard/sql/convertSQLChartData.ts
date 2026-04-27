@@ -46,6 +46,7 @@ export const convertSQLChartData = async (
   metadata: any,
   chartPanelStyle: any,
   annotations: any,
+  loading?: any,
 ) => {
   // Build the full shared context (all pre-switch logic lives here)
   const ctx = buildSQLContext(
@@ -58,6 +59,7 @@ export const convertSQLChartData = async (
     metadata,
     chartPanelStyle,
     annotations,
+    loading,
   );
 
   // Guard returned from contextBuilder (invalid/empty input)

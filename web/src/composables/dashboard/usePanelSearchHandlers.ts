@@ -54,6 +54,7 @@ export const usePanelSearchHandlers = ({
     { hits: any[][]; streamingAggs: boolean; orderAsc: boolean; isLTR: boolean }
   > = new Map();
   let flushScheduled = false;
+  let pendingProgressPercent: number | null = null;
 
   function scheduleFlush() {
     if (!flushScheduled) {
@@ -100,12 +101,19 @@ export const usePanelSearchHandlers = ({
 
       buffer.hits.length = 0; // clear buffer after flush
     }
+
+    if (pendingProgressPercent !== null) {
+      state.loadingProgressPercentage = pendingProgressPercent;
+      state.isPartialData = true;
+      pendingProgressPercent = null;
+    }
   }
 
   function clearHitsBuffer() {
     hitsBuffer.clear();
     chunkingLeftToRight.clear();
     flushScheduled = false;
+    pendingProgressPercent = null;
   }
 
   // Low-level streaming event handlers
@@ -315,8 +323,8 @@ export const usePanelSearchHandlers = ({
       }
 
       if (response.type === "event_progress") {
-        state.loadingProgressPercentage = response?.content?.percent ?? 0;
-        state.isPartialData = true;
+        pendingProgressPercent = response?.content?.percent ?? 0;
+        scheduleFlush();
       }
     } catch (error: any) {
       clearHitsBuffer();
