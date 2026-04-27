@@ -2344,4 +2344,51 @@ mod test {
             "V2 should include conditions field"
         );
     }
+
+    #[test]
+    fn test_frequency_type_serde() {
+        let cron = serde_json::to_string(&FrequencyType::Cron).unwrap();
+        assert_eq!(cron, "\"cron\"");
+        let minutes = serde_json::to_string(&FrequencyType::Minutes).unwrap();
+        assert_eq!(minutes, "\"minutes\"");
+        let back: FrequencyType = serde_json::from_str(&cron).unwrap();
+        assert_eq!(back, FrequencyType::Cron);
+        let back2: FrequencyType = serde_json::from_str(&minutes).unwrap();
+        assert_eq!(back2, FrequencyType::Minutes);
+        // default = Minutes
+        let d: FrequencyType = Default::default();
+        assert_eq!(d, FrequencyType::Minutes);
+    }
+
+    #[test]
+    fn test_logical_operator_serde_uppercase() {
+        let and = serde_json::to_string(&LogicalOperator::And).unwrap();
+        assert_eq!(and, "\"AND\"");
+        let or = serde_json::to_string(&LogicalOperator::Or).unwrap();
+        assert_eq!(or, "\"OR\"");
+        let back_and: LogicalOperator = serde_json::from_str(&and).unwrap();
+        assert_eq!(back_and, LogicalOperator::And);
+        let back_or: LogicalOperator = serde_json::from_str(&or).unwrap();
+        assert_eq!(back_or, LogicalOperator::Or);
+    }
+
+    #[test]
+    fn test_operator_serde_roundtrip() {
+        let cases = [
+            (Operator::EqualTo, "\"=\""),
+            (Operator::NotEqualTo, "\"!=\""),
+            (Operator::GreaterThan, "\">\""),
+            (Operator::GreaterThanEquals, "\">=\""),
+            (Operator::LessThan, "\"<\""),
+            (Operator::LessThanEquals, "\"<=\""),
+            (Operator::Contains, "\"contains\""),
+            (Operator::NotContains, "\"not_contains\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: Operator = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
 }
