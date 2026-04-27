@@ -493,4 +493,101 @@ mod tests {
             }"#
         ]].assert_eq(&serde_json::to_string_pretty(&err).unwrap());
     }
+
+    #[test]
+    fn test_metric_type_from_str() {
+        assert_eq!(MetricType::from("counter"), MetricType::Counter);
+        assert_eq!(MetricType::from("COUNTER"), MetricType::Counter);
+        assert_eq!(MetricType::from("gauge"), MetricType::Gauge);
+        assert_eq!(MetricType::from("histogram"), MetricType::Histogram);
+        assert_eq!(MetricType::from("gaugehistogram"), MetricType::GaugeHistogram);
+        assert_eq!(
+            MetricType::from("exponentialhistogram"),
+            MetricType::ExponentialHistogram
+        );
+        assert_eq!(MetricType::from("summary"), MetricType::Summary);
+        assert_eq!(MetricType::from("info"), MetricType::Info);
+        assert_eq!(MetricType::from("stateset"), MetricType::StateSet);
+        // unknown input → Unknown
+        assert_eq!(MetricType::from("unknown"), MetricType::Unknown);
+        assert_eq!(MetricType::from("bogus"), MetricType::Unknown);
+        assert_eq!(MetricType::from(""), MetricType::Unknown);
+    }
+
+    #[test]
+    fn test_metadata_new() {
+        let md = Metadata::new("http_requests_total");
+        assert_eq!(md.metric_family_name, "http_requests_total");
+        assert_eq!(md.metric_type, MetricType::Unknown);
+        assert!(md.help.is_empty());
+        assert!(md.unit.is_empty());
+    }
+
+    #[test]
+    fn test_metadata_object_from_metadata() {
+        let md = Metadata {
+            metric_type: MetricType::Counter,
+            metric_family_name: "req_total".to_string(),
+            help: "Total requests".to_string(),
+            unit: "requests".to_string(),
+        };
+        let obj = MetadataObject::from(md);
+        let json = serde_json::to_value(&obj).unwrap();
+        assert_eq!(json["type"], "counter");
+        assert_eq!(json["help"], "Total requests");
+        assert_eq!(json["unit"], "requests");
+    }
+
+    #[test]
+    fn test_function_from_str() {
+        assert_eq!(Function::from("avg"), Function::Avg);
+        assert_eq!(Function::from("AVG"), Function::Avg);
+        assert_eq!(Function::from("sum"), Function::Sum);
+        assert_eq!(Function::from("count"), Function::Count);
+        assert_eq!(Function::from("min"), Function::Min);
+        assert_eq!(Function::from("max"), Function::Max);
+        assert_eq!(Function::from("last"), Function::Last);
+        assert_eq!(Function::from("first"), Function::First);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid downsampling function")]
+    fn test_function_from_str_invalid_panics() {
+        let _ = Function::from("median");
+    }
+
+    #[test]
+    fn test_function_fun() {
+        assert_eq!(Function::Avg.fun(), "avg");
+        assert_eq!(Function::Sum.fun(), "sum");
+        assert_eq!(Function::Count.fun(), "count");
+        assert_eq!(Function::Min.fun(), "min");
+        assert_eq!(Function::Max.fun(), "max");
+        assert_eq!(Function::Last.fun(), "last_value");
+        assert_eq!(Function::First.fun(), "first_value");
+    }
+
+    #[test]
+    fn test_downsampling_rule_is_match() {
+        use regex::Regex;
+
+        let rule_with_regex = DownsamplingRule {
+            rule: Some(Regex::new("^http_").unwrap()),
+            function: Function::Avg,
+            offset: 0,
+            step: 60,
+        };
+        assert!(rule_with_regex.is_match("http_requests_total"));
+        assert!(!rule_with_regex.is_match("grpc_requests_total"));
+
+        // no rule → always matches
+        let rule_no_regex = DownsamplingRule {
+            rule: None,
+            function: Function::Sum,
+            offset: 0,
+            step: 60,
+        };
+        assert!(rule_no_regex.is_match("anything"));
+        assert!(rule_no_regex.is_match(""));
+    }
 }
