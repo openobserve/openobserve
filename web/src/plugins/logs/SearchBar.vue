@@ -2424,7 +2424,10 @@ import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
-import { logsUtils } from "@/composables/useLogs/logsUtils";
+import {
+  logsUtils,
+  removeFieldFromWhereAST,
+} from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import {
   getVisualizationConfig,
@@ -3244,6 +3247,32 @@ export default defineComponent({
       }
     };
 
+    // Debounced query trigger for absolute time when auto-run is enabled.
+    // Gives the user 1.5s to finish typing start/end time before firing.
+    const triggerAbsoluteQueryDebounced = debounce((value: object) => {
+      if (
+        searchObj.loading == false &&
+        store.state.zoConfig.query_on_stream_selection == false
+      ) {
+        searchObj.loading = true;
+        searchObj.runQuery = true;
+      }
+
+      if (config.isCloud == "true" && value.userChangedValue) {
+        segment.track("Button Click", {
+          button: "Date Change",
+          tab: value.tab,
+          value: value,
+          stream_name: searchObj.data.stream.selectedStream.join(","),
+          page: "Search Logs",
+        });
+      }
+
+      if (store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode) {
+        emit("searchdata");
+      }
+    }, 2500);
+
     const updateDateTime = async (value: object) => {
       if (
         value.valueType == "absolute" &&
@@ -3301,6 +3330,15 @@ export default defineComponent({
       await nextTick();
 
       if (
+        value.valueType === "absolute" &&
+        store.state.zoConfig.auto_query_enabled
+      ) {
+        // Debounce query trigger so user can finish typing the full time value
+        triggerAbsoluteQueryDebounced(value);
+        return;
+      }
+
+      if (
         searchObj.loading == false &&
         store.state.zoConfig.query_on_stream_selection == false
       ) {
@@ -3324,13 +3362,6 @@ export default defineComponent({
         value.valueType === "relative" &&
         store.state.zoConfig.query_on_stream_selection == false
       ) {
-        emit("searchdata");
-      } else if (
-        value.valueType === "absolute" &&
-        store.state.zoConfig.auto_query_enabled &&
-        searchObj.meta.liveMode
-      ) {
-        // Live mode: auto-trigger on committed absolute time range change
         emit("searchdata");
       }
     };
@@ -4774,7 +4805,7 @@ export default defineComponent({
 
     const toggleLiveMode = () => {
       searchObj.meta.liveMode = !searchObj.meta.liveMode;
-      localStorage.setItem("oo_live_mode_logs", String(searchObj.meta.liveMode));
+      localStorage.setItem("oo_toggle_auto_run", String(searchObj.meta.liveMode));
     };
 
     const handleHistogramMode = () => {};
@@ -5379,6 +5410,7 @@ export default defineComponent({
       backgroundColorStyle,
       editorWidthToggleFunction,
       fnParsedSQL,
+      fnUnparsedSQL,
       iconRight,
       functionToggleIcon,
       searchSchedulerJob,
@@ -5669,10 +5701,23 @@ export default defineComponent({
     },
     removeFieldTerm(fieldName: string) {
       if (!fieldName) return;
-      const newValue = removeFieldCondition(
-        this.searchObj.data.editorValue,
-        fieldName,
-      );
+      let newValue: string;
+      if (this.searchObj.meta.sqlMode) {
+        try {
+          const parsed = this.fnParsedSQL();
+          if (parsed?.where) {
+            const newWhere = removeFieldFromWhereAST(parsed.where, fieldName);
+            newValue = this.fnUnparsedSQL({ ...parsed, where: newWhere }).replaceAll("`", '"');
+          } else {
+            newValue = this.searchObj.data.editorValue;
+          }
+        } catch (e) {
+          console.log("Error removing field condition from SQL:", e);
+          newValue = removeFieldCondition(this.searchObj.data.editorValue, fieldName);
+        }
+      } else {
+        newValue = removeFieldCondition(this.searchObj.data.editorValue, fieldName);
+      }
       this.searchObj.data.editorValue = newValue;
       this.searchObj.data.query = newValue;
       this.searchObj.data.stream.removeFilterField = "";

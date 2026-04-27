@@ -1691,7 +1691,10 @@
     "streamTotal": "Streams",
     "totalDashboard": "Dashboards",
     "viewButton": "Ansicht",
-    "noDataAvailable": "Keine Daten verfügbar"
+    "noDataAvailable": "Keine Daten verfügbar",
+    "tabAiAssistant": "O2 KI-Assistent",
+    "tabOverview": "Überblick",
+    "tabUsage": "Verwendungszweck"
   },
   "billing": {
     "header": "Nutzung und Abrechnung",
@@ -3274,7 +3277,8 @@
     "metricsErrorDetails": "Beim Abrufen der Metrikdaten ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
     "noMetricsDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Metriken gefunden.",
     "errorRetrievingTraces": "Beim Abrufen der Spuren ist ein Fehler aufgetreten.",
-    "serviceGroupProtected": "Die Dienstgruppe kann nicht entfernt werden. Sie können nur die zugewiesenen Felder ändern."
+    "serviceGroupProtected": "Die Dienstgruppe kann nicht entfernt werden. Sie können nur die zugewiesenen Felder ändern.",
+    "noDataFound": "Keine Daten gefunden"
   },
   "sreChat": {
     "emptyMessage": "Fragen Sie mich alles über Ihre Warnungen und Vorfälle",
@@ -3612,5 +3616,30 @@
     "errLoadModel": "Modell konnte nicht geladen werden",
     "tierDefaultName": "Standard",
     "tierConditionalName": "Bedingte Stufe"
+  },
+  "overview": {
+    "title": "Überblick über das System",
+    "activeAnomalies": "Aktive Anomalien",
+    "activeIncidents": "Aktive Vorfälle",
+    "services": "Dienstleistungen",
+    "recentEvents": "Aktuelle Ereignisse",
+    "investigate": "Untersuchen →",
+    "untitledIncident": "Unbenannter Vorfall",
+    "viewLatencyCharts": "Latenz- und RED-Diagramme anzeigen",
+    "elevatedErrorRate": "Erhöhte Fehlerrate",
+    "reqPerSec": "Anforderung/en",
+    "allClear": "Alles klar",
+    "allClearDesc": "Keine aktiven Anomalien, Vorfälle oder beeinträchtigte Dienste im ausgewählten Zeitfenster."
+  },
+  "chatHistory": {
+    "title": "Chats",
+    "newChat": "Neuer Chat",
+    "search": "Suche",
+    "noMatches": "Keine Treffer",
+    "noHistory": "Kein Chatverlauf",
+    "delete": "Löschen",
+    "clearAll": "Alles löschen",
+    "clearAllTitle": "Alle Chats löschen",
+    "clearAllMessage": "Dadurch wird der gesamte Chatverlauf dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
   }
 }

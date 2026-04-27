@@ -123,7 +123,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           data-test="logs-search-filter-error-message"
                           style="white-space: pre-line"
-                        >{{ searchObj.data.filterErrMsg }}</div>
+                        >
+                          {{ searchObj.data.filterErrMsg }}
+                        </div>
                       </h5>
                     </div>
                     <div
@@ -488,6 +490,7 @@ import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
+import { saveLogsStream, restoreLogsStream } from "@/utils/streamPersist";
 
 export default defineComponent({
   name: "PageSearch",
@@ -811,8 +814,24 @@ export default defineComponent({
       clearAllTimeouts();
       try {
         if (searchObj) {
-          // Turn off all loaders before saving view
-          let savedSearchObj = JSON.parse(JSON.stringify(searchObj));
+          // Serialize breakdownSeries Map as entries array before JSON cloning
+          const breakdownSeries = searchObj.data?.histogram?.breakdownSeries;
+          const serializableSearchObj = {
+            ...searchObj,
+            data: {
+              ...searchObj.data,
+              histogram: {
+                ...searchObj.data?.histogram,
+                breakdownSeries:
+                  breakdownSeries instanceof Map
+                    ? [...breakdownSeries.entries()]
+                    : null,
+              },
+            },
+          };
+          let savedSearchObj = JSON.parse(
+            JSON.stringify(serializableSearchObj),
+          );
           savedSearchObj.loading = false;
           savedSearchObj.loadingHistogram = false;
           savedSearchObj.loadingCounter = false;
@@ -966,7 +985,9 @@ export default defineComponent({
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
+      if (!searchObj.data.stream.selectedStream.length) return;
       try {
+        searchObj.loading = true;
         searchObj.meta.refreshHistogram = true;
         await getQueryData();
         refreshHistogramChart();
@@ -1124,6 +1145,19 @@ export default defineComponent({
 
           restoreUrlQueryParams(dashboardPanelData);
 
+          if (
+            store.state.zoConfig?.auto_query_enabled &&
+            !router.currentRoute.value.query.stream &&
+            !searchObj.data.stream.selectedStream.length
+          ) {
+            const persisted = restoreLogsStream(
+              store.state.selectedOrganization.identifier,
+            );
+            if (persisted.length) {
+              searchObj.data.stream.selectedStream = persisted;
+            }
+          }
+
           if (isEnterpriseClusterEnabled()) {
             await getRegionInfo();
           }
@@ -1142,6 +1176,10 @@ export default defineComponent({
           store.dispatch("logs/setIsInitialized", true);
         } else {
           await initialLogsState();
+          const savedAutoRun = localStorage.getItem("oo_toggle_auto_run");
+          if (savedAutoRun !== null) {
+            searchObj.meta.liveMode = savedAutoRun === "true";
+          }
           await nextTick();
           await getStreamList(false);
           await nextTick();
@@ -1180,6 +1218,11 @@ export default defineComponent({
     }
 
     const handleActivation = async () => {
+      const savedAutoRun = localStorage.getItem("oo_toggle_auto_run");
+      if (savedAutoRun !== null) {
+        searchObj.meta.liveMode = savedAutoRun === "true";
+      }
+
       try {
         const queryParams: any = router.currentRoute.value.query;
 
@@ -1336,7 +1379,8 @@ export default defineComponent({
 
                 for (const [index, token] of parsedFilterQuery.entries()) {
                   if (streamFieldNames.has(token)) {
-                    parsedFilterQuery[index] = quoteSqlIdentifierIfNeeded(token);
+                    parsedFilterQuery[index] =
+                      quoteSqlIdentifierIfNeeded(token);
                   }
                 }
 
@@ -1490,7 +1534,8 @@ export default defineComponent({
           if (
             (item.expr.type === "column_ref" &&
               (item.expr?.column?.expr?.value === fieldName ||
-                (typeof item.expr.column === "string" && item.expr.column.replace(/['"`]/g, "") === fieldName))) ||
+                (typeof item.expr.column === "string" &&
+                  item.expr.column.replace(/['"`]/g, "") === fieldName))) ||
             (item.expr.type === "aggr_func" &&
               item.expr?.args?.expr?.column?.value === fieldName)
           ) {
@@ -1667,6 +1712,20 @@ export default defineComponent({
     // Store the histogram query so it persists even after searchResponse is cleared
     const storedHistogramQuery = ref("");
 
+    watch(
+      () => searchObj.data.stream.selectedStream,
+      (streams: string[]) => {
+        if (
+          store.state.zoConfig?.auto_query_enabled &&
+          Array.isArray(streams) &&
+          streams.length
+        ) {
+          saveLogsStream(store.state.selectedOrganization.identifier, streams);
+        }
+      },
+      { deep: true },
+    );
+
     // Watch for histogram query in search results and store it immediately
     // This ensures the histogram query is saved before queryResults might be reset
     watch(
@@ -1791,6 +1850,7 @@ export default defineComponent({
                       "bar",
                       "h-bar",
                       "line",
+                      "stacked",
                       "scatter",
                       "table",
                     ];
@@ -1904,7 +1964,8 @@ export default defineComponent({
                       ?.visualization_histogram_interval,
                   time_offset: {
                     start_time:
-                      searchObj?.data?.customDownloadQueryObj?.query?.start_time,
+                      searchObj?.data?.customDownloadQueryObj?.query
+                        ?.start_time,
                     end_time:
                       searchObj?.data?.customDownloadQueryObj?.query?.end_time,
                   },
@@ -2212,15 +2273,17 @@ export default defineComponent({
       { deep: true },
     );
 
-    // Live mode: when auto_query_enabled is true in zoConfig, live mode is on
-    // by default so queries auto-run on filter or datetime changes (debounced).
-    // Users can toggle it off via the Run Query dropdown.
-    // zoConfig may not be populated yet at mount time; watch for it to arrive.
+    // Live mode: when auto_query_enabled is true in zoConfig, always sync from
+    // localStorage so the module-level singleton reflects the user's preference
+    // even after navigating between pages. Defaults to true when no preference
+    // has been saved yet. zoConfig may not be populated yet at mount time;
+    // watch for it to arrive.
     watch(
       () => store.state.zoConfig?.auto_query_enabled,
       (enabled) => {
-        if (enabled && !searchObj.meta.liveMode) {
-          searchObj.meta.liveMode = true;
+        if (enabled) {
+          const saved = localStorage.getItem("oo_toggle_auto_run");
+          searchObj.meta.liveMode = saved === null ? true : saved === "true";
         }
       },
       { immediate: true },
@@ -2231,11 +2294,15 @@ export default defineComponent({
     // updateDateTime path is NOT already auto-running the query).
     // Uses runQueryFn so the histogram is also refreshed.
     const debouncedAutoRunOnDatetime = debounce(() => {
+      // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (1500ms).
+      // Only auto-run here for relative time to avoid double-triggering.
       if (
+        searchObj.data.datetime.type === "relative" &&
         searchObj.meta.liveMode &&
         store.state.zoConfig?.auto_query_enabled &&
         store.state.zoConfig?.query_on_stream_selection !== false &&
         searchObj.meta.logsVisualizeToggle === "logs" &&
+        searchObj.data.stream.selectedStream.length > 0 &&
         !searchObj.loading &&
         !searchObj.loadingHistogram
       ) {
@@ -2534,6 +2601,32 @@ export default defineComponent({
       });
     };
 
+    const detectHistogramBreakdownField = (): string | null => {
+      const selectedStreamFields = (searchObj.data.stream
+        ?.selectedStreamFields ?? []) as Array<{
+        name?: string | null;
+      }>;
+      const fieldNameMap = new Map<string, string>();
+
+      selectedStreamFields.forEach((field) => {
+        const fieldName = field.name?.toLowerCase();
+        if (fieldName && !fieldNameMap.has(fieldName)) {
+          fieldNameMap.set(fieldName, field.name ?? fieldName);
+        }
+      });
+
+      // Keep this order aligned with backend histogram breakdown detection in
+      // `src/service/search/sql/histogram.rs`.
+      const prioritizedFields = ["severity", "log_level", "level", "status"];
+      for (const fieldName of prioritizedFields) {
+        if (fieldNameMap.has(fieldName)) {
+          return fieldNameMap.get(fieldName) ?? null;
+        }
+      }
+
+      return null;
+    };
+
     // Helper function to copy dashboardPanelData while preserving stream info
     const copyDashboardDataToVisualize = async () => {
       // Extract and assign stream info BEFORE copying
@@ -2736,19 +2829,32 @@ export default defineComponent({
         /* Populate fields & axes */
         // For histogram queries, we need to modify the extractedFields to match the actual query structure
         let fieldsForVisualization = extractedFields;
+        const histogramBreakdownField = shouldUseHistogramQuery.value
+          ? detectHistogramBreakdownField()
+          : null;
+        let shouldAutoSelectChartTypeForFields = autoSelectChartType;
         if (shouldUseHistogramQuery.value) {
           // For histogram query, override the extracted fields to match the histogram structure
           fieldsForVisualization = {
-            group_by: ["zo_sql_key"], // histogram field is grouped by zo_sql_key
-            projections: ["zo_sql_key", "zo_sql_num"], // histogram returns zo_sql_key and zo_sql_num
+            group_by: histogramBreakdownField
+              ? ["zo_sql_key", "zo_sql_breakdown"]
+              : ["zo_sql_key"], // histogram field is grouped by zo_sql_key
+            projections: histogramBreakdownField
+              ? ["zo_sql_key", "zo_sql_breakdown", "zo_sql_num"]
+              : ["zo_sql_key", "zo_sql_num"], // histogram returns zo_sql_key and zo_sql_num
             timeseries_field: "zo_sql_key", // zo_sql_key is the time field in histogram
           };
+
+          if (histogramBreakdownField && autoSelectChartType) {
+            dashboardPanelData.data.type = "stacked";
+            shouldAutoSelectChartTypeForFields = false;
+          }
         }
 
         // Use the refactored functions
         await setCustomQueryFields(
           fieldsForVisualization,
-          autoSelectChartType,
+          shouldAutoSelectChartTypeForFields,
           signal,
         );
 

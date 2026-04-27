@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { generateTraceContext, getWebSocketUrl } from "@/utils/zincutils";
+import { patchNsFieldsInJson } from "@/utils/nsFieldsPatch";
 import http from "./http";
 import stream from "./stream";
 
@@ -75,6 +76,20 @@ const search = {
     if (is_ui_histogram) url += `&is_ui_histogram=${is_ui_histogram}`;
     if (is_multi_stream_search) url += `&is_multi_stream_search=${is_multi_stream_search}`;
     if (validate) url += `&validate=${validate}`;
+    const axiosConfig =
+      page_type === "traces"
+        ? {
+            transformResponse: [
+              (data: string) => {
+                try {
+                  return JSON.parse(patchNsFieldsInJson(data));
+                } catch {
+                  return JSON.parse(data);
+                }
+              },
+            ],
+          }
+        : undefined;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
       if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
@@ -88,16 +103,21 @@ const search = {
       if (tab_id) url += `&tab_id=${tab_id}`;
       if (tab_name) url += `&tab_name=${encodeURIComponent(tab_name)}`;
       if (validate) url += `&validate=${validate}`;
-      if (query.hasOwnProperty("aggs")) {
-        return http({ headers: { traceparent } }).post(url, {
-          ...query.query,
-          aggs: query.aggs,
-        });
+      if (Object.hasOwn(query, "aggs")) {
+        return http({ headers: { traceparent } }).post(
+          url,
+          { ...query.query, aggs: query.aggs },
+          axiosConfig,
+        );
       } else {
-        return http({ headers: { traceparent } }).post(url, query.query);
+        return http({ headers: { traceparent } }).post(
+          url,
+          query.query,
+          axiosConfig,
+        );
       }
     }
-    return http({ headers: { traceparent } }).post(url, query);
+    return http({ headers: { traceparent } }).post(url, query, axiosConfig);
   },
 
   result_schema: (

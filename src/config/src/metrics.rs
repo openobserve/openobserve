@@ -250,23 +250,6 @@ pub static INGEST_WAL_LOCK_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// pattern extraction timing metrics (enterprise feature)
-pub static PATTERN_EXTRACTION_TIME: Lazy<HistogramVec> = Lazy::new(|| {
-    HistogramVec::new(
-        HistogramOpts::new(
-            "pattern_extraction_time_seconds",
-            "Pattern extraction time in seconds",
-        )
-        .namespace(NAMESPACE)
-        .buckets(vec![
-            0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0,
-        ])
-        .const_labels(create_const_labels()),
-        &["organization", "phase"], // phase: read_parquet, extraction, ingestion, total
-    )
-    .expect("Metric created")
-});
-
 // service discovery metrics (enterprise feature)
 pub static SERVICE_STREAMS_SERVICES_DISCOVERED: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -1605,7 +1588,6 @@ pub static SERVICE_STREAMS_CLEANUP_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::
     )
     .expect("Metric created")
 });
-
 pub static SERVICE_STREAMS_CLEANUP_ROWS_EVICTED: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -1616,6 +1598,30 @@ pub static SERVICE_STREAMS_CLEANUP_ROWS_EVICTED: Lazy<IntCounterVec> = Lazy::new
         .const_labels(create_const_labels()),
         &["organization"],
     )
+    .expect("Metric created")
+});
+
+pub static LICENSE_USAGE_LAST_REPORT_TIMESTAMP: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "license_usage_last_report_timestamp",
+            "Unix timestamp in microseconds of the last successful usage report.".to_owned(),
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static LICENSE_USAGE_LAST_REPORTING_SUCCESS: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "license_usage_last_reporting_success",
+            "indicates whether last attempt of reporting for usage was successful or not. value of 1 indicates success, 0 indicates failure",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        )
     .expect("Metric created")
 });
 
@@ -1672,9 +1678,6 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_WAL_LOCK_TIME.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(PATTERN_EXTRACTION_TIME.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(SERVICE_STREAMS_SERVICES_DISCOVERED.clone()))
@@ -2041,6 +2044,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SERVICE_STREAMS_CLEANUP_ROWS_EVICTED.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(LICENSE_USAGE_LAST_REPORT_TIMESTAMP.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(LICENSE_USAGE_LAST_REPORTING_SUCCESS.clone()))
         .expect("Metric registered");
 }
 

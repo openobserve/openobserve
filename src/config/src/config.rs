@@ -254,6 +254,22 @@ pub static DEFAULT_SEARCH_AROUND_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+pub static HISTOGRAM_BREAKDOWN_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    get_config()
+        .limit
+        .histogram_breakdown_fields
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
+        .collect()
+});
+
 pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::new(|| {
     let mut map = HashMap::default();
     let streams: Vec<String> = get_config()
@@ -1334,6 +1350,12 @@ pub struct Common {
     )]
     pub regex_patterns_source_url: String,
     #[env_config(
+        name = "ZO_MODEL_PRICING_ENABLED",
+        default = false,
+        help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
+    )]
+    pub model_pricing_enabled: bool,
+    #[env_config(
         name = "ZO_MODEL_PRICING_SOURCE_URL",
         default = "https://raw.githubusercontent.com/openobserve/sdr_patterns/refs/heads/main/llm_pricing.json",
         help = "URL for built-in LLM model pricing JSON source."
@@ -1829,6 +1851,12 @@ pub struct Limit {
         default = true
     )]
     pub histogram_enabled: bool,
+    #[env_config(
+        name = "ZO_HISTOGRAM_BREAKDOWN_FIELDS",
+        help = "Comma-separated ordered list of stream fields used for stacked histogram breakdown. First match wins. Default: severity,log_level,level,status",
+        default = "severity,log_level,level,status"
+    )]
+    pub histogram_breakdown_fields: String,
     #[env_config(name = "ZO_CACHE_DELAY_SECS", default = 300)] // seconds
     pub cache_delay_secs: i64,
     #[env_config(

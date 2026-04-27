@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #cell-actions="{ row, column, active }">
             <CellActions
-              v-if="active && !column.columnDef.meta.disableCellAction"
+              v-if="showCellActions && active && !column.columnDef.meta.disableCellAction"
               :column="column"
               :row="row"
               :selected-stream-fields="
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hide-search-term-actions="false"
               :hide-ai="true"
               @copy="copyToClipboard(column.id, row[column.id])"
-              @add-search-term="addSearchTerm"
+              @add-search-term="(field, value, action) => addSearchTerm(field, value, action, row)"
               @send-to-ai-chat="sendToAiChat"
             />
           </template>
@@ -253,6 +253,8 @@ interface Props {
   sortOrder?: "asc" | "desc";
   /** Current search mode */
   searchMode?: TraceSearchMode;
+  /** Whether to show CellActions overlay on table cells. Default: true */
+  showCellActions?: boolean;
 }
 
 const { t } = useI18n();
@@ -269,6 +271,7 @@ const props = withDefaults(defineProps<Props>(), {
   sortBy: undefined,
   sortOrder: undefined,
   searchMode: "traces",
+  showCellActions: true,
 });
 
 const emit = defineEmits<{
@@ -291,16 +294,27 @@ const addSearchTerm = (
   field: string,
   fieldValue: string | number | boolean,
   action: string,
+  row?: Record<string, any>,
 ) => {
   const operator = action === "include" ? "=" : "!=";
   if (fieldValue === null || fieldValue === "" || fieldValue === "null") {
     const isOp = action === "include" ? "is" : "is not";
     searchObj.data.stream.addToFilter = `${field} ${isOp} null`;
   } else {
+    // For nanosecond timestamp fields, use the exact string shadow value to avoid
+    // the ~52-unit rounding that JSON.parse introduces for 19-digit integers.
+    const exactNsValue =
+      field === "start_time"
+        ? row?._start_time_ns
+        : field === "end_time"
+          ? row?._end_time_ns
+          : undefined;
     const displayValue =
-      field === "span_kind"
-        ? (SPAN_KIND_MAP[String(fieldValue)] ?? String(fieldValue))
-        : String(fieldValue);
+      exactNsValue !== undefined
+        ? String(exactNsValue)
+        : field === "span_kind"
+          ? (SPAN_KIND_MAP[String(fieldValue)] ?? String(fieldValue))
+          : String(fieldValue);
     searchObj.data.stream.addToFilter = `${field} ${operator} '${displayValue.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
   }
 };
