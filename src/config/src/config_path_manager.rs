@@ -66,3 +66,29 @@ pub fn update_config_file_last_hash(hash: String) {
     let mut manager = CONFIG_MANAGER.write().unwrap();
     manager.last_hash = Some(hash);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_update_and_get_last_hash() {
+        update_config_file_last_hash("abc123".to_string());
+        let hash = get_config_file_last_hash();
+        assert_eq!(hash.as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn test_update_last_hash_overwrites_previous() {
+        update_config_file_last_hash("first".to_string());
+        update_config_file_last_hash("second".to_string());
+        let hash = get_config_file_last_hash();
+        assert_eq!(hash.as_deref(), Some("second"));
+    }
+
+    #[test]
+    fn test_set_config_file_path_nonexistent_returns_error() {
+        let result = set_config_file_path(PathBuf::from("/nonexistent/path/config.toml"));
+        assert!(result.is_err());
+    }
+}
