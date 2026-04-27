@@ -91,3 +91,44 @@ pub enum Error {
         path: PathBuf,
     },
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_length_mismatch_debug() {
+        let err = Error::LengthMismatch {
+            expected: 10,
+            actual: 5,
+        };
+        let s = format!("{err:?}");
+        assert!(s.contains("LengthMismatch"));
+    }
+
+    #[test]
+    fn test_checksum_mismatch_debug() {
+        let err = Error::ChecksumMismatch {
+            expected: 0xdeadbeef,
+            actual: 0x12345678,
+        };
+        let s = format!("{err:?}");
+        assert!(s.contains("ChecksumMismatch"));
+    }
+
+    #[test]
+    fn test_file_identifier_mismatch_debug() {
+        let err = Error::FileIdentifierMismatch {};
+        let s = format!("{err:?}");
+        assert!(s.contains("FileIdentifierMismatch"));
+    }
+
+    #[test]
+    fn test_no_parent_dir_display() {
+        let err = Error::NoParentDir {
+            path: PathBuf::from("/file.wal"),
+        };
+        let display = format!("{err}");
+        assert!(display.contains("/file.wal"));
+    }
+}
