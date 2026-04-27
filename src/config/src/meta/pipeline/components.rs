@@ -956,4 +956,50 @@ mod tests {
         assert_eq!(edge.source, "src-1");
         assert_eq!(edge.target, "dst-1");
     }
+
+    #[test]
+    fn test_node_data_mem_size_remote_stream() {
+        let data = NodeData::RemoteStream(RemoteStreamParams {
+            org_id: "org".to_string().into(),
+            destination_name: "dest".to_string().into(),
+        });
+        assert!(data.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_node_data_mem_size_query() {
+        let data = NodeData::Query(DerivedStream::default());
+        assert!(data.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_node_data_mem_size_llm_evaluation() {
+        let data = NodeData::LlmEvaluation(LlmEvaluationParams::default());
+        assert!(data.mem_size() > 0);
+    }
+
+    #[test]
+    fn test_derived_stream_with_optional_fields_serde() {
+        let ds = DerivedStream {
+            org_id: "org".to_string(),
+            stream_type: StreamType::Logs,
+            delay: Some(30),
+            start_at: Some(1_700_000_000_000_000),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&ds).unwrap();
+        assert!(json.contains("delay"));
+        assert!(json.contains("start_at"));
+        let back: DerivedStream = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.delay, Some(30));
+        assert_eq!(back.start_at, Some(1_700_000_000_000_000));
+    }
+
+    #[test]
+    fn test_derived_stream_optional_fields_absent_when_none() {
+        let ds = DerivedStream::default();
+        let json = serde_json::to_string(&ds).unwrap();
+        assert!(!json.contains("\"delay\""));
+        assert!(!json.contains("\"start_at\""));
+    }
 }

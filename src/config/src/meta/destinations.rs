@@ -702,4 +702,41 @@ mod tests {
         assert_eq!(parsed[0]["org_id"], "myorg");
         assert_eq!(parsed[0]["key"], "val");
     }
+
+    #[test]
+    fn test_http_output_format_get_body_nested_event() {
+        let fmt = HTTPOutputFormat::NestedEvent;
+        let data = vec![
+            JsonRow(serde_json::json!({"level": "warn"})),
+            JsonRow(serde_json::json!({"level": "error"})),
+        ];
+        let meta = HashMap::new();
+        let body = fmt.get_body_from_data(&data, &meta);
+        let text = String::from_utf8(body).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2);
+        let first: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+        assert_eq!(first["event"]["level"], "warn");
+        let second: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+        assert_eq!(second["event"]["level"], "error");
+    }
+
+    #[test]
+    fn test_http_output_format_get_body_string_separated() {
+        let fmt = HTTPOutputFormat::StringSeparated {
+            separator: "|".to_string(),
+        };
+        let data = vec![
+            JsonRow(serde_json::json!({"x": 1})),
+            JsonRow(serde_json::json!({"x": 2})),
+        ];
+        let meta = HashMap::new();
+        let body = fmt.get_body_from_data(&data, &meta);
+        let text = String::from_utf8(body).unwrap();
+        assert!(text.contains('|'));
+        let parts: Vec<&str> = text.split('|').collect();
+        assert_eq!(parts.len(), 2);
+        let p0: serde_json::Value = serde_json::from_str(parts[0]).unwrap();
+        assert_eq!(p0["x"], 1);
+    }
 }

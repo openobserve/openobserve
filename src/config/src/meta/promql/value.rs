@@ -1577,4 +1577,90 @@ mod tests {
         assert_eq!(filtered.len(), 1);
         assert!(filtered.iter().all(|l| l.name != "__name__"));
     }
+
+    #[test]
+    fn test_eval_context_is_instant_true() {
+        let ctx = EvalContext::new(1000, 1000, 0, "trace-1".to_string());
+        assert!(ctx.is_instant());
+        let ts = ctx.timestamps();
+        assert_eq!(ts, vec![1000]);
+    }
+
+    #[test]
+    fn test_eval_context_is_instant_false_timestamps() {
+        let ctx = EvalContext::new(0, 200, 100, "trace-2".to_string());
+        assert!(!ctx.is_instant());
+        let ts = ctx.timestamps();
+        assert_eq!(ts, vec![0, 100, 200]);
+    }
+
+    #[test]
+    fn test_contains_same_label_set_vector_three_unique() {
+        let label_a = vec![Arc::new(Label::new("n", "a"))];
+        let label_b = vec![Arc::new(Label::new("n", "b"))];
+        let label_c = vec![Arc::new(Label::new("n", "c"))];
+        let v = Value::Vector(vec![
+            InstantValue {
+                labels: label_a,
+                sample: Sample::new(1, 1.0),
+            },
+            InstantValue {
+                labels: label_b,
+                sample: Sample::new(2, 2.0),
+            },
+            InstantValue {
+                labels: label_c,
+                sample: Sample::new(3, 3.0),
+            },
+        ]);
+        assert!(!v.contains_same_label_set());
+    }
+
+    #[test]
+    fn test_contains_same_label_set_vector_three_with_duplicate() {
+        let label_a = vec![Arc::new(Label::new("n", "a"))];
+        let label_b = vec![Arc::new(Label::new("n", "b"))];
+        let label_a2 = vec![Arc::new(Label::new("n", "a"))]; // dup
+        let v = Value::Vector(vec![
+            InstantValue {
+                labels: label_a,
+                sample: Sample::new(1, 1.0),
+            },
+            InstantValue {
+                labels: label_b,
+                sample: Sample::new(2, 2.0),
+            },
+            InstantValue {
+                labels: label_a2,
+                sample: Sample::new(3, 3.0),
+            },
+        ]);
+        assert!(v.contains_same_label_set());
+    }
+
+    #[test]
+    fn test_contains_same_label_set_matrix_three_unique() {
+        let la = vec![Arc::new(Label::new("n", "a"))];
+        let lb = vec![Arc::new(Label::new("n", "b"))];
+        let lc = vec![Arc::new(Label::new("n", "c"))];
+        let m = Value::Matrix(vec![
+            RangeValue::new(la, vec![]),
+            RangeValue::new(lb, vec![]),
+            RangeValue::new(lc, vec![]),
+        ]);
+        assert!(!m.contains_same_label_set());
+    }
+
+    #[test]
+    fn test_contains_same_label_set_matrix_three_with_duplicate() {
+        let la = vec![Arc::new(Label::new("n", "a"))];
+        let lb = vec![Arc::new(Label::new("n", "b"))];
+        let la2 = vec![Arc::new(Label::new("n", "a"))]; // dup
+        let m = Value::Matrix(vec![
+            RangeValue::new(la, vec![]),
+            RangeValue::new(lb, vec![]),
+            RangeValue::new(la2, vec![]),
+        ]);
+        assert!(m.contains_same_label_set());
+    }
 }
