@@ -1051,4 +1051,71 @@ mod tests {
         );
         assert!(result.is_err())
     }
+
+    #[test]
+    fn test_get_val_with_type_retained_string() {
+        let v = Value::String("hello".to_string());
+        assert_eq!(get_val_with_type_retained(&v), json!("hello"));
+    }
+
+    #[test]
+    fn test_get_val_with_type_retained_bool() {
+        assert_eq!(get_val_with_type_retained(&Value::Bool(true)), json!(true));
+        assert_eq!(
+            get_val_with_type_retained(&Value::Bool(false)),
+            json!(false)
+        );
+    }
+
+    #[test]
+    fn test_get_val_with_type_retained_number() {
+        let n = Value::Number(serde_json::Number::from(42));
+        assert_eq!(get_val_with_type_retained(&n), json!(42));
+    }
+
+    #[test]
+    fn test_get_val_with_type_retained_null() {
+        assert_eq!(get_val_with_type_retained(&Value::Null), Value::Null);
+    }
+
+    #[test]
+    fn test_get_val_with_type_retained_array() {
+        let arr = Value::Array(vec![json!(1), json!(2)]);
+        assert_eq!(get_val_with_type_retained(&arr), json!([1, 2]));
+    }
+
+    #[test]
+    fn test_get_val_for_attr_string_value() {
+        let attr = json!({"stringValue": "hello"});
+        assert_eq!(get_val_for_attr(&attr), json!("hello"));
+    }
+
+    #[test]
+    fn test_get_val_for_attr_int_value() {
+        let attr = json!({"intValue": "42"});
+        let result = get_val_for_attr(&attr);
+        assert_eq!(result.as_str().unwrap(), "42");
+    }
+
+    #[test]
+    fn test_get_val_for_attr_bool_value() {
+        let attr = json!({"boolValue": true});
+        let result = get_val_for_attr(&attr);
+        assert_eq!(result.as_str().unwrap(), "true");
+    }
+
+    #[test]
+    fn test_create_log_ingestion_req_json() {
+        let data = bytes::Bytes::from("{}");
+        let result = create_log_ingestion_req(0, data);
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), IngestionRequest::JSON(_)));
+    }
+
+    #[test]
+    fn test_create_log_ingestion_req_invalid_type() {
+        let data = bytes::Bytes::from("{}");
+        let result = create_log_ingestion_req(99, data);
+        assert!(result.is_err());
+    }
 }
