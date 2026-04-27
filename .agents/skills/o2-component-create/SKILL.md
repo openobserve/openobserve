@@ -13,24 +13,39 @@ Use this skill when **creating**, **auditing**, **refactoring**, or **migrating*
 - **Framework**: Vue 3 (Composition API, `<script setup lang="ts">`)
 - **Styling**: Tailwind CSS v4 with `tw:` prefix (e.g. `tw:flex tw:items-center`) — **no SCSS, ever**
 - **Tokens**: 3-layer design token system — base → semantic → component (see [references/design-tokens.md](references/design-tokens.md))
+- **Dark mode**: Every component MUST support both light and dark mode via token pairs — see [references/design-tokens.md](references/design-tokens.md) § Dark Mode
+- **Headless**: **Reka UI** (`reka-ui`) is the approved headless primitive library — use it for ARIA-complex components (Dialog, Tabs, Select, Popover, etc.)
 - **TypeScript**: Strict — see [references/typescript-rules.md](references/typescript-rules.md)
 - **Testing**: Vitest + `@vue/test-utils`
-- **Headless libraries**: **NEVER install without user confirmation** — see [references/headless-libraries.md](references/headless-libraries.md)
+- **Headless libraries**: Only Reka UI and @tanstack/vue-form confirmed — **NEVER install others without user confirmation** — see [references/headless-libraries.md](references/headless-libraries.md)
 
 ## Library Location
 
 ```
 web/src/lib/
-├── core/          # Button, Badge, Tag, Card, Avatar, Icon
-├── forms/         # Input, Textarea, Select, Checkbox, Radio, Switch, Slider, DatePicker, FileUpload, Label
-├── navigation/    # Tabs, Breadcrumbs, Pagination, Sidebar, Timeline
+├── core/          # Button (+ButtonGroup), Badge, Tag, Card, Avatar, Icon
+├── forms/         # Input, Textarea, Select (+SelectItem), Checkbox (+CheckboxGroup), Radio (+RadioGroup), Switch, Slider, DatePicker, FileUpload, Label
+├── navigation/    # Tabs (+Tab, +RouteTab, +TabPanels, +TabPanel), Breadcrumbs, Pagination, Sidebar
 ├── feedback/      # Toast, Alert, Spinner, Progress
-├── overlay/       # Modal, Tooltip, Dropdown, Popover
-├── data/          # Table, List, Tree
+├── overlay/       # Modal (+Header+Body+Footer), Tooltip, Dropdown (+Item+Separator), Popover
+├── data/          # Table (+TableColumn), List, Tree
 └── styles/        # Design token CSS files (base, semantic, component, dark)
 ```
 
 > **Why `lib/`?** The existing `web/src/components/` folder contains app-level Quasar components. The O2 library lives in `web/src/lib/` to avoid conflicts and clearly separate generic reusable primitives from app-specific components.
+
+## Component Families Rule
+
+**A compound component family must always be built and shipped together** — never ship only part of a family.
+
+Examples:
+
+- **Tabs**: `OTabs` + `OTab` + `ORouteTab` + `OTabPanels` + `OTabPanel`
+- **Button**: `OButton` + `OButtonGroup`
+- **Modal**: `OModal` + `OModalHeader` + `OModalBody` + `OModalFooter`
+- **Dropdown**: `ODropdown` + `ODropdownItem` + `ODropdownGroup` + `ODropdownSeparator`
+
+All family members co-locate in the same folder. See [references/component-guide.md](references/component-guide.md) § Component Families for full table and folder layout.
 
 ## Component Scope Rule
 
@@ -51,9 +66,10 @@ web/src/lib/{group}/{ComponentName}/
 ```
 
 **No `index.ts` per component.** Import directly by path:
+
 ```ts
-import OButton from '@/lib/core/Button/Button.vue'
-import type { ButtonProps } from '@/lib/core/Button/Button.types'
+import OButton from "@/lib/core/Button/Button.vue";
+import type { ButtonProps } from "@/lib/core/Button/Button.types";
 ```
 
 A group-level barrel (`web/src/lib/core/index.ts`) is optional and added only once a group has multiple built components.
@@ -64,30 +80,37 @@ A group-level barrel (`web/src/lib/core/index.ts`) is optional and added only on
 ## Workflow: Create a New Component
 
 ### Step 1 — Scan Existing Code
+
 Before writing any code, scan for existing implementations:
+
 ```
 grep_search for similar component names across web/src/components/
 grep_search for usage patterns in web/src/views/ and web/src/components/
 ```
+
 - Identify all Quasar usages of the equivalent component (`q-btn`, `q-input`, etc.)
 - Note what props and behaviors are actually used
 - Build a compatibility surface that covers all real usage, not just ideal usage
+- If this is a **family component**, identify all family members that need to be built
 
 ### Step 2 — Decide Design Tokens
+
 - List every visual property the component needs
 - Map to existing semantic tokens where possible
 - Create new component tokens only for values unique to this component
-- Add tokens to `web/src/lib/styles/tokens/component.css`
-- See [references/design-tokens.md](references/design-tokens.md) for naming conventions
+- **Add tokens to BOTH** `web/src/lib/styles/tokens/component.css` (light) AND `web/src/lib/styles/tokens/dark.css` (dark overrides)
+- See [references/design-tokens.md](references/design-tokens.md) for naming conventions and dark mode pairing rules
 
 ### Step 3 — Check Headless Library Need
-- If the component requires complex behavior (dropdown positioning, date picker calendar, virtual scroll, etc.) that would need a headless library primitive:
-  - **STOP** — do NOT install any library
-  - Ask the user: "I need a headless primitive for [behavior]. I recommend using [library name]. Can I install it?"
+
+- For ARIA-complex behavior: prefer **Reka UI** primitives — it is already confirmed
+- For other complex headless behavior (virtual scroll, form state):
+  - Check [references/headless-libraries.md](references/headless-libraries.md) for confirmed libraries
+  - **STOP** if the library is not confirmed — ask the user before installing
   - Only proceed after explicit confirmation
-  - See [references/headless-libraries.md](references/headless-libraries.md) for the confirmed-safe list
 
 ### Step 4 — Implement
+
 - Follow the Vue 3 SFC templates in [references/component-guide.md](references/component-guide.md)
 - All types in `.types.ts`, none inline in `.vue`
 - Strict TypeScript — no `any`, no implicit any
@@ -96,23 +119,28 @@ grep_search for usage patterns in web/src/views/ and web/src/components/
 - No SCSS. No `var(--*)` in templates. No hardcoded colors.
 - Variants via computed class map — see [references/component-guide.md](references/component-guide.md) § Variants
 - Accessibility: keyboard navigation, ARIA attributes, visible focus indicator
+- **Dark mode**: verify all token states look correct with `.dark` class on `<html>`
 
 ### Step 5 — Write Tests
+
 - See [references/component-guide.md](references/component-guide.md) § Tests for template
 - Cover: props, slots, emits, keyboard navigation, ARIA
 
 ### Step 6 — Validate
+
 Run through the checklist in [references/component-guide.md](references/component-guide.md) § Completion Checklist before declaring done.
 
 ## Workflow: Audit / Refactor
 
 1. **Structure** — Correct `lib/` folder/file names, no `index.ts` per component?
-2. **TypeScript** — No `any`, all types in `.types.ts`?
-3. **Tokens** — No hardcoded colors, no SCSS, no `var(--*)` in templates?
-4. **Quasar removal** — No `q-*` components inside library components?
-5. **Generic** — No app-specific logic (no store, router, API imports)?
-6. **Accessibility** — ARIA, keyboard, focus ring?
-7. **Tests** — Coverage, no snapshot-only?
+2. **Family completeness** — Are all family members built? (e.g. if OTabs exists, do OTab/OTabPanel/OTabPanels exist?)
+3. **TypeScript** — No `any`, all types in `.types.ts`?
+4. **Tokens** — No hardcoded colors, no SCSS, no `var(--*)` in templates?
+5. **Dark mode** — Every component token has a dark.css override? Tested in dark mode?
+6. **Quasar removal** — No `q-*` components inside library components?
+7. **Generic** — No app-specific logic (no store, router, API imports)?
+8. **Accessibility** — ARIA, keyboard, focus ring?
+9. **Tests** — Coverage, no snapshot-only?
 
 ## Critical Rules
 
@@ -121,16 +149,18 @@ Run through the checklist in [references/component-guide.md](references/componen
 - **NEVER** use `var(--*)` in templates — Tailwind utilities only
 - **NEVER** use hardcoded colors (`tw:bg-[#4f46e5]`)
 - **NEVER** use SCSS — only `.css` token files and Tailwind
-- **NEVER** install a headless library without user confirmation
+- **NEVER** ship a component without dark mode token coverage
+- **NEVER** ship half a family (e.g. OTabs without OTab, OTabPanel, OTabPanels)
+- **NEVER** install a headless library (other than reka-ui / @tanstack/vue-form) without user confirmation
 - **NEVER** cross-import between library groups
 - **NEVER** import from `web/src/components/`, stores, router, or services inside `lib/`
 - **ALWAYS** use `tw:` prefix on every Tailwind utility
 
 ## References
 
-| When | File |
-|------|------|
-| Full folder contract, SFC templates, completion checklist | [references/component-guide.md](references/component-guide.md) |
-| Token layers, naming, dark mode, component.css | [references/design-tokens.md](references/design-tokens.md) |
-| Strict TypeScript rules for Vue 3 | [references/typescript-rules.md](references/typescript-rules.md) |
-| Headless library confirmed-safe list | [references/headless-libraries.md](references/headless-libraries.md) |
+| When                                                                          | File                                                                 |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Full folder contract, SFC templates, component families, completion checklist | [references/component-guide.md](references/component-guide.md)       |
+| Token layers, naming, dark mode pairing, component.css                        | [references/design-tokens.md](references/design-tokens.md)           |
+| Strict TypeScript rules for Vue 3                                             | [references/typescript-rules.md](references/typescript-rules.md)     |
+| Reka UI + headless library confirmed-safe list                                | [references/headless-libraries.md](references/headless-libraries.md) |
