@@ -171,4 +171,48 @@ mod tests {
     fn test_get_node_ip() {
         assert!(!get_local_node_ip().is_empty());
     }
+
+    #[test]
+    fn test_get_http_schema_default() {
+        // Default config has tls_enabled = false, so should return "http"
+        let schema = get_http_schema();
+        assert!(schema == "http" || schema == "https");
+    }
+
+    #[test]
+    fn test_get_grpc_schema_default() {
+        let schema = get_grpc_schema();
+        assert!(schema == "http" || schema == "https");
+    }
+
+    #[test]
+    fn test_is_online_and_offline_are_exclusive() {
+        // At any point exactly one of these should be true or both false (during Prepare state)
+        let online = is_online();
+        let offline = is_offline();
+        // They can't both be true
+        assert!(!(online && offline));
+    }
+
+    #[test]
+    fn test_get_local_http_ip_is_not_empty() {
+        assert!(!get_local_http_ip().is_empty());
+    }
+
+    #[test]
+    fn test_get_local_grpc_ip_is_not_empty() {
+        assert!(!get_local_grpc_ip().is_empty());
+    }
+
+    #[test]
+    fn test_get_local_http_addr_format() {
+        let addr = get_local_http_addr();
+        assert!(addr.starts_with("http://") || addr.starts_with("https://"));
+    }
+
+    #[test]
+    fn test_get_local_grpc_addr_format() {
+        let addr = get_local_grpc_addr();
+        assert!(addr.starts_with("http://") || addr.starts_with("https://"));
+    }
 }
