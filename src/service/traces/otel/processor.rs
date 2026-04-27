@@ -196,21 +196,6 @@ impl OtelIngestionProcessor {
                 usage.insert("output".to_string(), output_tokens);
             }
 
-            // Ensure usage has a input,output,total
-            if !usage.contains_key("input") {
-                usage.insert("input".to_string(), 0);
-            }
-            if !usage.contains_key("output") {
-                usage.insert("output".to_string(), 0);
-            }
-            if !usage.contains_key("total") {
-                // Total = input + output only. Cache tokens (cache_read_input_tokens,
-                // cache_creation_input_tokens) are subsets of input, not additive.
-                let input = usage.get("input").copied().unwrap_or(0);
-                let output = usage.get("output").copied().unwrap_or(0);
-                usage.insert("total".to_string(), input + output);
-            }
-
             // Calculate cost from tokens if cost is missing but we have model and usage.
             // User-defined pricing takes priority over built-in pricing.
             if cost.is_empty()
@@ -248,19 +233,28 @@ impl OtelIngestionProcessor {
                     }
                 }
             }
+        }
 
-            // Ensure cost has a total if it has any data — sum all component costs
-            // (not just input+output) so cache token costs are included.
-            if !cost.contains_key("total") {
-                let total: f64 = cost
-                    .iter()
-                    .filter(|(k, _)| k.as_str() != "total")
-                    .map(|(_, &v)| v)
-                    .sum();
-                if total > 0.0 {
-                    cost.insert("total".to_string(), total);
-                }
-            }
+        // Ensure usage has a input,output,total
+        if !usage.contains_key("input") {
+            usage.insert("input".to_string(), 0);
+        }
+        if !usage.contains_key("output") {
+            usage.insert("output".to_string(), 0);
+        }
+        if !usage.contains_key("total") {
+            // Total = input + output only. Cache tokens (cache_read_input_tokens,
+            // cache_creation_input_tokens) are subsets of input, not additive.
+            let input = usage.get("input").copied().unwrap_or(0);
+            let output = usage.get("output").copied().unwrap_or(0);
+            usage.insert("total".to_string(), input + output);
+        }
+
+        // Ensure cost has a total if it has any data — sum all component costs
+        // (not just input+output) so cache token costs are included.
+        if !cost.contains_key("total") {
+            let total: f64 = cost.values().sum();
+            cost.insert("total".to_string(), total);
         }
 
         // Add enriched fields
@@ -832,11 +826,8 @@ mod tests {
 
         processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
 
-        // No pricing definition matched for unknown model — cost details should be absent.
-        // Emitting zeros would imply the cost is known to be zero (e.g. a free model),
-        // which is different from "cost unknown". The DB-backed pricing catalog is the
-        // only source of truth; the old hardcoded fallback has been removed.
-        assert!(!span_attrs.contains_key(O2Attributes::COST_DETAILS));
+        // No pricing definition matched for unknown model — cost details should be zero.
+        assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
     }
 
     #[test]
