@@ -107,3 +107,17 @@ impl StreamingAggregationContext {
         Ok(None)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_streaming_aggregation_context_new_returns_none() {
+        let request = Request::default();
+        let hit = Arc::new(Mutex::new(false));
+        let result = StreamingAggregationContext::new(&request, hit).await;
+        assert!(result.unwrap().is_none());
+    }
+}
