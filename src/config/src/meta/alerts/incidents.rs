@@ -1326,4 +1326,125 @@ mod tests {
         let result = event.increment_alert("alert-1", 2000);
         assert!(!result);
     }
+
+    // ── IncidentStatus Display + FromStr ─────────────────────────────────────
+
+    #[test]
+    fn test_incident_status_display() {
+        assert_eq!(IncidentStatus::Open.to_string(), "open");
+        assert_eq!(IncidentStatus::Acknowledged.to_string(), "acknowledged");
+        assert_eq!(IncidentStatus::Resolved.to_string(), "resolved");
+    }
+
+    #[test]
+    fn test_incident_status_from_str() {
+        use std::str::FromStr;
+        assert_eq!(IncidentStatus::from_str("open").unwrap(), IncidentStatus::Open);
+        assert_eq!(
+            IncidentStatus::from_str("ACKNOWLEDGED").unwrap(),
+            IncidentStatus::Acknowledged
+        );
+        assert_eq!(
+            IncidentStatus::from_str("resolved").unwrap(),
+            IncidentStatus::Resolved
+        );
+        assert!(IncidentStatus::from_str("unknown").is_err());
+    }
+
+    // ── IncidentSeverity Display + FromStr ────────────────────────────────────
+
+    #[test]
+    fn test_incident_severity_display() {
+        assert_eq!(IncidentSeverity::P1.to_string(), "P1");
+        assert_eq!(IncidentSeverity::P2.to_string(), "P2");
+        assert_eq!(IncidentSeverity::P3.to_string(), "P3");
+        assert_eq!(IncidentSeverity::P4.to_string(), "P4");
+    }
+
+    #[test]
+    fn test_incident_severity_from_str() {
+        use std::str::FromStr;
+        assert_eq!(IncidentSeverity::from_str("p1").unwrap(), IncidentSeverity::P1);
+        assert_eq!(IncidentSeverity::from_str("P2").unwrap(), IncidentSeverity::P2);
+        assert_eq!(IncidentSeverity::from_str("P3").unwrap(), IncidentSeverity::P3);
+        assert_eq!(IncidentSeverity::from_str("P4").unwrap(), IncidentSeverity::P4);
+        assert!(IncidentSeverity::from_str("P5").is_err());
+    }
+
+    // ── CorrelationReason TryFrom ─────────────────────────────────────────────
+
+    #[test]
+    fn test_correlation_reason_try_from() {
+        assert_eq!(
+            CorrelationReason::try_from("service_discovery").unwrap(),
+            CorrelationReason::ServiceDiscovery
+        );
+        assert_eq!(
+            CorrelationReason::try_from("PRIMARY_MATCH").unwrap(),
+            CorrelationReason::PrimaryMatch
+        );
+        assert!(CorrelationReason::try_from("bad_value").is_err());
+    }
+
+    // ── KeyType ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_key_type_display() {
+        assert_eq!(KeyType::AlertId.to_string(), "AlertId");
+        assert_eq!(KeyType::Secondary.to_string(), "Secondary");
+        assert_eq!(KeyType::Primary.to_string(), "Primary");
+    }
+
+    #[test]
+    fn test_key_type_can_upgrade_to() {
+        // AlertId can upgrade to Secondary or Primary
+        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Secondary));
+        assert!(KeyType::AlertId.can_upgrade_to(KeyType::Primary));
+        // Secondary can upgrade to Primary or stay Secondary
+        assert!(KeyType::Secondary.can_upgrade_to(KeyType::Primary));
+        assert!(KeyType::Secondary.can_upgrade_to(KeyType::Secondary));
+        // Secondary cannot downgrade to AlertId
+        assert!(!KeyType::Secondary.can_upgrade_to(KeyType::AlertId));
+        // Primary can only upgrade to itself
+        assert!(KeyType::Primary.can_upgrade_to(KeyType::Primary));
+        assert!(!KeyType::Primary.can_upgrade_to(KeyType::Secondary));
+        assert!(!KeyType::Primary.can_upgrade_to(KeyType::AlertId));
+    }
+
+    // ── DimensionRelationship::check ──────────────────────────────────────────
+
+    #[test]
+    fn test_dimension_relationship_new_empty_existing_not() {
+        let existing: HashMap<String, String> =
+            [("ns".to_string(), "prod".to_string())].into();
+        let result = DimensionRelationship::check(&existing, &HashMap::new());
+        assert_eq!(result, DimensionRelationship::PartialOverlap);
+    }
+
+    #[test]
+    fn test_dimension_relationship_new_is_superset() {
+        let existing: HashMap<String, String> =
+            [("ns".to_string(), "prod".to_string())].into();
+        let new: HashMap<String, String> = [
+            ("ns".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "us-east".to_string()),
+        ]
+        .into();
+        let result = DimensionRelationship::check(&existing, &new);
+        assert_eq!(result, DimensionRelationship::NewIsSuperset);
+    }
+
+    #[test]
+    fn test_dimension_relationship_new_is_subset() {
+        let existing: HashMap<String, String> = [
+            ("ns".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "us-east".to_string()),
+        ]
+        .into();
+        let new: HashMap<String, String> =
+            [("ns".to_string(), "prod".to_string())].into();
+        let result = DimensionRelationship::check(&existing, &new);
+        assert_eq!(result, DimensionRelationship::NewIsSubset);
+    }
+
 }
