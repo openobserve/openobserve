@@ -2141,4 +2141,138 @@ mod test {
             result.err()
         );
     }
+
+    #[test]
+    fn test_default_align_time() {
+        assert!(default_align_time());
+    }
+
+    #[test]
+    fn test_agg_function_display() {
+        assert_eq!(AggFunction::Avg.to_string(), "avg");
+        assert_eq!(AggFunction::Min.to_string(), "min");
+        assert_eq!(AggFunction::Max.to_string(), "max");
+        assert_eq!(AggFunction::Sum.to_string(), "sum");
+        assert_eq!(AggFunction::Count.to_string(), "count");
+        assert_eq!(AggFunction::Median.to_string(), "median");
+        assert_eq!(AggFunction::P50.to_string(), "p50");
+        assert_eq!(AggFunction::P75.to_string(), "p75");
+        assert_eq!(AggFunction::P90.to_string(), "p90");
+        assert_eq!(AggFunction::P95.to_string(), "p95");
+        assert_eq!(AggFunction::P99.to_string(), "p99");
+    }
+
+    #[test]
+    fn test_agg_function_try_from_str() {
+        assert_eq!(AggFunction::try_from("avg").unwrap(), AggFunction::Avg);
+        assert_eq!(AggFunction::try_from("AVG").unwrap(), AggFunction::Avg);
+        assert_eq!(AggFunction::try_from("min").unwrap(), AggFunction::Min);
+        assert_eq!(AggFunction::try_from("max").unwrap(), AggFunction::Max);
+        assert_eq!(AggFunction::try_from("sum").unwrap(), AggFunction::Sum);
+        assert_eq!(AggFunction::try_from("count").unwrap(), AggFunction::Count);
+        assert_eq!(AggFunction::try_from("median").unwrap(), AggFunction::Median);
+        assert_eq!(AggFunction::try_from("p50").unwrap(), AggFunction::P50);
+        assert_eq!(AggFunction::try_from("p75").unwrap(), AggFunction::P75);
+        assert_eq!(AggFunction::try_from("p90").unwrap(), AggFunction::P90);
+        assert_eq!(AggFunction::try_from("p95").unwrap(), AggFunction::P95);
+        assert_eq!(AggFunction::try_from("p99").unwrap(), AggFunction::P99);
+        assert!(AggFunction::try_from("unknown").is_err());
+    }
+
+    #[test]
+    fn test_query_type_display() {
+        assert_eq!(QueryType::Custom.to_string(), "custom");
+        assert_eq!(QueryType::SQL.to_string(), "sql");
+        assert_eq!(QueryType::PromQL.to_string(), "promql");
+    }
+
+    #[test]
+    fn test_query_type_from_str() {
+        assert_eq!(QueryType::from("custom"), QueryType::Custom);
+        assert_eq!(QueryType::from("sql"), QueryType::SQL);
+        assert_eq!(QueryType::from("SQL"), QueryType::SQL);
+        assert_eq!(QueryType::from("promql"), QueryType::PromQL);
+        assert_eq!(QueryType::from("unknown"), QueryType::Custom);
+    }
+
+    #[test]
+    fn test_operator_display() {
+        assert_eq!(Operator::EqualTo.to_string(), "=");
+        assert_eq!(Operator::NotEqualTo.to_string(), "!=");
+        assert_eq!(Operator::GreaterThan.to_string(), ">");
+        assert_eq!(Operator::GreaterThanEquals.to_string(), ">=");
+        assert_eq!(Operator::LessThan.to_string(), "<");
+        assert_eq!(Operator::LessThanEquals.to_string(), "<=");
+        assert_eq!(Operator::Contains.to_string(), "contains");
+        assert_eq!(Operator::NotContains.to_string(), "not contains");
+    }
+
+    #[test]
+    fn test_condition_group_has_conditions_empty() {
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![],
+        };
+        assert!(!group.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_group_has_conditions_non_empty() {
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "level".to_string(),
+                operator: Operator::EqualTo,
+                value: serde_json::Value::String("error".to_string()),
+                ignore_case: Some(false),
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+        assert!(group.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_group_validate_empty() {
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![],
+        };
+        // Empty group is invalid
+        assert!(group.validate().is_err());
+    }
+
+    #[test]
+    fn test_condition_group_validate_wrong_filter_type() {
+        let group = ConditionGroup {
+            filter_type: "condition".to_string(), // wrong — must be "group"
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "level".to_string(),
+                operator: Operator::EqualTo,
+                value: serde_json::Value::String("error".to_string()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+        assert!(group.validate().is_err());
+    }
+
+    #[test]
+    fn test_condition_group_validate_non_empty() {
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "status".to_string(),
+                operator: Operator::GreaterThan,
+                value: serde_json::Value::Number(serde_json::Number::from(400)),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+        assert!(group.validate().is_ok());
+    }
 }
