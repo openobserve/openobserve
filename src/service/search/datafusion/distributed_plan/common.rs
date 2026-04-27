@@ -170,3 +170,42 @@ pub fn process_partial_err(partial_err: Arc<Mutex<String>>, e: tonic::Status) {
         guard.push_str(format!(" \n {e}").as_str());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use parking_lot::Mutex;
+
+    use super::*;
+
+    #[test]
+    fn test_process_partial_err_sets_when_empty() {
+        let partial_err = Arc::new(Mutex::new(String::new()));
+        let status = tonic::Status::internal("test error");
+        process_partial_err(partial_err.clone(), status);
+        let result = partial_err.lock().clone();
+        assert!(!result.is_empty());
+        assert!(result.contains("test error"));
+    }
+
+    #[test]
+    fn test_process_partial_err_appends_when_not_empty() {
+        let partial_err = Arc::new(Mutex::new("first error".to_string()));
+        let status = tonic::Status::internal("second error");
+        process_partial_err(partial_err.clone(), status);
+        let result = partial_err.lock().clone();
+        assert!(result.starts_with("first error"));
+        assert!(result.contains("second error"));
+        assert!(result.contains(" \n "));
+    }
+
+    #[test]
+    fn test_process_partial_err_does_not_overwrite_existing() {
+        let partial_err = Arc::new(Mutex::new("existing".to_string()));
+        let status = tonic::Status::not_found("not found");
+        process_partial_err(partial_err.clone(), status);
+        let result = partial_err.lock().clone();
+        assert!(result.starts_with("existing"));
+    }
+}
