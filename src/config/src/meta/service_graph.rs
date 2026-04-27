@@ -180,4 +180,79 @@ mod tests {
         assert_eq!(back.total_requests, 100);
         assert_eq!(back.snapshot_version, 1);
     }
+
+    #[test]
+    fn test_service_edge_baseline_none_fields_omitted_from_json() {
+        let edge = ServiceEdge {
+            from: Some("svc_a".to_string()),
+            to: "svc_b".to_string(),
+            total_requests: 10,
+            failed_requests: 1,
+            error_rate: 10.0,
+            p50_latency_ns: 100,
+            p95_latency_ns: 500,
+            p99_latency_ns: 900,
+            baseline_p50_latency_ns: None,
+            baseline_p95_latency_ns: None,
+            baseline_p99_latency_ns: None,
+        };
+        let val = serde_json::to_value(&edge).unwrap();
+        // skip_serializing_if = "Option::is_none" → absent from JSON when None
+        assert!(val.get("baseline_p50_latency_ns").is_none());
+        assert!(val.get("baseline_p95_latency_ns").is_none());
+        assert!(val.get("baseline_p99_latency_ns").is_none());
+        assert_eq!(val["from"], "svc_a");
+    }
+
+    #[test]
+    fn test_service_edge_baseline_some_fields_present_in_json() {
+        let edge = ServiceEdge {
+            from: None,
+            to: "svc_b".to_string(),
+            total_requests: 5,
+            failed_requests: 0,
+            error_rate: 0.0,
+            p50_latency_ns: 50,
+            p95_latency_ns: 200,
+            p99_latency_ns: 400,
+            baseline_p50_latency_ns: Some(40),
+            baseline_p95_latency_ns: Some(180),
+            baseline_p99_latency_ns: Some(350),
+        };
+        let val = serde_json::to_value(&edge).unwrap();
+        assert_eq!(val["baseline_p50_latency_ns"], 40_u64);
+        assert_eq!(val["baseline_p95_latency_ns"], 180_u64);
+        assert_eq!(val["baseline_p99_latency_ns"], 350_u64);
+        // from = None → serialized as null
+        assert!(val["from"].is_null());
+    }
+
+    #[test]
+    fn test_service_node_stream_name_none_omitted() {
+        let node = ServiceNode {
+            id: "svc".to_string(),
+            label: "Service".to_string(),
+            requests: 100,
+            errors: 2,
+            error_rate: 2.0,
+            stream_name: None,
+        };
+        let val = serde_json::to_value(&node).unwrap();
+        // skip_serializing_if = "Option::is_none" → absent when None
+        assert!(val.get("stream_name").is_none());
+    }
+
+    #[test]
+    fn test_service_node_stream_name_some_present() {
+        let node = ServiceNode {
+            id: "svc".to_string(),
+            label: "Service".to_string(),
+            requests: 100,
+            errors: 2,
+            error_rate: 2.0,
+            stream_name: Some("my_stream".to_string()),
+        };
+        let val = serde_json::to_value(&node).unwrap();
+        assert_eq!(val["stream_name"], "my_stream");
+    }
 }
