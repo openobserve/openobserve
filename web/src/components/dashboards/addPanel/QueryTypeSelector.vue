@@ -447,7 +447,6 @@ export default defineComponent({
 .button {
   display: block;
   cursor: pointer;
-  // background-color: #f0eaea;
   border: none;
   font-size: 14px;
   padding: 3px 10px;
