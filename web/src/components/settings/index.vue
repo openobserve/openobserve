@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ORouteTab
                   name="general"
                   :to="`/settings/general?org_identifier=${store.state.selectedOrganization?.identifier}`"
-                  :icon="outlinedSettings"
+                  icon="settings"
                   :label="t('settings.generalLabel')"
                 >
                 </ORouteTab>
