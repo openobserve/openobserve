@@ -875,9 +875,16 @@ export const useStreamFields = () => {
         }
 
         // Priority: URL param > existing valid selection > latest by doc_time_max
+        // When auto_query_enabled is true, skip the latestStream fallback so we
+        // don't auto-select (and auto-query) a stream when the user has no
+        // persisted selection — they must choose manually.
         if (!selectedStream.length && existingValidStreams.length) {
           selectedStream = existingValidStreams;
-        } else if (!selectedStream.length && latestStream) {
+        } else if (
+          !selectedStream.length &&
+          latestStream &&
+          !store.state.zoConfig?.auto_query_enabled
+        ) {
           selectedStream = [latestStream];
         }
 
