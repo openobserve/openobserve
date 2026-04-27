@@ -185,10 +185,7 @@ mod tests {
     #[test]
     fn test_extract_usage_gen_ai_output_tokens() {
         let mut attrs = HashMap::new();
-        attrs.insert(
-            "gen_ai.usage.output_tokens".to_string(),
-            json::json!(50i64),
-        );
+        attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(50i64));
         let usage = UsageExtractor.extract_usage(&attrs, "");
         assert_eq!(usage.get("output"), Some(&50i64));
     }
@@ -196,10 +193,7 @@ mod tests {
     #[test]
     fn test_extract_usage_gen_ai_total_tokens() {
         let mut attrs = HashMap::new();
-        attrs.insert(
-            "gen_ai.usage.total_tokens".to_string(),
-            json::json!(150i64),
-        );
+        attrs.insert("gen_ai.usage.total_tokens".to_string(), json::json!(150i64));
         let usage = UsageExtractor.extract_usage(&attrs, "");
         assert_eq!(usage.get("total"), Some(&150i64));
     }
@@ -216,10 +210,7 @@ mod tests {
     fn test_extract_usage_open_inference_prompt_and_completion() {
         let mut attrs = HashMap::new();
         attrs.insert("llm.token_count.prompt".to_string(), json::json!(30i64));
-        attrs.insert(
-            "llm.token_count.completion".to_string(),
-            json::json!(20i64),
-        );
+        attrs.insert("llm.token_count.completion".to_string(), json::json!(20i64));
         let usage = UsageExtractor.extract_usage(&attrs, "");
         assert_eq!(usage.get("input"), Some(&30i64));
         assert_eq!(usage.get("output"), Some(&20i64));
@@ -245,10 +236,7 @@ mod tests {
     fn test_extract_usage_vercel_ai_scope_input_output() {
         let mut attrs = HashMap::new();
         attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(40i64));
-        attrs.insert(
-            "gen_ai.usage.output_tokens".to_string(),
-            json::json!(60i64),
-        );
+        attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(60i64));
         let usage = UsageExtractor.extract_usage(&attrs, "ai");
         assert_eq!(usage.get("input"), Some(&40i64));
         assert_eq!(usage.get("output"), Some(&60i64));

@@ -148,10 +148,7 @@ mod tests {
     #[test]
     fn test_extract_vercel_ai_returns_early_no_gen_ai_request_fallback() {
         let mut attrs = HashMap::new();
-        attrs.insert(
-            "gen_ai.request.top_p".to_string(),
-            json::json!(0.9f64),
-        );
+        attrs.insert("gen_ai.request.top_p".to_string(), json::json!(0.9f64));
         let params = ParametersExtractor.extract(&attrs, "ai");
         // Vercel path returns early without the gen_ai.request.* fallback
         assert!(params.get("top_p").is_none());
@@ -168,10 +165,7 @@ mod tests {
     #[test]
     fn test_extract_gen_ai_request_model_is_excluded() {
         let mut attrs = HashMap::new();
-        attrs.insert(
-            "gen_ai.request.model".to_string(),
-            json::json!("gpt-4"),
-        );
+        attrs.insert("gen_ai.request.model".to_string(), json::json!("gpt-4"));
         let params = ParametersExtractor.extract(&attrs, "");
         assert!(params.get("model").is_none());
     }
@@ -200,10 +194,7 @@ mod tests {
     #[test]
     fn test_extract_vercel_ai_tool_choice() {
         let mut attrs = HashMap::new();
-        attrs.insert(
-            "ai.prompt.toolChoice".to_string(),
-            json::json!("auto"),
-        );
+        attrs.insert("ai.prompt.toolChoice".to_string(), json::json!("auto"));
         let params = ParametersExtractor.extract(&attrs, "ai");
         assert_eq!(params.get("toolChoice"), Some(&"auto".to_string()));
     }
