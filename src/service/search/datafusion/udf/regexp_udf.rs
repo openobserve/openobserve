@@ -473,7 +473,8 @@ mod tests {
     fn test_clean_non_meta_escapes_removes_invalid_backslash() {
         // \: is invalid in Rust regex — backslash stripped, : kept
         assert_eq!(clean_non_meta_escapes(r"\:"), ":");
-        assert_eq!(clean_non_meta_escapes(r"\-"), "-");
+        // \- is valid (- is meta in regex_syntax 0.8+) — kept as-is
+        assert_eq!(clean_non_meta_escapes(r"\-"), r"\-");
     }
 
     #[test]
