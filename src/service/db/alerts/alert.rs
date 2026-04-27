@@ -17,7 +17,10 @@ use std::{collections::HashSet, str::FromStr};
 
 use config::{
     meta::{
-        alerts::{FrequencyType, alert::{Alert, ListAlertsParams}},
+        alerts::{
+            FrequencyType,
+            alert::{Alert, ListAlertsParams},
+        },
         folder::{DEFAULT_FOLDER, Folder},
         stream::StreamType,
     },
@@ -78,23 +81,24 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
             }
 
             let schedule_key = scheduler_key(alert.id);
-            let next_run_at =
-                if alert.trigger_condition.frequency_type == FrequencyType::Cron {
-                    match alert
-                        .trigger_condition
-                        .get_next_trigger_time(true, alert.tz_offset, false, None)
-                    {
-                        Ok(t) => t,
-                        Err(e) => {
-                            log::error!(
-                                "Failed to compute next trigger time for alert {schedule_key}: {e}"
-                            );
-                            now_micros()
-                        }
+            let next_run_at = if alert.trigger_condition.frequency_type == FrequencyType::Cron {
+                match alert.trigger_condition.get_next_trigger_time(
+                    true,
+                    alert.tz_offset,
+                    false,
+                    None,
+                ) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        log::error!(
+                            "Failed to compute next trigger time for alert {schedule_key}: {e}"
+                        );
+                        now_micros()
                     }
-                } else {
-                    now_micros()
-                };
+                }
+            } else {
+                now_micros()
+            };
             // Get the trigger from scheduler
             let mut trigger = db::scheduler::Trigger {
                 org: org_id.to_string(),
@@ -182,9 +186,7 @@ pub async fn create<C: TransactionTrait>(
         {
             Ok(t) => t,
             Err(e) => {
-                log::error!(
-                    "Failed to compute next trigger time for alert {schedule_key}: {e}"
-                );
+                log::error!("Failed to compute next trigger time for alert {schedule_key}: {e}");
                 now_micros()
             }
         }
@@ -229,9 +231,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
         {
             Ok(t) => t,
             Err(e) => {
-                log::error!(
-                    "Failed to compute next trigger time for alert {schedule_key}: {e}"
-                );
+                log::error!("Failed to compute next trigger time for alert {schedule_key}: {e}");
                 now_micros()
             }
         }
