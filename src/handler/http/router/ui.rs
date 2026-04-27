@@ -27,6 +27,8 @@ use rust_embed_for_web::{EmbedableFile, RustEmbed};
 
 #[derive(RustEmbed)]
 #[folder = "web/dist/"]
+#[cfg_attr(feature = "ci-embed", gzip = false)]
+#[cfg_attr(feature = "ci-embed", br = false)]
 struct WebAssets;
 
 /// Serve static files from embedded web assets

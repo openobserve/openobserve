@@ -27,6 +27,7 @@ enterprise = []
 vectorscan = []
 cloud = []
 vortex = ["config/vortex"]
+ci-embed = ["rust-embed-for-web/always-embed"]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = [

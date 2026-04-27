@@ -97,7 +97,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: playwright-release
+          shared-key: playwright-release-ci
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
@@ -108,21 +108,31 @@ jobs:
         with:
           node-version: 22
 
+      - name: Cache web/dist
+        id: cache-web-dist
+        uses: actions/cache@v4
+        with:
+          path: web/dist
+          key: web-dist-${{ hashFiles('web/package-lock.json', 'web/src/**', 'web/public/**', 'web/index.html', 'web/vite.config.*') }}
+
       - name: Build frontend code
+        if: steps.cache-web-dist.outputs.cache-hit != 'true'
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
           VITE_COVERAGE: "true"
           COVERAGE: "true"
         run: cd web && npm ci && npm run build
 
-      - name: Build and run binary
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+      - name: Build release-ci binary
+        env:
+          GIT_HASH_OVERRIDE: ${{ github.sha }}
+        run: cargo build --profile release-ci --features ci-embed --target x86_64-unknown-linux-gnu
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-binary
-          path: target/x86_64-unknown-linux-gnu/release/openobserve
+          name: release-ci-binary
+          path: target/x86_64-unknown-linux-gnu/release-ci/openobserve
           retention-days: 1
 
   ui_integration_tests:
@@ -391,11 +401,11 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v5
         with:
-          name: release-binary
-          path: release-binary
+          name: release-ci-binary
+          path: release-ci-binary
 
       - name: Start OpenObserve
-        run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
+        run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
         run: |
