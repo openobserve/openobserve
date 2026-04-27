@@ -53,6 +53,11 @@
   --color-white: #ffffff;
   --color-black: #000000;
 
+  /* --- Spacing scale --- */
+  --spacing-px:  1px;
+  --spacing-8:   2rem;      /* 32px */
+  --spacing-10:  2.5rem;    /* 40px */
+
   /* --- Radius scale --- */
   --radius-sm:   0.25rem;   /* 4px  */
   --radius-md:   0.375rem;  /* 6px  */

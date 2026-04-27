@@ -139,7 +139,7 @@ Run through the checklist in [references/component-guide.md](references/componen
 1. **Structure** — Correct `lib/` folder/file names, no `index.ts` per component?
 2. **Family completeness** — Are all family members built? (e.g. if OTabs exists, do OTab/OTabPanel/OTabPanels exist?)
 3. **TypeScript** — No `any`, all types in `.types.ts`?
-4. **Tokens** — No hardcoded colors, no SCSS, no `var(--*)` in templates?
+4. **Tokens** — No hardcoded colors or px values in token definitions, no SCSS, no `var(--*)` in templates?
 5. **Dark mode** — Every component token has a dark.css override? Tested in dark mode?
 6. **Quasar removal** — No `q-*` components inside library components?
 7. **Generic** — No app-specific logic (no store, router, API imports)?
@@ -152,6 +152,7 @@ Run through the checklist in [references/component-guide.md](references/componen
 - **NEVER** expose UI decision props (e.g. `rounded?: boolean`, `bordered?: boolean`) — design is baked in
 - **NEVER** use `var(--*)` in templates — Tailwind utilities only
 - **NEVER** use hardcoded colors (`tw:bg-[#4f46e5]`)
+- **NEVER** use hardcoded px values in token definitions — e.g. `--spacing-foo: 40px` → must be `var(--spacing-10)` referencing a `base.css` primitive
 - **NEVER** use SCSS — only `.css` token files and Tailwind
 - **NEVER** ship a component without dark mode token coverage
 - **NEVER** ship half a family (e.g. OTabs without OTab, OTabPanel, OTabPanels)
