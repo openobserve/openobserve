@@ -237,3 +237,71 @@ pub fn get_pending_batch_count(org_id: &str) -> i64 {
         .filter(|entry| entry.org_id == org_id)
         .count() as i64
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_alert() -> Alert {
+        serde_json::from_value(serde_json::json!({})).unwrap()
+    }
+
+    #[test]
+    fn test_pending_batch_new_has_one_alert() {
+        let batch = PendingBatch::new(
+            "fp1".to_string(),
+            "myorg".to_string(),
+            make_alert(),
+            vec![],
+            30,
+            10,
+        );
+        assert_eq!(batch.alerts.len(), 1);
+        assert!(!batch.is_full());
+    }
+
+    #[test]
+    fn test_pending_batch_is_full_at_capacity() {
+        let mut batch = PendingBatch::new(
+            "fp2".to_string(),
+            "myorg".to_string(),
+            make_alert(),
+            vec![],
+            30,
+            2,
+        );
+        assert!(!batch.is_full());
+        let added = batch.add_alert(make_alert(), vec![]);
+        assert!(added);
+        assert!(batch.is_full());
+    }
+
+    #[test]
+    fn test_pending_batch_add_alert_returns_false_when_full() {
+        let mut batch = PendingBatch::new(
+            "fp3".to_string(),
+            "myorg".to_string(),
+            make_alert(),
+            vec![],
+            30,
+            1,
+        );
+        assert!(batch.is_full());
+        let added = batch.add_alert(make_alert(), vec![]);
+        assert!(!added);
+        assert_eq!(batch.alerts.len(), 1);
+    }
+
+    #[test]
+    fn test_pending_batch_not_expired_immediately() {
+        let batch = PendingBatch::new(
+            "fp4".to_string(),
+            "myorg".to_string(),
+            make_alert(),
+            vec![],
+            3600, // 1 hour wait
+            10,
+        );
+        assert!(!batch.is_expired());
+    }
+}

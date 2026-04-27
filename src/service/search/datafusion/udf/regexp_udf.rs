@@ -456,6 +456,38 @@ mod tests {
         assert!(!is_valid_character_after_escape('a'));
     }
 
+    #[test]
+    fn test_clean_non_meta_escapes_empty() {
+        assert_eq!(clean_non_meta_escapes(""), "");
+    }
+
+    #[test]
+    fn test_clean_non_meta_escapes_valid_escapes_unchanged() {
+        // \d, \w, \s are valid — kept as-is
+        assert_eq!(clean_non_meta_escapes(r"\d+"), r"\d+");
+        assert_eq!(clean_non_meta_escapes(r"\w"), r"\w");
+        assert_eq!(clean_non_meta_escapes(r"\s"), r"\s");
+    }
+
+    #[test]
+    fn test_clean_non_meta_escapes_removes_invalid_backslash() {
+        // \: is invalid in Rust regex — backslash stripped, : kept
+        assert_eq!(clean_non_meta_escapes(r"\:"), ":");
+        assert_eq!(clean_non_meta_escapes(r"\-"), "-");
+    }
+
+    #[test]
+    fn test_clean_non_meta_escapes_no_backslash() {
+        let s = "hello world";
+        assert_eq!(clean_non_meta_escapes(s), s);
+    }
+
+    #[test]
+    fn test_clean_non_meta_escapes_double_backslash_kept() {
+        // \\ is a valid escape (literal backslash) — both chars kept
+        assert_eq!(clean_non_meta_escapes(r"\\"), r"\\");
+    }
+
     #[tokio::test]
     async fn test_regexp_match_to_fields_udf() {
         let log_line = r#"2024-02-29 00:15:30 15.128.22.213 GET /Administradores_Elina/service-worker.js - 443"#;

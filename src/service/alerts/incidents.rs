@@ -1978,3 +1978,43 @@ pub async fn update_severity(
 
     model_to_incident(updated).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge_dimensions_adds_new_keys() {
+        let mut existing = HashMap::from([("ns".to_string(), "prod".to_string())]);
+        let new = HashMap::from([("cluster".to_string(), "us-east".to_string())]);
+        let changed = merge_dimensions(&mut existing, &new, "inc-1");
+        assert!(changed);
+        assert_eq!(existing["cluster"], "us-east");
+    }
+
+    #[test]
+    fn test_merge_dimensions_no_change_same_values() {
+        let mut existing = HashMap::from([("ns".to_string(), "prod".to_string())]);
+        let new = HashMap::from([("ns".to_string(), "prod".to_string())]);
+        let changed = merge_dimensions(&mut existing, &new, "inc-2");
+        assert!(!changed);
+        assert_eq!(existing.len(), 1);
+    }
+
+    #[test]
+    fn test_merge_dimensions_conflict_keeps_existing() {
+        let mut existing = HashMap::from([("region".to_string(), "us-east".to_string())]);
+        let new = HashMap::from([("region".to_string(), "us-west".to_string())]);
+        let changed = merge_dimensions(&mut existing, &new, "inc-3");
+        assert!(!changed);
+        assert_eq!(existing["region"], "us-east");
+    }
+
+    #[test]
+    fn test_merge_dimensions_empty_new() {
+        let mut existing = HashMap::from([("ns".to_string(), "prod".to_string())]);
+        let changed = merge_dimensions(&mut existing, &HashMap::new(), "inc-4");
+        assert!(!changed);
+        assert_eq!(existing.len(), 1);
+    }
+}
