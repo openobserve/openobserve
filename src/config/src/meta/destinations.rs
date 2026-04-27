@@ -596,4 +596,105 @@ mod tests {
             _ => panic!("Should be Alert module"),
         }
     }
+
+    #[test]
+    fn test_http_type_display() {
+        assert_eq!(HTTPType::POST.to_string(), "post");
+        assert_eq!(HTTPType::PUT.to_string(), "put");
+        assert_eq!(HTTPType::GET.to_string(), "get");
+    }
+
+    #[test]
+    fn test_http_output_format_content_type() {
+        assert_eq!(HTTPOutputFormat::JSON.get_content_type(), "application/json");
+        assert_eq!(
+            HTTPOutputFormat::NDJSON.get_content_type(),
+            "application/x-ndjson"
+        );
+        assert_eq!(
+            HTTPOutputFormat::NestedEvent.get_content_type(),
+            "application/x-ndjson"
+        );
+        assert_eq!(
+            HTTPOutputFormat::ESBulk {
+                index: "test".to_string()
+            }
+            .get_content_type(),
+            "application/x-ndjson"
+        );
+        assert_eq!(
+            HTTPOutputFormat::StringSeparated {
+                separator: ",".to_string()
+            }
+            .get_content_type(),
+            "text/plain"
+        );
+    }
+
+    // serde_json::Value doesn't implement AsRef<Value>, so we use a newtype wrapper
+    #[derive(serde::Serialize)]
+    struct JsonRow(serde_json::Value);
+
+    impl AsRef<serde_json::Value> for JsonRow {
+        fn as_ref(&self) -> &serde_json::Value {
+            &self.0
+        }
+    }
+
+    #[test]
+    fn test_http_output_format_get_body_json() {
+        let fmt = HTTPOutputFormat::JSON;
+        let data = vec![JsonRow(serde_json::json!({"level": "info", "msg": "hello"}))];
+        let meta = HashMap::new();
+        let body = fmt.get_body_from_data(&data, &meta);
+        let parsed: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0]["level"], "info");
+    }
+
+    #[test]
+    fn test_http_output_format_get_body_ndjson() {
+        let fmt = HTTPOutputFormat::NDJSON;
+        let data = vec![
+            JsonRow(serde_json::json!({"a": 1})),
+            JsonRow(serde_json::json!({"b": 2})),
+        ];
+        let meta = HashMap::new();
+        let body = fmt.get_body_from_data(&data, &meta);
+        let text = String::from_utf8(body).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].contains("\"a\""));
+        assert!(lines[1].contains("\"b\""));
+    }
+
+    #[test]
+    fn test_http_output_format_get_body_es_bulk() {
+        let fmt = HTTPOutputFormat::ESBulk {
+            index: "my-index".to_string(),
+        };
+        let data = vec![JsonRow(serde_json::json!({"field": "value"}))];
+        let meta = HashMap::new();
+        let body = fmt.get_body_from_data(&data, &meta);
+        let text = String::from_utf8(body).unwrap();
+        // ES Bulk payload must end with newline
+        assert!(text.ends_with('\n'));
+        let lines: Vec<&str> = text.lines().collect();
+        // 2 lines per record: action + document
+        assert_eq!(lines.len(), 2);
+        let action: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+        assert_eq!(action["index"]["_index"], "my-index");
+    }
+
+    #[test]
+    fn test_http_output_format_get_body_metadata_injected() {
+        let fmt = HTTPOutputFormat::JSON;
+        let data = vec![JsonRow(serde_json::json!({"key": "val"}))];
+        let mut meta = HashMap::new();
+        meta.insert("org_id".to_string(), "myorg".to_string());
+        let body = fmt.get_body_from_data(&data, &meta);
+        let parsed: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(parsed[0]["org_id"], "myorg");
+        assert_eq!(parsed[0]["key"], "val");
+    }
 }

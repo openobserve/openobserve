@@ -3293,4 +3293,29 @@ mod tests {
             "Negative time range should return FiveMinutes"
         );
     }
+
+    #[test]
+    fn test_response_set_order_by_metadata() {
+        let mut resp = Response::default();
+        assert!(resp.order_by_metadata.is_empty());
+        resp.set_order_by_metadata(vec![
+            ("field1".to_string(), OrderBy::Desc),
+            ("field2".to_string(), OrderBy::Asc),
+        ]);
+        assert_eq!(resp.order_by_metadata.len(), 2);
+        assert_eq!(resp.order_by_metadata[0].0, "field1");
+        assert_eq!(resp.order_by_metadata[1].1, OrderBy::Asc);
+    }
+
+    #[test]
+    fn test_response_set_peak_memory_usage() {
+        let mut resp = Response::default();
+        assert!(resp.peak_memory_usage.is_none());
+        resp.set_peak_memory_usage(1024.5);
+        assert_eq!(resp.peak_memory_usage, Some(1024.5));
+        // overwrite
+        resp.set_peak_memory_usage(2048.0);
+        assert_eq!(resp.peak_memory_usage, Some(2048.0));
+    }
+
 }
