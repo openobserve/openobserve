@@ -119,3 +119,98 @@ impl ParametersExtractor {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_extract_vercel_ai_temperature() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.request.temperature".to_string(),
+            json::json!(0.7f64),
+        );
+        let params = ParametersExtractor.extract(&attrs, "ai");
+        assert_eq!(params.get("temperature"), Some(&"0.7".to_string()));
+    }
+
+    #[test]
+    fn test_extract_vercel_ai_max_tokens() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.request.max_tokens".to_string(), json::json!(512i64));
+        let params = ParametersExtractor.extract(&attrs, "ai");
+        assert_eq!(params.get("maxTokens"), Some(&"512".to_string()));
+    }
+
+    #[test]
+    fn test_extract_vercel_ai_returns_early_no_gen_ai_request_fallback() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.request.top_p".to_string(),
+            json::json!(0.9f64),
+        );
+        let params = ParametersExtractor.extract(&attrs, "ai");
+        // Vercel path returns early without the gen_ai.request.* fallback
+        assert!(params.get("top_p").is_none());
+    }
+
+    #[test]
+    fn test_extract_gen_ai_request_fallback_includes_top_p() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.request.top_p".to_string(), json::json!(0.9f64));
+        let params = ParametersExtractor.extract(&attrs, "");
+        assert_eq!(params.get("top_p"), Some(&"0.9".to_string()));
+    }
+
+    #[test]
+    fn test_extract_gen_ai_request_model_is_excluded() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("gpt-4"),
+        );
+        let params = ParametersExtractor.extract(&attrs, "");
+        assert!(params.get("model").is_none());
+    }
+
+    #[test]
+    fn test_extract_langfuse_model_parameters_json_string() {
+        let mut attrs = HashMap::new();
+        let mp = json::json!({ "temperature": "0.5", "max_tokens": "100" });
+        attrs.insert(
+            "langfuse.observation.model.parameters".to_string(),
+            json::Value::String(mp.to_string()),
+        );
+        let params = ParametersExtractor.extract(&attrs, "");
+        assert_eq!(params.get("temperature"), Some(&"0.5".to_string()));
+        assert_eq!(params.get("max_tokens"), Some(&"100".to_string()));
+    }
+
+    #[test]
+    fn test_sanitize_bool_value() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.request.stream".to_string(), json::json!(true));
+        let params = ParametersExtractor.extract(&attrs, "");
+        assert_eq!(params.get("stream"), Some(&"true".to_string()));
+    }
+
+    #[test]
+    fn test_extract_vercel_ai_tool_choice() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "ai.prompt.toolChoice".to_string(),
+            json::json!("auto"),
+        );
+        let params = ParametersExtractor.extract(&attrs, "ai");
+        assert_eq!(params.get("toolChoice"), Some(&"auto".to_string()));
+    }
+
+    #[test]
+    fn test_extract_empty_returns_empty_map() {
+        let params = ParametersExtractor.extract(&HashMap::new(), "");
+        assert!(params.is_empty());
+    }
+}
