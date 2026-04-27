@@ -25,8 +25,19 @@ const focusRingStyle = computed<Record<string, string> | null>(() => {
 
 function handleFocusin(event: FocusEvent): void {
   const target = event.target as HTMLElement
-  if (target.getAttribute('role') === 'tab' && target.matches(':focus-visible')) {
+  if (target.getAttribute('role') !== 'tab') return
+  if (target.matches(':focus-visible')) {
     focusedTabEl.value = target
+  }
+  // Scroll into view: arrow keys move focus without activating, so modelValue watch doesn't fire
+  const el = scrollRef.value
+  if (!el) return
+  const tabRect = target.getBoundingClientRect()
+  const containerRect = el.getBoundingClientRect()
+  if (tabRect.left < containerRect.left) {
+    el.scrollBy({ left: tabRect.left - containerRect.left - 8, behavior: 'smooth' })
+  } else if (tabRect.right > containerRect.right) {
+    el.scrollBy({ left: tabRect.right - containerRect.right + 8, behavior: 'smooth' })
   }
 }
 
