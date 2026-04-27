@@ -551,4 +551,35 @@ mod tests {
         db_user.organizations.clear();
         assert!(db_user.get_all_users().is_empty());
     }
+
+    #[test]
+    fn test_user_role_sre_agent_display_and_from_str() {
+        // Display: SreAgent → "sre_agent"
+        assert_eq!(format!("{}", UserRole::SreAgent), "sre_agent");
+        // from_str: "sre_agent" → SreAgent
+        assert_eq!(UserRole::from_str("sre_agent").unwrap(), UserRole::SreAgent);
+    }
+
+    #[test]
+    fn test_user_role_from_i16_all_variants() {
+        assert_eq!(UserRole::from(0_i16), UserRole::Root);
+        assert_eq!(UserRole::from(1_i16), UserRole::Admin);
+        assert_eq!(UserRole::from(2_i16), UserRole::Editor);
+        assert_eq!(UserRole::from(3_i16), UserRole::Viewer);
+        assert_eq!(UserRole::from(4_i16), UserRole::User);
+        assert_eq!(UserRole::from(5_i16), UserRole::ServiceAccount);
+        assert_eq!(UserRole::from(6_i16), UserRole::SreAgent);
+        assert_eq!(UserRole::from(99_i16), UserRole::Admin); // unknown → Admin
+    }
+
+    #[test]
+    fn test_user_role_into_i16_all_variants() {
+        assert_eq!(i16::from(UserRole::Root), 0);
+        assert_eq!(i16::from(UserRole::Admin), 1);
+        assert_eq!(i16::from(UserRole::Editor), 2);
+        assert_eq!(i16::from(UserRole::Viewer), 3);
+        assert_eq!(i16::from(UserRole::User), 4);
+        assert_eq!(i16::from(UserRole::ServiceAccount), 5);
+        assert_eq!(i16::from(UserRole::SreAgent), 6);
+    }
 }
