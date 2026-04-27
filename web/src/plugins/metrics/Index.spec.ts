@@ -111,6 +111,21 @@ vi.mock("lodash-es", () => ({
   debounce: (fn: any) => fn,
 }));
 
+// Hoisted so tests can assert on the stream-persist spies
+const { mockRestoreMetricsStream, mockSaveMetricsStream } = vi.hoisted(() => ({
+  mockRestoreMetricsStream: vi.fn().mockReturnValue(""),
+  mockSaveMetricsStream: vi.fn(),
+}));
+
+vi.mock("@/utils/streamPersist", () => ({
+  saveLogsStream: vi.fn(),
+  restoreLogsStream: vi.fn().mockReturnValue([]),
+  saveTracesStream: vi.fn(),
+  restoreTracesStream: vi.fn().mockReturnValue(""),
+  saveMetricsStream: mockSaveMetricsStream,
+  restoreMetricsStream: mockRestoreMetricsStream,
+}));
+
 // ---------------------------------------------------------------------------
 // Import the component AFTER all mocks are registered
 // ---------------------------------------------------------------------------
@@ -938,5 +953,110 @@ describe("Metrics Index — edge cases", () => {
     const wrapper = createWrapper();
     await flushPromises();
     expect(wrapper.vm).toHaveProperty("dateTimePickerRef");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stream selection persistence — metrics
+// ---------------------------------------------------------------------------
+
+describe("Metrics Index — stream selection persistence (restoreMetricsStream)", () => {
+  beforeEach(() => {
+    mockRestoreMetricsStream.mockReturnValue("");
+    mockSaveMetricsStream.mockClear();
+    mockDashboardPanelData.data.queries[0].fields.stream = "";
+    mockDashboardPanelData.data.queries[0].fields.stream_type = "";
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should call restoreMetricsStream with the org identifier when auto_query_enabled=true", async () => {
+    mockStore.state.zoConfig = {
+      ...(mockStore.state.zoConfig as any),
+      auto_query_enabled: true,
+    } as any;
+
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    expect(mockRestoreMetricsStream).toHaveBeenCalledWith("test-org");
+
+    // Restore
+    mockStore.state.zoConfig = { min_auto_refresh_interval: 5 } as any;
+    wrapper.unmount();
+  });
+
+  it("should apply the persisted stream to dashboardPanelData.data.queries[0].fields.stream", async () => {
+    mockStore.state.zoConfig = {
+      ...(mockStore.state.zoConfig as any),
+      auto_query_enabled: true,
+    } as any;
+    mockRestoreMetricsStream.mockReturnValue("my-persisted-metric");
+
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    expect(mockDashboardPanelData.data.queries[0].fields.stream).toBe(
+      "my-persisted-metric",
+    );
+
+    mockStore.state.zoConfig = { min_auto_refresh_interval: 5 } as any;
+    wrapper.unmount();
+  });
+
+  it("should NOT update stream when restoreMetricsStream returns an empty string", async () => {
+    mockStore.state.zoConfig = {
+      ...(mockStore.state.zoConfig as any),
+      auto_query_enabled: true,
+    } as any;
+    mockRestoreMetricsStream.mockReturnValue("");
+    mockDashboardPanelData.data.queries[0].fields.stream = "current-stream";
+
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    // Empty persisted value — component guard `if (persisted)` skips the assignment
+    expect(mockDashboardPanelData.data.queries[0].fields.stream).toBe("current-stream");
+
+    mockStore.state.zoConfig = { min_auto_refresh_interval: 5 } as any;
+    wrapper.unmount();
+  });
+
+  it("should NOT call restoreMetricsStream when auto_query_enabled is falsy", async () => {
+    mockStore.state.zoConfig = {
+      ...(mockStore.state.zoConfig as any),
+      auto_query_enabled: false,
+    } as any;
+
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    expect(mockRestoreMetricsStream).not.toHaveBeenCalled();
+
+    mockStore.state.zoConfig = { min_auto_refresh_interval: 5 } as any;
+    wrapper.unmount();
+  });
+
+  it("should NOT call restoreMetricsStream when auto_query_enabled is undefined", async () => {
+    // Default mockStore has no auto_query_enabled
+    mockStore.state.zoConfig = { min_auto_refresh_interval: 5 } as any;
+
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    expect(mockRestoreMetricsStream).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("should set stream_type to 'metrics' on mount regardless of persistence", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    expect(mockDashboardPanelData.data.queries[0].fields.stream_type).toBe(
+      "metrics",
+    );
+    wrapper.unmount();
   });
 });

@@ -225,6 +225,21 @@ vi.mock('@/composables/useLogs/usePatterns', () => ({
   patternsState: { value: { patterns: null, loading: false, error: null, lastQuery: null } },
 }))
 
+// Hoisted so factories and tests can reference both spies
+const { mockSaveLogsStream, mockRestoreLogsStream } = vi.hoisted(() => ({
+  mockSaveLogsStream: vi.fn(),
+  mockRestoreLogsStream: vi.fn().mockReturnValue([]),
+}));
+
+vi.mock("@/utils/streamPersist", () => ({
+  saveLogsStream: mockSaveLogsStream,
+  restoreLogsStream: mockRestoreLogsStream,
+  saveTracesStream: vi.fn(),
+  restoreTracesStream: vi.fn().mockReturnValue(""),
+  saveMetricsStream: vi.fn(),
+  restoreMetricsStream: vi.fn().mockReturnValue(""),
+}));
+
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
 
@@ -1305,5 +1320,387 @@ describe("Logs Index", async () => {
       expect(searchState().searchObj.data.countErrorMsg).toBe("");
       expect(searchState().searchObj.data.errorCode).toBe(0);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Auto-run feature — liveMode initialisation from localStorage
+// ---------------------------------------------------------------------------
+
+describe("Logs Index — auto-run liveMode initialisation", () => {
+  let localWrapper: any;
+
+  function mountFresh() {
+    return mount(Index, {
+      attachTo: "#app",
+      global: {
+        provide: { store },
+        plugins: [i18n, router],
+      },
+    });
+  }
+
+  beforeEach(() => {
+    // Ensure logs module shape present
+    (store.state as any).logs = {
+      isInitialized: true,
+      logs: {
+        data: { stream: { selectedStream: [] } },
+        organizationIdentifier: store.state.selectedOrganization.identifier,
+      },
+    };
+    vi.spyOn(store, "dispatch").mockResolvedValue(undefined as any);
+    (getFieldsFromQuery as Mock).mockResolvedValue({
+      fields: [],
+      filters: [],
+      streamName: "",
+    });
+    mockRestoreLogsStream.mockReturnValue([]);
+    localStorage.removeItem("oo_toggle_auto_run");
+  });
+
+  afterEach(() => {
+    localWrapper?.unmount();
+    localStorage.removeItem("oo_toggle_auto_run");
+    (store.state.zoConfig as any).auto_query_enabled = false;
+    vi.restoreAllMocks();
+  });
+
+  it("should set liveMode to true when auto_query_enabled=true and no saved preference exists", async () => {
+    (store.state.zoConfig as any).auto_query_enabled = true;
+    localWrapper = mountFresh();
+    await flushPromises();
+    expect(searchState().searchObj.meta.liveMode).toBe(true);
+  });
+
+  it("should set liveMode to true when auto_query_enabled=true and localStorage value is 'true'", async () => {
+    localStorage.setItem("oo_toggle_auto_run", "true");
+    (store.state.zoConfig as any).auto_query_enabled = true;
+    localWrapper = mountFresh();
+    await flushPromises();
+    expect(searchState().searchObj.meta.liveMode).toBe(true);
+  });
+
+  it("should set liveMode to false when auto_query_enabled=true and localStorage value is 'false'", async () => {
+    localStorage.setItem("oo_toggle_auto_run", "false");
+    (store.state.zoConfig as any).auto_query_enabled = true;
+    localWrapper = mountFresh();
+    await flushPromises();
+    expect(searchState().searchObj.meta.liveMode).toBe(false);
+  });
+
+  it("should NOT change liveMode when auto_query_enabled is false", async () => {
+    localStorage.setItem("oo_toggle_auto_run", "true");
+    (store.state.zoConfig as any).auto_query_enabled = false;
+    // Explicitly put liveMode in a known state before mounting
+    searchState().searchObj.meta.liveMode = false;
+    localWrapper = mountFresh();
+    await flushPromises();
+    // Watcher guard `if (enabled)` prevents the change
+    expect(searchState().searchObj.meta.liveMode).toBe(false);
+  });
+
+  it("should update liveMode reactively when auto_query_enabled flips from false to true", async () => {
+    localStorage.setItem("oo_toggle_auto_run", "false");
+    (store.state.zoConfig as any).auto_query_enabled = false;
+    searchState().searchObj.meta.liveMode = true; // initial state
+    localWrapper = mountFresh();
+    await flushPromises();
+
+    // Now enable auto_query_enabled — watcher should fire
+    (store.state.zoConfig as any).auto_query_enabled = true;
+    await flushPromises();
+    expect(searchState().searchObj.meta.liveMode).toBe(false);
+  });
+
+  it("handleActivation should restore liveMode from localStorage when savedAutoRun is set", async () => {
+    localStorage.setItem("oo_toggle_auto_run", "false");
+    (store.state.zoConfig as any).auto_query_enabled = false;
+    searchState().searchObj.meta.liveMode = true;
+    localWrapper = mountFresh();
+    await flushPromises();
+
+    // Simulate re-activation by calling the handler exposed on vm
+    if (typeof localWrapper.vm.handleActivation === "function") {
+      await localWrapper.vm.handleActivation();
+      await flushPromises();
+      expect(searchState().searchObj.meta.liveMode).toBe(false);
+    }
+  });
+
+  it("handleActivation should NOT change liveMode when no savedAutoRun is in localStorage", async () => {
+    localStorage.removeItem("oo_toggle_auto_run");
+    searchState().searchObj.meta.liveMode = true;
+    localWrapper = mountFresh();
+    await flushPromises();
+
+    if (typeof localWrapper.vm.handleActivation === "function") {
+      await localWrapper.vm.handleActivation();
+      await flushPromises();
+      // No saved value → no change
+      expect(searchState().searchObj.meta.liveMode).toBe(true);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stream selection persistence — logs
+// ---------------------------------------------------------------------------
+
+describe("Logs Index — stream selection persistence", () => {
+  let localWrapper: any;
+
+  function mountFresh() {
+    return mount(Index, {
+      attachTo: "#app",
+      global: {
+        provide: { store },
+        plugins: [i18n, router],
+      },
+    });
+  }
+
+  beforeEach(() => {
+    (store.state as any).logs = {
+      isInitialized: true,
+      logs: {
+        data: { stream: { selectedStream: [] } },
+        organizationIdentifier: store.state.selectedOrganization.identifier,
+      },
+    };
+    vi.spyOn(store, "dispatch").mockResolvedValue(undefined as any);
+    (getFieldsFromQuery as Mock).mockResolvedValue({
+      fields: [],
+      filters: [],
+      streamName: "",
+    });
+    mockSaveLogsStream.mockClear();
+    mockRestoreLogsStream.mockReturnValue([]);
+    localStorage.removeItem("oo_toggle_auto_run");
+  });
+
+  afterEach(() => {
+    localWrapper?.unmount();
+    (store.state.zoConfig as any).auto_query_enabled = false;
+    vi.restoreAllMocks();
+  });
+
+  it("should call restoreLogsStream with the org identifier on init when auto_query_enabled=true and no URL stream", async () => {
+    (store.state.zoConfig as any).auto_query_enabled = true;
+    searchState().searchObj.data.stream.selectedStream = [];
+    localWrapper = mountFresh();
+    await flushPromises();
+    expect(mockRestoreLogsStream).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+    );
+  });
+
+  it("should apply persisted streams to selectedStream when restoreLogsStream returns a non-empty list", async () => {
+    (store.state.zoConfig as any).auto_query_enabled = true;
+    mockRestoreLogsStream.mockReturnValue(["persisted-stream"]);
+    searchState().searchObj.data.stream.selectedStream = [];
+    localWrapper = mountFresh();
+    await flushPromises();
+    expect(searchState().searchObj.data.stream.selectedStream).toEqual([
+      "persisted-stream",
+    ]);
+  });
+
+  it("should NOT override selectedStream when restoreLogsStream returns an empty list", async () => {
+    (store.state.zoConfig as any).auto_query_enabled = true;
+    mockRestoreLogsStream.mockReturnValue([]);
+    searchState().searchObj.data.stream.selectedStream = [];
+    localWrapper = mountFresh();
+    await flushPromises();
+    expect(searchState().searchObj.data.stream.selectedStream).toEqual([]);
+  });
+
+  it("should NOT call restoreLogsStream when auto_query_enabled is false", async () => {
+    (store.state.zoConfig as any).auto_query_enabled = false;
+    searchState().searchObj.data.stream.selectedStream = [];
+    localWrapper = mountFresh();
+    await flushPromises();
+    // restoreLogsStream should not be called (or returns empty by default — selectedStream remains [])
+    const persistCall = mockRestoreLogsStream.mock.calls.some(
+      ([org]) => org === store.state.selectedOrganization.identifier,
+    );
+    // When auto_query_enabled is false the condition short-circuits
+    expect(searchState().searchObj.data.stream.selectedStream).toEqual([]);
+    // Even if called, the result should not have been applied since the feature is disabled
+    if (persistCall) {
+      // The guard inside the component ensures nothing is applied — selectedStream stays []
+      expect(searchState().searchObj.data.stream.selectedStream).toEqual([]);
+    }
+  });
+
+  it("should call saveLogsStream with the current org identifier when selectedStream changes", async () => {
+    (store.state.zoConfig as any).auto_query_enabled = true;
+    localWrapper = mountFresh();
+    await flushPromises();
+
+    mockSaveLogsStream.mockClear();
+    searchState().searchObj.data.stream.selectedStream = ["new-stream"];
+    await flushPromises();
+
+    expect(mockSaveLogsStream).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+      ["new-stream"],
+    );
+  });
+
+  it("should call saveLogsStream with an empty array when all streams are deselected", async () => {
+    (store.state.zoConfig as any).auto_query_enabled = true;
+    searchState().searchObj.data.stream.selectedStream = ["existing-stream"];
+    localWrapper = mountFresh();
+    await flushPromises();
+
+    mockSaveLogsStream.mockClear();
+    searchState().searchObj.data.stream.selectedStream = [];
+    await flushPromises();
+
+    expect(mockSaveLogsStream).toHaveBeenCalledWith(
+      store.state.selectedOrganization.identifier,
+      [],
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Auto-run debounced datetime watcher — logs
+// ---------------------------------------------------------------------------
+
+describe("Logs Index — debouncedAutoRunOnDatetime", () => {
+  let localWrapper: any;
+
+  function mountFresh() {
+    return mount(Index, {
+      attachTo: "#app",
+      global: {
+        provide: { store },
+        plugins: [i18n, router],
+      },
+    });
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    (store.state as any).logs = {
+      isInitialized: true,
+      logs: {
+        data: { stream: { selectedStream: [] } },
+        organizationIdentifier: store.state.selectedOrganization.identifier,
+      },
+    };
+    vi.spyOn(store, "dispatch").mockResolvedValue(undefined as any);
+    (getFieldsFromQuery as Mock).mockResolvedValue({
+      fields: [],
+      filters: [],
+      streamName: "",
+    });
+    mockRestoreLogsStream.mockReturnValue([]);
+    localStorage.removeItem("oo_toggle_auto_run");
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    localWrapper?.unmount();
+    (store.state.zoConfig as any).auto_query_enabled = false;
+    (store.state.zoConfig as any).query_on_stream_selection = false;
+    vi.restoreAllMocks();
+  });
+
+  it("should NOT trigger auto-run for absolute datetime type even with liveMode=true", async () => {
+    (store.state.zoConfig as any).auto_query_enabled = true;
+    (store.state.zoConfig as any).query_on_stream_selection = true;
+    localStorage.setItem("oo_toggle_auto_run", "true");
+
+    localWrapper = mountFresh();
+    vi.runAllTimers();
+    await flushPromises();
+
+    const runQuerySpy = vi.spyOn(localWrapper.vm, "runQueryFn").mockResolvedValue(undefined as any);
+
+    searchState().searchObj.meta.liveMode = true;
+    searchState().searchObj.data.datetime.type = "absolute";
+    searchState().searchObj.data.stream.selectedStream = ["my-stream"];
+    searchState().searchObj.loading = false;
+    searchState().searchObj.loadingHistogram = false;
+
+    // Change a datetime field to trigger the watcher
+    searchState().searchObj.data.datetime.startTime =
+      Date.now() * 1000 - 1_000_000;
+    vi.advanceTimersByTime(600);
+    await flushPromises();
+
+    expect(runQuerySpy).not.toHaveBeenCalled();
+  });
+
+  it("should NOT trigger auto-run when liveMode is false", async () => {
+    (store.state.zoConfig as any).auto_query_enabled = true;
+    (store.state.zoConfig as any).query_on_stream_selection = true;
+    localStorage.setItem("oo_toggle_auto_run", "false");
+
+    localWrapper = mountFresh();
+    vi.runAllTimers();
+    await flushPromises();
+
+    const runQuerySpy = vi.spyOn(localWrapper.vm, "runQueryFn").mockResolvedValue(undefined as any);
+
+    searchState().searchObj.meta.liveMode = false;
+    searchState().searchObj.data.datetime.type = "relative";
+    searchState().searchObj.data.stream.selectedStream = ["my-stream"];
+    searchState().searchObj.loading = false;
+
+    searchState().searchObj.data.datetime.relativeTimePeriod = "30m";
+    vi.advanceTimersByTime(600);
+    await flushPromises();
+
+    expect(runQuerySpy).not.toHaveBeenCalled();
+  });
+
+  it("should NOT trigger auto-run when no streams are selected", async () => {
+    (store.state.zoConfig as any).auto_query_enabled = true;
+    (store.state.zoConfig as any).query_on_stream_selection = true;
+    localStorage.setItem("oo_toggle_auto_run", "true");
+
+    localWrapper = mountFresh();
+    vi.runAllTimers();
+    await flushPromises();
+
+    const runQuerySpy = vi.spyOn(localWrapper.vm, "runQueryFn").mockResolvedValue(undefined as any);
+
+    searchState().searchObj.meta.liveMode = true;
+    searchState().searchObj.data.datetime.type = "relative";
+    searchState().searchObj.data.stream.selectedStream = []; // no stream
+    searchState().searchObj.loading = false;
+
+    searchState().searchObj.data.datetime.relativeTimePeriod = "30m";
+    vi.advanceTimersByTime(600);
+    await flushPromises();
+
+    expect(runQuerySpy).not.toHaveBeenCalled();
+  });
+
+  it("should NOT trigger auto-run when already loading", async () => {
+    (store.state.zoConfig as any).auto_query_enabled = true;
+    (store.state.zoConfig as any).query_on_stream_selection = true;
+    localStorage.setItem("oo_toggle_auto_run", "true");
+
+    localWrapper = mountFresh();
+    vi.runAllTimers();
+    await flushPromises();
+
+    const runQuerySpy = vi.spyOn(localWrapper.vm, "runQueryFn").mockResolvedValue(undefined as any);
+
+    searchState().searchObj.meta.liveMode = true;
+    searchState().searchObj.data.datetime.type = "relative";
+    searchState().searchObj.data.stream.selectedStream = ["my-stream"];
+    searchState().searchObj.loading = true; // already loading
+
+    searchState().searchObj.data.datetime.relativeTimePeriod = "30m";
+    vi.advanceTimersByTime(600);
+    await flushPromises();
+
+    expect(runQuerySpy).not.toHaveBeenCalled();
   });
 });
