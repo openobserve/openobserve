@@ -302,3 +302,58 @@ impl From<(MetaFolder, MetaDashboard)> for ListDashboardsResponseBodyItem {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_latest_dashboard_version_is_eight() {
+        assert_eq!(LATEST_DASHBOARD_VERSION, 8);
+    }
+
+    #[test]
+    fn test_deserialize_v2_request_body() {
+        let json = serde_json::json!({
+            "version": 2,
+            "title": "My Dashboard",
+            "description": "test"
+        });
+        let body: DashboardRequestBody = serde_json::from_value(json).unwrap();
+        assert!(matches!(body, DashboardRequestBody::V2(_)));
+    }
+
+    #[test]
+    fn test_deserialize_v8_request_body() {
+        let json = serde_json::json!({
+            "version": 8,
+            "title": "V8 Dashboard",
+            "description": "test"
+        });
+        let body: DashboardRequestBody = serde_json::from_value(json).unwrap();
+        assert!(matches!(body, DashboardRequestBody::V8(_)));
+    }
+
+    #[test]
+    fn test_deserialize_unsupported_version_returns_err() {
+        let json = serde_json::json!({
+            "version": 99,
+            "title": "Bad Version",
+            "description": "test"
+        });
+        let result: Result<DashboardRequestBody, _> = serde_json::from_value(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_request_body_v2_sets_version() {
+        let json = serde_json::json!({
+            "version": 2,
+            "title": "Converted",
+            "description": "test"
+        });
+        let body: DashboardRequestBody = serde_json::from_value(json).unwrap();
+        let meta: MetaDashboard = body.into();
+        assert_eq!(meta.version, 2);
+    }
+}
