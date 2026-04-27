@@ -771,6 +771,22 @@ pub async fn clone_config(
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
+    // Broadcast cloned config to all super cluster regions for API-read consistency.
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+        && let Err(e) =
+            o2_enterprise::enterprise::super_cluster::queue::anomaly_config_create(result.clone())
+                .await
+    {
+        log::warn!(
+            "[anomaly_detection {}] failed to broadcast ConfigCreate (clone) to super cluster: {e}",
+            result.anomaly_id
+        );
+    }
+
     // Register detection trigger for the new config
     {
         let trigger = crate::service::db::scheduler::Trigger {
