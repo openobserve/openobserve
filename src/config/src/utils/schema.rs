@@ -585,4 +585,30 @@ mod tests {
         ]);
         assert!(!schema_eq(&schema1, &schema2));
     }
+
+    #[test]
+    fn test_format_partition_key_alphanumeric() {
+        assert_eq!(format_partition_key("abc123"), "abc123");
+        assert_eq!(format_partition_key("hello-world"), "hello-world");
+        assert_eq!(format_partition_key("key=value"), "key=value");
+        assert_eq!(format_partition_key("under_score"), "under_score");
+    }
+
+    #[test]
+    fn test_format_partition_key_strips_special_chars() {
+        assert_eq!(format_partition_key("hello world"), "helloworld");
+        assert_eq!(format_partition_key("a/b/c"), "abc");
+        assert_eq!(format_partition_key("foo:bar"), "foobar");
+        assert_eq!(format_partition_key("a.b.c"), "abc");
+        assert_eq!(format_partition_key(""), "");
+    }
+
+    #[test]
+    fn test_format_partition_key_truncates_at_max_length() {
+        let long = "a".repeat(300);
+        let result = format_partition_key(&long);
+        // loop checks > MAX_PARTITION_KEY_LENGTH before push, so max result is MAX+1
+        assert!(result.len() <= super::MAX_PARTITION_KEY_LENGTH + 1);
+        assert!(result.len() < 200);
+    }
 }
