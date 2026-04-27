@@ -818,4 +818,65 @@ mod tests {
         assert_eq!(edge.source, "source-1");
         assert_eq!(edge.target, "target-2");
     }
+
+    #[test]
+    fn test_llm_evaluation_params_default() {
+        let p = LlmEvaluationParams::default();
+        assert_eq!(p.sampling_rate, 0.01);
+        assert!(p.enable_llm_judge);
+        assert_eq!(p.llm_span_identifier, "llm_input");
+        assert!(p.name.is_empty());
+        assert!(p.eval_template.is_none());
+    }
+
+    #[test]
+    fn test_llm_evaluation_params_sampling_rate_serde() {
+        // number format
+        let json = r#"{"sampling_rate": 0.5}"#;
+        let p: LlmEvaluationParams = serde_json::from_str(json).unwrap();
+        assert!((p.sampling_rate - 0.5).abs() < 1e-9);
+
+        // string format
+        let json_str = r#"{"sampling_rate": "0.25"}"#;
+        let p2: LlmEvaluationParams = serde_json::from_str(json_str).unwrap();
+        assert!((p2.sampling_rate - 0.25).abs() < 1e-9);
+
+        // out of range → error
+        let bad = r#"{"sampling_rate": 1.5}"#;
+        assert!(serde_json::from_str::<LlmEvaluationParams>(bad).is_err());
+
+        // negative → error
+        let neg = r#"{"sampling_rate": -0.1}"#;
+        assert!(serde_json::from_str::<LlmEvaluationParams>(neg).is_err());
+    }
+
+    #[test]
+    fn test_node_partial_eq() {
+        let node_a = Node::new(
+            "n1".to_string(),
+            NodeData::Stream(StreamParams {
+                org_id: "org".to_string().into(),
+                stream_name: "logs".to_string().into(),
+                stream_type: StreamType::Logs,
+            }),
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        let node_b = node_a.clone();
+        assert_eq!(node_a, node_b);
+
+        let node_c = Node::new(
+            "n2".to_string(), // different id
+            NodeData::Stream(StreamParams {
+                org_id: "org".to_string().into(),
+                stream_name: "logs".to_string().into(),
+                stream_type: StreamType::Logs,
+            }),
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        assert_ne!(node_a, node_c);
+    }
 }
