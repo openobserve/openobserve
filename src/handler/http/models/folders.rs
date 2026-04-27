@@ -129,3 +129,84 @@ impl From<Folder> for config::meta::folder::Folder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_folder_type_all_variants_convert() {
+        assert_eq!(
+            config::meta::folder::FolderType::from(FolderType::Dashboards),
+            config::meta::folder::FolderType::Dashboards
+        );
+        assert_eq!(
+            config::meta::folder::FolderType::from(FolderType::Alerts),
+            config::meta::folder::FolderType::Alerts
+        );
+        assert_eq!(
+            config::meta::folder::FolderType::from(FolderType::Reports),
+            config::meta::folder::FolderType::Reports
+        );
+    }
+
+    #[test]
+    fn test_folder_from_config_preserves_fields() {
+        let src = config::meta::folder::Folder {
+            folder_id: "abc".to_string(),
+            name: "My Folder".to_string(),
+            description: "a description".to_string(),
+        };
+        let f = Folder::from(src);
+        assert_eq!(f.folder_id, "abc");
+        assert_eq!(f.name, "My Folder");
+        assert_eq!(f.description, "a description");
+    }
+
+    #[test]
+    fn test_config_folder_from_folder_preserves_fields() {
+        let src = Folder {
+            folder_id: "xyz".to_string(),
+            name: "Test".to_string(),
+            description: "d".to_string(),
+        };
+        let f = config::meta::folder::Folder::from(src);
+        assert_eq!(f.folder_id, "xyz");
+        assert_eq!(f.name, "Test");
+        assert_eq!(f.description, "d");
+    }
+
+    #[test]
+    fn test_create_folder_request_body_folder_id_is_empty() {
+        let req = CreateFolderRequestBody {
+            name: "New Folder".to_string(),
+            description: "A description".to_string(),
+        };
+        let f = config::meta::folder::Folder::from(req);
+        assert!(f.folder_id.is_empty());
+        assert_eq!(f.name, "New Folder");
+        assert_eq!(f.description, "A description");
+    }
+
+    #[test]
+    fn test_list_folders_response_body_preserves_order_and_fields() {
+        let folders = vec![
+            config::meta::folder::Folder {
+                folder_id: "1".to_string(),
+                name: "Alpha".to_string(),
+                description: "".to_string(),
+            },
+            config::meta::folder::Folder {
+                folder_id: "2".to_string(),
+                name: "Beta".to_string(),
+                description: "".to_string(),
+            },
+        ];
+        let resp = ListFoldersResponseBody::from(folders);
+        assert_eq!(resp.list.len(), 2);
+        assert_eq!(resp.list[0].folder_id, "1");
+        assert_eq!(resp.list[0].name, "Alpha");
+        assert_eq!(resp.list[1].folder_id, "2");
+        assert_eq!(resp.list[1].name, "Beta");
+    }
+}

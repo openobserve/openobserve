@@ -214,6 +214,73 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
     })
 }
 
+#[cfg(test)]
+mod tests {
+    use svix_ksuid::KsuidLike as _;
+
+    use super::*;
+
+    fn valid_ksuid_str() -> String {
+        svix_ksuid::Ksuid::new(None, None).to_string()
+    }
+
+    #[test]
+    fn test_anomaly_config_to_list_item_missing_anomaly_id_returns_none() {
+        let v = serde_json::json!({ "name": "test" });
+        assert!(anomaly_config_to_list_item(&v).is_none());
+    }
+
+    #[test]
+    fn test_anomaly_config_to_list_item_invalid_ksuid_returns_none() {
+        let v = serde_json::json!({ "anomaly_id": "not-a-ksuid", "name": "test" });
+        assert!(anomaly_config_to_list_item(&v).is_none());
+    }
+
+    #[test]
+    fn test_anomaly_config_to_list_item_valid_returns_correct_fields() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({
+            "anomaly_id": id,
+            "name": "my_config",
+            "enabled": true,
+            "status": "waiting",
+            "detection_window_seconds": 3600,
+            "schedule_interval": "5m",
+            "last_detection_run": 1_700_000_000i64,
+        });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert_eq!(item.name, "my_config");
+        assert_eq!(item.alert_type, "anomaly_detection");
+        assert!(item.enabled);
+        assert_eq!(item.status.as_deref(), Some("waiting"));
+        assert!(!item.is_real_time);
+        assert_eq!(item.last_triggered_at, Some(1_700_000_000));
+    }
+
+    #[test]
+    fn test_anomaly_config_folder_id_defaults_to_default_when_absent() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id, "name": "x" });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert_eq!(item.folder_id, "default");
+    }
+
+    #[test]
+    fn test_anomaly_config_trigger_condition_derived_from_window_and_interval() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({
+            "anomaly_id": id,
+            "name": "x",
+            "detection_window_seconds": 120,
+            "schedule_interval": "2m",
+        });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        let tc = item.trigger_condition.expect("trigger_condition should be set");
+        assert_eq!(tc.period_minutes, 2);     // 120 / 60
+        assert_eq!(tc.frequency_minutes, 2);  // "2m" → 2
+    }
+}
+
 #[derive(Default, Serialize, ToSchema)]
 pub struct AlertBulkEnableResponse {
     #[schema(value_type = Vec<String>)]

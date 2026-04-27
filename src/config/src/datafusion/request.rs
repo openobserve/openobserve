@@ -167,3 +167,53 @@ impl From<FlightSearchRequest> for cluster_rpc::FlightSearchRequest {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Request;
+
+    #[test]
+    fn test_add_work_group_sets_field() {
+        let mut req = Request::default();
+        assert!(req.work_group.is_none());
+        req.add_work_group(Some("my_group".to_string()));
+        assert_eq!(req.work_group, Some("my_group".to_string()));
+    }
+
+    #[test]
+    fn test_add_work_group_clears_field() {
+        let mut req = Request::default();
+        req.add_work_group(Some("group".to_string()));
+        req.add_work_group(None);
+        assert!(req.work_group.is_none());
+    }
+
+    #[test]
+    fn test_set_streaming_output_sets_both_fields() {
+        let mut req = Request::default();
+        assert!(!req.streaming_output);
+        assert!(req.streaming_id.is_none());
+        req.set_streaming_output(true, Some("stream_123".to_string()));
+        assert!(req.streaming_output);
+        assert_eq!(req.streaming_id, Some("stream_123".to_string()));
+    }
+
+    #[test]
+    fn test_set_local_mode_sets_field() {
+        let mut req = Request::default();
+        assert!(req.local_mode.is_none());
+        req.set_local_mode(Some(true));
+        assert_eq!(req.local_mode, Some(true));
+        req.set_local_mode(None);
+        assert!(req.local_mode.is_none());
+    }
+
+    #[test]
+    fn test_set_use_cache_overrides_default() {
+        let mut req = Request::default();
+        req.set_use_cache(true);
+        assert!(req.use_cache);
+        req.set_use_cache(false);
+        assert!(!req.use_cache);
+    }
+}

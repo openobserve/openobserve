@@ -318,6 +318,72 @@ pub fn combine_detection_function(
     Some(combined)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_combine_none_function_returns_none() {
+        assert_eq!(combine_detection_function(None, None), None);
+        assert_eq!(
+            combine_detection_function(None, Some("field".to_string())),
+            None
+        );
+    }
+
+    #[test]
+    fn test_combine_count_always_produces_star() {
+        assert_eq!(
+            combine_detection_function(Some("count".to_string()), None),
+            Some("count(*)".to_string())
+        );
+        assert_eq!(
+            combine_detection_function(Some("count".to_string()), Some("col".to_string())),
+            Some("count(*)".to_string())
+        );
+    }
+
+    #[test]
+    fn test_combine_avg_with_field() {
+        assert_eq!(
+            combine_detection_function(Some("avg".to_string()), Some("cpu_usage".to_string())),
+            Some("avg(cpu_usage)".to_string())
+        );
+        assert_eq!(
+            combine_detection_function(Some("sum".to_string()), Some("bytes".to_string())),
+            Some("sum(bytes)".to_string())
+        );
+    }
+
+    #[test]
+    fn test_combine_already_combined_passthrough() {
+        assert_eq!(
+            combine_detection_function(Some("avg(cpu)".to_string()), None),
+            Some("avg(cpu)".to_string())
+        );
+        assert_eq!(
+            combine_detection_function(Some("count(*)".to_string()), Some("field".to_string())),
+            Some("count(*)".to_string())
+        );
+    }
+
+    #[test]
+    fn test_combine_without_field_returns_bare_name() {
+        assert_eq!(
+            combine_detection_function(Some("avg".to_string()), None),
+            Some("avg".to_string())
+        );
+    }
+
+    #[test]
+    fn test_combine_empty_field_treated_as_missing() {
+        assert_eq!(
+            combine_detection_function(Some("avg".to_string()), Some("".to_string())),
+            Some("avg".to_string())
+        );
+    }
+}
+
 /// HTTP request body for `GenerateSql` endpoint.
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct GenerateSqlRequestBody {
