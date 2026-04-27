@@ -128,3 +128,56 @@ pub struct EdgeTrendDataPoint {
 pub struct EdgeTrendResponse {
     pub data_points: Vec<EdgeTrendDataPoint>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_snapshot() -> ServiceGraphSnapshot {
+        ServiceGraphSnapshot {
+            timestamp: 1_000_000,
+            org_id: "default".to_string(),
+            trace_stream_name: "traces".to_string(),
+            client_service: Some("frontend".to_string()),
+            server_service: "backend".to_string(),
+            total_requests: 100,
+            failed_requests: 5,
+            error_rate: 5.0,
+            p50_latency_ns: 1_000_000,
+            p95_latency_ns: 5_000_000,
+            p99_latency_ns: 10_000_000,
+            first_seen: 900_000,
+            last_seen: 1_100_000,
+            snapshot_version: 1,
+        }
+    }
+
+    #[test]
+    fn test_to_json_includes_all_fields() {
+        let snap = make_snapshot();
+        let val = snap.to_json();
+        assert_eq!(val["_timestamp"], 1_000_000_i64);
+        assert_eq!(val["org_id"], "default");
+        assert_eq!(val["server_service"], "backend");
+        assert_eq!(val["total_requests"], 100_u64);
+        assert_eq!(val["failed_requests"], 5_u64);
+    }
+
+    #[test]
+    fn test_to_json_client_service_none_is_null() {
+        let mut snap = make_snapshot();
+        snap.client_service = None;
+        let val = snap.to_json();
+        assert!(val["client_service"].is_null());
+    }
+
+    #[test]
+    fn test_to_json_roundtrip() {
+        let snap = make_snapshot();
+        let val = snap.to_json();
+        let back: ServiceGraphSnapshot = serde_json::from_value(val).unwrap();
+        assert_eq!(back.org_id, "default");
+        assert_eq!(back.total_requests, 100);
+        assert_eq!(back.snapshot_version, 1);
+    }
+}
