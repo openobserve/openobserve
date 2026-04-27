@@ -401,8 +401,8 @@ pub async fn handle_otlp_request(
                         start_time,
                     );
 
-                    // check if we have any LLM related attributes
-                    if !is_llm_stream && detect_llm_stream(|k| span_att_map.contains_key(k)) {
+                    // set stream to llm stream if not already set
+                    if !is_llm_stream {
                         is_llm_stream = true;
                         need_mark_llm_stream = true;
                     }
