@@ -409,4 +409,61 @@ mod tests {
                 .map_or(true, |s| s.is_empty())
         );
     }
+
+    #[test]
+    fn test_column_visitor_compound_identifier() {
+        // table.field style → CompoundIdentifier branch in pre_visit_expr
+        let sql = "SELECT users.name, users.age FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        let users_ref = TableReference::from("users");
+        let columns = visitor.columns.get(&users_ref).unwrap();
+        assert!(columns.contains("name"));
+        assert!(columns.contains("age"));
+    }
+
+    #[test]
+    fn test_column_visitor_order_by_compound_expr_skipped() {
+        // ORDER BY expression with multiple fields → field_names.len() != 1 → order_by skipped
+        let sql = "SELECT name FROM users ORDER BY name, age";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        // Both single-field order_by expressions captured
+        assert_eq!(visitor.order_by.len(), 2);
+        assert!(visitor
+            .order_by
+            .iter()
+            .any(|(f, _)| f == "name" || f == "age"));
+    }
+
+    #[test]
+    fn test_column_visitor_limit_no_explicit_offset_defaults_to_zero() {
+        // LIMIT with no OFFSET → offset defaults to 0
+        let sql = "SELECT * FROM users LIMIT 5";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        assert_eq!(visitor.limit, Some(5));
+        assert_eq!(visitor.offset, Some(0));
+    }
 }
