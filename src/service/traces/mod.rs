@@ -1889,10 +1889,7 @@ mod tests {
         obj.insert("service.name".to_string(), json!("api"));
         assert!(!super::detect_llm_stream(|k| obj.contains_key(k)));
 
-        obj.insert(
-            GenAiAttributes::USAGE_INPUT_TOKENS.to_string(),
-            json!(42),
-        );
+        obj.insert(GenAiAttributes::USAGE_INPUT_TOKENS.to_string(), json!(42));
         assert!(super::detect_llm_stream(|k| obj.contains_key(k)));
     }
 
