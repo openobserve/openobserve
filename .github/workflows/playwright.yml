@@ -108,32 +108,32 @@ jobs:
         with:
           node-version: 22
 
-      - name: Cache web/dist
-        id: cache-web-dist
-        uses: actions/cache@v4
-        with:
-          path: web/dist
-          key: web-dist-${{ hashFiles('web/package-lock.json', 'web/src/**', 'web/public/**', 'web/index.html', 'web/vite.config.*') }}
-
-      - name: Build frontend code
-        if: steps.cache-web-dist.outputs.cache-hit != 'true'
+      - name: Build binary and frontend
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
           VITE_COVERAGE: "true"
           COVERAGE: "true"
-        run: cd web && npm ci && npm run build
-
-      - name: Build release-ci binary
-        env:
           GIT_HASH_OVERRIDE: ${{ github.sha }}
-        run: cargo build --profile release-ci --features ci-embed --target x86_64-unknown-linux-gnu
+        run: |
+          bash -c "cd web && npm ci && npm run build && cp -r ./dist /tmp/dist" &
+          sed -i 's|folder = "web/dist/"|folder = "/tmp/dist/"|' src/handler/http/router/ui.rs
+          cargo build --profile release-ci --target x86_64-unknown-linux-gnu
+          wait
 
-      - name: Upload artifacts
+      - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-ci-binary
           path: target/x86_64-unknown-linux-gnu/release-ci/openobserve
           retention-days: 1
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: /tmp/dist
+          retention-days: 1
+          if-no-files-found: error
 
   ui_integration_tests:
     name: e2e / ${{ matrix.testfolder }}
@@ -398,11 +398,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download artifacts
+      - name: Download binary artifact
         uses: actions/download-artifact@v5
         with:
           name: release-ci-binary
           path: release-ci-binary
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: frontend-dist
+          path: /tmp/dist
 
       - name: Start OpenObserve
         run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
