@@ -168,8 +168,8 @@ static LLM_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLock:
         Field::new("llm_usage_tokens_total", DataType::Int64, true),
         Field::new("llm_completion_start_time", DataType::Int64, true),
         // Float fields
-        Field::new("llm_cost_details_input", DataType::Float64, true),
-        Field::new("llm_cost_details_output", DataType::Float64, true),
+        Field::new("llm_usage_cost_input", DataType::Float64, true),
+        Field::new("llm_usage_cost_output", DataType::Float64, true),
         Field::new("llm_usage_cost_total", DataType::Float64, true),
     ]
 });
