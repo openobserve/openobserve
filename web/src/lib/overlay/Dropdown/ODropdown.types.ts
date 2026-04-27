@@ -1,16 +1,26 @@
 /**
- * Dropdown.types.ts ΓÇö single source of truth for all ODropdown family types.
+ * ODropdown.types.ts — public types for ODropdown.
  */
 
 import type { DropdownMenuContentProps, DropdownMenuRootProps } from "reka-ui";
 
-// --- ODropdown (Root + Content) ----------------------------------------------
+// Re-export family types so callers can import everything from one place if needed
+export type {
+  DropdownItemProps,
+  DropdownItemEmits,
+  DropdownItemSlots,
+} from "./ODropdownItem.types";
+export type {
+  DropdownGroupProps,
+  DropdownGroupSlots,
+} from "./ODropdownGroup.types";
+export type { DropdownSeparatorSlots } from "./ODropdownSeparator.types";
 
 export type DropdownAlign = "start" | "center" | "end";
 export type DropdownSide = "top" | "right" | "bottom" | "left";
 
 export interface DropdownProps {
-  /** Controlled open state ΓÇö use with v-model:open */
+  /** Controlled open state — use with v-model:open */
   open?: boolean;
   /** Whether the dropdown blocks interaction with the rest of the page */
   modal?: DropdownMenuRootProps["modal"];
@@ -27,47 +37,8 @@ export interface DropdownEmits {
 }
 
 export interface DropdownSlots {
-  /** The element that opens the dropdown ΓÇö rendered as-child into the trigger */
+  /** The element that opens the dropdown — rendered as-child into the trigger */
   trigger?: () => unknown;
   /** ODropdownItem / ODropdownGroup / ODropdownSeparator children */
   default?: () => unknown;
-}
-
-// --- ODropdownItem ------------------------------------------------------------
-
-export interface DropdownItemProps {
-  /** Prevents the user from interacting with this item */
-  disabled?: boolean;
-  /** Text used for typeahead matching (overrides text content) */
-  textValue?: string;
-}
-
-export interface DropdownItemEmits {
-  (e: "select", event: Event): void;
-}
-
-export interface DropdownItemSlots {
-  /** Icon placed before the label */
-  "icon-left"?: () => unknown;
-  /** Label text / content */
-  default?: () => unknown;
-  /** Icon placed after the label */
-  "icon-right"?: () => unknown;
-}
-
-// --- ODropdownGroup -----------------------------------------------------------
-
-export interface DropdownGroupProps {
-  /** Optional visible group label */
-  label?: string;
-}
-
-export interface DropdownGroupSlots {
-  default?: () => unknown;
-}
-
-// --- ODropdownSeparator -------------------------------------------------------
-
-export interface DropdownSeparatorSlots {
-  // no slots ΓÇö purely visual
 }

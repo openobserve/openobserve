@@ -1,10 +1,14 @@
 /**
- * ToggleGroup.types.ts ΓÇö single source of truth for all OToggleGroup family types.
+ * OToggleGroup.types.ts — public types for OToggleGroup.
  */
 
 import type { AcceptableValue } from "reka-ui";
 
-// --- OToggleGroup -------------------------------------------------------------
+// Re-export item types so callers can import everything from one place if needed
+export type {
+  ToggleGroupItemProps,
+  ToggleGroupItemSlots,
+} from "./OToggleGroupItem.types";
 
 export type ToggleGroupType = "single" | "multiple";
 export type ToggleGroupOrientation = "horizontal" | "vertical";
@@ -12,7 +16,7 @@ export type ToggleGroupOrientation = "horizontal" | "vertical";
 export interface ToggleGroupProps {
   /** Whether one or multiple items can be active at a time */
   type?: ToggleGroupType;
-  /** Controlled active value(s) ΓÇö use with v-model */
+  /** Controlled active value(s) — use with v-model */
   modelValue?: AcceptableValue | AcceptableValue[];
   /** Disables all items in the group */
   disabled?: boolean;
@@ -27,22 +31,4 @@ export interface ToggleGroupEmits {
 export interface ToggleGroupSlots {
   /** One or more OToggleGroupItem children */
   default?: () => unknown;
-}
-
-// --- OToggleGroupItem ---------------------------------------------------------
-
-export interface ToggleGroupItemProps {
-  /** Unique value for this option ΓÇö required */
-  value: AcceptableValue;
-  /** Disables only this item */
-  disabled?: boolean;
-}
-
-export interface ToggleGroupItemSlots {
-  /** Icon placed before the label */
-  "icon-left"?: () => unknown;
-  /** Label text / content */
-  default?: () => unknown;
-  /** Icon placed after the label */
-  "icon-right"?: () => unknown;
 }
