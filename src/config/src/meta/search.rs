@@ -3317,4 +3317,89 @@ mod tests {
         resp.set_peak_memory_usage(2048.0);
         assert_eq!(resp.peak_memory_usage, Some(2048.0));
     }
+
+    #[test]
+    fn test_scan_stats_add_zero_self_aggs_cache_ratio() {
+        // When self.aggs_cache_ratio == 0, take other's value
+        let mut stats1 = ScanStats {
+            aggs_cache_ratio: 0,
+            ..Default::default()
+        };
+        let stats2 = ScanStats {
+            aggs_cache_ratio: 75,
+            ..Default::default()
+        };
+        stats1.add(&stats2);
+        assert_eq!(stats1.aggs_cache_ratio, 75);
+    }
+
+    #[test]
+    fn test_scan_stats_add_zero_other_aggs_cache_ratio() {
+        // When other.aggs_cache_ratio == 0, keep self's value
+        let mut stats1 = ScanStats {
+            aggs_cache_ratio: 60,
+            ..Default::default()
+        };
+        let stats2 = ScanStats {
+            aggs_cache_ratio: 0,
+            ..Default::default()
+        };
+        stats1.add(&stats2);
+        assert_eq!(stats1.aggs_cache_ratio, 60);
+    }
+
+    #[test]
+    fn test_search_event_type_display_download_and_insights() {
+        assert_eq!(SearchEventType::Download.to_string(), "download");
+        assert_eq!(SearchEventType::Insights.to_string(), "insights");
+    }
+
+    #[test]
+    fn test_search_event_type_try_from_download_and_insights() {
+        assert_eq!(
+            SearchEventType::try_from("download").unwrap(),
+            SearchEventType::Download
+        );
+        assert_eq!(
+            SearchEventType::try_from("insights").unwrap(),
+            SearchEventType::Insights
+        );
+    }
+
+    #[test]
+    fn test_storage_type_equality() {
+        assert_eq!(StorageType::Memory, StorageType::Memory);
+        assert_eq!(StorageType::Wal, StorageType::Wal);
+        assert_ne!(StorageType::Memory, StorageType::Wal);
+    }
+
+    #[test]
+    fn test_values_event_context_serde_defaults() {
+        let json = r#"{"field":"myfield","no_count":false}"#;
+        let ctx: ValuesEventContext = serde_json::from_str(json).unwrap();
+        assert_eq!(ctx.field, "myfield");
+        assert!(ctx.top_k.is_none());
+        assert!(!ctx.no_count);
+    }
+
+    #[test]
+    fn test_request_encoding_default_is_empty() {
+        let enc: RequestEncoding = Default::default();
+        assert_eq!(enc, RequestEncoding::Empty);
+    }
+
+    #[test]
+    fn test_scan_stats_add_both_zero_aggs_cache_ratio() {
+        // Both zero → result is zero (other.aggs_cache_ratio branch)
+        let mut stats1 = ScanStats {
+            aggs_cache_ratio: 0,
+            ..Default::default()
+        };
+        let stats2 = ScanStats {
+            aggs_cache_ratio: 0,
+            ..Default::default()
+        };
+        stats1.add(&stats2);
+        assert_eq!(stats1.aggs_cache_ratio, 0);
+    }
 }
