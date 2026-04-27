@@ -3606,4 +3606,451 @@ mod tests {
     fn test_ensure_not_empty_single_char() {
         assert!(ensure_not_empty("a", "TEST").is_ok());
     }
+
+    #[test]
+    fn test_file_format_display() {
+        assert_eq!(FileFormat::Parquet.to_string(), "parquet");
+        assert_eq!(FileFormat::Vortex.to_string(), "vortex");
+    }
+
+    #[test]
+    fn test_file_format_from_str() {
+        assert_eq!("parquet".parse::<FileFormat>().unwrap(), FileFormat::Parquet);
+        assert_eq!("PARQUET".parse::<FileFormat>().unwrap(), FileFormat::Parquet);
+        assert_eq!("vortex".parse::<FileFormat>().unwrap(), FileFormat::Vortex);
+        assert_eq!("VORTEX".parse::<FileFormat>().unwrap(), FileFormat::Vortex);
+        assert!("unknown".parse::<FileFormat>().is_err());
+    }
+
+    #[test]
+    fn test_file_format_extension() {
+        assert_eq!(FileFormat::Parquet.extension(), ".parquet");
+        assert_eq!(FileFormat::Vortex.extension(), ".vortex");
+    }
+
+    #[test]
+    fn test_file_format_from_extension() {
+        assert_eq!(
+            FileFormat::from_extension("data.parquet"),
+            Some(FileFormat::Parquet)
+        );
+        assert_eq!(
+            FileFormat::from_extension("data.vortex"),
+            Some(FileFormat::Vortex)
+        );
+        assert_eq!(FileFormat::from_extension("data.json"), None);
+        assert_eq!(FileFormat::from_extension(""), None);
+        // full path
+        assert_eq!(
+            FileFormat::from_extension("/some/path/file.parquet"),
+            Some(FileFormat::Parquet)
+        );
+    }
+
+    #[test]
+    fn test_tls_root_certificates_display() {
+        assert_eq!(TlsRootCertificates::Webpki.to_string(), "webpki");
+        assert_eq!(TlsRootCertificates::Native.to_string(), "native");
+    }
+
+    #[test]
+    fn test_tls_root_certificates_from_str() {
+        assert_eq!(
+            "webpki".parse::<TlsRootCertificates>().unwrap(),
+            TlsRootCertificates::Webpki
+        );
+        assert_eq!(
+            "WEBPKI".parse::<TlsRootCertificates>().unwrap(),
+            TlsRootCertificates::Webpki
+        );
+        assert_eq!(
+            "native".parse::<TlsRootCertificates>().unwrap(),
+            TlsRootCertificates::Native
+        );
+        assert_eq!(
+            "NATIVE".parse::<TlsRootCertificates>().unwrap(),
+            TlsRootCertificates::Native
+        );
+        assert!("invalid".parse::<TlsRootCertificates>().is_err());
+    }
+
+    #[test]
+    fn test_route_dispatch_strategy_from_str() {
+        assert!(matches!(
+            "workload".parse::<RouteDispatchStrategy>().unwrap(),
+            RouteDispatchStrategy::Workload
+        ));
+        assert!(matches!(
+            "WORKLOAD".parse::<RouteDispatchStrategy>().unwrap(),
+            RouteDispatchStrategy::Workload
+        ));
+        assert!(matches!(
+            "random".parse::<RouteDispatchStrategy>().unwrap(),
+            RouteDispatchStrategy::Random
+        ));
+        assert!(matches!(
+            "RANDOM".parse::<RouteDispatchStrategy>().unwrap(),
+            RouteDispatchStrategy::Random
+        ));
+        // unknown maps to Other, not an error
+        assert!(matches!(
+            "unknown".parse::<RouteDispatchStrategy>().unwrap(),
+            RouteDispatchStrategy::Other
+        ));
+        assert!(matches!(
+            "  workload  ".parse::<RouteDispatchStrategy>().unwrap(),
+            RouteDispatchStrategy::Workload
+        ));
+    }
+
+    #[test]
+    fn test_get_parquet_compression() {
+        use parquet::basic::Compression;
+        assert_eq!(get_parquet_compression("snappy"), Compression::SNAPPY);
+        assert_eq!(
+            get_parquet_compression("uncompressed"),
+            Compression::UNCOMPRESSED
+        );
+        assert_eq!(get_parquet_compression("none"), Compression::UNCOMPRESSED);
+        assert_eq!(get_parquet_compression("lz4"), Compression::LZ4_RAW);
+        assert_eq!(get_parquet_compression("lz4_raw"), Compression::LZ4_RAW);
+        assert_eq!(get_parquet_compression("SNAPPY"), Compression::SNAPPY);
+        // unknown defaults to zstd
+        assert!(matches!(
+            get_parquet_compression("unknown"),
+            Compression::ZSTD(_)
+        ));
+        assert!(matches!(
+            get_parquet_compression("gzip"),
+            Compression::GZIP(_)
+        ));
+        assert!(matches!(
+            get_parquet_compression("brotli"),
+            Compression::BROTLI(_)
+        ));
+        assert!(matches!(
+            get_parquet_compression("zstd"),
+            Compression::ZSTD(_)
+        ));
+    }
+
+    #[test]
+    fn test_common_should_create_span() {
+        let mut common = Common::default();
+        assert!(!common.should_create_span());
+
+        common.tracing_enabled = true;
+        assert!(common.should_create_span());
+
+        common.tracing_enabled = false;
+        common.tracing_search_enabled = true;
+        assert!(common.should_create_span());
+
+        common.tracing_search_enabled = false;
+        common.search_inspector_enabled = true;
+        assert!(common.should_create_span());
+    }
+
+    #[test]
+    fn test_check_grpc_config_no_tls() {
+        let mut cfg = Config::default();
+        cfg.grpc.tls_enabled = false;
+        assert!(check_grpc_config(&mut cfg).is_ok());
+    }
+
+    #[test]
+    fn test_check_grpc_config_tls_missing_fields() {
+        let mut cfg = Config::default();
+        cfg.grpc.tls_enabled = true;
+        // All TLS fields empty — should fail
+        assert!(check_grpc_config(&mut cfg).is_err());
+    }
+
+    #[test]
+    fn test_check_grpc_config_tls_complete() {
+        let mut cfg = Config::default();
+        cfg.grpc.tls_enabled = true;
+        cfg.grpc.tls_cert_domain = "example.com".to_string();
+        cfg.grpc.tls_cert_path = "/certs/server.crt".to_string();
+        cfg.grpc.tls_key_path = "/certs/server.key".to_string();
+        assert!(check_grpc_config(&mut cfg).is_ok());
+    }
+
+    #[test]
+    fn test_check_http_config_no_tls() {
+        let mut cfg = Config::default();
+        cfg.http.tls_enabled = false;
+        assert!(check_http_config(&mut cfg).is_ok());
+    }
+
+    #[test]
+    fn test_check_http_config_tls_missing_fields() {
+        let mut cfg = Config::default();
+        cfg.http.tls_enabled = true;
+        // Both cert and key empty — should fail
+        assert!(check_http_config(&mut cfg).is_err());
+
+        cfg.http.tls_cert_path = "/certs/server.crt".to_string();
+        // key still missing — should fail
+        assert!(check_http_config(&mut cfg).is_err());
+    }
+
+    #[test]
+    fn test_check_http_config_tls_complete() {
+        let mut cfg = Config::default();
+        cfg.http.tls_enabled = true;
+        cfg.http.tls_cert_path = "/certs/server.crt".to_string();
+        cfg.http.tls_key_path = "/certs/server.key".to_string();
+        assert!(check_http_config(&mut cfg).is_ok());
+    }
+
+    #[test]
+    fn test_check_nats_config_defaults() {
+        let mut cfg = Config::default();
+        cfg.nats.queue_max_size = 0;
+        check_nats_config(&mut cfg).unwrap();
+        // 2048 MB → bytes
+        assert_eq!(cfg.nats.queue_max_size, 2048 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_check_nats_config_custom() {
+        let mut cfg = Config::default();
+        cfg.nats.queue_max_size = 1;
+        check_nats_config(&mut cfg).unwrap();
+        assert_eq!(cfg.nats.queue_max_size, 1 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_check_inverted_index_config_defaults() {
+        let mut cfg = Config::default();
+        cfg.limit.inverted_index_result_cache_max_entries = 0;
+        cfg.limit.inverted_index_result_cache_max_entry_size = 0;
+        cfg.limit.inverted_index_skip_threshold = 0;
+        cfg.limit.inverted_index_min_token_length = 0;
+        cfg.limit.inverted_index_max_token_length = 0;
+        check_inverted_index_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.inverted_index_result_cache_max_entries, 10000);
+        assert_eq!(cfg.limit.inverted_index_result_cache_max_entry_size, 20480);
+        assert_eq!(cfg.limit.inverted_index_skip_threshold, 35);
+        assert_eq!(cfg.limit.inverted_index_min_token_length, 2);
+        assert_eq!(cfg.limit.inverted_index_max_token_length, 64);
+    }
+
+    #[test]
+    fn test_check_inverted_index_config_preserves_existing() {
+        let mut cfg = Config::default();
+        cfg.limit.inverted_index_result_cache_max_entries = 5000;
+        cfg.limit.inverted_index_min_token_length = 3;
+        cfg.limit.inverted_index_max_token_length = 32;
+        check_inverted_index_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.inverted_index_result_cache_max_entries, 5000);
+        assert_eq!(cfg.limit.inverted_index_min_token_length, 3);
+        assert_eq!(cfg.limit.inverted_index_max_token_length, 32);
+    }
+
+    #[test]
+    fn test_check_health_check_config_defaults() {
+        let mut cfg = Config::default();
+        cfg.health_check.timeout = 0;
+        cfg.health_check.failed_times = 0;
+        check_health_check_config(&mut cfg).unwrap();
+        assert_eq!(cfg.health_check.timeout, 5);
+        assert_eq!(cfg.health_check.failed_times, 3);
+    }
+
+    #[test]
+    fn test_check_health_check_config_preserves_existing() {
+        let mut cfg = Config::default();
+        cfg.health_check.timeout = 10;
+        cfg.health_check.failed_times = 5;
+        check_health_check_config(&mut cfg).unwrap();
+        assert_eq!(cfg.health_check.timeout, 10);
+        assert_eq!(cfg.health_check.failed_times, 5);
+    }
+
+    #[test]
+    fn test_check_pipeline_config_defaults() {
+        let mut cfg = Config::default();
+        cfg.common.data_dir = "/data/".to_string();
+        cfg.pipeline.remote_stream_wal_dir = "".to_string();
+        cfg.pipeline.offset_flush_interval = 0;
+        cfg.pipeline.remote_request_max_retry_time = 0;
+        cfg.pipeline.pipeline_file_push_back_interval = 0;
+        cfg.pipeline.pipeline_sink_task_spawn_interval_ms = 0;
+        check_pipeline_config(&mut cfg).unwrap();
+        assert_eq!(
+            cfg.pipeline.remote_stream_wal_dir,
+            "/data/remote_stream_wal/"
+        );
+        assert_eq!(cfg.pipeline.offset_flush_interval, 10);
+        assert_eq!(cfg.pipeline.remote_request_max_retry_time, 86400);
+        assert_eq!(cfg.pipeline.pipeline_file_push_back_interval, 2);
+        assert_eq!(cfg.pipeline.pipeline_sink_task_spawn_interval_ms, 100);
+    }
+
+    #[test]
+    fn test_check_pipeline_config_adds_trailing_slash() {
+        let mut cfg = Config::default();
+        cfg.common.data_dir = "/data/".to_string();
+        cfg.pipeline.remote_stream_wal_dir = "/custom/wal".to_string();
+        cfg.pipeline.offset_flush_interval = 5;
+        cfg.pipeline.remote_request_max_retry_time = 3600;
+        check_pipeline_config(&mut cfg).unwrap();
+        assert_eq!(cfg.pipeline.remote_stream_wal_dir, "/custom/wal/");
+        assert_eq!(cfg.pipeline.offset_flush_interval, 5);
+        assert_eq!(cfg.pipeline.remote_request_max_retry_time, 3600);
+    }
+
+    #[test]
+    fn test_check_compact_config_defaults() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_days = 0;
+        cfg.compact.interval = 0;
+        cfg.compact.max_file_size = 0;
+        cfg.compact.delete_files_delay_hours = 0;
+        cfg.compact.old_data_interval = 0;
+        cfg.compact.old_data_max_days = 0;
+        cfg.compact.old_data_min_hours = 0;
+        cfg.compact.old_data_min_records = 0;
+        cfg.compact.old_data_min_files = 0;
+        cfg.compact.file_list_deleted_batch_size = 0;
+        cfg.compact.batch_size = 0;
+        cfg.compact.pending_jobs_metric_interval = 0;
+        check_compact_config(&mut cfg).unwrap();
+        assert_eq!(cfg.compact.interval, 10);
+        assert_eq!(cfg.compact.max_file_size, 512 * 1024 * 1024);
+        assert_eq!(cfg.compact.delete_files_delay_hours, 2);
+        assert_eq!(cfg.compact.old_data_interval, 3600);
+        assert_eq!(cfg.compact.old_data_max_days, 7);
+        assert_eq!(cfg.compact.old_data_min_hours, 2);
+        assert_eq!(cfg.compact.old_data_min_records, 100);
+        assert_eq!(cfg.compact.old_data_min_files, 10);
+        assert_eq!(cfg.compact.file_list_deleted_batch_size, 1000);
+        assert_eq!(cfg.compact.batch_size, 100);
+        assert_eq!(cfg.compact.pending_jobs_metric_interval, 300);
+    }
+
+    #[test]
+    fn test_check_compact_config_retention_too_short() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_days = 1;
+        assert!(check_compact_config(&mut cfg).is_err());
+        cfg.compact.data_retention_days = 2;
+        assert!(check_compact_config(&mut cfg).is_err());
+    }
+
+    #[test]
+    fn test_check_compact_config_valid_retention() {
+        let mut cfg = Config::default();
+        cfg.compact.data_retention_days = 3;
+        assert!(check_compact_config(&mut cfg).is_ok());
+        cfg.compact.data_retention_days = 0; // 0 means disabled
+        assert!(check_compact_config(&mut cfg).is_ok());
+    }
+
+    #[test]
+    fn test_check_limit_config_batch_size_clamping() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.batch_size = 0;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.batch_size, 8192);
+
+        cfg.limit.batch_size = 100; // below min
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.batch_size, 1024);
+
+        cfg.limit.batch_size = 10000; // above max
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.batch_size, 8192);
+
+        cfg.limit.batch_size = 4096; // within range
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.batch_size, 4096);
+    }
+
+    #[test]
+    fn test_check_limit_config_ingest_time_conversion() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.ingest_allowed_upto = 1;
+        cfg.limit.ingest_allowed_in_future = 2;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.ingest_allowed_upto_micro, 1 * 3600 * 1_000_000);
+        assert_eq!(
+            cfg.limit.ingest_allowed_in_future_micro,
+            2 * 3600 * 1_000_000
+        );
+    }
+
+    #[test]
+    fn test_check_limit_config_file_retention_migration() {
+        let mut cfg = Config::init().unwrap();
+        // deprecated logs_file_retention set to non-hourly should migrate to query_retention
+        cfg.limit.logs_file_retention = "daily".to_string();
+        cfg.limit.logs_query_retention = "hourly".to_string();
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.logs_query_retention, "daily");
+        // file retention always reset to hourly
+        assert_eq!(cfg.limit.logs_file_retention, "hourly");
+    }
+
+    #[test]
+    fn test_check_limit_config_file_retention_no_migration_if_query_set() {
+        let mut cfg = Config::init().unwrap();
+        // if query_retention was already explicitly set, don't overwrite it
+        cfg.limit.logs_file_retention = "daily".to_string();
+        cfg.limit.logs_query_retention = "weekly".to_string();
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.logs_query_retention, "weekly");
+    }
+
+    #[test]
+    fn test_check_s3_config_bucket_prefix_trailing_slash() {
+        let mut cfg = Config::default();
+        cfg.s3.server_url = "".to_string();
+        cfg.s3.provider = "aws".to_string();
+        cfg.s3.bucket_prefix = "prefix1,prefix2".to_string();
+        check_s3_config(&mut cfg).unwrap();
+        // each prefix should end with /
+        assert_eq!(cfg.s3.bucket_prefix, "prefix1/,prefix2/");
+    }
+
+    #[test]
+    fn test_check_s3_config_bucket_prefix_already_has_slash() {
+        let mut cfg = Config::default();
+        cfg.s3.provider = "aws".to_string();
+        cfg.s3.bucket_prefix = "prefix1/,prefix2/".to_string();
+        check_s3_config(&mut cfg).unwrap();
+        assert_eq!(cfg.s3.bucket_prefix, "prefix1/,prefix2/");
+    }
+
+    #[test]
+    fn test_check_s3_config_provider_lowercase() {
+        let mut cfg = Config::default();
+        cfg.s3.provider = "AWS".to_string();
+        check_s3_config(&mut cfg).unwrap();
+        assert_eq!(cfg.s3.provider, "aws");
+    }
+
+    #[test]
+    fn test_check_s3_config_keepalive_default() {
+        let mut cfg = Config::default();
+        cfg.s3.provider = "aws".to_string();
+        cfg.s3.keepalive_timeout = 0;
+        check_s3_config(&mut cfg).unwrap();
+        assert_eq!(cfg.s3.keepalive_timeout, 20);
+    }
+
+    #[test]
+    fn test_ensure_not_empty_whitespace_only() {
+        let result = ensure_not_empty("   ", "field");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("field"));
+    }
+
+    #[test]
+    fn test_ensure_not_empty_tab_only() {
+        assert!(ensure_not_empty("\t", "field").is_err());
+        assert!(ensure_not_empty("\n", "field").is_err());
+    }
 }
