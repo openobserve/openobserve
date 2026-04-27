@@ -63,3 +63,25 @@ impl ScalarUDFImpl for HistogramUdf {
         unreachable!()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use arrow::datatypes::{DataType, TimeUnit};
+    use datafusion::logical_expr::ScalarUDFImpl as _;
+
+    use super::*;
+
+    #[test]
+    fn test_histogram_udf_name() {
+        let udf = HistogramUdf::new();
+        assert_eq!(udf.name(), HISTOGRAM_UDF_NAME);
+        assert_eq!(HISTOGRAM_UDF_NAME, "histogram");
+    }
+
+    #[test]
+    fn test_histogram_udf_return_type_is_timestamp_microsecond() {
+        let udf = HistogramUdf::new();
+        let ret = udf.return_type(&[]).unwrap();
+        assert_eq!(ret, DataType::Timestamp(TimeUnit::Microsecond, None));
+    }
+}
