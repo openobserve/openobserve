@@ -593,4 +593,41 @@ mod tests {
         assert!(rule_no_regex.is_match("anything"));
         assert!(rule_no_regex.is_match(""));
     }
+
+    #[test]
+    fn test_metric_type_display_exponential_histogram() {
+        assert_eq!(
+            MetricType::ExponentialHistogram.to_string(),
+            "exponentialhistogram"
+        );
+    }
+
+    #[test]
+    fn test_api_error_type_serde_all_variants() {
+        let cases = [
+            (ApiErrorType::Timeout, "\"timeout\""),
+            (ApiErrorType::Cancelled, "\"cancelled\""),
+            (ApiErrorType::Exec, "\"exec\""),
+            (ApiErrorType::BadData, "\"bad_data\""),
+            (ApiErrorType::Internal, "\"internal\""),
+            (ApiErrorType::Unavailable, "\"unavailable\""),
+            (ApiErrorType::NotFound, "\"not_found\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+        }
+    }
+
+    #[test]
+    fn test_api_func_response_with_trace_id() {
+        let ok = ApiFuncResponse::ok("data".to_owned(), Some("trace-abc".to_string()));
+        let json = serde_json::to_string(&ok).unwrap();
+        assert!(json.contains("trace-abc"));
+        assert!(json.contains("\"status\":\"success\""));
+
+        let err = ApiFuncResponse::<()>::err_internal("fail", Some("trace-xyz".to_string()));
+        let json2 = serde_json::to_string(&err).unwrap();
+        assert!(json2.contains("trace-xyz"));
+    }
 }
