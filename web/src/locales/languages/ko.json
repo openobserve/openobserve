@@ -387,7 +387,8 @@
     "liveModeTooltip": "필터/시간 변경 시 쿼리 자동 실행",
     "turnOnLiveMode": "라이브 모드 켜기",
     "turnOffLiveMode": "라이브 모드 끄기",
-    "autoRunEnabled": "자동 실행 활성화"
+    "autoRunEnabled": "자동 실행 활성화",
+    "queryEditorPlaceholder": "검색어를 입력하거나 필드 이름 입력 시작..."
   },
   "menu": {
     "home": "홈",

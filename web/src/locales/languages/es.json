@@ -387,7 +387,8 @@
     "liveModeTooltip": "Consulta de ejecución automática sobre cambios de filtro/hora",
     "turnOnLiveMode": "Activa el modo Live",
     "turnOffLiveMode": "Desactivar el modo Live",
-    "autoRunEnabled": "Ejecución automática habilitada"
+    "autoRunEnabled": "Ejecución automática habilitada",
+    "queryEditorPlaceholder": "Introduzca una consulta o empiece a escribir un nombre de campo..."
   },
   "menu": {
     "home": "Inicio",

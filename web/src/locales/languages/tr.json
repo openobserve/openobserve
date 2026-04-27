@@ -387,7 +387,8 @@
     "liveModeTooltip": "Filtre/zaman değişikliklerinde sorguyu otomatik çalıştırın",
     "turnOnLiveMode": "Canlı modu açın",
     "turnOffLiveMode": "Canlı modu kapat",
-    "autoRunEnabled": "Otomatik çalıştırma etkin"
+    "autoRunEnabled": "Otomatik çalıştırma etkin",
+    "queryEditorPlaceholder": "Bir sorgu girin veya bir alan adı yazmaya başlayın..."
   },
   "menu": {
     "home": "Ana Sayfa",

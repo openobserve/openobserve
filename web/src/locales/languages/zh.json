@@ -387,7 +387,8 @@
     "liveModeTooltip": "在过滤器/时间更改时自动运行查询",
     "turnOnLiveMode": "开启直播模式",
     "turnOffLiveMode": "关闭直播模式",
-    "autoRunEnabled": "自动运行已启用"
+    "autoRunEnabled": "自动运行已启用",
+    "queryEditorPlaceholder": "输入查询或开始键入字段名称..."
   },
   "menu": {
     "home": "主页",

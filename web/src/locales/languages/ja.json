@@ -387,7 +387,8 @@
     "liveModeTooltip": "フィルター/時間の変更時にクエリを自動実行",
     "turnOnLiveMode": "ライブモードを有効にする",
     "turnOffLiveMode": "ライブモードをオフにする",
-    "autoRunEnabled": "自動実行有効"
+    "autoRunEnabled": "自動実行有効",
+    "queryEditorPlaceholder": "クエリを入力するか、フィールド名の入力を開始してください..."
   },
   "menu": {
     "home": "ホーム",

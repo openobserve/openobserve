@@ -387,7 +387,8 @@
     "liveModeTooltip": "Interrogazione automatica sulle modifiche al filtro/orario",
     "turnOnLiveMode": "Attiva la modalità Live",
     "turnOffLiveMode": "Disattiva la modalità Live",
-    "autoRunEnabled": "Esecuzione automatica abilitata"
+    "autoRunEnabled": "Esecuzione automatica abilitata",
+    "queryEditorPlaceholder": "Inserisci una query o inizia a digitare il nome di un campo..."
   },
   "menu": {
     "home": "Home",
