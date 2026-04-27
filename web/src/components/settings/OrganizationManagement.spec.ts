@@ -272,14 +272,16 @@ describe("OrganizationManagement.vue", () => {
     it("should have correct column configuration", () => {
       wrapper = createWrapper();
       const columns = wrapper.vm.columns;
-      expect(columns).toHaveLength(7);
+      expect(columns).toHaveLength(9);
       expect(columns[0].name).toBe("#");
       expect(columns[1].name).toBe("name");
       expect(columns[2].name).toBe("identifier");
       expect(columns[3].name).toBe("subscription_status");
-      expect(columns[4].name).toBe("created_on");
-      expect(columns[5].name).toBe("trial_expiry");
-      expect(columns[6].name).toBe("actions");
+      expect(columns[4].name).toBe("billing_provider");
+      expect(columns[5].name).toBe("created_on");
+      expect(columns[6].name).toBe("trial_expiry");
+      expect(columns[7].name).toBe("contract_end_date");
+      expect(columns[8].name).toBe("actions");
     });
 
     it("should have correct perPageOptions", () => {
@@ -424,8 +426,11 @@ describe("OrganizationManagement.vue", () => {
         name: "Test Org 1",
         identifier: "test-org-1",
         plan: "Pay as you go",
+        billing_provider: "-",
         created_at: "2023-12-01",
-        trial_expires_at: "2023-12-01"
+        trial_expires_at: "2023-12-01",
+        contract_end_date: 0,
+        contract_end_date_display: "-"
       });
     });
 
