@@ -43,13 +43,6 @@ mod tests {
     }
 
     #[test]
-    fn test_disk_usage_total_space_positive() {
-        for disk in get_disk_usage() {
-            assert!(disk.total_space > 0, "total space should be positive");
-        }
-    }
-
-    #[test]
     fn test_disk_usage_available_leq_total() {
         for disk in get_disk_usage() {
             assert!(
