@@ -251,4 +251,152 @@ mod tests {
         let val = json::to_string(&error_data);
         assert!(val.is_ok());
     }
+
+    #[test]
+    fn test_error_source_alert_serialization() {
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Alert,
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("alert"));
+    }
+
+    #[test]
+    fn test_error_source_dashboard_serialization() {
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Dashboard,
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("dashboard"));
+    }
+
+    #[test]
+    fn test_error_source_ingestion_serialization() {
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Ingestion,
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("ingestion"));
+    }
+
+    #[test]
+    fn test_error_source_search_serialization() {
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Search,
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("search"));
+    }
+
+    #[test]
+    fn test_error_source_other_serialization() {
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Other,
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("other"));
+    }
+
+    #[test]
+    fn test_error_source_function_serialization() {
+        let fe = FunctionError::new("my_func".to_string(), "exec failed".to_string());
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Function(fe),
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("function"));
+        assert!(val.contains("my_func"));
+    }
+
+    #[test]
+    fn test_pipeline_error_add_node_error() {
+        let mut pe = PipelineError::new("pid", "pname");
+        pe.add_node_error(
+            "node1".to_string(),
+            "function".to_string(),
+            "exec error".to_string(),
+            Some("fn1".to_string()),
+        );
+        pe.add_node_error(
+            "node1".to_string(),
+            "function".to_string(),
+            "another error".to_string(),
+            None,
+        );
+        assert_eq!(pe.node_errors.len(), 1);
+        let node = &pe.node_errors["node1"];
+        assert_eq!(node.error_count, 2);
+        assert_eq!(node.errors.len(), 2);
+    }
+
+    #[test]
+    fn test_sso_claim_parser_error_with_claims() {
+        let ce = SsoClaimParserError::new(
+            "fn".to_string(),
+            "parse_error".to_string(),
+            "bad input".to_string(),
+        )
+        .with_claims(r#"{"sub":"user1"}"#.to_string());
+        assert!(ce.claims_json.is_some());
+        assert!(ce.claims_json.unwrap().contains("user1"));
+    }
+
+    #[test]
+    fn test_sso_claim_parser_error_serialization_with_claims() {
+        let ce = SsoClaimParserError::new(
+            "my_fn".to_string(),
+            "exec_error".to_string(),
+            "vrl failed".to_string(),
+        )
+        .with_claims(r#"{"key":"val"}"#.to_string());
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::SsoClaimParser(ce),
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("sso_claim_parser"));
+        assert!(val.contains("claims"));
+    }
+
+    #[test]
+    fn test_node_errors_new_and_add_error() {
+        let mut node = NodeErrors::new(
+            "n1".to_string(),
+            "transform".to_string(),
+            Some("fn_name".to_string()),
+        );
+        assert_eq!(node.error_count, 0);
+        node.add_error("err1".to_string());
+        node.add_error("err1".to_string()); // duplicate — deduped in HashSet
+        node.add_error("err2".to_string());
+        assert_eq!(node.error_count, 3);
+        assert_eq!(node.errors.len(), 2); // "err1" deduplicated
+    }
+
+    #[test]
+    fn test_pipeline_error_with_no_node_errors_serialization() {
+        let pe = PipelineError::new("pid2", "pname2");
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Pipeline(pe),
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("pipeline"));
+        // node_errors empty → pipeline_node_errors NOT in output
+        assert!(!val.contains("pipeline_node_errors"));
+    }
 }
