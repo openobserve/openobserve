@@ -230,4 +230,36 @@ mod tests {
             .unwrap();
         assert!(location == expected_uri_1 || location == expected_uri_2);
     }
+
+    #[test]
+    fn test_long_url_returns_html_response() {
+        // Build a URL >= 1024 chars to trigger the HTML response path
+        let long_path = "a".repeat(1030);
+        let redirect_response = RedirectResponseBuilder::new(&format!("/{long_path}")).build();
+
+        let http_response = redirect_response.redirect_http();
+        assert_eq!(http_response.status(), StatusCode::FOUND);
+        // Should have Content-Type header, not Location header
+        assert!(http_response.headers().get(CONTENT_TYPE).is_some());
+        assert!(http_response.headers().get(LOCATION).is_none());
+    }
+
+    #[test]
+    fn test_redirect_display_implementation() {
+        let redirect_response = RedirectResponseBuilder::new("/web")
+            .with_query_param("foo", "bar")
+            .build();
+
+        let display_str = format!("{redirect_response}");
+        assert!(display_str.contains("Redirecting to"));
+        assert!(display_str.contains("/web"));
+        assert!(display_str.contains("foo=bar"));
+    }
+
+    #[test]
+    fn test_default_builder_uses_default_uri() {
+        let redirect_response = RedirectResponseBuilder::default().build();
+        let uri = redirect_response.build_full_redirect_uri();
+        assert_eq!(uri, DEFAULT_REDIRECT_RELATIVE_URI);
+    }
 }
