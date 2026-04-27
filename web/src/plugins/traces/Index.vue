@@ -811,7 +811,11 @@ const showTraceDetailsError = () => {
 };
 
 const updateFieldValues = (data) => {
-  const excludedFields = [store.state.zoConfig.timestamp_column];
+  const excludedFields = [
+    store.state.zoConfig.timestamp_column,
+    "_start_time_ns",
+    "_end_time_ns",
+  ];
   data.forEach((item) => {
     // Create set for each field values and add values to corresponding set
     Object.keys(item).forEach((key) => {
@@ -1042,8 +1046,13 @@ async function getQueryData(
             updateFieldValues(rawHits);
 
             // load the field stored in localstorage and rebuild the columns
-            loadLocalLogFilterField(searchObj.meta.searchMode);
-            rebuildColumns();
+            if (
+              searchObj.meta.searchMode === "spans" ||
+              searchObj.meta.searchMode === "traces"
+            ) {
+              loadLocalLogFilterField(searchObj.meta.searchMode);
+              rebuildColumns();
+            }
           }
         },
         error: (_payload: any, err: any) => {
@@ -1145,7 +1154,11 @@ async function extractFields() {
     searchObj.data.stream.selectedStreamFields = [];
     if (searchObj.data.streamResults.list.length > 0) {
       const schema = [];
-      const ignoreFields = [store.state.zoConfig.timestamp_column];
+      const ignoreFields = [
+        store.state.zoConfig.timestamp_column,
+        "_start_time_ns",
+        "_end_time_ns",
+      ];
       let ftsKeys;
 
       const stream = await getStream(
