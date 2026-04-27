@@ -287,7 +287,15 @@ const useLogs = () => {
       // it should work in case of page refresh, navigate user from streams page or short url
       let initialStreamSelected: boolean = searchObj.data.stream.selectedStream.length > 0;
 
-      await getStreamList();
+      // When auto_query_enabled is true and no URL stream param, the stream
+      // selection has already been restored from localStorage (or is intentionally
+      // empty). Pass selectStream=false so loadStreamLists only populates the
+      // streamLists dropdown without overriding selectedStream with latestStream.
+      const selectStream = !(
+        store.state.zoConfig?.auto_query_enabled &&
+        !router.currentRoute.value.query?.stream
+      );
+      await getStreamList(selectStream);
       await getFunctions();
       if (isActionsEnabled.value) await getActions();
       await extractFields();
