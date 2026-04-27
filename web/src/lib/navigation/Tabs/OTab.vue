@@ -3,6 +3,7 @@ import type { OTabProps, OTabSlots } from './OTab.types'
 import { computed, inject } from 'vue'
 import { TABS_CONTEXT_KEY } from './OTabs.types'
 import type { TabsContext } from './OTabs.types'
+import { TabsTrigger } from 'reka-ui'
 
 const props = withDefaults(defineProps<OTabProps>(), {
   disable: false,
@@ -21,17 +22,10 @@ const isImgIcon = computed<boolean>(() => Boolean(props.icon?.startsWith('img:')
 /** The resolved src URL (stripped of `img:` prefix) */
 const imgSrc = computed<string>(() => (props.icon?.startsWith('img:') ? props.icon.slice(4) : ''))
 
-function handleClick(): void {
-  if (props.disable) return
-  context?.value.onTabClick(props.name)
-}
-
 // ── Classes ────────────────────────────────────────────────────────────────
 const baseClasses = computed<string>(() => [
   'o-tab',
   'tw:relative tw:items-center tw:gap-1.5',
-  // Vertical tabs: flex stretch (no w-full so mx works correctly) + horizontal margins
-  // Horizontal tabs: inline-flex centered
   isVertical.value
     ? 'tw:flex tw:justify-start'
     : 'tw:inline-flex tw:justify-center',
@@ -73,15 +67,16 @@ const heightClasses = computed<string>(() => {
 </script>
 
 <template>
-  <button
-    role="tab"
-    type="button"
-    :aria-selected="isActive"
+  <!--
+    TabsTrigger handles: role="tab", aria-selected, tabindex (via RovingFocusItem),
+    disabled, data-state, click/keyboard activation, and aria-controls linkage.
+    aria-disabled is passed explicitly for screen-reader compatibility.
+  -->
+  <TabsTrigger
+    :value="name"
+    :disabled="disable"
     :aria-disabled="disable || undefined"
-    :disabled="disable || undefined"
-    :tabindex="isActive ? 0 : -1"
     :class="[baseClasses, stateClasses, heightClasses]"
-    @click="handleClick"
   >
     <!--
       If label or icon props are provided, render them (prop-driven mode).
@@ -107,5 +102,5 @@ const heightClasses = computed<string>(() => {
       <span v-if="label" class="o-tab__label tw:truncate">{{ label }}</span>
     </template>
     <slot v-else />
-  </button>
+  </TabsTrigger>
 </template>

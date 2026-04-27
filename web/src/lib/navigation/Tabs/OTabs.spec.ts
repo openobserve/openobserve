@@ -44,17 +44,17 @@ describe('OTabs', () => {
 
   it('renders a tablist', () => {
     const wrapper = mountTabs()
-    expect(wrapper.attributes('role')).toBe('tablist')
+    expect(wrapper.find('[role="tablist"]').exists()).toBe(true)
   })
 
   it('sets aria-orientation="horizontal" by default', () => {
     const wrapper = mountTabs()
-    expect(wrapper.attributes('aria-orientation')).toBe('horizontal')
+    expect(wrapper.find('[role="tablist"]').attributes('aria-orientation')).toBe('horizontal')
   })
 
   it('sets aria-orientation="vertical" when orientation is vertical', () => {
     const wrapper = mountTabs({ orientation: 'vertical' })
-    expect(wrapper.attributes('aria-orientation')).toBe('vertical')
+    expect(wrapper.find('[role="tablist"]').attributes('aria-orientation')).toBe('vertical')
   })
 
   // --- Slots ---
@@ -82,28 +82,30 @@ describe('OTabs', () => {
   })
 
   // --- Emits ---
+  // TabsTrigger activates on mousedown (not click), matching WAI-ARIA guidance.
 
-  it('emits update:modelValue when a tab is clicked', async () => {
+  it('emits update:modelValue when a tab is activated', async () => {
     const wrapper = mountTabs({ modelValue: 'tab1' })
     const tabs = wrapper.findAll('[role="tab"]')
-    await tabs[1].trigger('click')
+    await tabs[1].trigger('mousedown', { button: 0 })
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['tab2'])
   })
 
-  it('emits change when a tab is clicked', async () => {
+  it('emits change when a tab is activated', async () => {
     const wrapper = mountTabs({ modelValue: 'tab1' })
     const tabs = wrapper.findAll('[role="tab"]')
-    await tabs[2].trigger('click')
+    await tabs[2].trigger('mousedown', { button: 0 })
     expect(wrapper.emitted('change')?.[0]).toEqual(['tab3'])
   })
 
   // --- Keyboard navigation (horizontal) ---
+  // RovingFocusGroup (from TabsList) handles keyboard events that bubble up from focused tabs.
 
   it('moves focus to next tab on ArrowRight', async () => {
     const wrapper = mountTabs({ modelValue: 'tab1' })
     const tabs = wrapper.findAll('[role="tab"]')
     await tabs[0].element.focus()
-    await wrapper.trigger('keydown', { key: 'ArrowRight' })
+    await tabs[0].trigger('keydown', { key: 'ArrowRight' })
     expect(document.activeElement).toBe(tabs[1].element)
   })
 
@@ -111,7 +113,7 @@ describe('OTabs', () => {
     const wrapper = mountTabs({ modelValue: 'tab1' })
     const tabs = wrapper.findAll('[role="tab"]')
     await tabs[1].element.focus()
-    await wrapper.trigger('keydown', { key: 'ArrowLeft' })
+    await tabs[1].trigger('keydown', { key: 'ArrowLeft' })
     expect(document.activeElement).toBe(tabs[0].element)
   })
 
@@ -119,7 +121,7 @@ describe('OTabs', () => {
     const wrapper = mountTabs({ modelValue: 'tab1' })
     const tabs = wrapper.findAll('[role="tab"]')
     await tabs[2].element.focus()
-    await wrapper.trigger('keydown', { key: 'ArrowRight' })
+    await tabs[2].trigger('keydown', { key: 'ArrowRight' })
     expect(document.activeElement).toBe(tabs[0].element)
   })
 
@@ -127,7 +129,7 @@ describe('OTabs', () => {
     const wrapper = mountTabs({ modelValue: 'tab1' })
     const tabs = wrapper.findAll('[role="tab"]')
     await tabs[2].element.focus()
-    await wrapper.trigger('keydown', { key: 'Home' })
+    await tabs[2].trigger('keydown', { key: 'Home' })
     expect(document.activeElement).toBe(tabs[0].element)
   })
 
@@ -135,7 +137,7 @@ describe('OTabs', () => {
     const wrapper = mountTabs({ modelValue: 'tab1' })
     const tabs = wrapper.findAll('[role="tab"]')
     await tabs[0].element.focus()
-    await wrapper.trigger('keydown', { key: 'End' })
+    await tabs[0].trigger('keydown', { key: 'End' })
     expect(document.activeElement).toBe(tabs[2].element)
   })
 
@@ -145,7 +147,7 @@ describe('OTabs', () => {
     const wrapper = mountTabs({ modelValue: 'tab1', orientation: 'vertical' })
     const tabs = wrapper.findAll('[role="tab"]')
     await tabs[0].element.focus()
-    await wrapper.trigger('keydown', { key: 'ArrowDown' })
+    await tabs[0].trigger('keydown', { key: 'ArrowDown' })
     expect(document.activeElement).toBe(tabs[1].element)
   })
 
@@ -153,14 +155,14 @@ describe('OTabs', () => {
     const wrapper = mountTabs({ modelValue: 'tab1', orientation: 'vertical' })
     const tabs = wrapper.findAll('[role="tab"]')
     await tabs[1].element.focus()
-    await wrapper.trigger('keydown', { key: 'ArrowUp' })
+    await tabs[1].trigger('keydown', { key: 'ArrowUp' })
     expect(document.activeElement).toBe(tabs[0].element)
   })
 
   // --- o-tabs CSS class ---
 
-  it('has o-tabs class', () => {
+  it('has o-tabs class on the tablist', () => {
     const wrapper = mountTabs()
-    expect(wrapper.classes()).toContain('o-tabs')
+    expect(wrapper.find('.o-tabs').exists()).toBe(true)
   })
 })
