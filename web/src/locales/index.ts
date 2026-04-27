@@ -57,17 +57,20 @@ const i18n = createI18n({
   messages: {},
 });
 
+const loadedLocales = new Set<string>();
+
 /**
  * Load and register a locale's messages with i18n. No-op if already loaded.
  * Call this before switching `i18n.global.locale.value` to a non-loaded language.
  */
 export async function loadLocaleMessages(locale: string): Promise<void> {
-  if (i18n.global.availableLocales.includes(locale as any)) {
+  if (loadedLocales.has(locale)) {
     return;
   }
   const loader = localeLoaders[locale] || localeLoaders["en-gb"];
   const mod = await loader();
-  i18n.global.setLocaleMessage(locale as any, mod.default ?? mod);
+  i18n.global?.setLocaleMessage?.(locale as any, mod.default ?? mod);
+  loadedLocales.add(locale);
 }
 
 /**
