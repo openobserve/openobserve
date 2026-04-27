@@ -25,10 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-splitter
         class="traces-horizontal-splitter full-height"
         v-model="splitterModel"
-        :disable="activeTab === 'service-graph'"
+        :disable="
+          activeTab === 'service-graph' || activeTab === 'services-catalog'
+        "
         horizontal
         :before-class="
-          activeTab === 'service-graph' ? 'tw:max-h-[3.54rem]!' : ''
+          activeTab === 'service-graph' || activeTab === 'services-catalog'
+            ? 'tw:max-h-[3.54rem]!'
+            : ''
         "
         @update:model-value="onSplitterUpdate"
       >
@@ -52,6 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
               @service-graph-refresh="serviceGraphRef?.loadServiceGraph()"
+              @services-catalog-refresh="
+                servicesCatalogRef?.loadServicesCatalog()
+              "
             />
           </div>
         </template>
@@ -67,6 +74,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="serviceGraphRef"
               class="tw:h-full"
               @view-traces="handleServiceGraphViewTraces"
+            />
+          </div>
+
+          <!-- Services Catalog Tab Content -->
+          <div
+            v-if="activeTab === 'services-catalog'"
+            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+          >
+            <services-catalog
+              ref="servicesCatalogRef"
+              class="tw:h-full"
+              @view-traces="handleServicesCatalogViewTraces"
             />
           </div>
 
@@ -318,11 +337,17 @@ const SanitizedHtmlRenderer = defineAsyncComponent(
   () => import("@/components/SanitizedHtmlRenderer.vue"),
 );
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
+const ServicesCatalog = defineAsyncComponent(
+  () => import("./ServicesCatalog.vue"),
+);
 
 const store = useStore();
-const activeTab = computed(() =>
-  searchObj.meta.searchMode === "service-graph" ? "service-graph" : "search",
-);
+const activeTab = computed(() => {
+  if (searchObj.meta.searchMode === "service-graph") return "service-graph";
+  if (searchObj.meta.searchMode === "services-catalog")
+    return "services-catalog";
+  return "search";
+});
 const router = useRouter();
 const $q = useQuasar();
 const { t } = useI18n();
@@ -355,6 +380,7 @@ let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
+const servicesCatalogRef = ref<any>(null);
 const splitterModel = ref(15);
 let parser: any;
 const fieldValues = ref({});
@@ -1517,8 +1543,10 @@ function restoreUrlQueryParams() {
   const tab = typeof queryParams.tab === "string" ? queryParams.tab : undefined;
   if (
     tab !== undefined &&
-    (["service-graph", "traces", "spans"] as const).includes(
-      tab as "service-graph" | "traces" | "spans",
+    (
+      ["service-graph", "traces", "spans", "services-catalog"] as const
+    ).includes(
+      tab as "service-graph" | "traces" | "spans" | "services-catalog",
     )
   ) {
     if (tab === "service-graph" && config.isEnterprise !== "true") return;
@@ -1615,10 +1643,12 @@ const onErrorOnlyToggled = (value: boolean) => {
   }
 };
 
-// Handler for Search Mode toggle (Service Graph / Traces / Spans)
-const onSearchModeChange = (mode: "traces" | "spans" | "service-graph") => {
+// Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
+const onSearchModeChange = (
+  mode: "traces" | "spans" | "service-graph" | "services-catalog",
+) => {
   searchObj.meta.searchMode = mode;
-  if (mode === "service-graph") return;
+  if (mode === "service-graph" || mode === "services-catalog") return;
   if (
     mode === "traces" &&
     searchObj.meta.resultGrid.sortBy !== "start_time" &&
@@ -2049,6 +2079,18 @@ const handleServiceGraphViewTraces = (data: any) => {
   }
 
   // Run the query
+  nextTick(() => {
+    runQueryFn();
+  });
+};
+
+// Handler for services catalog row click — switches to traces mode filtered by service
+const handleServicesCatalogViewTraces = (serviceName: string) => {
+  const escapedName = escapeSingleQuotes(serviceName);
+  searchObj.data.editorValue = `service_name = '${escapedName}'`;
+  searchObj.data.query = searchObj.data.editorValue;
+  searchObj.meta.sqlMode = false;
+  searchObj.meta.searchMode = "traces";
   nextTick(() => {
     runQueryFn();
   });
