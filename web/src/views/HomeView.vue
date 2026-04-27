@@ -54,16 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="activeHomeTab === 'usage'" class="tw:h-full tw:overflow-y-auto">
     <div v-if="!no_data_ingest && !isLoadingSummary" class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container card-container--col" :class="store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 40px)]' : 'tw:h-full'">
         <!-- 1st section -->
-      <div class="banners-wrapper">
-         <div>
-          <WebinarBanner v-if="config.isCloud === 'true'" variant="home" />
-          <TrialPeriod></TrialPeriod>
-         </div>
-          <LicensePeriod v-if="!showUsageReportBanner" @update-license="goToLicensePage"></LicensePeriod>
-          <UsageReportBanner></UsageReportBanner>
-          <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
-        </div>
-      </div>
+         <div class="banners-wrapper">
+            <div>
+            <WebinarBanner v-if="config.isCloud === 'true'" variant="home" />
+            <TrialPeriod></TrialPeriod>
+          </div>
+            <LicensePeriod v-if="!showUsageReportBanner" @update-license="goToLicensePage"></LicensePeriod>
+            <UsageReportBanner></UsageReportBanner>
+            <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
+          </div>
         <div class="feature-card"
         :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
         role="region"
