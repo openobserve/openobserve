@@ -114,4 +114,41 @@ mod tests {
         let attrs = make_attributes(vec![("llm.model_name", json::json!("llama3"))]);
         assert_eq!(extractor.extract(&attrs), Some("llama3".to_string()));
     }
+
+    #[test]
+    fn test_extract_langfuse_model_name_key() {
+        let extractor = ModelExtractor;
+        let attrs = make_attributes(vec![(
+            "langfuse.observation.model.name",
+            json::json!("claude-3-haiku"),
+        )]);
+        assert_eq!(
+            extractor.extract(&attrs),
+            Some("claude-3-haiku".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_openinference_llm_response_model() {
+        let extractor = ModelExtractor;
+        let attrs = make_attributes(vec![("llm.response.model", json::json!("mistral-7b"))]);
+        assert_eq!(extractor.extract(&attrs), Some("mistral-7b".to_string()));
+    }
+
+    #[test]
+    fn test_extract_vercel_priority_over_request_model() {
+        let extractor = ModelExtractor;
+        let attrs = make_attributes(vec![
+            ("gen_ai.request.model", json::json!("gpt-3.5")),
+            ("ai.model.id", json::json!("gpt-4-turbo")),
+        ]);
+        assert_eq!(extractor.extract(&attrs), Some("gpt-4-turbo".to_string()));
+    }
+
+    #[test]
+    fn test_extract_empty_string_returns_some_empty() {
+        let extractor = ModelExtractor;
+        let attrs = make_attributes(vec![("gen_ai.response.model", json::json!(""))]);
+        assert_eq!(extractor.extract(&attrs), Some("".to_string()));
+    }
 }

@@ -204,4 +204,85 @@ mod tests {
         let params = ParametersExtractor.extract(&HashMap::new(), "");
         assert!(params.is_empty());
     }
+
+    #[test]
+    fn test_sanitize_array_value_uses_json_fallback() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.request.stop_sequences".to_string(),
+            json::json!(["stop", "end"]),
+        );
+        let params = ParametersExtractor.extract(&attrs, "");
+        let val = params.get("stop_sequences").unwrap();
+        assert!(val.contains("stop"));
+        assert!(val.contains("end"));
+    }
+
+    #[test]
+    fn test_extract_openinference_invocation_parameters() {
+        let mut attrs = HashMap::new();
+        let json_str = r#"{"temperature": 0.5, "max_tokens": 200}"#;
+        attrs.insert(
+            "llm.invocation_parameters".to_string(),
+            json::Value::String(json_str.to_string()),
+        );
+        let params = ParametersExtractor.extract(&attrs, "");
+        assert_eq!(params.get("temperature"), Some(&"0.5".to_string()));
+        assert_eq!(params.get("max_tokens"), Some(&"200".to_string()));
+    }
+
+    #[test]
+    fn test_extract_pydantic_model_config() {
+        let mut attrs = HashMap::new();
+        let json_str = r#"{"temperature": 0.3}"#;
+        attrs.insert(
+            "model_config".to_string(),
+            json::Value::String(json_str.to_string()),
+        );
+        let params = ParametersExtractor.extract(&attrs, "");
+        assert_eq!(params.get("temperature"), Some(&"0.3".to_string()));
+    }
+
+    #[test]
+    fn test_vercel_max_steps() {
+        let mut attrs = HashMap::new();
+        attrs.insert("ai.settings.maxSteps".to_string(), json::json!(5i64));
+        let params = ParametersExtractor.extract(&attrs, "ai");
+        assert_eq!(params.get("maxSteps"), Some(&"5".to_string()));
+    }
+
+    #[test]
+    fn test_vercel_max_retries() {
+        let mut attrs = HashMap::new();
+        attrs.insert("ai.settings.maxRetries".to_string(), json::json!(3i64));
+        let params = ParametersExtractor.extract(&attrs, "ai");
+        assert_eq!(params.get("maxRetries"), Some(&"3".to_string()));
+    }
+
+    #[test]
+    fn test_vercel_mode() {
+        let mut attrs = HashMap::new();
+        attrs.insert("ai.settings.mode".to_string(), json::json!("json"));
+        let params = ParametersExtractor.extract(&attrs, "ai");
+        assert_eq!(params.get("mode"), Some(&"json".to_string()));
+    }
+
+    #[test]
+    fn test_vercel_system_prompt() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.system".to_string(), json::json!("You are helpful"));
+        let params = ParametersExtractor.extract(&attrs, "ai");
+        assert_eq!(params.get("system"), Some(&"You are helpful".to_string()));
+    }
+
+    #[test]
+    fn test_vercel_finish_reason() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.response.finish_reasons".to_string(),
+            json::json!("stop"),
+        );
+        let params = ParametersExtractor.extract(&attrs, "ai");
+        assert_eq!(params.get("finishReason"), Some(&"stop".to_string()));
+    }
 }

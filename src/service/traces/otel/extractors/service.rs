@@ -83,4 +83,26 @@ mod tests {
         let result = ServiceNameExtractor.extract_from_span_attributes(&HashMap::new());
         assert!(result.is_none());
     }
+
+    #[test]
+    fn test_extract_non_string_value_returns_none() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "langfuse.observation.metadata.source".to_string(),
+            config::utils::json::json!(123),
+        );
+        let result = ServiceNameExtractor.extract_from_span_attributes(&attrs);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_whitespace_only_returns_some() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "langfuse.observation.metadata.source".to_string(),
+            config::utils::json::json!("  "),
+        );
+        let result = ServiceNameExtractor.extract_from_span_attributes(&attrs);
+        assert_eq!(result, Some("  ".to_string()));
+    }
 }
