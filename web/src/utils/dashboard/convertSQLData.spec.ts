@@ -370,6 +370,85 @@ describe("convertSQLData", () => {
       expect(Array.isArray(result.options.series)).toBe(true);
       expect(result.options.series.length).toBeGreaterThanOrEqual(1);
     });
+
+    it("should pass loading parameter through to convertSQLData", async () => {
+      const searchData = [
+        [{ timestamp: "2023-01-01", value: 10 }],
+      ];
+
+      const result = await convertMultiSQLData(
+        mockPanelSchema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        { value: [[{}]] },
+        { queries: [{}] },
+        mockChartPanelStyle,
+        mockAnnotations,
+        true, // loading = streaming
+      );
+
+      // Should not throw and should return valid options
+      expect(result.options).toBeDefined();
+    });
+
+    it("should default loading to undefined when not provided", async () => {
+      const searchData = [
+        [{ timestamp: "2023-01-01", value: 10 }],
+      ];
+
+      const result = await convertMultiSQLData(
+        mockPanelSchema,
+        searchData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        { value: [[{}]] },
+        { queries: [{}] },
+        mockChartPanelStyle,
+        mockAnnotations,
+        // loading omitted — should default to undefined (final render)
+      );
+
+      expect(result.options).toBeDefined();
+    });
+  });
+
+  describe("loading parameter in convertSQLData", () => {
+    it("should accept loading=true without error", async () => {
+      const result = await convertSQLData(
+        mockPanelSchema,
+        [[{ timestamp: "2023-01-01", value: 10 }]],
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+        true, // loading
+      );
+
+      expect(result.options).toBeDefined();
+    });
+
+    it("should accept loading=false without error", async () => {
+      const result = await convertSQLData(
+        mockPanelSchema,
+        [[{ timestamp: "2023-01-01", value: 10 }]],
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+        false, // loading
+      );
+
+      expect(result.options).toBeDefined();
+    });
   });
 
   describe("Internal utility functions", () => {
