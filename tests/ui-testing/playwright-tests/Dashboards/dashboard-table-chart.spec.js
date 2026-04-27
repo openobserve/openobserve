@@ -311,7 +311,9 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       );
 
       // First apply: execute the query with VRL so the new field is generated
+      const streamPromise1 = waitForStreamComplete(page);
       await pm.dashboardPanelActions.applyDashboardBtn();
+      await streamPromise1;
       await pm.chartTypeSelector.waitForTableDataLoad();
 
       // Now enable dynamic columns so the VRL-created field appears as a column
@@ -319,7 +321,9 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await pm.dashboardPanelConfigs.selectDynamicColumns();
 
       // Second apply: re-render table with dynamic columns enabled
+      const streamPromise2 = waitForStreamComplete(page);
       await pm.dashboardPanelActions.applyDashboardBtn();
+      await streamPromise2;
       await pm.chartTypeSelector.waitForTableDataLoad();
 
       // Verify the VRL-created field appears as a column in the table

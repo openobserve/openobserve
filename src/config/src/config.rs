@@ -50,7 +50,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 39;
+pub const DB_SCHEMA_VERSION: u64 = 41;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -252,6 +252,22 @@ pub static DEFAULT_SEARCH_AROUND_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields.sort();
     fields.dedup();
     fields
+});
+
+pub static HISTOGRAM_BREAKDOWN_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    get_config()
+        .limit
+        .histogram_breakdown_fields
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
+        .collect()
 });
 
 pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::new(|| {
@@ -750,6 +766,21 @@ pub struct Http {
         help = "Custom access log format, leave empty to use default format, shortcut: common, json"
     )]
     pub access_log_format: String,
+    #[env_config(
+        name = "ZO_HTTP_REAL_IP_SOURCE",
+        default = "XEnvoyExternalAddress,XRealIp",
+        help = "Comma-separated list of sources to resolve the real client IP; tried in \
+                order, first match wins. TCP peer (ConnectInfo) is always used as the final \
+                fallback. Supported entries: XEnvoyExternalAddress (Envoy/Istio), \
+                XRealIp (nginx, Traefik), RightmostXForwardedFor (nginx/HAProxy/AWS ALB/GCP LB), \
+                RightmostForwarded (RFC 7239), CfConnectingIp (Cloudflare), \
+                TrueClientIp (Akamai/Cloudflare Enterprise), FlyClientIp (Fly.io), \
+                CloudFrontViewerAddress (AWS CloudFront), ConnectInfo (TCP peer). Default \
+                covers the common k8s ingresses. Only list sources whose proxy is actually \
+                in front of this server; clients can spoof any header the server trusts \
+                without an upstream to terminate it."
+    )]
+    pub real_ip_source: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -1318,6 +1349,24 @@ pub struct Common {
         help = "URL for built-in regex patterns JSON source. Can be customized to use different pattern libraries."
     )]
     pub regex_patterns_source_url: String,
+    #[env_config(
+        name = "ZO_MODEL_PRICING_ENABLED",
+        default = false,
+        help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
+    )]
+    pub model_pricing_enabled: bool,
+    #[env_config(
+        name = "ZO_MODEL_PRICING_SOURCE_URL",
+        default = "https://raw.githubusercontent.com/openobserve/sdr_patterns/refs/heads/main/llm_pricing.json",
+        help = "URL for built-in LLM model pricing JSON source."
+    )]
+    pub model_pricing_source_url: String,
+    #[env_config(
+        name = "ZO_MODEL_PRICING_SYNC_INTERVAL_SECS",
+        default = 21600,
+        help = "Interval in seconds for syncing built-in model pricing from GitHub. Default: 6 hours (21600)."
+    )]
+    pub model_pricing_sync_interval_secs: u64,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
     #[env_config(name = "ZO_ES_VERSION", default = "")]
@@ -1412,6 +1461,12 @@ pub struct Common {
         help = "Enable cross-linking feature for drill-down links on log/trace records"
     )]
     pub enable_cross_linking: bool,
+    #[env_config(
+        name = "ZO_AUTO_QUERY_ENABLED",
+        default = false,
+        help = "Enable Live Mode feature in the UI. When true, users can toggle auto-query on filter/time-range changes. When false, the Live Mode toggle is hidden and Run Query button is always shown."
+    )]
+    pub auto_query_enabled: bool,
 }
 
 impl Common {
@@ -1524,10 +1579,14 @@ pub struct Limit {
     pub query_default_limit: i64,
     #[env_config(name = "ZO_QUERY_VALUES_DEFAULT_NUM", default = 10)]
     pub query_values_default_num: i64,
-    #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 1)] // seconds
-    pub query_partition_by_secs: usize,
-    #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 768)] // MB/s/core
+    #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 1024)] // MB/s/core
     pub query_group_base_speed: usize,
+    #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 5)] // seconds
+    pub query_partition_by_secs: usize,
+    #[env_config(name = "ZO_QUERY_PARTITION_MAX_NUM", default = 100)] // max number of partitions
+    pub query_partition_max_num: usize,
+    #[env_config(name = "ZO_DISABLE_PARTITIONS_FOR_NON_TS_ORDER_BY", default = false)]
+    pub disable_partitions_for_non_ts_order_by: bool,
     // Default Config: Run Query Recommendation Analysis for last one hour for every hour
     #[env_config(name = "ZO_QUERY_RECOMMENDATION_DURATION", default = 3600000000)] // microseconds
     pub query_recommendation_duration: i64,
@@ -1792,6 +1851,12 @@ pub struct Limit {
         default = true
     )]
     pub histogram_enabled: bool,
+    #[env_config(
+        name = "ZO_HISTOGRAM_BREAKDOWN_FIELDS",
+        help = "Comma-separated ordered list of stream fields used for stacked histogram breakdown. First match wins. Default: severity,log_level,level,status",
+        default = "severity,log_level,level,status"
+    )]
+    pub histogram_breakdown_fields: String,
     #[env_config(name = "ZO_CACHE_DELAY_SECS", default = 300)] // seconds
     pub cache_delay_secs: i64,
     #[env_config(
@@ -3011,7 +3076,10 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.query_group_base_speed *= 1024 * 1024;
     }
     if cfg.limit.query_partition_by_secs == 0 {
-        cfg.limit.query_partition_by_secs = 30;
+        cfg.limit.query_partition_by_secs = 5;
+    }
+    if cfg.limit.query_partition_max_num == 0 {
+        cfg.limit.query_partition_max_num = 100;
     }
     if cfg.limit.query_default_limit == 0 {
         cfg.limit.query_default_limit = 1000;

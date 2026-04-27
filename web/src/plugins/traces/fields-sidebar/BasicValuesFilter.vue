@@ -80,14 +80,15 @@
               <span
                 class="tw:text-[0.75rem] tw:flex-1 tw:text-right tw:pr-[0.25rem]"
               >
-                {{ formatDuration(percentiles[p.key]) }}
+                {{ formatTimeWithSuffix(percentiles[p.key]) }}
               </span>
-              <div class="tw:flex">
+              <div class="tw:flex tw:w-[3rem]">
                 <q-btn
+                  v-if="p.key !== 'max'"
                   :data-test="`log-search-subfield-list-equal-${row.name}-field-btn`"
                   size="0.3rem"
                   round
-                  :title="`duration >= ${formatDuration(percentiles[p.key])}`"
+                  :title="`duration >= ${formatTimeWithSuffix(percentiles[p.key])}`"
                   @click.stop="
                     addSearchTerm(
                       `duration>='${formatTimeWithSuffix(percentiles[p.key])}'`,
@@ -104,13 +105,13 @@
                   :data-test="`log-search-subfield-list-not-equal-${row.name}-field-btn`"
                   size="0.3rem"
                   round
-                  :title="`duration <= ${formatDuration(percentiles[p.key])}`"
+                  :title="`duration <= ${formatTimeWithSuffix(percentiles[p.key])}`"
                   @click.stop="
                     addSearchTerm(
                       `duration<='${formatTimeWithSuffix(percentiles[p.key])}'`,
                     )
                   "
-                  class="o2-custom-button-hover tw:ml-[0.25rem]! tw:mr-[0.625rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]!"
+                  class="o2-custom-button-hover tw:mr-[0.625rem]! tw:border! tw:border-solid-[1px]! tw:border-[var(--o2-border-color)]! tw:ml-auto!"
                 >
                   <q-icon
                     :name="outlinedArrowBackIos"
@@ -237,6 +238,7 @@ const PERCENTILE_LABELS = [
   { key: "p75", label: "P75" },
   { key: "p95", label: "P95" },
   { key: "p99", label: "P99" },
+  { key: "max", label: "Max" },
 ] as const;
 
 const {
@@ -250,21 +252,6 @@ const {
 const hasPercentiles = computed(() =>
   PERCENTILE_LABELS.some((p) => percentiles.value[p.key] !== null),
 );
-
-/**
- * Formats a raw microsecond value into a human-readable string with a dynamic
- * unit: µs for sub-millisecond, ms up to 1 s, s above that.
- */
-const formatDuration = (us: number | null): string => {
-  if (us === null) return "—";
-  if (us < 1_000) return `${Math.round(us)} µs`;
-  if (us < 1_000_000) {
-    const ms = us / 1_000;
-    return `${Number.isInteger(ms) ? ms : ms.toFixed(2)} ms`;
-  }
-  const s = us / 1_000_000;
-  return `${Number.isInteger(s) ? s : s.toFixed(2)} s`;
-};
 
 const store = useStore();
 const { searchObj } = useTraces();

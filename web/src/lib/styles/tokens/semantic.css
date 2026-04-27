@@ -1,0 +1,52 @@
+/* ============================================================
+   SEMANTIC TOKENS — maps base palette to intent/meaning
+   Used directly in components for shared design decisions.
+   ============================================================ */
+
+@theme inline {
+  /* --- Text --- */
+  --color-text-primary:   var(--color-grey-900);
+  --color-text-secondary: var(--color-grey-500);
+  --color-text-disabled:  var(--color-grey-400);
+  --color-text-inverse:   var(--color-white);
+
+  /* --- Surfaces --- */
+  --color-surface-base:    var(--color-white);
+  --color-surface-panel:   var(--color-grey-50);
+  --color-surface-overlay: var(--color-white);
+
+  /* --- Borders --- */
+  --color-border-default: var(--color-grey-200);
+  --color-border-strong:  var(--color-grey-400);
+
+  /* --- Brand / Primary --- */
+  --color-primary-50:  var(--color-primary-50);
+  --color-primary-100: var(--color-primary-100);
+  --color-primary-200: var(--color-primary-200);
+  --color-primary-300: var(--color-primary-300);
+  --color-primary-400: var(--color-primary-400);
+  --color-primary-500: var(--color-primary-500);
+  --color-primary-600: var(--color-primary-600);
+  --color-primary-700: var(--color-primary-700);
+  --color-primary-800: var(--color-primary-800);
+  --color-primary-900: var(--color-primary-900);
+
+  /* --- Error / Danger --- */
+  --color-error-50:  var(--color-error-50);
+  --color-error-100: var(--color-error-100);
+  --color-error-400: var(--color-error-400);
+  --color-error-500: var(--color-error-500);
+  --color-error-600: var(--color-error-600);
+  --color-error-700: var(--color-error-700);
+
+  /* --- Radius / Shadow (semantic aliases) --- */
+  --radius-sm:   var(--radius-sm);
+  --radius-md:   var(--radius-md);
+  --radius-lg:   var(--radius-lg);
+  --radius-xl:   var(--radius-xl);
+  --radius-full: var(--radius-full);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}

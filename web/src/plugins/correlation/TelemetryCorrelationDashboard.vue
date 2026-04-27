@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Search -->
                 <div
-                  class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                  class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
                 >
                   <q-input
                     v-model="metricSearchText"
@@ -569,6 +569,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :hits="tracesForDimensions"
                 :loading="false"
                 :show-header="false"
+                :show-cell-actions="false"
                 @row-click="openTraceInNewWindow"
               />
             </div>
@@ -702,7 +703,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Search -->
               <div
-                class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
               >
                 <q-input
                   v-model="metricSearchText"
@@ -1076,6 +1077,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hits="tracesForDimensions"
               :loading="false"
               :show-header="false"
+              :show-cell-actions="false"
               @row-click="openTraceInNewWindow"
             />
           </div>
@@ -1264,6 +1266,7 @@ import {
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import {
   groupMetricsByCategory,
+  getDefaultMetricSelections,
   type MetricGroupDefinition,
   DEFAULT_METRIC_GROUP_DEFINITIONS,
 } from "@/utils/metrics/metricGrouping";
@@ -1271,7 +1274,8 @@ import type { StreamInfo } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, getUUID } from "@/utils/zincutils";
+import useHttpStreaming from "@/composables/useStreamingSearch";
 import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
@@ -1326,6 +1330,11 @@ const { generateDashboard, generateLogsDashboard } =
   useMetricsCorrelationDashboard();
 const { semanticGroups, loadSemanticGroups } = useServiceCorrelation();
 const { formatTracesMetaData } = useTraces();
+const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
+  useHttpStreaming();
+
+// Track in-flight dimension-based trace stream so it can be cancelled on re-fetch
+let currentTracesStreamTraceId: string | null = null;
 
 // Resolved group definitions and their ids (reactive to prop changes)
 const groupDefs = computed(
@@ -1558,12 +1567,14 @@ const applyUnstableDimensionDefaults = (
   }
 
   const result = streams.map((stream) => {
-    const updatedFilters = { ...stream.filters };
+    const updatedFilters = { ...(stream.filters ?? {}) };
     const changedKeys: string[] = [];
     const notMatchedKeys: string[] = [];
 
     // For each filter in the stream, check if it maps to an unstable dimension
-    for (const [filterKey, filterValue] of Object.entries(stream.filters)) {
+    for (const [filterKey, filterValue] of Object.entries(
+      stream.filters ?? {},
+    )) {
       // Look up the semantic dimension ID for this field name
       const dimensionId = fieldToDimensionId.get(filterKey);
 
@@ -1589,11 +1600,18 @@ const uniqueMetricStreams = computed(() => {
   return getUniqueStreams(props.metricStreams);
 });
 
-// Selected metric streams (default to first 6 unique streams)
-// Apply SELECT_ALL_VALUE defaults for unstable dimensions
+// Selected metric streams — prefer curated defaults from group definitions,
+// fall back to first 6 unique streams for non-OTel deployments.
+// Apply SELECT_ALL_VALUE defaults for unstable dimensions.
 const selectedMetricStreams = ref<StreamInfo[]>(
   applyUnstableDimensionDefaults(
-    getUniqueStreams(props.metricStreams).slice(0, 6),
+    (() => {
+      const unique = getUniqueStreams(props.metricStreams);
+      const defs =
+        props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS;
+      const defaults = getDefaultMetricSelections(defs, unique);
+      return defaults.length > 0 ? defaults : unique.slice(0, 6);
+    })(),
   ),
 );
 
@@ -1889,11 +1907,13 @@ const applyDimensionChanges = () => {
   // Update metric stream filters with new dimension values
   // Use semantic groups to map filter field names to dimension IDs
   selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => {
-    const updatedFilters = { ...stream.filters };
+    const updatedFilters = { ...(stream.filters ?? {}) };
 
     // For each filter in the stream, find its semantic dimension ID
     // and update with the new value from activeDimensions
-    for (const [filterKey, _filterValue] of Object.entries(stream.filters)) {
+    for (const [filterKey, _filterValue] of Object.entries(
+      stream.filters ?? {},
+    )) {
       const dimensionId = fieldToDimensionId.get(filterKey);
       if (dimensionId && activeDimensions.value[dimensionId] !== undefined) {
         const newValue = activeDimensions.value[dimensionId];
@@ -2532,41 +2552,79 @@ const fetchTraceByTraceId = async (traceId: string) => {
 };
 
 /**
- * Fetch traces via dimension-based correlation
+ * Fetch traces via dimension-based correlation using HTTP streaming (/latest_stream)
  */
-const fetchTracesByDimensions = async () => {
+const fetchTracesByDimensions = (): Promise<any[]> => {
   if (!props.traceStreams?.length) {
-    return [];
+    return Promise.resolve([]);
   }
 
   const traceStreamInfo = props.traceStreams[0];
   const streamName = traceStreamInfo.stream_name;
 
-  // Build filter using ALL filters from the trace stream's filters
-  // This uses all the filters coming from the correlation API
   const filterParts: string[] = [];
-
-  // Use all filters from traceStreamInfo.filters
   if (traceStreamInfo.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
       filterParts.push(`${fieldName}='${value}'`);
     }
   }
-
   const filter = filterParts.join(" AND ");
 
-  const response = await searchService.get_traces({
-    org_identifier: currentOrgIdentifier.value,
-    start_time: props.timeRange.startTime,
-    end_time: props.timeRange.endTime,
-    filter: filter,
-    size: 50,
-    from: 0,
-    stream_name: streamName,
-  });
+  // Cancel any previous in-flight stream
+  if (currentTracesStreamTraceId) {
+    cancelStreamQueryBasedOnRequestId({
+      trace_id: currentTracesStreamTraceId,
+      org_id: currentOrgIdentifier.value,
+    });
+    currentTracesStreamTraceId = null;
+  }
 
-  // Format traces with service colors and proper structure for TraceBlock
-  return formatTracesMetaData(response.data?.hits || []);
+  const traceId = getUUID().replace(/-/g, "");
+  currentTracesStreamTraceId = traceId;
+
+  const accumulated: any[] = [];
+
+  return new Promise((resolve, reject) => {
+    (async () => {
+      try {
+        await fetchQueryDataWithHttpStream(
+          {
+            queryReq: {
+              stream_name: streamName,
+              filter: filter,
+              start_time: props.timeRange.startTime,
+              end_time: props.timeRange.endTime,
+              from: 0,
+              size: 50,
+            },
+            type: "traces",
+            traceId,
+            org_id: currentOrgIdentifier.value,
+          },
+          {
+            data: (_: any, response: any) => {
+              const hits: any[] = response.content?.results?.hits || [];
+              if (hits.length > 0) {
+                accumulated.push(...formatTracesMetaData(hits));
+              }
+            },
+            error: (_: any, err: any) => {
+              currentTracesStreamTraceId = null;
+              reject(err);
+            },
+            complete: () => {
+              currentTracesStreamTraceId = null;
+              resolve(accumulated);
+            },
+            reset: () => {},
+          },
+        );
+      } catch (e) {
+        currentTracesStreamTraceId = null;
+        reject(e);
+      }
+    })();
+  });
 };
 
 /**
@@ -2637,6 +2695,7 @@ const openTracesPage = () => {
       to: props.timeRange.endTime,
       query: b64EncodeUnicode(filterQuery), // Base64 encode the filter query
       org_identifier: org,
+      tab: "traces",
     },
   });
 

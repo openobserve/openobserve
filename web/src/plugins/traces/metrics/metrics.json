@@ -28,6 +28,12 @@
             "label_option": {
               "rotate": 0
             },
+            "custom_chart_options": {
+              "tooltip": {
+                "appendToBody": true,
+                "confine": false
+              }
+            },
             "show_symbol": false,
             "line_interpolation": "smooth",
             "legend_width": {
@@ -180,16 +186,16 @@
             "label_option": {
               "rotate": 0
             },
+            "custom_chart_options": {
+              "tooltip": {
+                "appendToBody": true,
+                "confine": false
+              }
+            },
             "show_symbol": false,
             "line_interpolation": "smooth",
             "legend_width": {
               "unit": "px"
-            },
-            "tooltip": {
-              "trigger": "axis",
-              "confine": true,
-              "appendToBody": true,
-              "renderMode": "html"
             },
             "base_map": {
               "type": "osm"
@@ -310,6 +316,12 @@
             "axis_border_show": false,
             "label_option": {
               "rotate": 0
+            },
+            "custom_chart_options": {
+              "tooltip": {
+                "appendToBody": true,
+                "confine": false
+              }
             },
             "show_symbol": true,
             "line_interpolation": "smooth",

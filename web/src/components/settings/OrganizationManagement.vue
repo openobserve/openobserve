@@ -46,6 +46,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="otg-management-extend-trial-btn"
               @click.stop="toggleExtendTrialDialog(props.row)"
             ></q-btn>
+            <q-btn
+              v-if="props.row.billing_provider === '-'"
+              label="Add Contract"
+              class="q-ml-xs text-capitalize"
+              unelevated
+              dense
+              size="sm"
+              padding="xs"
+              text-color="positive"
+              data-test="org-management-add-contract-btn"
+              @click.stop="toggleContractDialog(props.row, 'create')"
+            ></q-btn>
+            <q-btn
+              v-if="props.row.billing_provider === 'no_op'"
+              label="Extend Contract"
+              class="q-ml-xs text-capitalize"
+              unelevated
+              dense
+              size="sm"
+              padding="xs"
+              text-color="positive"
+              data-test="org-management-extend-contract-btn"
+              @click.stop="toggleContractDialog(props.row, 'extend')"
+            ></q-btn>
+            <q-btn
+              v-if="props.row.billing_provider === 'no_op'"
+              label="Revoke"
+              class="q-ml-xs text-capitalize"
+              unelevated
+              dense
+              size="sm"
+              padding="xs"
+              text-color="negative"
+              data-test="org-management-revoke-contract-btn"
+              @click.stop="confirmRevokeContract(props.row)"
+            ></q-btn>
           </q-td>
         </template>
         <template #top="scope">
@@ -87,6 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-table>
     </div>
+
+    <!-- Extend Trial Dialog -->
     <q-dialog v-model="extendTrialPrompt">
       <q-card class="q-pa-sm" style="min-width: 450px;">
         <q-toolbar>
@@ -137,6 +175,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <!-- External Contract Dialog -->
+    <q-dialog v-model="contractPrompt">
+      <q-card class="q-pa-sm" style="min-width: 500px;">
+        <q-toolbar>
+          <q-toolbar-title>
+            <span class="text-weight-bold" :title="contractDataRow.name">
+              {{ contractMode === 'create' ? 'Create' : 'Extend' }} External Contract for {{ contractDataRow.name }}
+            </span>
+          </q-toolbar-title>
+          <q-btn flat round dense icon="close" v-close-popup />
+        </q-toolbar>
+
+        <q-card-section>
+          <div class="q-mb-md">
+            <div class="text-bold q-mb-xs">
+              {{ contractMode === 'create' ? 'End Date' : 'New End Date' }}
+            </div>
+            <q-input
+              v-model="contractEndDate"
+              dense
+              outlined
+              type="date"
+              data-test="contract-end-date-input"
+            />
+          </div>
+          <div v-if="contractMode === 'extend' && contractDataRow.contract_end_date" class="text-caption text-grey">
+            Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="right" class="text-primary">
+          <q-btn
+            v-close-popup
+            class="q-mr-md o2-secondary-button tw:h-[36px]"
+            :label="t('common.cancel')"
+            no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          />
+          <q-btn
+            class="o2-primary-button no-border tw:h-[36px]"
+            :label="contractMode === 'create' ? 'Create Contract' : 'Extend Contract'"
+            no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            @click.stop="submitContract"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 <script lang="ts">
@@ -180,6 +269,12 @@ export default defineComponent({
     const pagination: any = ref({
       rowsPerPage: 20,
     });
+
+    // Contract management state
+    const contractPrompt = ref(false);
+    const contractDataRow = ref<any>({});
+    const contractMode = ref<'create' | 'extend'>('create');
+    const contractEndDate = ref('');
 
     onMounted(() => {
       if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
@@ -227,6 +322,14 @@ export default defineComponent({
         style: "col-1"
       },
       {
+        name: "billing_provider",
+        field: "billing_provider",
+        label: "Provider",
+        align: "left",
+        sortable: true,
+        style: "col-1"
+      },
+      {
         name: "created_on",
         field: "created_at",
         label: t("settings.created_on"),
@@ -241,12 +344,19 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "contract_end_date",
+        field: "contract_end_date_display",
+        label: "Contract End",
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "actions",
         field: "actions",
         label: t("settings.actions"),
         align: "center",
         sortable: false,
-        style: "width: 110px",
+        style: "width: 280px",
       },
     ]);
     const perPageOptions: any = [
@@ -260,15 +370,28 @@ export default defineComponent({
     const subscriptionPlans: any = {
       "0": "Free",
       "1": "Pay as you go",
-      "2": "Enterprise"
+      "2": "Enterprise",
+      "3": "External Contract"
     }
-    
+
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
       qTable.value.setPagination(pagination.value);
     };
-    
+
+    const formatMicrosToDate = (micros: number): string => {
+      if (!micros || micros <= 0) return '-';
+      return timestampToTimezoneDate(micros, "UTC", "yyyy-MM-dd");
+    };
+
+    const dateToMicros = (dateStr: string): number => {
+      // Treat the picked date as end-of-day UTC so selecting today is still in the future.
+      const d = new Date(dateStr);
+      d.setUTCHours(23, 59, 59, 999);
+      return d.getTime() * 1000;
+    };
+
     const getData = () => {
       loading.value = true;
       const dismiss = $q.notify({
@@ -287,8 +410,11 @@ export default defineComponent({
               name: responseData[i].name,
               identifier: responseData[i].identifier,
               plan: subscriptionPlans[responseData[i].plan],
+              billing_provider: responseData[i].billing_provider || '-',
               created_at: timestampToTimezoneDate(responseData[i].created_at, "UTC", "yyyy-MM-dd"),
               trial_expires_at: timestampToTimezoneDate(responseData[i].trial_expires_at, "UTC", "yyyy-MM-dd"),
+              contract_end_date: responseData[i].contract_end_date || 0,
+              contract_end_date_display: formatMicrosToDate(responseData[i].contract_end_date),
             });
           }
 
@@ -319,6 +445,105 @@ export default defineComponent({
 
     const getTimestampInMicroseconds = (weeks: number) => (Date.now() + weeks * 7 * 24 * 60 * 60 * 1000) * 1000;
 
+    const toggleContractDialog = (row: any, mode: 'create' | 'extend') => {
+      contractDataRow.value = row;
+      contractMode.value = mode;
+      contractEndDate.value = '';
+      contractPrompt.value = true;
+    };
+
+    const submitContract = () => {
+      const metaOrg = store.state.selectedOrganization.identifier;
+
+      if (contractMode.value === 'create') {
+        if (!contractEndDate.value) {
+          $q.notify({ type: "negative", message: "End date is required." });
+          return;
+        }
+        const payload = {
+          org_id: contractDataRow.value.identifier,
+          end_date: dateToMicros(contractEndDate.value),
+        };
+
+        loading.value = true;
+        const dismiss = $q.notify({ spinner: true, message: "Creating external contract..." });
+        OrganizationServices.create_external_contract(metaOrg, payload)
+          .then(() => {
+            $q.notify({ type: "positive", message: "External contract created successfully." });
+            contractPrompt.value = false;
+            getData();
+            loading.value = false;
+            dismiss();
+          })
+          .catch((error) => {
+            loading.value = false;
+            dismiss();
+            $q.notify({
+              type: "negative",
+              message: error.response?.data?.message || "Failed to create external contract.",
+              timeout: 5000,
+            });
+          });
+      } else {
+        if (!contractEndDate.value) {
+          $q.notify({ type: "negative", message: "New end date is required." });
+          return;
+        }
+        const payload = {
+          org_id: contractDataRow.value.identifier,
+          new_end_date: dateToMicros(contractEndDate.value),
+        };
+
+        loading.value = true;
+        const dismiss = $q.notify({ spinner: true, message: "Extending external contract..." });
+        OrganizationServices.extend_external_contract(metaOrg, payload)
+          .then(() => {
+            $q.notify({ type: "positive", message: "External contract extended successfully." });
+            contractPrompt.value = false;
+            getData();
+            loading.value = false;
+            dismiss();
+          })
+          .catch((error) => {
+            loading.value = false;
+            dismiss();
+            $q.notify({
+              type: "negative",
+              message: error.response?.data?.message || "Failed to extend external contract.",
+              timeout: 5000,
+            });
+          });
+      }
+    };
+
+    const confirmRevokeContract = (row: any) => {
+      $q.dialog({
+        title: 'Revoke External Contract',
+        message: `Are you sure you want to revoke the external contract for "${row.name}"? The organization will revert to the Free tier.`,
+        cancel: true,
+        persistent: true,
+      }).onOk(() => {
+        const metaOrg = store.state.selectedOrganization.identifier;
+        loading.value = true;
+        const dismiss = $q.notify({ spinner: true, message: "Revoking external contract..." });
+        OrganizationServices.revoke_external_contract(metaOrg, row.identifier)
+          .then(() => {
+            $q.notify({ type: "positive", message: "External contract revoked successfully." });
+            getData();
+            loading.value = false;
+            dismiss();
+          })
+          .catch((error) => {
+            loading.value = false;
+            dismiss();
+            $q.notify({
+              type: "negative",
+              message: error.response?.data?.message || "Failed to revoke external contract.",
+              timeout: 5000,
+            });
+          });
+      });
+    };
 
     const updateTrialPeriod = (org_id: string, extended_week: number) => {
       const payload = {
@@ -380,6 +605,14 @@ export default defineComponent({
       getData,
       getTimestampInMicroseconds,
       selectedPerPage,
+      contractPrompt,
+      contractDataRow,
+      contractMode,
+      contractEndDate,
+      toggleContractDialog,
+      submitContract,
+      confirmRevokeContract,
+      formatMicrosToDate,
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {
         var filtered = [];

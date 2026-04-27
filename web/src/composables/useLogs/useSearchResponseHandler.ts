@@ -482,6 +482,9 @@ export const useSearchResponseHandler = () => {
     searchObj.data.queryResults.converted_histogram_query =
       response?.content?.results?.converted_histogram_query ?? "";
 
+    searchObj.data.queryResults.histogram_breakdown_field =
+      response?.content?.results?.histogram_breakdown_field ?? null;
+
     if (
       !searchObj.data.queryResults.visualization_histogram_interval &&
       response.content?.results?.histogram_interval

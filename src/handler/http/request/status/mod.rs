@@ -189,10 +189,12 @@ struct ConfigResponse<'a> {
     alert_preview_timerange_minutes: i64,
     incidents_enabled: bool,
     service_streams_enabled: bool,
+    model_pricing_enabled: bool,
     anomaly_detection_enabled: bool,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
+    auto_query_enabled: bool,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -428,10 +430,12 @@ pub async fn zo_config() -> impl IntoResponse {
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         incidents_enabled,
         service_streams_enabled,
+        model_pricing_enabled: cfg.common.model_pricing_enabled,
         anomaly_detection_enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled: cfg.common.search_inspector_enabled,
+        auto_query_enabled: cfg.common.auto_query_enabled,
     })
 }
 

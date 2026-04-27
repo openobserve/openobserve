@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Chart Area -->
                   <div
                     v-if="!resolvedConfig.hideChartPreview"
-                    class="col tw:relative"
+                    class="col tw:relative tw:overflow-hidden"
                   >
                     <div :class="chartAreaClass" :style="chartAreaStyle">
                       <PanelSchemaRenderer
@@ -1000,7 +1000,7 @@ const searchType = computed(() => {
     case "dashboard":
       return "dashboards";
     case "metrics":
-      return "dashboards";
+      return "ui";
     case "logs":
       return "ui";
     case "build":

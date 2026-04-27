@@ -311,34 +311,47 @@ describe("FieldValuesPanel.vue", () => {
       expect((wrapper.vm as any).selectedValues).toEqual([]);
     });
 
-    it("emits 'add-multiple-search-terms' with include when Include mode button clicked", async () => {
-      wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
-      // Set filterMode to 'exclude' while selectedValues is empty so no premature emit
-      (wrapper.vm as any).filterMode = "exclude";
-      await nextTick();
-      (wrapper.vm as any).selectedValues = ["value-1", "value-2"];
-      await nextTick();
-      const includeBtn = wrapper.find(
-        '[data-test="field-values-panel-include-mode-btn"]'
-      );
-      await includeBtn.trigger("click");
-      const emitted = wrapper.emitted("add-multiple-search-terms");
-      expect(emitted).toBeTruthy();
-      expect(emitted![0]).toEqual(["status", ["value-1", "value-2"], "include"]);
-    });
+    // Mode-switch emissions are debounced (300 ms) so fake timers are required
+    // to flush the debounce before asserting the emitted event.
+    describe("mode switch emits (debounced)", () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+      afterEach(() => {
+        vi.useRealTimers();
+      });
 
-    it("emits 'add-multiple-search-terms' with exclude when Exclude mode button clicked", async () => {
-      wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
-      // filterMode defaults to 'include'; set selectedValues then click exclude
-      (wrapper.vm as any).selectedValues = ["value-1"];
-      await nextTick();
-      const excludeBtn = wrapper.find(
-        '[data-test="field-values-panel-exclude-mode-btn"]'
-      );
-      await excludeBtn.trigger("click");
-      const emitted = wrapper.emitted("add-multiple-search-terms");
-      expect(emitted).toBeTruthy();
-      expect(emitted![0]).toEqual(["status", ["value-1"], "exclude"]);
+      it("emits 'add-multiple-search-terms' with include when Include mode button clicked", async () => {
+        wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
+        // Set filterMode to 'exclude' while selectedValues is empty so no premature emit
+        (wrapper.vm as any).filterMode = "exclude";
+        await nextTick();
+        (wrapper.vm as any).selectedValues = ["value-1", "value-2"];
+        await nextTick();
+        const includeBtn = wrapper.find(
+          '[data-test="field-values-panel-include-mode-btn"]'
+        );
+        await includeBtn.trigger("click");
+        vi.runAllTimers();
+        const emitted = wrapper.emitted("add-multiple-search-terms");
+        expect(emitted).toBeTruthy();
+        expect(emitted![0]).toEqual(["status", ["value-1", "value-2"], "include"]);
+      });
+
+      it("emits 'add-multiple-search-terms' with exclude when Exclude mode button clicked", async () => {
+        wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
+        // filterMode defaults to 'include'; set selectedValues then click exclude
+        (wrapper.vm as any).selectedValues = ["value-1"];
+        await nextTick();
+        const excludeBtn = wrapper.find(
+          '[data-test="field-values-panel-exclude-mode-btn"]'
+        );
+        await excludeBtn.trigger("click");
+        vi.runAllTimers();
+        const emitted = wrapper.emitted("add-multiple-search-terms");
+        expect(emitted).toBeTruthy();
+        expect(emitted![0]).toEqual(["status", ["value-1"], "exclude"]);
+      });
     });
 
     it("does NOT clear selectedValues after applying multi-select include", async () => {
@@ -423,26 +436,33 @@ describe("FieldValuesPanel.vue", () => {
   // ─── Search bar (showValueSearch) ───────────────────────────────────────────
 
   describe("Value search bar", () => {
-    it("hides search bar when cachedValues count is below defaultValuesCount", () => {
+    it("hides search bar when there are no values", () => {
       wrapper = createWrapper({
-        defaultValuesCount: 10,
-        fieldValues: buildFieldValues(5), // 5 values < 10 defaultValuesCount
+        fieldValues: buildFieldValues(0),
       });
-      // cachedValues only fill after watch fires; initially empty → showValueSearch=false
       expect(wrapper.find(".value-search-container").exists()).toBe(false);
     });
 
-    it("shows search bar once cachedValues reach defaultValuesCount", async () => {
+    it("shows search bar when values exist even below defaultValuesCount", () => {
       wrapper = createWrapper({
-        defaultValuesCount: 3,
-        fieldValues: buildFieldValues(3),
+        defaultValuesCount: 10,
+        fieldValues: buildFieldValues(5),
       });
-      // Trigger the watch by setting cachedValues directly
-      (wrapper.vm as any).cachedValues = [
-        { key: "a", count: 1 },
-        { key: "b", count: 2 },
-        { key: "c", count: 3 },
-      ];
+      expect(wrapper.find(".value-search-container").exists()).toBe(true);
+    });
+
+    it("keeps search bar visible when searching returns no values but cache exists", async () => {
+      wrapper = createWrapper({
+        fieldValues: buildFieldValues(2),
+      });
+      await nextTick();
+      await wrapper.setProps({
+        fieldValues: {
+          isLoading: false,
+          values: [],
+          errMsg: "",
+        },
+      });
       await nextTick();
       expect(wrapper.find(".value-search-container").exists()).toBe(true);
     });

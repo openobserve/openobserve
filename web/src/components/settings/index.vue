@@ -135,6 +135,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </q-route-tab>
                 <q-route-tab
+                  v-if="store.state.zoConfig.model_pricing_enabled"
+                  data-test="model-pricing-tab"
+                  name="model_pricing"
+                  :to="{
+                    name: 'modelPricing',
+                    query: {
+                      org_identifier: store.state.selectedOrganization?.identifier,
+                    },
+                  }"
+                  content-class="tab_content"
+                  icon="paid"
+                  :label="t('settings.llmModelPricing')"
+                >
+                </q-route-tab>
+                <q-route-tab
                   v-if="config.isEnterprise == 'true'"
                   data-test="management-cipher-key-tab"
                   name="cipher-keys"
@@ -149,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('settings.cipherKeys')"
                 >
                 </q-route-tab>
-                <q-route-tab
+                <!-- <q-route-tab
                   v-if="config.isEnterprise == 'true'"
                   data-test="ai-toolsets-tab"
                   name="ai_toolsets"
@@ -163,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon="smart_toy"
                   :label="t('settings.aiToolsets')"
                 >
-                </q-route-tab>
+                </q-route-tab> -->
                 <q-route-tab
                     v-if="config.isEnterprise == 'true' && isMetaOrg"
                     data-test="license-tab"

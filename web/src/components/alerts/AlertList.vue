@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: 100%"
                 :style="
                   filteredResults?.length
-                    ? 'width: 100%; height: calc(100vh  - var(--navbar-height) - 77px)'
+                    ? 'width: 100%; height: calc(100vh  - var(--navbar-height) - 87px)'
                     : 'width: 100%'
                 "
                 class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     ? 'warning'
                                     : props.row.status === 'disabled'
                                       ? 'grey'
-                                      : 'info'
+                                      : 'positive'
                             "
                             :label="props.row.status"
                             style="text-transform: capitalize; cursor: default"
@@ -677,14 +677,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
-                      class="tw:flex items-center no-border o2-secondary-button tw:h-[36px] q-mr-sm tw:w-[180px]"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'o2-secondary-button-dark'
-                          : 'o2-secondary-button-light'
-                      "
+                      class="tw:flex items-center no-border o2-secondary-button tw:h-[36px] q-mr-sm tw:w-[200px]"
                       no-caps
                       dense
+                      style="width: 170px"
                       @click="bulkToggleAlerts('resume')"
                     >
                       <q-icon name="play_arrow" size="16px" />
@@ -2636,7 +2632,9 @@ export default defineComponent({
               store.state.selectedOrganization.identifier,
               alertId,
             );
-            return res.data;
+            const data = res.data;
+            if (data.hasOwnProperty("id")) delete data.id;
+            return data;
           }),
         );
         alertToBeExported.push(...alertsData);

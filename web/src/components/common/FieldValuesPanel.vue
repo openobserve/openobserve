@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filterMode === 'include' ? 'filter-mode-btn--active-include' : '',
           ]"
           title="Include mode (=)"
-          @click="filterMode = 'include'"
+          @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
         >
           <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filterMode === 'exclude' ? 'filter-mode-btn--active-exclude' : '',
           ]"
           title="Exclude mode (≠)"
-          @click="filterMode = 'exclude'"
+          @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
         >
           <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
@@ -177,7 +177,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ formatLargeNumber(value.count) }}
               </div>
             </div>
-
           </q-item>
         </q-list>
       </div>
@@ -208,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { watchDebounced } from "@vueuse/core";
+import { useDebounceFn, watchDebounced } from "@vueuse/core";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { formatLargeNumber } from "@/utils/zincutils";
@@ -248,11 +247,13 @@ const emit = defineEmits<{
 }>();
 
 /**
- * Filter mode (include / exclude). Defaults to include.
- * Switching the mode only affects future checkbox interactions —
- * it does NOT retroactively modify already-applied filters.
+ * Filter mode (include / exclude). Initialised from the current query state
+ * and kept in sync with the active filter props so that it always reflects
+ * which operator (= / !=) the user's selection is using.
  */
-const filterMode = ref<"include" | "exclude">("include");
+const filterMode = ref<"include" | "exclude">(
+  (props.activeExcludeValues?.length ?? 0) > 0 ? "exclude" : "include",
+);
 
 /**
  * Union of all values that are currently active in the query (both included
@@ -307,9 +308,11 @@ const displayValues = computed(() => {
   return props.fieldValues?.values || [];
 });
 
-// Show search box once original values hit the fetch limit.
+// Show search box whenever there are values to search.
 const showValueSearch = computed(
-  () => cachedValues.value.length >= props.defaultValuesCount,
+  () =>
+    cachedValues.value.length > 0 ||
+    (props.fieldValues?.values?.length ?? 0) > 0,
 );
 
 watchDebounced(
@@ -320,18 +323,50 @@ watchDebounced(
   { debounce: 300 },
 );
 
-// When the user flips the mode switch with values already selected,
-// immediately re-apply the current selection under the new mode.
-watch(filterMode, (newMode) => {
+/**
+ * Debounced emission for mode changes. The UI toggle updates immediately
+ * (instant feedback) but the API call is consolidated so that rapid
+ * include→exclude→include clicks only fire one search at the end, preventing
+ * a brief "no events found" flash (from an intermediate result set) that
+ * would reset the field-list scroll position.
+ */
+const debouncedEmitModeChange = useDebounceFn((mode: "include" | "exclude") => {
   if (selectedValues.value.length > 0) {
-    emit(
-      "add-multiple-search-terms",
-      props.fieldName,
-      [...selectedValues.value],
-      newMode,
-    );
+    emit("add-multiple-search-terms", props.fieldName, [...selectedValues.value], mode);
   }
-});
+}, 300);
+
+/**
+ * Called when the user explicitly clicks the include/exclude toggle.
+ * Updates filterMode immediately for instant visual feedback, then
+ * debounces the actual query emission to avoid rapid successive API calls.
+ * This is the ONLY path that should emit add-multiple-search-terms for
+ * a mode change — the prop-sync watcher below only updates the ref silently.
+ */
+const setFilterMode = (mode: "include" | "exclude") => {
+  filterMode.value = mode;
+  debouncedEmitModeChange(mode);
+};
+
+// Keep filterMode in sync with the external filter state.
+// When props change after a query re-run (or after reset() is called with
+// stale props), this corrects the toggle without triggering a new emission.
+watch(
+  () => ({
+    exc: props.activeExcludeValues?.length ?? 0,
+    inc: props.activeIncludeValues?.length ?? 0,
+  }),
+  ({ exc, inc }) => {
+    if (exc > 0) {
+      filterMode.value = "exclude";
+    } else if (inc > 0) {
+      filterMode.value = "include";
+    }
+    // When both are zero (no active filters) keep the current mode so the
+    // user's last preference is preserved for the next checkbox interaction.
+  },
+  { deep: true },
+);
 
 /**
  * Called only on explicit user checkbox interaction (never on parent sync).
@@ -401,7 +436,8 @@ const reset = () => {
   selectedValues.value = allActiveValues.value;
   valueSearchTerm.value = "";
   cachedValues.value = [];
-  filterMode.value = "include";
+  filterMode.value =
+    (props.activeExcludeValues?.length ?? 0) > 0 ? "exclude" : "include";
   isLoadingMore.value = false;
 };
 

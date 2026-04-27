@@ -190,21 +190,34 @@ pub async fn correlate_streams(
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
-        use config::meta::{correlation::ServiceIdentityConfig, system_settings::SettingScope};
-        let identity_config = match infra::table::system_settings::get(
-            &SettingScope::Org,
-            Some(&org_id),
-            None,
-            "service_identity",
-        )
-        .await
-        {
-            Ok(Some(s)) => serde_json::from_value::<ServiceIdentityConfig>(s.setting_value)
-                .unwrap_or_else(|_| ServiceIdentityConfig::default_config()),
-            _ => ServiceIdentityConfig::default_config(),
-        };
+        let identity_config =
+            crate::service::db::system_settings::get_service_identity_config(&org_id).await;
+        log::debug!(
+            "[correlation] Loaded service_identity config for org {}: sets={}, tracked_alias_ids={:?}",
+            org_id,
+            identity_config.sets.len(),
+            identity_config.tracked_alias_ids
+        );
         let semantic_groups =
             o2_enterprise::enterprise::alerts::semantic_config::load_defaults_from_file();
+
+        // Enhanced debug logging for correlation troubleshooting
+        log::debug!(
+            "[correlation] org_id={}, available_dimensions={:?}, source_stream={}, source_type={}",
+            org_id,
+            req.available_dimensions,
+            req.source_stream,
+            req.source_type
+        );
+        log::debug!(
+            "[correlation] identity_config: sets_count={}, tracked_alias_ids={:?}",
+            identity_config.sets.len(),
+            identity_config.tracked_alias_ids
+        );
+        log::debug!(
+            "[correlation] semantic_groups_count={}",
+            semantic_groups.len()
+        );
 
         match o2_enterprise::enterprise::service_streams::storage::correlate(
             &org_id,
@@ -214,13 +227,34 @@ pub async fn correlate_streams(
         )
         .await
         {
-            Ok(Some(response)) => MetaHttpResponse::json(response),
+            Ok(Some(response)) => {
+                log::debug!(
+                    "[correlation] success: found match for org_id={}, source_stream={}",
+                    org_id,
+                    req.source_stream
+                );
+                MetaHttpResponse::json(response)
+            }
             Ok(None) => {
+                log::debug!(
+                    "[correlation] no_match: no service found for org_id={}, source_stream={}, available_dimensions={:?}",
+                    org_id,
+                    req.source_stream,
+                    req.available_dimensions
+                );
                 // No service found - this is a successful API call with no results
                 // Return 200 with null to indicate "no match" (not an error)
                 (StatusCode::OK, Json(serde_json::json!(null))).into_response()
             }
-            Err(e) => MetaHttpResponse::internal_error(format!("Failed to correlate streams: {e}")),
+            Err(e) => {
+                log::error!(
+                    "[correlation] error: failed correlation for org_id={}, source_stream={}, error={}",
+                    org_id,
+                    req.source_stream,
+                    e
+                );
+                MetaHttpResponse::internal_error(format!("Failed to correlate streams: {e}"))
+            }
         }
     }
 

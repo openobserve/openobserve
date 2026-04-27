@@ -89,6 +89,7 @@ const defaultObject = {
     >(),
     showErrorOnly: false,
     queryEditorPlaceholderFlag: true,
+    liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
     searchMode: "spans" as TraceSearchMode,
     serviceGraphVisualizationType:
       (localStorage.getItem("serviceGraph_visualizationType") as

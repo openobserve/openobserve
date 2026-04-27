@@ -28,7 +28,9 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
-  getServiceIconDataUrl: vi.fn().mockReturnValue("data:image/svg+xml;base64,ICON"),
+  getServiceIconDataUrl: vi
+    .fn()
+    .mockReturnValue("data:image/svg+xml;base64,ICON"),
 }));
 
 vi.mock("@/composables/useTraces", () => ({
@@ -36,6 +38,19 @@ vi.mock("@/composables/useTraces", () => ({
     searchObj: { meta: { serviceColors: { alertmanager: "#1ab8be" } } },
     buildQueryDetails: vi.fn(),
     navigateToLogs: vi.fn(),
+  }),
+}));
+
+vi.mock("@/aws-exports", () => ({
+  default: {
+    isEnterprise: "true",
+    isCloud: "false",
+  },
+}));
+
+vi.mock("@/composables/useServiceCorrelation", () => ({
+  useServiceCorrelation: () => ({
+    findRelatedTelemetry: vi.fn().mockResolvedValue(null),
   }),
 }));
 
@@ -251,9 +266,9 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should call getServiceIconDataUrl with the span service name", () => {
       expect(
-        vi.mocked(getServiceIconDataUrl).mock.calls.some(
-          (call) => call[0] === mockSpan.service_name,
-        ),
+        vi
+          .mocked(getServiceIconDataUrl)
+          .mock.calls.some((call) => call[0] === mockSpan.service_name),
       ).toBe(true);
     });
   });
@@ -429,7 +444,9 @@ describe("TraceDetailsSidebar", async () => {
         '[data-test="trace-details-sidebar-attributes-table"]',
       );
       expect(attributesTable.exists()).toBe(true);
-      expect(attributesTable.text()).toContain("dev2-openobserve-alertmanager-1");
+      expect(attributesTable.text()).toContain(
+        "dev2-openobserve-alertmanager-1",
+      );
     });
   });
 
@@ -919,6 +936,252 @@ describe("TraceDetailsSidebar", async () => {
       expect(Array.isArray(newWrapper.vm.spanLinks)).toBe(true);
 
       newWrapper.unmount();
+    });
+  });
+
+  describe("correlateForMetrics — no data found", () => {
+    let correlationWrapper: any;
+
+    beforeEach(async () => {
+      correlationWrapper = mount(TraceDetailsSidebar, {
+        attachTo: "#app",
+        props: {
+          span: mockSpan,
+          baseTracePosition: mockBaseTracePosition,
+          searchQuery: "",
+          streamName: "default",
+          serviceStreamsEnabled: true,
+        },
+        global: {
+          plugins: [i18n, router],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            "q-resize-observer": true,
+            "q-virtual-scroll": {
+              template: `
+                <div>
+                  <slot name="before"></slot>
+                  <div v-for="(item, index) in items" :key="index">
+                    <slot :item="item" :index="index"></slot>
+                  </div>
+                </div>
+              `,
+              props: ["items"],
+            },
+          },
+        },
+      });
+
+      await correlationWrapper.vm.$nextTick();
+    });
+
+    afterEach(() => {
+      correlationWrapper?.unmount();
+    });
+
+    it("should set correlationError to noDataFound message when findRelatedTelemetry returns null", async () => {
+      const metricsTab = correlationWrapper.find(
+        '[data-test="trace-details-sidebar-tabs-correlated-metrics"]',
+      );
+      expect(metricsTab.exists()).toBe(true);
+
+      await metricsTab.trigger("click");
+      await flushPromises();
+
+      expect(correlationWrapper.vm.correlationError).toContain("No Data Found");
+    });
+  });
+
+  describe("getFilterValue — raw value substitution for RAW_VALUE_FILTER_FIELDS", () => {
+    // getFilterValue is explicitly returned from setup() and is part of the component's
+    // public API. We call it directly here to unit-test its branching logic in isolation
+    // before verifying the full emit path through DOM interaction below.
+
+    it("should return the raw numeric start_time from props.span, not the display string", () => {
+      const displayValue = "some formatted date string";
+      const result = wrapper.vm.getFilterValue("start_time", displayValue);
+      expect(result).toBe(mockSpan.start_time);
+    });
+
+    it("should return the raw numeric end_time from props.span, not the display string", () => {
+      const displayValue = "some formatted date string";
+      const result = wrapper.vm.getFilterValue("end_time", displayValue);
+      expect(result).toBe(mockSpan.end_time);
+    });
+
+    it("should return the display value unchanged for non-RAW_VALUE_FILTER_FIELDS (e.g. span_id)", () => {
+      const displayValue = mockSpan.span_id;
+      const result = wrapper.vm.getFilterValue("span_id", displayValue);
+      expect(result).toBe(displayValue);
+    });
+
+    it("should return the display value unchanged for an arbitrary field not in the set", () => {
+      const displayValue = "GET";
+      const result = wrapper.vm.getFilterValue("http_method", displayValue);
+      expect(result).toBe(displayValue);
+    });
+
+    it("should fall back to display value when start_time is absent from props.span", async () => {
+      const spanWithoutStartTime = { ...mockSpan };
+      delete (spanWithoutStartTime as any).start_time;
+      await wrapper.setProps({ span: spanWithoutStartTime });
+
+      const displayValue = "fallback display";
+      const result = wrapper.vm.getFilterValue("start_time", displayValue);
+      expect(result).toBe(displayValue);
+    });
+
+    it("should return the raw value for the configured timestamp column (@timestamp)", async () => {
+      // mockStore has zoConfig.timestamp_column = "@timestamp", so RAW_VALUE_FILTER_FIELDS
+      // includes "@timestamp". Mount a wrapper whose span contains @timestamp so the raw
+      // value can be returned rather than falling back to displayValue.
+      const rawTsValue = 9_999_999_999_999;
+      const spanWithTsCol = { ...mockSpan, "@timestamp": rawTsValue };
+      const tsWrapper = mount(TraceDetailsSidebar, {
+        attachTo: "#app",
+        props: { span: spanWithTsCol, baseTracePosition: mockBaseTracePosition, searchQuery: "" },
+        global: {
+          plugins: [i18n, router],
+          provide: { store: mockStore },
+          stubs: { "q-resize-observer": true, "q-virtual-scroll": { template: "<div><slot /></div>", props: ["items"] } },
+        },
+      });
+      await tsWrapper.vm.$nextTick();
+      const displayValue = "2025-07-14T10:14:52.843Z";
+      expect(tsWrapper.vm.getFilterValue("@timestamp", displayValue)).toBe(rawTsValue);
+      tsWrapper.unmount();
+    });
+
+    it("should return the display value unchanged for _timestamp when timestamp_column is @timestamp", () => {
+      // mockStore.zoConfig.timestamp_column = "@timestamp", so RAW_VALUE_FILTER_FIELDS
+      // is Set(["start_time", "end_time", "@timestamp"]).
+      // "_timestamp" is NOT in the set — display value must pass through unchanged.
+      const displayValue = "2025-07-14T10:14:52.843Z";
+      const result = wrapper.vm.getFilterValue("_timestamp", displayValue);
+      expect(result).toBe(displayValue);
+    });
+  });
+
+  describe("apply-filter-immediately emit — getFilterValue called at the emit site", () => {
+    // This describe block mounts a separate wrapper with JsonPreview stubbed to render
+    // its #field-dropdown slot directly in the DOM (no q-btn-dropdown popup layer).
+    // This lets us click the filter q-item without needing Quasar popup mechanics.
+    let filterWrapper: any;
+
+    const mountWithInlineSlot = (spanOverrides: Record<string, unknown> = {}) =>
+      mount(TraceDetailsSidebar, {
+        attachTo: "#app",
+        props: {
+          span: { ...mockSpan, ...spanOverrides },
+          baseTracePosition: mockBaseTracePosition,
+          searchQuery: "",
+        },
+        global: {
+          plugins: [i18n, router],
+          provide: { store: mockStore },
+          stubs: {
+            "q-resize-observer": true,
+            "q-virtual-scroll": {
+              template: `
+                <div>
+                  <slot name="before"></slot>
+                  <div v-for="(item, index) in items" :key="index">
+                    <slot :item="item" :index="index"></slot>
+                  </div>
+                </div>
+              `,
+              props: ["items"],
+            },
+            // Stub JsonPreview to render its #field-dropdown slot inline for each key
+            // in `value`, so the q-item inside is immediately clickable without a popup.
+            JsonPreview: {
+              props: ["value", "highlightQuery", "showCopyButton", "copyButtonClass"],
+              template: `
+                <div data-test="trace-details-sidebar-attributes-table">
+                  <div
+                    v-for="(val, key) in value"
+                    :key="key"
+                    :data-test="'json-preview-field-' + key"
+                  >
+                    <slot name="field-dropdown" :field="key" :value="val" />
+                  </div>
+                </div>
+              `,
+            },
+          },
+        },
+      });
+
+    beforeEach(async () => {
+      filterWrapper = mountWithInlineSlot();
+      await filterWrapper.vm.$nextTick();
+    });
+
+    afterEach(() => {
+      filterWrapper?.unmount();
+    });
+
+    it("should emit apply-filter-immediately with the raw start_time number, not the display string", async () => {
+      // The stub renders the slot for every key. Find the q-item under the start_time field.
+      const startTimeSlot = filterWrapper.find(
+        '[data-test="json-preview-field-start_time"]',
+      );
+      expect(startTimeSlot.exists()).toBe(true);
+
+      const filterItem = startTimeSlot.find("div[class*='q-item'], .q-item, [role='option']");
+      // Fall back to finding by the q-item element directly
+      const qItem = startTimeSlot.find(".q-item") || startTimeSlot.findAll("*").find((el: any) => el.element.tagName === "DIV" && el.attributes("clickable") !== undefined);
+
+      // Click the first q-item in the slot (the "=" filter action)
+      const items = startTimeSlot.findAll(".q-item");
+      expect(items.length).toBeGreaterThan(0);
+      await items[0].trigger("click");
+
+      const emitted = filterWrapper.emitted("apply-filter-immediately");
+      expect(emitted).toBeTruthy();
+      const lastEmit = emitted![emitted!.length - 1][0];
+      expect(lastEmit.field).toBe("start_time");
+      // Must be the raw nanosecond integer from props.span, not the formatted date string
+      expect(lastEmit.value).toBe(mockSpan.start_time);
+      expect(typeof lastEmit.value).toBe("number");
+    });
+
+    it("should emit apply-filter-immediately with the raw end_time number, not the display string", async () => {
+      const endTimeSlot = filterWrapper.find(
+        '[data-test="json-preview-field-end_time"]',
+      );
+      expect(endTimeSlot.exists()).toBe(true);
+
+      const items = endTimeSlot.findAll(".q-item");
+      expect(items.length).toBeGreaterThan(0);
+      await items[0].trigger("click");
+
+      const emitted = filterWrapper.emitted("apply-filter-immediately");
+      expect(emitted).toBeTruthy();
+      const lastEmit = emitted![emitted!.length - 1][0];
+      expect(lastEmit.field).toBe("end_time");
+      expect(lastEmit.value).toBe(mockSpan.end_time);
+      expect(typeof lastEmit.value).toBe("number");
+    });
+
+    it("should emit apply-filter-immediately with the display string unchanged for span_id", async () => {
+      const spanIdSlot = filterWrapper.find(
+        '[data-test="json-preview-field-span_id"]',
+      );
+      expect(spanIdSlot.exists()).toBe(true);
+
+      const items = spanIdSlot.findAll(".q-item");
+      expect(items.length).toBeGreaterThan(0);
+      await items[0].trigger("click");
+
+      const emitted = filterWrapper.emitted("apply-filter-immediately");
+      expect(emitted).toBeTruthy();
+      const lastEmit = emitted![emitted!.length - 1][0];
+      expect(lastEmit.field).toBe("span_id");
+      // span_id is not in RAW_VALUE_FILTER_FIELDS — display value passes through
+      expect(lastEmit.value).toBe(mockSpan.span_id);
     });
   });
 

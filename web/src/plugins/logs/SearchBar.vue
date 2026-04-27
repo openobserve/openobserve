@@ -1054,24 +1054,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                     "
                   >
-                    <q-btn
-                      data-test="logs-search-bar-refresh-btn"
-                      data-cy="search-bar-visuzlie-hard-refresh-button"
-                      dense
-                      flat
-                      no-caps
-                      :title="t('search.refreshCacheAndRunQuery')"
-                      class="q-pa-sm search-button-dropdown tw:text-[12px]"
-                      v-close-popup
-                      @click="handleRunQueryFn(true)"
-                      :disable="
-                        config.isEnterprise == 'true' &&
-                        !!visualizeSearchRequestTraceIds.length
-                      "
-                    >
-                      <q-icon name="refresh" class="q-mr-xs" />
-                      {{ t("search.refreshCacheAndRunQuery") }}
-                    </q-btn>
+                    <q-list class="tw:min-w-[200px] tw:py-1">
+                      <q-item
+                        data-test="logs-search-bar-refresh-btn"
+                        data-cy="search-bar-visuzlie-hard-refresh-button"
+                        clickable
+                        v-close-popup
+                        @click="handleRunQueryFn(true)"
+                        :disable="
+                          config.isEnterprise == 'true' &&
+                          !!visualizeSearchRequestTraceIds.length
+                        "
+                        class="tw:text-[12px] tw:rounded-md tw:mx-1"
+                      >
+                        <q-item-section avatar class="tw:min-w-0 tw:pr-2">
+                          <q-icon name="refresh" size="16px" />
+                        </q-item-section>
+                        <q-item-section>
+                          {{ t("search.refreshCacheAndRunQuery") }}
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
                   </template>
 
                   <!-- NLP Mode: No additional options -->
@@ -1175,24 +1178,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                     "
                   >
-                    <q-btn
-                      data-test="logs-search-bar-refresh-btn"
-                      data-cy="search-bar-visuzlie-hard-refresh-button"
-                      dense
-                      flat
-                      no-caps
-                      :title="t('search.refreshCacheAndRunQuery')"
-                      class="q-pa-sm search-button-dropdown tw:text-[12px]"
-                      v-close-popup
-                      @click="handleRunQueryFn(true)"
-                      :disable="
-                        config.isEnterprise == 'true' &&
-                        !!visualizeSearchRequestTraceIds.length
-                      "
-                    >
-                      <q-icon name="refresh" class="q-mr-xs" />
-                      {{ t("search.refreshCacheAndRunQuery") }}
-                    </q-btn>
+                    <q-list class="tw:min-w-[200px] tw:py-1">
+                      <q-item
+                        data-test="logs-search-bar-refresh-btn"
+                        data-cy="search-bar-visuzlie-hard-refresh-button"
+                        clickable
+                        v-close-popup
+                        @click="handleRunQueryFn(true)"
+                        :disable="
+                          config.isEnterprise == 'true' &&
+                          !!visualizeSearchRequestTraceIds.length
+                        "
+                        class="tw:text-[12px] tw:rounded-md tw:mx-1"
+                      >
+                        <q-item-section avatar class="tw:min-w-0 tw:pr-2">
+                          <q-icon name="refresh" size="16px" />
+                        </q-item-section>
+                        <q-item-section>
+                          {{ t("search.refreshCacheAndRunQuery") }}
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
                   </template>
 
                   <!-- NL detected, AI bar not open: No additional options -->
@@ -1246,7 +1252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
                     : 'o2-run-query-button o2-color-primary',
-                  config.isEnterprise == 'true'
+                  config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled
                     ? 'search-button-enterprise-border-radius'
                     : 'search-button-normal-border-radius',
                 ]"
@@ -1271,19 +1277,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     !searchObj.data.stream.selectedStream.length)
                 "
               >
+                <q-tooltip
+                  v-if="
+                    searchObj.meta.liveMode &&
+                    store.state.zoConfig.auto_query_enabled &&
+                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                  "
+                >{{ t("search.autoRunEnabled") }}</q-tooltip>
+                <q-icon
+                  v-if="
+                    searchObj.meta.liveMode &&
+                    store.state.zoConfig.auto_query_enabled &&
+                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                  "
+                  name="autorenew"
+                  size="14px"
+                  class="q-mr-xs"
+                />
                 {{
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? t("search.generateQuery")
                     : t("search.runQuery")
                 }}
               </q-btn>
-              <!-- Dropdown: "Ask AI" state only when NL detected + AI bar not open -->
+              <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
               <q-separator
-                v-if="config.isEnterprise == 'true'"
+                v-if="config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled"
                 class="tw:h-[29px] tw:w-[1px]"
               />
               <q-btn-dropdown
-                v-if="config.isEnterprise == 'true'"
+                v-if="config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled"
                 flat
                 class="tw:h-[29px] search-button-dropdown"
                 :class="[
@@ -1300,35 +1323,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                       ? 'o2-color-primary'
                       : '',
-                  config.isEnterprise == 'true'
+                  config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled
                     ? 'search-button-dropdown-enterprise-border-radius'
                     : 'search-button-normal-border-radius',
                 ]"
                 unelevated
                 dense
               >
-                <!-- SQL Mode / AI bar open: Refresh option -->
+                <!-- SQL Mode / AI bar open: Refresh option + Live Mode toggle -->
                 <template
                   v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
                 >
-                  <q-btn
-                    data-test="logs-search-bar-refresh-btn"
-                    data-cy="search-bar-refresh-button"
-                    dense
-                    flat
-                    no-caps
-                    :title="t('search.refreshCacheAndRunQuery')"
-                    class="q-pa-sm tw:text-[12px]"
-                    v-close-popup
-                    @click="handleRunQueryFn(true)"
-                    :disable="
-                      searchObj.loading == true ||
-                      searchObj.loadingHistogram == true
-                    "
-                  >
-                    <q-icon name="refresh" class="q-mr-xs" />
-                    {{ t("search.refreshCacheAndRunQuery") }}
-                  </q-btn>
+                  <q-list class="tw:min-w-[200px] tw:py-1">
+                    <q-item
+                      v-if="config.isEnterprise == 'true'"
+                      data-test="logs-search-bar-refresh-btn"
+                      data-cy="search-bar-refresh-button"
+                      clickable
+                      v-close-popup
+                      :disable="
+                        searchObj.loading == true ||
+                        searchObj.loadingHistogram == true
+                      "
+                      @click="handleRunQueryFn(true)"
+                      class="tw:text-[12px] tw:rounded-md tw:mx-1"
+                    >
+                      <q-item-section avatar class="tw:min-w-0 tw:pr-2">
+                        <q-icon name="refresh" size="16px" />
+                      </q-item-section>
+                      <q-item-section>
+                        {{ t("search.refreshCacheAndRunQuery") }}
+                      </q-item-section>
+                    </q-item>
+
+                    <q-separator
+                      v-if="
+                        config.isEnterprise == 'true' &&
+                        store.state.zoConfig.auto_query_enabled
+                      "
+                      class="tw:my-1"
+                    />
+
+                    <!-- Live Mode toggle — only when backend flag is enabled -->
+                    <q-item
+                      v-if="store.state.zoConfig.auto_query_enabled"
+                      data-test="logs-search-bar-live-mode-toggle-btn"
+                      clickable
+                      v-close-popup
+                      @click="toggleLiveMode"
+                      class="tw:text-[12px] tw:rounded-md tw:mx-1"
+                    >
+                      <q-item-section avatar class="tw:min-w-0 tw:pr-2">
+                        <q-icon
+                          :name="searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'"
+                          size="16px"
+                          :color="searchObj.meta.liveMode ? 'primary' : ''"
+                        />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label class="tw:font-medium">
+                          {{
+                            searchObj.meta.liveMode
+                              ? t("search.turnOffLiveMode")
+                              : t("search.turnOnLiveMode")
+                          }}
+                        </q-item-label>
+                        <q-item-label caption class="tw:text-[11px]">
+                          {{ t("search.liveModeTooltip") }}
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
                 </template>
                 <!-- NL detected, AI bar not open: Empty menu -->
                 <template v-else>
@@ -1385,8 +1450,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="router.currentRoute.value.name === 'logs'"
                 ref="queryEditorRef"
                 :query="searchObj.data.query"
-                :keywords="autoCompleteKeywords"
-                :suggestions="autoCompleteSuggestions"
+                :keywords="effectiveKeywords"
+                :suggestions="effectiveSuggestions"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
                 :show-ai-icon="
@@ -2346,7 +2411,7 @@ import {
 
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, debounce } from "lodash-es";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { inject } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
@@ -2359,7 +2424,10 @@ import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
-import { logsUtils } from "@/composables/useLogs/logsUtils";
+import {
+  logsUtils,
+  removeFieldFromWhereAST,
+} from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import {
   getVisualizationConfig,
@@ -2631,6 +2699,7 @@ export default defineComponent({
     } = useSearchBar();
     const { loadStreamLists, extractFields } = useStreamFields();
 
+
     const {
       refreshData,
       handleRunQuery,
@@ -2695,9 +2764,12 @@ export default defineComponent({
       autoCompleteData,
       autoCompleteKeywords,
       autoCompleteSuggestions,
+      effectiveKeywords,
+      effectiveSuggestions,
       getSuggestions,
       updateFieldKeywords,
       updateFunctionKeywords,
+      updateStreamKeywords,
     } = useSqlSuggestions();
 
     const refreshTimeChange = (item) => {
@@ -2818,6 +2890,16 @@ export default defineComponent({
         if (fields != undefined && fields.length) updateFieldKeywords(fields);
       },
       { immediate: true, deep: true },
+    );
+
+    watch(
+      () => searchObj.data.streamResults?.list,
+      (list) => {
+        updateStreamKeywords(
+          (list ?? []).map((s: any) => ({ name: s.name })),
+        );
+      },
+      { immediate: true, deep: false },
     );
     watch(
       () => searchObj.meta.showSearchScheduler,
@@ -2981,7 +3063,7 @@ export default defineComponent({
       return columnNames;
     };
 
-    const updateQueryValue = (value: string) => {
+    const updateQueryValue = (value: string, event?: any) => {
       // if (searchObj.meta.jobId != "") {
       //   searchObj.meta.jobId = "";
       //   getQueryData(false);
@@ -3165,6 +3247,32 @@ export default defineComponent({
       }
     };
 
+    // Debounced query trigger for absolute time when auto-run is enabled.
+    // Gives the user 1.5s to finish typing start/end time before firing.
+    const triggerAbsoluteQueryDebounced = debounce((value: object) => {
+      if (
+        searchObj.loading == false &&
+        store.state.zoConfig.query_on_stream_selection == false
+      ) {
+        searchObj.loading = true;
+        searchObj.runQuery = true;
+      }
+
+      if (config.isCloud == "true" && value.userChangedValue) {
+        segment.track("Button Click", {
+          button: "Date Change",
+          tab: value.tab,
+          value: value,
+          stream_name: searchObj.data.stream.selectedStream.join(","),
+          page: "Search Logs",
+        });
+      }
+
+      if (store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode) {
+        emit("searchdata");
+      }
+    }, 2500);
+
     const updateDateTime = async (value: object) => {
       if (
         value.valueType == "absolute" &&
@@ -3220,6 +3328,15 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       await nextTick();
+
+      if (
+        value.valueType === "absolute" &&
+        store.state.zoConfig.auto_query_enabled
+      ) {
+        // Debounce query trigger so user can finish typing the full time value
+        triggerAbsoluteQueryDebounced(value);
+        return;
+      }
 
       if (
         searchObj.loading == false &&
@@ -3541,6 +3658,13 @@ export default defineComponent({
       fnEditorRef?.value?.setValue(fnValue.function);
       searchObj.data.tempFunctionName = fnValue.name;
       searchObj.data.tempFunctionContent = fnValue.function;
+
+      if (
+        store.state.zoConfig?.auto_query_enabled &&
+        searchObj.meta.liveMode
+      ) {
+        emit("searchdata");
+      }
     };
 
     const fnSavedFunctionDialog = () => {
@@ -4546,7 +4670,10 @@ export default defineComponent({
       }
 
       queryEditorRef.value?.setValue(searchObj.data.query);
-      if (store.state.zoConfig.query_on_stream_selection == false) {
+      if (
+        store.state.zoConfig.query_on_stream_selection == false ||
+        (store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode)
+      ) {
         handleRunQueryFn();
       }
     };
@@ -4674,6 +4801,11 @@ export default defineComponent({
     const handleQuickMode = () => {
       searchObj.meta.quickMode = !searchObj.meta.quickMode;
       emit("handleQuickModeChange");
+    };
+
+    const toggleLiveMode = () => {
+      searchObj.meta.liveMode = !searchObj.meta.liveMode;
+      localStorage.setItem("oo_toggle_auto_run", String(searchObj.meta.liveMode));
     };
 
     const handleHistogramMode = () => {};
@@ -5218,6 +5350,8 @@ export default defineComponent({
       handleRunQueryFn,
       autoCompleteKeywords,
       autoCompleteSuggestions,
+      effectiveKeywords,
+      effectiveSuggestions,
       onRefreshIntervalUpdate,
       updateTimezone,
       dateTimeRef,
@@ -5276,6 +5410,7 @@ export default defineComponent({
       backgroundColorStyle,
       editorWidthToggleFunction,
       fnParsedSQL,
+      fnUnparsedSQL,
       iconRight,
       functionToggleIcon,
       searchSchedulerJob,
@@ -5342,6 +5477,7 @@ export default defineComponent({
       shouldMoveSavedViewToMenu,
       shouldMoveSqlToggleToMenu,
       shouldMoveShareToMenu,
+      toggleLiveMode,
     };
   },
   computed: {
@@ -5554,19 +5690,44 @@ export default defineComponent({
           this.searchObj.data.stream.addToFilter = "";
           if (this.queryEditorRef?.setValue)
             this.queryEditorRef.setValue(this.searchObj.data.query);
+          if (
+            this.store.state.zoConfig.auto_query_enabled &&
+            this.searchObj.meta.liveMode
+          ) {
+            this.$emit("searchdata");
+          }
         }
       }
     },
     removeFieldTerm(fieldName: string) {
       if (!fieldName) return;
-      const newValue = removeFieldCondition(
-        this.searchObj.data.editorValue,
-        fieldName,
-      );
+      let newValue: string;
+      if (this.searchObj.meta.sqlMode) {
+        try {
+          const parsed = this.fnParsedSQL();
+          if (parsed?.where) {
+            const newWhere = removeFieldFromWhereAST(parsed.where, fieldName);
+            newValue = this.fnUnparsedSQL({ ...parsed, where: newWhere }).replaceAll("`", '"');
+          } else {
+            newValue = this.searchObj.data.editorValue;
+          }
+        } catch (e) {
+          console.log("Error removing field condition from SQL:", e);
+          newValue = removeFieldCondition(this.searchObj.data.editorValue, fieldName);
+        }
+      } else {
+        newValue = removeFieldCondition(this.searchObj.data.editorValue, fieldName);
+      }
       this.searchObj.data.editorValue = newValue;
       this.searchObj.data.query = newValue;
       this.searchObj.data.stream.removeFilterField = "";
       if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
+      if (
+        this.store.state.zoConfig.auto_query_enabled &&
+        this.searchObj.meta.liveMode
+      ) {
+        this.$emit("searchdata");
+      }
     },
     toggleTransformEditor(newVal) {
       if (newVal == false) {
@@ -5580,6 +5741,12 @@ export default defineComponent({
     resetFunction(newVal) {
       if (newVal == "" && store && !store?.state?.savedViewFlag) {
         this.resetFunctionContent();
+        if (
+          this.store.state.zoConfig?.auto_query_enabled &&
+          this.searchObj.meta.liveMode
+        ) {
+          this.$emit("searchdata");
+        }
       }
     },
     resetFunctionDefinition(newVal) {
@@ -5743,7 +5910,7 @@ export default defineComponent({
   font-weight: 500 !important;
   line-height: 16px !important;
   padding: 0px 0px !important;
-  width: 74px !important;
+  width: 94px !important;
   transition:
     box-shadow 0.3s ease,
     opacity 0.2s ease;

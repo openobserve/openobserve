@@ -4,17 +4,9 @@ on:
   push:
     branches:
       - "main"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
   pull_request:
     branches:
       - "*"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
   merge_group:
 
 concurrency:
@@ -54,8 +46,33 @@ env:
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
+  check_changes:
+    name: check_changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: check
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
+          if [ -z "$CHANGED" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          elif echo "$CHANGED" | grep -qvE '(\.md$|^docs/)'; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
   build_binary:
     name: build_binary
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on:
       labels: ubicloud-standard-30
 
@@ -80,7 +97,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          prefix-key: playwright
+          shared-key: playwright-release
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: |
@@ -162,6 +180,7 @@ jobs:
                 "logsqueries.matchall.spec.js",
                 "searchpartition.spec.js",
                 "logs-autocomplete-suggestions.spec.js",
+                "logs-sql-autocomplete.spec.js",
               ]
           - testfolder: "Alerts"
             browser: "chrome"
@@ -187,6 +206,7 @@ jobs:
                 "maxquery.spec.js",
                 "dashboard-chartJson.spec.js",
                 "dashboard-promql-suggestions.spec.js",
+                "dashboard-sql-autocomplete.spec.js",
                 "dashboard-share-link.spec.js",
                 "crossLinking.spec.js",
                 "dashboard-multi-sql.spec.js",
@@ -219,6 +239,7 @@ jobs:
                 "dashboard-sankey.spec.js",
                 "dashboard-pie-donut.spec.js",
                 "dashboard-table-chart.spec.js",
+                "dashboard-table-copy-cell.spec.js",
                 "dashboard-metric-camelcase.spec.js",
               ]
           - testfolder: "Dashboards-Streaming"
@@ -378,7 +399,16 @@ jobs:
         run: chmod +x ./release-binary/openobserve && ./release-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
-        run: sleep 60
+        run: |
+          for i in $(seq 1 120); do
+            if curl -sf http://localhost:5080/web/login > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server failed to start in 120s"
+          exit 1
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
@@ -972,11 +1002,18 @@ jobs:
     runs-on:
       labels: ubicloud-standard-8
     permissions: {}
-    needs: [build_binary, ui_integration_tests, merge_and_upload_reports, generate_coverage_report]
+    needs: [check_changes, build_binary, ui_integration_tests, merge_and_upload_reports, generate_coverage_report]
     if: always()
     steps:
       - name: Check test results
         run: |
+          # check_changes must have succeeded — if it failed, all downstream jobs skipped
+          # and we would otherwise incorrectly report success.
+          if [ "${{ needs.check_changes.result }}" != "success" ]; then
+            echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"
+            exit 1
+          fi
+
           # Check all job results - accept success or skipped for all jobs
           BUILD_OK=false
           UI_OK=false
@@ -991,7 +1028,7 @@ jobs:
             UI_OK=true
           fi
 
-          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ]; then
+          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "failure" ]; then
             MERGE_OK=true
           fi
 

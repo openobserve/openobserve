@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:font-semibold flex items-center"
           style="width: 190px; height: 36px"
         >
-          Notifications
+          {{ t('alerts.anomaly.notifications') }}
           <q-icon
             name="info"
             size="17px"
@@ -40,17 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               self="center left"
               max-width="300px"
             >
-              <span style="font-size: 14px">
-                When enabled, a notification will be sent to the selected
-                destination whenever an anomaly is detected.
-              </span>
+              <span style="font-size: 14px">{{ t('alerts.anomaly.notificationsTooltip') }}</span>
             </q-tooltip>
           </q-icon>
         </div>
         <div>
           <q-toggle
             v-model="config.alert_enabled"
-            :label="config.alert_enabled ? 'Enabled' : 'Disabled'"
+            :label="config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')"
             size="xs"
             class="o2-toggle-button-xs"
             :class="
@@ -133,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #no-option>
                 <q-item>
                   <q-item-section class="text-grey"
-                    >No destinations found</q-item-section
+                    >{{ t('alerts.anomaly.noDestinationsFound') }}</q-item-section
                   >
                 </q-item>
               </template>
@@ -147,12 +144,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
-              title="Refresh destinations"
+              :title="t('alerts.alertSettings.refreshDestinations')"
               style="min-width: auto"
               @click="$emit('refresh:destinations')"
             />
             <q-btn
-              label="Add New Destination"
+              :label="t('alerts.anomaly.addNewDestination')"
               class="o2-secondary-button q-ml-sm"
               no-caps
               size="sm"
@@ -167,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="font-size: 11px; line-height: 12px"
             data-test="anomaly-destination-error"
           >
-            At least one destination is required!
+            {{ t('alerts.anomaly.destinationRequired') }}
           </div>
         </div>
       </div>
@@ -180,11 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-icon name="info" size="16px"
 class="tw:mt-px tw:flex-shrink-0" />
-        <span>
-          Anomaly detection will still run and write results to the
-          <code>_anomalies</code> stream. Enable notifications to receive alerts
-          when anomalies are detected.
-        </span>
+        <span>{{ t('alerts.anomaly.disabledNotificationsInfo') }}</span>
       </div>
     </div>
   </div>

@@ -1,0 +1,67 @@
+/* ============================================================
+   BASE TOKENS — raw palette, spacing, radius, shadows
+   These are NEVER referenced directly in components.
+   Components use semantic or component tokens only.
+   ============================================================ */
+
+:root {
+  /* --- Primary palette --- */
+  --color-primary-50:  #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+
+  /* --- Grey palette --- */
+  --color-grey-0:   #ffffff;
+  --color-grey-50:  #f9fafb;
+  --color-grey-100: #f3f4f6;
+  --color-grey-200: #e5e7eb;
+  --color-grey-300: #d1d5db;
+  --color-grey-400: #9ca3af;
+  --color-grey-500: #6b7280;
+  --color-grey-600: #4b5563;
+  --color-grey-700: #374151;
+  --color-grey-800: #1f2937;
+  --color-grey-900: #111827;
+  --color-grey-950: #030712;
+
+  /* --- Error palette --- */
+  --color-error-50:  #fef2f2;
+  --color-error-100: #fee2e2;
+  --color-error-400: #f87171;
+  --color-error-500: #ef4444;
+  --color-error-600: #dc2626;
+  --color-error-700: #b91c1c;
+
+  /* --- Success palette --- */
+  --color-success-50:  #f0fdf4;
+  --color-success-500: #22c55e;
+  --color-success-700: #15803d;
+
+  /* --- Warning palette --- */
+  --color-warning-50:  #fffbeb;
+  --color-warning-500: #f59e0b;
+  --color-warning-700: #b45309;
+
+  /* --- White / Black --- */
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* --- Radius scale --- */
+  --radius-sm:   0.25rem;   /* 4px  */
+  --radius-md:   0.375rem;  /* 6px  */
+  --radius-lg:   0.5rem;    /* 8px  */
+  --radius-xl:   0.75rem;   /* 12px */
+  --radius-full: 9999px;
+
+  /* --- Shadow scale --- */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}

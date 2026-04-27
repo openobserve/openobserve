@@ -112,3 +112,119 @@ where
 pub struct TestActionRequest {
     pub inputs: Vec<serde_json::Value>,
 }
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use chrono::TimeZone;
+    use config::meta::actions::action::{ActionStatus, ExecutionDetailsType};
+    use svix_ksuid::Ksuid;
+
+    use super::*;
+
+    // A valid KSUID in base62 format.
+    const TEST_KSUID: &str = "0ujtsYcgvSTl8PAuAdqWYSMnLOv";
+
+    fn test_ksuid() -> Ksuid {
+        Ksuid::from_str(TEST_KSUID).unwrap()
+    }
+
+    fn make_action(
+        id: Option<Ksuid>,
+        last_executed_at: Option<DateTime<Utc>>,
+        last_successful_at: Option<DateTime<Utc>>,
+    ) -> Action {
+        Action {
+            id,
+            org_id: "test_org".to_string(),
+            name: "my_action".to_string(),
+            execution_details: ExecutionDetailsType::Once,
+            cron_expr: None,
+            environment_variables: HashMap::new(),
+            created_by: "user@example.com".to_string(),
+            status: ActionStatus::Ready,
+            created_at: Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap(),
+            last_executed_at,
+            last_successful_at,
+            zip_file_name: "action.zip".to_string(),
+            last_modified_at: Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap(),
+            origin_cluster_url: "".to_string(),
+            service_account: "sa@example.com".to_string(),
+            description: None,
+            zip_file_path: None,
+        }
+    }
+
+    #[test]
+    fn test_try_from_action_into_info_response_with_id() {
+        let action = make_action(Some(test_ksuid()), None, None);
+        let resp = GetActionInfoResponse::try_from(action).unwrap();
+        assert_eq!(resp.name, "my_action");
+        assert_eq!(resp.created_by, "user@example.com");
+        // last_run_at falls back to created_at when last_executed_at is None
+        assert_eq!(
+            resp.last_run_at,
+            Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap()
+        );
+        assert!(resp.last_successful_at.is_none());
+    }
+
+    #[test]
+    fn test_try_from_action_info_response_no_id_errors() {
+        let action = make_action(None, None, None);
+        let err = GetActionInfoResponse::try_from(action).unwrap_err();
+        assert!(err.to_string().contains("No Id"));
+    }
+
+    #[test]
+    fn test_try_from_action_info_response_with_last_executed_at() {
+        let last_exec = Utc.with_ymd_and_hms(2024, 6, 1, 12, 0, 0).unwrap();
+        let last_success = Utc.with_ymd_and_hms(2024, 5, 1, 0, 0, 0).unwrap();
+        let action = make_action(Some(test_ksuid()), Some(last_exec), Some(last_success));
+        let resp = GetActionInfoResponse::try_from(action).unwrap();
+        assert_eq!(resp.last_run_at, last_exec);
+        assert_eq!(resp.last_successful_at, Some(last_success));
+    }
+
+    #[test]
+    fn test_try_from_action_into_details_response_with_id() {
+        let action = make_action(Some(test_ksuid()), None, None);
+        let resp = GetActionDetailsResponse::try_from(action).unwrap();
+        assert_eq!(resp.name, "my_action");
+        assert_eq!(resp.service_account, "sa@example.com");
+        assert!(resp.cron_expr.is_none());
+        assert!(resp.description.is_none());
+    }
+
+    #[test]
+    fn test_try_from_action_details_response_no_id_errors() {
+        let action = make_action(None, None, None);
+        let result = GetActionDetailsResponse::try_from(action);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_serialize_datetime_fields() {
+        // Covers serialize_datetime (required field) and serialize_option_datetime (None case)
+        // in a single serialization pass.
+        let action = make_action(Some(test_ksuid()), None, None);
+        let resp = GetActionInfoResponse::try_from(action).unwrap();
+        let json = serde_json::to_value(&resp).unwrap();
+        let expected_micros = Utc
+            .with_ymd_and_hms(2024, 1, 1, 0, 0, 0)
+            .unwrap()
+            .timestamp_micros();
+        assert_eq!(json["created_at"], expected_micros);
+        assert!(json["last_successful_at"].is_null());
+    }
+
+    #[test]
+    fn test_serialize_option_datetime_some() {
+        let success_at = Utc.with_ymd_and_hms(2024, 3, 15, 10, 30, 0).unwrap();
+        let action = make_action(Some(test_ksuid()), None, Some(success_at));
+        let resp = GetActionInfoResponse::try_from(action).unwrap();
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["last_successful_at"], success_at.timestamp_micros());
+    }
+}

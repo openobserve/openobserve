@@ -617,6 +617,35 @@ describe("ServiceGraphNodeSidePanel", () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // metricGroupResources ref
+  // -------------------------------------------------------------------------
+
+  describe("metricGroupResources", () => {
+    beforeEach(() => {
+      wrapper = mountPanel();
+    });
+
+    it("should expose exactly 4 metric group entries", () => {
+      expect(wrapper.vm.metricGroupResources).toHaveLength(4);
+    });
+
+    it("should have IDs in order: pods, nodes, network, others", () => {
+      const ids = wrapper.vm.metricGroupResources.map(
+        (g: { id: string }) => g.id,
+      );
+      expect(ids).toEqual(["pods", "nodes", "network", "others"]);
+    });
+
+    it("should have the expected id and label for each group", () => {
+      const groups = wrapper.vm.metricGroupResources;
+      expect(groups[0]).toMatchObject({ id: "pods", label: "Pods" });
+      expect(groups[1]).toMatchObject({ id: "nodes", label: "Nodes" });
+      expect(groups[2]).toMatchObject({ id: "network", label: "Network" });
+      expect(groups[3]).toMatchObject({ id: "others", label: "Others" });
+    });
+  });
+
   describe("viewRelatedLogs — valid logs stream found", () => {
     beforeEach(() => {
       vi.mocked(correlateStreams).mockResolvedValue({

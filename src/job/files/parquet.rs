@@ -707,9 +707,6 @@ async fn merge_files(
 
     // get latest version of schema
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
-    #[cfg(feature = "enterprise")]
-    let log_patterns_enabled =
-        infra::schema::get_stream_setting_log_patterns_enabled(&stream_settings);
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
     let index_fields = get_stream_setting_index_fields(&stream_settings);
@@ -813,37 +810,6 @@ async fn merge_files(
         start.elapsed().as_millis(),
     );
 
-    // Enterprise: Extract patterns from merged parquet (ingester nodes only)
-    #[cfg(feature = "enterprise")]
-    {
-        use config::cluster::LOCAL_NODE;
-        if LOCAL_NODE.is_ingester() && stream_type == StreamType::Logs && log_patterns_enabled {
-            let buf_clone = buf.clone();
-            let org_id_clone = org_id.clone();
-            let stream_name_clone = stream_name.clone();
-            let fts_fields = full_text_search_fields.clone();
-
-            // Spawn pattern extraction task (don't block file movement)
-            tokio::spawn(async move {
-                if let Err(e) = extract_patterns_from_parquet(
-                    &org_id_clone,
-                    &stream_name_clone,
-                    &buf_clone,
-                    &fts_fields,
-                )
-                .await
-                {
-                    log::error!(
-                        "[PatternExtraction] Failed to extract patterns for {}/{}: {}",
-                        org_id_clone,
-                        stream_name_clone,
-                        e
-                    );
-                }
-            });
-        }
-    }
-
     // upload file
     let buf = Bytes::from(buf);
     if cfg.cache_latest_files.enabled
@@ -865,19 +831,35 @@ async fn merge_files(
         let service_streams_config =
             &o2_enterprise::enterprise::common::config::get_config().service_streams;
 
-        // Skip self-reporting streams from _meta organization to avoid processing internal metrics
-        if service_streams_config.node_matches_processing_node(&LOCAL_NODE)
-            && service_streams_config.enabled
+        let valid_stream_type = stream_type == StreamType::Logs
+            || stream_type == StreamType::Metrics
+            || stream_type == StreamType::Traces;
+
+        if service_streams_config.enabled
+            && service_streams_config.node_matches_processing_node(&LOCAL_NODE)
             && org_id != config::META_ORG_ID
-            && (stream_type == StreamType::Logs
-                || stream_type == StreamType::Metrics
-                || stream_type == StreamType::Traces)
+            && valid_stream_type
         {
             // Get stream count for this type (cached, 5-min TTL — counts rarely change).
             let stream_count =
                 crate::service::db::schema::get_stream_count_cached(&org_id, stream_type).await;
 
-            // Check if we should process this file (adaptive per-type sampling)
+            // Get coverage deficit: how many known services are missing streams of this type.
+            // Derived entirely from the in-memory cache — no DB I/O.
+            // Feeds the fast-lane boost in the sampler: 100% incomplete → rate=1 (all streams
+            // active), tapering back to normal as coverage fills in.
+            // Passing (0, 0) when disabled is the documented no-op sentinel for the sampler.
+            let coverage_deficit = if service_streams_config.coverage_catchup_enabled {
+                o2_enterprise::enterprise::service_streams::cache::get_coverage_deficit(
+                    &org_id,
+                    stream_type,
+                )
+                .await
+            } else {
+                (0, 0)
+            };
+
+            // Check if we should process this file (adaptive per-type sampling with fast lane)
             let should_process =
                 o2_enterprise::enterprise::service_streams::sampler::should_process_file(
                     &org_id,
@@ -885,6 +867,7 @@ async fn merge_files(
                     &stream_name,
                     &new_file_key,
                     stream_count,
+                    coverage_deficit,
                 );
 
             if should_process {
@@ -964,154 +947,6 @@ fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {
     let stream_name = columns[3].to_string();
     let prefix_date = format!("{}-{}-{}", columns[4], columns[5], columns[6]);
     (org_id, stream_type, stream_name, prefix_date)
-}
-
-#[cfg(feature = "enterprise")]
-async fn extract_patterns_from_parquet(
-    org_id: &str,
-    stream_name: &str,
-    parquet_data: &[u8],
-    fts_fields: &[String],
-) -> Result<(), anyhow::Error> {
-    use config::utils::json;
-
-    let start = std::time::Instant::now();
-
-    // Read parquet data and extract log messages
-    let parquet_bytes = Bytes::from(parquet_data.to_vec());
-    let file_format = config::get_config().common.file_format;
-    let (_schema, mut reader) =
-        get_recordbatch_reader_from_bytes(file_format, &parquet_bytes).await?;
-    let mut log_messages = Vec::new();
-    let read_start = std::time::Instant::now();
-
-    // ParquetRecordBatchStream is a Stream, use .next().await
-    use futures::StreamExt;
-
-    use crate::common::meta::ingestion::{IngestUser, SystemJobType};
-    while let Some(batch_result) = reader.next().await {
-        let batch = batch_result?;
-
-        // Try to find FTS fields in the batch
-        for fts_field in fts_fields {
-            if let Some(column) = batch.column_by_name(fts_field) {
-                // Extract string values from the column
-                use arrow::array::Array;
-                if let Some(string_array) =
-                    column.as_any().downcast_ref::<arrow::array::StringArray>()
-                {
-                    for i in 0..string_array.len() {
-                        if !string_array.is_null(i) {
-                            log_messages.push((
-                                0i64, // timestamp not needed for pattern extraction
-                                {
-                                    let mut map = json::Map::new();
-                                    map.insert(
-                                        fts_field.clone(),
-                                        json::Value::String(string_array.value(i).to_string()),
-                                    );
-                                    map
-                                },
-                            ));
-                        }
-                    }
-                    break; // Found FTS field, no need to check others
-                }
-            }
-        }
-    }
-
-    let read_duration = read_start.elapsed();
-
-    if log_messages.is_empty() {
-        log::debug!(
-            "[PatternExtraction] No log messages found in parquet for {}/{}",
-            org_id,
-            stream_name
-        );
-        return Ok(());
-    }
-
-    log::info!(
-        "[PatternExtraction] Read {} log messages from parquet in {:?} for {}/{}",
-        log_messages.len(),
-        read_duration,
-        org_id,
-        stream_name
-    );
-
-    // Record parquet read time metric
-    metrics::PATTERN_EXTRACTION_TIME
-        .with_label_values(&[org_id, "read_parquet"])
-        .observe(read_duration.as_secs_f64());
-
-    // Extract patterns directly using XDrain (no in-memory accumulation needed)
-    let extraction_start = std::time::Instant::now();
-    let patterns = o2_enterprise::enterprise::log_patterns::extract_patterns_from_logs(
-        &log_messages,
-        fts_fields,
-    )
-    .map_err(|e| anyhow::anyhow!("Pattern extraction failed: {}", e))?;
-    let extraction_duration = extraction_start.elapsed();
-
-    if patterns.is_empty() {
-        log::debug!(
-            "[PatternExtraction] No patterns found for {}/{}",
-            org_id,
-            stream_name
-        );
-        return Ok(());
-    }
-
-    log::info!(
-        "[PatternExtraction] Extracted {} patterns from {} logs in {:?} for {}/{}",
-        patterns.len(),
-        log_messages.len(),
-        extraction_duration,
-        org_id,
-        stream_name
-    );
-
-    // Record pattern extraction time metric
-    metrics::PATTERN_EXTRACTION_TIME
-        .with_label_values(&[org_id, "extraction"])
-        .observe(extraction_duration.as_secs_f64());
-
-    // Ingest patterns immediately
-    let ingest_start = std::time::Instant::now();
-    crate::service::logs::patterns::ingest_patterns(
-        org_id,
-        stream_name,
-        patterns,
-        IngestUser::SystemJob(SystemJobType::LogPatterns),
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!("Failed to ingest patterns: {}", e))?;
-    let ingest_duration = ingest_start.elapsed();
-
-    let total_duration = start.elapsed();
-
-    log::info!(
-        "[PatternExtraction] Completed in {:?} (read: {:?}, extract: {:?}, ingest: {:?}) for {}/{}",
-        total_duration,
-        read_duration,
-        extraction_duration,
-        ingest_duration,
-        org_id,
-        stream_name
-    );
-
-    // Record ingestion time metric
-    metrics::PATTERN_EXTRACTION_TIME
-        .with_label_values(&[org_id, "ingestion"])
-        .observe(ingest_duration.as_secs_f64());
-
-    // Record total pattern extraction time metric
-    metrics::PATTERN_EXTRACTION_TIME
-        .with_label_values(&[org_id, "total"])
-        .observe(total_duration.as_secs_f64());
-
-    Ok(())
 }
 
 #[cfg(feature = "enterprise")]

@@ -146,10 +146,9 @@ export default class DashboardDrilldownPage {
     await tablePanel.waitFor({ state: 'attached', timeout: 20000 });
     await tablePanel.scrollIntoViewIfNeeded();
 
-    // Quasar virtual-scroll renders actual data rows inside tbody.q-virtual-scroll__content
-    // (distinct from the hidden spacer tbody rows). Click directly on the tr to ensure
-    // Quasar's onClick handler fires and emits @row-click.
-    const tableRow = tablePanel.locator('tbody.q-virtual-scroll__content tr').first();
+    // TanStack table (dashboard mode) renders rows directly in tbody with class dashboard-data-row.
+    // Click the first data row to trigger the @click:dataRow event (emitted as row-click).
+    const tableRow = tablePanel.locator('tbody tr.dashboard-data-row').first();
     await tableRow.waitFor({ state: 'visible', timeout: 30000 });
     await tableRow.click();
     await this.page.waitForTimeout(500);

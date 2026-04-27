@@ -361,10 +361,6 @@ pub async fn watch_node_list() -> Result<()> {
                     add_node_to_consistent_hash(&item_value, &Role::FlattenCompactor, None).await;
                 }
                 NODES.write().await.insert(item_key.to_string(), item_value);
-                NODES_HEALTH_CHECK
-                    .write()
-                    .await
-                    .insert(item_key.to_string(), 0);
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -399,7 +395,6 @@ pub async fn watch_node_list() -> Result<()> {
                         .await;
                 }
                 NODES.write().await.remove(item_key);
-                NODES_HEALTH_CHECK.write().await.remove(item_key);
             }
             Event::Empty => {}
         }
@@ -432,16 +427,9 @@ pub async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
             );
             let mut w = NODES_HEALTH_CHECK.write().await;
             let Some(entry) = w.get_mut(&node.uuid) else {
-                // when the node comes online we populate the health check map
-                // its expected that when node is marked online, it should be able to respond
-                // to health checks. A node is marked online after GRPC init which marks complete
-                // setup of the node.
-                log::warn!(
-                    "[CLUSTER] node {node:?} is marked as online but not present in health check map"
-                );
-                return Err(Error::Message(format!(
-                    "{node:?} node state not in health check map"
-                )));
+                // node haven't been added to the cluster yet, when the health check first succeed,
+                // it will be added to the check map
+                continue;
             };
             *entry += 1;
             let times = *entry;

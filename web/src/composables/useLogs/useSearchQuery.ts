@@ -307,10 +307,20 @@ export const useSearchQuery = () => {
             )
           : cloneDeep(searchObj.data.datetime);
 
-      // Only mutate datetime timestamps in normal mode
+      // Only mutate datetime timestamps in normal mode.
+      // Guard shouldIgnoreWatcher so the datetime watcher in Index.vue does not
+      // re-fire runQueryFn when we update these values internally — otherwise
+      // every buildSearch() call on a relative time range would trigger the
+      // watcher and create an infinite query loop.
       if (searchObj.data.datetime.type === "relative" && !readOnly) {
+        searchObj.shouldIgnoreWatcher = true;
         searchObj.data.datetime.startTime = timestamps.startTime;
         searchObj.data.datetime.endTime = timestamps.endTime;
+        // Reset on next tick so the watcher has a chance to observe the flag
+        // before processing any pending reactive updates.
+        Promise.resolve().then(() => {
+          searchObj.shouldIgnoreWatcher = false;
+        });
       }
 
       if (
@@ -582,6 +592,8 @@ export const useSearchQuery = () => {
         searchObj.data.histogram = {
           xData: [],
           yData: [],
+          breakdownField: null,
+          breakdownSeries: null,
           chartParams: {
             title: "",
             unparsed_x_data: [],
