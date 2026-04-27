@@ -1868,7 +1868,13 @@ mod tests {
             index_size: 0,
             flattened: false,
         };
-        let key = FileKey::new(42, "acc".to_string(), "files/k.parquet".to_string(), meta.clone(), false);
+        let key = FileKey::new(
+            42,
+            "acc".to_string(),
+            "files/k.parquet".to_string(),
+            meta.clone(),
+            false,
+        );
         assert_eq!(key.id, 42);
         assert_eq!(key.account, "acc");
         assert_eq!(key.key, "files/k.parquet");

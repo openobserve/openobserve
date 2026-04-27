@@ -1331,9 +1331,8 @@ mod tests {
         let empty = SchemaCache::new(Schema::new(Vec::<Field>::new()));
         assert!(empty.is_empty());
 
-        let non_empty = SchemaCache::new(Schema::new(vec![
-            Field::new("f", DataType::Boolean, false),
-        ]));
+        let non_empty =
+            SchemaCache::new(Schema::new(vec![Field::new("f", DataType::Boolean, false)]));
         assert!(!non_empty.is_empty());
     }
 

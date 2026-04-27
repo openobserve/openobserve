@@ -420,18 +420,12 @@ mod tests {
             SendStrategy::from_str("summary").unwrap(),
             SendStrategy::Summary
         );
-        assert_eq!(
-            SendStrategy::from_str("all").unwrap(),
-            SendStrategy::All
-        );
+        assert_eq!(SendStrategy::from_str("all").unwrap(), SendStrategy::All);
         // unknown → default (FirstWithCount)
         assert_eq!(
             SendStrategy::from_str("UNKNOWN").unwrap(),
             SendStrategy::default()
         );
-        assert_eq!(
-            SendStrategy::from_str("").unwrap(),
-            SendStrategy::default()
-        );
+        assert_eq!(SendStrategy::from_str("").unwrap(), SendStrategy::default());
     }
 }

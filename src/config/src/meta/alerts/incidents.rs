@@ -1339,7 +1339,10 @@ mod tests {
     #[test]
     fn test_incident_status_from_str() {
         use std::str::FromStr;
-        assert_eq!(IncidentStatus::from_str("open").unwrap(), IncidentStatus::Open);
+        assert_eq!(
+            IncidentStatus::from_str("open").unwrap(),
+            IncidentStatus::Open
+        );
         assert_eq!(
             IncidentStatus::from_str("ACKNOWLEDGED").unwrap(),
             IncidentStatus::Acknowledged
@@ -1364,10 +1367,22 @@ mod tests {
     #[test]
     fn test_incident_severity_from_str() {
         use std::str::FromStr;
-        assert_eq!(IncidentSeverity::from_str("p1").unwrap(), IncidentSeverity::P1);
-        assert_eq!(IncidentSeverity::from_str("P2").unwrap(), IncidentSeverity::P2);
-        assert_eq!(IncidentSeverity::from_str("P3").unwrap(), IncidentSeverity::P3);
-        assert_eq!(IncidentSeverity::from_str("P4").unwrap(), IncidentSeverity::P4);
+        assert_eq!(
+            IncidentSeverity::from_str("p1").unwrap(),
+            IncidentSeverity::P1
+        );
+        assert_eq!(
+            IncidentSeverity::from_str("P2").unwrap(),
+            IncidentSeverity::P2
+        );
+        assert_eq!(
+            IncidentSeverity::from_str("P3").unwrap(),
+            IncidentSeverity::P3
+        );
+        assert_eq!(
+            IncidentSeverity::from_str("P4").unwrap(),
+            IncidentSeverity::P4
+        );
         assert!(IncidentSeverity::from_str("P5").is_err());
     }
 
@@ -1415,16 +1430,14 @@ mod tests {
 
     #[test]
     fn test_dimension_relationship_new_empty_existing_not() {
-        let existing: HashMap<String, String> =
-            [("ns".to_string(), "prod".to_string())].into();
+        let existing: HashMap<String, String> = [("ns".to_string(), "prod".to_string())].into();
         let result = DimensionRelationship::check(&existing, &HashMap::new());
         assert_eq!(result, DimensionRelationship::PartialOverlap);
     }
 
     #[test]
     fn test_dimension_relationship_new_is_superset() {
-        let existing: HashMap<String, String> =
-            [("ns".to_string(), "prod".to_string())].into();
+        let existing: HashMap<String, String> = [("ns".to_string(), "prod".to_string())].into();
         let new: HashMap<String, String> = [
             ("ns".to_string(), "prod".to_string()),
             ("cluster".to_string(), "us-east".to_string()),
@@ -1441,10 +1454,8 @@ mod tests {
             ("cluster".to_string(), "us-east".to_string()),
         ]
         .into();
-        let new: HashMap<String, String> =
-            [("ns".to_string(), "prod".to_string())].into();
+        let new: HashMap<String, String> = [("ns".to_string(), "prod".to_string())].into();
         let result = DimensionRelationship::check(&existing, &new);
         assert_eq!(result, DimensionRelationship::NewIsSubset);
     }
-
 }
