@@ -151,4 +151,66 @@ mod tests {
         let result = MetadataExtractor.extract_session_id(&HashMap::new(), &HashMap::new());
         assert!(result.is_none());
     }
+
+    #[test]
+    fn test_extract_user_id_from_vercel_metadata() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "ai.telemetry.metadata.userId".to_string(),
+            json::json!("vercel_user"),
+        );
+        let result = MetadataExtractor.extract_user_id(&attrs, &HashMap::new());
+        assert_eq!(result, Some("vercel_user".to_string()));
+    }
+
+    #[test]
+    fn test_extract_user_id_non_string_returns_none() {
+        let mut attrs = HashMap::new();
+        attrs.insert("user.id".to_string(), json::json!(42));
+        let result = MetadataExtractor.extract_user_id(&attrs, &HashMap::new());
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extract_session_id_from_gen_ai_conversation_id() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.conversation.id".to_string(),
+            json::json!("conv_456"),
+        );
+        let result = MetadataExtractor.extract_session_id(&attrs, &HashMap::new());
+        assert_eq!(result, Some("conv_456".to_string()));
+    }
+
+    #[test]
+    fn test_extract_session_id_from_vercel_metadata() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "ai.telemetry.metadata.sessionId".to_string(),
+            json::json!("vercel_session"),
+        );
+        let result = MetadataExtractor.extract_session_id(&attrs, &HashMap::new());
+        assert_eq!(result, Some("vercel_session".to_string()));
+    }
+
+    #[test]
+    fn test_extract_session_id_from_langfuse_metadata_session_id() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "langfuse.observation.metadata.session_id".to_string(),
+            json::json!("lf_session"),
+        );
+        let result = MetadataExtractor.extract_session_id(&attrs, &HashMap::new());
+        assert_eq!(result, Some("lf_session".to_string()));
+    }
+
+    #[test]
+    fn test_extract_session_id_span_takes_priority_over_resource() {
+        let mut attrs = HashMap::new();
+        attrs.insert("session.id".to_string(), json::json!("span_session"));
+        let mut resource = HashMap::new();
+        resource.insert("session.id".to_string(), json::json!("res_session"));
+        let result = MetadataExtractor.extract_session_id(&attrs, &resource);
+        assert_eq!(result, Some("span_session".to_string()));
+    }
 }

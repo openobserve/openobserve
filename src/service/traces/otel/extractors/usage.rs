@@ -300,4 +300,86 @@ mod tests {
         let cost = UsageExtractor.extract_cost(&HashMap::new());
         assert!(cost.is_empty());
     }
+
+    #[test]
+    fn test_extract_usage_cache_read_tokens() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.usage.cache_read_tokens".to_string(),
+            json::json!(25i64),
+        );
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("cache_read_input_tokens"), Some(&25i64));
+    }
+
+    #[test]
+    fn test_extract_usage_cache_write_tokens() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.usage.cache_write_tokens".to_string(),
+            json::json!(10i64),
+        );
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("cache_creation_input_tokens"), Some(&10i64));
+    }
+
+    #[test]
+    fn test_extract_usage_prompt_completion_tokens_alias() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.usage.prompt_tokens".to_string(), json::json!(80i64));
+        attrs.insert(
+            "gen_ai.usage.completion_tokens".to_string(),
+            json::json!(120i64),
+        );
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("input"), Some(&80i64));
+        assert_eq!(usage.get("output"), Some(&120i64));
+    }
+
+    #[test]
+    fn test_extract_usage_vercel_prompt_tokens_fallback() {
+        let mut attrs = HashMap::new();
+        // No input_tokens present; prompt_tokens is the or_else fallback
+        attrs.insert("gen_ai.usage.prompt_tokens".to_string(), json::json!(60i64));
+        let usage = UsageExtractor.extract_usage(&attrs, "ai");
+        assert_eq!(usage.get("input"), Some(&60i64));
+    }
+
+    #[test]
+    fn test_extract_usage_langfuse_nested_object() {
+        // Tests the `else if let Some(s) = v.as_object()` branch in usage_details
+        let mut attrs = HashMap::new();
+        let details = json::json!({
+            "tokens": {
+                "input": 100,
+                "output": 50
+            }
+        });
+        attrs.insert(
+            "langfuse.observation.usage_details".to_string(),
+            json::Value::String(details.to_string()),
+        );
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("tokens_input"), Some(&100i64));
+        assert_eq!(usage.get("tokens_output"), Some(&50i64));
+    }
+
+    #[test]
+    fn test_extract_cost_langfuse_nested_object() {
+        // Tests the `else if let Some(s) = v.as_object()` branch in cost_details
+        let mut attrs = HashMap::new();
+        let details = json::json!({
+            "tokens": {
+                "input": 0.01,
+                "output": 0.005
+            }
+        });
+        attrs.insert(
+            "langfuse.observation.cost_details".to_string(),
+            json::Value::String(details.to_string()),
+        );
+        let cost = UsageExtractor.extract_cost(&attrs);
+        assert_eq!(cost.get("tokens_input"), Some(&0.01f64));
+        assert_eq!(cost.get("tokens_output"), Some(&0.005f64));
+    }
 }
