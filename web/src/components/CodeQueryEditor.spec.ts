@@ -569,28 +569,43 @@ describe("CodeQueryEditor", () => {
       getElementByIdSpy?.mockRestore();
     });
 
+    // Snapshot the registerCompletionItemProvider call count before mounting,
+    // then wait for our mount to push a new call. Using a baseline (instead of
+    // vi.clearAllMocks + waiting for addCommand) avoids a race under parallel
+    // CI load where a previous test's still-running setupEditor would satisfy
+    // vi.waitFor on addCommand BEFORE our component had registered its provider.
     const mountAndWait = async (props: any = {}) => {
-      vi.clearAllMocks();
+      const monacoApi = await import("monaco-editor/esm/vs/editor/editor.api");
+      const registerFn = vi.mocked(
+        monacoApi.languages.registerCompletionItemProvider,
+      );
+      const baselineIndex = registerFn.mock.calls.length;
+
       const fakeEl = document.createElement("div");
       getElementByIdSpy = vi
         .spyOn(document, "getElementById")
         .mockReturnValue(fakeEl);
-      const wrapper = mount(CodeQueryEditor, {
+      mount(CodeQueryEditor, {
         props: { editorId: "test-editor", query: "SELECT * FROM logs", ...props },
         global: { plugins: [store] },
       });
+
       await vi.waitFor(
-        () => { expect(mockEditorObj.addCommand).toHaveBeenCalled(); },
-        { timeout: 3000 },
+        () => {
+          expect(registerFn.mock.calls.length).toBeGreaterThan(baselineIndex);
+        },
+        { timeout: 5000 },
       );
-      return wrapper;
+      return baselineIndex;
     };
 
-    const captureProvideCompletionItems = async () => {
+    const captureProvideCompletionItems = async (baselineIndex: number) => {
       const monacoApi = await import("monaco-editor/esm/vs/editor/editor.api");
-      const calls = vi.mocked(monacoApi.languages.registerCompletionItemProvider).mock.calls;
-      expect(calls.length).toBeGreaterThan(0);
-      return calls[calls.length - 1][1].provideCompletionItems as Function;
+      const calls = vi.mocked(
+        monacoApi.languages.registerCompletionItemProvider,
+      ).mock.calls;
+      // Use the first call AFTER the baseline — that is unambiguously our mount.
+      return calls[baselineIndex][1].provideCompletionItems as Function;
     };
 
     const callProvider = (fn: Function, text = "") => {
@@ -609,15 +624,15 @@ describe("CodeQueryEditor", () => {
       );
 
     it("includes function suggestions when suggestions prop is null (default)", async () => {
-      await mountAndWait({ suggestions: null });
-      const fn = await captureProvideCompletionItems();
+      const baselineIndex = await mountAndWait({ suggestions: null });
+      const fn = await captureProvideCompletionItems(baselineIndex);
       const result = callProvider(fn);
       expect(hasFunctionSuggestion(result)).toBe(true);
     });
 
     it("includes no function suggestions when suggestions prop is [] (explicit empty)", async () => {
-      await mountAndWait({ suggestions: [] });
-      const fn = await captureProvideCompletionItems();
+      const baselineIndex = await mountAndWait({ suggestions: [] });
+      const fn = await captureProvideCompletionItems(baselineIndex);
       const result = callProvider(fn);
       expect(hasFunctionSuggestion(result)).toBe(false);
     });
@@ -628,8 +643,8 @@ describe("CodeQueryEditor", () => {
         kind: "Text",
         insertText: (_kw: string) => `custom_fn('${_kw}')`,
       };
-      await mountAndWait({ suggestions: [customSuggestion] });
-      const fn = await captureProvideCompletionItems();
+      const baselineIndex = await mountAndWait({ suggestions: [customSuggestion] });
+      const fn = await captureProvideCompletionItems(baselineIndex);
       const result = callProvider(fn, "SELECT");
       const found = result.suggestions.some(
         (s: any) => typeof s.label === "string" && s.label.startsWith("custom_fn"),
