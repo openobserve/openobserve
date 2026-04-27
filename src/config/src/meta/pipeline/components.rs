@@ -748,4 +748,74 @@ mod tests {
         }
         assert!(result.is_ok(), "Failed to deserialize: {:?}", result.err());
     }
+
+    // ── PipelineSource methods ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_pipeline_source_is_scheduled() {
+        let scheduled = PipelineSource::Scheduled(DerivedStream::default());
+        assert!(scheduled.is_scheduled());
+        assert!(!scheduled.is_realtime());
+
+        let realtime = PipelineSource::Realtime(StreamParams::new("org", "stream", StreamType::Logs));
+        assert!(realtime.is_realtime());
+        assert!(!realtime.is_scheduled());
+    }
+
+    // ── DerivedStream::get_scheduler_module_key ───────────────────────────────
+
+    #[test]
+    fn test_derived_stream_scheduler_module_key() {
+        let stream = DerivedStream {
+            org_id: "myorg".to_string(),
+            stream_type: StreamType::Logs,
+            ..Default::default()
+        };
+        let key = stream.get_scheduler_module_key("my_pipeline", "pipe-123");
+        assert_eq!(key, "logs/myorg/my_pipeline/pipe-123");
+    }
+
+    // ── Node methods ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_node_new_and_accessors() {
+        let stream_data = NodeData::Stream(StreamParams::new("org", "stream", StreamType::Logs));
+        let node = Node::new(
+            "node-1".to_string(),
+            stream_data.clone(),
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        assert_eq!(node.get_node_id(), "node-1");
+        assert_eq!(node.get_node_data(), stream_data);
+        assert!(!node.is_function_node());
+    }
+
+    #[test]
+    fn test_node_is_function_node() {
+        let func_data = NodeData::Function(FunctionParams {
+            name: "my_func".to_string(),
+            after_flatten: false,
+            num_args: 0,
+        });
+        let node = Node::new(
+            "func-1".to_string(),
+            func_data,
+            10.0,
+            20.0,
+            "default".to_string(),
+        );
+        assert!(node.is_function_node());
+    }
+
+    // ── Edge::new ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_edge_new() {
+        let edge = Edge::new("source-1".to_string(), "target-2".to_string());
+        assert_eq!(edge.id, "esource-1-target-2");
+        assert_eq!(edge.source, "source-1");
+        assert_eq!(edge.target, "target-2");
+    }
 }
