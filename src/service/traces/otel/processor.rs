@@ -252,7 +252,7 @@ impl OtelIngestionProcessor {
 
         // Ensure cost has a total if it has any data — sum all component costs
         // (not just input+output) so cache token costs are included.
-        if !cost.is_empty() && !cost.contains_key("total") {
+        if !cost.contains_key("total") {
             let total: f64 = cost.values().sum();
             cost.insert("total".to_string(), total);
         }
@@ -826,11 +826,8 @@ mod tests {
 
         processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
 
-        // No pricing definition matched for unknown model — cost details should be absent.
-        // Emitting zeros would imply the cost is known to be zero (e.g. a free model),
-        // which is different from "cost unknown". The DB-backed pricing catalog is the
-        // only source of truth; the old hardcoded fallback has been removed.
-        assert!(!span_attrs.contains_key(O2Attributes::COST_DETAILS));
+        // No pricing definition matched for unknown model — cost details should be zero.
+        assert!(span_attrs.contains_key(O2Attributes::COST_DETAILS));
     }
 
     #[test]
