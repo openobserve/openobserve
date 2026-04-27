@@ -399,3 +399,62 @@ fn generate_deduplication_arrays(
         .collect_vec();
     DeduplicationArrays { arrays }
 }
+
+#[cfg(test)]
+mod tests {
+    use arrow::array::{BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array};
+
+    use super::*;
+
+    #[test]
+    fn test_array_get_value_string() {
+        let arr = Array::String(StringArray::from(vec!["hello", "world"]));
+        assert_eq!(arr.get_value(0), Value::String("hello".to_string()));
+        assert_eq!(arr.get_value(1), Value::String("world".to_string()));
+    }
+
+    #[test]
+    fn test_array_get_value_int64() {
+        let arr = Array::Int64(Int64Array::from(vec![42, -1]));
+        assert_eq!(arr.get_value(0), Value::Int64(42));
+        assert_eq!(arr.get_value(1), Value::Int64(-1));
+    }
+
+    #[test]
+    fn test_array_get_value_uint64() {
+        let arr = Array::UInt64(UInt64Array::from(vec![0, 100]));
+        assert_eq!(arr.get_value(0), Value::UInt64(0));
+        assert_eq!(arr.get_value(1), Value::UInt64(100));
+    }
+
+    #[test]
+    fn test_array_get_value_boolean() {
+        let arr = Array::Boolean(BooleanArray::from(vec![true, false]));
+        assert_eq!(arr.get_value(0), Value::Boolean(true));
+        assert_eq!(arr.get_value(1), Value::Boolean(false));
+    }
+
+    #[test]
+    fn test_array_get_value_float64() {
+        let arr = Array::Float64(Float64Array::from(vec![3.14]));
+        assert_eq!(arr.get_value(0), Value::Float64(3.14));
+    }
+
+    #[test]
+    fn test_deduplication_arrays_get_value_multi_column() {
+        let arrays = DeduplicationArrays {
+            arrays: vec![
+                Array::String(StringArray::from(vec!["a", "b"])),
+                Array::Int64(Int64Array::from(vec![1, 2])),
+            ],
+        };
+        assert_eq!(
+            arrays.get_value(0),
+            vec![Value::String("a".to_string()), Value::Int64(1)]
+        );
+        assert_eq!(
+            arrays.get_value(1),
+            vec![Value::String("b".to_string()), Value::Int64(2)]
+        );
+    }
+}
