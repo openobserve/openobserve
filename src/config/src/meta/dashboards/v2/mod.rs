@@ -347,4 +347,52 @@ mod tests {
         let med = serde_json::to_string(&AggregationFunc::Median).unwrap();
         assert_eq!(med, "\"median\"");
     }
+
+    #[test]
+    fn test_variables_default_has_none_show_dynamic_filters() {
+        let vars = Variables::default();
+        assert!(vars.show_dynamic_filters.is_none());
+        let json = serde_json::to_string(&vars).unwrap();
+        assert!(!json.contains("showDynamicFilters"));
+    }
+
+    #[test]
+    fn test_variables_with_show_dynamic_filters_some() {
+        let vars = Variables {
+            list: vec![],
+            show_dynamic_filters: Some(true),
+        };
+        let json = serde_json::to_string(&vars).unwrap();
+        assert!(json.contains("showDynamicFilters"));
+    }
+
+    #[test]
+    fn test_legend_width_skip_none_fields() {
+        let lw = LegendWidth {
+            value: None,
+            unit: None,
+        };
+        let json = serde_json::to_string(&lw).unwrap();
+        assert!(!json.contains("value"));
+        assert!(!json.contains("unit"));
+    }
+
+    #[test]
+    fn test_aggregation_func_all_variants_roundtrip() {
+        let all = [
+            AggregationFunc::Count,
+            AggregationFunc::CountDistinct,
+            AggregationFunc::Histogram,
+            AggregationFunc::Sum,
+            AggregationFunc::Min,
+            AggregationFunc::Max,
+            AggregationFunc::Avg,
+            AggregationFunc::Median,
+        ];
+        for variant in all {
+            let s = serde_json::to_string(&variant).unwrap();
+            let back: AggregationFunc = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
 }
