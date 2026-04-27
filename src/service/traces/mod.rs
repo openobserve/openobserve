@@ -92,6 +92,39 @@ const SPAN_ID_BYTES_COUNT: usize = 8;
 const TRACE_ID_BYTES_COUNT: usize = 16;
 const ATTR_STATUS_CODE: &str = "status_code";
 const ATTR_STATUS_MESSAGE: &str = "status_message";
+const LLM_INT64_FIELDS: [&str; 4] = [
+    "llm_usage_tokens_input",
+    "llm_usage_tokens_output",
+    "llm_usage_tokens_total",
+    "llm_completion_start_time",
+];
+const LLM_FLOAT64_FIELDS: [&str; 3] = [
+    "llm_usage_cost_input",
+    "llm_usage_cost_output",
+    "llm_usage_cost_total",
+];
+
+fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
+    for field in LLM_INT64_FIELDS {
+        if let Some(value) = record_val.get_mut(field)
+            && value.as_i64().is_none()
+        {
+            *value = json::Value::Number(json::Number::from(json::get_int_value(value)));
+        }
+    }
+
+    for field in LLM_FLOAT64_FIELDS {
+        if let Some(value) = record_val.get_mut(field)
+            && !value.is_f64()
+        {
+            let float_value = json::get_float_value(value);
+            *value = json::Value::Number(
+                json::Number::from_f64(float_value)
+                    .unwrap_or_else(|| json::Number::from_f64(0.0).unwrap()),
+            );
+        }
+    }
+}
 
 pub async fn otlp_proto(
     org_id: &str,
@@ -477,6 +510,7 @@ pub async fn handle_otlp_request(
                             ).into_response());
                         }
                     };
+                    normalize_llm_field_types(&mut record_val);
 
                     if let Some(Some(fields)) = user_defined_schema_map.get(&traces_stream_name) {
                         record_val = crate::service::ingestion::refactor_map(record_val, fields);
@@ -539,6 +573,7 @@ pub async fn handle_otlp_request(
                                     .into_response());
                             }
                         };
+                        normalize_llm_field_types(&mut record_val);
 
                         if let Some(Some(fields)) =
                             user_defined_schema_map.get(&stream_params.stream_name.to_string())
@@ -734,6 +769,7 @@ pub async fn ingest_json(
                     .into_response());
             }
         };
+        normalize_llm_field_types(&mut record_val);
 
         // check if we have any LLM related attributes
         if !is_llm_stream && detect_llm_stream(|k| record_val.contains_key(k)) {
@@ -1191,6 +1227,66 @@ mod tests {
     fn test_get_span_status_none() {
         // Test None status (default case)
         assert_eq!(super::get_span_status(None), "UNSET");
+    }
+
+    #[test]
+    fn test_normalize_llm_field_types() {
+        let mut record = json!({
+            "llm_usage_tokens_input": "12",
+            "llm_usage_tokens_output": 34.8,
+            "llm_usage_tokens_total": true,
+            "llm_completion_start_time": "123456789",
+            "llm_usage_cost_input": "0.25",
+            "llm_usage_cost_output": 1,
+            "llm_usage_cost_total": false,
+            "unrelated": "value"
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+
+        super::normalize_llm_field_types(&mut record);
+
+        assert_eq!(
+            record
+                .get("llm_usage_tokens_input")
+                .and_then(|v| v.as_i64()),
+            Some(12)
+        );
+        assert_eq!(
+            record
+                .get("llm_usage_tokens_output")
+                .and_then(|v| v.as_i64()),
+            Some(34)
+        );
+        assert_eq!(
+            record
+                .get("llm_usage_tokens_total")
+                .and_then(|v| v.as_i64()),
+            Some(1)
+        );
+        assert_eq!(
+            record
+                .get("llm_completion_start_time")
+                .and_then(|v| v.as_i64()),
+            Some(123456789)
+        );
+        assert_eq!(
+            record.get("llm_usage_cost_input").and_then(|v| v.as_f64()),
+            Some(0.25)
+        );
+        assert_eq!(
+            record.get("llm_usage_cost_output").and_then(|v| v.as_f64()),
+            Some(1.0)
+        );
+        assert_eq!(
+            record.get("llm_usage_cost_total").and_then(|v| v.as_f64()),
+            Some(0.0)
+        );
+        assert_eq!(
+            record.get("unrelated").and_then(|v| v.as_str()),
+            Some("value")
+        );
     }
 
     #[test]
