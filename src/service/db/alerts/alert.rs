@@ -17,7 +17,10 @@ use std::{collections::HashSet, str::FromStr};
 
 use config::{
     meta::{
-        alerts::alert::{Alert, ListAlertsParams},
+        alerts::{
+            FrequencyType,
+            alert::{Alert, ListAlertsParams},
+        },
         folder::{DEFAULT_FOLDER, Folder},
         stream::StreamType,
     },
@@ -78,11 +81,29 @@ pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infr
             }
 
             let schedule_key = scheduler_key(alert.id);
+            let next_run_at = if alert.trigger_condition.frequency_type == FrequencyType::Cron {
+                match alert.trigger_condition.get_next_trigger_time(
+                    true,
+                    alert.tz_offset,
+                    false,
+                    None,
+                ) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        log::error!(
+                            "Failed to compute next trigger time for alert {schedule_key}: {e}"
+                        );
+                        now_micros()
+                    }
+                }
+            } else {
+                now_micros()
+            };
             // Get the trigger from scheduler
             let mut trigger = db::scheduler::Trigger {
                 org: org_id.to_string(),
                 module_key: schedule_key.clone(),
-                next_run_at: now_micros(),
+                next_run_at,
                 is_realtime: alert.is_real_time,
                 is_silenced: false,
                 ..Default::default()
@@ -158,10 +179,24 @@ pub async fn create<C: TransactionTrait>(
     #[cfg(feature = "enterprise")]
     super_cluster::emit_create_event(org_id, folder_id, alert.clone()).await?;
 
+    let next_run_at = if alert.trigger_condition.frequency_type == FrequencyType::Cron {
+        match alert
+            .trigger_condition
+            .get_next_trigger_time(true, alert.tz_offset, false, None)
+        {
+            Ok(t) => t,
+            Err(e) => {
+                log::error!("Failed to compute next trigger time for alert {schedule_key}: {e}");
+                now_micros()
+            }
+        }
+    } else {
+        now_micros()
+    };
     let trigger = db::scheduler::Trigger {
         org: org_id.to_string(),
         module_key: schedule_key.clone(),
-        next_run_at: now_micros(),
+        next_run_at,
         is_realtime: alert.is_real_time,
         is_silenced: false,
         ..Default::default()
@@ -189,10 +224,24 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     #[cfg(feature = "enterprise")]
     super_cluster::emit_update_event(org_id, folder_id, alert.clone()).await?;
 
+    let next_run_at = if alert.trigger_condition.frequency_type == FrequencyType::Cron {
+        match alert
+            .trigger_condition
+            .get_next_trigger_time(true, alert.tz_offset, false, None)
+        {
+            Ok(t) => t,
+            Err(e) => {
+                log::error!("Failed to compute next trigger time for alert {schedule_key}: {e}");
+                now_micros()
+            }
+        }
+    } else {
+        now_micros()
+    };
     let mut trigger = db::scheduler::Trigger {
         org: org_id.to_string(),
         module_key: schedule_key.clone(),
-        next_run_at: now_micros(),
+        next_run_at,
         is_realtime: alert.is_real_time,
         is_silenced: false,
         ..Default::default()
