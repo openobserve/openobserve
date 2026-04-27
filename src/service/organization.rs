@@ -1010,6 +1010,17 @@ pub fn is_system_service_account(email: &str) -> bool {
     email.starts_with(O2_SRE_AGENT_EMAIL_PREFIX) && email.ends_with(O2_SRE_AGENT_EMAIL_SUFFIX)
 }
 
+/// Build the SRE-agent SA email for an org. Always lowercase: the FK
+/// `org_users.email -> users.email` is case-sensitive in PostgreSQL, but
+/// `db::org_users::add_with_flags` lowercases its input — so the `users` row
+/// must be written lowercase too, otherwise it never matches and the
+/// `org_users` insert hits a foreign-key violation. This bites any org whose
+/// identifier is a ksuid (mixed case by design).
+#[cfg(feature = "enterprise")]
+fn sre_agent_email(org_id: &str) -> String {
+    format!("{O2_SRE_AGENT_EMAIL_PREFIX}{org_id}{O2_SRE_AGENT_EMAIL_SUFFIX}").to_lowercase()
+}
+
 /// Ensures the SysRcaAgent service account exists for the given org, creating it if needed.
 /// Idempotent: returns Ok(()) immediately if the account already exists.
 #[cfg(feature = "enterprise")]
@@ -1019,7 +1030,7 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
 
     use crate::service::users::create_service_account_if_not_exists;
 
-    let email = format!("{O2_SRE_AGENT_EMAIL_PREFIX}{org_id}{O2_SRE_AGENT_EMAIL_SUFFIX}");
+    let email = sre_agent_email(org_id);
 
     // Only create the DB record if the account doesn't exist yet.
     match db::org_users::get(org_id, &email).await {
@@ -1030,6 +1041,12 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
             // Only treat genuine "not found" errors as missing accounts
             // Other DB errors should bubble up rather than triggering creation
             if err.to_string().contains("User not found") {
+                // Drop any orphaned mixed-case row in `users` left over from a
+                // pre-fix run. `users::remove` is case-insensitive, so it's a
+                // no-op when no orphan exists; safe to call unconditionally
+                // since we only reach this branch when there's no `org_users`
+                // row, meaning any matching `users` row is unreferenced.
+                table::users::remove(&email).await?;
                 create_service_account_if_not_exists(&email).await?;
 
                 let token = generate_random_string(32);
@@ -1074,7 +1091,7 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
 /// Creates the account if it does not yet exist.
 #[cfg(feature = "enterprise")]
 pub async fn get_sre_agent_credentials(org_id: &str) -> Result<(String, String), anyhow::Error> {
-    let email = format!("{O2_SRE_AGENT_EMAIL_PREFIX}{org_id}{O2_SRE_AGENT_EMAIL_SUFFIX}");
+    let email = sre_agent_email(org_id);
 
     match db::org_users::get(org_id, &email).await {
         Ok(record) => return Ok((email, record.token)),
