@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Selection Actions -->
         <div class="selection-actions q-mb-md">
-          <q-btn-group flat>
+          <OButtonGroup>
             <q-btn
               flat
               dense
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="grey-7"
               size="sm"
             />
-          </q-btn-group>
+          </OButtonGroup>
         </div>
 
         <!-- Groups List -->
@@ -382,6 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import { useQuasar } from "quasar";
 import alertsService from "@/services/alerts";
 

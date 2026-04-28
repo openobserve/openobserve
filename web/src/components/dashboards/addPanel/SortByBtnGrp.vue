@@ -1,6 +1,6 @@
 <template>
   Sort By:
-  <q-btn-group class="el-border">
+  <OButtonGroup class="el-border">
     <q-btn
       :class="[!fieldObj.sortBy ? 'selected' : '', 'tw:px-2.5', 'el-border']"
       @click="updateSortOption(null)"
@@ -30,11 +30,12 @@
     >
       <DescSort />
     </q-btn>
-  </q-btn-group>
+  </OButtonGroup>
 </template>
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import { defineComponent } from "vue";
 import AscSort from "@/components/icons/AscSort.vue";
 import DescSort from "@/components/icons/DescSort.vue";
@@ -42,7 +43,7 @@ import { inject } from "vue";
 
 export default defineComponent({
   name: "SortByBtnGrp",
-  components: { AscSort, DescSort },
+  components: { OButtonGroup, AscSort, DescSort },
   props: {
     fieldObj: {
       type: Object,

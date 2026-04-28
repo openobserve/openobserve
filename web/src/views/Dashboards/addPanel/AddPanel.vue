@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('panel.apply')"
               @click="() => runQuery(false)"
             />
-            <q-btn-group
+            <OButtonGroup
               v-if="config.isEnterprise === 'true'"
               class="tw:h-[36px] q-ml-md o2-primary-button"
               style="
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-item>
                 </q-list>
               </q-btn-dropdown>
-            </q-btn-group>
+            </OButtonGroup>
           </template>
         </div>
       </div>
@@ -292,6 +292,7 @@ import {
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -302,6 +303,7 @@ export default defineComponent({
   props: ["metaData"],
 
   components: {
+    OButtonGroup,
     DateTimePickerDashboard,
     AddSettingVariable,
     QueryInspector,
