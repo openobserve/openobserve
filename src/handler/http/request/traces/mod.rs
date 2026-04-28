@@ -1549,7 +1549,18 @@ async fn process_latest_traces_stream(
 
         // Q2b: per-(trace_id, service_name) breakdown, only for multi-service traces.
         if !multi_service_tids.is_empty() {
-            let multi_ids_str = multi_service_tids.join("','");
+            // Same sanitization as Q2a above — trace IDs come from DB rows and must be
+            // validated before interpolating into SQL.
+            let multi_ids_str = multi_service_tids
+                .iter()
+                .map(|tid| {
+                    tid.chars()
+                        .filter(|c| c.is_ascii_hexdigit() || *c == '-')
+                        .collect::<String>()
+                })
+                .filter(|tid| !tid.is_empty())
+                .collect::<Vec<String>>()
+                .join("','");
             let svc_sql = format!(
                 "SELECT trace_id, service_name, count(*) AS svc_count, max(duration) AS svc_duration \
                  FROM \"{stream_name}\" WHERE trace_id IN ('{multi_ids_str}') \
