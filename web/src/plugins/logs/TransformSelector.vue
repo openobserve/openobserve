@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn-group
+  <OButtonGroup
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
     class="q-pa-none float-left q-mr-xs tw:h-[32px] transform-selector element-box-shadow el-border"
   >
@@ -148,11 +148,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </q-tooltip>
     </q-btn>
-  </q-btn-group>
+  </OButtonGroup>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";

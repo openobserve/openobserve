@@ -53,7 +53,7 @@
       style="display: flex; flex-direction: row; gap: 10px; align-items: center"
     >
       {{ t("dashboard.goTo") }}
-      <q-btn-group class="">
+      <OButtonGroup>
         <q-btn
           :class="drilldownData.type == 'byDashboard' ? 'selected' : ''"
           size="sm"
@@ -87,13 +87,13 @@
             style="cursor: pointer; height: 25px; display: flex !important"
           />{{ t("common.logs") }}</q-btn
         >
-      </q-btn-group>
+      </OButtonGroup>
     </div>
 
     <div v-if="drilldownData.type === 'logs'" style="margin-top: 10px">
       <div>
         <label>{{ t("dashboard.selectLogsMode") }}</label>
-        <q-btn-group class="q-ml-sm">
+        <OButtonGroup class="q-ml-sm">
           <q-btn
             :class="drilldownData.data.logsMode === 'auto' ? 'selected' : ''"
             size="sm"
@@ -108,7 +108,7 @@
           >
             {{ t("common.custom") }}
           </q-btn>
-        </q-btn-group>
+        </OButtonGroup>
       </div>
       <div
         v-if="drilldownData.data.logsMode === 'custom'"
@@ -379,6 +379,7 @@
 
 <script lang="ts">
 import { defineAsyncComponent, inject, reactive, ref } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -406,6 +407,7 @@ const QueryEditor = defineAsyncComponent(
 export default defineComponent({
   name: "DrilldownPopUp",
   components: {
+    OButtonGroup,
     DrilldownUserGuide,
     CommonAutoComplete,
     QueryEditor,

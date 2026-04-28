@@ -15,7 +15,7 @@
         >
           <template v-for="(element, index) in props.operations">
             <div class="operation-item">
-              <q-btn-group>
+              <OButtonGroup>
                 <q-btn
                   square
                   icon="drag_indicator"
@@ -130,7 +130,7 @@
                   icon="close"
                   :data-test="`promql-operation-remove-${index}`"
                 />
-              </q-btn-group>
+              </OButtonGroup>
             </div>
           </template>
         </draggable>
@@ -216,6 +216,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import {

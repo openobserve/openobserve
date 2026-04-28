@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'name', null)"
         data-test="dashboard-name-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="close"
             />
           </div>
-        </q-btn-group>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'value_for_maps', null)"
         data-test="dashboard-value_for_maps-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="close"
             />
           </div>
-        </q-btn-group>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -295,10 +295,12 @@ import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuil
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import useNotifications from "@/composables/useNotifications";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 
 export default defineComponent({
   name: "DashboardMapsQueryBuilder",
   components: {
+    OButtonGroup,
     SortByBtnGrp,
     CommonAutoComplete,
     SanitizedHtmlRenderer,

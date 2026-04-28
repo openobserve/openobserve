@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-btn-group
+  <OButtonGroup
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
     class="q-pa-none float-left q-mr-xs tw:h-[32px] function-selector element-box-shadow el-border"
   >
@@ -108,11 +108,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("common.save") }}
       </q-tooltip>
     </q-btn>
-  </q-btn-group>
+  </OButtonGroup>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";

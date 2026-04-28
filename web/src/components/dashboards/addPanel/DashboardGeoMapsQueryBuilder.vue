@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'latitude', null)"
         data-test="dashboard-latitude-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="close"
             />
           </div>
-        </q-btn-group>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'longitude', null)"
         data-test="dashboard-longitude-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="close"
             />
           </div>
-        </q-btn-group>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'weight', null)"
         data-test="dashboard-weight-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="close"
             />
           </div>
-        </q-btn-group>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -384,6 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, reactive, watch, computed, nextTick } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -398,6 +399,7 @@ import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 export default defineComponent({
   name: "DashboardGeoMapsQueryBuilder",
   components: {
+    OButtonGroup,
     DashboardFiltersOption,
     DynamicFunctionPopUp,
     DashboardJoinsOption,
