@@ -16,6 +16,7 @@ use utils::{
 };
 
 pub(super) async fn get_provider(
+    org_id: &str,
     typ: ProviderType,
     data: &str,
 ) -> Result<Box<dyn ObjectStore>, anyhow::Error> {
@@ -28,7 +29,7 @@ pub(super) async fn get_provider(
         }
         ProviderType::AwsRoleArn => {
             let creds: AwsRoleArn = serde_json::from_str(data)?;
-            let store = aws_role_utils::get_aws_from_role(creds).await?;
+            let store = aws_role_utils::get_aws_from_role(org_id, creds).await?;
             ret = Box::new(store);
         }
         ProviderType::GcpCredentials => {
@@ -53,7 +54,7 @@ pub async fn get_provider_list() -> Result<Vec<(String, Box<dyn ObjectStore>)>, 
     let mut ret: Vec<(String, Box<dyn ObjectStore>)> = Vec::with_capacity(list.len());
 
     for provider in list {
-        match get_provider(provider.provider_type, &provider.data).await {
+        match get_provider(&provider.org_id, provider.provider_type, &provider.data).await {
             Ok(v) => ret.push((provider.org_id, Box::new(v))),
             Err(e) => {
                 log::error!(
@@ -118,7 +119,7 @@ pub async fn set_storage(
     org_id: &str,
     provider_data: OrgStorageProvider,
 ) -> Result<(), anyhow::Error> {
-    let provider = get_provider(provider_data.provider_type, &provider_data.data).await?;
+    let provider = get_provider(org_id, provider_data.provider_type, &provider_data.data).await?;
 
     test_provider(&provider).await?;
 
@@ -130,7 +131,7 @@ pub async fn set_storage(
 }
 
 pub async fn validate_provider(provider: &OrgStorageProvider) -> Result<(), anyhow::Error> {
-    let provider = get_provider(provider.provider_type, &provider.data).await?;
+    let provider = get_provider(&provider.org_id, provider.provider_type, &provider.data).await?;
     test_provider(&provider).await?;
     Ok(())
 }

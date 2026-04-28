@@ -77,7 +77,6 @@ pub struct AzureCredentials {
 pub struct AwsRoleArn {
     pub bucket_name: String,
     pub region: String,
-    pub org_id: String,
     pub role_arn: String,
 }
 

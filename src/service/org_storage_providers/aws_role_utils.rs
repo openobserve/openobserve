@@ -128,6 +128,7 @@ async fn get_sts_credentials(
 }
 
 pub async fn get_aws_from_role(
+    org_id: &str,
     config: AwsRoleArn,
 ) -> object_store::Result<object_store::aws::AmazonS3> {
     let opts = object_store::ClientOptions::default()
@@ -159,7 +160,7 @@ pub async fn get_aws_from_role(
     };
     drop(wlock);
 
-    let (exp, creds) = get_sts_credentials(&config.org_id, region, &config.role_arn)
+    let (exp, creds) = get_sts_credentials(org_id, region, &config.role_arn)
         .await
         .map_err(|e| object_store::Error::Generic {
             store: "aws_from_role",
@@ -173,7 +174,7 @@ pub async fn get_aws_from_role(
     };
 
     let credential_provider = CredentialProvider {
-        org_id: config.org_id,
+        org_id: org_id.to_string(),
         role_arn: config.role_arn,
         region,
         expiry: AtomicI64::new(exp),

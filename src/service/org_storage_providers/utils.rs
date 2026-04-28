@@ -38,18 +38,14 @@ pub fn get_aws(config: AwsCredentials) -> object_store::Result<object_store::aws
         .with_client_options(opts)
         .with_bucket_name(&config.bucket_name)
         .with_retry(retry_config)
-        .with_virtual_hosted_style_request(force_hosted_style);
+        .with_virtual_hosted_style_request(force_hosted_style)
+        .with_access_key_id(&config.access_key)
+        .with_secret_access_key(&config.secret_key);
     if !config.server_url.is_empty() {
         builder = builder.with_endpoint(&config.server_url);
     }
     if !config.region.is_empty() {
         builder = builder.with_region(&config.region);
-    }
-    if !config.access_key.is_empty() {
-        builder = builder.with_access_key_id(&config.access_key);
-    }
-    if !config.secret_key.is_empty() {
-        builder = builder.with_secret_access_key(&config.secret_key);
     }
     builder.build()
 }
@@ -65,13 +61,9 @@ pub fn get_azure(
                 .with_timeout(std::time::Duration::from_secs(cfg.s3.request_timeout))
                 .with_allow_invalid_certificates(cfg.s3.allow_invalid_certificates),
         )
-        .with_container_name(&config.bucket_name);
-    if !config.access_key.is_empty() {
-        builder = builder.with_account(&config.access_key);
-    }
-    if !config.secret_key.is_empty() {
-        builder = builder.with_access_key(&config.secret_key);
-    }
+        .with_container_name(&config.bucket_name)
+        .with_account(&config.access_key)
+        .with_access_key(&config.secret_key);
     if !config.server_url.is_empty() {
         builder = builder.with_endpoint(config.server_url.clone());
     }
@@ -82,7 +74,7 @@ pub fn get_gcp(
     config: GcpCredentials,
 ) -> object_store::Result<object_store::gcp::GoogleCloudStorage> {
     let cfg = get_config();
-    let mut builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
+    let builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
         .with_client_options(
             object_store::ClientOptions::default()
                 .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
@@ -90,10 +82,8 @@ pub fn get_gcp(
                 .with_allow_invalid_certificates(cfg.s3.allow_invalid_certificates),
         )
         .with_url(&config.server_url)
-        .with_bucket_name(&config.bucket_name);
-    if !config.access_key.is_empty() {
-        builder = builder.with_service_account_path(&config.access_key);
-    }
+        .with_bucket_name(&config.bucket_name)
+        .with_service_account_path(&config.access_key);
     builder.build()
 }
 

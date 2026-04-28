@@ -114,6 +114,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org = entry.org_id.clone();
 
                 let provider = match super::super::org_storage_providers::get_provider(
+                    &org,
                     entry.provider_type,
                     &entry.data,
                 )
