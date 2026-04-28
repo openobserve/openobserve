@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="services-catalog tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem]"
   >
-    <!-- Toolbar: filter + export -->
+    <!-- Toolbar: filter + chips + legend -->
     <div class="tw:flex tw:items-center tw:gap-2 tw:py-[0.625rem]">
       <!-- Search input -->
       <div data-test="services-catalog-filter-input">
@@ -36,14 +36,130 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-input>
       </div>
-      <span
-        v-if="!isLoading && services.length > 0"
-        class="tw:text-[0.75rem] tw:text-[var(--o2-text-secondary)]"
-        data-test="services-catalog-service-count"
+
+      <template v-if="!isLoading && services.length > 0">
+        <!-- Neutral total / filtered count -->
+        <div
+          class="tw:flex tw:items-center tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
+          data-test="services-catalog-service-count"
+        >
+          <template v-if="filterText">
+            {{ filteredServices.length }} / {{ services.length }}
+          </template>
+          <template v-else>
+            {{ services.length }}
+          </template>
+          {{
+            services.length === 1
+              ? t("traces.servicesCatalog.serviceLabel")
+              : t("traces.servicesCatalog.servicesLabel")
+          }}
+          <q-tooltip v-if="filterText">
+            {{ filteredServices.length }} of {{ services.length }} services
+            shown
+          </q-tooltip>
+        </div>
+
+        <!-- Critical chip -->
+        <div
+          v-if="statusCounts.critical > 0"
+          class="sc-chip sc-chip--critical"
+          data-test="services-catalog-chip-critical"
+        >
+          {{ statusCounts.critical }}
+          {{ t("traces.servicesCatalog.status.critical") }}
+        </div>
+
+        <!-- Warning chip -->
+        <div
+          v-if="statusCounts.warning > 0"
+          class="sc-chip sc-chip--warning"
+          data-test="services-catalog-chip-warning"
+        >
+          {{ statusCounts.warning }}
+          {{ t("traces.servicesCatalog.status.warning") }}
+        </div>
+
+        <!-- Degraded chip -->
+        <div
+          v-if="statusCounts.degraded > 0"
+          class="sc-chip sc-chip--degraded"
+          data-test="services-catalog-chip-degraded"
+        >
+          {{ statusCounts.degraded }}
+          {{ t("traces.servicesCatalog.status.degraded") }}
+        </div>
+      </template>
+
+      <!-- Status legend -->
+      <div
+        class="tw:ml-auto tw:flex tw:items-center tw:gap-3 tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:border tw:border-[var(--o2-border-color)]"
+        data-test="services-catalog-status-legend"
       >
-        {{ filteredServices.length }}
-        {{ filteredServices.length === 1 ? "service" : "services" }}
-      </span>
+        <span
+          class="tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-4)] tw:whitespace-nowrap"
+        >
+          {{ t("traces.servicesCatalog.legend.title") }}
+        </span>
+        <div class="tw:flex tw:items-center tw:gap-[0.875rem]">
+          <div
+            class="tw:flex tw:items-center tw:gap-[0.375rem]"
+            data-test="services-catalog-legend-healthy"
+          >
+            <span class="sc-legend-dot sc-legend-dot--healthy" />
+            <span
+              class="tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-2)]"
+              >{{ t("traces.servicesCatalog.status.healthy") }}</span
+            >
+            <span
+              class="tw:text-[0.65rem] tw:opacity-55 tw:text-[var(--o2-text-4)]"
+              >&lt;&nbsp;1%</span
+            >
+          </div>
+          <div
+            class="tw:flex tw:items-center tw:gap-[0.375rem]"
+            data-test="services-catalog-legend-degraded"
+          >
+            <span class="sc-legend-dot sc-legend-dot--degraded" />
+            <span
+              class="tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-2)]"
+              >{{ t("traces.servicesCatalog.status.degraded") }}</span
+            >
+            <span
+              class="tw:text-[0.65rem] tw:opacity-55 tw:text-[var(--o2-text-4)]"
+              >1&nbsp;–&nbsp;5%</span
+            >
+          </div>
+          <div
+            class="tw:flex tw:items-center tw:gap-[0.375rem]"
+            data-test="services-catalog-legend-warning"
+          >
+            <span class="sc-legend-dot sc-legend-dot--warning" />
+            <span
+              class="tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-2)]"
+              >{{ t("traces.servicesCatalog.status.warning") }}</span
+            >
+            <span
+              class="tw:text-[0.65rem] tw:opacity-55 tw:text-[var(--o2-text-4)]"
+              >5&nbsp;–&nbsp;10%</span
+            >
+          </div>
+          <div
+            class="tw:flex tw:items-center tw:gap-[0.375rem]"
+            data-test="services-catalog-legend-critical"
+          >
+            <span class="sc-legend-dot sc-legend-dot--critical" />
+            <span
+              class="tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-2)]"
+              >{{ t("traces.servicesCatalog.status.critical") }}</span
+            >
+            <span
+              class="tw:text-[0.65rem] tw:opacity-55 tw:text-[var(--o2-text-4)]"
+              >&gt;&nbsp;10%</span
+            >
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Empty state (shown when not loading and no data) -->
@@ -75,15 +191,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-status-bar="false"
         :default-columns="false"
         data-test="services-catalog-table"
+        @click:dataRow="handleRowClick"
       >
         <!-- Status badge -->
         <template #cell-status="{ item }">
-          <q-badge
-            :color="statusColor(item.status)"
-            :label="t(`traces.servicesCatalog.status.${item.status}`)"
-            class="tw:text-[0.65rem] tw:px-[0.5rem]! tw:py-[0.25rem]!"
+          <span
+            class="tw:rounded tw:py-[0.125rem] tw:inline-flex tw:items-center tw:w-fit tw:text-[0.75rem] tw:font-semibold"
+            :class="statusBadgeClass(item.status)"
             :data-test="`services-catalog-status-${item.service_name}`"
-          />
+          >
+            {{ t(`traces.servicesCatalog.status.${item.status}`) }}
+          </span>
         </template>
 
         <!-- Service name via TraceServiceCell -->
@@ -92,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :item="item"
             class="tw:cursor-pointer"
             :data-test="`services-catalog-service-link-${item.service_name}`"
-            @click="viewTraces(item.service_name)"
+            @click.stop="handleRowClick(item)"
           />
         </template>
 
@@ -106,13 +224,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
 
-        <!-- Latency columns -->
+        <!-- Request / error count columns -->
+        <template #cell-total_requests="{ item }">
+          <span :data-test="`services-catalog-requests-${item.service_name}`">
+            {{ formatLargeNumber(item.total_requests) }}
+            <q-tooltip>{{ item.total_requests.toLocaleString() }}</q-tooltip>
+          </span>
+        </template>
+
+        <template #cell-error_count="{ item }">
+          <span :data-test="`services-catalog-errors-${item.service_name}`">
+            {{ formatLargeNumber(item.error_count) }}
+            <q-tooltip>{{ item.error_count.toLocaleString() }}</q-tooltip>
+          </span>
+        </template>
+
+        <!-- Latency / duration columns -->
         <template #cell-p50_latency_ns="{ item }">
-          {{ formatLat(item.p50_latency_ns) }}
+          <span>
+            {{ formatLat(item.p50_latency_ns) }}
+            <q-tooltip>{{ item.p50_latency_ns.toLocaleString() }} ns</q-tooltip>
+          </span>
         </template>
 
         <template #cell-p95_latency_ns="{ item }">
-          {{ formatLat(item.p95_latency_ns) }}
+          <span>
+            {{ formatLat(item.p95_latency_ns) }}
+            <q-tooltip>{{ item.p95_latency_ns.toLocaleString() }} ns</q-tooltip>
+          </span>
         </template>
 
         <template #cell-p99_latency_ns="{ item }">
@@ -122,23 +261,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             {{ formatLat(item.p99_latency_ns) }}
+            <q-tooltip>{{ item.p99_latency_ns.toLocaleString() }} ns</q-tooltip>
           </span>
         </template>
 
-        <template #cell-avg_latency_ns="{ item }">
-          {{ formatLat(item.avg_latency_ns) }}
+        <template #cell-avg_duration_ns="{ item }">
+          <span>
+            {{ formatLat(item.avg_duration_ns) }}
+            <q-tooltip
+              >{{ item.avg_duration_ns.toLocaleString() }} ns</q-tooltip
+            >
+          </span>
         </template>
 
-        <!-- Last seen -->
-        <template #cell-last_seen_ts="{ item }">
-          <span
-            :class="
-              isStale(item.last_seen_ts)
-                ? 'tw:text-amber-500'
-                : 'tw:text-[var(--o2-text-secondary)]'
-            "
-          >
-            {{ formatLastSeen(item.last_seen_ts) }}
+        <template #cell-max_duration_ns="{ item }">
+          <span>
+            {{ formatLat(item.max_duration_ns) }}
+            <q-tooltip
+              >{{ item.max_duration_ns.toLocaleString() }} ns</q-tooltip
+            >
           </span>
         </template>
 
@@ -196,6 +337,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty />
       </TenstackTable>
     </div>
+
+    <!-- Service node side panel -->
+    <ServiceGraphNodeSidePanel
+      v-if="selectedServiceRow"
+      :selected-node="selectedServiceNode"
+      :graph-data="emptyGraphData"
+      :time-range="timeRange"
+      :visible="showSidePanel"
+      :stream-filter="searchObj.data.stream.selectedStream.value"
+      data-test="services-catalog-node-side-panel"
+      @close="handleCloseSidePanel"
+      @view-traces="viewTraces"
+    />
   </div>
 </template>
 
@@ -207,10 +361,16 @@ import { copyToClipboard as qCopyToClipboard } from "quasar";
 import TenstackTable from "@/components/TenstackTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import TraceServiceCell from "./components/TraceServiceCell.vue";
+import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import useTraces from "@/composables/useTraces";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { formatLatency } from "@/utils/traces/treeTooltipHelpers";
-import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
+import {
+  b64EncodeUnicode,
+  generateTraceContext,
+  formatLargeNumber,
+  formatTimeWithSuffix,
+} from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 
@@ -229,21 +389,38 @@ const P99_WARN_NS = 1_000_000_000;
 
 interface ServiceRow {
   service_name: string;
-  status: "healthy" | "warning" | "degraded";
+  status: "healthy" | "degraded" | "warning" | "critical";
   total_requests: number;
   error_count: number;
   error_rate: number;
-  avg_latency_ns: number;
+  avg_duration_ns: number;
+  max_duration_ns: number;
   p50_latency_ns: number;
   p95_latency_ns: number;
   p99_latency_ns: number;
-  operation_count: number;
-  last_seen_ts: number;
 }
 
 const isLoading = ref(false);
 const services = ref<ServiceRow[]>([]);
 const filterText = ref("");
+const selectedServiceRow = ref<ServiceRow | null>(null);
+const showSidePanel = ref(false);
+
+const selectedServiceNode = computed(() =>
+  selectedServiceRow.value
+    ? {
+        id: selectedServiceRow.value.service_name,
+        name: selectedServiceRow.value.service_name,
+      }
+    : null,
+);
+
+const emptyGraphData = { nodes: [], edges: [] };
+
+const timeRange = computed(() => ({
+  startTime: searchObj.data.datetime.startTime,
+  endTime: searchObj.data.datetime.endTime,
+}));
 
 let currentTraceId: string | null = null;
 
@@ -261,8 +438,15 @@ const tableColumns = computed(() => [
     header: t("traces.servicesCatalog.columns.status"),
     accessorKey: "status",
     size: 90,
-    enableSorting: false,
-    meta: { slot: true, align: "left" },
+    enableSorting: true,
+    sortingFn: (rowA: any, rowB: any) => {
+      const order = { healthy: 0, degraded: 1, warning: 2, critical: 3 };
+      return (
+        (order[rowA.original.status as keyof typeof order] ?? 0) -
+        (order[rowB.original.status as keyof typeof order] ?? 0)
+      );
+    },
+    meta: { slot: true, align: "left", disableCellAction: true },
   },
   {
     id: "total_requests",
@@ -270,7 +454,7 @@ const tableColumns = computed(() => [
     accessorKey: "total_requests",
     size: 110,
     enableSorting: true,
-    meta: { align: "right" },
+    meta: { slot: true, align: "right" },
   },
   {
     id: "error_rate",
@@ -286,7 +470,7 @@ const tableColumns = computed(() => [
     accessorKey: "error_count",
     size: 90,
     enableSorting: true,
-    meta: { align: "right" },
+    meta: { slot: true, align: "right" },
   },
   {
     id: "p50_latency_ns",
@@ -313,30 +497,28 @@ const tableColumns = computed(() => [
     meta: { slot: true, align: "right" },
   },
   {
-    id: "avg_latency_ns",
-    header: t("traces.servicesCatalog.columns.avgLatency"),
-    accessorKey: "avg_latency_ns",
-    size: 110,
+    id: "avg_duration_ns",
+    header: t("traces.servicesCatalog.columns.avgDuration"),
+    accessorKey: "avg_duration_ns",
+    size: 120,
     enableSorting: true,
     meta: { slot: true, align: "right" },
   },
   {
-    id: "operation_count",
-    header: t("traces.servicesCatalog.columns.operations"),
-    accessorKey: "operation_count",
-    size: 110,
+    id: "max_duration_ns",
+    header: t("traces.servicesCatalog.columns.maxDuration"),
+    accessorKey: "max_duration_ns",
+    size: 120,
     enableSorting: true,
-    meta: { align: "right" },
-  },
-  {
-    id: "last_seen_ts",
-    header: t("traces.servicesCatalog.columns.lastSeen"),
-    accessorKey: "last_seen_ts",
-    size: 110,
-    enableSorting: true,
-    meta: { slot: true, align: "left" },
+    meta: { slot: true, align: "right" },
   },
 ]);
+
+const statusCounts = computed(() => ({
+  critical: services.value.filter((s) => s.status === "critical").length,
+  warning: services.value.filter((s) => s.status === "warning").length,
+  degraded: services.value.filter((s) => s.status === "degraded").length,
+}));
 
 const filteredServices = computed(() => {
   if (!filterText.value.trim()) return services.value;
@@ -344,21 +526,26 @@ const filteredServices = computed(() => {
   return services.value.filter((s) => s.service_name.toLowerCase().includes(q));
 });
 
-function deriveStatus(errorRate: number): "healthy" | "warning" | "degraded" {
-  if (errorRate >= 5) return "degraded";
-  if (errorRate >= 1) return "warning";
+function deriveStatus(
+  errorRate: number,
+): "healthy" | "degraded" | "warning" | "critical" {
+  if (errorRate > 10) return "critical";
+  if (errorRate > 5) return "warning";
+  if (errorRate > 1) return "degraded";
   return "healthy";
 }
 
-function statusColor(status: string): string {
-  if (status === "degraded") return "negative";
-  if (status === "warning") return "warning";
-  return "positive";
+function statusBadgeClass(status: string): string {
+  if (status === "critical") return "o2-status-badge--error";
+  if (status === "warning") return "o2-status-badge--warning";
+  if (status === "degraded") return "o2-status-badge--degraded";
+  return "o2-status-badge--success";
 }
 
 function errorRateClass(rate: number): string {
-  if (rate >= 5) return "tw:text-red-500 tw:font-medium";
-  if (rate >= 1) return "tw:text-orange-500";
+  if (rate > 10) return "tw:text-red-500 tw:font-medium";
+  if (rate > 5) return "tw:text-orange-500";
+  if (rate > 1) return "tw:text-yellow-500";
   return "";
 }
 
@@ -366,28 +553,8 @@ function formatPercent(value: number): string {
   return value.toFixed(2) + "%";
 }
 
-function formatLat(ns: number): string {
-  return formatLatency(ns);
-}
-
-function formatLastSeen(ts: number): string {
-  if (!ts) return "—";
-  const diffMs = Date.now() - ts / 1000;
-  if (diffMs < 60_000) return t("traces.servicesCatalog.justNow");
-  const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 60)
-    return t("traces.servicesCatalog.minutesAgo", { n: diffMin });
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return t("traces.servicesCatalog.hoursAgo", { n: diffHr });
-  return t("traces.servicesCatalog.daysAgo", {
-    n: Math.floor(diffHr / 24),
-  });
-}
-
-// Services not sending data for >5min are considered stale
-function isStale(ts: number): boolean {
-  if (!ts) return false;
-  return Date.now() - ts / 1000 > 5 * 60_000;
+function formatLat(us: number): string {
+  return formatTimeWithSuffix(us);
 }
 
 function addSearchTerm(
@@ -404,18 +571,35 @@ function addSearchTerm(
   }
 }
 
-function viewTraces(serviceName: string) {
+function handleRowClick(row: ServiceRow) {
+  if (selectedServiceRow.value?.service_name === row.service_name) {
+    showSidePanel.value = false;
+    selectedServiceRow.value = null;
+  } else {
+    selectedServiceRow.value = row;
+    showSidePanel.value = true;
+  }
+}
+
+function handleCloseSidePanel() {
+  showSidePanel.value = false;
+  selectedServiceRow.value = null;
+}
+
+function viewTraces(data: string | Record<string, any>) {
+  const serviceName =
+    typeof data === "string" ? data : (data?.serviceName ?? "");
   emit("view-traces", serviceName);
 }
 
 function getTimeRange(): { start_time: number; end_time: number } {
   if (searchObj.data.datetime.type === "relative") {
-    const t = getConsumableRelativeTime(
+    const relTime = getConsumableRelativeTime(
       searchObj.data.datetime.relativeTimePeriod,
     );
     return {
-      start_time: t.startTime,
-      end_time: t.endTime,
+      start_time: relTime.startTime,
+      end_time: relTime.endTime,
     };
   }
   const dt = cloneDeep(searchObj.data.datetime);
@@ -429,7 +613,6 @@ async function loadServicesCatalog() {
   const streamName = searchObj.data.stream.selectedStream.value;
   if (!streamName) return;
 
-  // Cancel any in-flight query
   if (currentTraceId) {
     cancelStreamQueryBasedOnRequestId({
       trace_id: currentTraceId,
@@ -441,19 +624,17 @@ async function loadServicesCatalog() {
   services.value = [];
 
   const { start_time, end_time } = getTimeRange();
-  const tsCol = store.state.zoConfig.timestamp_column || "_timestamp";
 
   const sql = `SELECT
   service_name,
   COUNT(*) AS total_requests,
   SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
   CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) / CAST(COUNT(*) AS DOUBLE) * 100 AS error_rate,
-  AVG(duration) AS avg_latency_ns,
+  AVG(duration) AS avg_duration_ns,
+  MAX(duration) AS max_duration_ns,
   approx_percentile_cont(duration, 0.5) AS p50_latency_ns,
   approx_percentile_cont(duration, 0.95) AS p95_latency_ns,
-  approx_percentile_cont(duration, 0.99) AS p99_latency_ns,
-  COUNT(DISTINCT operation_name) AS operation_count,
-  MAX(${tsCol}) AS last_seen_ts
+  approx_percentile_cont(duration, 0.99) AS p99_latency_ns
 FROM "${streamName}"
 GROUP BY service_name
 ORDER BY total_requests DESC`;
@@ -485,23 +666,25 @@ ORDER BY total_requests DESC`;
           response.type === "search_response_metadata"
         ) {
           const hits: any[] = response.content?.results?.hits ?? [];
+          const serviceMap = new Map(
+            services.value.map((s) => [s.service_name, s]),
+          );
           for (const hit of hits) {
-            let _services = services.value;
-            _services.push({
-              service_name: hit.service_name ?? "",
+            const name = hit.service_name ?? "";
+            serviceMap.set(name, {
+              service_name: name,
               total_requests: hit.total_requests ?? 0,
               error_count: hit.error_count ?? 0,
               error_rate: hit.error_rate ?? 0,
-              avg_latency_ns: hit.avg_latency_ns ?? 0,
+              avg_duration_ns: hit.avg_duration_ns ?? 0,
+              max_duration_ns: hit.max_duration_ns ?? 0,
               p50_latency_ns: hit.p50_latency_ns ?? 0,
               p95_latency_ns: hit.p95_latency_ns ?? 0,
               p99_latency_ns: hit.p99_latency_ns ?? 0,
-              operation_count: hit.operation_count ?? 0,
-              last_seen_ts: hit.last_seen_ts ?? 0,
               status: deriveStatus(hit.error_rate ?? 0),
             });
-            services.value = [..._services];
           }
+          services.value = Array.from(serviceMap.values());
         }
       },
       error: (_payload: any, _response: any) => {
@@ -554,5 +737,73 @@ onUnmounted(() => {
   .container {
     border-radius: 0 !important;
   }
+}
+
+// Table status badges — use service-health colors for consistency with ServiceGraph
+.o2-status-badge--success {
+  color: var(--o2-service-health-healthy);
+}
+.o2-status-badge--degraded {
+  color: var(--o2-service-health-degraded);
+}
+.o2-status-badge--warning {
+  color: var(--o2-service-health-warning);
+}
+.o2-status-badge--error {
+  color: var(--o2-service-health-critical);
+}
+
+// Count chips in toolbar
+.sc-chip {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  gap: 0.25rem;
+}
+.sc-chip--degraded {
+  color: var(--o2-service-health-degraded);
+  background: color-mix(
+    in srgb,
+    var(--o2-service-health-degraded) 12%,
+    transparent
+  );
+}
+.sc-chip--warning {
+  color: var(--o2-service-health-warning);
+  background: color-mix(
+    in srgb,
+    var(--o2-service-health-warning) 12%,
+    transparent
+  );
+}
+.sc-chip--critical {
+  color: var(--o2-service-health-critical);
+  background: color-mix(
+    in srgb,
+    var(--o2-service-health-critical) 12%,
+    transparent
+  );
+}
+
+// Legend dots
+.sc-legend-dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sc-legend-dot--healthy {
+  background: var(--o2-service-health-healthy);
+}
+.sc-legend-dot--degraded {
+  background: var(--o2-service-health-degraded);
+}
+.sc-legend-dot--warning {
+  background: var(--o2-service-health-warning);
+}
+.sc-legend-dot--critical {
+  background: var(--o2-service-health-critical);
 }
 </style>

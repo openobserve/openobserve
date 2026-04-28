@@ -441,6 +441,12 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-span-kind-consumer-bg: #{$o2-teal-200};
   --o2-span-kind-internal-text: #{$o2-gray-900};
   --o2-span-kind-internal-bg: #{$o2-gray-300};
+
+  // Service-health indicator colors — intentionally theme-invariant (match ServiceGraph node colors)
+  --o2-service-health-healthy: #52c41a;
+  --o2-service-health-degraded: #faad14;
+  --o2-service-health-warning: #fa8c16;
+  --o2-service-health-critical: #f5222d;
 }
 
 // Semantic Colors - Dark Mode
@@ -575,7 +581,13 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-span-kind-internal-text: #{$o2-dark-gray-900};
   --o2-span-kind-internal-bg: #{$o2-dark-gray-200};
 
-  
+  // Service-health indicator colors — intentionally theme-invariant (match ServiceGraph node colors)
+  --o2-service-health-healthy: #52c41a;
+  --o2-service-health-degraded: #faad14;
+  --o2-service-health-warning: #fa8c16;
+  --o2-service-health-critical: #f5222d;
+
+
 
 
   --o2-section-header-bg: #28292a;

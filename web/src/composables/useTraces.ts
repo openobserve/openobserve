@@ -420,6 +420,14 @@ const useTraces = () => {
     });
   };
 
+  const getOrSetServiceColor = (serviceName: string): string => {
+    if (serviceName && !searchObj.meta.serviceColors[serviceName]) {
+      const colorIndex = Object.keys(searchObj.meta.serviceColors).length;
+      searchObj.meta.serviceColors[serviceName] = getSpanColorHex(colorIndex);
+    }
+    return searchObj.meta.serviceColors[serviceName];
+  };
+
   const formatTracesMetaData = (traces: any[]): any[] => {
     if (!traces.length) return [];
 
@@ -476,6 +484,7 @@ const useTraces = () => {
     tracesShareURL,
     formatTracesMetaData,
     setServiceColors,
+    getOrSetServiceColor,
   };
 };
 

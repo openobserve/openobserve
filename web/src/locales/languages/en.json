@@ -3182,8 +3182,8 @@
       "multiStepAgent": "Multi-step Agent"
     },
     "servicesCatalog": {
-      "tabLabel": "Services Catalog",
-      "title": "Services Catalog",
+      "tabLabel": "Service Catalog",
+      "title": "Service Catalog",
       "filterPlaceholder": "Filter by service name...",
       "noServicesFound": "No services found in the selected time range.",
       "loading": "Loading services...",
@@ -3196,21 +3196,23 @@
         "p50Latency": "P50",
         "p95Latency": "P95",
         "p99Latency": "P99",
-        "avgLatency": "Avg Latency",
-        "lastSeen": "Last Seen",
+        "avgDuration": "Avg Duration",
+        "maxDuration": "Max Duration",
         "operations": "Operations"
       },
       "status": {
         "healthy": "Healthy",
+        "degraded": "Degraded",
         "warning": "Warning",
-        "degraded": "Degraded"
+        "critical": "Critical"
       },
+      "serviceLabel": "service",
+      "servicesLabel": "services",
       "viewTraces": "View Traces",
       "exportCsv": "Export CSV",
-      "justNow": "Just now",
-      "minutesAgo": "{n}m ago",
-      "hoursAgo": "{n}h ago",
-      "daysAgo": "{n}d ago"
+      "legend": {
+        "title": "Error Rate"
+      }
     }
   },
   "actions": {
