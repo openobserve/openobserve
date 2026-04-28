@@ -249,4 +249,32 @@ mod tests {
         assert_eq!(partial.rejected_spans, 5);
         assert_eq!(partial.error_message, "test error");
     }
+
+    #[test]
+    fn test_span_link_context_optional_fields_absent_when_none() {
+        let ctx = SpanLinkContext {
+            trace_id: "tid".to_string(),
+            span_id: "sid".to_string(),
+            trace_flags: None,
+            trace_state: None,
+        };
+        let json = serde_json::to_value(&ctx).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("traceFlags"));
+        assert!(!obj.contains_key("traceState"));
+    }
+
+    #[test]
+    fn test_span_link_context_optional_fields_present_when_some() {
+        let ctx = SpanLinkContext {
+            trace_id: "tid".to_string(),
+            span_id: "sid".to_string(),
+            trace_flags: Some(1),
+            trace_state: Some("s1".to_string()),
+        };
+        let json = serde_json::to_value(&ctx).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("traceFlags"));
+        assert!(obj.contains_key("traceState"));
+    }
 }
