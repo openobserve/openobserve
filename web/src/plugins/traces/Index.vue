@@ -550,7 +550,10 @@ function loadStreamLists() {
       if (selectedStreamItemObj.label != undefined) {
         searchObj.data.stream.selectedStream = selectedStreamItemObj;
       } else {
-        searchObj.data.stream.selectedStream = {};
+        searchObj.data.stream.selectedStream = {
+          label: "",
+          value: "",
+        };
         searchObj.loading = false;
         searchObj.data.queryResults = {};
         searchObj.data.sortedQueryResults = [];
@@ -1165,6 +1168,9 @@ const updateNewDateTime = (startTime: number, endTime: number) => {
 async function extractFields() {
   try {
     searchObj.data.stream.selectedStreamFields = [];
+
+    if (!searchObj.data.stream?.selectedStream?.value) return;
+
     if (searchObj.data.streamResults.list.length > 0) {
       const schema = [];
       const ignoreFields = [
@@ -1627,7 +1633,7 @@ const onFiltersReset = () => {
 };
 
 const isStreamSelected = computed(() => {
-  return searchObj.data.stream.selectedStream.value.trim().length > 0;
+  return searchObj.data.stream?.selectedStream?.value?.trim()?.length > 0;
 });
 
 /**
