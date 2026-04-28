@@ -32,7 +32,7 @@ jobs:
 
       # ── PR: add lowest open milestone (skip drafts) ──
       - name: Add milestone to PR
-        if: github.event_name == 'pull_request_target' && github.event.pull_request.draft == false
+        if: github.event_name == 'pull_request_target' && github.event.pull_request.draft == false && github.event.pull_request.base.ref == 'main'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
