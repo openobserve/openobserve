@@ -387,7 +387,8 @@
     "liveModeTooltip": "Automatische Ausführung der Abfrage bei Filter-/Zeitänderungen",
     "turnOnLiveMode": "Aktiviere den Live-Modus",
     "turnOffLiveMode": "Schalten Sie den Live-Modus aus",
-    "autoRunEnabled": "Automatischer Lauf aktiviert"
+    "autoRunEnabled": "Automatischer Lauf aktiviert",
+    "selectStreamFirst": "Wähle zuerst einen Stream"
   },
   "menu": {
     "home": "Startseite",
