@@ -1180,4 +1180,36 @@ mod tests {
         assert_eq!(status.failed, 0);
         assert_eq!(status.warning, 2);
     }
+
+    #[test]
+    fn test_org_setting_payload_all_none_absent() {
+        let payload = OrganizationSettingPayload {
+            scrape_interval: None,
+            trace_id_field_name: None,
+            span_id_field_name: None,
+            toggle_ingestion_logs: None,
+            streaming_aggregation_enabled: None,
+            enable_streaming_search: None,
+            min_auto_refresh_interval: None,
+            light_mode_theme_color: None,
+            dark_mode_theme_color: None,
+            max_series_per_query: None,
+            usage_stream_enabled: None,
+            cross_links: None,
+        };
+        let json = serde_json::to_value(&payload).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("scrape_interval"));
+        assert!(!obj.contains_key("trace_id_field_name"));
+        assert!(!obj.contains_key("span_id_field_name"));
+        assert!(!obj.contains_key("toggle_ingestion_logs"));
+        assert!(!obj.contains_key("streaming_aggregation_enabled"));
+        assert!(!obj.contains_key("enable_streaming_search"));
+        assert!(!obj.contains_key("min_auto_refresh_interval"));
+        assert!(!obj.contains_key("light_mode_theme_color"));
+        assert!(!obj.contains_key("dark_mode_theme_color"));
+        assert!(!obj.contains_key("max_series_per_query"));
+        assert!(!obj.contains_key("usage_stream_enabled"));
+        assert!(!obj.contains_key("cross_links"));
+    }
 }
