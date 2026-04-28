@@ -967,7 +967,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class=" no-border q-mr-md o2-secondary-button tw:h-[36px]"
                     :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                     no-caps
-                    v-bind:disable="!selectedFields.length"
+                    v-bind:disable="!selectedFields.length || hasUDSFieldInSelection"
                     @click="updateDefinedSchemaFields"
                   >
                     <span class="flex items-center justify-start q-mr-sm">
@@ -979,6 +979,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? t("logStream.removeSchemaField")
                         : t("logStream.addSchemaField")
                     }}
+                    <q-tooltip v-if="hasUDSFieldInSelection">
+                      {{ t("logStream.udsFieldAlreadyInSchema") }}
+                    </q-tooltip>
                   </q-btn>
                   <q-btn
                     v-if="activeMainTab != 'configuration' && activeMainTab != 'crossLinking'"
@@ -1221,6 +1224,13 @@ export default defineComponent({
 
     const hasUserDefinedSchema = computed(() => {
       return !!indexData.value.defined_schema_fields?.length;
+    });
+
+    const hasUDSFieldInSelection = computed(() => {
+      return (
+        activeTab.value === "allFields" &&
+        selectedFields.value.some((field: any) => field.isUserDefined)
+      );
     });
 
     const allFieldsName = computed(() => {
@@ -2563,6 +2573,7 @@ export default defineComponent({
       activeTab,
       updateActiveTab,
       hasUserDefinedSchema,
+      hasUDSFieldInSelection,
       isSchemaUDSEnabled,
       updateDefinedSchemaFields,
       selectedFields,

@@ -128,6 +128,70 @@ async fn patch_sre_readonly_eval_templates() {
 }
 
 #[cfg(feature = "enterprise")]
+async fn patch_sre_readonly_alerts_incidents() {
+    use bytes::Bytes;
+
+    const MIGRATION_ORG: &str = "_migration";
+    const FLAG_KEY: &str = "sre_readonly_afolder_incidents_v1";
+
+    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
+        .await
+        .is_ok()
+    {
+        return;
+    }
+
+    let is_leader = infra::cluster::get_cached_online_nodes()
+        .await
+        .and_then(|mut nodes| {
+            nodes.sort_by_key(|n| n.id);
+            nodes.into_iter().next()
+        })
+        .map(|first| first.id == LOCAL_NODE.id)
+        .unwrap_or(true);
+
+    if !is_leader {
+        log::debug!("patch_sre_readonly_alerts_incidents: not the lowest-id node, skipping");
+        return;
+    }
+
+    let orgs = match crate::service::db::organization::list(None).await {
+        Ok(orgs) => orgs,
+        Err(e) => {
+            log::error!("Failed to list orgs for sre-readonly alerts/incidents patch: {e}");
+            return;
+        }
+    };
+
+    let mut failed = false;
+    for org in orgs {
+        if let Err(e) =
+            o2_openfga::authorizer::roles::patch_sre_readonly_role_alerts_incidents(&org.identifier)
+                .await
+        {
+            log::warn!(
+                "Failed to patch sre-readonly alerts/incidents for org '{}': {e}",
+                org.identifier
+            );
+            failed = true;
+        }
+    }
+
+    if failed {
+        log::warn!("sre-readonly alerts/incidents patch had failures — will retry on next startup");
+        return;
+    }
+
+    if let Err(e) =
+        crate::service::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
+    {
+        log::error!("Failed to set sre_readonly_afolder_incidents migration flag: {e}");
+    } else {
+        log::info!("sre-readonly alerts/incidents patch complete");
+    }
+}
+
+#[cfg(feature = "enterprise")]
 async fn backfill_sys_rca_agent_openfga_tuples() {
     use bytes::Bytes;
 
@@ -249,6 +313,50 @@ async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
     Ok(Some(()))
 }
 
+// TODO: in a separate PR, replace the metering lock fn with this one instead
+#[cfg(feature = "enterprise")]
+async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
+    use infra::{cluster::get_node_by_uuid, dist_lock};
+
+    let db = infra::db::get_db().await;
+    let node = db.get(&key).await.ok().unwrap_or_default();
+    let node = String::from_utf8_lossy(&node);
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+        return Ok(node.to_string());
+    }
+
+    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
+        let locker = infra::dist_lock::lock(&key, 0).await?;
+        // check the working node again, maybe other node locked it first
+        let node = db.get(&key).await.ok().unwrap_or_default();
+        let node = String::from_utf8_lossy(&node);
+        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
+            dist_lock::unlock(&locker).await?;
+            return Ok(node.to_string());
+        }
+        // set to current node
+        let ret = db
+            .put(
+                &key,
+                LOCAL_NODE.uuid.clone().into(),
+                infra::db::NO_NEED_WATCH,
+                None,
+            )
+            .await;
+        // Check db.put result before releasing the lock to ensure consistent state
+        if let Err(e) = ret {
+            dist_lock::unlock(&locker).await?;
+            drop(locker);
+            return Err(e.into());
+        }
+        dist_lock::unlock(&locker).await?;
+        drop(locker);
+    }
+
+    Ok(LOCAL_NODE.uuid.clone())
+}
+
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
@@ -358,6 +466,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // migration even in multi-node deployments. KV flag prevents re-runs.
         backfill_sys_rca_agent_openfga_tuples().await;
         patch_sre_readonly_eval_templates().await;
+        patch_sre_readonly_alerts_incidents().await;
     }
 
     tokio::task::spawn(promql_self_consume::run());
@@ -404,6 +513,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
     tokio::task::spawn(db::system_settings::watch());
+    tokio::task::spawn(db::model_pricing::watch());
     tokio::task::spawn(db::alerts::templates::watch());
     tokio::task::spawn(db::alerts::destinations::watch());
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
@@ -453,6 +563,32 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::system_settings::cache()
         .await
         .expect("system settings cache failed");
+
+    if config::get_config().common.model_pricing_enabled {
+        db::model_pricing::cache()
+            .await
+            .expect("model pricing cache failed");
+
+        // Sync built-in model pricing from GitHub (initial + periodic)
+        if LOCAL_NODE.is_querier() {
+            tokio::task::spawn(async {
+                if let Err(e) = db::model_pricing_sync::sync_built_in_from_github(false).await {
+                    log::error!("[model_pricing] initial built-in sync failed: {e}");
+                }
+            });
+            tokio::task::spawn(async {
+                let interval = std::time::Duration::from_secs(
+                    config::get_config().common.model_pricing_sync_interval_secs,
+                );
+                loop {
+                    tokio::time::sleep(interval).await;
+                    if let Err(e) = db::model_pricing_sync::sync_built_in_from_github(false).await {
+                        log::error!("[model_pricing] periodic built-in sync failed: {e}");
+                    }
+                }
+            });
+        }
+    }
 
     // ensure system templates exist in database BEFORE caching
     alerts::templates::ensure_system_templates()
@@ -505,15 +641,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     config_watcher::run();
-
-    #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_querier() && get_o2_config().ai.enabled {
-        tokio::task::spawn(async move {
-            o2_enterprise::enterprise::ai::agent::prompt::prompts::load_system_prompt()
-                .await
-                .expect("load system prompt failed");
-        });
-    }
 
     // Initialize slot-based admission ledger on querier nodes
     #[cfg(feature = "enterprise")]
@@ -818,15 +945,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
 pub async fn init_deferred() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
-        // only querier nodes watch license keys
-        if LOCAL_NODE.is_querier() {
-            o2_enterprise::enterprise::license::start_license_check(
-                crate::service::self_reporting::search::get_usage,
-                LOCAL_NODE.is_single_role(),
-            )
-            .await;
-            tokio::task::spawn(db::license::watch());
-        }
+        o2_enterprise::enterprise::license::start_license_check(
+            crate::service::self_reporting::search::get_usage,
+            get_nats_lock,
+            crate::service::self_reporting::search::get_license_usage_data_from_node,
+            LOCAL_NODE.is_router() || LOCAL_NODE.is_single_role(),
+        )
+        .await;
+        tokio::task::spawn(db::license::watch());
     }
 
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {

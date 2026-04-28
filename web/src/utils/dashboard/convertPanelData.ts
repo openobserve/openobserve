@@ -91,6 +91,8 @@ export const convertPanelData = async (
             hoveredSeriesState,
             annotations,
             metadata,
+            resultMetaData?.value,
+            loading,
           )),
         };
       } else {
@@ -108,6 +110,7 @@ export const convertPanelData = async (
               metadata,
               chartPanelStyle,
               annotations,
+              loading,
             )),
           };
         } catch (error) {
@@ -129,6 +132,8 @@ export const convertPanelData = async (
             hoveredSeriesState,
             annotations,
             metadata,
+            resultMetaData?.value,
+            loading,
           )),
         };
       } else {
@@ -164,6 +169,8 @@ export const convertPanelData = async (
             hoveredSeriesState,
             annotations,
             metadata,
+            resultMetaData?.value,
+            loading,
           )),
         };
       } else {
@@ -187,6 +194,8 @@ export const convertPanelData = async (
             hoveredSeriesState,
             annotations,
             metadata,
+            resultMetaData?.value,
+            loading,
           )),
         };
       } else {

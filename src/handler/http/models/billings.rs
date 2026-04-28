@@ -39,16 +39,21 @@ pub struct ListSubscriptionResponseBody {
     pub subscription_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub customer_id: Option<String>,
-    /// Billing provider: "stripe" or "aws"
-    pub provider: String,
+    /// Billing provider: "stripe", "aws", or "azure". Omitted for external-contract subs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
 }
 
 impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
     fn from(value: cloud_billings::CustomerBilling) -> Self {
+        let provider = match value.provider {
+            cloud_billings::MeteringProvider::NoOp => None,
+            other => Some(other.to_string()),
+        };
         Self {
             subscription_type: value.subscription_type.to_string(),
             customer_id: value.customer_id,
-            provider: value.provider.to_string(),
+            provider,
         }
     }
 }
@@ -100,4 +105,166 @@ impl From<cloud_billings::org_usage::OrgUsageQueryResult> for OrgUserData {
 pub struct NewUserAttribution {
     pub from: String,
     pub company: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use cloud_billings::{
+        CustomerBilling, MeteringProvider, SubscriptionType, org_usage::OrgUsageQueryResult,
+    };
+
+    use super::*;
+
+    fn billing_with_provider(provider: MeteringProvider) -> CustomerBilling {
+        let mut cb = CustomerBilling::new("admin@example.com", "org-x");
+        cb.provider = provider;
+        cb.subscription_type = SubscriptionType::Rate;
+        cb.customer_id = Some("cus_abc".to_string());
+        cb
+    }
+
+    #[test]
+    fn test_list_subscription_response_omits_provider_for_noop() {
+        // External-contract orgs (NoOp provider) must hide the provider field
+        // from the API response — that's the contract the frontend relies on
+        // to detect "this is an external contract" vs. a real billing backend.
+        let mut cb = billing_with_provider(MeteringProvider::NoOp);
+        cb.subscription_type = SubscriptionType::ExternalContract;
+        cb.customer_id = Some("custom".to_string());
+
+        let body: ListSubscriptionResponseBody = cb.into();
+
+        assert!(body.provider.is_none());
+        assert_eq!(body.subscription_type, "external-contract");
+        assert_eq!(body.customer_id.as_deref(), Some("custom"));
+
+        let json = serde_json::to_value(&body).unwrap();
+        assert!(
+            json.get("provider").is_none(),
+            "provider field must be omitted from JSON for NoOp, got {json}"
+        );
+    }
+
+    #[test]
+    fn test_list_subscription_response_includes_provider_for_stripe() {
+        let body: ListSubscriptionResponseBody =
+            billing_with_provider(MeteringProvider::Stripe).into();
+
+        assert_eq!(body.provider.as_deref(), Some("stripe"));
+        assert_eq!(body.subscription_type, "pay-as-you-go");
+    }
+
+    #[test]
+    fn test_list_subscription_response_includes_provider_for_aws_and_azure() {
+        let aws: ListSubscriptionResponseBody = billing_with_provider(MeteringProvider::Aws).into();
+        assert_eq!(aws.provider.as_deref(), Some("aws"));
+
+        let azure: ListSubscriptionResponseBody =
+            billing_with_provider(MeteringProvider::Azure).into();
+        assert_eq!(azure.provider.as_deref(), Some("azure"));
+    }
+
+    #[test]
+    fn test_convert_to_unit_gb_to_mb() {
+        let mut body = GetOrgUsageResponseBody {
+            data: vec![OrgUserData {
+                event: "ingestion".to_string(),
+                value: 2.0,
+                unit: "GB".to_string(),
+            }],
+            range: "30d".to_string(),
+        };
+
+        body.convert_to_unit("MB");
+
+        assert_eq!(body.data[0].unit, "MB");
+        assert!((body.data[0].value - 2048.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_convert_to_unit_mb_to_gb() {
+        let mut body = GetOrgUsageResponseBody {
+            data: vec![OrgUserData {
+                event: "ingestion".to_string(),
+                value: 1024.0,
+                unit: "MB".to_string(),
+            }],
+            range: "30d".to_string(),
+        };
+
+        body.convert_to_unit("GB");
+
+        assert_eq!(body.data[0].unit, "GB");
+        assert!((body.data[0].value - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_convert_to_unit_is_case_insensitive() {
+        let mut body = GetOrgUsageResponseBody {
+            data: vec![OrgUserData {
+                event: "ingestion".to_string(),
+                value: 1.0,
+                unit: "gb".to_string(),
+            }],
+            range: "30d".to_string(),
+        };
+
+        body.convert_to_unit("mb");
+
+        assert_eq!(body.data[0].unit, "MB");
+        assert!((body.data[0].value - 1024.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_convert_to_unit_no_op_when_units_match() {
+        let mut body = GetOrgUsageResponseBody {
+            data: vec![OrgUserData {
+                event: "ingestion".to_string(),
+                value: 5.5,
+                unit: "GB".to_string(),
+            }],
+            range: "7d".to_string(),
+        };
+
+        body.convert_to_unit("GB");
+
+        assert_eq!(body.data[0].unit, "GB");
+        assert!((body.data[0].value - 5.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_convert_to_unit_unknown_pair_is_ignored() {
+        let mut body = GetOrgUsageResponseBody {
+            data: vec![OrgUserData {
+                event: "ingestion".to_string(),
+                value: 100.0,
+                unit: "Bytes".to_string(),
+            }],
+            range: "1d".to_string(),
+        };
+
+        body.convert_to_unit("MB");
+
+        // No conversion path defined for Bytes → MB; record stays untouched.
+        assert_eq!(body.data[0].unit, "Bytes");
+        assert!((body.data[0].value - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_org_user_data_from_query_result() {
+        // OrgUsageQueryResult only derives Deserialize, so build it from JSON.
+        // UsageEvent uses default (PascalCase) serde, not snake_case.
+        let json = serde_json::json!({
+            "event": "Ingestion",
+            "unit": "GB",
+            "size": 12.5,
+        });
+        let q: OrgUsageQueryResult = serde_json::from_value(json).unwrap();
+
+        let data: OrgUserData = q.into();
+
+        assert!((data.value - 12.5).abs() < f64::EPSILON);
+        assert_eq!(data.unit, "GB");
+        assert_eq!(data.event, "Ingestion");
+    }
 }

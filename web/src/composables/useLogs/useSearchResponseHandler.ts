@@ -173,7 +173,7 @@ export const useSearchResponseHandler = () => {
     }
   };
 
-  const handleStreamingHits = (
+  const handleStreamingHits = async (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
     isPagination: boolean,
@@ -217,14 +217,14 @@ export const useSearchResponseHandler = () => {
     }
 
     refreshPagination(true);
-    processPostPaginationData();
+    await processPostPaginationData();
   };
 
-  const processPostPaginationData = () => {
+  const processPostPaginationData = async () => {
     updateFieldValues();
-    extractFields();
+    await extractFields();
     updateGridColumns();
-    filterHitsColumns();
+    await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
   };
 
@@ -481,6 +481,9 @@ export const useSearchResponseHandler = () => {
 
     searchObj.data.queryResults.converted_histogram_query =
       response?.content?.results?.converted_histogram_query ?? "";
+
+    searchObj.data.queryResults.histogram_breakdown_field =
+      response?.content?.results?.histogram_breakdown_field ?? null;
 
     if (
       !searchObj.data.queryResults.visualization_histogram_interval &&

@@ -639,6 +639,8 @@ describe("Logs Index", async () => {
   });
 
   it("Should execute runQueryFn and show job scheduler", async () => {
+    // runQueryFn guards against empty selectedStream, so a stream must be present.
+    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     // do not rely on spying internal closures; assert state change
     await wrapper.vm.runQueryFn();
     expect(wrapper.vm.showJobScheduler).toBe(true);

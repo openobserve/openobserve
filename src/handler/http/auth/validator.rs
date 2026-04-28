@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::net::IpAddr;
-
 use axum::{
     body::Body,
     extract::Request,
@@ -29,8 +27,9 @@ use config::{
 #[cfg(feature = "enterprise")]
 use o2_dex::config::get_config as get_dex_config;
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::license::block_feature_for_report_failure;
+#[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
-use url::Url;
 
 use crate::{
     common::{
@@ -1020,62 +1019,6 @@ pub async fn validator_proxy_url(
     oo_validator_internal(req_data, auth_info, path_prefix).await
 }
 
-pub async fn validate_http_internal(req: &Request) -> Result<(), AuthError> {
-    let router_nodes = infra::cluster::get_cached_online_router_nodes()
-        .await
-        .unwrap_or_default();
-
-    // Get the peer address from headers
-    let peer = req
-        .headers()
-        .get("X-Forwarded-For")
-        .or_else(|| req.headers().get("Forwarded"))
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("unknown")
-        .to_string();
-
-    let router_node = router_nodes.iter().find(|node| {
-        let node_url = match Url::parse(&node.http_addr) {
-            Ok(node_url) => node_url,
-            Err(e) => {
-                log::error!("Failed to parse node URL: {e}");
-                return false;
-            }
-        };
-
-        // Get IP from peer address (strips port if present)
-        let peer_ip = match peer
-            .split(':')
-            .next()
-            .and_then(|addr| addr.parse::<IpAddr>().ok())
-        {
-            Some(ip) => ip,
-            None => {
-                log::debug!("Failed to parse peer IP from: {peer}");
-                return false;
-            }
-        };
-
-        let node_ip = match node_url
-            .host()
-            .and_then(|h| h.to_string().parse::<IpAddr>().ok())
-        {
-            Some(ip) => ip,
-            None => {
-                log::debug!("Failed to parse node IP");
-                return false;
-            }
-        };
-
-        peer_ip == node_ip
-    });
-
-    if router_node.is_none() {
-        return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
-    }
-    Ok(())
-}
-
 #[cfg(feature = "enterprise")]
 pub(crate) async fn check_permissions(
     user_id: &str,
@@ -1086,6 +1029,10 @@ pub(crate) async fn check_permissions(
     use crate::common::infra::config::ORG_USERS;
 
     if !get_openfga_config().enabled {
+        return true;
+    }
+
+    if block_feature_for_report_failure().await {
         return true;
     }
 

@@ -632,6 +632,14 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
+        // LLM Model Pricing
+        .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))
+        // NOTE: named routes MUST be registered before {model_id} to avoid being matched as a model ID
+        .route("/{org_id}/llm/models/built-in", get(model_pricing::get_built_in))
+        .route("/{org_id}/llm/models/refresh-built-in", post(model_pricing::refresh_built_in))
+        .route("/{org_id}/llm/models/test", post(model_pricing::test_model_match))
+        .route("/{org_id}/llm/models/{model_id}", get(model_pricing::get).put(model_pricing::update).delete(model_pricing::delete))
+
         // Metrics
         .route("/{org_id}/ingest/metrics/_json", post(metrics::ingest::json))
 
@@ -957,6 +965,15 @@ pub fn service_routes() -> Router {
             .route(
                 "/{org_id}/extend_trial_period",
                 put(organization::org::extend_trial_period),
+            )
+            .route(
+                "/{org_id}/external_contract",
+                post(organization::org::create_external_contract)
+                    .put(organization::org::extend_external_contract),
+            )
+            .route(
+                "/{org_id}/external_contract/{target_org_id}",
+                delete(organization::org::revoke_external_contract),
             )
             .route(
                 "/{org_id}/aws-marketplace/link-subscription",

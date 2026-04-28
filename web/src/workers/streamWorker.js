@@ -2,6 +2,22 @@
 // This offloads decoding and parsing from the main thread
 let activeBuffers = {};
 
+// Per-traceId flag: true only for traces streams where nanosecond start_time/end_time
+// fields need exact string copies injected before JSON.parse rounds them.
+let patchNsMap = {};
+
+// Regex targets only 19+ digit integers — nanosecond epoch timestamps.
+// µs (16-digit) and ms (13-digit) values are safely representable and untouched.
+// (?<!\\) skips escaped-quote sequences inside JSON string values.
+const NS_FIELDS_RE = /(?<!\\)"(start_time|end_time)"\s*:\s*(\d{19,})/g;
+
+function safeParseJson(text, patchNs) {
+  if (!patchNs) return JSON.parse(text);
+  NS_FIELDS_RE.lastIndex = 0;
+  const patched = text.replace(NS_FIELDS_RE, '"$1":$2,"_$1_ns":"$2"');
+  return JSON.parse(patched);
+}
+
 // Helper function to extract data from message line
 function extractData(line) {
   return line.startsWith('data:') ? line.slice(6) : line.slice(5);
@@ -15,6 +31,7 @@ self.onmessage = async (event) => {
     case 'startStream':
       // For Safari compatibility, we receive chunks instead of streams
       activeBuffers[traceId] = '';
+      patchNsMap[traceId] = !!event.data.patchNsFields;
       break;
 
     case 'processChunk':
@@ -32,14 +49,17 @@ self.onmessage = async (event) => {
       });
 
       delete activeBuffers[traceId];
+      delete patchNsMap[traceId];
       break;
 
     case 'cancelStream':
       delete activeBuffers[traceId];
+      delete patchNsMap[traceId];
       break;
 
     case 'closeAll':
       activeBuffers = {};
+      patchNsMap = {};
       break;
   }
 };
@@ -79,7 +99,7 @@ function processChunk(traceId, chunk) {
 
             try {
               // Try to parse as JSON
-              const json = JSON.parse(data);
+              const json = safeParseJson(data, patchNsMap[traceId]);
 
               batch.push({
                 type: eventType,
@@ -101,7 +121,7 @@ function processChunk(traceId, chunk) {
           const data = extractData(msgLines[0]);
           try {
             // Try to parse as JSON
-            const json = JSON.parse(data);
+            const json = safeParseJson(data, patchNsMap[traceId]);
             batch.push({
               type: 'data',
               traceId,

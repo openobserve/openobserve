@@ -31,6 +31,7 @@ import {
   convertToCamelCase,
   deepCopy,
 } from "@/utils/zincutils";
+import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
@@ -48,9 +49,25 @@ export const useStreamFields = () => {
     fieldValues,
     notificationMsg,
     streamSchemaFieldsIndexMapping,
+    schemaRequestToken,
   } = searchState();
 
   const { fnParsedSQL, getColumnWidth } = logsUtils();
+
+  const correlationFilters = useCorrelationFilters({
+    orgId: () => store.state.selectedOrganization.identifier,
+    streamType: () => searchObj.data.stream.streamType,
+    streamName: () => searchObj.data.stream.selectedStream[0],
+    streamSchemaFields: () => searchObj.data.stream.selectedStreamFields,
+    getQuery: () => searchObj.data.query || searchObj.data.editorValue,
+    setQuery: (whereClause: string) => {
+      searchObj.data.query = whereClause;
+      searchObj.data.editorValue = whereClause;
+      searchObj.meta.sqlMode = false;
+    },
+    querySource: () => searchObj.data.query,
+  });
+  correlationFilters.watchQuery();
 
   const updateFieldValues = () => {
     try {
@@ -108,6 +125,8 @@ export const useStreamFields = () => {
   };
 
   const extractFields = async () => {
+    schemaRequestToken.value++;
+    const capturedToken = schemaRequestToken.value;
     try {
       searchObjDebug["extractFieldsStartTime"] = performance.now();
       searchObjDebug["extractFieldsWithAPI"] = "";
@@ -205,6 +224,7 @@ export const useStreamFields = () => {
             // check for schema exist in the object or not
             // if not pull the schema from server.
             const streamData = await loadStreamFields(stream.name);
+            if (capturedToken !== schemaRequestToken.value) return;
             if (streamData.schema === undefined) {
               searchObj.loadingStream = false;
               searchObj.data.errorMsg = t("search.noFieldFound");
@@ -368,13 +388,16 @@ export const useStreamFields = () => {
             let UDSFieldCount = 0;
             // Build type map in a single pass over the schema array
             const schemaTypeMap: Record<string, string> = {};
+            const definedFields = stream.settings?.defined_schema_fields || [];
+            const tsCol = store.state.zoConfig?.timestamp_column;
+            const allCol = store.state.zoConfig?.all_fields_name;
             const fields: [string] =
               stream.settings?.defined_schema_fields &&
               searchObj.meta.useUserDefinedSchemas === "user_defined_schema"
                 ? [
-                    store.state.zoConfig?.timestamp_column,
-                    ...stream.settings?.defined_schema_fields,
-                    store.state.zoConfig?.all_fields_name,
+                    ...(definedFields.includes(tsCol) ? [] : [tsCol]),
+                    ...definedFields,
+                    ...(definedFields.includes(allCol) ? [] : [allCol]),
                   ]
                 : stream.schema.map((obj: any) => {
                     schemaTypeMap[obj.name] = obj.type;
@@ -731,6 +754,7 @@ export const useStreamFields = () => {
           interestingFieldsMap,
         ).filter((field: any) => interestingFieldsMap[field]);
 
+        if (capturedToken !== schemaRequestToken.value) return;
         // searchObj.data.stream.selectedStreamFields = schemaMaps;
         searchObj.data.stream.selectedStreamFields = [
           ...commonSchemaMaps,
@@ -750,6 +774,9 @@ export const useStreamFields = () => {
 
         createFieldIndexMapping();
       }
+
+      correlationFilters.restore();
+
       searchObjDebug["extractFieldsEndTime"] = performance.now();
     } catch (e: any) {
       searchObj.loadingStream = false;
@@ -801,8 +828,18 @@ export const useStreamFields = () => {
     try {
       if (searchObj.data.streamResults.list.length > 0) {
         let lastUpdatedStreamTime = 0;
+        let latestStream = "";
 
         let selectedStream: any[] = [];
+        let existingValidStreams: any[] = [];
+
+        // Capture current selection (from localStorage restore or in-session state)
+        // to use as a fallback when no URL param is present.
+        const currentSelection: string[] = Array.isArray(
+          searchObj.data.stream.selectedStream,
+        )
+          ? searchObj.data.stream.selectedStream
+          : [];
 
         searchObj.data.stream.streamLists = [];
         let itemObj: {
@@ -824,13 +861,26 @@ export const useStreamFields = () => {
           }
           if (
             !router.currentRoute.value?.query?.stream &&
+            currentSelection.includes(item.name)
+          ) {
+            existingValidStreams.push(itemObj.value);
+          }
+          if (
+            !router.currentRoute.value?.query?.stream &&
             item.stats.doc_time_max >= lastUpdatedStreamTime
           ) {
-            selectedStream = [];
             lastUpdatedStreamTime = item.stats.doc_time_max;
-            selectedStream.push(itemObj.value);
+            latestStream = item.name;
           }
         }
+
+        // Priority: URL param > existing valid selection > latest by doc_time_max
+        if (!selectedStream.length && existingValidStreams.length) {
+          selectedStream = existingValidStreams;
+        } else if (!selectedStream.length && latestStream) {
+          selectedStream = [latestStream];
+        }
+
         if (
           (store.state.zoConfig.query_on_stream_selection == false ||
             router.currentRoute.value.query?.type == "stream_explorer") &&
@@ -1109,7 +1159,7 @@ export const useStreamFields = () => {
     }
   };
 
-  const filterHitsColumns = () => {
+  const filterHitsColumns = async () => {
     searchObj.data.queryResults.filteredHit = [];
     let itemHits: any = {};
     if (searchObj.data.stream.selectedFields.length > 0) {
@@ -1129,7 +1179,10 @@ export const useStreamFields = () => {
       searchObj.data.queryResults.filteredHit =
         searchObj.data.queryResults.hits;
     }
+
+    await correlationFilters.save();
   };
+
 
   return {
     updateFieldValues,
