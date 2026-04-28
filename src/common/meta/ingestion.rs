@@ -912,4 +912,57 @@ mod tests {
         assert_eq!(resp.text, "my error");
         assert_eq!(resp.code, 422);
     }
+
+    #[test]
+    fn test_bulk_response_item_optional_fields_absent_when_none() {
+        let item = BulkResponseItem {
+            _index: "idx".to_string(),
+            _id: "id1".to_string(),
+            _version: None,
+            result: None,
+            _shards: None,
+            _seq_no: None,
+            _primary_term: None,
+            status: 200,
+            error: None,
+            original_record: None,
+        };
+        let json = serde_json::to_value(&item).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("_version"));
+        assert!(!obj.contains_key("result"));
+        assert!(!obj.contains_key("_shards"));
+        assert!(!obj.contains_key("_seq_no"));
+        assert!(!obj.contains_key("_primary_term"));
+        assert!(!obj.contains_key("error"));
+        assert!(!obj.contains_key("originalRecord"));
+    }
+
+    #[test]
+    fn test_bulk_response_item_optional_fields_present_when_some() {
+        let item = BulkResponseItem {
+            _index: "idx".to_string(),
+            _id: "id1".to_string(),
+            _version: Some(1),
+            result: Some("created".to_string()),
+            _shards: Some(ShardResponse {
+                total: 1,
+                successful: 1,
+                failed: 0,
+            }),
+            _seq_no: Some(0),
+            _primary_term: Some(1),
+            status: 201,
+            error: None,
+            original_record: Some(json::json!({"key": "val"})),
+        };
+        let json = serde_json::to_value(&item).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("_version"));
+        assert!(obj.contains_key("result"));
+        assert!(obj.contains_key("_shards"));
+        assert!(obj.contains_key("_seq_no"));
+        assert!(obj.contains_key("_primary_term"));
+        assert!(obj.contains_key("originalRecord"));
+    }
 }
