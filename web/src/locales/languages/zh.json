@@ -388,7 +388,9 @@
     "turnOnLiveMode": "开启直播模式",
     "turnOffLiveMode": "关闭直播模式",
     "autoRunEnabled": "自动运行已启用",
-    "selectStreamFirst": "先选择一个直播"
+    "selectStreamFirst": "先选择一个直播",
+    "traces": "痕迹",
+    "switchToLogs": "点击切换回日志"
   },
   "menu": {
     "home": "主页",

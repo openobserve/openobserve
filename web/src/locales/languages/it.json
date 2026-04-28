@@ -388,7 +388,9 @@
     "turnOnLiveMode": "Attiva la modalità Live",
     "turnOffLiveMode": "Disattiva la modalità Live",
     "autoRunEnabled": "Esecuzione automatica abilitata",
-    "selectStreamFirst": "Seleziona prima uno stream"
+    "selectStreamFirst": "Seleziona prima uno stream",
+    "traces": "Tracce",
+    "switchToLogs": "clicca per tornare a Logs"
   },
   "menu": {
     "home": "Home",

@@ -490,7 +490,12 @@ import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
-import { saveLogsStream, restoreLogsStream } from "@/utils/streamPersist";
+import {
+  saveLogsStream,
+  restoreLogsStream,
+  saveLogsStreamType,
+  restoreLogsStreamType,
+} from "@/utils/streamPersist";
 
 export default defineComponent({
   name: "PageSearch",
@@ -1148,6 +1153,19 @@ export default defineComponent({
           if (
             store.state.zoConfig?.auto_query_enabled &&
             !router.currentRoute.value.query.stream &&
+            !router.currentRoute.value.query.stream_type
+          ) {
+            const persistedType = restoreLogsStreamType(
+              store.state.selectedOrganization.identifier,
+            );
+            if (persistedType) {
+              searchObj.data.stream.streamType = persistedType;
+            }
+          }
+
+          if (
+            store.state.zoConfig?.auto_query_enabled &&
+            !router.currentRoute.value.query.stream &&
             !searchObj.data.stream.selectedStream.length
           ) {
             const persisted = restoreLogsStream(
@@ -1731,6 +1749,18 @@ export default defineComponent({
         }
       },
       { deep: true },
+    );
+
+    watch(
+      () => searchObj.data.stream.streamType,
+      (streamType: string) => {
+        if (store.state.zoConfig?.auto_query_enabled && streamType) {
+          saveLogsStreamType(
+            store.state.selectedOrganization.identifier,
+            streamType,
+          );
+        }
+      },
     );
 
     // Watch for histogram query in search results and store it immediately

@@ -388,7 +388,9 @@
     "turnOnLiveMode": "Canlı modu açın",
     "turnOffLiveMode": "Canlı modu kapat",
     "autoRunEnabled": "Otomatik çalıştırma etkin",
-    "selectStreamFirst": "Önce bir yayın seçin"
+    "selectStreamFirst": "Önce bir yayın seçin",
+    "traces": "İzleri",
+    "switchToLogs": "Günlüklere geri dönmek için tıklayın"
   },
   "menu": {
     "home": "Ana Sayfa",
