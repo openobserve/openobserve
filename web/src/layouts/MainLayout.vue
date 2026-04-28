@@ -115,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="closeChat"
           :aiChatInputContext="aiChatInputContext"
           :appendMode="aiChatAppendMode"
+          :aiChatPayload="aiChatPayload"
         />
       </div>
     </div>
@@ -332,6 +333,8 @@ export default defineComponent({
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const aiChatAppendMode = ref(true);
+    const aiChatAutoSend = ref(false);
+    const aiChatPayload = ref<{ text: string; autoSend: boolean; id: number } | null>(null);
     const rowsPerPage = ref(10);
     const searchQuery = ref("");
 
@@ -1079,6 +1082,11 @@ export default defineComponent({
     };
 
     const toggleAIChat = () => {
+      // On the home page, switch to the AI tab instead of opening the side panel
+      if (router.currentRoute.value.name === "home") {
+        window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
+        return;
+      }
       const isEnabled = !store.state.isAiChatEnabled;
       store.dispatch("setIsAiChatEnabled", isEnabled);
       window.dispatchEvent(new Event("resize"));
@@ -1105,22 +1113,30 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
     };
 
-    const sendToAiChat = (value: any, append: boolean = true) => {
+    const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
       if (!store.state.isAiChatEnabled) {
         store.dispatch("setIsAiChatEnabled", true);
       }
 
-      // Set the append mode
+      // Support object payload { query, autoSend } from OverviewTab
+      let text = value;
+      let shouldAutoSend = autoSend;
+      if (value && typeof value === "object" && "query" in value) {
+        text = value.query;
+        shouldAutoSend = value.autoSend ?? false;
+      }
+
       aiChatAppendMode.value = append;
 
-      // Always clear and set to trigger the watcher in O2AIChat
+      // Deliver text + autoSend atomically in a single object so O2AIChat
+      // watcher always sees both values together — no timing race.
+      aiChatPayload.value = { text, autoSend: shouldAutoSend, id: Date.now() };
+
+      // Keep legacy aiChatInputContext in sync for other callers
       aiChatInputContext.value = "";
       nextTick(() => {
-        aiChatInputContext.value = value;
-        // Clear it after another tick so it doesn't accumulate in parent
-        nextTick(() => {
-          aiChatInputContext.value = "";
-        });
+        aiChatInputContext.value = text;
+        nextTick(() => { aiChatInputContext.value = ""; });
       });
     };
 

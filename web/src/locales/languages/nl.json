@@ -1689,7 +1689,10 @@
     "streamTotal": "Streams",
     "totalDashboard": "Dashboards",
     "viewButton": "Bekijken",
-    "noDataAvailable": "Geen gegevens beschikbaar"
+    "noDataAvailable": "Geen gegevens beschikbaar",
+    "tabAiAssistant": "O2 AI-assistent",
+    "tabOverview": "Overzicht",
+    "tabUsage": "Gebruik"
   },
   "billing": {
     "header": "Gebruik en facturering",
@@ -3624,5 +3627,30 @@
     "errLoadModel": "Het laden van het model is mislukt",
     "tierDefaultName": "Standaard",
     "tierConditionalName": "Voorwaardelijke laag"
+  },
+  "overview": {
+    "title": "Overzicht van het systeem",
+    "activeAnomalies": "Actieve afwijkingen",
+    "activeIncidents": "Actieve incidenten",
+    "services": "Diensten",
+    "recentEvents": "Recente evenementen",
+    "investigate": "Onderzoeken →",
+    "untitledIncident": "Incident zonder titel",
+    "viewLatencyCharts": "Latency- en RED-grafieken bekijken",
+    "elevatedErrorRate": "Verhoogd foutenpercentage",
+    "reqPerSec": "requise/s",
+    "allClear": "Alles duidelijk",
+    "allClearDesc": "Geen actieve afwijkingen, incidenten of slechte services in het geselecteerde tijdvenster."
+  },
+  "chatHistory": {
+    "title": "Chats",
+    "newChat": "Nieuwe chat",
+    "search": "Zoek",
+    "noMatches": "Geen wedstrijden",
+    "noHistory": "Geen chatgeschiedenis",
+    "delete": "Verwijderen",
+    "clearAll": "Alles wissen",
+    "clearAllTitle": "Alle chats wissen",
+    "clearAllMessage": "Hiermee wordt alle chatgeschiedenis definitief verwijderd. Deze actie kan niet ongedaan worden gemaakt."
   }
 }

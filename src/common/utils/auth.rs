@@ -390,8 +390,9 @@ where
             // this will take format of settings:{org_id} or pipelines:{org_id} etc
             let key = if path_columns[1].eq("invites") {
                 "users"
-            } else if (path_columns[1].eq("rename") || path_columns[1].eq("extend_trial_period"))
-                && method.eq("PUT")
+            } else if ((path_columns[1].eq("rename") || path_columns[1].eq("extend_trial_period"))
+                && method.eq("PUT"))
+                || path_columns[1].eq("external_contract")
             {
                 "organizations"
             } else {
@@ -401,6 +402,7 @@ where
             // for organization api changes we need perms on _all_{org}
             let entity = match (key, path_columns[1]) {
                 ("organizations", "extend_trial_period") => "_all__meta".to_string(),
+                ("organizations", "external_contract") => "_all__meta".to_string(),
                 ("organizations", "organizations") => {
                     // Special case: assume_service_account endpoint should check org:_all__meta
                     if url_len == 3 && path_columns[2] == "assume_service_account" {

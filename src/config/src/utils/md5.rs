@@ -50,4 +50,57 @@ mod tests {
         let expected = "e01eeed093cb22bb";
         assert_eq!(short_hash(input), expected);
     }
+
+    #[test]
+    fn test_hash_empty_string() {
+        // md5 of empty string is a well-known constant
+        assert_eq!(hash(""), "d41d8cd98f00b204e9800998ecf8427e");
+        assert_eq!(hash("").len(), 32);
+    }
+
+    #[test]
+    fn test_hash_is_deterministic() {
+        let input = "openobserve";
+        assert_eq!(hash(input), hash(input));
+    }
+
+    #[test]
+    fn test_hash_different_inputs_produce_different_outputs() {
+        assert_ne!(hash("foo"), hash("bar"));
+        // Single-character difference still produces a different hash.
+        assert_ne!(hash("hello world"), hash("hello world!"));
+    }
+
+    #[test]
+    fn test_hash_unicode_input() {
+        // Non-ASCII content must hash without panicking and yield a 32-char hex string.
+        let result = hash("こんにちは🌍");
+        assert_eq!(result.len(), 32);
+        assert!(result.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_short_hash_length_and_content() {
+        let input = "hello world";
+        let full = hash(input);
+        let short = short_hash(input);
+        // short_hash returns the middle 16 chars of the 32-char md5 hex digest.
+        assert_eq!(short.len(), 16);
+        assert_eq!(short, &full[8..24]);
+        assert!(short.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_short_hash_empty_string() {
+        // Middle 16 characters of the empty-string md5.
+        let full = hash("");
+        let short = short_hash("");
+        assert_eq!(short, &full[8..24]);
+    }
+
+    #[test]
+    fn test_short_hash_is_deterministic() {
+        let input = "openobserve";
+        assert_eq!(short_hash(input), short_hash(input));
+    }
 }

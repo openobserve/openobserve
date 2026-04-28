@@ -368,13 +368,16 @@ export const useStreamFields = () => {
             let UDSFieldCount = 0;
             // Build type map in a single pass over the schema array
             const schemaTypeMap: Record<string, string> = {};
+            const definedFields = stream.settings?.defined_schema_fields || [];
+            const tsCol = store.state.zoConfig?.timestamp_column;
+            const allCol = store.state.zoConfig?.all_fields_name;
             const fields: [string] =
               stream.settings?.defined_schema_fields &&
               searchObj.meta.useUserDefinedSchemas === "user_defined_schema"
                 ? [
-                    store.state.zoConfig?.timestamp_column,
-                    ...stream.settings?.defined_schema_fields,
-                    store.state.zoConfig?.all_fields_name,
+                    ...(definedFields.includes(tsCol) ? [] : [tsCol]),
+                    ...definedFields,
+                    ...(definedFields.includes(allCol) ? [] : [allCol]),
                   ]
                 : stream.schema.map((obj: any) => {
                     schemaTypeMap[obj.name] = obj.type;

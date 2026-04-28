@@ -974,7 +974,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   flat
                   :title="t('search.cancel')"
-                  class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
+                  class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</q-btn
                 >
@@ -1022,12 +1022,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </q-btn>
-                <q-separator
-                  v-if="visualizeSearchRequestTraceIds.length === 0"
-                  class="tw:h-[29px] tw:w-[1px]"
-                />
+                <q-separator class="tw:h-[29px] tw:w-[1px]" />
                 <q-btn-dropdown
-                  v-if="visualizeSearchRequestTraceIds.length === 0"
                   flat
                   class="tw:h-[29px] search-button-dropdown"
                   :class="[
@@ -1097,7 +1093,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   flat
                   :title="t('search.cancel')"
-                  class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
+                  class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</q-btn
                 >
@@ -1146,12 +1142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </q-btn>
-                <q-separator
-                  v-if="visualizeSearchRequestTraceIds.length === 0"
-                  class="tw:h-[29px] tw:w-[1px]"
-                />
+                <q-separator class="tw:h-[29px] tw:w-[1px]" />
                 <q-btn-dropdown
-                  v-if="visualizeSearchRequestTraceIds.length === 0"
                   flat
                   class="tw:h-[29px] search-button-dropdown"
                   :class="[
@@ -3247,6 +3239,32 @@ export default defineComponent({
       }
     };
 
+    // Debounced query trigger for absolute time when auto-run is enabled.
+    // Gives the user 1.5s to finish typing start/end time before firing.
+    const triggerAbsoluteQueryDebounced = debounce((value: object) => {
+      if (
+        searchObj.loading == false &&
+        store.state.zoConfig.query_on_stream_selection == false
+      ) {
+        searchObj.loading = true;
+        searchObj.runQuery = true;
+      }
+
+      if (config.isCloud == "true" && value.userChangedValue) {
+        segment.track("Button Click", {
+          button: "Date Change",
+          tab: value.tab,
+          value: value,
+          stream_name: searchObj.data.stream.selectedStream.join(","),
+          page: "Search Logs",
+        });
+      }
+
+      if (store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode) {
+        emit("searchdata");
+      }
+    }, 2500);
+
     const updateDateTime = async (value: object) => {
       if (
         value.valueType == "absolute" &&
@@ -3304,6 +3322,15 @@ export default defineComponent({
       await nextTick();
 
       if (
+        value.valueType === "absolute" &&
+        store.state.zoConfig.auto_query_enabled
+      ) {
+        // Debounce query trigger so user can finish typing the full time value
+        triggerAbsoluteQueryDebounced(value);
+        return;
+      }
+
+      if (
         searchObj.loading == false &&
         store.state.zoConfig.query_on_stream_selection == false
       ) {
@@ -3327,13 +3354,6 @@ export default defineComponent({
         value.valueType === "relative" &&
         store.state.zoConfig.query_on_stream_selection == false
       ) {
-        emit("searchdata");
-      } else if (
-        value.valueType === "absolute" &&
-        store.state.zoConfig.auto_query_enabled &&
-        searchObj.meta.liveMode
-      ) {
-        // Live mode: auto-trigger on committed absolute time range change
         emit("searchdata");
       }
     };
@@ -4777,7 +4797,7 @@ export default defineComponent({
 
     const toggleLiveMode = () => {
       searchObj.meta.liveMode = !searchObj.meta.liveMode;
-      localStorage.setItem("oo_live_mode_logs", String(searchObj.meta.liveMode));
+      localStorage.setItem("oo_toggle_auto_run", String(searchObj.meta.liveMode));
     };
 
     const handleHistogramMode = () => {};

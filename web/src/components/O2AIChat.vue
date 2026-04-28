@@ -307,12 +307,48 @@
 
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
         <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
-          <div v-if="chatMessages.length === 0" class="welcome-section ">
-            <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full ">
+          <div v-if="chatMessages.length === 0" class="welcome-section" :class="{ 'welcome-section--centered': centeredStart }">
+            <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full">
               <img :src="o2AiTitleLogo" />
               <div class="tw:relative tw:inline-block">
                 <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 Assistant</span>
                 <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
+              </div>
+              <!-- Input rendered here when centeredStart so it appears mid-screen -->
+              <div v-if="centeredStart" class="centered-input-wrap">
+                <div
+                  class="unified-input-box"
+                  :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+                  @dragover="handleDragOver"
+                  @drop="handleDrop"
+                  @paste="handlePaste"
+                >
+                  <RichTextInput
+                    ref="chatInput"
+                    v-model="inputMessage"
+                    :placeholder="'Write your prompt'"
+                    :disabled="isLoading"
+                    :theme="store.state.theme"
+                    :references="contextReferences"
+                    :borderless="true"
+                    @keydown="handleKeyDown"
+                    @submit="sendMessage"
+                    @update:references="handleReferencesUpdate"
+                  />
+                  <div class="input-bottom-bar">
+                    <div class="tw:flex tw:items-center tw:gap-2"></div>
+                    <div class="tw:flex tw:items-center tw:gap-2">
+                      <q-btn
+                        v-if="inputMessage.trim() || pendingImages.length > 0"
+                        @click="sendMessage"
+                        round dense flat size="sm"
+                        class="send-button"
+                      >
+                        <q-icon name="send" size="16px" color="white" />
+                      </q-btn>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -866,7 +902,7 @@
         </div>
       </div>
 
-      <div class="chat-input-container q-ma-md">
+      <div v-if="!(centeredStart && chatMessages.length === 0)" class="chat-input-container q-ma-md">
         <!-- Confirmation dialog -->
         <O2AIConfirmDialog
           :visible="pendingConfirmation !== null"
@@ -1088,6 +1124,14 @@ export default defineComponent({
     appendMode: {
       type: Boolean,
       default: true
+    },
+    aiChatPayload: {
+      type: Object as () => { text: string; autoSend: boolean; id: number } | null,
+      default: null
+    },
+    centeredStart: {
+      type: Boolean,
+      default: false
     }
   },
   setup(props) {
@@ -1645,6 +1689,7 @@ export default defineComponent({
 
     watch(() => props.aiChatInputContext, (newAiChatInputContext: string) => {
       if(newAiChatInputContext) {
+
         // Create a reference chip from the context
         const contextChip: ReferenceChip = {
           id: `context-${Date.now()}`,
@@ -1669,6 +1714,19 @@ export default defineComponent({
         }
         // If component not ready, chips will be processed when componentReady becomes true
         // No fallback text needed - avoids flickering when chat opens
+      }
+    });
+
+    // Atomic payload watcher — text + autoSend arrive together, no timing race
+    watch(() => props.aiChatPayload, (payload) => {
+      if (!payload?.text) return;
+      if (payload.autoSend) {
+        inputMessage.value = payload.text;
+        nextTick(() => {
+          setTimeout(() => {
+            sendMessage();
+          }, 50);
+        });
       }
     });
 
@@ -4928,10 +4986,27 @@ export default defineComponent({
     background: linear-gradient(to right, rgba(var(--q-primary-rgb), 0.05), rgba(var(--q-primary-rgb), 0.1));
     border-radius: 8px;
     margin-bottom: 24px;
-    height: 100%;
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
+
+    &.welcome-section--centered {
+      background: transparent;
+      padding: 0;
+      margin-bottom: 0;
+    }
+  }
+
+  .centered-input-wrap {
+    max-width: 900px;
+    width: calc(100% - 16px);
+    margin-top: 1.25em;
+    font-size: 1rem;
+
+    :deep(.rich-text-input) {
+      font-size: 1rem;
+    }
   }
 
   // Fixed analyzing indicator above input

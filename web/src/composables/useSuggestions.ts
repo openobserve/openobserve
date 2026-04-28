@@ -382,7 +382,14 @@ const useSqlSuggestions = () => {
       labelMeta.meta.label = match[1] ?? match[2] ?? match[3] ?? match[4];
       // True when the user has already typed an opening quote, e.g. field = 'partial
       // In this case insertText should be  value'  (close only), not  'value'
-      labelMeta.meta.hasOpenQuote = /'[^']*$/.test(textUpToCursor);
+      //
+      // Scope the check to the text starting at the current match, not the full
+      // query. A closed quote from a preceding condition (e.g. http = 'te') has
+      // no trailing non-quote chars after it until cursor, which would otherwise
+      // make /'[^']*$/ fire and wrongly set hasOpenQuote for the new condition.
+      labelMeta.meta.hasOpenQuote = /'[^']*$/.test(
+        textUpToCursor.slice(match.index),
+      );
     }
     return labelMeta;
   }

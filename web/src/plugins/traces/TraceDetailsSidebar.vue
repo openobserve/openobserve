@@ -466,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="
                   $emit('apply-filter-immediately', {
                     field,
-                    value: fieldValue,
+                    value: getFilterValue(field, fieldValue),
                     operator: action.operator,
                   })
                 "
@@ -527,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click.stop="
                       $emit('apply-filter-immediately', {
                         field,
-                        value: fieldValue,
+                        value: getFilterValue(field, fieldValue),
                         operator: action.operator,
                       })
                     "
@@ -1142,10 +1142,33 @@ export default defineComponent({
       return lines.join("\n");
     };
 
+    const store = useStore();
+
+    const RAW_VALUE_FILTER_FIELDS = new Set([
+      store.state?.zoConfig?.timestamp_column || "_timestamp",
+    ]);
+
     const filterActions = [
       { operator: "=" as const, iconComponent: EqualIcon },
       { operator: "!=" as const, iconComponent: NotEqualIcon },
     ];
+
+    const getFilterValue = (field: string, displayValue: unknown): unknown => {
+      const span = props.span as Record<string, unknown>;
+      if (field === "start_time") {
+        return span._start_time_ns ?? span.start_time ?? displayValue;
+      }
+      if (field === "end_time") {
+        return span._end_time_ns ?? span.end_time ?? displayValue;
+      }
+      const timestampField =
+        store.state?.zoConfig?.timestamp_column || "_timestamp";
+      if (field === timestampField) {
+        return span[timestampField] ?? displayValue;
+      }
+
+      return displayValue;
+    };
 
     const attributesForDisplay = computed(() => {
       const attrs = { ...spanDetails.value.attrs };
@@ -1244,8 +1267,6 @@ export default defineComponent({
     onBeforeMount(() => {
       spanDetails.value = getFormattedSpanDetails();
     });
-
-    const store = useStore();
 
     // Get current theme from store
     const isDarkMode = computed(() => store.state.theme === "dark");
@@ -1442,6 +1463,10 @@ export default defineComponent({
 
       if (spanDetails.attrs.events) delete spanDetails.attrs.events;
 
+      // These are custom meta fields for start_time and end_time so removing it from spanDetails
+      delete spanDetails.attrs._start_time_ns;
+      delete spanDetails.attrs._end_time_ns;
+
       spanDetails.attrs.duration = spanDetails.attrs.duration + "us";
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
         date.formatDate(
@@ -1482,6 +1507,8 @@ export default defineComponent({
       store.state.zoConfig.timestamp_column,
       "start_time",
       "end_time",
+      "_start_time_ns",
+      "_end_time_ns",
       "duration",
       "busy_ns",
       "idle_ns",
@@ -2141,6 +2168,7 @@ export default defineComponent({
       linkColumns,
       getTagRows,
       tagColumns,
+      getFilterValue,
       attributesForDisplay,
       attributesViewMode,
       attributesTableColumns,

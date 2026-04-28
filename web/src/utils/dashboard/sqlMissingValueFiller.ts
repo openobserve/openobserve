@@ -20,6 +20,9 @@ import { isTimeSeries } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
 import { detectChunkingDirection } from "./chunkingDirection";
 
+const formatUtc = (date: Date) =>
+  format(toZonedTime(date, "UTC"), "yyyy-MM-dd'T'HH:mm:ss");
+
 /**
  * Fills in missing time-series data points between the start and end time
  * based on the histogram interval, inserting null/no-value entries where data
@@ -47,6 +50,7 @@ export const fillMissingValues = (
   zAxisKeys: string[],
   breakDownKeys: string[],
   noValueConfigOption: any,
+  loading?: any,
 ): any[] => {
   // Get the interval in minutes
   const interval = resultMetaData?.map(
@@ -106,13 +110,10 @@ export const fillMissingValues = (
   // Use metadata endTime for the user's selected end time.
   const metaDataEndTime = metadata?.queries[0]?.endTime?.toString() ?? 0;
   const endTime = new Date(parseInt(metaDataEndTime) / 1000);
-  const formattedUserEnd = format(
-    toZonedTime(endTime, "UTC"),
-    "yyyy-MM-dd'T'HH:mm:ss",
-  );
+  const formattedUserEnd = formatUtc(endTime);
 
   // Detect chunking direction from first resultMetaData entry.
-  const isLeftToRight =
+  const isLTR =
     detectChunkingDirection(
       resultMetaData?.[0]?.time_offset?.start_time ?? 0,
       resultMetaData?.[0]?.time_offset?.end_time ?? 0,
@@ -123,20 +124,21 @@ export const fillMissingValues = (
   let binnedFillStart: Date;
   let endTimeForFill: string;
 
-  if (isLeftToRight) {
-    // LTR: fill from user's start to latest chunk's end
+  if (!loading) {
+    // Final render or cancel: fill the full user query range
+    binnedFillStart = binnedDate;
+    endTimeForFill = formattedUserEnd;
+  } else if (isLTR) {
+    // LTR streaming: fill from user's start to latest chunk's end
     binnedFillStart = binnedDate;
     const lastChunkEndTime =
       resultMetaData?.[resultMetaData.length - 1]?.time_offset?.end_time ?? 0;
     const fillEndTime = lastChunkEndTime
       ? new Date(lastChunkEndTime / 1000)
       : endTime;
-    endTimeForFill = format(
-      toZonedTime(fillEndTime, "UTC"),
-      "yyyy-MM-dd'T'HH:mm:ss",
-    );
+    endTimeForFill = formatUtc(fillEndTime);
   } else {
-    // RTL: fill from earliest chunk's start to user's end (existing behavior)
+    // RTL streaming: fill from earliest chunk's start to user's end
     const resultMetaStartTime =
       resultMetaData?.[resultMetaData.length - 1]?.time_offset?.start_time ?? 0;
     const fillStartTime = resultMetaStartTime
@@ -146,96 +148,46 @@ export const fillMissingValues = (
     endTimeForFill = formattedUserEnd;
   }
 
-  // Build map from processedData for O(1) lookup
+  // Build map from processedData for O(1) lookup, and track actual data
+  // time range so we only fill gaps between real data points.
   const hasBreakdown =
     xAxisKeysWithoutTimeStamp.length > 0 ||
     breakdownAxisKeysWithoutTimeStamp.length > 0;
   const searchDataMap = new Map();
+  let actualMinTime: string | null = null;
+  let actualMaxTime: string | null = null;
   processedData?.forEach((d: any) => {
+    const timeVal = `${getDataValue(d, timeKey)}`;
     const key = hasBreakdown
-      ? `${getDataValue(d, timeKey)}-${getDataValue(d, uniqueKey)}`
-      : `${getDataValue(d, timeKey)}`;
+      ? `${timeVal}-${getDataValue(d, uniqueKey)}`
+      : timeVal;
     searchDataMap.set(key, d);
+    if (!actualMinTime || timeVal < actualMinTime) actualMinTime = timeVal;
+    if (!actualMaxTime || timeVal > actualMaxTime) actualMaxTime = timeVal;
   });
 
-  const filledData: any = [];
-
-  // Count unique time slots up to 3. We only need to know if there are < 3
-  // (phantom anchor needed) or >= 3 (ECharts can derive interval from data).
-  // Break early once 3 distinct slots are found to avoid iterating all rows.
-  const uniqueTimeSlots = new Set<string>();
-  for (const d of processedData) {
-    uniqueTimeSlots.add(getDataValue(d, timeKey));
-    if (uniqueTimeSlots.size >= 3) break;
-  }
-  const uniqueTimeSlotCount = uniqueTimeSlots.size;
-
-  // RTL: insert an empty-string anchor at the user's selected start time when the fill
-  // loop doesn't yet cover it. This pins the ECharts x-axis left edge to the
-  // user's query range from the very first chunk.
-  if (!isLeftToRight && binnedFillStart > binnedDate) {
-    const anchorFormattedTime = format(
-      toZonedTime(binnedDate, "UTC"),
-      "yyyy-MM-dd'T'HH:mm:ss",
-    );
-    const anchorTimes = [anchorFormattedTime];
-
-    // Also insert a phantom point one interval after the user's selected start
-    // time when data is sparse (< 3 unique time slots). This gives ECharts a
-    // known 30s consecutive gap at the left edge of the axis so it sizes bars
-    // correctly instead of using the huge gap from user-start to first chunk
-    // (~hours/days). Only added when it falls strictly before the first real
-    // data point (binnedFillStart), otherwise it would overlap real data.
-    // Once there are >= 3 real time slots ECharts can derive the interval from
-    // the data itself and the phantom is no longer needed.
-    if (uniqueTimeSlotCount < 3) {
-      const nearAnchorTime = new Date(binnedDate.getTime() + interval * 1000);
-      // Only add the near-anchor if it's strictly before the first real data
-      if (nearAnchorTime < binnedFillStart) {
-        const nearAnchorFormattedTime = format(
-          toZonedTime(nearAnchorTime, "UTC"),
-          "yyyy-MM-dd'T'HH:mm:ss",
-        );
-        anchorTimes.push(nearAnchorFormattedTime);
+  if (loading) {
+    // LTR streaming: clamp both edges to actual data bounds. Timestamps
+    // before actualMinTime or after actualMaxTime have no new data yet —
+    // the overlay preserves previously rendered chart values for those.
+    // RTL streaming: no clamping — the fill extends from chunkStart to
+    // userEnd so the "newer" (right) side gets noValue entries.
+    if (isLTR) {
+      if (actualMinTime && actualMinTime > formatUtc(binnedFillStart)) {
+        binnedFillStart = new Date(actualMinTime + "Z");
+      }
+      if (actualMaxTime && actualMaxTime < endTimeForFill) {
+        endTimeForFill = actualMaxTime;
       }
     }
 
-    // Anchor/phantom entries use empty string (not noValueConfigOption) so
-    // ECharts renders them as gaps rather than plotted points at the configured value.
-    if (!hasBreakdown) {
-      anchorTimes.forEach((t) => {
-        const anchorEntry: any = { [timeKey]: t };
-        keys.forEach((key) => {
-          if (key !== timeKey) anchorEntry[key] = "";
-        });
-        filledData.push(anchorEntry);
-      });
-    } else {
-      anchorTimes.forEach((t) => {
-        uniqueXAxisValues.forEach((uniqueValue: any) => {
-          const anchorEntry: any = {
-            [timeKey]: t,
-            [uniqueKey]: uniqueValue,
-          };
-          keys.forEach((key) => {
-            if (key !== timeKey && key !== uniqueKey) {
-              anchorEntry[key] = "";
-            }
-          });
-          filledData.push(anchorEntry);
-        });
-      });
-    }
   }
 
-  // Fill slot-by-slot in chronological order from binnedFillStart
-  // (resultMetaData start) to endTimeForFill (user's end).
-  // Only covers the range where streaming data has been received.
+  const filledData: any = [];
+
+  // Fill slot-by-slot in chronological order, only between actual data points.
   let currentTime = binnedFillStart;
-  let currentFormattedTime = format(
-    toZonedTime(currentTime, "UTC"),
-    "yyyy-MM-dd'T'HH:mm:ss",
-  );
+  let currentFormattedTime = formatUtc(currentTime);
 
   while (currentFormattedTime <= endTimeForFill) {
     if (!hasBreakdown) {
@@ -272,70 +224,7 @@ export const fillMissingValues = (
     }
 
     currentTime = new Date(currentTime.getTime() + intervalMillis);
-    currentFormattedTime = format(
-      toZonedTime(currentTime, "UTC"),
-      "yyyy-MM-dd'T'HH:mm:ss",
-    );
-  }
-
-  // LTR: insert an empty-string anchor at the user's selected end time when the fill
-  // loop doesn't yet cover it. This pins the ECharts x-axis right edge to the
-  // user's query range from the very first chunk.
-  if (isLeftToRight) {
-    const binnedUserEnd = dateBin(interval, endTime, origin);
-    const formattedBinnedUserEnd = format(
-      toZonedTime(binnedUserEnd, "UTC"),
-      "yyyy-MM-dd'T'HH:mm:ss",
-    );
-
-    if (endTimeForFill < formattedBinnedUserEnd) {
-      const anchorTimes: string[] = [];
-
-      // Insert a phantom point one interval before the user's selected end
-      // time when data is sparse (< 3 unique time slots). This gives ECharts a
-      // known consecutive gap at the right edge so it sizes bars correctly.
-      if (uniqueTimeSlotCount < 3) {
-        const nearAnchorTime = new Date(
-          binnedUserEnd.getTime() - interval * 1000,
-        );
-        const formattedNearAnchor = format(
-          toZonedTime(nearAnchorTime, "UTC"),
-          "yyyy-MM-dd'T'HH:mm:ss",
-        );
-        if (formattedNearAnchor > endTimeForFill) {
-          anchorTimes.push(formattedNearAnchor);
-        }
-      }
-
-      anchorTimes.push(formattedBinnedUserEnd);
-
-      // Anchor/phantom entries use empty string (not noValueConfigOption) so
-      // ECharts renders them as gaps rather than plotted points at the configured value.
-      if (!hasBreakdown) {
-        anchorTimes.forEach((t) => {
-          const anchorEntry: any = { [timeKey]: t };
-          keys.forEach((key) => {
-            if (key !== timeKey) anchorEntry[key] = "";
-          });
-          filledData.push(anchorEntry);
-        });
-      } else {
-        anchorTimes.forEach((t) => {
-          uniqueXAxisValues.forEach((uniqueValue: any) => {
-            const anchorEntry: any = {
-              [timeKey]: t,
-              [uniqueKey]: uniqueValue,
-            };
-            keys.forEach((key) => {
-              if (key !== timeKey && key !== uniqueKey) {
-                anchorEntry[key] = "";
-              }
-            });
-            filledData.push(anchorEntry);
-          });
-        });
-      }
-    }
+    currentFormattedTime = formatUtc(currentTime);
   }
 
   return filledData;

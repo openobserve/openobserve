@@ -551,5 +551,63 @@ describe("TracesSearchResultList", () => {
         "span_kind != 'Server'",
       );
     });
+
+    it("should use fieldValue directly for start_time without needing a row shadow field", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "start_time",
+        "1700000000123456789",
+        "include",
+      );
+      expect(sharedSearchObj.data.stream.addToFilter).toBe(
+        "start_time = '1700000000123456789'",
+      );
+    });
+
+    it("should use fieldValue directly for end_time without needing a row shadow field", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "end_time",
+        "1700000000987654321",
+        "include",
+      );
+      expect(sharedSearchObj.data.stream.addToFilter).toBe(
+        "end_time = '1700000000987654321'",
+      );
+    });
+
+    it("should set is null filter when fieldValue is null for start_time", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "start_time",
+        "null",
+        "include",
+      );
+      expect(sharedSearchObj.data.stream.addToFilter).toBe("start_time is null");
+    });
+
+    it("should set is null filter when fieldValue is null for a generic field", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "service_name",
+        "null",
+        "include",
+      );
+      expect(sharedSearchObj.data.stream.addToFilter).toBe(
+        "service_name is null",
+      );
+    });
   });
 });

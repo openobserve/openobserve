@@ -58,6 +58,7 @@ cmd_check() {
         cat <<'EOF'
 import json
 import os
+import subprocess
 import sys
 
 thresholds = {
@@ -72,17 +73,62 @@ with open('report.json') as f:
 totals = report['data'][0]['totals']
 
 exit_status = 0
+failing_metrics = []
 for k, threshold in thresholds.items():
     actual = totals[k]['percent']
-    k = k.capitalize()
+    label = k.capitalize()
     if actual >= threshold:
-        print(f'✅ {k} coverage: {actual:.2f}%', file=sys.stderr)
+        print(f'✅ {label} coverage: {actual:.2f}%', file=sys.stderr)
     else:
         print(
-            f'❌ {k} coverage is below threshold: {actual:.2f}% < {threshold}%',
+            f'❌ {label} coverage is below threshold: {actual:.2f}% < {threshold}%',
             file=sys.stderr,
         )
+        failing_metrics.append(k)
         exit_status = 1
+
+if failing_metrics:
+    # Fetch per-file data from the existing profdata — no tests re-run
+    result = subprocess.run(
+        ['cargo', 'llvm-cov', 'report', '--json',
+         '--ignore-filename-regex', 'job|.*generated.*'],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0:
+        full = json.loads(result.stdout)
+        files = full['data'][0].get('files', [])
+        metrics_label = ', '.join(failing_metrics)
+        print(f'\n── Worst files by {metrics_label} coverage (top 20) ──', file=sys.stderr)
+        scored = []
+        for entry in files:
+            fname = entry.get('filename', '')
+            summary = entry.get('summary', {})
+            for metric in failing_metrics:
+                m = summary.get(metric, {})
+                covered = m.get('covered', 0)
+                total = m.get('count', 0)
+                if total == 0:
+                    continue
+                pct = covered / total * 100
+                missed = total - covered
+                scored.append((pct, missed, total, metric, fname))
+        # lowest coverage first, then most missed
+        scored.sort(key=lambda x: (x[0], -x[1]))
+        seen = set()
+        count = 0
+        for pct, missed, total, metric, fname in scored:
+            key = (metric, fname)
+            if key in seen:
+                continue
+            seen.add(key)
+            short = fname.split('/src/', 1)[-1] if '/src/' in fname else fname
+            print(f'  {metric:10s} {pct:5.1f}%  ({missed} uncovered / {total} total)  {short}', file=sys.stderr)
+            count += 1
+            if count >= 20:
+                break
+    else:
+        print(f'(could not fetch per-file breakdown: {result.stderr.strip()})', file=sys.stderr)
+
 sys.exit(exit_status)
 EOF
     )
