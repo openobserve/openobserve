@@ -21,8 +21,27 @@ jobs:
         with:
           fetch-depth: 0 # Full history needed to check what changed
 
+      - name: Find existing review comment
+        id: find_comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Find the existing claude-pr-review comment ID (numeric, for gh api)
+          COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --jq '[.[] | select(.body | contains("claude-pr-review")) | .id] | last // empty')
+
+          if [ -n "$COMMENT_ID" ]; then
+            echo "comment_id=$COMMENT_ID" >> "$GITHUB_OUTPUT"
+            echo "Found existing review comment: $COMMENT_ID"
+          else
+            echo "comment_id=" >> "$GITHUB_OUTPUT"
+            echo "No existing review comment found, will create new one"
+          fi
+
       - name: PR Review with Progress Tracking
         uses: anthropics/claude-code-action@v1
+        env:
+          EXISTING_COMMENT_ID: ${{ steps.find_comment.outputs.comment_id }}
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           track_progress: true
@@ -30,24 +49,24 @@ jobs:
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
+            EXISTING_COMMENT_ID: ${{ steps.find_comment.outputs.comment_id }}
 
-            ## CRITICAL: ONE COMMENT ONLY
+            ## CRITICAL: ONE COMMENT ONLY — ALWAYS UPDATE IF EXISTS
 
             You must post EXACTLY ONE comment on this PR. Never post multiple comments.
             Never post a summary AND a review - combine everything into ONE comment.
 
             ### Step 1: Gather PR Context (DO THIS FIRST)
 
-            Run both of these once and reuse the results throughout:
+            Run this once and reuse the results throughout:
 
             **Commits:**
             `gh pr view ${{ github.event.pull_request.number }} --json commits --jq '[.commits[] | {sha: .oid, author: .authors[0].login, message: .messageHeadline}]'`
 
-            **Existing review comment (id + body):**
-            `gh pr view ${{ github.event.pull_request.number }} --json comments --jq '[.comments[] | select(.body | contains("claude-pr-review")) | {id: .id, body: .body}]'`
+            **If EXISTING_COMMENT_ID is not empty**, fetch the existing comment body to understand what was previously flagged:
+            `gh api repos/${{ github.repository }}/issues/comments/${{ steps.find_comment.outputs.comment_id }} --jq '.body'`
 
             From the results above:
-            - Note the existing comment **id** (if any) for Step 3
             - Note the existing comment **body** to understand what was previously flagged
             - Look for bot commit → human revert patterns in the commit list: if a human commit undoes code that a bot commit introduced, treat those lines as an intentional author decision. Do NOT re-raise or re-fix them. Add to Resolved as: `~~Issue~~ — intentionally reverted by author`
 
@@ -60,12 +79,13 @@ jobs:
 
             ### Step 3: Post or Update Comment
 
-            **If existing comment found (Step 1 returned an id):**
+            **If EXISTING_COMMENT_ID is `${{ steps.find_comment.outputs.comment_id }}` (non-empty), you MUST update it:**
             ```
-            gh api repos/${{ github.repository }}/issues/comments/{COMMENT_ID} -X PATCH -f body='...'
+            gh api repos/${{ github.repository }}/issues/comments/${{ steps.find_comment.outputs.comment_id }} -X PATCH -f body='...'
             ```
+            Do NOT create a new comment when EXISTING_COMMENT_ID is set. Always PATCH the existing one.
 
-            **If no existing comment:**
+            **If EXISTING_COMMENT_ID is empty, create a new comment:**
             ```
             gh pr comment ${{ github.event.pull_request.number }} --body '...'
             ```
@@ -89,6 +109,7 @@ jobs:
             ### STRICT RULES
 
             - **ONE comment only** - never post multiple comments
+            - **Always PATCH existing comment** - if EXISTING_COMMENT_ID is provided, update it; never create a duplicate
             - **No summaries** - no "Review Complete", no "Security Assessment", no highlights
             - **No praise** - no "excellent", "strong", "great work" sections
             - **2 sentences max** per issue
