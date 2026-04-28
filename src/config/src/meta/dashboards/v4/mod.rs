@@ -615,4 +615,43 @@ mod tests {
         let json = serde_json::to_string(&vl).unwrap();
         assert!(json.contains("multiSelect"));
     }
+
+    #[test]
+    fn test_drill_down_default_all_none_absent() {
+        let dd = DrillDown::default();
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(!json.contains("name"));
+        assert!(!json.contains("type"));
+        assert!(!json.contains("targetBlank"));
+        assert!(!json.contains("findBy"));
+        assert!(!json.contains("data"));
+    }
+
+    #[test]
+    fn test_mark_line_default_all_none_absent() {
+        let ml = MarkLine::default();
+        let json = serde_json::to_string(&ml).unwrap();
+        assert!(!json.contains("name"));
+        assert!(!json.contains("type"));
+        assert!(!json.contains("value"));
+    }
+
+    #[test]
+    fn test_drill_down_data_default_all_none_absent() {
+        let dd = DrillDownData::default();
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(!json.contains("url"));
+        assert!(!json.contains("folder"));
+        assert!(!json.contains("dashboard"));
+        assert!(!json.contains("tab"));
+        assert!(!json.contains("passAllVariables"));
+        assert!(!json.contains("variables"));
+    }
+
+    #[test]
+    fn test_query_data_default_filter_absent() {
+        let qd = QueryData::default();
+        let json = serde_json::to_string(&qd).unwrap();
+        assert!(!json.contains("filter"));
+    }
 }

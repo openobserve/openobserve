@@ -587,4 +587,40 @@ mod tests {
         let json = serde_json::to_string(&vl).unwrap();
         assert!(json.contains("multiSelect"));
     }
+
+    #[test]
+    fn test_drill_down_all_none_absent() {
+        let dd = DrillDown {
+            name: None,
+            type_field: None,
+            target_blank: None,
+            find_by: None,
+            data: None,
+        };
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(!json.contains("name"));
+        assert!(!json.contains("type"));
+        assert!(!json.contains("targetBlank"));
+        assert!(!json.contains("findBy"));
+        assert!(!json.contains("data"));
+    }
+
+    #[test]
+    fn test_drill_down_data_all_none_absent() {
+        let dd = DrillDownData {
+            url: None,
+            folder: None,
+            dashboard: None,
+            tab: None,
+            pass_all_variables: None,
+            variables: None,
+        };
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(!json.contains("url"));
+        assert!(!json.contains("folder"));
+        assert!(!json.contains("dashboard"));
+        assert!(!json.contains("tab"));
+        assert!(!json.contains("passAllVariables"));
+        assert!(!json.contains("variables"));
+    }
 }
