@@ -417,4 +417,160 @@ mod tests {
         assert!(!json.contains("axisBorderShow"));
         assert!(!json.contains("legendWidth"));
     }
+
+    #[test]
+    fn test_panel_config_optional_some_fields_present() {
+        let cfg = PanelConfig {
+            show_legends: true,
+            legends_position: Some("bottom".to_string()),
+            unit: Some("bytes".to_string()),
+            unit_custom: Some("B".to_string()),
+            decimals: Some(OrdF64::from(2.0)),
+            axis_width: Some(OrdF64::from(50.0)),
+            axis_border_show: Some(true),
+            legend_width: Some(LegendWidth {
+                value: Some(OrdF64::from(100.0)),
+                unit: Some("px".to_string()),
+            }),
+            base_map: None,
+            map_view: None,
+        };
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("\"unit\""));
+        assert!(json.contains("unit_custom"));
+        assert!(json.contains("decimals"));
+        assert!(json.contains("axisWidth"));
+        assert!(json.contains("axisBorderShow"));
+        assert!(json.contains("legendWidth"));
+    }
+
+    #[test]
+    fn test_axis_item_optional_fields_absent_when_none() {
+        let item = AxisItem {
+            label: "l".to_string(),
+            alias: "a".to_string(),
+            column: "c".to_string(),
+            color: None,
+            aggregation_function: None,
+            sort_by: None,
+            args: None,
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(!json.contains("aggregationFunction"));
+        assert!(!json.contains("sortBy"));
+        assert!(!json.contains("\"args\""));
+    }
+
+    #[test]
+    fn test_axis_item_optional_fields_present_when_some() {
+        let item = AxisItem {
+            label: "l".to_string(),
+            alias: "a".to_string(),
+            column: "c".to_string(),
+            color: None,
+            aggregation_function: Some(AggregationFunc::Sum),
+            sort_by: Some("asc".to_string()),
+            args: Some(vec![]),
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("aggregationFunction"));
+        assert!(json.contains("sortBy"));
+        assert!(json.contains("\"args\""));
+    }
+
+    #[test]
+    fn test_query_config_optional_fields_absent_when_none() {
+        let qc = QueryConfig {
+            promql_legend: "l".to_string(),
+            layer_type: None,
+            weight_fixed: None,
+            limit: None,
+            min: None,
+            max: None,
+        };
+        let json = serde_json::to_string(&qc).unwrap();
+        assert!(!json.contains("layer_type"));
+        assert!(!json.contains("weight_fixed"));
+        assert!(!json.contains("\"limit\""));
+        assert!(!json.contains("\"min\""));
+        assert!(!json.contains("\"max\""));
+    }
+
+    #[test]
+    fn test_query_config_optional_fields_present_when_some() {
+        let qc = QueryConfig {
+            promql_legend: "l".to_string(),
+            layer_type: Some("scatter".to_string()),
+            weight_fixed: Some(OrdF64::from(1.0)),
+            limit: Some(OrdF64::from(10.0)),
+            min: Some(OrdF64::from(0.0)),
+            max: Some(OrdF64::from(100.0)),
+        };
+        let json = serde_json::to_string(&qc).unwrap();
+        assert!(json.contains("layer_type"));
+        assert!(json.contains("weight_fixed"));
+        assert!(json.contains("\"limit\""));
+        assert!(json.contains("\"min\""));
+        assert!(json.contains("\"max\""));
+    }
+
+    #[test]
+    fn test_panel_fields_optional_absent_when_none() {
+        let pf = PanelFields {
+            stream: "s".to_string(),
+            stream_type: StreamType::Logs,
+            x: vec![],
+            y: vec![],
+            z: None,
+            latitude: None,
+            longitude: None,
+            weight: None,
+            filter: vec![],
+        };
+        let json = serde_json::to_string(&pf).unwrap();
+        assert!(!json.contains("\"z\""));
+        assert!(!json.contains("latitude"));
+        assert!(!json.contains("longitude"));
+        assert!(!json.contains("weight"));
+    }
+
+    #[test]
+    fn test_panel_fields_optional_present_when_some() {
+        let axis = AxisItem {
+            label: "l".to_string(),
+            alias: "a".to_string(),
+            column: "c".to_string(),
+            color: None,
+            aggregation_function: None,
+            sort_by: None,
+            args: None,
+        };
+        let pf = PanelFields {
+            stream: "s".to_string(),
+            stream_type: StreamType::Logs,
+            x: vec![],
+            y: vec![],
+            z: Some(vec![axis.clone()]),
+            latitude: Some(axis.clone()),
+            longitude: Some(axis.clone()),
+            weight: Some(axis),
+            filter: vec![],
+        };
+        let json = serde_json::to_string(&pf).unwrap();
+        assert!(json.contains("\"z\""));
+        assert!(json.contains("latitude"));
+        assert!(json.contains("longitude"));
+        assert!(json.contains("weight"));
+    }
+
+    #[test]
+    fn test_legend_width_present_when_some() {
+        let lw = LegendWidth {
+            value: Some(OrdF64::from(80.0)),
+            unit: Some("px".to_string()),
+        };
+        let json = serde_json::to_string(&lw).unwrap();
+        assert!(json.contains("value"));
+        assert!(json.contains("unit"));
+    }
 }
