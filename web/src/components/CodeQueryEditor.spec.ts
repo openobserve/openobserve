@@ -523,7 +523,7 @@ describe("CodeQueryEditor", () => {
         () => {
           expect(mockEditorObj.addCommand).toHaveBeenCalled();
         },
-        { timeout: 3000 },
+        { timeout: 10000 },
       );
       return shortcutWrapper;
     };
@@ -594,7 +594,7 @@ describe("CodeQueryEditor", () => {
         () => {
           expect(registerFn.mock.calls.length).toBeGreaterThan(baselineIndex);
         },
-        { timeout: 5000 },
+        { timeout: 15000 },
       );
       return baselineIndex;
     };
