@@ -195,6 +195,12 @@ pub struct ExtendExternalContractRequest {
     pub new_end_date: i64,
 }
 
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct EnableOrgStorageRequest {
+    pub org_id: String,
+}
+
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct OrgSummary {
     pub streams: StreamSummary,
@@ -402,6 +408,8 @@ pub struct OrganizationSetting {
     pub claim_parser_function: String,
     #[serde(default)]
     pub cross_links: Vec<config::meta::stream::CrossLink>,
+    #[serde(default)]
+    pub org_storage_enabled: bool,
 }
 
 impl Default for OrganizationSetting {
@@ -434,6 +442,7 @@ impl Default for OrganizationSetting {
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
+            org_storage_enabled: false,
         }
     }
 }

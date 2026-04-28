@@ -987,6 +987,10 @@ pub fn service_routes() -> Router {
             .route(
                 "/{org_id}/azure-marketplace/link-subscription",
                 post(cloud::azure_marketplace::link_subscription),
+            )
+            .route(
+                "/{org_id}/enable_org_storage",
+                put(organization::org::enable_org_storage),
             );
     }
 

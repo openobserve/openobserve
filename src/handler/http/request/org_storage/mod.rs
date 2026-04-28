@@ -68,6 +68,23 @@ struct GetStorageResponse {
 pub async fn save(Path(org_id): Path<String>, Json(body): Json<SetupStorageRequest>) -> Response {
     let req = body;
 
+    #[cfg(feature = "cloud")]
+    {
+        // for cloud, the org storage must be enabled first
+        let org_settings = match crate::service::db::organization::get_org_setting(&org_id).await {
+            Ok(org) => org,
+            Err(e) => {
+                return HttpResponse::not_found(e.to_string());
+            }
+        };
+
+        if !org_settings.org_storage_enabled {
+            return HttpResponse::bad_request(
+                "org level storage is not enabled for this organization, please contact administrators.",
+            );
+        }
+    }
+
     // don't let org which already have set the storage use this route,
     // they can use PUT route for updating credentials
     match crate::service::org_storage_providers::get_redacted_config(&org_id).await {
@@ -192,6 +209,23 @@ pub async fn get(Path(org_id): Path<String>) -> Response {
     )
 )]
 pub async fn update(Path(org_id): Path<String>, Json(req): Json<SetupStorageRequest>) -> Response {
+    #[cfg(feature = "cloud")]
+    {
+        // for cloud, org storage must be enabled first
+        let org_settings = match crate::service::db::organization::get_org_setting(&org_id).await {
+            Ok(org) => org,
+            Err(e) => {
+                return HttpResponse::not_found(e.to_string());
+            }
+        };
+
+        if !org_settings.org_storage_enabled {
+            return HttpResponse::bad_request(
+                "org level storage is not enabled for this organization, please contact administrators.",
+            );
+        }
+    }
+
     let mut existing =
         match crate::service::org_storage_providers::get_redacted_config(&org_id).await {
             Ok(Some(v)) => v,

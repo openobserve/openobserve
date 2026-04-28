@@ -71,12 +71,12 @@ pub async fn get_provider_list() -> Result<Vec<(String, Box<dyn ObjectStore>)>, 
 #[inline]
 fn redact(v: &str) -> String {
     let s = v.len();
-    let e1 = s.max(3);
+    let e1 = s.min(3);
     let e2 = s.saturating_sub(3);
     format!(
         "{}***{}",
         v.get(0..e1).unwrap_or_default(),
-        v.get(s..e2).unwrap_or_default()
+        v.get(e2..s).unwrap_or_default()
     )
 }
 
