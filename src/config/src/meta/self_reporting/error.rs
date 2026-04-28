@@ -399,4 +399,52 @@ mod tests {
         // node_errors empty → pipeline_node_errors NOT in output
         assert!(!val.contains("pipeline_node_errors"));
     }
+
+    #[test]
+    fn test_node_errors_function_name_none_absent_from_json() {
+        let node = NodeErrors::new("n1".to_string(), "transform".to_string(), None);
+        let json = serde_json::to_value(&node).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("function_name"));
+    }
+
+    #[test]
+    fn test_node_errors_function_name_some_present_in_json() {
+        let node = NodeErrors::new(
+            "n2".to_string(),
+            "function".to_string(),
+            Some("my_fn".to_string()),
+        );
+        let json = serde_json::to_value(&node).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("function_name"));
+        assert_eq!(obj["function_name"], serde_json::json!("my_fn"));
+    }
+
+    #[test]
+    fn test_pipeline_error_new_empty() {
+        let pe = PipelineError::new("p1", "Pipeline One");
+        assert_eq!(pe.pipeline_id, "p1");
+        assert_eq!(pe.pipeline_name, "Pipeline One");
+        assert!(pe.error.is_none());
+        assert!(pe.node_errors.is_empty());
+    }
+
+    #[test]
+    fn test_function_error_new() {
+        let fe = FunctionError::new("fn_name".to_string(), "some error".to_string());
+        assert_eq!(fe.function_name, "fn_name");
+        assert_eq!(fe.error, "some error");
+    }
+
+    #[test]
+    fn test_error_source_sso_no_claims_absent_from_serialization() {
+        let ce = SsoClaimParserError::new("fn".to_string(), "parse".to_string(), "bad".to_string());
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::SsoClaimParser(ce),
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(!val.contains("claims"));
+    }
 }

@@ -2391,4 +2391,54 @@ mod test {
             assert_eq!(back, variant);
         }
     }
+
+    #[test]
+    fn test_trigger_condition_timezone_none_absent_from_json() {
+        let tc = TriggerCondition {
+            timezone: None,
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&tc).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("timezone"));
+    }
+
+    #[test]
+    fn test_trigger_condition_timezone_some_present_in_json() {
+        let tc = TriggerCondition {
+            timezone: Some("America/New_York".to_string()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&tc).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("timezone"));
+        assert_eq!(obj["timezone"], serde_json::json!("America/New_York"));
+    }
+
+    #[test]
+    fn test_condition_item_condition_ignore_case_none_absent_from_json() {
+        let cic = ConditionItemCondition {
+            column: "level".to_string(),
+            operator: Operator::EqualTo,
+            value: serde_json::json!("error"),
+            ignore_case: None,
+            logical_operator: LogicalOperator::And,
+        };
+        let json = serde_json::to_value(&cic).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("ignore_case"));
+    }
+
+    #[test]
+    fn test_condition_item_condition_ignore_case_some_present_in_json() {
+        let cic = ConditionItemCondition {
+            column: "level".to_string(),
+            operator: Operator::EqualTo,
+            value: serde_json::json!("error"),
+            ignore_case: Some(true),
+            logical_operator: LogicalOperator::Or,
+        };
+        let json = serde_json::to_value(&cic).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("ignore_case"));
+        assert_eq!(obj["ignore_case"], serde_json::json!(true));
+    }
 }
