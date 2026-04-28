@@ -496,11 +496,20 @@ pub async fn get_latest_traces(
     // Q2a: per-trace aggregates. One row per trace_id (bounded by N traces) so this
     // never trips the search-service row cap, which the previous SELECT * approach
     // could hit when traces had tens of thousands of spans.
-    let trace_ids = traces_data
+    //
+    // Sanitize trace IDs before interpolating into SQL: allow only hex chars and hyphens.
+    // Trace IDs originate from ingested data and could contain injected SQL if not validated.
+    let sanitized_ids: Vec<String> = traces_data
         .values()
-        .map(|v| v.trace_id.clone())
-        .collect::<Vec<String>>()
-        .join("','");
+        .map(|v| {
+            v.trace_id
+                .chars()
+                .filter(|c| c.is_ascii_hexdigit() || *c == '-')
+                .collect::<String>()
+        })
+        .filter(|tid| !tid.is_empty())
+        .collect();
+    let trace_ids = sanitized_ids.join("','");
     let query_sql = format!(
         "SELECT trace_id, \
             count(*) AS span_count, \
@@ -508,7 +517,7 @@ pub async fn get_latest_traces(
             min(start_time) AS min_start_time, \
             max(end_time) AS max_end_time, \
             max(duration) AS max_duration, \
-            approx_distinct(service_name) AS service_count, \
+            count(DISTINCT service_name) AS service_count, \
             max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN service_name END) AS root_service_name, \
             max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN operation_name END) AS root_operation_name, \
             first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_service_name, \
@@ -660,7 +669,18 @@ pub async fn get_latest_traces(
 
     // Q2b: per-(trace_id, service_name) breakdown, only for multi-service traces.
     if !multi_service_tids.is_empty() {
-        let multi_ids_str = multi_service_tids.join("','");
+        // Same sanitization as Q2a above — trace IDs come from DB rows and must be
+        // validated before interpolating into SQL.
+        let multi_ids_str = multi_service_tids
+            .iter()
+            .map(|tid| {
+                tid.chars()
+                    .filter(|c| c.is_ascii_hexdigit() || *c == '-')
+                    .collect::<String>()
+            })
+            .filter(|tid| !tid.is_empty())
+            .collect::<Vec<String>>()
+            .join("','");
         let svc_sql = format!(
             "SELECT trace_id, service_name, count(*) AS svc_count, max(duration) AS svc_duration \
              FROM \"{stream_name}\" WHERE trace_id IN ('{multi_ids_str}') \
@@ -1402,7 +1422,7 @@ async fn process_latest_traces_stream(
                 min(start_time) AS min_start_time, \
                 max(end_time) AS max_end_time, \
                 max(duration) AS max_duration, \
-                approx_distinct(service_name) AS service_count, \
+                count(DISTINCT service_name) AS service_count, \
                 max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN service_name END) AS root_service_name, \
                 max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN operation_name END) AS root_operation_name, \
                 first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_service_name, \
