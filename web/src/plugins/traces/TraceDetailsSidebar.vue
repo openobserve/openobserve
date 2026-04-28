@@ -418,31 +418,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- View mode toggle toolbar -->
         <div class="tw:flex tw:items-center tw:justify-start tw:pb-[0.3rem]">
-          <q-btn-toggle
-            v-model="attributesViewMode"
-            toggle-color="primary"
-            text-color="primary"
-            bordered
-            class="tw:rounded!"
-            :options="[
-              {
-                value: 'json',
-                label: 'JSON',
-                attrs: {
-                  class:
-                    'tw:px-[0.5rem]! tw:py-[0.1rem]! tw:min-h-auto! tw:text-[0.7rem]! tw:tracking-[0.03rem]',
-                },
-              },
-              {
-                value: 'table',
-                label: 'Table',
-                attrs: {
-                  class:
-                    'tw:px-[0.5rem]! tw:min-h-auto! tw:py-[0.1rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]',
-                },
-              },
-            ]"
-          />
+          <OToggleGroup v-model="attributesViewMode" class="tw:rounded!">
+            <OToggleGroupItem
+              value="json"
+              class="tw:px-[0.5rem]! tw:py-[0.1rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]"
+              >JSON</OToggleGroupItem
+            >
+            <OToggleGroupItem
+              value="table"
+              class="tw:px-[0.5rem]! tw:py-[0.1rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]"
+              >Table</OToggleGroupItem
+            >
+          </OToggleGroup>
         </div>
         <!-- JSON View -->
         <div
@@ -951,10 +938,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { cloneDeep } from "lodash-es";
 import { date, useQuasar, type QTableProps, copyToClipboard } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
@@ -1030,6 +1019,8 @@ export default defineComponent({
     OTab,
     OTabPanels,
     OTabPanel,
+    OToggleGroup,
+    OToggleGroupItem,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,

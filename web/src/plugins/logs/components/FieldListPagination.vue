@@ -21,21 +21,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Schema Toggle Buttons -->
     <div v-if="showUserDefinedSchemaToggle">
-      <q-btn-toggle
-        no-caps
+      <OToggleGroup
         :model-value="useUserDefinedSchemas"
         @update:model-value="$emit('toggle-schema', $event)"
         data-test="logs-page-field-list-user-defined-schema-toggle"
         class="schema-field-toggle q-mr-xs tw:p-0"
-        toggle-color="primary"
-        bordered
-        size="0.5rem"
-        text-color="primary"
-        bg-color="primary"
-        :options="userDefinedSchemaBtnGroupOption"
       >
-        <template v-slot:user_defined_slot>
-          <div data-test="logs-user-defined-fields-btn">
+        <OToggleGroupItem
+          v-for="opt in userDefinedSchemaBtnGroupOption"
+          :key="opt.value"
+          :value="opt.value"
+          data-test="logs-user-defined-fields-btn"
+        >
+          <template v-if="opt.slot === 'user_defined_slot'">
             <q-icon name="person" class="tw:text-[12px]!"></q-icon>
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
             <q-tooltip
@@ -45,14 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="18.75rem"
               class="text-body2"
             >
-              <span class="text-bold" color="white">{{
-                t("search.userDefinedSchemaLabel")
-              }}</span>
+              <span class="text-bold" color="white">{{ t("search.userDefinedSchemaLabel") }}</span>
             </q-tooltip>
-          </div>
-        </template>
-        <template v-slot:all_fields_slot>
-          <div data-test="logs-all-fields-btn">
+          </template>
+          <template v-else-if="opt.slot === 'all_fields_slot'">
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
             <q-tooltip
               data-test="logs-page-fields-list-all-fields-warning-tooltip"
@@ -61,16 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="18.75rem"
               class="text-body2"
             >
-              <span class="text-bold" color="white">{{
-                t("search.allFieldsLabel")
-              }}</span>
+              <span class="text-bold" color="white">{{ t("search.allFieldsLabel") }}</span>
               <q-separator color="white" class="q-mt-xs q-mb-xs" />
               {{ t("search.allFieldsWarningMsg") }}
             </q-tooltip>
-          </div>
-        </template>
-        <template v-slot:interesting_fields_slot v-if="showQuickMode">
-          <div data-test="logs-interesting-fields-btn">
+          </template>
+          <template v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode">
             <q-icon name="info" class="tw:text-[12px]!" />
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
             <q-tooltip
@@ -79,31 +69,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="18.75rem"
               class="text-body2"
             >
-              <span class="text-bold" color="white">{{
-                t("search.showOnlyInterestingFields")
-              }}</span>
+              <span class="text-bold" color="white">{{ t("search.showOnlyInterestingFields") }}</span>
             </q-tooltip>
-          </div>
-        </template>
-      </q-btn-toggle>
+          </template>
+          <template v-else>{{ opt.label }}</template>
+        </OToggleGroupItem>
+      </OToggleGroup>
     </div>
 
     <!-- Interesting Fields Toggle (when no user defined schema) -->
     <div v-else-if="showQuickMode">
-      <q-btn-toggle
-        no-caps
+      <OToggleGroup
         :model-value="showOnlyInterestingFields"
         @update:model-value="$emit('toggle-interesting-fields', $event)"
         data-test="logs-page-field-list-user-defined-schema-toggle"
         class="schema-field-toggle q-mr-xs"
-        toggle-color="primary"
-        bordered
-        size="0.5rem"
-        text-color="primary"
-        :options="selectedFieldsBtnGroupOption"
       >
-        <template v-slot:all_fields_slot>
-          <div data-test="logs-all-fields-btn">
+        <OToggleGroupItem
+          v-for="opt in selectedFieldsBtnGroupOption"
+          :key="opt.value"
+          :value="opt.value"
+        >
+          <template v-if="opt.slot === 'all_fields_slot'">
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
             <q-tooltip
               data-test="logs-page-fields-list-all-fields-warning-tooltip"
@@ -112,16 +99,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="18.75rem"
               class="text-body2"
             >
-              <span class="text-bold" color="white">{{
-                t("search.allFieldsLabel")
-              }}</span>
+              <span class="text-bold" color="white">{{ t("search.allFieldsLabel") }}</span>
               <q-separator color="white" class="q-mt-xs q-mb-xs" />
               {{ t("search.allFieldsWarningMsg") }}
             </q-tooltip>
-          </div>
-        </template>
-        <template v-slot:interesting_fields_slot v-if="showQuickMode">
-          <div data-test="logs-interesting-fields-btn">
+          </template>
+          <template v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode">
             <q-icon name="info" class="tw:text-[12px]!" />
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
             <q-tooltip
@@ -130,13 +113,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               max-width="18.75rem"
               class="text-body2"
             >
-              <span class="text-bold" color="white">{{
-                t("search.showOnlyInterestingFields")
-              }}</span>
+              <span class="text-bold" color="white">{{ t("search.showOnlyInterestingFields") }}</span>
             </q-tooltip>
-          </div>
-        </template>
-      </q-btn-toggle>
+          </template>
+          <template v-else>{{ opt.label }}</template>
+        </OToggleGroupItem>
+      </OToggleGroup>
     </div>
 
     <!-- Pagination and Reset Controls -->
@@ -219,6 +201,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
 const { t } = useI18n();
 
