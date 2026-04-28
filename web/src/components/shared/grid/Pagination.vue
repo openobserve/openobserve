@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <q-btn-group>
+      <OButtonGroup>
         <q-btn
           icon="chevron_left"
           :text-color="scope.isFirstPage ? '$light-text2' : '$dark'"
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disable="scope.isLastPage"
           @click="scope.nextPage"
         />
-      </q-btn-group>
+      </OButtonGroup>
     </div>
   </div>
 </template>
@@ -131,6 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 // @ts-nocheck
 import { defineComponent, ref } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -138,6 +139,7 @@ import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
   name: "QTablePagination",
+  components: { OButtonGroup },
   // eslint-disable-next-line vue/require-prop-types
   props: [
     "scope",

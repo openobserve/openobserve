@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 &nbsp;
               </div>
-              <q-btn-group
+              <OButtonGroup
                 class="axis-field"
                 :draggable="true"
                 @dragstart="onFieldDragStart($event, itemX, 'x', index)"
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon="close"
                   />
                 </div>
-              </q-btn-group>
+              </OButtonGroup>
             </div>
             <div
               class="text-caption text-weight-bold text-center q-py-xs"
@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 &nbsp;
               </div>
-              <q-btn-group
+              <OButtonGroup
                 class="axis-field"
                 :draggable="true"
                 @dragstart="onFieldDragStart($event, itemB, 'breakdown', index)"
@@ -335,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon="close"
                   />
                 </div>
-              </q-btn-group>
+              </OButtonGroup>
             </div>
             <div
               class="text-caption text-weight-bold text-center q-py-xs"
@@ -407,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             &nbsp;
           </div>
-          <q-btn-group
+          <OButtonGroup
             class="axis-field"
             :draggable="true"
             @dragstart="onFieldDragStart($event, itemY, 'y', index)"
@@ -485,7 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon="close"
               />
             </div>
-          </q-btn-group>
+          </OButtonGroup>
         </div>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
@@ -559,7 +559,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               &nbsp;
             </div>
-            <q-btn-group
+            <OButtonGroup
               class="axis-field"
               :draggable="true"
               @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
@@ -633,7 +633,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon="close"
                 />
               </div>
-            </q-btn-group>
+            </OButtonGroup>
           </div>
           <div
             class="text-caption text-weight-bold text-center q-py-xs"
@@ -720,10 +720,12 @@ import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOp
 import { promQueryModeller } from "@/components/promql/operations/queryModeller";
 import type { PromVisualQuery } from "@/components/promql/types";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
   components: {
+    OButtonGroup,
     DashboardGeoMapsQueryBuilder,
     DashboardMapsQueryBuilder,
     DashboardSankeyChartBuilder,

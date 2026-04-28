@@ -9,7 +9,7 @@
           :key="index"
           class="join-item"
         >
-          <q-btn-group class="axis-field">
+          <OButtonGroup class="axis-field">
             <div>
               <q-btn
                 no-caps
@@ -64,7 +64,7 @@
                 <q-tooltip>{{ t("panel.removeJoin") }}</q-tooltip>
               </q-btn>
             </div>
-          </q-btn-group>
+          </OButtonGroup>
         </div>
         <q-btn
           icon="add"
@@ -85,6 +85,7 @@
 
 <script lang="ts">
 import { defineComponent, inject, onMounted, computed, watchEffect } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { watchDebounced } from "@vueuse/core";
@@ -148,6 +149,7 @@ export default defineComponent({
   name: "DashboardJoinOption",
 
   components: {
+    OButtonGroup,
     AddJoinPopUp,
     LeftJoinTypeSvg,
     InnerJoinTypeSvg,

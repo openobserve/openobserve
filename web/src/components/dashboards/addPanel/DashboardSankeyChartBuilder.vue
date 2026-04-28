@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'source', null)"
         data-test="dashboard-source-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="close"
             />
           </div>
-        </q-btn-group>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'target', null)"
         data-test="dashboard-target-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="close"
             />
           </div>
-        </q-btn-group>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragenter="onDragEnter($event, 'value', null)"
         data-test="dashboard-value-layout"
       >
-        <q-btn-group
+        <OButtonGroup
           class="axis-field q-mr-sm q-my-xs"
           v-if="
             dashboardPanelData.data.queries[
@@ -371,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="close"
             />
           </div>
-        </q-btn-group>
+        </OButtonGroup>
         <div
           class="text-caption text-weight-bold text-center q-py-xs"
           v-if="
@@ -416,10 +416,12 @@ import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFuncti
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",
   components: {
+    OButtonGroup,
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     DashboardFiltersOption,
