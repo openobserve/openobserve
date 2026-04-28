@@ -356,4 +356,94 @@ mod tests {
         let meta: MetaDashboard = body.into();
         assert_eq!(meta.version, 2);
     }
+
+    #[test]
+    fn test_list_dashboards_query_folder_and_title() {
+        let q: ListDashboardsQuery = serde_json::from_value(serde_json::json!({
+            "folder": "my_folder",
+            "title": "my_title"
+        }))
+        .unwrap();
+        let params = q.into("my_org");
+        assert_eq!(params.org_id, "my_org");
+        assert_eq!(params.folder_id.as_deref(), Some("my_folder"));
+        assert_eq!(params.title_pat.as_deref(), Some("my_title"));
+    }
+
+    #[test]
+    fn test_list_dashboards_query_title_only() {
+        let q: ListDashboardsQuery = serde_json::from_value(serde_json::json!({
+            "title": "search_term"
+        }))
+        .unwrap();
+        let params = q.into("org1");
+        assert_eq!(params.org_id, "org1");
+        assert!(params.folder_id.is_none());
+        assert_eq!(params.title_pat.as_deref(), Some("search_term"));
+    }
+
+    #[test]
+    fn test_list_dashboards_query_folder_only() {
+        let q: ListDashboardsQuery = serde_json::from_value(serde_json::json!({
+            "folder": "specific_folder"
+        }))
+        .unwrap();
+        let params = q.into("org2");
+        assert_eq!(params.org_id, "org2");
+        assert_eq!(params.folder_id.as_deref(), Some("specific_folder"));
+        assert!(params.title_pat.is_none());
+    }
+
+    #[test]
+    fn test_list_dashboards_query_no_params_defaults_to_default_folder() {
+        let q: ListDashboardsQuery = serde_json::from_value(serde_json::json!({})).unwrap();
+        let params = q.into("org3");
+        assert_eq!(params.org_id, "org3");
+        assert_eq!(
+            params.folder_id.as_deref(),
+            Some(config::meta::folder::DEFAULT_FOLDER)
+        );
+        assert!(params.title_pat.is_none());
+    }
+
+    #[test]
+    fn test_list_dashboards_query_pagination_applied_when_title_and_page_size_set() {
+        let q: ListDashboardsQuery = serde_json::from_value(serde_json::json!({
+            "title": "some_title",
+            "pageSize": 10
+        }))
+        .unwrap();
+        let params = q.into("org4");
+        assert!(params.page_size_and_idx.is_some());
+        assert_eq!(params.page_size_and_idx, Some((10, 0)));
+    }
+
+    #[test]
+    fn test_list_dashboards_query_pagination_ignored_when_title_empty() {
+        let q: ListDashboardsQuery = serde_json::from_value(serde_json::json!({
+            "title": "",
+            "pageSize": 10
+        }))
+        .unwrap();
+        let params = q.into("org5");
+        assert!(params.page_size_and_idx.is_none());
+    }
+
+    #[test]
+    fn test_list_dashboards_query_pagination_ignored_without_page_size() {
+        let q: ListDashboardsQuery = serde_json::from_value(serde_json::json!({
+            "title": "some_title"
+        }))
+        .unwrap();
+        let params = q.into("org6");
+        assert!(params.page_size_and_idx.is_none());
+    }
+
+    #[test]
+    fn test_move_dashboard_request_body_deserialize() {
+        let json = serde_json::json!({"from": "folder_a", "to": "folder_b"});
+        let body: MoveDashboardRequestBody = serde_json::from_value(json).unwrap();
+        assert_eq!(body.from, "folder_a");
+        assert_eq!(body.to, "folder_b");
+    }
 }

@@ -2441,4 +2441,145 @@ mod test {
         assert!(obj.contains_key("ignore_case"));
         assert_eq!(obj["ignore_case"], serde_json::json!(true));
     }
+
+    fn make_end_condition() -> ConditionList {
+        ConditionList::EndCondition(Condition {
+            column: "field".to_string(),
+            operator: Operator::EqualTo,
+            value: serde_json::json!("value"),
+            ignore_case: false,
+        })
+    }
+
+    #[test]
+    fn test_condition_list_depth_end_condition() {
+        assert_eq!(make_end_condition().depth(), 1);
+    }
+
+    #[test]
+    fn test_condition_list_depth_legacy_conditions() {
+        let cond = ConditionList::LegacyConditions(vec![Condition {
+            column: "c".to_string(),
+            operator: Operator::EqualTo,
+            value: serde_json::json!(1),
+            ignore_case: false,
+        }]);
+        assert_eq!(cond.depth(), 1);
+    }
+
+    #[test]
+    fn test_condition_list_depth_and_node() {
+        let node = ConditionList::AndNode {
+            and: vec![make_end_condition(), make_end_condition()],
+        };
+        assert_eq!(node.depth(), 2);
+    }
+
+    #[test]
+    fn test_condition_list_depth_or_node() {
+        let node = ConditionList::OrNode {
+            or: vec![make_end_condition()],
+        };
+        assert_eq!(node.depth(), 2);
+    }
+
+    #[test]
+    fn test_condition_list_depth_not_node() {
+        let node = ConditionList::NotNode {
+            not: Box::new(make_end_condition()),
+        };
+        assert_eq!(node.depth(), 2);
+    }
+
+    #[test]
+    fn test_condition_list_depth_nested() {
+        let inner = ConditionList::AndNode {
+            and: vec![make_end_condition()],
+        };
+        let outer = ConditionList::OrNode { or: vec![inner] };
+        // outer (depth 1) → inner AndNode (depth 2) → EndCondition (depth 1): total 3
+        assert_eq!(outer.depth(), 3);
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_end_condition() {
+        assert!(make_end_condition().has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_not_node() {
+        let node = ConditionList::NotNode {
+            not: Box::new(make_end_condition()),
+        };
+        assert!(node.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_and_node_empty() {
+        let node = ConditionList::AndNode { and: vec![] };
+        assert!(!node.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_or_node_non_empty() {
+        let node = ConditionList::OrNode {
+            or: vec![make_end_condition()],
+        };
+        assert!(node.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_legacy_empty() {
+        let node = ConditionList::LegacyConditions(vec![]);
+        assert!(!node.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_and_node() {
+        let node = ConditionList::AndNode {
+            and: vec![make_end_condition(), make_end_condition()],
+        };
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 2);
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_or_node() {
+        let node = ConditionList::OrNode {
+            or: vec![make_end_condition()],
+        };
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 1);
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_not_node() {
+        let node = ConditionList::NotNode {
+            not: Box::new(make_end_condition()),
+        };
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 1);
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_end_condition() {
+        let node = make_end_condition();
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 1);
+        assert!(matches!(items[0], ConditionList::EndCondition(_)));
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_legacy_conditions() {
+        let cond = Condition {
+            column: "x".to_string(),
+            operator: Operator::GreaterThan,
+            value: serde_json::json!(5),
+            ignore_case: false,
+        };
+        let node = ConditionList::LegacyConditions(vec![cond]);
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 1);
+        assert!(matches!(items[0], ConditionList::EndCondition(_)));
+    }
 }
