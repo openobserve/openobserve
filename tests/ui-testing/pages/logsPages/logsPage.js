@@ -6998,24 +6998,4 @@ export class LogsPage {
         return result;
     }
 
-    /**
-     * Set query content in the editor and return focus for further interaction.
-     * Unlike setQueryEditorContent(), this version types the query character by
-     * character to ensure Monaco's suggestion watcher fires naturally.
-     * @param {string} query - The SQL query to type
-     */
-    async typeQueryInEditor(query) {
-        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
-        await inputArea.click({ force: true });
-        await this.page.waitForTimeout(300);
-        // First clear existing content via Ctrl+A + delete
-        await this.page.keyboard.press('Control+a');
-        await this.page.waitForTimeout(100);
-        await this.page.keyboard.press('Delete');
-        await this.page.waitForTimeout(200);
-        // Type the query character by character with small delay
-        await this.page.keyboard.type(query, { delay: 30 });
-        await this.page.waitForTimeout(500);
-        testLogger.info(`Typed query in editor: "${query.substring(0, 60)}..."`);
-    }
 }

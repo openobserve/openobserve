@@ -1667,10 +1667,22 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForTimeout(1000);
 
+    // Register search response listener BEFORE stream selection to avoid race condition
+    testLogger.info('Setting up search response listener before stream selection...');
+    const searchResponsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/_search') && resp.status() === 200,
+      { timeout: 60000 },
+    );
+
     // Select stream
     await pm.logsPage.selectStream("e2e_automate");
     await pm.logsPage.waitForQueryEditorVisible();
+
+    // Wait for auto-search to populate field values in Monaco's suggestion cache
+    testLogger.info('Waiting for auto-search to populate field values...');
+    await searchResponsePromise;
     await page.waitForTimeout(1000);
+    testLogger.info('Auto-search completed, field values cached');
 
     // Set multi-condition WHERE query with mixed quotes.
     // The first condition has a properly closed quote: http = 'te'
@@ -1688,6 +1700,7 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('✅ Mixed quote query text verified in editor');
 
     // Verify no error states are present (editor should not show errors for this pattern)
+    // The cursor is now after "host = 'te" (partial open quote in second condition)
     const hasErrorState = await page.evaluate(() => {
       const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]');
       if (!editor) return 'editor-not-found';
@@ -1704,6 +1717,28 @@ test.describe("Logs Regression Bugs", () => {
     // PRIMARY CHECK: Mixed quote pattern must not trigger editor errors
     expect(hasErrorState).toBe('no-error');
     testLogger.info('✅ No editor error states for mixed quote pattern');
+
+    // SECONDARY CHECK: Trigger Ctrl+Space to open suggestion widget in the
+    // value context of the second condition (after host = 'te).
+    // This is the key behavior the hasOpenQuote fix enables: the scoped
+    // regex must detect the open quote in the second condition independently
+    // from the closed quote in the first condition, so value completions work.
+    // Without the fix, the regex would see the closed quote ('te') from the
+    // first condition and fail to detect the open quote in the second.
+    testLogger.info('Triggering suggestion widget after partial open quote in second condition...');
+    await pm.logsPage.triggerEditorSuggestions();
+    await pm.logsPage.waitForSuggestionWidgetVisible(5000);
+    testLogger.info('✅ Suggestion widget appeared in mixed quote context');
+
+    // Verify functions are NOT in suggestions (value context filtering)
+    const result = await pm.logsPage.checkSuggestionForFunctions();
+    testLogger.info('Suggestion analysis in mixed quote context', result);
+    expect(result.hasFunctions).toBe(false);
+    testLogger.info('✅ No functions in mixed quote value suggestions');
+
+    // Verify actual field values are suggested (proving hasOpenQuote fix works)
+    expect(result.rowCount).toBeGreaterThan(0);
+    testLogger.info(`✅ ${result.rowCount} value suggestions in mixed quote context`);
 
     testLogger.info("Test passed: Mixed quote handling verified");
   });

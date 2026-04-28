@@ -434,29 +434,27 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
   // Fix: PR #11502 added :disable="!selectedStreamName" to Run Query button
   // ======================================================================
 
+  /**
+   * Shared setup for Bug #11498 tests: ingest logs data, navigate to pipelines,
+   * add a new pipeline, drag the Query button, and wait for the dialog.
+   */
+  async function setupBug11498Test(page) {
+    const streamNames = ["e2e_automate", "k8s_json"];
+    await pageManager.pipelinesPage.bulkIngestToStreams(streamNames, logsdata);
+    await pageManager.pipelinesPage.openPipelineMenu();
+    await page.waitForTimeout(1000);
+    await pageManager.pipelinesPage.addPipeline();
+    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.queryButton);
+    await page.waitForTimeout(500);
+    await pageManager.pipelinesPage.waitForScheduledPipelineDialog();
+    await page.waitForTimeout(1000);
+  }
+
   test("Bug #11498: should disable Run Query button when no stream is selected", {
     tag: ['@smoke', '@P0', '@bug11498', '@pipelineRegression']
   }, async ({ page }) => {
     testLogger.info("Testing Run Query button is disabled without stream selection");
-
-    // Ingest logs data to ensure logs streams exist for testing
-    const streamNames = ["e2e_automate", "k8s_json"];
-    await pageManager.pipelinesPage.bulkIngestToStreams(streamNames, logsdata);
-
-    // Navigate to pipelines
-    await pageManager.pipelinesPage.openPipelineMenu();
-    await page.waitForTimeout(1000);
-
-    // Add new pipeline
-    await pageManager.pipelinesPage.addPipeline();
-
-    // Drag Query button to canvas - opens Query form dialog
-    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.queryButton);
-    await page.waitForTimeout(500);
-
-    // Wait for scheduled pipeline dialog to load
-    await pageManager.pipelinesPage.waitForScheduledPipelineDialog();
-    await page.waitForTimeout(1000);
+    await setupBug11498Test(page);
 
     // Verify Run Query button is visible but disabled (no stream selected yet)
     await pageManager.pipelinesPage.expectRunQueryDisabled();
@@ -483,25 +481,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     tag: ['@smoke', '@P0', '@bug11498', '@pipelineRegression']
   }, async ({ page }) => {
     testLogger.info("Testing Run Query button enables after stream selection");
-
-    // Ingest logs data to ensure logs streams exist for testing
-    const streamNames = ["e2e_automate", "k8s_json"];
-    await pageManager.pipelinesPage.bulkIngestToStreams(streamNames, logsdata);
-
-    // Navigate to pipelines
-    await pageManager.pipelinesPage.openPipelineMenu();
-    await page.waitForTimeout(1000);
-
-    // Add new pipeline
-    await pageManager.pipelinesPage.addPipeline();
-
-    // Drag Query button to canvas - opens Query form dialog
-    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.queryButton);
-    await page.waitForTimeout(500);
-
-    // Wait for scheduled pipeline dialog to load
-    await pageManager.pipelinesPage.waitForScheduledPipelineDialog();
-    await page.waitForTimeout(1000);
+    await setupBug11498Test(page);
 
     // Expand Build Query section
     await pageManager.pipelinesPage.expandBuildQuerySection();
