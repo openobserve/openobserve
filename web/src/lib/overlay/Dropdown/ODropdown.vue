@@ -10,6 +10,7 @@ import {
   DropdownMenuPortal,
   DropdownMenuContent,
 } from "reka-ui";
+import { ref, watch } from "vue";
 
 const props = withDefaults(defineProps<DropdownProps>(), {
   modal: true,
@@ -21,13 +22,30 @@ const props = withDefaults(defineProps<DropdownProps>(), {
 const emit = defineEmits<DropdownEmits>();
 
 defineSlots<DropdownSlots>();
+
+// Vue boolean-casts absent `open` prop to `false`, which would lock
+// DropdownMenuRoot into controlled-closed mode. We manage state ourselves
+// so reka-ui stays responsive in both uncontrolled and controlled usage.
+const internalOpen = ref(false);
+
+watch(
+  () => props.open,
+  (v) => {
+    if (v !== undefined) internalOpen.value = v;
+  },
+);
+
+function handleOpenChange(v: boolean) {
+  internalOpen.value = v;
+  emit("update:open", v);
+}
 </script>
 
 <template>
   <DropdownMenuRoot
-    :open="open"
+    :open="internalOpen"
     :modal="modal"
-    @update:open="(v) => emit('update:open', v)"
+    @update:open="handleOpenChange"
   >
     <DropdownMenuTrigger as-child>
       <slot name="trigger" />
@@ -39,13 +57,13 @@ defineSlots<DropdownSlots>();
         :align="align"
         :side-offset="sideOffset"
         :class="[
-          // Layout
-          'tw:min-w-40 tw:p-1',
+          // Layout + stacking (must be above Quasar header/drawer: 2000/3000)
+          'tw:min-w-40 tw:p-1 tw:z-[6000]',
           // Surface
           'tw:bg-dropdown-bg tw:border tw:border-dropdown-border tw:rounded-lg tw:shadow-md',
           // Typography
           'tw:text-sm tw:text-dropdown-item-text',
-          // Animation ΓÇö uses Reka data attributes
+          // Animation — uses Reka data attributes
           'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0 tw:data-[state=open]:zoom-in-95',
           'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:zoom-out-95',
           'tw:data-[side=bottom]:slide-in-from-top-2 tw:data-[side=top]:slide-in-from-bottom-2',

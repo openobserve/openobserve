@@ -3,6 +3,8 @@ import type { ButtonProps, ButtonEmits, ButtonSlots } from "./OButton.types";
 import { Primitive } from "reka-ui";
 import { computed } from "vue";
 
+defineOptions({ inheritAttrs: false });
+
 const props = withDefaults(defineProps<ButtonProps>(), {
   as: "button",
   variant: "primary",
@@ -16,7 +18,7 @@ const emit = defineEmits<ButtonEmits>();
 
 defineSlots<ButtonSlots>();
 
-// Variant class map ΓÇö every entry is a full token-based class string
+// Variant class map - every entry is a full token-based class string
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   primary: [
     "tw:bg-button-primary tw:text-button-primary-foreground",
@@ -63,7 +65,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
 };
 
 const classes = computed<string[]>(() => [
-  // Base ΓÇö layout, typography, interaction
+  // Base - layout, typography, interaction
   "tw:inline-flex tw:items-center tw:justify-center tw:whitespace-nowrap",
   "tw:font-medium tw:transition-colors tw:duration-150",
   "tw:outline-none tw:focus-visible:outline-none",
