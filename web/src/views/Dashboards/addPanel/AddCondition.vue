@@ -12,7 +12,7 @@
       class="condition-logical-operator"
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}}`"
     />
-    <q-btn-group>
+    <OButtonGroup>
       <q-btn
         square
         icon-right="arrow_drop_down"
@@ -163,11 +163,12 @@
         icon="close"
         data-test="dashboard-add-condition-remove"
       />
-    </q-btn-group>
+    </OButtonGroup>
   </div>
 </template>
 
 <script lang="ts">
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
@@ -185,6 +186,7 @@ import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 export default defineComponent({
   name: "AddCondition",
   components: {
+    OButtonGroup,
     OTabs, OTab, OTabPanels, OTabPanel,
     CommonAutoComplete,
     SanitizedHtmlRenderer,

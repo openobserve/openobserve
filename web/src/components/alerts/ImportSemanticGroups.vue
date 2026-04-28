@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-chip>
               </div>
               <div class="col">
-                <q-btn-group flat class="float-right">
+                <OButtonGroup class="float-right">
                   <q-btn
                     flat
                     dense
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     class="action-btn"
                   />
-                </q-btn-group>
+                </OButtonGroup>
               </div>
             </div>
           </div>
@@ -351,6 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";

@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-toggle>
         </div>
-        <q-btn-group
+        <OButtonGroup
           v-if="!shouldMoveSavedViewToMenu"
           class="q-ml-xs q-pa-none element-box-shadow el-border"
         >
@@ -428,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tooltip>
             {{ t("search.savedViewsLabel") }}
           </q-tooltip>
-        </q-btn-group>
+        </OButtonGroup>
         <!-- reset filters button - directly on toolbar (hidden when moved to menu) -->
         <o-button
           v-if="!shouldMoveSavedViewToMenu"
@@ -922,7 +922,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="search-time float-left q-mr-xs">
           <div class="flex">
-            <q-btn-group
+            <OButtonGroup
               class="q-pa-none q-mr-xs element-box-shadow el-border"
               v-if="
                 config.isEnterprise == 'true' &&
@@ -956,7 +956,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model:ticked="searchObj.meta.clusters"
                 />
               </q-btn-dropdown>
-            </q-btn-group>
+            </OButtonGroup>
             <div
               v-if="
                 searchObj.meta.logsVisualizeToggle === 'visualize' ||
@@ -1716,7 +1716,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="q-py-sm file-type">
             <label class="q-pr-sm">{{ t("search.fileType") }}</label
             ><br />
-            <q-btn-group
+            <OButtonGroup
               data-test="custom-download-file-type-button-group"
               class="file-type-button-group q-mt-xs"
             >
@@ -1732,7 +1732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 outline
               />
-            </q-btn-group>
+            </OButtonGroup>
           </div>
         </q-card-section>
 
@@ -2425,6 +2425,7 @@ import {
   Minimize,
 } from "lucide-vue-next";
 import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import {
   getFieldFromExpression,
   hasFieldCondition,
@@ -2491,6 +2492,7 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OButtonGroup,
     DateTime,
     ShareButton,
     OButton,

@@ -10,7 +10,7 @@
           :key="index"
           class="label-filter-item"
         >
-          <q-btn-group>
+          <OButtonGroup>
             <q-btn
               square
               icon-right="arrow_drop_down"
@@ -138,7 +138,7 @@
               icon="close"
               :data-test="`promql-label-filter-remove-${index}`"
             />
-          </q-btn-group>
+          </OButtonGroup>
         </div>
 
         <!-- Add Button -->
@@ -161,6 +161,7 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, inject } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
