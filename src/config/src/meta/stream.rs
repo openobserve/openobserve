@@ -2194,4 +2194,68 @@ mod tests {
         assert!(obj.contains_key("alias"));
         assert_eq!(obj["alias"], serde_json::json!("timestamp"));
     }
+
+    #[test]
+    fn test_time_range_is_empty_true() {
+        let r = TimeRange::new(0, 0);
+        assert!(r.is_empty());
+    }
+
+    #[test]
+    fn test_time_range_is_empty_false() {
+        let r = TimeRange::new(100, 200);
+        assert!(!r.is_empty());
+    }
+
+    #[test]
+    fn test_time_range_is_empty_partial_zero() {
+        // Only both zero counts as empty
+        let r = TimeRange::new(0, 100);
+        assert!(!r.is_empty());
+    }
+
+    #[test]
+    fn test_time_range_contains_exact() {
+        let outer = TimeRange::new(0, 100);
+        let inner = TimeRange::new(0, 100);
+        assert!(outer.contains(&inner));
+    }
+
+    #[test]
+    fn test_time_range_contains_strict_subset() {
+        let outer = TimeRange::new(0, 100);
+        let inner = TimeRange::new(20, 80);
+        assert!(outer.contains(&inner));
+    }
+
+    #[test]
+    fn test_time_range_contains_not_contained() {
+        let outer = TimeRange::new(0, 50);
+        let inner = TimeRange::new(40, 100);
+        assert!(!outer.contains(&inner));
+    }
+
+    #[test]
+    fn test_time_range_intersects_overlap() {
+        let a = TimeRange::new(0, 100);
+        let b = TimeRange::new(50, 150);
+        assert!(a.intersects(&b));
+        assert!(b.intersects(&a));
+    }
+
+    #[test]
+    fn test_time_range_intersects_no_overlap() {
+        let a = TimeRange::new(0, 50);
+        let b = TimeRange::new(50, 100);
+        // a.end == b.start: condition is a.start < b.end && a.end > b.start => 0<100 && 50>50 =>
+        // false
+        assert!(!a.intersects(&b));
+    }
+
+    #[test]
+    fn test_time_range_intersects_disjoint() {
+        let a = TimeRange::new(0, 30);
+        let b = TimeRange::new(50, 100);
+        assert!(!a.intersects(&b));
+    }
 }

@@ -382,6 +382,123 @@ mod tests {
             Some("avg".to_string())
         );
     }
+
+    #[test]
+    fn test_create_alert_anomaly_fields_none_when_no_anomaly_config() {
+        let req: CreateAlertRequestBody = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(req.anomaly_fields().is_none());
+    }
+
+    #[test]
+    fn test_create_alert_anomaly_fields_combines_function_and_field() {
+        let req: CreateAlertRequestBody = serde_json::from_value(serde_json::json!({
+            "anomaly_config": {
+                "query_mode": "filters",
+                "detection_function": "avg",
+                "detection_function_field": "cpu_usage",
+                "histogram_interval": "5m",
+                "schedule_interval": "1h",
+                "detection_window_seconds": 3600
+            }
+        }))
+        .unwrap();
+        let fields = req.anomaly_fields().unwrap();
+        assert_eq!(fields.detection_function, "avg(cpu_usage)");
+    }
+
+    #[test]
+    fn test_create_alert_anomaly_fields_passthrough_when_already_combined() {
+        let req: CreateAlertRequestBody = serde_json::from_value(serde_json::json!({
+            "anomaly_config": {
+                "query_mode": "filters",
+                "detection_function": "count(*)",
+                "histogram_interval": "5m",
+                "schedule_interval": "1h",
+                "detection_window_seconds": 3600
+            }
+        }))
+        .unwrap();
+        let fields = req.anomaly_fields().unwrap();
+        assert_eq!(fields.detection_function, "count(*)");
+    }
+
+    #[test]
+    fn test_update_alert_anomaly_fields_default_when_no_anomaly_config() {
+        let req: UpdateAlertRequestBody = serde_json::from_value(serde_json::json!({})).unwrap();
+        let fields = req.anomaly_fields();
+        assert!(fields.detection_function.is_none());
+        assert!(fields.detection_function_field.is_none());
+    }
+
+    #[test]
+    fn test_update_alert_anomaly_fields_combines_when_both_set() {
+        let req: UpdateAlertRequestBody = serde_json::from_value(serde_json::json!({
+            "anomaly_config": {
+                "detection_function": "avg",
+                "detection_function_field": "memory"
+            }
+        }))
+        .unwrap();
+        let fields = req.anomaly_fields();
+        assert_eq!(fields.detection_function, Some("avg(memory)".to_string()));
+    }
+
+    #[test]
+    fn test_list_alerts_query_into_all_fields() {
+        let q = ListAlertsQuery {
+            folder: Some("f1".to_string()),
+            stream_type: None,
+            stream_name: None,
+            alert_name_substring: Some("test_alert".to_string()),
+            owner: Some("user@example.com".to_string()),
+            enabled: Some(true),
+            page_size: Some(20),
+            page_idx: Some(1),
+            alert_type: None,
+        };
+        let params = q.into("my_org");
+        assert_eq!(params.org_id, "my_org");
+        assert_eq!(params.folder_id.as_deref(), Some("f1"));
+        assert_eq!(params.name_substring.as_deref(), Some("test_alert"));
+        assert_eq!(params.enabled, Some(true));
+        assert_eq!(params.page_size_and_idx, Some((20, 1)));
+    }
+
+    #[test]
+    fn test_list_alerts_query_into_defaults() {
+        let q = ListAlertsQuery {
+            folder: None,
+            stream_type: None,
+            stream_name: None,
+            alert_name_substring: None,
+            owner: None,
+            enabled: None,
+            page_size: None,
+            page_idx: None,
+            alert_type: None,
+        };
+        let params = q.into("org2");
+        assert_eq!(params.org_id, "org2");
+        assert!(params.folder_id.is_none());
+        assert!(params.page_size_and_idx.is_none());
+    }
+
+    #[test]
+    fn test_list_alerts_query_page_idx_defaults_to_zero() {
+        let q = ListAlertsQuery {
+            folder: None,
+            stream_type: None,
+            stream_name: None,
+            alert_name_substring: None,
+            owner: None,
+            enabled: None,
+            page_size: Some(5),
+            page_idx: None,
+            alert_type: None,
+        };
+        let params = q.into("org3");
+        assert_eq!(params.page_size_and_idx, Some((5, 0)));
+    }
 }
 
 /// HTTP request body for `GenerateSql` endpoint.
