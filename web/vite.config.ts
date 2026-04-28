@@ -179,7 +179,9 @@ export default defineConfig({
           ) {
             return "o2cs-oo-rum";
           }
-          if (id.includes("date-fns")) return "o2cs-date-fns";
+          if (/node_modules\/(date-fns|date-fns-tz)\//.test(id)) {
+            return "o2cs-date-fns";
+          }
           if (id.includes("/moment/") || id.includes("moment-timezone")) {
             return "moment";
           }
@@ -194,13 +196,13 @@ export default defineConfig({
           ) {
             return "echarts";
           }
-          if (id.includes("/luxon/")) return "luxon";
-          if (id.includes("/marked/")) return "marked";
-          if (id.includes("/jszip/")) return "jszip";
-          if (id.includes("/leaflet/")) return "leaflet";
-          if (id.includes("/gridstack/")) return "gridstack";
-          if (id.includes("/flag-icons/")) return "flag-icons";
-          if (id.includes("/highlight.js/")) return "highlight.js";
+          if (/node_modules\/luxon\//.test(id)) return "luxon";
+          if (/node_modules\/marked\//.test(id)) return "marked";
+          if (/node_modules\/jszip\//.test(id)) return "jszip";
+          if (/node_modules\/leaflet\//.test(id)) return "leaflet";
+          if (/node_modules\/gridstack\//.test(id)) return "gridstack";
+          if (/node_modules\/flag-icons\//.test(id)) return "flag-icons";
+          if (/node_modules\/highlight\.js\//.test(id)) return "highlight.js";
         },
         chunkFileNames: ({ name }) => {
           if (name.startsWith("o2cs-")) {

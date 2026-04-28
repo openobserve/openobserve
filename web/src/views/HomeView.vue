@@ -999,13 +999,27 @@ export default defineComponent({
     // Speculatively prefetch the Logs route during Home idle time so the
     // Home → Logs navigation is instant. Logs is statistically the most-clicked
     // route and pulls ~1.5 MB of chunks (including Monaco) on first visit.
+    let prefetchHandle: number | null = null;
     onMounted(() => {
-      const schedule =
-        (window as any).requestIdleCallback ||
-        ((cb: () => void) => setTimeout(cb, 200));
-      schedule(() => {
-        prefetchRoute("/logs");
-      });
+      const ric = (window as any).requestIdleCallback;
+      if (ric) {
+        prefetchHandle = ric(() => {
+          prefetchHandle = null;
+          prefetchRoute("/logs");
+        });
+      } else {
+        prefetchHandle = window.setTimeout(() => {
+          prefetchHandle = null;
+          prefetchRoute("/logs");
+        }, 200);
+      }
+    });
+    onUnmounted(() => {
+      if (prefetchHandle == null) return;
+      const cic = (window as any).cancelIdleCallback;
+      if (cic) cic(prefetchHandle);
+      else clearTimeout(prefetchHandle);
+      prefetchHandle = null;
     });
 
     const homeChat = ref<any>(null);
