@@ -996,7 +996,7 @@ async fn filter_permitted_dashboards(
     let permitted_objects = crate::handler::http::auth::validator::list_objects_for_user(
         org_id,
         user_id,
-        "GET_INDIVIDUAL",
+        "GET_INDIVIDUAL_FROM_ROLE",
         "dashboard",
     )
     .await
