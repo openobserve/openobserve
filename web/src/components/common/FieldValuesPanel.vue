@@ -78,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'filter-mode-btn',
             filterMode === 'include' ? 'filter-mode-btn--active-include' : '',
           ]"
+          :disable="filterMode !== 'include' && isModeToggleDisabled"
           title="Include mode (=)"
           @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
@@ -96,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'filter-mode-btn',
             filterMode === 'exclude' ? 'filter-mode-btn--active-exclude' : '',
           ]"
+          :disable="filterMode !== 'exclude' && isModeToggleDisabled"
           title="Exclude mode (≠)"
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
@@ -394,6 +396,13 @@ const clearSelection = () => {
   selectedValues.value = [];
   emit("remove-field-filter", props.fieldName);
 };
+
+// Only block the non-active toggle when a request is in-flight with active
+// selections — prevents out-of-order responses without blocking the user
+// when there's nothing selected (no API call would be triggered anyway).
+const isModeToggleDisabled = computed(
+  () => !!(props.fieldValues?.isLoading && selectedValues.value.length > 0),
+);
 
 const isLoadingMore = ref(false);
 let valuesCountBeforeLoadMore = 0;
