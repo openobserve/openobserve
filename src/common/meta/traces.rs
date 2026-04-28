@@ -277,4 +277,62 @@ mod tests {
         assert!(obj.contains_key("traceFlags"));
         assert!(obj.contains_key("traceState"));
     }
+
+    #[test]
+    fn test_event_attributes_absent_when_empty() {
+        let event = Event {
+            name: "e".to_string(),
+            _timestamp: 0,
+            attributes: HashMap::new(),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("attr_key"));
+    }
+
+    #[test]
+    fn test_event_attributes_present_when_non_empty() {
+        let mut attrs = HashMap::new();
+        attrs.insert("attr_key".to_string(), json::json!("val"));
+        let event = Event {
+            name: "e".to_string(),
+            _timestamp: 0,
+            attributes: attrs,
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert!(json.as_object().unwrap().contains_key("attr_key"));
+    }
+
+    #[test]
+    fn test_span_link_attributes_absent_when_empty() {
+        let link = SpanLink {
+            context: SpanLinkContext {
+                trace_id: "t".to_string(),
+                span_id: "s".to_string(),
+                trace_flags: None,
+                trace_state: None,
+            },
+            attributes: HashMap::new(),
+            dropped_attributes_count: 0,
+        };
+        let json = serde_json::to_value(&link).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("link_key"));
+    }
+
+    #[test]
+    fn test_span_link_attributes_present_when_non_empty() {
+        let mut attrs = HashMap::new();
+        attrs.insert("link_key".to_string(), json::json!(42));
+        let link = SpanLink {
+            context: SpanLinkContext {
+                trace_id: "t".to_string(),
+                span_id: "s".to_string(),
+                trace_flags: None,
+                trace_state: None,
+            },
+            attributes: attrs,
+            dropped_attributes_count: 0,
+        };
+        let json = serde_json::to_value(&link).unwrap();
+        assert!(json.as_object().unwrap().contains_key("link_key"));
+    }
 }
