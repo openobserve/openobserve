@@ -832,4 +832,58 @@ mod tests {
         let json = serde_json::to_string(&item).unwrap();
         assert!(json.contains("sum"));
     }
+
+    #[test]
+    fn test_variables_show_dynamic_filters_none_absent() {
+        let vars = Variables::default();
+        let json = serde_json::to_string(&vars).unwrap();
+        assert!(!json.contains("showDynamicFilters"));
+    }
+
+    #[test]
+    fn test_variables_show_dynamic_filters_some_present() {
+        let vars = Variables {
+            list: vec![],
+            show_dynamic_filters: Some(true),
+        };
+        let json = serde_json::to_string(&vars).unwrap();
+        assert!(json.contains("showDynamicFilters"));
+    }
+
+    #[test]
+    fn test_datetime_options_none_fields_absent() {
+        let opts = DateTimeOptions {
+            typee: "relative".to_string(),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&opts).unwrap();
+        assert!(!json.contains("startTime"));
+        assert!(!json.contains("endTime"));
+    }
+
+    #[test]
+    fn test_variable_list_all_optional_fields_absent_when_none() {
+        let vl = VariableList::default();
+        let json = serde_json::to_string(&vl).unwrap();
+        assert!(!json.contains("multiSelect"));
+        assert!(!json.contains("hideOnDashboard"));
+        assert!(!json.contains("selectAllValueForMultiSelect"));
+        assert!(!json.contains("customMultiSelectValue"));
+    }
+
+    #[test]
+    fn test_variable_list_optional_fields_present_when_some() {
+        let vl = VariableList {
+            multi_select: Some(false),
+            hide_on_dashboard: Some(true),
+            select_all_value_for_multi_select: Some("all".to_string()),
+            custom_multi_select_value: Some(vec!["v1".to_string()]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&vl).unwrap();
+        assert!(json.contains("multiSelect"));
+        assert!(json.contains("hideOnDashboard"));
+        assert!(json.contains("selectAllValueForMultiSelect"));
+        assert!(json.contains("customMultiSelectValue"));
+    }
 }

@@ -826,4 +826,76 @@ mod tests {
         assert_eq!(item.is_derived, Some(false));
         assert_eq!(item.show_field_as_json, Some(true));
     }
+
+    #[test]
+    fn test_variables_show_dynamic_filters_none_absent() {
+        let vars = Variables::default();
+        let json = serde_json::to_string(&vars).unwrap();
+        assert!(!json.contains("showDynamicFilters"));
+    }
+
+    #[test]
+    fn test_variables_show_dynamic_filters_some_present() {
+        let vars = Variables {
+            list: vec![],
+            show_dynamic_filters: Some(false),
+        };
+        let json = serde_json::to_string(&vars).unwrap();
+        assert!(json.contains("showDynamicFilters"));
+    }
+
+    #[test]
+    fn test_datetime_options_none_fields_absent() {
+        let opts = DateTimeOptions {
+            typee: "relative".to_string(),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&opts).unwrap();
+        assert!(!json.contains("relativePeriod"));
+        assert!(!json.contains("startTime"));
+        assert!(!json.contains("endTime"));
+    }
+
+    #[test]
+    fn test_datetime_options_absolute_fields_serialized() {
+        let opts = DateTimeOptions {
+            typee: "absolute".to_string(),
+            relative_time_period: None,
+            start_time: Some(100),
+            end_time: Some(200),
+        };
+        let val = serde_json::to_value(&opts).unwrap();
+        assert_eq!(val["type"], "absolute");
+        assert_eq!(val["startTime"], 100_i64);
+        assert_eq!(val["endTime"], 200_i64);
+    }
+
+    #[test]
+    fn test_variable_list_all_optional_fields_absent_when_none() {
+        let vl = VariableList::default();
+        let json = serde_json::to_string(&vl).unwrap();
+        assert!(!json.contains("multiSelect"));
+        assert!(!json.contains("hideOnDashboard"));
+        assert!(!json.contains("selectAllValueForMultiSelect"));
+        assert!(!json.contains("customMultiSelectValue"));
+        assert!(!json.contains("escapeSingleQuotes"));
+    }
+
+    #[test]
+    fn test_variable_list_optional_fields_present_when_some() {
+        let vl = VariableList {
+            multi_select: Some(true),
+            hide_on_dashboard: Some(true),
+            select_all_value_for_multi_select: Some("All".to_string()),
+            custom_multi_select_value: Some(vec!["a".to_string(), "b".to_string()]),
+            escape_single_quotes: Some(false),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&vl).unwrap();
+        assert!(json.contains("multiSelect"));
+        assert!(json.contains("hideOnDashboard"));
+        assert!(json.contains("selectAllValueForMultiSelect"));
+        assert!(json.contains("customMultiSelectValue"));
+        assert!(json.contains("escapeSingleQuotes"));
+    }
 }
