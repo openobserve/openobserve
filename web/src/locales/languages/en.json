@@ -135,6 +135,7 @@
     "resetFields": "Reset selected table fields",
     "metrics": "Metrics",
     "selectIndex": "Select Stream First",
+    "selectStreamFirst": "Select a stream first",
     "typeSearch": "Type your search query here.",
     "searchField": "Search for a field",
     "searchDimension": "Search Dimensions",
