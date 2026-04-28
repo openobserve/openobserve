@@ -2172,4 +2172,26 @@ mod tests {
         assert_eq!(s.end_time, 0);
         assert_eq!(s.size, 0);
     }
+
+    #[test]
+    fn test_cross_link_field_alias_none_absent_from_json() {
+        let f = CrossLinkField {
+            name: "ts".to_string(),
+            alias: None,
+        };
+        let json = serde_json::to_value(&f).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("alias"));
+    }
+
+    #[test]
+    fn test_cross_link_field_alias_some_present_in_json() {
+        let f = CrossLinkField {
+            name: "ts".to_string(),
+            alias: Some("timestamp".to_string()),
+        };
+        let json = serde_json::to_value(&f).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("alias"));
+        assert_eq!(obj["alias"], serde_json::json!("timestamp"));
+    }
 }
