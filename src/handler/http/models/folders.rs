@@ -189,6 +189,43 @@ mod tests {
     }
 
     #[test]
+    fn test_create_folder_response_body_from_config_folder() {
+        let src = config::meta::folder::Folder {
+            folder_id: "resp1".to_string(),
+            name: "Response Folder".to_string(),
+            description: "desc".to_string(),
+        };
+        let resp = CreateFolderResponseBody::from(src);
+        assert_eq!(resp.0.folder_id, "resp1");
+        assert_eq!(resp.0.name, "Response Folder");
+    }
+
+    #[test]
+    fn test_get_folder_response_body_from_config_folder() {
+        let src = config::meta::folder::Folder {
+            folder_id: "get1".to_string(),
+            name: "Get Folder".to_string(),
+            description: "get desc".to_string(),
+        };
+        let resp = GetFolderResponseBody::from(src);
+        assert_eq!(resp.0.folder_id, "get1");
+        assert_eq!(resp.0.description, "get desc");
+    }
+
+    #[test]
+    fn test_update_folder_request_body_into_config_folder() {
+        let req = UpdateFolderRequestBody(Folder {
+            folder_id: "upd1".to_string(),
+            name: "Updated".to_string(),
+            description: "new desc".to_string(),
+        });
+        let f = config::meta::folder::Folder::from(req);
+        assert_eq!(f.folder_id, "upd1");
+        assert_eq!(f.name, "Updated");
+        assert_eq!(f.description, "new desc");
+    }
+
+    #[test]
     fn test_list_folders_response_body_preserves_order_and_fields() {
         let folders = vec![
             config::meta::folder::Folder {
