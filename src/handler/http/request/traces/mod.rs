@@ -525,7 +525,8 @@ pub async fn get_latest_traces(
          FROM \"{stream_name}\" WHERE trace_id IN ('{trace_ids}') GROUP BY trace_id"
     );
     req.query.from = 0;
-    req.query.size = get_config().limit.query_default_limit;
+    // Q2a returns one row per trace_id, so size = number of traces.
+    req.query.size = traces_data.len() as i64;
     req.query.sql = query_sql;
     req.query.start_time = start_time;
     req.query.end_time = end_time;
@@ -537,138 +538,131 @@ pub async fn get_latest_traces(
     let mut multi_service_tids: Vec<String> = Vec::new();
     let mut multi_service_total: i64 = 0;
 
-    loop {
-        let search_res = SearchService::cache::search(
-            &trace_id,
-            &org_id,
-            stream_type,
-            user_id_opt.clone(),
-            &req,
-            "".to_string(),
-            false,
-            None,
-            false,
-        )
-        .instrument(http_span.clone())
-        .await;
+    let search_res = SearchService::cache::search(
+        &trace_id,
+        &org_id,
+        stream_type,
+        user_id_opt.clone(),
+        &req,
+        "".to_string(),
+        false,
+        None,
+        false,
+    )
+    .instrument(http_span.clone())
+    .await;
 
-        let resp_search = match search_res {
-            Ok(res) => res,
-            Err(err) => {
-                let time = start.elapsed().as_secs_f64();
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/traces/latest",
-                        "500",
-                        &org_id,
-                        stream_type.as_str(),
-                        "",
-                        "",
-                    ])
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/traces/latest",
-                        "500",
-                        &org_id,
-                        stream_type.as_str(),
-                        "",
-                        "",
-                    ])
-                    .inc();
-                log::error!("get traces latest data error: {err:?}");
-                return map_error_to_http_response(&err, Some(trace_id));
-            }
+    let resp_search = match search_res {
+        Ok(res) => res,
+        Err(err) => {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/api/org/traces/latest",
+                    "500",
+                    &org_id,
+                    stream_type.as_str(),
+                    "",
+                    "",
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/api/org/traces/latest",
+                    "500",
+                    &org_id,
+                    stream_type.as_str(),
+                    "",
+                    "",
+                ])
+                .inc();
+            log::error!("get traces latest data error: {err:?}");
+            return map_error_to_http_response(&err, Some(trace_id));
+        }
+    };
+
+    for item in resp_search.hits {
+        let tid = item
+            .get("trace_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        if tid.is_empty() {
+            continue;
+        }
+        let span_count = json::get_int_value(item.get("span_count").unwrap_or_default());
+        let error_count = json::get_int_value(item.get("error_count").unwrap_or_default());
+        let min_start = json::get_int_value(item.get("min_start_time").unwrap_or_default());
+        let max_end = json::get_int_value(item.get("max_end_time").unwrap_or_default());
+        let max_duration = json::get_int_value(item.get("max_duration").unwrap_or_default());
+        let service_count = json::get_int_value(item.get("service_count").unwrap_or_default());
+        let root_service_name = item
+            .get("root_service_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let root_operation_name = item
+            .get("root_operation_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let first_service_name = item
+            .get("first_service_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let first_operation_name = item
+            .get("first_operation_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+
+        // Prefer the true root span's labels; fall back to earliest span.
+        let event_service_name = if !root_service_name.is_empty() {
+            root_service_name
+        } else {
+            first_service_name
+        };
+        let event_operation_name = if !root_operation_name.is_empty() {
+            root_operation_name
+        } else {
+            first_operation_name
         };
 
-        let resp_size = resp_search.hits.len() as i64;
-        for item in resp_search.hits {
-            let tid = item
-                .get("trace_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
-            if tid.is_empty() {
-                continue;
+        if let Some(trace) = traces_data.get_mut(&tid) {
+            trace.spans[0] = span_count.try_into().unwrap_or_default();
+            trace.spans[1] = error_count.try_into().unwrap_or_default();
+            if trace.start_time == 0 || trace.start_time > min_start {
+                trace.start_time = min_start;
             }
-            let span_count = json::get_int_value(item.get("span_count").unwrap_or_default());
-            let error_count = json::get_int_value(item.get("error_count").unwrap_or_default());
-            let min_start = json::get_int_value(item.get("min_start_time").unwrap_or_default());
-            let max_end = json::get_int_value(item.get("max_end_time").unwrap_or_default());
-            let max_duration = json::get_int_value(item.get("max_duration").unwrap_or_default());
-            let service_count = json::get_int_value(item.get("service_count").unwrap_or_default());
-            let root_service_name = item
-                .get("root_service_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
-            let root_operation_name = item
-                .get("root_operation_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
-            let first_service_name = item
-                .get("first_service_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
-            let first_operation_name = item
-                .get("first_operation_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
+            if trace.end_time < max_end {
+                trace.end_time = max_end;
+            }
+            trace.duration = max_duration;
+            // update the duration if the duration is not correct
+            if trace.end_time - trace.start_time > trace.duration * 1000 {
+                trace.duration = (trace.end_time - trace.start_time) / 1000;
+            }
+            trace.first_event = serde_json::json!({
+                "service_name": event_service_name,
+                "operation_name": event_operation_name,
+            });
 
-            // Prefer the true root span's labels; fall back to earliest span.
-            let event_service_name = if !root_service_name.is_empty() {
-                root_service_name
+            if service_count <= 1 {
+                // Single service: populate the services list directly from Q2a;
+                // skip Q2b for this trace.
+                if !event_service_name.is_empty() {
+                    trace.service_name.push(TraceServiceNameItem {
+                        service_name: event_service_name,
+                        count: span_count.try_into().unwrap_or_default(),
+                        duration: max_duration,
+                    });
+                }
             } else {
-                first_service_name
-            };
-            let event_operation_name = if !root_operation_name.is_empty() {
-                root_operation_name
-            } else {
-                first_operation_name
-            };
-
-            if let Some(trace) = traces_data.get_mut(&tid) {
-                trace.spans[0] = span_count.try_into().unwrap_or_default();
-                trace.spans[1] = error_count.try_into().unwrap_or_default();
-                if trace.start_time == 0 || trace.start_time > min_start {
-                    trace.start_time = min_start;
-                }
-                if trace.end_time < max_end {
-                    trace.end_time = max_end;
-                }
-                trace.duration = max_duration;
-                // update the duration if the duration is not correct
-                if trace.end_time - trace.start_time > trace.duration * 1000 {
-                    trace.duration = (trace.end_time - trace.start_time) / 1000;
-                }
-                trace.first_event = serde_json::json!({
-                    "service_name": event_service_name,
-                    "operation_name": event_operation_name,
-                });
-
-                if service_count <= 1 {
-                    // Single service: populate the services list directly from Q2a;
-                    // skip Q2b for this trace.
-                    if !event_service_name.is_empty() {
-                        trace.service_name.push(TraceServiceNameItem {
-                            service_name: event_service_name,
-                            count: span_count.try_into().unwrap_or_default(),
-                            duration: max_duration,
-                        });
-                    }
-                } else {
-                    multi_service_tids.push(tid);
-                    multi_service_total += service_count;
-                }
+                multi_service_tids.push(tid);
+                multi_service_total += service_count;
             }
         }
-        if resp_size < req.query.size {
-            break;
-        }
-        req.query.from += req.query.size;
     }
 
     // Q2b: per-(trace_id, service_name) breakdown, only for multi-service traces.
@@ -1431,7 +1425,8 @@ async fn process_latest_traces_stream(
         let mut req2 = base_req.clone();
         req2.query.sql = detail_sql;
         req2.query.from = 0;
-        req2.query.size = get_config().limit.query_default_limit;
+        // Q2a returns one row per trace_id, so size = number of traces.
+        req2.query.size = traces_data.len() as i64;
         req2.query.start_time = p_start_actual;
         req2.query.end_time = p_end_actual;
 
@@ -1442,124 +1437,114 @@ async fn process_latest_traces_stream(
         let mut multi_service_tids: Vec<String> = Vec::new();
         let mut multi_service_total: i64 = 0;
 
-        loop {
-            if sender.is_closed() {
+        if sender.is_closed() {
+            return;
+        }
+        let detail_res = match SearchService::cache::search(
+            &trace_id,
+            &org_id,
+            stream_type,
+            Some(user_id.clone()),
+            &req2,
+            "".to_string(),
+            false,
+            None,
+            false,
+        )
+        .await
+        {
+            Ok(res) => res,
+            Err(e) => {
+                log::error!(
+                    "[TRACES_STREAM trace_id {trace_id}] Query2 error on partition [{p_start},{p_end}]: {e}"
+                );
+                let _ = sender.send(Err(e)).await;
                 return;
             }
-            let detail_res = match SearchService::cache::search(
-                &trace_id,
-                &org_id,
-                stream_type,
-                Some(user_id.clone()),
-                &req2,
-                "".to_string(),
-                false,
-                None,
-                false,
-            )
-            .await
-            {
-                Ok(res) => res,
-                Err(e) => {
-                    log::error!(
-                        "[TRACES_STREAM trace_id {trace_id}] Query2 error on partition [{p_start},{p_end}]: {e}"
-                    );
-                    let _ = sender.send(Err(e)).await;
-                    return;
-                }
+        };
+
+        for item in detail_res.hits {
+            let tid = item
+                .get("trace_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            if tid.is_empty() {
+                continue;
+            }
+            let span_count = json::get_int_value(item.get("span_count").unwrap_or_default());
+            let error_count = json::get_int_value(item.get("error_count").unwrap_or_default());
+            let min_start = json::get_int_value(item.get("min_start_time").unwrap_or_default());
+            let max_end = json::get_int_value(item.get("max_end_time").unwrap_or_default());
+            let max_duration = json::get_int_value(item.get("max_duration").unwrap_or_default());
+            let service_count = json::get_int_value(item.get("service_count").unwrap_or_default());
+            let root_service_name = item
+                .get("root_service_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let root_operation_name = item
+                .get("root_operation_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let first_service_name = item
+                .get("first_service_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let first_operation_name = item
+                .get("first_operation_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+
+            // Prefer the true root span's labels; fall back to earliest span.
+            let event_service_name = if !root_service_name.is_empty() {
+                root_service_name
+            } else {
+                first_service_name
+            };
+            let event_operation_name = if !root_operation_name.is_empty() {
+                root_operation_name
+            } else {
+                first_operation_name
             };
 
-            let resp_size = detail_res.hits.len() as i64;
-            for item in detail_res.hits {
-                let tid = item
-                    .get("trace_id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string();
-                if tid.is_empty() {
-                    continue;
+            if let Some(trace) = traces_data.get_mut(&tid) {
+                trace.spans[0] = span_count.try_into().unwrap_or_default();
+                trace.spans[1] = error_count.try_into().unwrap_or_default();
+                if trace.start_time == 0 || trace.start_time > min_start {
+                    trace.start_time = min_start;
                 }
-                let span_count = json::get_int_value(item.get("span_count").unwrap_or_default());
-                let error_count = json::get_int_value(item.get("error_count").unwrap_or_default());
-                let min_start = json::get_int_value(item.get("min_start_time").unwrap_or_default());
-                let max_end = json::get_int_value(item.get("max_end_time").unwrap_or_default());
-                let max_duration =
-                    json::get_int_value(item.get("max_duration").unwrap_or_default());
-                let service_count =
-                    json::get_int_value(item.get("service_count").unwrap_or_default());
-                let root_service_name = item
-                    .get("root_service_name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string();
-                let root_operation_name = item
-                    .get("root_operation_name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string();
-                let first_service_name = item
-                    .get("first_service_name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string();
-                let first_operation_name = item
-                    .get("first_operation_name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string();
+                if trace.end_time < max_end {
+                    trace.end_time = max_end;
+                }
+                trace.duration = max_duration;
+                // update the duration if the duration is not correct
+                if trace.end_time - trace.start_time > trace.duration * 1000 {
+                    trace.duration = (trace.end_time - trace.start_time) / 1000;
+                }
+                trace.first_event = serde_json::json!({
+                    "service_name": event_service_name,
+                    "operation_name": event_operation_name,
+                });
 
-                // Prefer the true root span's labels; fall back to earliest span.
-                let event_service_name = if !root_service_name.is_empty() {
-                    root_service_name
+                if service_count <= 1 {
+                    // Single service: populate the services list directly from Q2a;
+                    // skip Q2b for this trace.
+                    if !event_service_name.is_empty() {
+                        trace.service_name.push(TraceServiceNameItem {
+                            service_name: event_service_name,
+                            count: span_count.try_into().unwrap_or_default(),
+                            duration: max_duration,
+                        });
+                    }
                 } else {
-                    first_service_name
-                };
-                let event_operation_name = if !root_operation_name.is_empty() {
-                    root_operation_name
-                } else {
-                    first_operation_name
-                };
-
-                if let Some(trace) = traces_data.get_mut(&tid) {
-                    trace.spans[0] = span_count.try_into().unwrap_or_default();
-                    trace.spans[1] = error_count.try_into().unwrap_or_default();
-                    if trace.start_time == 0 || trace.start_time > min_start {
-                        trace.start_time = min_start;
-                    }
-                    if trace.end_time < max_end {
-                        trace.end_time = max_end;
-                    }
-                    trace.duration = max_duration;
-                    // update the duration if the duration is not correct
-                    if trace.end_time - trace.start_time > trace.duration * 1000 {
-                        trace.duration = (trace.end_time - trace.start_time) / 1000;
-                    }
-                    trace.first_event = serde_json::json!({
-                        "service_name": event_service_name,
-                        "operation_name": event_operation_name,
-                    });
-
-                    if service_count <= 1 {
-                        // Single service: populate the services list directly from Q2a;
-                        // skip Q2b for this trace.
-                        if !event_service_name.is_empty() {
-                            trace.service_name.push(TraceServiceNameItem {
-                                service_name: event_service_name,
-                                count: span_count.try_into().unwrap_or_default(),
-                                duration: max_duration,
-                            });
-                        }
-                    } else {
-                        multi_service_tids.push(tid);
-                        multi_service_total += service_count;
-                    }
+                    multi_service_tids.push(tid);
+                    multi_service_total += service_count;
                 }
             }
-
-            if resp_size < req2.query.size {
-                break;
-            }
-            req2.query.from += req2.query.size;
         }
 
         // Q2b: per-(trace_id, service_name) breakdown, only for multi-service traces.
