@@ -62,3 +62,37 @@ impl Related<super::dashboards::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "report-1".to_string(),
+            org: "myorg".to_string(),
+            folder_id: "folder-1".to_string(),
+            name: "Weekly Report".to_string(),
+            title: "Weekly Summary".to_string(),
+            description: Some("A weekly report".to_string()),
+            enabled: true,
+            frequency: serde_json::json!({"type": "weekly", "day": "Monday"}),
+            destinations: serde_json::json!(["email@example.com"]),
+            message: None,
+            timezone: "UTC".to_string(),
+            tz_offset: 0,
+            owner: Some("admin@example.com".to_string()),
+            last_edited_by: None,
+            created_at: 1000,
+            updated_at: Some(2000),
+            start_at: 1000,
+            image_preview: false,
+        };
+        assert_eq!(m.id, "report-1");
+        assert_eq!(m.org, "myorg");
+        assert!(m.enabled);
+        assert!(!m.image_preview);
+        assert!(m.message.is_none());
+    }
+}

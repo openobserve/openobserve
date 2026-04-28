@@ -539,3 +539,52 @@ pub async fn clear() -> Result<(), errors::Error> {
 pub async fn is_empty() -> bool {
     len().await == 0
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::user::UserRole;
+
+    use super::*;
+
+    #[test]
+    fn test_org_user_record_new_fields() {
+        let r = OrgUserRecord::new(
+            "org-1",
+            "user@example.com",
+            UserRole::Admin,
+            "tok-abc",
+            None,
+        );
+        assert_eq!(r.org_id, "org-1");
+        assert_eq!(r.email, "user@example.com");
+        assert_eq!(r.token, "tok-abc");
+        assert!(r.rum_token.is_none());
+        assert!(r.allow_static_token);
+        assert!(r.created_at > 0);
+    }
+
+    #[test]
+    fn test_org_user_record_new_with_rum_token() {
+        let r = OrgUserRecord::new(
+            "org-2",
+            "admin@example.com",
+            UserRole::Viewer,
+            "tok-xyz",
+            Some("rum-tok".to_string()),
+        );
+        assert_eq!(r.rum_token.as_deref(), Some("rum-tok"));
+    }
+
+    #[test]
+    fn test_org_user_put_fields() {
+        let p = OrgUserPut {
+            email: "e@x.com".to_string(),
+            org_id: "org-3".to_string(),
+            role: UserRole::Editor,
+            token: "t".to_string(),
+            rum_token: None,
+        };
+        assert_eq!(p.org_id, "org-3");
+        assert!(p.rum_token.is_none());
+    }
+}
