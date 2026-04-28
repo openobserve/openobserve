@@ -707,9 +707,10 @@ pub async fn update_stream_settings(
 
     // check for bloom filter fields
     if !new_settings.bloom_filter_fields.add.is_empty() {
-        let new_bloom: Vec<_> = new_settings
-            .bloom_filter_fields
-            .add
+        let mut add = new_settings.bloom_filter_fields.add;
+        add.sort();
+        add.dedup();
+        let new_bloom: Vec<_> = add
             .into_iter()
             .filter(|f| !settings.bloom_filter_fields.contains(f))
             .collect();
@@ -723,9 +724,10 @@ pub async fn update_stream_settings(
 
     // check for index fields
     if !new_settings.index_fields.add.is_empty() {
-        let new_index: Vec<_> = new_settings
-            .index_fields
-            .add
+        let mut add = new_settings.index_fields.add;
+        add.sort();
+        add.dedup();
+        let new_index: Vec<_> = add
             .into_iter()
             .filter(|f| !settings.index_fields.contains(f))
             .collect();
@@ -739,11 +741,19 @@ pub async fn update_stream_settings(
     }
 
     if !new_settings.extended_retention_days.add.is_empty() {
+        let mut seen = Vec::new();
         let new_retention: Vec<_> = new_settings
             .extended_retention_days
             .add
             .into_iter()
-            .filter(|r| !settings.extended_retention_days.contains(r))
+            .filter(|r| {
+                if seen.contains(r) || settings.extended_retention_days.contains(r) {
+                    false
+                } else {
+                    seen.push(r.clone());
+                    true
+                }
+            })
             .collect();
         settings.extended_retention_days.extend(new_retention);
     }
@@ -876,9 +886,10 @@ pub async fn update_stream_settings(
     }
 
     if !new_settings.full_text_search_keys.add.is_empty() {
-        let new_fts: Vec<_> = new_settings
-            .full_text_search_keys
-            .add
+        let mut add = new_settings.full_text_search_keys.add;
+        add.sort();
+        add.dedup();
+        let new_fts: Vec<_> = add
             .into_iter()
             .filter(|f| !settings.full_text_search_keys.contains(f))
             .collect();
@@ -893,9 +904,21 @@ pub async fn update_stream_settings(
     }
 
     if !new_settings.partition_keys.add.is_empty() {
-        settings
+        let mut seen = Vec::new();
+        let new_partition: Vec<_> = new_settings
             .partition_keys
-            .extend(new_settings.partition_keys.add);
+            .add
+            .into_iter()
+            .filter(|k| {
+                if seen.contains(k) || settings.partition_keys.contains(k) {
+                    false
+                } else {
+                    seen.push(k.clone());
+                    true
+                }
+            })
+            .collect();
+        settings.partition_keys.extend(new_partition);
     }
 
     if !new_settings.partition_keys.remove.is_empty() {
