@@ -705,4 +705,94 @@ mod tests {
         assert_eq!(stream_samples[0], "v0");
         assert_eq!(stream_samples[9], "v9");
     }
+
+    #[test]
+    fn test_stream_info_filters_empty_absent() {
+        let s = StreamInfo::with_type("s".to_string(), StreamType::Logs);
+        let json = serde_json::to_value(&s).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("filters"));
+    }
+
+    #[test]
+    fn test_stream_info_filters_present_when_nonempty() {
+        let mut filters = HashMap::new();
+        filters.insert("env".to_string(), "prod".to_string());
+        let s = StreamInfo::with_type_and_filters("s".to_string(), StreamType::Logs, filters);
+        let json = serde_json::to_value(&s).unwrap();
+        assert!(json.as_object().unwrap().contains_key("filters"));
+    }
+
+    #[test]
+    fn test_correlation_response_all_streams_absent_when_empty() {
+        let r = CorrelationResponse {
+            service_name: "svc".to_string(),
+            matched_dimensions: HashMap::new(),
+            additional_dimensions: HashMap::new(),
+            related_streams: RelatedStreams {
+                logs: vec![],
+                traces: vec![],
+                metrics: vec![],
+            },
+            all_streams: vec![],
+            matched_set_id: None,
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("all_streams"));
+        assert!(!obj.contains_key("matched_set_id"));
+    }
+
+    #[test]
+    fn test_correlation_response_all_streams_present_when_nonempty() {
+        let r = CorrelationResponse {
+            service_name: "svc".to_string(),
+            matched_dimensions: HashMap::new(),
+            additional_dimensions: HashMap::new(),
+            related_streams: RelatedStreams {
+                logs: vec![],
+                traces: vec![],
+                metrics: vec![],
+            },
+            all_streams: vec![StreamInfo::with_type("x".to_string(), StreamType::Logs)],
+            matched_set_id: Some("set1".to_string()),
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("all_streams"));
+        assert!(obj.contains_key("matched_set_id"));
+    }
+
+    #[test]
+    fn test_dimension_analytics_empty_maps_absent() {
+        let d = DimensionAnalytics::new("env".to_string());
+        let json = serde_json::to_value(&d).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("sample_values"));
+        assert!(!obj.contains_key("value_children"));
+        assert!(!obj.contains_key("value_counts"));
+    }
+
+    #[test]
+    fn test_service_streams_empty_vecs_absent() {
+        let s = ServiceStreams::default();
+        let json = serde_json::to_value(&s).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("logs"));
+        assert!(!obj.contains_key("traces"));
+        assert!(!obj.contains_key("metrics"));
+    }
+
+    #[test]
+    fn test_service_streams_vecs_present_when_nonempty() {
+        let s = ServiceStreams {
+            logs: vec!["l".to_string()],
+            traces: vec!["t".to_string()],
+            metrics: vec!["m".to_string()],
+        };
+        let json = serde_json::to_value(&s).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("logs"));
+        assert!(obj.contains_key("traces"));
+        assert!(obj.contains_key("metrics"));
+    }
 }

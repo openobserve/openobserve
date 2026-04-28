@@ -683,4 +683,46 @@ mod tests {
         assert!(rule.rule.is_none());
         assert_eq!(rule.function, Function::Avg);
     }
+
+    #[test]
+    fn test_request_range_query_skip_fields_absent_when_empty() {
+        let q = RequestRangeQuery {
+            query: None,
+            start: None,
+            end: None,
+            step: None,
+            timeout: None,
+            use_cache: None,
+            use_streaming: None,
+            search_type: None,
+            regions: vec![],
+            clusters: vec![],
+        };
+        let json = serde_json::to_value(&q).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("search_type"));
+        assert!(!obj.contains_key("regions"));
+        assert!(!obj.contains_key("clusters"));
+    }
+
+    #[test]
+    fn test_request_range_query_skip_fields_present_when_set() {
+        let q = RequestRangeQuery {
+            query: None,
+            start: None,
+            end: None,
+            step: None,
+            timeout: None,
+            use_cache: None,
+            use_streaming: None,
+            search_type: Some(SearchEventType::UI),
+            regions: vec!["us-east".to_string()],
+            clusters: vec!["c1".to_string()],
+        };
+        let json = serde_json::to_value(&q).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("search_type"));
+        assert!(obj.contains_key("regions"));
+        assert!(obj.contains_key("clusters"));
+    }
 }
