@@ -976,7 +976,8 @@
     "fieldName": "Nom du champ",
     "fieldRequired": "Ce champ est obligatoire !",
     "dataType": "Type de données",
-    "dataTypeRequired": "Le type de données est obligatoire !"
+    "dataTypeRequired": "Le type de données est obligatoire !",
+    "udsFieldAlreadyInSchema": "Un ou plusieurs champs sélectionnés font déjà partie du schéma défini"
   },
   "function": {
     "header": "Fonctions",
