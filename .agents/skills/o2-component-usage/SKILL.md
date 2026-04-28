@@ -255,14 +255,35 @@ For every file in the current component's list:
 
 Replace in batches using `multi_replace_string_in_file`:
 
-1. Update the `<script setup>` imports: remove Quasar (if explicit), add O2 imports
-2. Replace each template usage with O2 equivalent
-3. Keep all business logic, `v-model`, `v-if`, `v-for`, `@click` handlers intact — only replace the component tags and props
+1. **Detect script style first**: check if the file uses `<script setup lang="ts">` or `export default defineComponent({...})`
+2. Update imports: remove Quasar (if explicit), add O2 imports
+3. **If Options API** (`defineComponent`): register the components in `components: {}` — this is MANDATORY or Vue silently ignores the import and renders nothing
+4. Replace each template usage with O2 equivalent
+5. Keep all business logic, `v-model`, `v-if`, `v-for`, `@click` handlers intact — only replace the component tags and props
+
+**`components:` registration for Options API (CRITICAL):**
+
+```ts
+// If components: {} already exists — add to it:
+components: { ExistingComponent, OToggleGroup, OToggleGroupItem },
+
+// If components: {} does not exist — add it after name: "..."
+export default defineComponent({
+  name: "MyComponent",
+  components: { OToggleGroup, OToggleGroupItem },  // ← ADD THIS
+  setup() { ... }
+})
+```
+
+> **`<script setup>` files do NOT need `components: {}` — imported components are auto-registered.**
+> **Options API files ALWAYS need `components: {}` — forgetting it means the component silently does nothing in the browser.**
 
 **Per-file checklist:**
 
+- [ ] Detected script style (`<script setup>` vs `defineComponent`)
 - [ ] Old `<q-*>` tag removed
-- [ ] O2 component imported in `<script setup>`
+- [ ] O2 component imported
+- [ ] **If Options API: O2 components registered in `components: {}`** ← NEVER skip this
 - [ ] All used props mapped (see tables below)
 - [ ] All slots mapped
 - [ ] All event handlers mapped
@@ -361,14 +382,15 @@ Current tracker: `quasar-button-migration.md` (repo root)
 
 ## Common Pitfalls
 
-| Pitfall                                     | Fix                                                             |
-| ------------------------------------------- | --------------------------------------------------------------- |
-| Leaving `v-close-popup` on items            | Remove it — ODropdownItem closes automatically on `@select`     |
-| Using `q-btn` inside `OButtonGroup`         | Replace with `OButton` — never mix                              |
-| Passing `toggle-color` to `OToggleGroup`    | Drop it — styling via tokens only                               |
-| Forgetting to import O2 component           | Always add import in `<script setup>` alongside the replacement |
-| Mixing O2 and Quasar within the same family | Full family replacement in one commit per file                  |
-| Dynamic `:options` on `q-btn-toggle`        | Use `v-for` on `OToggleGroupItem` instead                       |
+| Pitfall                                                   | Fix                                                                                                                                 |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Options API file: not registering in `components: {}`** | Vue silently ignores the import — component renders as unknown element. Always add to `components: {}` for `defineComponent` files. |
+| Leaving `v-close-popup` on items                          | Remove it — ODropdownItem closes automatically on `@select`                                                                         |
+| Using `q-btn` inside `OButtonGroup`                       | Replace with `OButton` — never mix                                                                                                  |
+| Passing `toggle-color` to `OToggleGroup`                  | Drop it — styling via tokens only                                                                                                   |
+| Forgetting to import O2 component                         | Always add import in `<script setup>` alongside the replacement                                                                     |
+| Mixing O2 and Quasar within the same family               | Full family replacement in one commit per file                                                                                      |
+| Dynamic `:options` on `q-btn-toggle`                      | Use `v-for` on `OToggleGroupItem` instead                                                                                           |
 
 ---
 
