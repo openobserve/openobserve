@@ -945,7 +945,6 @@ function getIcon(data, ioType) {
   background: #6b7280;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
-  position: relative;
 
   &::before {
     content: '';
