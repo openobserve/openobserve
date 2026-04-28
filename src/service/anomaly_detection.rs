@@ -1867,4 +1867,55 @@ mod tests {
         let hit = serde_json::json!({"_timestamp": true});
         assert!(extract_timestamp_from_hit(&hit).is_err());
     }
+
+    // ── extract_value_from_hit ──────────────────────────────────────────────
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extract_value_from_hit_value_field_f64() {
+        let hit = serde_json::json!({"value": 3.14});
+        assert!((extract_value_from_hit(&hit).unwrap() - 3.14).abs() < f64::EPSILON);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extract_value_from_hit_count_field_integer() {
+        let hit = serde_json::json!({"count": 42});
+        assert!((extract_value_from_hit(&hit).unwrap() - 42.0).abs() < f64::EPSILON);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extract_value_from_hit_underscore_count_field() {
+        let hit = serde_json::json!({"_count": 7});
+        assert!((extract_value_from_hit(&hit).unwrap() - 7.0).abs() < f64::EPSILON);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extract_value_from_hit_metric_field() {
+        let hit = serde_json::json!({"metric": 100.5});
+        assert!((extract_value_from_hit(&hit).unwrap() - 100.5).abs() < f64::EPSILON);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extract_value_from_hit_result_field() {
+        let hit = serde_json::json!({"result": 0.0});
+        assert!((extract_value_from_hit(&hit).unwrap() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extract_value_from_hit_no_value_field_returns_error() {
+        let hit = serde_json::json!({"other_field": 99.0});
+        assert!(extract_value_from_hit(&hit).is_err());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_extract_value_from_hit_non_numeric_value_field_returns_error() {
+        let hit = serde_json::json!({"value": "not_a_number"});
+        assert!(extract_value_from_hit(&hit).is_err());
+    }
 }
