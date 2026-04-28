@@ -1106,6 +1106,26 @@ mod tests {
     }
 
     #[test]
+    fn test_trigger_condition_timezone_none_absent() {
+        let tc = TriggerCondition {
+            timezone: None,
+            ..TriggerCondition::default()
+        };
+        let json = serde_json::to_value(&tc).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("timezone"));
+    }
+
+    #[test]
+    fn test_trigger_condition_timezone_some_present() {
+        let tc = TriggerCondition {
+            timezone: Some("America/New_York".to_string()),
+            ..TriggerCondition::default()
+        };
+        let json = serde_json::to_value(&tc).unwrap();
+        assert!(json.as_object().unwrap().contains_key("timezone"));
+    }
+
+    #[test]
     fn test_compare_historic_data_from_meta() {
         let meta = meta_alerts::CompareHistoricData {
             offset: "1h".to_string(),
