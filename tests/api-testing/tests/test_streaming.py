@@ -33,6 +33,41 @@ def generate_random_string(length=5):
     return random_string
 
 
+def wait_for_ingestion_count(session, base_url, stream, expected, timeout=120, interval=2):
+    """Poll _search until COUNT(*) for the stream reaches `expected`.
+
+    Replaces fixed sleeps that try to wait out indexing delay; returns as soon as
+    the data is searchable, fails the test if the count never converges in time.
+    """
+    deadline = time.time() + timeout
+    end_us = int(datetime.now(timezone.utc).timestamp() * 1_000_000)
+    start_us = end_us - 24 * 3600 * 1_000_000
+    payload = {
+        "query": {
+            "sql": f'SELECT COUNT(*) AS cnt FROM "{stream}"',
+            "start_time": start_us,
+            "end_time": end_us,
+            "size": -1,
+        }
+    }
+    last = None
+    while time.time() < deadline:
+        r = session.post(
+            f"{base_url}api/{org_id}/_search?type=logs&search_type=UI&use_cache=false",
+            json=payload,
+        )
+        if r.status_code == 200:
+            hits = (r.json() or {}).get("hits") or []
+            last = hits[0].get("cnt", 0) if hits else 0
+            if last >= expected:
+                return last
+        time.sleep(interval)
+    pytest.fail(
+        f"Timed out waiting for {stream} to reach {expected} rows "
+        f"(last seen: {last}) within {timeout}s"
+    )
+
+
 # Generate a random string of length 5
 random_string = generate_random_string()
 
@@ -70,6 +105,8 @@ def test_ingest_data(create_session, base_url_sc):
         f"Data ingestion failed with status code: {resp_ing.status_code}"
     )
 
+    wait_for_ingestion_count(session, base_url_sc, stream_name, expected=3848)
+
     # Join stream data
 
 
@@ -91,6 +128,8 @@ def test_ingest_join(create_session, base_url_sc):
     assert resp_ing_join.status_code == 200, (
         f"Data ingestion failed for join with status code: {resp_ing_join.status_code}"
     )
+
+    wait_for_ingestion_count(session, base_url_sc, stream_join, expected=3848)
 
 
 def test_disable_streaming(create_session, base_url):
@@ -209,11 +248,9 @@ def test_histogram(
     url = base_url
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
 
-    time.sleep(20)  # Increased wait time for data indexing
-
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    ten_min_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)  # Increased to 1 hour to ensure data coverage across test runs
+    ten_min_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
     json_data_hist = {
         "query": {
             "sql": hist_query,
@@ -925,11 +962,9 @@ def test_streaming_histogram(
     url = base_url
     session.auth = HTTPBasicAuth(ZO_ROOT_USER_EMAIL, ZO_ROOT_USER_PASSWORD)
 
-    time.sleep(20)  # Increased wait time for data indexing
-
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    ten_min_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)  # Increased to 1 hour to ensure data coverage across test runs
+    ten_min_ago = int((now - timedelta(hours=1)).timestamp() * 1000000)
     json_data_hist = {
         "query": {
             "sql": hist_query,
