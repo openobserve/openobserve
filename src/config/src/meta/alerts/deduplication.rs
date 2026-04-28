@@ -597,4 +597,62 @@ mod tests {
         let result: Result<GlobalDeduplicationConfig, _> = serde_json::from_str(json);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_deduplication_config_empty_fields_absent_from_json() {
+        let config = DeduplicationConfig::default();
+        let json = serde_json::to_value(&config).unwrap();
+        let obj = json.as_object().unwrap();
+        // Vec::is_empty → absent
+        assert!(!obj.contains_key("fingerprint_fields"));
+        // Option::is_none → absent
+        assert!(!obj.contains_key("time_window_minutes"));
+        assert!(!obj.contains_key("grouping"));
+    }
+
+    #[test]
+    fn test_deduplication_config_set_fields_present_in_json() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec!["host".to_string()],
+            time_window_minutes: Some(30),
+            grouping: Some(GroupingConfig {
+                enabled: true,
+                max_group_size: 10,
+                send_strategy: SendStrategy::Summary,
+                group_wait_seconds: 30,
+            }),
+        };
+        let json = serde_json::to_value(&config).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("fingerprint_fields"));
+        assert!(obj.contains_key("time_window_minutes"));
+        assert!(obj.contains_key("grouping"));
+    }
+
+    #[test]
+    fn test_global_dedup_config_empty_fields_absent_from_json() {
+        let config = GlobalDeduplicationConfig::default();
+        let json = serde_json::to_value(&config).unwrap();
+        let obj = json.as_object().unwrap();
+        // Vec::is_empty → absent
+        assert!(!obj.contains_key("alert_fingerprint_groups"));
+        // Option::is_none → absent
+        assert!(!obj.contains_key("time_window_minutes"));
+    }
+
+    #[test]
+    fn test_global_dedup_config_set_fields_present_in_json() {
+        let config = GlobalDeduplicationConfig {
+            enabled: true,
+            alert_dedup_enabled: false,
+            alert_fingerprint_groups: vec!["host".to_string()],
+            time_window_minutes: Some(60),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&config).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("alert_fingerprint_groups"));
+        assert!(obj.contains_key("time_window_minutes"));
+    }
 }

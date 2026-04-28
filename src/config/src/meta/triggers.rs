@@ -287,6 +287,52 @@ mod tests {
     }
 
     #[test]
+    fn test_trigger_start_end_time_none_absent_from_json() {
+        let t = Trigger {
+            id: 1,
+            org: "org".to_string(),
+            module: TriggerModule::Alert,
+            module_key: "k".to_string(),
+            next_run_at: 0,
+            is_realtime: false,
+            is_silenced: false,
+            status: TriggerStatus::Waiting,
+            start_time: None,
+            end_time: None,
+            retries: 0,
+            data: "{}".to_string(),
+        };
+        let json = serde_json::to_value(&t).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("start_time"));
+        assert!(!obj.contains_key("end_time"));
+    }
+
+    #[test]
+    fn test_trigger_start_end_time_some_present_in_json() {
+        let t = Trigger {
+            id: 2,
+            org: "org".to_string(),
+            module: TriggerModule::Alert,
+            module_key: "k".to_string(),
+            next_run_at: 0,
+            is_realtime: false,
+            is_silenced: false,
+            status: TriggerStatus::Waiting,
+            start_time: Some(1000),
+            end_time: Some(2000),
+            retries: 0,
+            data: "{}".to_string(),
+        };
+        let json = serde_json::to_value(&t).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("start_time"));
+        assert_eq!(obj["start_time"], serde_json::json!(1000_i64));
+        assert!(obj.contains_key("end_time"));
+        assert_eq!(obj["end_time"], serde_json::json!(2000_i64));
+    }
+
+    #[test]
     fn test_trigger_mem_size_at_least_struct_size() {
         let t = Trigger {
             id: 1,
