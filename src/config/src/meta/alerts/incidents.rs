@@ -1458,4 +1458,91 @@ mod tests {
         let result = DimensionRelationship::check(&existing, &new);
         assert_eq!(result, DimensionRelationship::NewIsSubset);
     }
+
+    fn make_incident(
+        resolved_at: Option<i64>,
+        title: Option<String>,
+        assigned_to: Option<String>,
+        topology_context: Option<IncidentTopology>,
+    ) -> Incident {
+        Incident {
+            id: "abc123".to_string(),
+            org_id: "org1".to_string(),
+            status: IncidentStatus::default(),
+            severity: IncidentSeverity::default(),
+            first_alert_at: 1000,
+            last_alert_at: 2000,
+            resolved_at,
+            alert_count: 1,
+            title,
+            assigned_to,
+            created_at: 1000,
+            updated_at: 2000,
+            group_values: serde_json::Value::Null,
+            key_type: KeyType::default(),
+            topology_context,
+        }
+    }
+
+    #[test]
+    fn test_incident_optional_fields_none_absent_from_json() {
+        let incident = make_incident(None, None, None, None);
+        let json = serde_json::to_value(&incident).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("resolved_at"));
+        assert!(!obj.contains_key("title"));
+        assert!(!obj.contains_key("assigned_to"));
+        assert!(!obj.contains_key("topology_context"));
+    }
+
+    #[test]
+    fn test_incident_optional_fields_some_present_in_json() {
+        let incident = make_incident(
+            Some(3000),
+            Some("High CPU".to_string()),
+            Some("oncall@example.com".to_string()),
+            None,
+        );
+        let json = serde_json::to_value(&incident).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("resolved_at"));
+        assert_eq!(obj["resolved_at"], serde_json::json!(3000_i64));
+        assert!(obj.contains_key("title"));
+        assert_eq!(obj["title"], serde_json::json!("High CPU"));
+        assert!(obj.contains_key("assigned_to"));
+    }
+
+    #[test]
+    fn test_incident_stats_mttr_none_absent_from_json() {
+        let stats = IncidentStats {
+            total_incidents: 10,
+            open_incidents: 5,
+            acknowledged_incidents: 2,
+            resolved_incidents: 3,
+            by_severity: Default::default(),
+            by_service: Default::default(),
+            mttr_minutes: None,
+            alerts_per_incident_avg: 2.5,
+        };
+        let json = serde_json::to_value(&stats).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("mttr_minutes"));
+    }
+
+    #[test]
+    fn test_incident_stats_mttr_some_present_in_json() {
+        let stats = IncidentStats {
+            total_incidents: 5,
+            open_incidents: 1,
+            acknowledged_incidents: 0,
+            resolved_incidents: 4,
+            by_severity: Default::default(),
+            by_service: Default::default(),
+            mttr_minutes: Some(15.5),
+            alerts_per_incident_avg: 3.0,
+        };
+        let json = serde_json::to_value(&stats).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("mttr_minutes"));
+        assert_eq!(obj["mttr_minutes"], serde_json::json!(15.5_f64));
+    }
 }
