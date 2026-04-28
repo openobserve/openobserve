@@ -76,6 +76,10 @@
   --color-dropdown-label: var(--color-text-secondary);
   --color-dropdown-separator: var(--color-border-default);
 
+  /* Menu (floating panel) */
+  --color-menu-bg: var(--color-surface-overlay);
+  --color-menu-border: var(--color-border-default);
+
   /* Tabs */
   --color-tabs-indicator: var(--color-primary-600);
   --color-tabs-active-text: var(--color-primary-600);
@@ -156,6 +160,10 @@
   --color-dropdown-item-disabled: var(--color-dropdown-item-disabled);
   --color-dropdown-label: var(--color-dropdown-label);
   --color-dropdown-separator: var(--color-dropdown-separator);
+
+  /* Menu (floating panel) */
+  --color-menu-bg: var(--color-menu-bg);
+  --color-menu-border: var(--color-menu-border);
 
   /* Tabs */
   --color-tabs-indicator: var(--color-tabs-indicator);
