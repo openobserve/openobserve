@@ -1445,6 +1445,13 @@ export default defineComponent({
                   "*",
                 );
               }
+            } else {
+              // Schema not yet loaded — fall back to SELECT * to avoid leaving
+              // the [FIELD_LIST] placeholder literal in the query
+              searchObj.data.query = searchObj.data.query.replace(
+                /\[FIELD_LIST\]/g,
+                "*",
+              );
             }
           }
 
