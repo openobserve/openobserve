@@ -387,7 +387,8 @@
     "liveModeTooltip": "Filtre/zaman değişikliklerinde sorguyu otomatik çalıştırın",
     "turnOnLiveMode": "Canlı modu açın",
     "turnOffLiveMode": "Canlı modu kapat",
-    "autoRunEnabled": "Otomatik çalıştırma etkin"
+    "autoRunEnabled": "Otomatik çalıştırma etkin",
+    "selectStreamFirst": "Önce bir yayın seçin"
   },
   "menu": {
     "home": "Ana Sayfa",
