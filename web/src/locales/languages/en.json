@@ -1035,6 +1035,7 @@
     "addField": "Add Field",
     "addSchemaField": "Add to Defined Schema",
     "removeSchemaField": "Remove Defined Schema",
+    "udsFieldAlreadyInSchema": "One or more selected fields are already part of the defined schema",
     "storeOriginalData": "Store Original Data",
     "flattenLevel": "Flatten Level",
     "approxPartition": "Use Stream Stats for Partitioning",
