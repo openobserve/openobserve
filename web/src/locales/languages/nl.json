@@ -387,7 +387,8 @@
     "liveModeTooltip": "Query automatisch uitvoeren bij wijzigingen in filter/tijd",
     "turnOnLiveMode": "Live-modus inschakelen",
     "turnOffLiveMode": "Live-modus uitschakelen",
-    "autoRunEnabled": "Automatisch uitvoeren ingeschakeld"
+    "autoRunEnabled": "Automatisch uitvoeren ingeschakeld",
+    "selectStreamFirst": "Selecteer eerst een stream"
   },
   "menu": {
     "home": "Home",

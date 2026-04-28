@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? 'o2-primary-button-dark'
               : 'o2-primary-button-light'
           "
+          :disable="!selectedStreamName"
           @click="
             {
               expandState.output = true;
@@ -86,8 +87,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               runQuery();
             }
           "
-          >{{ t("search.runQuery") }}</q-btn
         >
+          {{ t("search.runQuery") }}
+          <q-tooltip v-if="!selectedStreamName" anchor="bottom middle" self="top middle">
+            {{ t("search.selectStreamFirst") }}
+          </q-tooltip>
+        </q-btn>
 
         <q-btn
           data-test="add-function-fullscreen-btn"
