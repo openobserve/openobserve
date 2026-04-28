@@ -619,8 +619,8 @@ pub async fn get_latest_traces(
             };
 
             if let Some(trace) = traces_data.get_mut(&tid) {
-                trace.spans[0] = span_count.try_into().unwrap_or(u16::MAX);
-                trace.spans[1] = error_count.try_into().unwrap_or(u16::MAX);
+                trace.spans[0] = span_count.try_into().unwrap_or_default();
+                trace.spans[1] = error_count.try_into().unwrap_or_default();
                 if trace.start_time == 0 || trace.start_time > min_start {
                     trace.start_time = min_start;
                 }
@@ -643,7 +643,7 @@ pub async fn get_latest_traces(
                     if !event_service_name.is_empty() {
                         trace.service_name.push(TraceServiceNameItem {
                             service_name: event_service_name,
-                            count: span_count.try_into().unwrap_or(u16::MAX),
+                            count: span_count.try_into().unwrap_or_default(),
                             duration: max_duration,
                         });
                     }
@@ -711,7 +711,7 @@ pub async fn get_latest_traces(
                 if let Some(trace) = traces_data.get_mut(&tid) {
                     trace.service_name.push(TraceServiceNameItem {
                         service_name: svc_name,
-                        count: svc_count.try_into().unwrap_or(u16::MAX),
+                        count: svc_count.try_into().unwrap_or_default(),
                         duration: svc_duration,
                     });
                 }
@@ -1500,8 +1500,8 @@ async fn process_latest_traces_stream(
                 };
 
                 if let Some(trace) = traces_data.get_mut(&tid) {
-                    trace.spans[0] = span_count.try_into().unwrap_or(u16::MAX);
-                    trace.spans[1] = error_count.try_into().unwrap_or(u16::MAX);
+                    trace.spans[0] = span_count.try_into().unwrap_or_default();
+                    trace.spans[1] = error_count.try_into().unwrap_or_default();
                     if trace.start_time == 0 || trace.start_time > min_start {
                         trace.start_time = min_start;
                     }
@@ -1524,7 +1524,7 @@ async fn process_latest_traces_stream(
                         if !event_service_name.is_empty() {
                             trace.service_name.push(TraceServiceNameItem {
                                 service_name: event_service_name,
-                                count: span_count.try_into().unwrap_or(u16::MAX),
+                                count: span_count.try_into().unwrap_or_default(),
                                 duration: max_duration,
                             });
                         }
@@ -1595,14 +1595,13 @@ async fn process_latest_traces_stream(
                         .and_then(|v| v.as_str())
                         .unwrap_or_default()
                         .to_string();
-                    let svc_count =
-                        json::get_int_value(item.get("svc_count").unwrap_or_default());
+                    let svc_count = json::get_int_value(item.get("svc_count").unwrap_or_default());
                     let svc_duration =
                         json::get_int_value(item.get("svc_duration").unwrap_or_default());
                     if let Some(trace) = traces_data.get_mut(&tid) {
                         trace.service_name.push(TraceServiceNameItem {
                             service_name: svc_name,
-                            count: svc_count.try_into().unwrap_or(u16::MAX),
+                            count: svc_count.try_into().unwrap_or_default(),
                             duration: svc_duration,
                         });
                     }
