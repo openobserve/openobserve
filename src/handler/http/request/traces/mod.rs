@@ -532,7 +532,10 @@ pub async fn get_latest_traces(
 
     // Trace IDs that have more than one service — these need a follow-up Q2b.
     // Single-service traces are fully populated from Q2a alone.
+    // Track the total expected (trace_id, service_name) row count so Q2b can size
+    // its request exactly and skip pagination.
     let mut multi_service_tids: Vec<String> = Vec::new();
+    let mut multi_service_total: i64 = 0;
 
     loop {
         let search_res = SearchService::cache::search(
@@ -658,6 +661,7 @@ pub async fn get_latest_traces(
                     }
                 } else {
                     multi_service_tids.push(tid);
+                    multi_service_total += service_count;
                 }
             }
         }
@@ -688,58 +692,52 @@ pub async fn get_latest_traces(
         );
         req.query.sql = svc_sql;
         req.query.from = 0;
-        req.query.size = get_config().limit.query_default_limit;
+        // Output is bounded to the total service count summed from Q2a, so a single
+        // request fetches everything.
+        req.query.size = multi_service_total;
 
-        loop {
-            let search_res = SearchService::cache::search(
-                &trace_id,
-                &org_id,
-                stream_type,
-                user_id_opt.clone(),
-                &req,
-                "".to_string(),
-                false,
-                None,
-                false,
-            )
-            .instrument(http_span.clone())
-            .await;
+        let search_res = SearchService::cache::search(
+            &trace_id,
+            &org_id,
+            stream_type,
+            user_id_opt.clone(),
+            &req,
+            "".to_string(),
+            false,
+            None,
+            false,
+        )
+        .instrument(http_span.clone())
+        .await;
 
-            let resp_search = match search_res {
-                Ok(res) => res,
-                Err(err) => {
-                    log::error!("get traces latest service-breakdown error: {err:?}");
-                    return map_error_to_http_response(&err, Some(trace_id));
-                }
-            };
-
-            let resp_size = resp_search.hits.len() as i64;
-            for item in resp_search.hits {
-                let tid = item
-                    .get("trace_id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string();
-                let svc_name = item
-                    .get("service_name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string();
-                let svc_count = json::get_int_value(item.get("svc_count").unwrap_or_default());
-                let svc_duration =
-                    json::get_int_value(item.get("svc_duration").unwrap_or_default());
-                if let Some(trace) = traces_data.get_mut(&tid) {
-                    trace.service_name.push(TraceServiceNameItem {
-                        service_name: svc_name,
-                        count: svc_count.try_into().unwrap_or_default(),
-                        duration: svc_duration,
-                    });
-                }
+        let resp_search = match search_res {
+            Ok(res) => res,
+            Err(err) => {
+                log::error!("get traces latest service-breakdown error: {err:?}");
+                return map_error_to_http_response(&err, Some(trace_id));
             }
-            if resp_size < req.query.size {
-                break;
+        };
+
+        for item in resp_search.hits {
+            let tid = item
+                .get("trace_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let svc_name = item
+                .get("service_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let svc_count = json::get_int_value(item.get("svc_count").unwrap_or_default());
+            let svc_duration = json::get_int_value(item.get("svc_duration").unwrap_or_default());
+            if let Some(trace) = traces_data.get_mut(&tid) {
+                trace.service_name.push(TraceServiceNameItem {
+                    service_name: svc_name,
+                    count: svc_count.try_into().unwrap_or_default(),
+                    duration: svc_duration,
+                });
             }
-            req.query.from += req.query.size;
         }
     }
     let mut traces_data = traces_data.values().collect::<Vec<&TraceResponseItem>>();
@@ -1439,7 +1437,10 @@ async fn process_latest_traces_stream(
 
         // Trace IDs that have more than one service — these need a follow-up Q2b.
         // Single-service traces are fully populated from Q2a alone.
+        // Track the total expected (trace_id, service_name) row count so Q2b can
+        // size its request exactly and skip pagination.
         let mut multi_service_tids: Vec<String> = Vec::new();
+        let mut multi_service_total: i64 = 0;
 
         loop {
             if sender.is_closed() {
@@ -1550,6 +1551,7 @@ async fn process_latest_traces_stream(
                         }
                     } else {
                         multi_service_tids.push(tid);
+                        multi_service_total += service_count;
                     }
                 }
             }
@@ -1572,65 +1574,59 @@ async fn process_latest_traces_stream(
             let mut req3 = base_req.clone();
             req3.query.sql = svc_sql;
             req3.query.from = 0;
-            req3.query.size = get_config().limit.query_default_limit;
+            // Output is bounded to the total service count summed from Q2a, so a
+            // single request fetches everything.
+            req3.query.size = multi_service_total;
             req3.query.start_time = p_start_actual;
             req3.query.end_time = p_end_actual;
 
-            loop {
-                if sender.is_closed() {
+            if sender.is_closed() {
+                return;
+            }
+            let svc_res = match SearchService::cache::search(
+                &trace_id,
+                &org_id,
+                stream_type,
+                Some(user_id.clone()),
+                &req3,
+                "".to_string(),
+                false,
+                None,
+                false,
+            )
+            .await
+            {
+                Ok(res) => res,
+                Err(e) => {
+                    log::error!(
+                        "[TRACES_STREAM trace_id {trace_id}] Query2b error on partition [{p_start},{p_end}]: {e}"
+                    );
+                    let _ = sender.send(Err(e)).await;
                     return;
                 }
-                let svc_res = match SearchService::cache::search(
-                    &trace_id,
-                    &org_id,
-                    stream_type,
-                    Some(user_id.clone()),
-                    &req3,
-                    "".to_string(),
-                    false,
-                    None,
-                    false,
-                )
-                .await
-                {
-                    Ok(res) => res,
-                    Err(e) => {
-                        log::error!(
-                            "[TRACES_STREAM trace_id {trace_id}] Query2b error on partition [{p_start},{p_end}]: {e}"
-                        );
-                        let _ = sender.send(Err(e)).await;
-                        return;
-                    }
-                };
+            };
 
-                let svc_resp_size = svc_res.hits.len() as i64;
-                for item in svc_res.hits {
-                    let tid = item
-                        .get("trace_id")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or_default()
-                        .to_string();
-                    let svc_name = item
-                        .get("service_name")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or_default()
-                        .to_string();
-                    let svc_count = json::get_int_value(item.get("svc_count").unwrap_or_default());
-                    let svc_duration =
-                        json::get_int_value(item.get("svc_duration").unwrap_or_default());
-                    if let Some(trace) = traces_data.get_mut(&tid) {
-                        trace.service_name.push(TraceServiceNameItem {
-                            service_name: svc_name,
-                            count: svc_count.try_into().unwrap_or_default(),
-                            duration: svc_duration,
-                        });
-                    }
+            for item in svc_res.hits {
+                let tid = item
+                    .get("trace_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let svc_name = item
+                    .get("service_name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let svc_count = json::get_int_value(item.get("svc_count").unwrap_or_default());
+                let svc_duration =
+                    json::get_int_value(item.get("svc_duration").unwrap_or_default());
+                if let Some(trace) = traces_data.get_mut(&tid) {
+                    trace.service_name.push(TraceServiceNameItem {
+                        service_name: svc_name,
+                        count: svc_count.try_into().unwrap_or_default(),
+                        duration: svc_duration,
+                    });
                 }
-
-                if svc_resp_size < req3.query.size {
-                    break;
-                }
-                req3.query.from += req3.query.size;
             }
         }
 
