@@ -555,7 +555,7 @@ import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrel
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import config from "@/aws-exports";
-import ORefreshButton from "@/lib/core/RefreshButton/RefreshButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 
 export default defineComponent({
   name: "SearchResult",
