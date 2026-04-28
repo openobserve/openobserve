@@ -1105,6 +1105,78 @@ mod tests {
     }
 
     #[test]
+    fn test_get_val_for_attr_double_value() {
+        let attr = json!({"doubleValue": 3.14});
+        let result = get_val_for_attr(&attr);
+        assert_eq!(result.as_str().unwrap(), "3.14");
+    }
+
+    #[test]
+    fn test_get_val_for_attr_bytes_value() {
+        let attr = json!({"bytesValue": "aGVsbG8="});
+        let result = get_val_for_attr(&attr);
+        assert_eq!(result.as_str().unwrap(), "aGVsbG8=");
+    }
+
+    #[test]
+    fn test_get_val_for_attr_array_value() {
+        let attr = json!({
+            "arrayValue": {
+                "values": [
+                    {"stringValue": "hello"},
+                    {"intValue": "42"}
+                ]
+            }
+        });
+        let result = get_val_for_attr(&attr);
+        let arr = result.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0].as_str().unwrap(), "hello");
+        assert_eq!(arr[1].as_str().unwrap(), "42");
+    }
+
+    #[test]
+    fn test_get_val_for_attr_kvlist_value() {
+        let attr = json!({
+            "kvlistValue": {
+                "values": [
+                    {"key": "my_key", "value": {"stringValue": "my_val"}}
+                ]
+            }
+        });
+        let result = get_val_for_attr(&attr);
+        let obj = result.as_object().unwrap();
+        assert!(obj.contains_key("my_key"));
+        assert_eq!(obj["my_key"].as_str().unwrap(), "my_val");
+    }
+
+    #[test]
+    fn test_get_val_for_attr_unknown_key_returns_string() {
+        // Unknown keys fall through to the default case which calls get_string_value
+        let attr = json!({"unknownKey": "somevalue"});
+        let result = get_val_for_attr(&attr);
+        assert_eq!(result.as_str().unwrap(), "somevalue");
+    }
+
+    #[test]
+    fn test_get_val_for_attr_snake_case_string_value() {
+        let attr = json!({"string_value": "hello_snake"});
+        let result = get_val_for_attr(&attr);
+        assert_eq!(result.as_str().unwrap(), "hello_snake");
+    }
+
+    #[test]
+    fn test_get_val_with_type_retained_object() {
+        let obj = Value::Object({
+            let mut m = serde_json::Map::new();
+            m.insert("k".to_string(), json!("v"));
+            m
+        });
+        let result = get_val_with_type_retained(&obj);
+        assert_eq!(result["k"].as_str().unwrap(), "v");
+    }
+
+    #[test]
     fn test_create_log_ingestion_req_json() {
         let data = bytes::Bytes::from("{}");
         let result = create_log_ingestion_req(0, data);
