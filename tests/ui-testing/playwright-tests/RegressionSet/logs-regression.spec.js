@@ -1547,35 +1547,23 @@ test.describe("Logs Regression Bugs", () => {
     // Wait for Monaco's debounced validateDoubleQuotes() to execute (default debounce: 500ms)
     await page.waitForTimeout(1000);
 
-    // Verify warning markers via several approaches.
+    // Verify warning markers via DOM inspection.
     // Note: window.monaco is NOT globally exposed (module-scoped in CodeQueryEditor.vue),
     // so we cannot use window.monaco.editor.getModelMarkers() directly.
-    // Instead, we check the DOM for decoration elements Monaco renders for warnings.
+    // Instead, we check the DOM for .squiggly-warning elements — these are the
+    // precise CSS class Monaco renders for warning-level decorations (from
+    // validateDoubleQuotes()). We avoid checking generic decoration elements
+    // like .cdr which match any Monaco decoration (cursor overlays, bracket
+    // highlights, etc.) and would make the assertion pass vacuously.
     const hasWarnings = await page.evaluate(() => {
       try {
-        // Approach 1: Check for Monaco's squiggly-warning DOM elements
-        // Monaco renders warning markers as visual decorations with CSS class "squiggly-warning"
         const editorContainer =
           document.querySelector('[data-test="logs-search-bar-query-editor"]');
         if (!editorContainer) return false;
 
         const warningSquiggles =
           editorContainer.querySelectorAll('.squiggly-warning');
-        if (warningSquiggles.length > 0) return true;
-
-        // Approach 2: Check for content decoration renderer (.cdr) elements
-        // in the view-overlays section. These are present when Monaco renders
-        // any text decorations (warnings, errors, hints).
-        const monacoEditor = editorContainer.querySelector('.monaco-editor');
-        if (monacoEditor) {
-          const overlays = monacoEditor.querySelector('.view-overlays');
-          if (overlays) {
-            const cdrEls = overlays.querySelectorAll('.cdr');
-            if (cdrEls.length > 0) return true;
-          }
-        }
-
-        return false;
+        return warningSquiggles.length > 0;
       } catch (e) {
         return false;
       }
