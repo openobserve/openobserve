@@ -1,12 +1,38 @@
 <template>
-  <div class="chat-container" :class="[{ 'chat-open': isOpen }, store.state.theme == 'dark' ? 'dark-mode' : 'light-mode']" 
+  <Teleport to="body" :disabled="!isFullscreen || !isOpen">
+  <div
+    class="chat-container"
+    :class="[
+      { 'chat-open': isOpen, 'chat-fullscreen': isFullscreen && isOpen },
+      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
+    ]"
   >
+    <div
+      v-if="isFullscreenActive"
+      class="chat-fullscreen-sidebar-wrap"
+      :class="{ 'is-collapsed': isSidebarCollapsed }"
+    >
+      <button
+        class="chat-sidebar-toggle"
+        @click="toggleSidebar"
+        :title="isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+      >
+        <q-icon :name="isSidebarCollapsed ? 'menu' : 'chevron_left'" size="18px" />
+      </button>
+      <HomeChatHistory
+        v-if="!isSidebarCollapsed"
+        class="chat-fullscreen-sidebar"
+        @load-chat="onSidebarLoadChat"
+        @new-chat="onSidebarNewChat"
+      /><!-- [TABS] handlers `onSidebarLoadChat`/`onSidebarNewChat`. If dropping tabs, change to
+              `loadChat` and `addNewChat` directly. -->
+    </div>
     <div v-if="isOpen" class="chat-content-wrapper" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
       <div class="chat-header" :style="{ height:  headerHeight ? headerHeight + 'px' : '' }">
         <div class="chat-title tw:flex tw:justify-between tw:items-center tw:w-full">
 
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <q-avatar size="24px">
+          <div v-if="!isFullscreenActive" class="tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:flex-1">
+            <q-avatar size="24px" class="tw:flex-shrink-0">
               <img :src="o2AiTitleLogo" />
             </q-avatar>
 
@@ -14,10 +40,10 @@
               flat
               dense
               no-caps
-              class="chat-title-dropdown"
+              class="chat-title-dropdown tw:min-w-0"
               @click="loadHistory"
             >
-              <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-[220px]">
+              <div class="tw:flex tw:items-center tw:gap-1 tw:min-w-0">
                 <span class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block">
                   {{ displayedTitle || 'New Chat' }}
                   <q-tooltip
@@ -105,21 +131,74 @@
             </q-btn>
           </div>
 
-          <div>
+          <!-- ============================== [TABS] BEGIN ============================== -->
+          <!-- Fullscreen tab strip (Chrome-style). If we drop tabs, replace this whole block
+               with a plain title element and remove all [TABS]-marked code below + in <script>
+               + in <style>. -->
+          <div
+            v-if="isFullscreenActive"
+            class="chat-tab-bar"
+            @dragover.prevent
+            @drop="onTabDrop($event)"
+          >
+            <button
+              v-for="tab in tabs"
+              :key="tab.key"
+              class="chat-tab-btn"
+              :class="{
+                'chat-tab-active': tab.key === activeTabKey,
+                'chat-tab-dragging': draggingTabKey === tab.key,
+              }"
+              draggable="true"
+              :title="tab.title || 'New Chat'"
+              @click="switchToTab(tab.key)"
+              @dragstart="onTabDragStart($event, tab.key)"
+              @dragend="onTabDragEnd"
+              @dragenter.prevent="onTabDragEnter(tab.key)"
+            >
+              <q-icon name="drag_indicator" class="chat-tab-drag-handle" size="0.875em" />
+              <span class="chat-tab-label">{{ tab.title || 'New Chat' }}</span>
+              <q-icon
+                name="close"
+                size="0.875em"
+                class="chat-tab-close"
+                @click.stop="closeTab(tab.key)"
+              />
+            </button>
+            <button class="chat-tab-add-btn" @click="addNewTab" :title="'New chat tab'">
+              <q-icon name="add" size="1em" />
+            </button>
+          </div>
+          <!-- =============================== [TABS] END =============================== -->
+
+          <div class="chat-header-actions tw:flex tw:items-center tw:flex-shrink-0">
             <!-- Edit title button -->
             <q-btn
               v-if="currentChatId"
               flat
               round
               dense
-              size="md"
+              size="sm"
               icon="edit"
               @click.stop="openEditTitleDialog"
             >
               <q-tooltip :delay="500">Edit title</q-tooltip>
             </q-btn>
-            <q-btn flat round dense size="md" icon="add" @click="addNewChat" />
-            <q-btn flat round dense size="md" icon="close" @click="$emit('close')" />
+            <!-- [TABS] handler `onAddClick` (branches to addNewTab in fullscreen). If dropping
+                 tabs, change to `@click="addNewChat"` and remove the `v-if`. -->
+            <q-btn v-if="!isFullscreenActive" flat round dense size="sm" icon="add" @click="onAddClick" />
+            <q-btn
+              v-if="enableFullscreen"
+              flat
+              round
+              dense
+              size="sm"
+              :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+              @click="toggleFullscreen"
+            >
+              <q-tooltip :delay="500">{{ isFullscreen ? 'Exit fullscreen' : 'Fullscreen' }}</q-tooltip>
+            </q-btn>
+            <q-btn flat round dense size="sm" icon="close" @click="closeChat" />
           </div>
         </div>
       </div>
@@ -307,15 +386,17 @@
 
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
         <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
-          <div v-if="chatMessages.length === 0" class="welcome-section" :class="{ 'welcome-section--centered': centeredStart }">
+          <div v-if="chatMessages.length === 0" class="welcome-section" :class="{ 'welcome-section--centered': centeredStart || isFullscreenActive }">
             <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full">
               <img :src="o2AiTitleLogo" />
               <div class="tw:relative tw:inline-block">
                 <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 Assistant</span>
                 <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
               </div>
-              <!-- Input rendered here when centeredStart so it appears mid-screen -->
-              <div v-if="centeredStart" class="centered-input-wrap">
+              <!-- Personalized greeting (fullscreen empty state only) -->
+              <div v-if="isFullscreenActive" class="chat-greeting">{{ greeting }}</div>
+              <!-- Input rendered here when centeredStart or fullscreen so it appears mid-screen -->
+              <div v-if="centeredStart || isFullscreenActive" class="centered-input-wrap">
                 <div
                   class="unified-input-box"
                   :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
@@ -349,10 +430,21 @@
                     </div>
                   </div>
                 </div>
+                <!-- Suggested prompts (fullscreen empty state only) -->
+                <div v-if="isFullscreenActive" class="chat-suggested-prompts">
+                  <button
+                    v-for="prompt in suggestedPrompts"
+                    :key="prompt"
+                    class="chat-suggested-chip"
+                    @click="useSuggestedPrompt(prompt)"
+                  >
+                    {{ prompt }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-          <div v-for="(message, index) in processedMessages" 
+          <div v-for="(message, index) in processedMessages"
             :key="index" 
             class="message" 
             :class="[
@@ -902,7 +994,7 @@
         </div>
       </div>
 
-      <div v-if="!(centeredStart && chatMessages.length === 0)" class="chat-input-container q-ma-md">
+      <div v-if="!((centeredStart || isFullscreenActive) && chatMessages.length === 0)" class="chat-input-container q-ma-md">
         <!-- Confirmation dialog -->
         <O2AIConfirmDialog
           :visible="pendingConfirmation !== null"
@@ -1044,6 +1136,7 @@
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script lang="ts">
@@ -1060,11 +1153,13 @@ import { useStore } from 'vuex';
 import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { matThumbUpAlt, matThumbDownAlt } from '@quasar/extras/material-icons';
-import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
+import { getImageURL, getUUIDv7, useLocalTimezone } from '@/utils/zincutils';
+import moment from 'moment-timezone';
 import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/ts/interfaces/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
+import HomeChatHistory from '@/views/HomeChatHistory.vue';
 import { useChatHistory } from '@/composables/useChatHistory';
 import { useAiDashboardEvents, getDashboardEventType } from '@/composables/useAiDashboardEvents';
 
@@ -1106,6 +1201,7 @@ export default defineComponent({
     ConfirmDialog,
     RichTextInput,
     O2AIConfirmDialog,
+    HomeChatHistory,
   },
   props: {
     isOpen: {
@@ -1132,11 +1228,91 @@ export default defineComponent({
     centeredStart: {
       type: Boolean,
       default: false
+    },
+    enableFullscreen: {
+      type: Boolean,
+      default: false
     }
   },
-  setup(props) {
+  emits: ['close'],
+  setup(props, { emit }) {
     const $q = useQuasar();
     const router = useRouter();
+    const FULLSCREEN_LS_KEY = 'o2-ai-chat-fullscreen';
+    const isFullscreen = ref<boolean>(
+      props.enableFullscreen
+        ? (() => { try { return localStorage.getItem(FULLSCREEN_LS_KEY) === '1'; } catch { return false; } })()
+        : false
+    );
+    watch(isFullscreen, (val) => {
+      if (!props.enableFullscreen) return;
+      try { localStorage.setItem(FULLSCREEN_LS_KEY, val ? '1' : '0'); } catch { /* ignore */ }
+    });
+    // Lock body scroll while the fullscreen overlay is actually visible.
+    const fullscreenActive = computed(() => props.enableFullscreen && isFullscreen.value && props.isOpen);
+    watch(fullscreenActive, (active) => {
+      try {
+        if (active) document.body.classList.add('o2-chat-fullscreen-lock');
+        else document.body.classList.remove('o2-chat-fullscreen-lock');
+      } catch { /* ignore */ }
+    }, { immediate: true });
+    const toggleFullscreen = () => {
+      if (!props.enableFullscreen) return;
+      isFullscreen.value = !isFullscreen.value;
+    };
+    const closeChat = () => {
+      // Don't reset isFullscreen here — preserve the user's preference for next open.
+      emit('close');
+    };
+
+    // Sidebar (HomeChatHistory) collapse/expand for fullscreen mode
+    const SIDEBAR_LS_KEY = 'o2-ai-chat-sidebar-collapsed';
+    const isSidebarCollapsed = ref<boolean>(
+      (() => { try { return localStorage.getItem(SIDEBAR_LS_KEY) === '1'; } catch { return false; } })(),
+    );
+    const toggleSidebar = () => {
+      isSidebarCollapsed.value = !isSidebarCollapsed.value;
+    };
+    watch(isSidebarCollapsed, (val) => {
+      try { localStorage.setItem(SIDEBAR_LS_KEY, val ? '1' : '0'); } catch { /* ignore */ }
+    });
+
+    // Personalized greeting + suggested prompts for the empty-state in fullscreen mode
+    const userDisplayName = computed(() => {
+      const info = store.state.userInfo;
+      const name = info?.name?.trim();
+      if (name) return name.split(/\s+/)[0];
+      const email = info?.email?.trim();
+      if (email) return email.split('@')[0];
+      return '';
+    });
+    const greeting = computed(() => {
+      const tz = useLocalTimezone() || moment.tz.guess();
+      const hr = moment().tz(tz).hour();
+      const part = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+      const name = userDisplayName.value;
+      return name ? `${part}, ${name}` : part;
+    });
+    const suggestedPrompts = [
+      'Find errors in the last hour',
+      'Summarize my logs from today',
+      'Show me slow API calls',
+      'Build a SQL query for me',
+    ];
+    const useSuggestedPrompt = (prompt: string) => {
+      inputMessage.value = prompt;
+      try { chatInput.value?.focus?.(); } catch { /* ignore */ }
+    };
+    // Close the chat when the user navigates between pages while it's open (only for the
+    // global/fullscreen-enabled panel; embedded dialog instances manage their own lifecycle).
+    watch(() => router.currentRoute.value.fullPath, (newPath, oldPath) => {
+      if (!props.enableFullscreen || !props.isOpen || newPath === oldPath) return;
+      closeChat();
+    });
+    // Release the body scroll lock if the chat unmounts while fullscreen.
+    onUnmounted(() => {
+      try { document.body.classList.remove('o2-chat-fullscreen-lock'); } catch { /* ignore */ }
+    });
     const inputMessage = ref(props.aiChatInputContext ? props.aiChatInputContext : '');
     const chatMessages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
@@ -4752,6 +4928,251 @@ export default defineComponent({
       );
     });
 
+    // ============================== [TABS] BEGIN ==============================
+    // Fullscreen tabs implementation: per-tab state, drag-to-reorder, drafts, localStorage
+    // persistence. To remove tabs entirely, delete this whole block down to the [TABS] END
+    // marker, plus the corresponding return entries below, plus the [TABS] template/style
+    // sections.
+    type Tab = { key: string; chatId: number | null; title: string };
+    const tabs = ref<Tab[]>([]);
+    const activeTabKey = ref<string>('');
+    const tabDrafts = new Map<string, { input: string; images: ImageAttachment[] }>();
+    const isFullscreenActive = computed(
+      () => props.enableFullscreen && isFullscreen.value && props.isOpen,
+    );
+    const genTabKey = () => `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const TABS_LS_KEY = 'o2-ai-chat-tabs';
+    const ACTIVE_TAB_LS_KEY = 'o2-ai-chat-active-tab';
+
+    const persistTabs = () => {
+      if (!props.enableFullscreen) return;
+      try {
+        const persistable = tabs.value
+          .filter(t => t.chatId !== null)
+          .map(t => ({ chatId: t.chatId, title: t.title }));
+        localStorage.setItem(TABS_LS_KEY, JSON.stringify(persistable));
+        const active = tabs.value.find(t => t.key === activeTabKey.value);
+        const activeId = active?.chatId;
+        if (activeId !== null && activeId !== undefined) {
+          localStorage.setItem(ACTIVE_TAB_LS_KEY, String(activeId));
+        } else {
+          localStorage.removeItem(ACTIVE_TAB_LS_KEY);
+        }
+      } catch { /* ignore */ }
+    };
+
+    const restoreTabsFromStorage = async (): Promise<{ success: boolean; storedActiveChatId: number | null }> => {
+      if (!props.enableFullscreen) return { success: false, storedActiveChatId: null };
+      try {
+        const raw = localStorage.getItem(TABS_LS_KEY);
+        if (!raw) return { success: false, storedActiveChatId: null };
+        const stored = JSON.parse(raw) as Array<{ chatId: number; title: string }>;
+        if (!Array.isArray(stored) || stored.length === 0) {
+          return { success: false, storedActiveChatId: null };
+        }
+        // Validate: drop chatIds that no longer exist in history.
+        const allHistory = await dbLoadHistory();
+        const validIds = new Set(allHistory.map(h => h.id));
+        const valid = stored.filter(t => typeof t.chatId === 'number' && validIds.has(t.chatId));
+        if (valid.length === 0) return { success: false, storedActiveChatId: null };
+        tabs.value = valid.map(t => ({ key: genTabKey(), chatId: t.chatId, title: t.title }));
+
+        let storedActiveChatId: number | null = null;
+        const activeRaw = localStorage.getItem(ACTIVE_TAB_LS_KEY);
+        if (activeRaw) {
+          const parsed = parseInt(activeRaw, 10);
+          if (!isNaN(parsed) && validIds.has(parsed)) storedActiveChatId = parsed;
+        }
+        return { success: true, storedActiveChatId };
+      } catch {
+        return { success: false, storedActiveChatId: null };
+      }
+    };
+
+    const saveDraftForActiveTab = () => {
+      if (!activeTabKey.value) return;
+      tabDrafts.set(activeTabKey.value, {
+        input: inputMessage.value || '',
+        images: [...(pendingImages.value || [])],
+      });
+    };
+    const restoreDraftForActiveTab = () => {
+      const draft = tabDrafts.get(activeTabKey.value);
+      inputMessage.value = draft?.input ?? '';
+      pendingImages.value = draft?.images ?? [];
+    };
+
+    const ensureInitialTab = () => {
+      if (tabs.value.length > 0) return;
+      const tab: Tab = {
+        key: genTabKey(),
+        chatId: currentChatId.value,
+        title: displayedTitle.value || 'New Chat',
+      };
+      tabs.value.push(tab);
+      activeTabKey.value = tab.key;
+    };
+
+    const switchToTab = async (key: string) => {
+      if (key === activeTabKey.value) return;
+      const tab = tabs.value.find(t => t.key === key);
+      if (!tab) return;
+      saveDraftForActiveTab();
+      activeTabKey.value = key;
+      if (tab.chatId === null) {
+        if (currentChatId.value !== null) addNewChat();
+      } else if (tab.chatId !== currentChatId.value) {
+        await loadChat(tab.chatId);
+      }
+      restoreDraftForActiveTab();
+    };
+
+    const addNewTab = () => {
+      saveDraftForActiveTab();
+      const tab: Tab = { key: genTabKey(), chatId: null, title: 'New Chat' };
+      tabs.value.push(tab);
+      activeTabKey.value = tab.key;
+      addNewChat();
+      restoreDraftForActiveTab();
+    };
+
+    const closeTab = (key: string) => {
+      const idx = tabs.value.findIndex(t => t.key === key);
+      if (idx === -1) return;
+      const wasActive = key === activeTabKey.value;
+      tabs.value.splice(idx, 1);
+      tabDrafts.delete(key);
+      if (tabs.value.length === 0) {
+        addNewTab();
+        return;
+      }
+      if (wasActive) {
+        const next = tabs.value[idx] || tabs.value[idx - 1];
+        if (next) switchToTab(next.key);
+      }
+    };
+
+    // Drag-to-reorder (mirrors HomeView's tab bar pattern)
+    const draggingTabKey = ref<string | null>(null);
+    const dragOverTabKey = ref<string | null>(null);
+    const onTabDragStart = (e: DragEvent, key: string) => {
+      draggingTabKey.value = key;
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', key);
+      }
+    };
+    const onTabDragEnter = (key: string) => {
+      dragOverTabKey.value = key;
+    };
+    const onTabDragEnd = () => {
+      draggingTabKey.value = null;
+      dragOverTabKey.value = null;
+    };
+    const onTabDrop = (e: DragEvent) => {
+      e.preventDefault();
+      const fromKey = e.dataTransfer?.getData('text/plain') || draggingTabKey.value;
+      const toKey = dragOverTabKey.value;
+      draggingTabKey.value = null;
+      dragOverTabKey.value = null;
+      if (!fromKey || !toKey || fromKey === toKey) return;
+      const fromIdx = tabs.value.findIndex(t => t.key === fromKey);
+      const toIdx = tabs.value.findIndex(t => t.key === toKey);
+      if (fromIdx === -1 || toIdx === -1) return;
+      const next = [...tabs.value];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      tabs.value = next;
+    };
+
+    const onSidebarLoadChat = (id: number) => {
+      const existing = tabs.value.find(t => t.chatId === id);
+      if (existing) {
+        if (existing.key !== activeTabKey.value) switchToTab(existing.key);
+        return;
+      }
+      saveDraftForActiveTab();
+      const tab: Tab = { key: genTabKey(), chatId: id, title: '' };
+      tabs.value.push(tab);
+      activeTabKey.value = tab.key;
+      loadChat(id);
+      restoreDraftForActiveTab();
+    };
+
+    const onSidebarNewChat = () => addNewTab();
+
+    const onAddClick = () => {
+      if (isFullscreenActive.value) addNewTab();
+      else addNewChat();
+    };
+
+    // Sync the active tab's chatId/title when they change from anywhere (loadChat, addNewChat,
+    // edit-title save, etc.). If the new chatId already has a tab, switch to it instead of
+    // duplicating.
+    watch(currentChatId, (newId) => {
+      if (!isFullscreenActive.value || tabs.value.length === 0) return;
+      if (newId !== null) {
+        const existing = tabs.value.find(t => t.chatId === newId);
+        if (existing && existing.key !== activeTabKey.value) {
+          activeTabKey.value = existing.key;
+          return;
+        }
+      }
+      const active = tabs.value.find(t => t.key === activeTabKey.value);
+      if (active) active.chatId = newId;
+    });
+    watch(displayedTitle, (newTitle) => {
+      if (!isFullscreenActive.value) return;
+      const active = tabs.value.find(t => t.key === activeTabKey.value);
+      if (active) active.title = newTitle || 'New Chat';
+    });
+    // When the user enters fullscreen, restore tabs from localStorage (if any), then ensure the
+    // currently-loaded chat is reflected as the active tab. We DON'T clear tabs when leaving
+    // fullscreen — they're preserved (and persisted) so re-entering shows them as before.
+    const reconcileActiveTabWithCurrentChat = () => {
+      const matching = tabs.value.find(t => t.chatId === currentChatId.value);
+      if (matching) {
+        activeTabKey.value = matching.key;
+        return;
+      }
+      // No tab matches the chat the user is currently viewing — add one and make it active.
+      const tab: Tab = {
+        key: genTabKey(),
+        chatId: currentChatId.value,
+        title: displayedTitle.value || 'New Chat',
+      };
+      tabs.value.push(tab);
+      activeTabKey.value = tab.key;
+    };
+    watch(isFullscreenActive, async (active) => {
+      if (!active) return;
+      if (tabs.value.length === 0) {
+        const result = await restoreTabsFromStorage();
+        if (!result.success) {
+          ensureInitialTab();
+          return;
+        }
+        // Prefer the user's currently-loaded chat as active if it matches a restored tab.
+        // Otherwise fall back to the previously-stored active chat. Otherwise the first tab.
+        const targetChatId =
+          (currentChatId.value !== null && tabs.value.find(t => t.chatId === currentChatId.value))
+            ? currentChatId.value
+            : (result.storedActiveChatId ?? tabs.value[0].chatId);
+        const target = tabs.value.find(t => t.chatId === targetChatId) ?? tabs.value[0];
+        activeTabKey.value = target.key;
+        if (target.chatId !== null && target.chatId !== currentChatId.value) {
+          await loadChat(target.chatId);
+        }
+        return;
+      }
+      reconcileActiveTabWithCurrentChat();
+    });
+
+    // Persist tabs + active tab to localStorage so reopening fullscreen restores them.
+    watch([tabs, activeTabKey], persistTabs, { deep: true });
+    // =============================== [TABS] END ===============================
+
     return {
       inputMessage,
       chatMessages,
@@ -4855,6 +5276,30 @@ export default defineComponent({
       closeImagePreview,
       contextReferences,
       handleReferencesUpdate,
+      isFullscreen,
+      toggleFullscreen,
+      closeChat,
+      isFullscreenActive,
+      isSidebarCollapsed,
+      toggleSidebar,
+      greeting,
+      suggestedPrompts,
+      useSuggestedPrompt,
+      // ============================== [TABS] BEGIN ==============================
+      tabs,
+      activeTabKey,
+      switchToTab,
+      closeTab,
+      addNewTab,
+      onSidebarLoadChat,
+      onSidebarNewChat,
+      onAddClick,
+      draggingTabKey,
+      onTabDragStart,
+      onTabDragEnter,
+      onTabDragEnd,
+      onTabDrop,
+      // =============================== [TABS] END ===============================
     }
   }
 });
@@ -4871,6 +5316,307 @@ export default defineComponent({
   background-color: var(--o2-card-bg);
   border-radius: 0.375rem;
   box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
+
+  &.chat-fullscreen {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+    box-shadow: none;
+    z-index: 4500;
+    flex-direction: row;
+    background-color: var(--q-page-background, #ffffff);
+
+    &.dark-mode {
+      background-color: #1a1a1a;
+    }
+
+    .chat-fullscreen-sidebar-wrap {
+      position: relative;
+      height: 100%;
+      width: 15em;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--o2-border-color);
+      background: var(--o2-card-bg);
+      transition: width 0.18s ease;
+
+      &.is-collapsed {
+        width: 44px;
+      }
+    }
+
+    .chat-sidebar-toggle {
+      position: absolute;
+      top: 8px;
+      right: 6px;
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--o2-text-muted);
+      z-index: 2;
+      transition: background 0.12s, color 0.12s;
+
+      &:hover {
+        background: var(--o2-hover-gray);
+        color: var(--o2-text-primary);
+      }
+    }
+
+    .chat-fullscreen-sidebar-wrap.is-collapsed .chat-sidebar-toggle {
+      right: auto;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .chat-fullscreen-sidebar {
+      height: 100%;
+      width: 100%;
+      flex-shrink: 0;
+
+      :deep(.hch-root) {
+        width: 100%;
+        border-right: none;
+      }
+      :deep(.hch-header) {
+        padding-right: 36px;
+      }
+    }
+
+    // Centered empty-state greeting + suggested prompt chips
+    .chat-greeting {
+      margin-top: 12px;
+      font-size: 1.75rem;
+      font-weight: 400;
+      color: var(--q-primary-text);
+      text-align: center;
+      letter-spacing: -0.01em;
+    }
+
+    .chat-suggested-prompts {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 16px;
+      padding: 0 8px;
+    }
+
+    .chat-suggested-chip {
+      background: transparent;
+      border: 1px solid var(--o2-border-color);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 0.8125rem;
+      color: var(--o2-text-muted);
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+
+      &:hover {
+        background: var(--o2-hover-gray);
+        color: var(--q-primary-text);
+        border-color: var(--o2-text-muted);
+      }
+    }
+
+    .chat-content-wrapper {
+      flex: 1;
+      min-width: 0;
+      background-color: var(--q-page-background, #ffffff);
+    }
+
+    &.dark-mode .chat-content-wrapper {
+      background-color: #1a1a1a;
+    }
+
+    // ============================== [TABS] BEGIN ==============================
+    // Header overrides so the tab strip sits flush. Remove if dropping tabs.
+    .chat-content-wrapper > .chat-header {
+      padding: 0 0 0 0;
+      border-bottom: none;
+      align-items: stretch;
+      background: transparent;
+    }
+
+    .chat-content-wrapper > .chat-header > .chat-title {
+      align-items: stretch;
+    }
+
+    .chat-content-wrapper > .chat-header + .q-separator {
+      display: none;
+    }
+
+    // Header-action buttons should align to the bottom (in line with the tab strip).
+    .chat-header-actions {
+      align-self: flex-end;
+      padding: 0 8px 4px 4px;
+    }
+    // =============================== [TABS] END ===============================
+  }
+
+  // ============================== [TABS] BEGIN ==============================
+  // Chrome-style tab bar
+  .chat-tab-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    padding: 0 4px 0 8px;
+    background: var(--o2-tab-bar-bg, rgba(0, 0, 0, 0.04));
+    border-radius: 0;
+
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: var(--q-separator-color);
+      border-radius: 2px;
+    }
+  }
+
+  .chat-tab-btn {
+    position: relative;
+    background: transparent;
+    border: none;
+    padding: 0.4rem 0.5rem 0.4rem 0.625rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--o2-text-muted);
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    user-select: none;
+    // Chrome-style: tabs share available space, shrink toward a minimum, then horizontal scroll
+    flex: 1 1 220px;
+    min-width: 60px;
+    max-width: 220px;
+    height: 30px;
+    border-radius: 8px 8px 0 0;
+    overflow: hidden;
+
+    // Subtle vertical separator between adjacent inactive tabs
+    &:not(.chat-tab-active) + .chat-tab-btn:not(.chat-tab-active)::before {
+      content: '';
+      position: absolute;
+      left: -1px;
+      top: 25%;
+      bottom: 25%;
+      width: 1px;
+      background: var(--q-separator-color);
+    }
+
+    &:hover {
+      background-color: var(--o2-tab-hover-bg, rgba(0, 0, 0, 0.06));
+      color: var(--q-primary-text);
+
+      .chat-tab-drag-handle,
+      .chat-tab-close {
+        opacity: 0.6;
+      }
+    }
+  }
+
+  .chat-tab-drag-handle {
+    opacity: 0;
+    transition: opacity 0.15s;
+    cursor: grab;
+    flex-shrink: 0;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  .chat-tab-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .chat-tab-close {
+    opacity: 0;
+    transition: opacity 0.15s, background-color 0.15s;
+    flex-shrink: 0;
+    border-radius: 50%;
+    padding: 2px;
+
+    &:hover {
+      opacity: 1 !important;
+      background-color: var(--q-hover-color);
+    }
+  }
+
+  .chat-tab-dragging {
+    opacity: 0.4;
+  }
+
+  // Active tab "raises" out of the bar — same background as the content area so it appears
+  // seamlessly connected to the messages panel below.
+  .chat-tab-active {
+    background-color: var(--q-page-background, #ffffff) !important;
+    color: var(--q-primary-text) !important;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.04);
+    z-index: 1;
+
+    .chat-tab-close {
+      opacity: 0.6;
+    }
+  }
+
+  .chat-tab-add-btn {
+    background: none;
+    border: none;
+    padding: 0.375rem 0.5rem;
+    color: var(--o2-text-muted);
+    cursor: pointer;
+    border-radius: 50%;
+    margin: 0 4px 2px 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    transition: background-color 0.15s, color 0.15s;
+
+    &:hover {
+      color: var(--q-primary-text);
+      background-color: var(--o2-tab-hover-bg, rgba(0, 0, 0, 0.08));
+    }
+  }
+
+  // Dark mode adjustments
+  &.dark-mode .chat-tab-bar {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  &.dark-mode .chat-tab-btn:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+  &.dark-mode .chat-tab-active {
+    background-color: #1a1a1a !important;
+  }
+  &.dark-mode .chat-tab-add-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  // =============================== [TABS] END ===============================
 
   .chat-content-wrapper {
     display: flex;
@@ -4896,15 +5642,16 @@ export default defineComponent({
     }
 
     .chat-title-dropdown {
-      padding: 6px 12px;
+      padding: 6px 8px;
       border-radius: 4px;
       transition: background-color 0.2s;
-      max-width: 210px;
       height: 32px;
       min-height: 32px;
+      min-width: 0;
       display: flex;
       align-items: center;
       overflow: hidden;
+      flex-shrink: 1;
 
       &:hover {
         background-color: var(--q-hover-color);
@@ -4918,7 +5665,14 @@ export default defineComponent({
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        max-width: 180px;
+        min-width: 0;
+      }
+    }
+
+    .chat-header-actions {
+      .q-btn {
+        padding: 4px;
+        min-height: 0;
       }
     }
   }
@@ -5685,17 +6439,27 @@ export default defineComponent({
 
 .clear-all-container {
   background: var(--q-page-background);
-  padding: 8px;
+  padding: 6px 8px;
   border-top: 1px solid var(--q-separator-color);
   flex-shrink: 0;
 
   .clear-all-btn {
     width: 100%;
     color: var(--q-negative);
-    font-size: 13px;
+    font-size: 12.5px;
+    font-weight: 500;
+    border-radius: 6px;
+    padding: 6px 10px;
+    justify-content: flex-start;
+    gap: 6px;
+    transition: background-color 0.2s, color 0.2s;
+
+    :deep(.q-icon) {
+      font-size: 1.1em;
+    }
 
     &:hover {
-      background-color: rgba(var(--q-negative-rgb), 0.1);
+      background-color: rgba(var(--q-negative-rgb), 0.08);
     }
   }
 }
@@ -6651,5 +7415,11 @@ export default defineComponent({
     color: #ffdcd7;
     background-color: #67060c;
   }
+}
+</style>
+
+<style lang="scss">
+body.o2-chat-fullscreen-lock {
+  overflow: hidden !important;
 }
 </style> 

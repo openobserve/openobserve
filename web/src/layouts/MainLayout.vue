@@ -112,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <O2AIChat
           :header-height="42.5"
           :is-open="store.state.isAiChatEnabled"
+          :enable-fullscreen="true"
           @close="closeChat"
           :aiChatInputContext="aiChatInputContext"
           :appendMode="aiChatAppendMode"
@@ -1201,6 +1202,7 @@ export default defineComponent({
       sendToAiChat,
       aiChatInputContext,
       aiChatAppendMode,
+      aiChatPayload,
       userClickedOrg,
       searchQuery,
       filteredOrganizations,
