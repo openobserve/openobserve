@@ -566,4 +566,89 @@ mod tests {
         invalid.user_id = None;
         assert!(invalid.validate().is_err());
     }
+
+    #[test]
+    fn test_system_setting_skip_serializing_if_none_fields_absent() {
+        let s = SystemSetting::new_system("key1", serde_json::json!(1));
+        let json = serde_json::to_value(&s).unwrap();
+        let obj = json.as_object().unwrap();
+        // All optional fields are None → skip_serializing_if omits them
+        assert!(!obj.contains_key("id"));
+        assert!(!obj.contains_key("org_id"));
+        assert!(!obj.contains_key("user_id"));
+        assert!(!obj.contains_key("setting_category"));
+        assert!(!obj.contains_key("description"));
+        assert!(!obj.contains_key("created_by"));
+        assert!(!obj.contains_key("updated_by"));
+    }
+
+    #[test]
+    fn test_system_setting_skip_serializing_if_some_fields_present() {
+        let mut s = SystemSetting::new_system("key2", serde_json::json!(2));
+        s.id = Some(42);
+        s.setting_category = Some("search".to_string());
+        s.description = Some("desc".to_string());
+        s.created_by = Some("user@example.com".to_string());
+        s.updated_by = Some("admin@example.com".to_string());
+        let json = serde_json::to_value(&s).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("id"));
+        assert_eq!(obj["id"], serde_json::json!(42));
+        assert!(obj.contains_key("setting_category"));
+        assert!(obj.contains_key("description"));
+        assert!(obj.contains_key("created_by"));
+        assert!(obj.contains_key("updated_by"));
+    }
+
+    #[test]
+    fn test_system_setting_payload_skip_serializing_if_none() {
+        let p = SystemSettingPayload {
+            setting_key: "k".to_string(),
+            setting_value: serde_json::json!(true),
+            setting_category: None,
+            description: None,
+        };
+        let json = serde_json::to_value(&p).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("setting_category"));
+        assert!(!obj.contains_key("description"));
+    }
+
+    #[test]
+    fn test_system_setting_payload_skip_serializing_if_some() {
+        let p = SystemSettingPayload {
+            setting_key: "k".to_string(),
+            setting_value: serde_json::json!(false),
+            setting_category: Some("ui".to_string()),
+            description: Some("some desc".to_string()),
+        };
+        let json = serde_json::to_value(&p).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("setting_category"));
+        assert!(obj.contains_key("description"));
+    }
+
+    #[test]
+    fn test_resolved_settings_sources_skip_serializing_if() {
+        let mut settings = std::collections::HashMap::new();
+        settings.insert("key1".to_string(), serde_json::json!("val"));
+
+        let no_sources = ResolvedSettings {
+            settings: settings.clone(),
+            sources: None,
+        };
+        let json = serde_json::to_value(&no_sources).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("sources"));
+
+        let with_sources = ResolvedSettings {
+            settings,
+            sources: Some({
+                let mut m = std::collections::HashMap::new();
+                m.insert("key1".to_string(), SettingScope::System);
+                m
+            }),
+        };
+        let json = serde_json::to_value(&with_sources).unwrap();
+        assert!(json.as_object().unwrap().contains_key("sources"));
+    }
 }

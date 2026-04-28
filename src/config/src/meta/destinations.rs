@@ -739,4 +739,73 @@ mod tests {
         let p0: serde_json::Value = serde_json::from_str(parts[0]).unwrap();
         assert_eq!(p0["x"], 1);
     }
+
+    #[test]
+    fn test_endpoint_none_optional_fields_absent_from_json() {
+        let ep = Endpoint {
+            url: "http://example.com".to_string(),
+            method: HTTPType::POST,
+            skip_tls_verify: false,
+            headers: None,
+            action_id: None,
+            output_format: None,
+            destination_type: None,
+            metadata: HashMap::new(),
+        };
+        let json = serde_json::to_value(&ep).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("headers"));
+        assert!(!obj.contains_key("action_id"));
+        assert!(!obj.contains_key("output_format"));
+        assert!(!obj.contains_key("destination_type"));
+    }
+
+    #[test]
+    fn test_endpoint_some_optional_fields_present_in_json() {
+        let mut headers = HashMap::new();
+        headers.insert("X-Token".to_string(), "abc".to_string());
+        let ep = Endpoint {
+            url: "http://example.com".to_string(),
+            method: HTTPType::GET,
+            skip_tls_verify: false,
+            headers: Some(headers),
+            action_id: Some("act1".to_string()),
+            output_format: Some(HTTPOutputFormat::JSON),
+            destination_type: Some("custom".to_string()),
+            metadata: HashMap::new(),
+        };
+        let json = serde_json::to_value(&ep).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("headers"));
+        assert!(obj.contains_key("action_id"));
+        assert!(obj.contains_key("output_format"));
+        assert!(obj.contains_key("destination_type"));
+    }
+
+    #[test]
+    fn test_module_alert_template_none_absent_from_json() {
+        let module = Module::Alert {
+            template: None,
+            destination_type: DestinationType::Http(Endpoint::default()),
+        };
+        let json = serde_json::to_value(&module).unwrap();
+        // Module is externally tagged: {"alert": {...inner...}}
+        let inner = json.get("alert").unwrap();
+        let obj = inner.as_object().unwrap();
+        assert!(!obj.contains_key("template"));
+    }
+
+    #[test]
+    fn test_module_alert_template_some_present_in_json() {
+        let module = Module::Alert {
+            template: Some("my_template".to_string()),
+            destination_type: DestinationType::Http(Endpoint::default()),
+        };
+        let json = serde_json::to_value(&module).unwrap();
+        // Module is externally tagged: {"alert": {...inner...}}
+        let inner = json.get("alert").unwrap();
+        let obj = inner.as_object().unwrap();
+        assert!(obj.contains_key("template"));
+        assert_eq!(obj["template"], serde_json::json!("my_template"));
+    }
 }
