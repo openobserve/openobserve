@@ -444,6 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               patternsState?.patterns?.statistics?.total_logs_analyzed
             "
             :wrap="searchObj.meta.toggleSourceWrap"
+            :scroll-target="scrollContainerRef"
             @open-details="openPatternDetails"
             @add-to-search="addPatternToSearch"
             @create-alert="createAlertFromPattern"

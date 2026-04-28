@@ -36,8 +36,6 @@ describe("SearchResult Component", () => {
     // jsdom does not implement HTMLElement.scrollTo
     HTMLElement.prototype.scrollTo = vi.fn();
 
-    Object.defineProperty(HTMLElement.prototype, "scrollTo", vi.fn());
-
     // Mock store state
     store.state.zoConfig = {
       sql_mode: false,
