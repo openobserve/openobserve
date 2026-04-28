@@ -30,7 +30,7 @@ pub struct SetupStorageRequest {
 #[derive(Serialize)]
 struct GetStorageResponse {
     provider: Option<ProviderType>,
-    data: String,
+    data: serde_json::Value,
     created_at: i64,
     updated_at: i64,
 }
@@ -159,15 +159,18 @@ pub async fn save(Path(org_id): Path<String>, Json(body): Json<SetupStorageReque
 )]
 pub async fn get(Path(org_id): Path<String>) -> Response {
     match crate::service::org_storage_providers::get_redacted_config(&org_id).await {
-        Ok(Some(v)) => HttpResponse::json(GetStorageResponse {
-            provider: Some(v.provider_type),
-            data: v.data,
-            created_at: v.created_at,
-            updated_at: v.updated_at,
-        }),
+        Ok(Some(v)) => {
+            let data_json: serde_json::Value = serde_json::from_str(&v.data).unwrap();
+            HttpResponse::json(GetStorageResponse {
+                provider: Some(v.provider_type),
+                data: data_json,
+                created_at: v.created_at,
+                updated_at: v.updated_at,
+            })
+        }
         Ok(None) => HttpResponse::json(GetStorageResponse {
             provider: None,
-            data: "".into(),
+            data: serde_json::Value::Null,
             created_at: 0,
             updated_at: 0,
         }),
