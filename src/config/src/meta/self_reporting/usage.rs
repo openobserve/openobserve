@@ -1451,6 +1451,68 @@ mod tests {
         assert!(obj.contains_key("grouped"));
         assert!(obj.contains_key("group_size"));
     }
+
+    #[test]
+    fn test_request_stats_optional_fields_absent_when_none() {
+        let stats = RequestStats {
+            node_name: None,
+            ..RequestStats::default()
+        };
+        let json = serde_json::to_value(&stats).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("function"));
+        assert!(!obj.contains_key("cached_ratio"));
+        assert!(!obj.contains_key("scan_files"));
+        assert!(!obj.contains_key("compressed_size"));
+        assert!(!obj.contains_key("min_ts"));
+        assert!(!obj.contains_key("max_ts"));
+        assert!(!obj.contains_key("user_email"));
+        assert!(!obj.contains_key("search_type"));
+        assert!(!obj.contains_key("trace_id"));
+        assert!(!obj.contains_key("took_wait_in_queue"));
+        assert!(!obj.contains_key("result_cache_ratio"));
+        assert!(!obj.contains_key("work_group"));
+        assert!(!obj.contains_key("node_name"));
+        assert!(!obj.contains_key("dashboard_info"));
+        assert!(!obj.contains_key("peak_memory_usage"));
+    }
+
+    #[test]
+    fn test_request_stats_optional_fields_present_when_some() {
+        let stats = RequestStats {
+            function: Some("my_fn".to_string()),
+            cached_ratio: Some(75),
+            scan_files: Some(10),
+            compressed_size: Some(1024.0),
+            min_ts: Some(1000),
+            max_ts: Some(2000),
+            user_email: Some("u@example.com".to_string()),
+            search_type: Some(SearchEventType::UI),
+            trace_id: Some("t123".to_string()),
+            took_wait_in_queue: Some(50),
+            result_cache_ratio: Some(80),
+            work_group: Some("wg1".to_string()),
+            node_name: Some("node1".to_string()),
+            peak_memory_usage: Some(256.0),
+            ..RequestStats::default()
+        };
+        let json = serde_json::to_value(&stats).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("function"));
+        assert!(obj.contains_key("cached_ratio"));
+        assert!(obj.contains_key("scan_files"));
+        assert!(obj.contains_key("compressed_size"));
+        assert!(obj.contains_key("min_ts"));
+        assert!(obj.contains_key("max_ts"));
+        assert!(obj.contains_key("user_email"));
+        assert!(obj.contains_key("search_type"));
+        assert!(obj.contains_key("trace_id"));
+        assert!(obj.contains_key("took_wait_in_queue"));
+        assert!(obj.contains_key("result_cache_ratio"));
+        assert!(obj.contains_key("work_group"));
+        assert!(obj.contains_key("node_name"));
+        assert!(obj.contains_key("peak_memory_usage"));
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
