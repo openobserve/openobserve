@@ -388,7 +388,9 @@
     "turnOnLiveMode": "Activa el modo Live",
     "turnOffLiveMode": "Desactivar el modo Live",
     "autoRunEnabled": "Ejecución automática habilitada",
-    "selectStreamFirst": "Selecciona primero una transmisión"
+    "selectStreamFirst": "Selecciona primero una transmisión",
+    "traces": "Huellas",
+    "switchToLogs": "haga clic para volver a Registros"
   },
   "menu": {
     "home": "Inicio",

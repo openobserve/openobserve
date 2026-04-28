@@ -388,7 +388,9 @@
     "turnOnLiveMode": "Aktiviere den Live-Modus",
     "turnOffLiveMode": "Schalten Sie den Live-Modus aus",
     "autoRunEnabled": "Automatischer Lauf aktiviert",
-    "selectStreamFirst": "Wähle zuerst einen Stream"
+    "selectStreamFirst": "Wähle zuerst einen Stream",
+    "traces": "Spuren",
+    "switchToLogs": "klicken Sie hier, um zurück zu Logs zu wechseln"
   },
   "menu": {
     "home": "Startseite",
