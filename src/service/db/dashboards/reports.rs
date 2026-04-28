@@ -13,10 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
+use chrono::FixedOffset;
 use config::meta::{
-    dashboards::reports::{ListReportsParams, Report},
+    dashboards::reports::{ListReportsParams, Report, ReportFrequencyType},
     folder::{DEFAULT_FOLDER, Folder, FolderType},
 };
+use cron::Schedule;
 use infra::table;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 
@@ -51,7 +55,23 @@ pub async fn create<C: ConnectionTrait + TransactionTrait>(
     report: Report,
 ) -> Result<String, anyhow::Error> {
     let org = report.org_id.clone();
-    let next_run_at = report.start;
+    let next_run_at = if report.frequency.frequency_type == ReportFrequencyType::Cron {
+        let tz_offset = FixedOffset::east_opt(report.tz_offset * 60)
+            .unwrap_or(FixedOffset::east_opt(0).unwrap());
+        match Schedule::from_str(&report.frequency.cron) {
+            Ok(schedule) => schedule
+                .upcoming(tz_offset)
+                .next()
+                .map(|t| t.timestamp_micros())
+                .unwrap_or(report.start),
+            Err(e) => {
+                log::error!("Failed to parse cron expression for report: {e}");
+                report.start
+            }
+        }
+    } else {
+        report.start
+    };
 
     let report_id = create_without_updating_trigger(conn, folder_snowflake_id, report).await?;
     let trigger = db::scheduler::Trigger {
@@ -74,7 +94,23 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     report: Report,
 ) -> Result<(), anyhow::Error> {
     let org_id = report.org_id.clone();
-    let next_run_at = report.start;
+    let next_run_at = if report.frequency.frequency_type == ReportFrequencyType::Cron {
+        let tz_offset = FixedOffset::east_opt(report.tz_offset * 60)
+            .unwrap_or(FixedOffset::east_opt(0).unwrap());
+        match Schedule::from_str(&report.frequency.cron) {
+            Ok(schedule) => schedule
+                .upcoming(tz_offset)
+                .next()
+                .map(|t| t.timestamp_micros())
+                .unwrap_or(report.start),
+            Err(e) => {
+                log::error!("Failed to parse cron expression for report: {e}");
+                report.start
+            }
+        }
+    } else {
+        report.start
+    };
 
     let report_id =
         update_without_updating_trigger(conn, folder_snowflake_id, new_folder_snowflake_id, report)
@@ -169,7 +205,23 @@ pub async fn update_by_id<C: ConnectionTrait + TransactionTrait>(
     report: Report,
 ) -> Result<(), anyhow::Error> {
     let org_id = report.org_id.clone();
-    let next_run_at = report.start;
+    let next_run_at = if report.frequency.frequency_type == ReportFrequencyType::Cron {
+        let tz_offset = FixedOffset::east_opt(report.tz_offset * 60)
+            .unwrap_or(FixedOffset::east_opt(0).unwrap());
+        match Schedule::from_str(&report.frequency.cron) {
+            Ok(schedule) => schedule
+                .upcoming(tz_offset)
+                .next()
+                .map(|t| t.timestamp_micros())
+                .unwrap_or(report.start),
+            Err(e) => {
+                log::error!("Failed to parse cron expression for report: {e}");
+                report.start
+            }
+        }
+    } else {
+        report.start
+    };
 
     let id =
         update_by_id_without_updating_trigger(conn, report_id, new_folder_snowflake_id, report)
