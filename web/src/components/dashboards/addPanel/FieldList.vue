@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : ''
         "
         :readonly="dashboardPanelDataPageKey === 'logs'"
+        :title="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream"
         hide-bottom-space
       >
         <template
@@ -174,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="props?.row?.isGroup"
                 class="tw:pl-2 tw:py-1 tw:font-semibold field-group-header"
+                :title="props?.row?.groupName"
               >
                 {{ props?.row?.groupName }}
               </div>

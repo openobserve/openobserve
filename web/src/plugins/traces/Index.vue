@@ -811,7 +811,11 @@ const showTraceDetailsError = () => {
 };
 
 const updateFieldValues = (data) => {
-  const excludedFields = [store.state.zoConfig.timestamp_column];
+  const excludedFields = [
+    store.state.zoConfig.timestamp_column,
+    "_start_time_ns",
+    "_end_time_ns",
+  ];
   data.forEach((item) => {
     // Create set for each field values and add values to corresponding set
     Object.keys(item).forEach((key) => {
@@ -1042,8 +1046,13 @@ async function getQueryData(
             updateFieldValues(rawHits);
 
             // load the field stored in localstorage and rebuild the columns
-            loadLocalLogFilterField(searchObj.meta.searchMode);
-            rebuildColumns();
+            if (
+              searchObj.meta.searchMode === "spans" ||
+              searchObj.meta.searchMode === "traces"
+            ) {
+              loadLocalLogFilterField(searchObj.meta.searchMode);
+              rebuildColumns();
+            }
           }
         },
         error: (_payload: any, err: any) => {
@@ -1145,7 +1154,11 @@ async function extractFields() {
     searchObj.data.stream.selectedStreamFields = [];
     if (searchObj.data.streamResults.list.length > 0) {
       const schema = [];
-      const ignoreFields = [store.state.zoConfig.timestamp_column];
+      const ignoreFields = [
+        store.state.zoConfig.timestamp_column,
+        "_start_time_ns",
+        "_end_time_ns",
+      ];
       let ftsKeys;
 
       const stream = await getStream(
@@ -1214,7 +1227,7 @@ async function extractFields() {
             name: rowName,
             ftsKey: ftsKeys.has(rowName),
             showValues: !idFields[rowName],
-            label: rowName === "duration" ? "duration (µs)" : rowName,
+            label: rowName,
             dataType: schemaTypeMap.get(rowName),
             isSchemaField: true,
           });
@@ -1420,6 +1433,12 @@ onUnmounted(() => {
 
 onActivated(async () => {
   setupContextProvider();
+
+  const savedAutoRun = localStorage.getItem("oo_toggle_auto_run");
+  if (savedAutoRun !== null) {
+    searchObj.meta.liveMode = savedAutoRun === "true";
+  }
+
   const params = router.currentRoute.value.query;
   if (params.reload === "true") {
     restoreUrlQueryParams();
@@ -1866,13 +1885,17 @@ watch(moveSplitter, () => {
   }
 });
 
-// Live mode: enable by default when auto_query_enabled flag is on.
-// zoConfig may not be populated yet at mount time; watch for it to arrive.
+// Live mode: when auto_query_enabled is true in zoConfig, always sync from
+// localStorage so the module-level singleton reflects the user's preference
+// even after navigating between pages. Defaults to true when no preference
+// has been saved yet. zoConfig may not be populated yet at mount time;
+// watch for it to arrive.
 watch(
   () => store.state.zoConfig?.auto_query_enabled,
   (enabled) => {
-    if (enabled && !searchObj.meta.liveMode) {
-      searchObj.meta.liveMode = true;
+    if (enabled) {
+      const saved = localStorage.getItem("oo_toggle_auto_run");
+      searchObj.meta.liveMode = saved === null ? true : saved === "true";
     }
   },
   { immediate: true },
@@ -1892,7 +1915,10 @@ const debouncedAutoRunOnQuery = debounce(() => {
 // Debounced auto-run on datetime changes in live mode.
 // Traces has no existing auto-run on datetime, so no guard needed.
 const debouncedAutoRunOnDatetime = debounce(() => {
+  // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (2500ms).
+  // Only auto-run here for relative time to avoid double-triggering.
   if (
+    searchObj.data.datetime.type === "relative" &&
     searchObj.meta.liveMode &&
     store.state.zoConfig?.auto_query_enabled &&
     !searchObj.loading

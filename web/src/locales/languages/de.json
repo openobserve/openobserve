@@ -1691,7 +1691,10 @@
     "streamTotal": "Streams",
     "totalDashboard": "Dashboards",
     "viewButton": "Ansicht",
-    "noDataAvailable": "Keine Daten verfügbar"
+    "noDataAvailable": "Keine Daten verfügbar",
+    "tabAiAssistant": "O2 KI-Assistent",
+    "tabOverview": "Überblick",
+    "tabUsage": "Verwendungszweck"
   },
   "billing": {
     "header": "Nutzung und Abrechnung",
@@ -3613,5 +3616,30 @@
     "errLoadModel": "Modell konnte nicht geladen werden",
     "tierDefaultName": "Standard",
     "tierConditionalName": "Bedingte Stufe"
+  },
+  "overview": {
+    "title": "Überblick über das System",
+    "activeAnomalies": "Aktive Anomalien",
+    "activeIncidents": "Aktive Vorfälle",
+    "services": "Dienstleistungen",
+    "recentEvents": "Aktuelle Ereignisse",
+    "investigate": "Untersuchen →",
+    "untitledIncident": "Unbenannter Vorfall",
+    "viewLatencyCharts": "Latenz- und RED-Diagramme anzeigen",
+    "elevatedErrorRate": "Erhöhte Fehlerrate",
+    "reqPerSec": "Anforderung/en",
+    "allClear": "Alles klar",
+    "allClearDesc": "Keine aktiven Anomalien, Vorfälle oder beeinträchtigte Dienste im ausgewählten Zeitfenster."
+  },
+  "chatHistory": {
+    "title": "Chats",
+    "newChat": "Neuer Chat",
+    "search": "Suche",
+    "noMatches": "Keine Treffer",
+    "noHistory": "Kein Chatverlauf",
+    "delete": "Löschen",
+    "clearAll": "Alles löschen",
+    "clearAllTitle": "Alle Chats löschen",
+    "clearAllMessage": "Dadurch wird der gesamte Chatverlauf dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
   }
 }

@@ -998,17 +998,24 @@ describe("TraceDetailsSidebar", async () => {
     // getFilterValue is explicitly returned from setup() and is part of the component's
     // public API. We call it directly here to unit-test its branching logic in isolation
     // before verifying the full emit path through DOM interaction below.
+    //
+    // RAW_VALUE_FILTER_FIELDS = new Set(["start_time", "end_time", <timestamp_column>])
+    // All three fields go through the same unified path: span[field] ?? displayValue.
+    // start_time and end_time arrive as nanosecond strings after NS-field patching in the
+    // search pipeline, so the tests use string fixtures to reflect the real runtime type.
 
-    it("should return the raw numeric start_time from props.span, not the display string", () => {
-      const displayValue = "some formatted date string";
-      const result = wrapper.vm.getFilterValue("start_time", displayValue);
-      expect(result).toBe(mockSpan.start_time);
+    it("should return the raw string start_time from props.span, not the formatted display string", async () => {
+      const rawStartTime = "1700000000123456789";
+      await wrapper.setProps({ span: { ...mockSpan, start_time: rawStartTime } });
+      const result = wrapper.vm.getFilterValue("start_time", "formatted-date");
+      expect(result).toBe(rawStartTime);
     });
 
-    it("should return the raw numeric end_time from props.span, not the display string", () => {
-      const displayValue = "some formatted date string";
-      const result = wrapper.vm.getFilterValue("end_time", displayValue);
-      expect(result).toBe(mockSpan.end_time);
+    it("should return the raw string end_time from props.span, not the formatted display string", async () => {
+      const rawEndTime = "1700000321495828456";
+      await wrapper.setProps({ span: { ...mockSpan, end_time: rawEndTime } });
+      const result = wrapper.vm.getFilterValue("end_time", "formatted-date");
+      expect(result).toBe(rawEndTime);
     });
 
     it("should return the display value unchanged for non-RAW_VALUE_FILTER_FIELDS (e.g. span_id)", () => {
@@ -1032,19 +1039,97 @@ describe("TraceDetailsSidebar", async () => {
       const result = wrapper.vm.getFilterValue("start_time", displayValue);
       expect(result).toBe(displayValue);
     });
+
+    it("should return the raw value for the configured timestamp column (@timestamp)", async () => {
+      // mockStore has zoConfig.timestamp_column = "@timestamp", so RAW_VALUE_FILTER_FIELDS
+      // includes "@timestamp". Mount a wrapper whose span contains @timestamp so the raw
+      // value can be returned rather than falling back to displayValue.
+      const rawTsValue = 9_999_999_999_999;
+      const spanWithTsCol = { ...mockSpan, "@timestamp": rawTsValue };
+      const tsWrapper = mount(TraceDetailsSidebar, {
+        attachTo: "#app",
+        props: { span: spanWithTsCol, baseTracePosition: mockBaseTracePosition, searchQuery: "" },
+        global: {
+          plugins: [i18n, router],
+          provide: { store: mockStore },
+          stubs: { "q-resize-observer": true, "q-virtual-scroll": { template: "<div><slot /></div>", props: ["items"] } },
+        },
+      });
+      await tsWrapper.vm.$nextTick();
+      const displayValue = "2025-07-14T10:14:52.843Z";
+      expect(tsWrapper.vm.getFilterValue("@timestamp", displayValue)).toBe(rawTsValue);
+      tsWrapper.unmount();
+    });
+
+    it("should return the display value unchanged for _timestamp when timestamp_column is @timestamp", () => {
+      // mockStore.zoConfig.timestamp_column = "@timestamp", so RAW_VALUE_FILTER_FIELDS
+      // is Set(["start_time", "end_time", "@timestamp"]).
+      // "_timestamp" is NOT in the set — display value must pass through unchanged.
+      const displayValue = "2025-07-14T10:14:52.843Z";
+      const result = wrapper.vm.getFilterValue("_timestamp", displayValue);
+      expect(result).toBe(displayValue);
+    });
+  });
+
+  describe("getFormattedSpanDetails — _start_time_ns / _end_time_ns are never injected", () => {
+    // The NS patching pipeline no longer injects _start_time_ns / _end_time_ns shadow
+    // fields onto span objects. getFormattedSpanDetails must therefore not expose them
+    // in the rendered attributes, and the component must not attempt to delete them.
+
+    it("should not render _start_time_ns in the attributes table", () => {
+      const attributesTable = wrapper.find(
+        '[data-test="trace-details-sidebar-attributes-table"]',
+      );
+      expect(attributesTable.exists()).toBe(true);
+      expect(attributesTable.text()).not.toContain("_start_time_ns");
+    });
+
+    it("should not render _end_time_ns in the attributes table", () => {
+      const attributesTable = wrapper.find(
+        '[data-test="trace-details-sidebar-attributes-table"]',
+      );
+      expect(attributesTable.exists()).toBe(true);
+      expect(attributesTable.text()).not.toContain("_end_time_ns");
+    });
+
+    it("should not expose _start_time_ns or _end_time_ns for the standard mockSpan which carries neither key", () => {
+      // The NS patching pipeline no longer injects _start_time_ns / _end_time_ns into spans.
+      // mockSpan represents a normal span that does not carry those keys, so they must not
+      // appear in the rendered attribute list.
+      expect(Object.prototype.hasOwnProperty.call(mockSpan, "_start_time_ns")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(mockSpan, "_end_time_ns")).toBe(false);
+
+      const attributesTable = wrapper.find(
+        '[data-test="trace-details-sidebar-attributes-table"]',
+      );
+      expect(attributesTable.exists()).toBe(true);
+      expect(attributesTable.text()).not.toContain("_start_time_ns");
+      expect(attributesTable.text()).not.toContain("_end_time_ns");
+    });
   });
 
   describe("apply-filter-immediately emit — getFilterValue called at the emit site", () => {
     // This describe block mounts a separate wrapper with JsonPreview stubbed to render
     // its #field-dropdown slot directly in the DOM (no q-btn-dropdown popup layer).
     // This lets us click the filter q-item without needing Quasar popup mechanics.
+    //
+    // start_time and end_time are provided as nanosecond strings to reflect the real
+    // runtime type after NS-field patching in the search pipeline.
     let filterWrapper: any;
+
+    const NS_START_TIME = "1700000000123456789";
+    const NS_END_TIME = "1700000321495828456";
 
     const mountWithInlineSlot = (spanOverrides: Record<string, unknown> = {}) =>
       mount(TraceDetailsSidebar, {
         attachTo: "#app",
         props: {
-          span: { ...mockSpan, ...spanOverrides },
+          span: {
+            ...mockSpan,
+            start_time: NS_START_TIME,
+            end_time: NS_END_TIME,
+            ...spanOverrides,
+          },
           baseTracePosition: mockBaseTracePosition,
           searchQuery: "",
         },
@@ -1093,16 +1178,12 @@ describe("TraceDetailsSidebar", async () => {
       filterWrapper?.unmount();
     });
 
-    it("should emit apply-filter-immediately with the raw start_time number, not the display string", async () => {
+    it("should emit apply-filter-immediately with the raw NS-string start_time, not the display string", async () => {
       // The stub renders the slot for every key. Find the q-item under the start_time field.
       const startTimeSlot = filterWrapper.find(
         '[data-test="json-preview-field-start_time"]',
       );
       expect(startTimeSlot.exists()).toBe(true);
-
-      const filterItem = startTimeSlot.find("div[class*='q-item'], .q-item, [role='option']");
-      // Fall back to finding by the q-item element directly
-      const qItem = startTimeSlot.find(".q-item") || startTimeSlot.findAll("*").find((el: any) => el.element.tagName === "DIV" && el.attributes("clickable") !== undefined);
 
       // Click the first q-item in the slot (the "=" filter action)
       const items = startTimeSlot.findAll(".q-item");
@@ -1113,12 +1194,12 @@ describe("TraceDetailsSidebar", async () => {
       expect(emitted).toBeTruthy();
       const lastEmit = emitted![emitted!.length - 1][0];
       expect(lastEmit.field).toBe("start_time");
-      // Must be the raw nanosecond integer from props.span, not the formatted date string
-      expect(lastEmit.value).toBe(mockSpan.start_time);
-      expect(typeof lastEmit.value).toBe("number");
+      // Must be the raw nanosecond string from props.span (as delivered by NS patching),
+      // not the formatted date string produced by getFormattedSpanDetails.
+      expect(lastEmit.value).toBe(NS_START_TIME);
     });
 
-    it("should emit apply-filter-immediately with the raw end_time number, not the display string", async () => {
+    it("should emit apply-filter-immediately with the raw NS-string end_time, not the display string", async () => {
       const endTimeSlot = filterWrapper.find(
         '[data-test="json-preview-field-end_time"]',
       );
@@ -1132,8 +1213,9 @@ describe("TraceDetailsSidebar", async () => {
       expect(emitted).toBeTruthy();
       const lastEmit = emitted![emitted!.length - 1][0];
       expect(lastEmit.field).toBe("end_time");
-      expect(lastEmit.value).toBe(mockSpan.end_time);
-      expect(typeof lastEmit.value).toBe("number");
+      // Must be the raw nanosecond string from props.span (as delivered by NS patching),
+      // not the formatted date string.
+      expect(lastEmit.value).toBe(NS_END_TIME);
     });
 
     it("should emit apply-filter-immediately with the display string unchanged for span_id", async () => {

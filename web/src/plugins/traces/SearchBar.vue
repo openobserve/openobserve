@@ -206,17 +206,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="searchData"
             :loading="isLoading"
             :disable="isLoading"
-            >
-              <q-tooltip v-if="searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled">{{ t("search.autoRunEnabled") }}</q-tooltip>
-              <q-icon
-                v-if="searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled"
-                name="autorenew"
-                size="14px"
-                class="q-mr-xs"
-              />
-              {{ t("search.runQuery") }}
-            </q-btn
           >
+            <q-tooltip
+              v-if="
+                searchObj.meta.liveMode &&
+                store.state.zoConfig.auto_query_enabled
+              "
+              >{{ t("search.autoRunEnabled") }}</q-tooltip
+            >
+            <q-icon
+              v-if="
+                searchObj.meta.liveMode &&
+                store.state.zoConfig.auto_query_enabled
+              "
+              name="autorenew"
+              size="14px"
+              class="q-mr-xs"
+            />
+            {{ t("search.runQuery") }}
+          </q-btn>
           <!-- Dropdown: shown when live mode feature is enabled -->
           <q-separator
             v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
@@ -239,7 +247,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section avatar class="tw:min-w-0 tw:pr-2">
                   <q-icon
-                    :name="searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'"
+                    :name="
+                      searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'
+                    "
                     size="16px"
                     :color="searchObj.meta.liveMode ? 'primary' : ''"
                   />
@@ -411,6 +421,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
+import { debounce } from "lodash-es";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -479,7 +490,6 @@ export default defineComponent({
     let parser: any;
     let streamName = "";
     const dateTimeRef = ref(null);
-
 
     const { getStream } = useStreams();
 
@@ -604,6 +614,24 @@ export default defineComponent({
       }
     };
 
+    // Debounced query trigger for absolute time when auto-run is enabled.
+    // Gives the user 2.5s to finish typing start/end time before firing.
+    const triggerAbsoluteQueryDebounced = debounce((value: object) => {
+      if (config.isCloud == "true" && value.userChangedValue) {
+        segment.track("Button Click", {
+          button: "Date Change",
+          tab: value.tab,
+          value: value,
+          stream_name: searchObj.data.stream.selectedStream.value,
+          page: "Search Logs",
+        });
+      }
+
+      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
+        emit("searchdata");
+      }
+    }, 2500);
+
     const updateDateTime = async (value: object) => {
       if (router.currentRoute.value.name !== "traces") return;
       if (
@@ -660,6 +688,15 @@ export default defineComponent({
       await nextTick();
       await nextTick();
 
+      if (
+        value.valueType === "absolute" &&
+        store.state.zoConfig?.auto_query_enabled
+      ) {
+        // Debounce query trigger so user can finish typing the full time value
+        triggerAbsoluteQueryDebounced(value);
+        return;
+      }
+
       if (config.isCloud == "true" && value.userChangedValue) {
         segment.track("Button Click", {
           button: "Date Change",
@@ -681,7 +718,7 @@ export default defineComponent({
     const toggleLiveMode = () => {
       searchObj.meta.liveMode = !searchObj.meta.liveMode;
       localStorage.setItem(
-        "oo_live_mode_traces",
+        "oo_toggle_auto_run",
         String(searchObj.meta.liveMode),
       );
     };

@@ -66,6 +66,7 @@ export function buildSQLContext(
   metadata: any,
   chartPanelStyle: any,
   annotations: any,
+  loading?: any,
 ): SQLContext | null {
   // Set gridlines visibility based on config.show_gridlines (default: true)
   const showGridlines =
@@ -162,6 +163,7 @@ export function buildSQLContext(
     zAxisKeys,
     breakDownKeys,
     noValueConfigOption,
+    loading,
   );
 
   // get the axis data using key
