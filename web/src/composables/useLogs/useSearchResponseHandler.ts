@@ -220,11 +220,11 @@ export const useSearchResponseHandler = () => {
     processPostPaginationData();
   };
 
-  const processPostPaginationData = () => {
+  const processPostPaginationData = async () => {
     updateFieldValues();
-    extractFields();
+    await extractFields();
     updateGridColumns();
-    filterHitsColumns();
+    await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
   };
 

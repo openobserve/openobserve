@@ -309,6 +309,7 @@ import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
+import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -336,6 +337,20 @@ const {
   updatedLocalLogFilterField,
 } = useTraces();
 const { fnParsedSQL } = logsUtils();
+
+const correlationFilters = useCorrelationFilters({
+  orgId: () => store.state.selectedOrganization.identifier,
+  streamType: () => "traces",
+  streamName: () => searchObj.data.stream.selectedStream.value,
+  streamSchemaFields: () => searchObj.data.stream.selectedStreamFields,
+  getQuery: () => searchObj.data.editorValue,
+  setQuery: (whereClause: string) => {
+    searchObj.data.editorValue = whereClause;
+  },
+  querySource: () => searchObj.data.editorValue,
+});
+correlationFilters.watchQuery();
+
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
@@ -461,6 +476,7 @@ async function getStreamList() {
         }
 
         await extractFields();
+        correlationFilters.restore();
 
         if (
           searchObj.data.editorValue &&
@@ -1052,6 +1068,7 @@ async function getQueryData(
             ) {
               loadLocalLogFilterField(searchObj.meta.searchMode);
               rebuildColumns();
+              correlationFilters.save();
             }
           }
         },
