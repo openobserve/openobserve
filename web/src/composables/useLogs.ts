@@ -37,6 +37,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import useStreamingSearch from "@/composables/useStreamingSearch";
 
 const useLogs = () => {
   const store = useStore();
@@ -80,6 +81,7 @@ const useLogs = () => {
 
   const { showErrorNotification } = useNotifications();
   const { getStreams } = useStreams();
+  const { cancelStreamQueryBasedOnRequestId } = useStreamingSearch();
 
   const router = useRouter();
 
@@ -256,8 +258,27 @@ const useLogs = () => {
     }
   };
 
+  const cancelInflightRequests = () => {
+    const orgId = searchObj.organizationIdentifier;
+    if (searchObj.data.lastSearchTraceId) {
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: searchObj.data.lastSearchTraceId,
+        org_id: orgId,
+      });
+      searchObj.data.lastSearchTraceId = "";
+    }
+    if (searchObj.data.lastHistogramTraceId) {
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: searchObj.data.lastHistogramTraceId,
+        org_id: orgId,
+      });
+      searchObj.data.lastHistogramTraceId = "";
+    }
+  };
+
   const loadLogsData = async () => {
     try {
+      cancelInflightRequests();
       resetFunctions();
 
       // Create initialStreamSelected variable to handle first time load when api call for function & actions are
@@ -325,6 +346,7 @@ const useLogs = () => {
 
   const handleRunQuery = async (clear_cache = false) => {
     try {
+      cancelInflightRequests();
       searchObj.loading = true;
       searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;

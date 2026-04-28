@@ -246,6 +246,7 @@ export const DEFAULT_LOGS_CONFIG = {
     searchRequestTraceIds: [] as string[],
     searchWebSocketTraceIds: [] as string[],
     lastSearchTraceId: "" as string,
+    lastHistogramTraceId: "" as string,
     isOperationCancelled: false,
     searchRetriesCount: {} as { [key: string]: number },
     actionId: null,

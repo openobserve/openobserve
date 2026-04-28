@@ -48,6 +48,7 @@ export const useStreamFields = () => {
     fieldValues,
     notificationMsg,
     streamSchemaFieldsIndexMapping,
+    schemaRequestToken,
   } = searchState();
 
   const { fnParsedSQL, getColumnWidth } = logsUtils();
@@ -108,6 +109,8 @@ export const useStreamFields = () => {
   };
 
   const extractFields = async () => {
+    schemaRequestToken.value++;
+    const capturedToken = schemaRequestToken.value;
     try {
       searchObjDebug["extractFieldsStartTime"] = performance.now();
       searchObjDebug["extractFieldsWithAPI"] = "";
@@ -205,6 +208,7 @@ export const useStreamFields = () => {
             // check for schema exist in the object or not
             // if not pull the schema from server.
             const streamData = await loadStreamFields(stream.name);
+            if (capturedToken !== schemaRequestToken.value) return;
             if (streamData.schema === undefined) {
               searchObj.loadingStream = false;
               searchObj.data.errorMsg = t("search.noFieldFound");
@@ -734,6 +738,7 @@ export const useStreamFields = () => {
           interestingFieldsMap,
         ).filter((field: any) => interestingFieldsMap[field]);
 
+        if (capturedToken !== schemaRequestToken.value) return;
         // searchObj.data.stream.selectedStreamFields = schemaMaps;
         searchObj.data.stream.selectedStreamFields = [
           ...commonSchemaMaps,
