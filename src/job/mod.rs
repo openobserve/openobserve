@@ -165,10 +165,9 @@ async fn patch_sre_readonly_alerts_incidents() {
 
     let mut failed = false;
     for org in orgs {
-        if let Err(e) = o2_openfga::authorizer::roles::patch_sre_readonly_role_alerts_incidents(
-            &org.identifier,
-        )
-        .await
+        if let Err(e) =
+            o2_openfga::authorizer::roles::patch_sre_readonly_role_alerts_incidents(&org.identifier)
+                .await
         {
             log::warn!(
                 "Failed to patch sre-readonly alerts/incidents for org '{}': {e}",
@@ -179,9 +178,7 @@ async fn patch_sre_readonly_alerts_incidents() {
     }
 
     if failed {
-        log::warn!(
-            "sre-readonly alerts/incidents patch had failures — will retry on next startup"
-        );
+        log::warn!("sre-readonly alerts/incidents patch had failures — will retry on next startup");
         return;
     }
 
