@@ -631,4 +631,35 @@ mod tests {
         assert!(back.value.is_none());
         assert!(back.options.is_none());
     }
+
+    #[test]
+    fn test_panel_config_unit_none_absent() {
+        let cfg = PanelConfig {
+            title: "t".to_string(),
+            description: "d".to_string(),
+            show_legends: false,
+            legends_position: None,
+            promql_legend: None,
+            unit: None,
+            unit_custom: None,
+        };
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(!json.contains("unit"));
+    }
+
+    #[test]
+    fn test_panel_config_unit_some_present() {
+        let cfg = PanelConfig {
+            title: "t".to_string(),
+            description: "d".to_string(),
+            show_legends: false,
+            legends_position: None,
+            promql_legend: None,
+            unit: Some("bytes".to_string()),
+            unit_custom: Some("mb".to_string()),
+        };
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("unit"));
+        assert!(json.contains("unit_custom"));
+    }
 }

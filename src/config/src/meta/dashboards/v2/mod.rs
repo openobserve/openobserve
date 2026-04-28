@@ -395,4 +395,26 @@ mod tests {
             assert_eq!(back, variant);
         }
     }
+
+    #[test]
+    fn test_panel_config_optional_none_fields_absent() {
+        let cfg = PanelConfig {
+            show_legends: false,
+            legends_position: None,
+            unit: None,
+            unit_custom: None,
+            decimals: None,
+            axis_width: None,
+            axis_border_show: None,
+            legend_width: None,
+            base_map: None,
+            map_view: None,
+        };
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(!json.contains("unit"));
+        assert!(!json.contains("decimals"));
+        assert!(!json.contains("axisWidth"));
+        assert!(!json.contains("axisBorderShow"));
+        assert!(!json.contains("legendWidth"));
+    }
 }
