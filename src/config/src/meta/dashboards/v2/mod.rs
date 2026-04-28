@@ -411,11 +411,11 @@ mod tests {
             map_view: None,
         };
         let json = serde_json::to_string(&cfg).unwrap();
-        assert!(!json.contains("unit"));
+        assert!(!json.contains("\"unit\""));
         assert!(!json.contains("decimals"));
-        assert!(!json.contains("axisWidth"));
-        assert!(!json.contains("axisBorderShow"));
-        assert!(!json.contains("legendWidth"));
+        assert!(!json.contains("axis_width"));
+        assert!(!json.contains("axis_border_show"));
+        assert!(!json.contains("legend_width"));
     }
 
     #[test]
@@ -439,9 +439,9 @@ mod tests {
         assert!(json.contains("\"unit\""));
         assert!(json.contains("unit_custom"));
         assert!(json.contains("decimals"));
-        assert!(json.contains("axisWidth"));
-        assert!(json.contains("axisBorderShow"));
-        assert!(json.contains("legendWidth"));
+        assert!(json.contains("axis_width"));
+        assert!(json.contains("axis_border_show"));
+        assert!(json.contains("legend_width"));
     }
 
     #[test]

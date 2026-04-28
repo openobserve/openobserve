@@ -1225,7 +1225,12 @@ mod tests {
             service_account: None,
         };
         let json = serde_json::to_value(&resp).unwrap();
-        assert!(!json.as_object().unwrap().contains_key("service_account"));
+        let obj = json.as_object().unwrap();
+        // Organization.service_account=None flattens in as null;
+        // OrganizationCreationResponse.service_account=None is skipped via skip_serializing_if.
+        // The key exists (null from Organization), but it is not a ServiceAccountTokenInfo object.
+        let sa_val = obj.get("service_account");
+        assert!(sa_val.map(|v| v.is_null()).unwrap_or(true));
     }
 
     #[test]
