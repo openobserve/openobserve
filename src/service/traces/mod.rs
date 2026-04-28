@@ -92,6 +92,39 @@ const SPAN_ID_BYTES_COUNT: usize = 8;
 const TRACE_ID_BYTES_COUNT: usize = 16;
 const ATTR_STATUS_CODE: &str = "status_code";
 const ATTR_STATUS_MESSAGE: &str = "status_message";
+const LLM_INT64_FIELDS: [&str; 4] = [
+    "llm_usage_tokens_input",
+    "llm_usage_tokens_output",
+    "llm_usage_tokens_total",
+    "llm_completion_start_time",
+];
+const LLM_FLOAT64_FIELDS: [&str; 3] = [
+    "llm_usage_cost_input",
+    "llm_usage_cost_output",
+    "llm_usage_cost_total",
+];
+
+fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
+    for field in LLM_INT64_FIELDS {
+        if let Some(value) = record_val.get_mut(field)
+            && value.as_i64().is_none()
+        {
+            *value = json::Value::Number(json::Number::from(json::get_int_value(value)));
+        }
+    }
+
+    for field in LLM_FLOAT64_FIELDS {
+        if let Some(value) = record_val.get_mut(field)
+            && !value.is_f64()
+        {
+            let float_value = json::get_float_value(value);
+            *value = json::Value::Number(
+                json::Number::from_f64(float_value)
+                    .unwrap_or_else(|| json::Number::from_f64(0.0).unwrap()),
+            );
+        }
+    }
+}
 
 pub async fn otlp_proto(
     org_id: &str,
@@ -244,8 +277,16 @@ pub async fn handle_otlp_request(
     // Initialize OTEL processor for enriching spans with AI/ML observability attributes
     let otel_processor = OtelIngestionProcessor::new();
 
-    // Pre-load user-defined model pricing entries for this org (in-memory cache, no I/O)
-    let org_pricing_entries = crate::service::db::model_pricing::get_org_pricing_entries(org_id);
+    // Pre-load user-defined model pricing entries for this org (in-memory cache, no I/O).
+    // When ZO_MODEL_PRICING_ENABLED=false, skip DB pricing and fall back to hardcoded values.
+    static EMPTY_PRICING: std::sync::OnceLock<
+        std::sync::Arc<Vec<crate::service::db::model_pricing::CachedModelPricing>>,
+    > = std::sync::OnceLock::new();
+    let org_pricing_entries = if config::get_config().common.model_pricing_enabled {
+        crate::service::db::model_pricing::get_org_pricing_entries(org_id)
+    } else {
+        std::sync::Arc::clone(EMPTY_PRICING.get_or_init(|| std::sync::Arc::new(vec![])))
+    };
 
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
@@ -360,11 +401,8 @@ pub async fn handle_otlp_request(
                         start_time,
                     );
 
-                    // check if we have any LLM related attributes
-                    if !is_llm_stream
-                        && (span_att_map.contains_key(otel::attributes::O2Attributes::INPUT)
-                            || span_att_map.contains_key(otel::attributes::O2Attributes::OUTPUT))
-                    {
+                    // set stream to llm stream if not already set
+                    if !is_llm_stream {
                         is_llm_stream = true;
                         need_mark_llm_stream = true;
                     }
@@ -472,6 +510,7 @@ pub async fn handle_otlp_request(
                             ).into_response());
                         }
                     };
+                    normalize_llm_field_types(&mut record_val);
 
                     if let Some(Some(fields)) = user_defined_schema_map.get(&traces_stream_name) {
                         record_val = crate::service::ingestion::refactor_map(record_val, fields);
@@ -534,6 +573,7 @@ pub async fn handle_otlp_request(
                                     .into_response());
                             }
                         };
+                        normalize_llm_field_types(&mut record_val);
 
                         if let Some(Some(fields)) =
                             user_defined_schema_map.get(&stream_params.stream_name.to_string())
@@ -729,12 +769,10 @@ pub async fn ingest_json(
                     .into_response());
             }
         };
+        normalize_llm_field_types(&mut record_val);
 
         // check if we have any LLM related attributes
-        if !is_llm_stream
-            && (record_val.contains_key(otel::attributes::O2Attributes::INPUT)
-                || record_val.contains_key(otel::attributes::O2Attributes::OUTPUT))
-        {
+        if !is_llm_stream && detect_llm_stream(|k| record_val.contains_key(k)) {
             is_llm_stream = true;
             need_mark_llm_stream = true;
         }
@@ -1129,6 +1167,20 @@ async fn write_traces(
     Ok(req_stats)
 }
 
+fn detect_llm_stream(contains_key: impl Fn(&str) -> bool) -> bool {
+    let keys = [
+        otel::attributes::GenAiAttributes::USAGE_INPUT_TOKENS,
+        otel::attributes::GenAiAttributes::USAGE_OUTPUT_TOKENS,
+        otel::attributes::GenAiAttributes::INPUT_MESSAGES,
+        otel::attributes::GenAiAttributes::OUTPUT_MESSAGES,
+        otel::attributes::O2Attributes::INPUT,
+        otel::attributes::O2Attributes::OUTPUT,
+        otel::attributes::LangfuseAttributes::INPUT,
+        otel::attributes::LangfuseAttributes::OUTPUT,
+    ];
+    keys.iter().any(|k| contains_key(k))
+}
+
 #[cfg(test)]
 mod tests {
     use config::utils::json::json;
@@ -1175,6 +1227,66 @@ mod tests {
     fn test_get_span_status_none() {
         // Test None status (default case)
         assert_eq!(super::get_span_status(None), "UNSET");
+    }
+
+    #[test]
+    fn test_normalize_llm_field_types() {
+        let mut record = json!({
+            "llm_usage_tokens_input": "12",
+            "llm_usage_tokens_output": 34.8,
+            "llm_usage_tokens_total": true,
+            "llm_completion_start_time": "123456789",
+            "llm_usage_cost_input": "0.25",
+            "llm_usage_cost_output": 1,
+            "llm_usage_cost_total": false,
+            "unrelated": "value"
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+
+        super::normalize_llm_field_types(&mut record);
+
+        assert_eq!(
+            record
+                .get("llm_usage_tokens_input")
+                .and_then(|v| v.as_i64()),
+            Some(12)
+        );
+        assert_eq!(
+            record
+                .get("llm_usage_tokens_output")
+                .and_then(|v| v.as_i64()),
+            Some(34)
+        );
+        assert_eq!(
+            record
+                .get("llm_usage_tokens_total")
+                .and_then(|v| v.as_i64()),
+            Some(1)
+        );
+        assert_eq!(
+            record
+                .get("llm_completion_start_time")
+                .and_then(|v| v.as_i64()),
+            Some(123456789)
+        );
+        assert_eq!(
+            record.get("llm_usage_cost_input").and_then(|v| v.as_f64()),
+            Some(0.25)
+        );
+        assert_eq!(
+            record.get("llm_usage_cost_output").and_then(|v| v.as_f64()),
+            Some(1.0)
+        );
+        assert_eq!(
+            record.get("llm_usage_cost_total").and_then(|v| v.as_f64()),
+            Some(0.0)
+        );
+        assert_eq!(
+            record.get("unrelated").and_then(|v| v.as_str()),
+            Some("value")
+        );
     }
 
     #[test]
@@ -1793,5 +1905,102 @@ mod tests {
             span_att_map.get(super::ATTR_STATUS_MESSAGE).unwrap(),
             "Internal server error"
         );
+    }
+
+    #[test]
+    fn test_detect_llm_stream_empty() {
+        let map: std::collections::HashMap<String, config::utils::json::Value> =
+            std::collections::HashMap::new();
+        assert!(!super::detect_llm_stream(|k| map.contains_key(k)));
+
+        let obj = config::utils::json::Map::new();
+        assert!(!super::detect_llm_stream(|k| obj.contains_key(k)));
+    }
+
+    #[test]
+    fn test_detect_llm_stream_no_match() {
+        let mut map: std::collections::HashMap<String, config::utils::json::Value> =
+            std::collections::HashMap::new();
+        map.insert("http.method".to_string(), json!("GET"));
+        map.insert("service.name".to_string(), json!("api"));
+        assert!(!super::detect_llm_stream(|k| map.contains_key(k)));
+    }
+
+    #[test]
+    fn test_detect_llm_stream_hashmap_gen_ai() {
+        use crate::service::traces::otel::attributes::GenAiAttributes;
+
+        let keys = [
+            GenAiAttributes::USAGE_INPUT_TOKENS,
+            GenAiAttributes::USAGE_OUTPUT_TOKENS,
+            GenAiAttributes::INPUT_MESSAGES,
+            GenAiAttributes::OUTPUT_MESSAGES,
+        ];
+        for key in keys {
+            let mut map: std::collections::HashMap<String, config::utils::json::Value> =
+                std::collections::HashMap::new();
+            map.insert(key.to_string(), json!("value"));
+            assert!(
+                super::detect_llm_stream(|k| map.contains_key(k)),
+                "expected detection for key {key}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_detect_llm_stream_hashmap_o2_attrs() {
+        use crate::service::traces::otel::attributes::O2Attributes;
+
+        let mut map: std::collections::HashMap<String, config::utils::json::Value> =
+            std::collections::HashMap::new();
+        map.insert(O2Attributes::INPUT.to_string(), json!("prompt"));
+        assert!(super::detect_llm_stream(|k| map.contains_key(k)));
+
+        let mut map: std::collections::HashMap<String, config::utils::json::Value> =
+            std::collections::HashMap::new();
+        map.insert(O2Attributes::OUTPUT.to_string(), json!("completion"));
+        assert!(super::detect_llm_stream(|k| map.contains_key(k)));
+    }
+
+    #[test]
+    fn test_detect_llm_stream_hashmap_langfuse() {
+        use crate::service::traces::otel::attributes::LangfuseAttributes;
+
+        let mut map: std::collections::HashMap<String, config::utils::json::Value> =
+            std::collections::HashMap::new();
+        map.insert(LangfuseAttributes::INPUT.to_string(), json!("prompt"));
+        assert!(super::detect_llm_stream(|k| map.contains_key(k)));
+
+        let mut map: std::collections::HashMap<String, config::utils::json::Value> =
+            std::collections::HashMap::new();
+        map.insert(LangfuseAttributes::OUTPUT.to_string(), json!("completion"));
+        assert!(super::detect_llm_stream(|k| map.contains_key(k)));
+    }
+
+    #[test]
+    fn test_detect_llm_stream_json_map() {
+        use crate::service::traces::otel::attributes::GenAiAttributes;
+
+        let mut obj = config::utils::json::Map::new();
+        obj.insert("service.name".to_string(), json!("api"));
+        assert!(!super::detect_llm_stream(|k| obj.contains_key(k)));
+
+        obj.insert(GenAiAttributes::USAGE_INPUT_TOKENS.to_string(), json!(42));
+        assert!(super::detect_llm_stream(|k| obj.contains_key(k)));
+    }
+
+    #[test]
+    fn test_detect_llm_stream_mixed_attrs_match_first() {
+        use crate::service::traces::otel::attributes::GenAiAttributes;
+
+        let mut map: std::collections::HashMap<String, config::utils::json::Value> =
+            std::collections::HashMap::new();
+        map.insert("http.method".to_string(), json!("POST"));
+        map.insert("service.name".to_string(), json!("llm-api"));
+        map.insert(
+            GenAiAttributes::OUTPUT_MESSAGES.to_string(),
+            json!("response"),
+        );
+        assert!(super::detect_llm_stream(|k| map.contains_key(k)));
     }
 }

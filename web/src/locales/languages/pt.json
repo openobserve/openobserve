@@ -1691,7 +1691,10 @@
     "streamTotal": "Fluxos",
     "totalDashboard": "Painéis",
     "viewButton": "Visualizar",
-    "noDataAvailable": "Não há dados disponíveis"
+    "noDataAvailable": "Não há dados disponíveis",
+    "tabAiAssistant": "Assistente de IA O2",
+    "tabOverview": "Visão geral",
+    "tabUsage": "Uso"
   },
   "billing": {
     "header": "Uso e cobrança",
@@ -3274,7 +3277,8 @@
     "metricsErrorDetails": "Ocorreu um erro ao buscar dados de métricas. Por favor, tente novamente.",
     "noMetricsDescription": "Nenhuma métrica encontrada para essa correlação no intervalo de tempo selecionado.",
     "errorRetrievingTraces": "Ocorreu um erro ao recuperar os traços.",
-    "serviceGroupProtected": "O grupo de serviços não pode ser removido. Você só pode modificar os campos mapeados."
+    "serviceGroupProtected": "O grupo de serviços não pode ser removido. Você só pode modificar os campos mapeados.",
+    "noDataFound": "Nenhum dado encontrado"
   },
   "sreChat": {
     "emptyMessage": "Pergunte-me qualquer coisa sobre seus alertas e incidentes",
@@ -3612,5 +3616,30 @@
     "errLoadModel": "Falha ao carregar o modelo",
     "tierDefaultName": "Padrão",
     "tierConditionalName": "Nível condicional"
+  },
+  "overview": {
+    "title": "Visão geral do sistema",
+    "activeAnomalies": "Anomalias ativas",
+    "activeIncidents": "Incidentes ativos",
+    "services": "Serviços",
+    "recentEvents": "Eventos recentes",
+    "investigate": "Investigue →",
+    "untitledIncident": "Incidente sem título",
+    "viewLatencyCharts": "Exibir gráficos de latência e RED",
+    "elevatedErrorRate": "Taxa de erro elevada",
+    "reqPerSec": "exigida/s",
+    "allClear": "Tudo limpo",
+    "allClearDesc": "Sem anomalias ativas, incidentes ou serviços degradados na janela de tempo selecionada."
+  },
+  "chatHistory": {
+    "title": "Conversa",
+    "newChat": "Novo bate-papo",
+    "search": "Pesquisar",
+    "noMatches": "Sem jogos",
+    "noHistory": "Sem histórico de bate-papo",
+    "delete": "Excluir",
+    "clearAll": "Limpar tudo",
+    "clearAllTitle": "Limpar todos os bate-papos",
+    "clearAllMessage": "Isso excluirá permanentemente todo o histórico de bate-papo. Essa ação não pode ser desfeita."
   }
 }

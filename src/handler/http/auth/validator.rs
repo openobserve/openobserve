@@ -27,6 +27,8 @@ use config::{
 #[cfg(feature = "enterprise")]
 use o2_dex::config::get_config as get_dex_config;
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::license::block_feature_for_report_failure;
+#[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
 
 use crate::{
@@ -1027,6 +1029,10 @@ pub(crate) async fn check_permissions(
     use crate::common::infra::config::ORG_USERS;
 
     if !get_openfga_config().enabled {
+        return true;
+    }
+
+    if block_feature_for_report_failure().await {
         return true;
     }
 

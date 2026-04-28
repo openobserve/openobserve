@@ -86,6 +86,8 @@ pub struct ServiceNode {
     pub requests: u64,
     pub errors: u64,
     pub error_rate: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_name: Option<String>,
 }
 
 /// Edge in service graph
