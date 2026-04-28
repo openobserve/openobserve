@@ -1068,9 +1068,6 @@ async function getQueryData(
             ) {
               loadLocalLogFilterField(searchObj.meta.searchMode);
               rebuildColumns();
-              correlationFilters.save().catch((e) =>
-                console.error("[correlation:save] error:", e),
-              );
             }
           }
         },
@@ -1102,6 +1099,9 @@ async function getQueryData(
           if (!isPagination) {
             fetchTracesCount();
           }
+          correlationFilters.save().catch((e) =>
+            console.error("[correlation:save] error:", e),
+          );
         },
         reset: (_payload: any) => {
           searchObj.data.queryResults = {};
@@ -1821,9 +1821,9 @@ const getMoreData = () => {
   }
 };
 
-const onChangeStream = () => {
+const onChangeStream = async () => {
+  await extractFields();
   runQueryFn();
-  extractFields();
 };
 
 const collapseFieldList = () => {
