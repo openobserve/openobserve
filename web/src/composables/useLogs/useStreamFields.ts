@@ -31,6 +31,7 @@ import {
   convertToCamelCase,
   deepCopy,
 } from "@/utils/zincutils";
+import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
@@ -52,6 +53,21 @@ export const useStreamFields = () => {
   } = searchState();
 
   const { fnParsedSQL, getColumnWidth } = logsUtils();
+
+  const correlationFilters = useCorrelationFilters({
+    orgId: () => store.state.selectedOrganization.identifier,
+    streamType: () => searchObj.data.stream.streamType,
+    streamName: () => searchObj.data.stream.selectedStream[0],
+    streamSchemaFields: () => searchObj.data.stream.selectedStreamFields,
+    getQuery: () => searchObj.data.query || searchObj.data.editorValue,
+    setQuery: (whereClause: string) => {
+      searchObj.data.query = whereClause;
+      searchObj.data.editorValue = whereClause;
+      searchObj.meta.sqlMode = false;
+    },
+    querySource: () => searchObj.data.query,
+  });
+  correlationFilters.watchQuery();
 
   const updateFieldValues = () => {
     try {
@@ -758,6 +774,9 @@ export const useStreamFields = () => {
 
         createFieldIndexMapping();
       }
+
+      correlationFilters.restore();
+
       searchObjDebug["extractFieldsEndTime"] = performance.now();
     } catch (e: any) {
       searchObj.loadingStream = false;
@@ -1140,7 +1159,7 @@ export const useStreamFields = () => {
     }
   };
 
-  const filterHitsColumns = () => {
+  const filterHitsColumns = async () => {
     searchObj.data.queryResults.filteredHit = [];
     let itemHits: any = {};
     if (searchObj.data.stream.selectedFields.length > 0) {
@@ -1160,7 +1179,10 @@ export const useStreamFields = () => {
       searchObj.data.queryResults.filteredHit =
         searchObj.data.queryResults.hits;
     }
+
+    await correlationFilters.save();
   };
+
 
   return {
     updateFieldValues,
