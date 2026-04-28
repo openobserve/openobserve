@@ -19,7 +19,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="column logs-index-menu tw:p-[0.375rem]! tw:h-[calc(100%-0.7rem)]"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
-    <div style="max-width: 100%; overflow: hidden">
+    <div
+      class="tw:flex tw:items-center tw:gap-1"
+      style="max-width: 100%; overflow: hidden"
+    >
+      <q-btn
+        v-if="searchObj.data.stream.streamType && searchObj.data.stream.streamType !== 'logs'"
+        data-test="log-search-index-list-stream-type-badge"
+        flat
+        dense
+        no-caps
+        class="stream-type-badge tw:shrink-0"
+        @click="onStreamTypeChange('logs')"
+      >
+        <q-icon :name="streamTypeIcon" size="16px" />
+        <q-tooltip anchor="bottom middle" self="top middle">
+          {{ streamTypeLabel }} — {{ t("search.switchToLogs") }}
+        </q-tooltip>
+      </q-btn>
       <q-select
         ref="streamSelect"
         data-test="log-search-index-list-select-stream"
@@ -36,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         multiple
         emit-value
         map-options
+        class="tw:flex-1 tw:min-w-0"
         @filter="filterStreamFn"
         @update:model-value="handleMultiStreamSelection"
       >
@@ -181,6 +199,10 @@ import {
   outlinedAdd,
   outlinedVisibility,
   outlinedVisibilityOff,
+  outlinedSearch,
+  outlinedBarChart,
+  outlinedAccountTree,
+  outlinedTableView,
 } from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -198,6 +220,10 @@ import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
+import {
+  saveLogsStreamType,
+  saveLogsStream,
+} from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 
 interface Filter {
@@ -271,7 +297,7 @@ export default defineComponent({
       extractValueQuery,
     } = useLogs();
 
-    const { filterHitsColumns, extractFields } = useStreamFields();
+    const { filterHitsColumns, extractFields, getStreamList } = useStreamFields();
 
     const { searchObj, streamSchemaFieldsIndexMapping } = searchState();
 
@@ -368,9 +394,30 @@ export default defineComponent({
     });
 
     const streamTypes = [
-      { label: t("search.logs"), value: "logs" },
-      { label: t("search.enrichmentTables"), value: "enrichment_tables" },
+      { label: t("search.logs"), value: "logs", icon: outlinedSearch },
+      { label: t("search.traces"), value: "traces", icon: outlinedAccountTree },
+      { label: t("search.metrics"), value: "metrics", icon: outlinedBarChart },
+      { label: t("search.enrichmentTables"), value: "enrichment_tables", icon: outlinedTableView },
     ];
+
+    const streamTypeIcon = computed(() => {
+      const current = searchObj.data.stream.streamType;
+      return streamTypes.find((t) => t.value === current)?.icon ?? outlinedSearch;
+    });
+
+    const streamTypeLabel = computed(() => {
+      const current = searchObj.data.stream.streamType;
+      return streamTypes.find((t) => t.value === current)?.label ?? "";
+    });
+
+    const onStreamTypeChange = async (newType: string) => {
+      searchObj.data.stream.streamType = newType;
+      searchObj.data.stream.selectedStream = [];
+      searchObj.data.stream.selectedStreamFields = [];
+      saveLogsStreamType(store.state.selectedOrganization.identifier, newType);
+      saveLogsStream(store.state.selectedOrganization.identifier, []);
+      await getStreamList(true);
+    };
 
     const showUserDefinedSchemaToggle = computed(() => {
       return (
@@ -1790,6 +1837,9 @@ export default defineComponent({
       addSearchTerm,
       fieldValues,
       streamTypes,
+      streamTypeIcon,
+      streamTypeLabel,
+      onStreamTypeChange,
       outlinedAdd,
       outlinedVisibilityOff,
       outlinedVisibility,
@@ -1889,6 +1939,14 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.stream-type-badge {
+  height: 32px;
+  width: 32px;
+  border: 1px solid var(--o2-border);
+  border-radius: 4px;
+  padding: 0;
+}
+
 .indexlist-search-input {
   height: 36px;
   .q-field__control {
