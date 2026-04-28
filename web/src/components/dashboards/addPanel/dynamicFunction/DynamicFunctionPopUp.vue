@@ -39,7 +39,7 @@
     </div>
 
     <div
-      :style="(!customQuery && !fields.isDerived) ? 'width: calc(100% - 134px)' : 'width: max-content;'"
+      :style="(!customQuery && !fields.isDerived) ? 'width: calc(100% - 134px); display: flex; flex-direction: column;' : 'width: max-content;'"
     >
       <OTabs
         v-if="!customQuery && !fields.isDerived"
@@ -175,7 +175,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 export default {
   name: "DynamicFunctionPopUp",
-  components: { RawQueryBuilder, SelectFunction, SortByBtnGrp },
+  components: { RawQueryBuilder, SelectFunction, SortByBtnGrp, OTabs, OTab, OTabPanels, OTabPanel },
   props: {
     modelValue: {
       type: Object,
@@ -282,6 +282,10 @@ export default {
 .tab-item {
   flex: 0 1 auto !important;
   padding: 10px 16px !important;
+}
+
+:deep(.o-tab) {
+  flex: 1;
 }
 
 .text-label-bold {
