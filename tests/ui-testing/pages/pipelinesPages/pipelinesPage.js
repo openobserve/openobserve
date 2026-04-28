@@ -3411,48 +3411,42 @@ export class PipelinesPage {
     // ========== Bug #11400: Query Editor Warning Decorations ==========
 
     /**
-     * Set value in the Monaco query editor and verify warning markers exist
+     * Set value in the Monaco query editor and verify warning markers exist.
+     * Uses DOM-based detection of .squiggly-warning CSS classes instead of
+     * window.monaco API (which is module-scoped and not globally exposed).
      * @param {string} queryText - SQL query to set in the editor
      * @returns {Promise<boolean>} True if warning markers are found
      */
     async setQueryAndCheckWarnings(queryText) {
-        // Focus the editor and set value using eval
-        await this.scheduledPipelineSqlEditor.click();
+        // Set value by filling the Monaco inputarea (same approach as logsPage.setQueryEditorContent)
+        const inputArea = this.scheduledPipelineSqlEditor.locator('.inputarea');
+        await inputArea.click({ force: true });
         await this.page.waitForTimeout(300);
+        await inputArea.fill(queryText);
+        await this.page.waitForTimeout(500);
 
-        // Use Monaco API to set value and check for markers
-        const hasWarnings = await this.page.evaluate((query) => {
-            // Try to find the Monaco editor instance
-            const editorElement = document.querySelector('.monaco-editor');
-            if (!editorElement) return false;
+        // Check for warning decorations via DOM (squiggly-warning CSS class)
+        const hasWarnings = await this.page.evaluate(() => {
+            const editorContainer = document.querySelector('[data-test="scheduled-pipeline-sql-editor"]');
+            if (!editorContainer) return false;
+            const warningSquiggles = editorContainer.querySelectorAll('.squiggly-warning');
+            return warningSquiggles.length > 0;
+        });
 
-            // Access the editor instance from the known global or via __vue__
-            // Monaco stores editor instances - try to find by model
-            const model = editorElement.__vue__?.editorObj?.getModel() ||
-                          // fallback: use monaco global if exposed
-                          (window.monaco?.editor?.getModels?.()?.[0]);
-
-            if (!model) return false;
-
-            // Set value
-            model.setValue(query);
-
-            // Check markers for "dq-validation" owner
-            const markers = window.monaco?.editor?.getModelMarkers?.({ owner: 'dq-validation' }) || [];
-            return markers.length > 0;
-        }, queryText);
-
-        testLogger.info(`Warning markers found: ${hasWarnings}`);
+        testLogger.info(`Warning markers found (DOM): ${hasWarnings}`);
         return hasWarnings;
     }
 
     /**
-     * Expect warning markers to be present in the editor (double-quote validation)
+     * Expect warning markers to be present in the editor (double-quote validation).
+     * Uses DOM-based .squiggly-warning detection (window.monaco is not globally exposed).
      */
     async expectWarningMarkersPresent() {
         const hasMarkers = await this.page.evaluate(() => {
-            const markers = window.monaco?.editor?.getModelMarkers?.({ owner: 'dq-validation' }) || [];
-            return markers.length > 0;
+            const editorContainer = document.querySelector('[data-test="scheduled-pipeline-sql-editor"]');
+            if (!editorContainer) return false;
+            const warningSquiggles = editorContainer.querySelectorAll('.squiggly-warning');
+            return warningSquiggles.length > 0;
         });
         expect(hasMarkers).toBe(true);
         testLogger.info('✅ Warning markers are present in the editor');

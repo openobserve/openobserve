@@ -474,6 +474,9 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     await pageManager.pipelinesPage.expectRunQueryDisabled();
 
     testLogger.info("Test passed: Run Query is disabled when no stream is selected");
+
+    // Teardown: close the scheduled pipeline dialog to avoid state carry-over
+    await pageManager.pipelinesPage.clickCancelAndConfirm();
   });
 
   test("Bug #11498: should enable Run Query button after stream is selected", {
@@ -520,6 +523,9 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     await pageManager.pipelinesPage.expectRunQueryEnabled();
 
     testLogger.info("Test passed: Run Query is enabled after stream selection");
+
+    // Teardown: close the scheduled pipeline dialog to avoid state carry-over
+    await pageManager.pipelinesPage.clickCancelAndConfirm();
   });
 
 });

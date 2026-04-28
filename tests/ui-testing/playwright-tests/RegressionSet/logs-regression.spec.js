@@ -1609,18 +1609,24 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForTimeout(1000);
 
-    // Select stream to populate field values
-    await pm.logsPage.selectStream("e2e_automate");
-    await pm.logsPage.waitForQueryEditorVisible();
-
-    // Wait for auto-search to complete, which populates field values in
-    // Monaco's suggestion cache. This ensures the suggestion widget will
-    // have data when triggered via Ctrl+Space.
-    testLogger.info('Waiting for auto-search to populate field values...');
-    await page.waitForResponse(
+    // Register the waitForResponse promise BEFORE the action that triggers
+    // the search (selectStream), to avoid a race condition: if the /_search
+    // response arrives before the listener is set up, the test would hang
+    // for 60s then fail.
+    testLogger.info('Setting up search response listener before stream selection...');
+    const searchResponsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/_search') && resp.status() === 200,
       { timeout: 60000 },
     );
+
+    // Select stream — this triggers an auto-search which populates field
+    // values in Monaco's suggestion cache.
+    await pm.logsPage.selectStream("e2e_automate");
+    await pm.logsPage.waitForQueryEditorVisible();
+
+    // Wait for auto-search to complete before proceeding
+    testLogger.info('Waiting for auto-search to populate field values...');
+    await searchResponsePromise;
     await page.waitForTimeout(1000); // Small buffer for Monaco to process field values
     testLogger.info('✅ Auto-search completed, field values cached');
 
