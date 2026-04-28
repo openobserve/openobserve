@@ -986,7 +986,7 @@ async function getQueryData(
         org_id: searchObj.organizationIdentifier,
       },
       {
-        data: async (_payload: any, response: any) => {
+        data: (_payload: any, response: any) => {
           // Each metadata event signals a new backend partition — advance the counter
           if (response.type === "search_response_metadata") {
             tracesPartitionMap[searchTraceId].partition++;
@@ -1068,7 +1068,9 @@ async function getQueryData(
             ) {
               loadLocalLogFilterField(searchObj.meta.searchMode);
               rebuildColumns();
-              await correlationFilters.save();
+              correlationFilters.save().catch((e) =>
+                console.error("[correlation:save] error:", e),
+              );
             }
           }
         },

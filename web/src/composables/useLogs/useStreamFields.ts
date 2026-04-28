@@ -1131,7 +1131,6 @@ export const useStreamFields = () => {
       }
 
       extractFTSFields();
-      correlationFilters.restore();
     } catch (e: any) {
       searchObj.loadingStream = false;
       notificationMsg.value = "Error while updating table columns.";
