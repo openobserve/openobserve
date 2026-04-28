@@ -17,26 +17,26 @@ Use this skill when **using** or **composing** O2 components in views, layouts, 
 
 ```ts
 // Direct import by path — no index.ts per component
-import OButton from "@/lib/core/Button/OButton.vue"
-import type { ButtonProps } from "@/lib/core/Button/OButton.types"
+import OButton from "@/lib/core/Button/OButton.vue";
+import type { ButtonProps } from "@/lib/core/Button/OButton.types";
 
-import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue"
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue"
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue"
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue"
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue"
-import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue"
-import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue"
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 
 // Tab family — all four must be imported together
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue"
-import OTab from "@/lib/navigation/Tabs/OTab.vue"
-import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue"
-import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue"
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 // For router-linked tabs:
-import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue"
+import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 ```
 
 All O2 components use the `O` prefix (e.g. `OButton`, `OTabs`, `OModal`).
@@ -157,6 +157,39 @@ Some components are compound families — **always use all members together**. N
 - `ODropdownItem` emits `@select` instead of `@click` + `v-close-popup`
 - `ODropdownGroup` has a `label` prop for section headings
 - `align` prop on `ODropdown`: `"start"` | `"center"` | `"end"` (default `"start"`)
+
+#### ODropdown implementation notes (do not regress)
+
+**Trigger wrapper** — `DropdownMenuTrigger` must use `as="span"` (a concrete DOM element), **not** `as-child`. With `as-child` reka-ui loses the anchor element when the trigger is nested inside another reka-ui Primitive (e.g. `TabsTrigger` inside `OTab`), causing the menu to open at `(0,0)` / top-left of the page.
+
+```vue
+<!-- CORRECT -->
+<DropdownMenuTrigger as="span" style="display: inline-flex;">
+  <slot name="trigger" />
+</DropdownMenuTrigger>
+
+<!-- WRONG — breaks positioning when nested in reka-ui primitives -->
+<DropdownMenuTrigger as-child>
+  <slot name="trigger" />
+</DropdownMenuTrigger>
+```
+
+**Controlled open state** — Vue boolean-casts an absent `open` prop to `false`, which locks `DropdownMenuRoot` in controlled-closed mode. `ODropdown` therefore maintains an `internalOpen` ref and syncs from the `open` prop via a `watch`. Do **not** bind `:open="props.open"` directly.
+
+```ts
+// Correct pattern inside ODropdown.vue
+const internalOpen = ref(false);
+watch(
+  () => props.open,
+  (v) => {
+    if (v !== undefined) internalOpen.value = v;
+  },
+);
+function handleOpenChange(v: boolean) {
+  internalOpen.value = v;
+  emit("update:open", v);
+}
+```
 
 ## Component Not Available?
 

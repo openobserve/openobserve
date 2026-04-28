@@ -20,11 +20,11 @@ defineSlots<ToggleGroupItemSlots>();
       // Layout
       'tw:inline-flex tw:items-center tw:justify-center tw:gap-2',
       'tw:h-9 tw:px-3 tw:text-sm tw:font-medium tw:whitespace-nowrap',
-      // Base state ΓÇö inactive
+      // Base state - inactive
       'tw:bg-toggle-item-bg tw:text-toggle-item-text',
       'tw:transition-colors tw:duration-150',
       'tw:outline-none tw:cursor-pointer',
-      // Hover (inactive only ΓÇö :enabled equivalent)
+      // Hover (inactive only - :enabled equivalent)
       'tw:hover:bg-toggle-item-hover-bg',
       // Active / pressed state (data-state=on)
       'tw:data-[state=on]:bg-toggle-item-active-bg',
