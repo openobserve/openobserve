@@ -222,7 +222,7 @@ import incidentsService from "@/services/incidents";
 import serviceGraphService from "@/services/service_graph";
 import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/RefreshButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 
 const { t } = useI18n();

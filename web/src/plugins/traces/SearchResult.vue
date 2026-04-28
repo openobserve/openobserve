@@ -175,7 +175,7 @@ import useTraces from "../../composables/useTraces";
 import { useRouter } from "vue-router";
 import TracesSearchResultList from "./components/TracesSearchResultList.vue";
 import { formatLargeNumber } from "../../utils/zincutils";
-import ORefreshButton from "@/lib/core/RefreshButton/RefreshButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 
 export default defineComponent({
   name: "SearchResult",
