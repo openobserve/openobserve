@@ -378,4 +378,51 @@ mod tests {
         assert_eq!(back.operator, TierOperator::Gt);
         assert_eq!(back.value, 200000.0);
     }
+
+    #[test]
+    fn test_model_pricing_definition_optional_fields_absent_when_none() {
+        let def = ModelPricingDefinition {
+            name: "m".to_string(),
+            match_pattern: ".*".to_string(),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&def).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("id"));
+        assert!(!obj.contains_key("valid_from"));
+    }
+
+    #[test]
+    fn test_model_pricing_definition_valid_from_present_when_some() {
+        let def = ModelPricingDefinition {
+            name: "m".to_string(),
+            match_pattern: ".*".to_string(),
+            valid_from: Some(1_700_000_000_000_000),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&def).unwrap();
+        assert!(json.as_object().unwrap().contains_key("valid_from"));
+    }
+
+    #[test]
+    fn test_pricing_tier_condition_absent_when_none() {
+        let tier = PricingTierDefinition::default();
+        let json = serde_json::to_value(&tier).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("condition"));
+    }
+
+    #[test]
+    fn test_pricing_tier_condition_present_when_some() {
+        let tier = PricingTierDefinition {
+            name: "extended".to_string(),
+            condition: Some(TierCondition {
+                usage_key: "input".to_string(),
+                operator: TierOperator::Gt,
+                value: 200000.0,
+            }),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&tier).unwrap();
+        assert!(json.as_object().unwrap().contains_key("condition"));
+    }
 }

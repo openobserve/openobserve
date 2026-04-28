@@ -1002,4 +1002,21 @@ mod tests {
         assert!(!json.contains("\"delay\""));
         assert!(!json.contains("\"start_at\""));
     }
+
+    #[test]
+    fn test_llm_evaluation_params_eval_template_absent_when_none() {
+        let params = LlmEvaluationParams::default();
+        let json = serde_json::to_value(&params).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("eval_template"));
+    }
+
+    #[test]
+    fn test_llm_evaluation_params_eval_template_present_when_some() {
+        let params = LlmEvaluationParams {
+            eval_template: Some("my_template".to_string()),
+            ..LlmEvaluationParams::default()
+        };
+        let json = serde_json::to_value(&params).unwrap();
+        assert!(json.as_object().unwrap().contains_key("eval_template"));
+    }
 }
