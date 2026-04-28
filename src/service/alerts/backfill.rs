@@ -718,4 +718,99 @@ mod tests {
     fn test_daily_alignment_both_not_aligned() {
         assert!(validate_time_alignment_daily(HOUR_ALIGNED_START, HOUR_ALIGNED_END).is_err());
     }
+
+    // ── BackfillJobStatus serde ───────────────────────────────────────────────
+
+    fn make_minimal_status() -> BackfillJobStatus {
+        BackfillJobStatus {
+            job_id: "job1".to_string(),
+            pipeline_id: "pipe1".to_string(),
+            pipeline_name: None,
+            start_time: 1_000,
+            end_time: 2_000,
+            current_position: 1_500,
+            progress_percent: 50,
+            status: "running".to_string(),
+            enabled: true,
+            deletion_status: None,
+            deletion_job_ids: None,
+            created_at: None,
+            last_triggered_at: None,
+            chunks_completed: None,
+            chunks_total: None,
+            chunk_period_minutes: None,
+            delay_between_chunks_secs: None,
+            delete_before_backfill: None,
+            error: None,
+        }
+    }
+
+    #[test]
+    fn test_backfill_job_status_skip_serializing_if_none_fields_absent() {
+        let status = make_minimal_status();
+        let json = serde_json::to_value(&status).unwrap();
+        let obj = json.as_object().unwrap();
+        // Fields with skip_serializing_if = "Option::is_none" — absent when None
+        assert!(!obj.contains_key("deletion_status"));
+        assert!(!obj.contains_key("deletion_job_ids"));
+        assert!(!obj.contains_key("created_at"));
+        assert!(!obj.contains_key("last_triggered_at"));
+        assert!(!obj.contains_key("chunks_completed"));
+        assert!(!obj.contains_key("chunks_total"));
+        assert!(!obj.contains_key("chunk_period_minutes"));
+        assert!(!obj.contains_key("delay_between_chunks_secs"));
+        assert!(!obj.contains_key("delete_before_backfill"));
+        assert!(!obj.contains_key("error"));
+        // pipeline_name has no skip_serializing_if — serializes as null when None
+        assert!(obj.contains_key("pipeline_name"));
+        assert!(obj["pipeline_name"].is_null());
+    }
+
+    #[test]
+    fn test_backfill_job_status_all_some_fields_present() {
+        let status = BackfillJobStatus {
+            job_id: "j".to_string(),
+            pipeline_id: "p".to_string(),
+            pipeline_name: Some("My Pipeline".to_string()),
+            start_time: 0,
+            end_time: 100,
+            current_position: 50,
+            progress_percent: 50,
+            status: "done".to_string(),
+            enabled: false,
+            deletion_status: Some(DeletionStatus::Completed),
+            deletion_job_ids: Some(vec!["d1".to_string()]),
+            created_at: Some(1000),
+            last_triggered_at: Some(2000),
+            chunks_completed: Some(5),
+            chunks_total: Some(10),
+            chunk_period_minutes: Some(60),
+            delay_between_chunks_secs: Some(30),
+            delete_before_backfill: Some(true),
+            error: Some("oops".to_string()),
+        };
+        let json = serde_json::to_value(&status).unwrap();
+        let obj = json.as_object().unwrap();
+        assert_eq!(obj["pipeline_name"], "My Pipeline");
+        assert_eq!(obj["created_at"], 1000_i64);
+        assert_eq!(obj["chunks_completed"], 5_u64);
+        assert_eq!(obj["chunks_total"], 10_u64);
+        assert_eq!(obj["delete_before_backfill"], true);
+        assert_eq!(obj["error"], "oops");
+    }
+
+    #[test]
+    fn test_backfill_job_status_required_fields_always_present() {
+        let status = make_minimal_status();
+        let json = serde_json::to_value(&status).unwrap();
+        let obj = json.as_object().unwrap();
+        assert_eq!(obj["job_id"], "job1");
+        assert_eq!(obj["pipeline_id"], "pipe1");
+        assert_eq!(obj["start_time"], 1_000_i64);
+        assert_eq!(obj["end_time"], 2_000_i64);
+        assert_eq!(obj["current_position"], 1_500_i64);
+        assert_eq!(obj["progress_percent"], 50_u8);
+        assert_eq!(obj["status"], "running");
+        assert_eq!(obj["enabled"], true);
+    }
 }

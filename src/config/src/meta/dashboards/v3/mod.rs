@@ -509,4 +509,82 @@ mod tests {
         assert!(back.operator.is_none());
         assert!(back.value.is_none());
     }
+
+    #[test]
+    fn test_variables_show_dynamic_filters_none_absent() {
+        let vars = Variables::default();
+        assert!(vars.show_dynamic_filters.is_none());
+        let json = serde_json::to_string(&vars).unwrap();
+        assert!(!json.contains("showDynamicFilters"));
+    }
+
+    #[test]
+    fn test_variables_show_dynamic_filters_some_present() {
+        let vars = Variables {
+            list: vec![],
+            show_dynamic_filters: Some(false),
+        };
+        let json = serde_json::to_string(&vars).unwrap();
+        assert!(json.contains("showDynamicFilters"));
+        assert!(json.contains("false"));
+    }
+
+    #[test]
+    fn test_datetime_options_relative_time_period_none_absent() {
+        let opts = DateTimeOptions {
+            typee: "relative".to_string(),
+            relative_time_period: None,
+            start_time: None,
+            end_time: None,
+        };
+        let json = serde_json::to_string(&opts).unwrap();
+        assert!(!json.contains("relative_time_period"));
+        assert!(!json.contains("start_time"));
+        assert!(!json.contains("end_time"));
+    }
+
+    #[test]
+    fn test_datetime_options_absolute_times_serialized() {
+        let opts = DateTimeOptions {
+            typee: "absolute".to_string(),
+            relative_time_period: None,
+            start_time: Some(1_000_000),
+            end_time: Some(2_000_000),
+        };
+        let val = serde_json::to_value(&opts).unwrap();
+        assert_eq!(val["type"], "absolute");
+        assert_eq!(val["startTime"], 1_000_000_i64);
+        assert_eq!(val["endTime"], 2_000_000_i64);
+        assert!(val.get("relative_time_period").is_none());
+    }
+
+    #[test]
+    fn test_variable_list_multi_select_none_absent() {
+        let vl = VariableList {
+            type_field: "query".to_string(),
+            name: "v".to_string(),
+            label: "V".to_string(),
+            query_data: None,
+            value: None,
+            options: None,
+            multi_select: None,
+        };
+        let json = serde_json::to_string(&vl).unwrap();
+        assert!(!json.contains("multiSelect"));
+    }
+
+    #[test]
+    fn test_variable_list_multi_select_some_present() {
+        let vl = VariableList {
+            type_field: "custom".to_string(),
+            name: "env".to_string(),
+            label: "Env".to_string(),
+            query_data: None,
+            value: None,
+            options: None,
+            multi_select: Some(true),
+        };
+        let json = serde_json::to_string(&vl).unwrap();
+        assert!(json.contains("multiSelect"));
+    }
 }
