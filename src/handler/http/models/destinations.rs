@@ -495,4 +495,40 @@ mod tests {
         let meta = t.into("org");
         assert!(matches!(meta.template_type, meta_dest::TemplateType::Sns));
     }
+
+    #[test]
+    fn test_destination_optional_fields_absent_when_none() {
+        let d = Destination::default();
+        let json = serde_json::to_value(&d).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("headers"));
+        assert!(!obj.contains_key("template"));
+        assert!(!obj.contains_key("sns_topic_arn"));
+        assert!(!obj.contains_key("aws_region"));
+        assert!(!obj.contains_key("output_format"));
+        assert!(!obj.contains_key("destination_type_name"));
+    }
+
+    #[test]
+    fn test_destination_optional_fields_present_when_some() {
+        let mut hdrs = HashMap::new();
+        hdrs.insert("X-Token".to_string(), "abc".to_string());
+        let d = Destination {
+            headers: Some(hdrs),
+            template: Some("Default".to_string()),
+            sns_topic_arn: Some("arn:aws:sns:us-east-1:123:topic".to_string()),
+            aws_region: Some("us-east-1".to_string()),
+            output_format: Some(meta_dest::HTTPOutputFormat::JSON),
+            destination_type_name: Some("openobserve".to_string()),
+            ..Destination::default()
+        };
+        let json = serde_json::to_value(&d).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("headers"));
+        assert!(obj.contains_key("template"));
+        assert!(obj.contains_key("sns_topic_arn"));
+        assert!(obj.contains_key("aws_region"));
+        assert!(obj.contains_key("output_format"));
+        assert!(obj.contains_key("destination_type_name"));
+    }
 }
