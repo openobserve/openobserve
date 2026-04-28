@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         { 'no-position-absolute': store.state.printMode },
         { 'wrap-enabled': wrapCells },
       ]"
-      :virtual-scroll="!showPagination && !store.state.printMode"
+      :virtual-scroll="!showPagination"
       v-model:pagination="pagination"
       :rows-per-page-options="paginationOptions"
       :virtual-scroll-sticky-size-start="48"
