@@ -76,6 +76,16 @@
   --color-dropdown-label: var(--color-text-secondary);
   --color-dropdown-separator: var(--color-border-default);
 
+  /* Modal */
+  --color-modal-bg: var(--color-surface-panel);
+  --color-modal-border: var(--color-border-default);
+  --color-modal-header-border: var(--color-border-default);
+  --color-modal-footer-border: var(--color-border-default);
+  --color-modal-title: var(--color-text-primary);
+  --color-modal-close-text: var(--color-text-secondary);
+  --color-modal-close-hover-bg: var(--color-surface-overlay);
+  --color-modal-focus-ring: var(--color-primary-400);
+
   /* Menu (floating panel) */
   --color-menu-bg: var(--color-surface-overlay);
   --color-menu-border: var(--color-border-default);
@@ -160,6 +170,16 @@
   --color-dropdown-item-disabled: var(--color-dropdown-item-disabled);
   --color-dropdown-label: var(--color-dropdown-label);
   --color-dropdown-separator: var(--color-dropdown-separator);
+
+  /* Modal */
+  --color-modal-bg: var(--color-modal-bg);
+  --color-modal-border: var(--color-modal-border);
+  --color-modal-header-border: var(--color-modal-header-border);
+  --color-modal-footer-border: var(--color-modal-footer-border);
+  --color-modal-title: var(--color-modal-title);
+  --color-modal-close-text: var(--color-modal-close-text);
+  --color-modal-close-hover-bg: var(--color-modal-close-hover-bg);
+  --color-modal-focus-ring: var(--color-modal-focus-ring);
 
   /* Menu (floating panel) */
   --color-menu-bg: var(--color-menu-bg);
