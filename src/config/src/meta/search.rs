@@ -3610,4 +3610,79 @@ mod tests {
         assert!(!obj.contains_key("search_event_context"));
         assert!(!obj.contains_key("local_mode"));
     }
+
+    #[test]
+    fn test_search_history_hit_response_none_fields_absent() {
+        let hit = SearchHistoryHitResponse {
+            org_id: "org".to_string(),
+            stream_type: "logs".to_string(),
+            stream_name: "s".to_string(),
+            min_ts: 0,
+            max_ts: 0,
+            request_body: "SELECT 1".to_string(),
+            size: 0.0,
+            num_records: 0,
+            response_time: 0.0,
+            cached_ratio: 0,
+            trace_id: "t1".to_string(),
+            function: None,
+            _timestamp: None,
+            unit: None,
+            event: None,
+        };
+        let json = serde_json::to_value(&hit).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("function"));
+        assert!(!obj.contains_key("_timestamp"));
+        assert!(!obj.contains_key("unit"));
+        assert!(!obj.contains_key("event"));
+    }
+
+    #[test]
+    fn test_search_history_hit_response_some_fields_present() {
+        let hit = SearchHistoryHitResponse {
+            org_id: "org".to_string(),
+            stream_type: "logs".to_string(),
+            stream_name: "s".to_string(),
+            min_ts: 0,
+            max_ts: 0,
+            request_body: "SELECT 1".to_string(),
+            size: 0.0,
+            num_records: 0,
+            response_time: 0.0,
+            cached_ratio: 0,
+            trace_id: "t1".to_string(),
+            function: Some("my_fn".to_string()),
+            _timestamp: Some(1000),
+            unit: Some("bytes".to_string()),
+            event: Some("ui".to_string()),
+        };
+        let json = serde_json::to_value(&hit).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("function"));
+        assert!(obj.contains_key("_timestamp"));
+        assert!(obj.contains_key("unit"));
+        assert!(obj.contains_key("event"));
+    }
+
+    #[test]
+    fn test_query_sampling_fields_none_absent() {
+        let q = Query::default();
+        let json = serde_json::to_value(&q).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("sampling_config"));
+        assert!(!obj.contains_key("sampling_ratio"));
+    }
+
+    #[test]
+    fn test_query_sampling_ratio_some_present() {
+        let q = Query {
+            sampling_ratio: Some(0.5),
+            ..Query::default()
+        };
+        let json = serde_json::to_value(&q).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("sampling_ratio"));
+        assert_eq!(obj["sampling_ratio"], serde_json::json!(0.5_f64));
+    }
 }
