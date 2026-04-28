@@ -30,7 +30,7 @@ defineSlots<DropdownItemSlots>();
     @select="(e) => emit('select', e)"
   >
     <slot name="icon-left" />
-    <slot />
+    <slot />  
     <slot name="icon-right" />
   </DropdownMenuItem>
 </template>
