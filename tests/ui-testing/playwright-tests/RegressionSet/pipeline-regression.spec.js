@@ -3,6 +3,7 @@ const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { safeWaitForNetworkIdle, safeWaitForDOMContentLoaded } = require('../utils/wait-helpers.js');
 const logsdata = require('../../../test-data/logs_data.json');
 
 test.describe.configure({ mode: "serial" });
@@ -48,7 +49,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     await pageManager.pipelinesPage.ingestTracesData(TRACES_SERVICE_NAME, 5, TRACES_STREAM_NAME);
 
     // Wait for data to be indexed
-    await page.waitForTimeout(2000);
+    await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`
@@ -101,32 +102,32 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
     // Navigate to pipelines
     await pageManager.pipelinesPage.openPipelineMenu();
-    await page.waitForTimeout(1000);
+    await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
     // Add new pipeline
     await pageManager.pipelinesPage.addPipeline();
 
     // Drag Query button to canvas - opens Query/Scheduled Pipeline form dialog
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.queryButton);
-    await page.waitForTimeout(500);
+    await safeWaitForDOMContentLoaded(page);
 
     // Wait for scheduled pipeline form dialog to load
     await pageManager.pipelinesPage.waitForScheduledPipelineDialog();
-    await page.waitForTimeout(1000);
+    await safeWaitForDOMContentLoaded(page);
 
     // Expand "Build Query" section
     await pageManager.pipelinesPage.expandBuildQuerySection();
-    await page.waitForTimeout(500);
+    await safeWaitForDOMContentLoaded(page);
 
     // Select stream type: METRICS (this is the key part of the test!)
     testLogger.info('Selecting metrics stream type');
     await pageManager.pipelinesPage.selectStreamType('metrics');
-    await page.waitForTimeout(1000);
+    await safeWaitForDOMContentLoaded(page);
 
     // Select the metrics stream we ingested
     testLogger.info(`Selecting metrics stream: ${METRICS_STREAM_NAME}`);
     await pageManager.pipelinesPage.selectStreamName(METRICS_STREAM_NAME);
-    await page.waitForTimeout(1500);
+    await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
     // Verify SQL editor is visible with auto-generated query
     await pageManager.pipelinesPage.expectSqlEditorVisible();
@@ -140,8 +141,8 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     // Click "Validate and Close" button using page object method
     await pageManager.pipelinesPage.clickValidateAndClose();
 
-    // Wait for validation to complete
-    await page.waitForTimeout(3000);
+    // Wait for validation to complete (the page.route interceptor captures validation API calls)
+    await safeWaitForNetworkIdle(page, { timeout: 15000 });
 
     // Verify the validation API was called with correct stream type
     testLogger.info('Validation API calls captured', { calls: validationApiCalls });
@@ -210,32 +211,32 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
     // Navigate to pipelines
     await pageManager.pipelinesPage.openPipelineMenu();
-    await page.waitForTimeout(1000);
+    await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
     // Add new pipeline
     await pageManager.pipelinesPage.addPipeline();
 
     // Drag Query button to canvas - opens Query/Scheduled Pipeline form dialog
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.queryButton);
-    await page.waitForTimeout(500);
+    await safeWaitForDOMContentLoaded(page);
 
     // Wait for scheduled pipeline form dialog to load
     await pageManager.pipelinesPage.waitForScheduledPipelineDialog();
-    await page.waitForTimeout(1000);
+    await safeWaitForDOMContentLoaded(page);
 
     // Expand "Build Query" section
     await pageManager.pipelinesPage.expandBuildQuerySection();
-    await page.waitForTimeout(500);
+    await safeWaitForDOMContentLoaded(page);
 
     // Select stream type: TRACES (this is the key part of the test!)
     testLogger.info('Selecting traces stream type');
     await pageManager.pipelinesPage.selectStreamType('traces');
-    await page.waitForTimeout(1000);
+    await safeWaitForDOMContentLoaded(page);
 
     // Select the traces stream (in OpenObserve, traces go to "default" stream)
     testLogger.info(`Selecting traces stream: ${TRACES_STREAM_NAME}`);
     await pageManager.pipelinesPage.selectStreamName(TRACES_STREAM_NAME);
-    await page.waitForTimeout(1500);
+    await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
     // Verify SQL editor is visible with auto-generated query
     await pageManager.pipelinesPage.expectSqlEditorVisible();
@@ -249,8 +250,8 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     // Click "Validate and Close" button using page object method
     await pageManager.pipelinesPage.clickValidateAndClose();
 
-    // Wait for validation to complete
-    await page.waitForTimeout(3000);
+    // Wait for validation to complete (the page.route interceptor captures validation API calls)
+    await safeWaitForNetworkIdle(page, { timeout: 15000 });
 
     // Verify the validation API was called with correct stream type
     testLogger.info('Validation API calls captured', { calls: validationApiCalls });
@@ -295,30 +296,30 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
     // Navigate to pipelines
     await pageManager.pipelinesPage.openPipelineMenu();
-    await page.waitForTimeout(1000);
+    await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
     // Add new pipeline
     await pageManager.pipelinesPage.addPipeline();
 
     // Drag Query button to canvas
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.queryButton);
-    await page.waitForTimeout(500);
+    await safeWaitForDOMContentLoaded(page);
 
     // Wait for scheduled pipeline form dialog
     await pageManager.pipelinesPage.waitForScheduledPipelineDialog();
-    await page.waitForTimeout(1000);
+    await safeWaitForDOMContentLoaded(page);
 
     // Expand "Build Query" section
     await pageManager.pipelinesPage.expandBuildQuerySection();
-    await page.waitForTimeout(500);
+    await safeWaitForDOMContentLoaded(page);
 
     // Select metrics stream type
     await pageManager.pipelinesPage.selectStreamType('metrics');
-    await page.waitForTimeout(1000);
+    await safeWaitForDOMContentLoaded(page);
 
     // Select the metrics stream
     await pageManager.pipelinesPage.selectStreamName(METRICS_STREAM_NAME);
-    await page.waitForTimeout(1500);
+    await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
     // Verify query is generated
     await pageManager.pipelinesPage.expectSqlEditorVisible();
@@ -332,14 +333,14 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     // Focus the SQL editor using page object
     await pageManager.pipelinesPage.focusSqlEditor();
 
-    // Small delay to ensure focus
-    await page.waitForTimeout(100);
+    // Ensure DOM is settled before clicking the button
+    await safeWaitForDOMContentLoaded(page);
 
     // Quickly click Validate and Close using page object
     await pageManager.pipelinesPage.clickValidateAndClose();
 
-    // Wait a moment for any dialogs to appear
-    await page.waitForTimeout(2000);
+    // Wait for network to settle (any validation/dialog API calls)
+    await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
     // The "Discard Changes" dialog should NOT appear
     // Before the fix, this dialog would appear because blur was triggering validation
@@ -374,32 +375,32 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
     // Navigate to pipelines
     await pageManager.pipelinesPage.openPipelineMenu();
-    await page.waitForTimeout(1000);
+    await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
     // Add new pipeline
     await pageManager.pipelinesPage.addPipeline();
 
     // Drag Query button to canvas
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.queryButton);
-    await page.waitForTimeout(500);
+    await safeWaitForDOMContentLoaded(page);
 
     // Wait for scheduled pipeline form dialog
     await pageManager.pipelinesPage.waitForScheduledPipelineDialog();
-    await page.waitForTimeout(1000);
+    await safeWaitForDOMContentLoaded(page);
 
     // Expand "Build Query" section
     await pageManager.pipelinesPage.expandBuildQuerySection();
-    await page.waitForTimeout(500);
+    await safeWaitForDOMContentLoaded(page);
 
     // Select metrics stream type and stream
     await pageManager.pipelinesPage.selectStreamType('metrics');
-    await page.waitForTimeout(1000);
+    await safeWaitForDOMContentLoaded(page);
     await pageManager.pipelinesPage.selectStreamName(METRICS_STREAM_NAME);
-    await page.waitForTimeout(1500);
+    await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
     // Focus the SQL editor using page object
     await pageManager.pipelinesPage.focusSqlEditor();
-    await page.waitForTimeout(100);
+    await safeWaitForDOMContentLoaded(page);
 
     testLogger.info('Clicking Cancel button quickly after editor focus');
 
@@ -407,7 +408,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     await pageManager.pipelinesPage.clickCancelAndConfirm();
 
     // Wait for dialog handling
-    await page.waitForTimeout(1500);
+    await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
     // Should see the normal confirmation dialog (from clicking Cancel)
     // NOT from blur interference - this is expected behavior
@@ -442,12 +443,12 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     const streamNames = ["e2e_automate", "k8s_json"];
     await pageManager.pipelinesPage.bulkIngestToStreams(streamNames, logsdata);
     await pageManager.pipelinesPage.openPipelineMenu();
-    await page.waitForTimeout(1000);
+    await safeWaitForNetworkIdle(page, { timeout: 10000 });
     await pageManager.pipelinesPage.addPipeline();
     await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.queryButton);
-    await page.waitForTimeout(500);
+    await safeWaitForDOMContentLoaded(page);
     await pageManager.pipelinesPage.waitForScheduledPipelineDialog();
-    await page.waitForTimeout(1000);
+    await safeWaitForDOMContentLoaded(page);
   }
 
   test("Bug #11498: should disable Run Query button when no stream is selected", {
@@ -461,11 +462,11 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
     // Expand Build Query section to select a stream
     await pageManager.pipelinesPage.expandBuildQuerySection();
-    await page.waitForTimeout(500);
+    await safeWaitForDOMContentLoaded(page);
 
     // Select stream type (logs)
     await pageManager.pipelinesPage.selectStreamType("logs");
-    await page.waitForTimeout(1000);
+    await safeWaitForDOMContentLoaded(page);
 
     // Run Query should still be disabled (no stream NAME selected yet,
     // only stream TYPE)
@@ -485,15 +486,15 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
     // Expand Build Query section
     await pageManager.pipelinesPage.expandBuildQuerySection();
-    await page.waitForTimeout(500);
+    await safeWaitForDOMContentLoaded(page);
 
     // Select stream type (logs)
     await pageManager.pipelinesPage.selectStreamType("logs");
-    await page.waitForTimeout(1000);
+    await safeWaitForDOMContentLoaded(page);
 
     // Select stream name (e2e_automate)
     await pageManager.pipelinesPage.selectStreamName("e2e_automate");
-    await page.waitForTimeout(1000);
+    await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
     // Verify SQL editor is visible (query auto-generated)
     await pageManager.pipelinesPage.expectSqlEditorVisible();
