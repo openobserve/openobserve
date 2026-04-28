@@ -979,7 +979,8 @@
     "fieldName": "字段名",
     "fieldRequired": "字段为必填字段！",
     "dataType": "数据类型",
-    "dataTypeRequired": "数据类型为必填项！"
+    "dataTypeRequired": "数据类型为必填项！",
+    "udsFieldAlreadyInSchema": "一个或多个选定字段已经是定义架构的一部分"
   },
   "function": {
     "header": "函数",

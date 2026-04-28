@@ -979,7 +979,8 @@
     "fieldName": "Veldnaam",
     "fieldRequired": "Veld is verplicht!",
     "dataType": "Gegevenstype",
-    "dataTypeRequired": "Gegevenstype is vereist!"
+    "dataTypeRequired": "Gegevenstype is vereist!",
+    "udsFieldAlreadyInSchema": "Een of meer geselecteerde velden maken al deel uit van het gedefinieerde schema"
   },
   "function": {
     "header": "Functies",
