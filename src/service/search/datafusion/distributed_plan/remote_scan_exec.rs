@@ -435,3 +435,34 @@ pub fn is_parquet_file_not_found(e: &tonic::Status) -> bool {
             .unwrap_or(false)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_parquet_file_not_found_true() {
+        let msg = r#"prefix text {"code":20006,"inner":""}"#;
+        let status = tonic::Status::new(tonic::Code::Internal, msg);
+        assert!(is_parquet_file_not_found(&status));
+    }
+
+    #[test]
+    fn test_is_parquet_file_not_found_wrong_code() {
+        let msg = r#"{"code":20001,"inner":"bad sql"}"#;
+        let status = tonic::Status::new(tonic::Code::Internal, msg);
+        assert!(!is_parquet_file_not_found(&status));
+    }
+
+    #[test]
+    fn test_is_parquet_file_not_found_non_internal_status() {
+        let status = tonic::Status::new(tonic::Code::NotFound, "not found");
+        assert!(!is_parquet_file_not_found(&status));
+    }
+
+    #[test]
+    fn test_is_parquet_file_not_found_no_json() {
+        let status = tonic::Status::new(tonic::Code::Internal, "no json here");
+        assert!(!is_parquet_file_not_found(&status));
+    }
+}
