@@ -152,3 +152,18 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     log::info!("/ofga/model Cached ");
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ofga_key_prefix_value() {
+        assert_eq!(OFGA_KEY_PREFIX, "/ofga/model");
+    }
+
+    #[test]
+    fn test_ofga_key_prefix_starts_with_slash() {
+        assert!(OFGA_KEY_PREFIX.starts_with('/'));
+    }
+}

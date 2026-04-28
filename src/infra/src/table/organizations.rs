@@ -356,3 +356,51 @@ pub async fn invalidate_cache(org_id: Option<&str>) {
         cache.drain();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::organization::OrganizationType;
+
+    use super::*;
+
+    #[test]
+    fn test_organization_record_new_fields() {
+        let rec = OrganizationRecord::new("org-1", "My Org", OrganizationType::Default);
+        assert_eq!(rec.identifier, "org-1");
+        assert_eq!(rec.org_name, "My Org");
+        assert_eq!(rec.org_type, OrganizationType::Default);
+        assert!(rec.created_at > 0);
+        assert_eq!(rec.created_at, rec.updated_at);
+    }
+
+    #[test]
+    fn test_organization_record_new_custom_type() {
+        let rec = OrganizationRecord::new("acme", "Acme Corp", OrganizationType::Custom);
+        assert_eq!(rec.identifier, "acme");
+        assert_eq!(rec.org_type, OrganizationType::Custom);
+    }
+
+    #[test]
+    fn test_list_filter_with_limit_some() {
+        let f = ListFilter::with_limit(Some(50));
+        assert_eq!(f.limit, Some(50));
+        assert!(f.created_after.is_none());
+        assert!(f.created_before.is_none());
+    }
+
+    #[test]
+    fn test_list_filter_with_limit_none() {
+        let f = ListFilter::with_limit(None);
+        assert!(f.limit.is_none());
+        assert!(f.created_after.is_none());
+        assert!(f.created_before.is_none());
+    }
+
+    #[test]
+    fn test_list_filter_default() {
+        let f = ListFilter::default();
+        assert!(f.limit.is_none());
+        assert!(f.created_after.is_none());
+        assert!(f.created_before.is_none());
+    }
+}

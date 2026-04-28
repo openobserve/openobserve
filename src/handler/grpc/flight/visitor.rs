@@ -189,3 +189,32 @@ pub fn get_peak_memory_from_ctx(ctx: &SessionContext) -> Arc<AtomicUsize> {
         peak_memory
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_remote_scan_visitor_new_has_no_stats() {
+        let v = RemoteScanVisitor::new();
+        assert!(v.scan_stats.is_none());
+    }
+
+    #[test]
+    fn test_metrics_visitor_new_has_empty_metrics() {
+        let v = MetricsVisitor::new();
+        assert!(v.metrics.is_empty());
+    }
+
+    #[test]
+    fn test_partial_err_visitor_new_has_no_err() {
+        let v = PartialErrVisitor::new();
+        assert!(v.partial_err.is_none());
+    }
+
+    #[test]
+    fn test_peak_memory_visitor_new_has_none() {
+        let v = PeakMemoryVisitor::new();
+        assert!(v.peak_memory.is_none());
+    }
+}

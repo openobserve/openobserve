@@ -811,10 +811,7 @@ mod tests {
 
     #[test]
     fn test_split_file_list_all_tantivy() {
-        let files = vec![
-            make_file(100, 200, 512),
-            make_file(300, 400, 1024),
-        ];
+        let files = vec![make_file(100, 200, 512), make_file(300, 400, 1024)];
         let (tantivy, datafusion) = split_file_list_by_time_range(files, 0, 1000, 0);
         assert_eq!(tantivy.len(), 2);
         assert!(datafusion.is_empty());
@@ -857,15 +854,12 @@ mod tests {
 
     #[test]
     fn test_collect_stats_aggregates() {
-        let files = vec![
-            make_file(0, 100, 10),
-            make_file(100, 200, 20),
-        ];
+        let files = vec![make_file(0, 100, 10), make_file(100, 200, 20)];
         let stats = collect_stats(&files);
         assert_eq!(stats.files, 2);
-        assert_eq!(stats.records, 20);         // 10 + 10
-        assert_eq!(stats.original_size, 200);  // 100 + 100
+        assert_eq!(stats.records, 20); // 10 + 10
+        assert_eq!(stats.original_size, 200); // 100 + 100
         assert_eq!(stats.compressed_size, 100); // 50 + 50
-        assert_eq!(stats.idx_scan_size, 30);   // 10 + 20
+        assert_eq!(stats.idx_scan_size, 30); // 10 + 20
     }
 }

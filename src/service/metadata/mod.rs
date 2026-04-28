@@ -94,3 +94,20 @@ pub async fn close() -> infra::errors::Result<()> {
     // flush metadata
     METADATA_MANAGER.close().await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metadata_manager_new() {
+        let m = MetadataManager::new();
+        drop(m);
+    }
+
+    #[test]
+    fn test_metadata_manager_default() {
+        let m = MetadataManager::default();
+        drop(m);
+    }
+}

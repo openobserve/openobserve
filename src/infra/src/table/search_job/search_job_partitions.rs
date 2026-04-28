@@ -245,3 +245,46 @@ pub async fn clean_deleted_partition_job(job_id: &str) -> Result<(), errors::Err
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Filter, MetaColumn};
+    use crate::table::search_job::common::{OperatorType, Value};
+
+    #[test]
+    fn test_filter_new_with_string_value() {
+        let f = Filter::new(
+            MetaColumn::JobId,
+            OperatorType::Equal,
+            Value::string("job-abc"),
+        );
+        assert!(matches!(f.left, MetaColumn::JobId));
+        assert!(matches!(f.operator, OperatorType::Equal));
+        assert!(matches!(&f.right, Value::String(s) if s == "job-abc"));
+    }
+
+    #[test]
+    fn test_filter_new_with_i64_value() {
+        let f = Filter::new(MetaColumn::StartTime, OperatorType::Equal, Value::i64(9999));
+        assert!(matches!(f.left, MetaColumn::StartTime));
+        assert!(matches!(f.right, Value::I64(v) if v == 9999));
+    }
+
+    #[test]
+    fn test_filter_new_partition_id() {
+        let f = Filter::new(
+            MetaColumn::PartitionId,
+            OperatorType::Equal,
+            Value::string("part-1"),
+        );
+        assert!(matches!(f.left, MetaColumn::PartitionId));
+    }
+
+    #[test]
+    fn test_filter_clone() {
+        let f = Filter::new(MetaColumn::Status, OperatorType::Equal, Value::i64(1));
+        let cloned = f.clone();
+        assert!(matches!(cloned.left, MetaColumn::Status));
+        assert!(matches!(cloned.right, Value::I64(v) if v == 1));
+    }
+}
