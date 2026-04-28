@@ -886,4 +886,84 @@ mod tests {
         assert!(json.contains("selectAllValueForMultiSelect"));
         assert!(json.contains("customMultiSelectValue"));
     }
+
+    #[test]
+    fn test_color_cfg_default_all_none_absent() {
+        let cfg = ColorCfg::default();
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(!json.contains("mode"));
+        assert!(!json.contains("fixedColor"));
+        assert!(!json.contains("seriesBy"));
+        assert!(!json.contains("colorBySeries"));
+    }
+
+    #[test]
+    fn test_mapping_default_all_none_absent() {
+        let m = Mapping::default();
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(!json.contains("type"));
+        assert!(!json.contains("value"));
+        assert!(!json.contains("from"));
+        assert!(!json.contains("to"));
+        assert!(!json.contains("pattern"));
+        assert!(!json.contains("match"));
+        assert!(!json.contains("color"));
+        assert!(!json.contains("text"));
+    }
+
+    #[test]
+    fn test_drill_down_default_all_none_absent() {
+        let dd = DrillDown::default();
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(!json.contains("name"));
+        assert!(!json.contains("type"));
+        assert!(!json.contains("targetBlank"));
+        assert!(!json.contains("findBy"));
+        assert!(!json.contains("data"));
+    }
+
+    #[test]
+    fn test_mark_line_default_all_none_absent() {
+        let ml = MarkLine::default();
+        let json = serde_json::to_string(&ml).unwrap();
+        assert!(!json.contains("name"));
+        assert!(!json.contains("type"));
+        assert!(!json.contains("value"));
+    }
+
+    #[test]
+    fn test_override_config_default_all_none_absent() {
+        let oc = OverrideConfig::default();
+        let json = serde_json::to_string(&oc).unwrap();
+        assert!(!json.contains("field"));
+        assert!(!json.contains("config"));
+    }
+
+    #[test]
+    fn test_drill_down_data_default_all_none_absent() {
+        let dd = DrillDownData::default();
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(!json.contains("url"));
+        assert!(!json.contains("folder"));
+        assert!(!json.contains("dashboard"));
+        assert!(!json.contains("tab"));
+        assert!(!json.contains("passAllVariables"));
+        assert!(!json.contains("variables"));
+        assert!(!json.contains("logsMode"));
+        assert!(!json.contains("logsQuery"));
+    }
+
+    #[test]
+    fn test_time_shift_default_offset_absent() {
+        let ts = TimeShift::default();
+        let json = serde_json::to_string(&ts).unwrap();
+        assert!(!json.contains("offSet"));
+    }
+
+    #[test]
+    fn test_query_data_default_filter_absent() {
+        let qd = QueryData::default();
+        let json = serde_json::to_string(&qd).unwrap();
+        assert!(!json.contains("filter"));
+    }
 }
