@@ -3562,4 +3562,52 @@ mod tests {
         assert!(obj.contains_key("query_index"));
         assert!(obj.contains_key("peak_memory_usage"));
     }
+
+    #[test]
+    fn test_search_event_context_default_all_absent() {
+        let ctx = SearchEventContext::default();
+        let json = serde_json::to_value(&ctx).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("alert_key"));
+        assert!(!obj.contains_key("alert_name"));
+        assert!(!obj.contains_key("derived_stream_key"));
+        assert!(!obj.contains_key("report_id"));
+        assert!(!obj.contains_key("dashboard_id"));
+        assert!(!obj.contains_key("dashboard_name"));
+        assert!(!obj.contains_key("folder_id"));
+        assert!(!obj.contains_key("folder_name"));
+    }
+
+    #[test]
+    fn test_search_event_context_some_fields_present() {
+        let ctx = SearchEventContext {
+            alert_key: Some("alert-1".to_string()),
+            alert_name: Some("My Alert".to_string()),
+            report_key: Some("rpt-42".to_string()),
+            dashboard_id: Some("dash-1".to_string()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&ctx).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("alert_key"));
+        assert!(obj.contains_key("alert_name"));
+        assert!(obj.contains_key("report_id"));
+        assert!(obj.contains_key("dashboard_id"));
+    }
+
+    #[test]
+    fn test_request_search_type_none_absent() {
+        let req = Request {
+            query: Query::default(),
+            search_type: None,
+            search_event_context: None,
+            local_mode: None,
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&req).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("search_type"));
+        assert!(!obj.contains_key("search_event_context"));
+        assert!(!obj.contains_key("local_mode"));
+    }
 }
