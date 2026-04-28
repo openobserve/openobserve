@@ -357,7 +357,7 @@ describe("fillMissingValues", () => {
     },
   ];
 
-  it("LTR: anchors user-end with empty string when first chunk starts at user-start", () => {
+  it("LTR: anchors user-end with fallback value when first chunk starts at user-start", () => {
     const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
     const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
     // First chunk covers only the very start → LTR
@@ -384,10 +384,10 @@ describe("fillMissingValues", () => {
       (r: any) => r.ts === new Date(userEnd).toISOString().slice(0, 19),
     );
     expect(anchor).toBeDefined();
-    expect(anchor.value).toBe(""); // empty string, NOT "fallback"
+    expect(anchor.value).toBe("fallback");
   });
 
-  it("RTL: anchors user-start with empty string when first chunk ends at user-end", () => {
+  it("RTL: anchors user-start with fallback value when first chunk ends at user-end", () => {
     const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
     const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
     // First chunk covers only the very end → RTL
@@ -413,10 +413,10 @@ describe("fillMissingValues", () => {
       (r: any) => r.ts === new Date(userStart).toISOString().slice(0, 19),
     );
     expect(anchor).toBeDefined();
-    expect(anchor.value).toBe(""); // empty string, NOT "fallback"
+    expect(anchor.value).toBe("fallback");
   });
 
-  it("LTR with breakdown: right-edge anchor is emitted per series with empty string", () => {
+  it("LTR with breakdown: right-edge anchor is emitted per series with noValueConfigOption", () => {
     const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
     const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
     const chunkStart = userStart;
@@ -448,12 +448,12 @@ describe("fillMissingValues", () => {
     );
     expect(apiAnchor).toBeDefined();
     expect(webAnchor).toBeDefined();
-    // Anchor must use "" regardless of noValueConfigOption
-    expect(apiAnchor.value).toBe("");
-    expect(webAnchor.value).toBe("");
+    // Anchor uses noValueConfigOption
+    expect(apiAnchor.value).toBe(0);
+    expect(webAnchor.value).toBe(0);
   });
 
-  it("RTL with breakdown: left-edge anchor is emitted per series with empty string", () => {
+  it("RTL with breakdown: left-edge anchor is emitted per series with noValueConfigOption", () => {
     const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
     const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
     const chunkStart = userEnd - 60_000;
@@ -485,8 +485,156 @@ describe("fillMissingValues", () => {
     );
     expect(apiAnchor).toBeDefined();
     expect(webAnchor).toBeDefined();
-    expect(apiAnchor.value).toBe("");
-    expect(webAnchor.value).toBe("");
+    expect(apiAnchor.value).toBe(0);
+    expect(webAnchor.value).toBe(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Streaming: no clamping — fill the full chunk boundary range
+  // ---------------------------------------------------------------------------
+
+  it("LTR streaming: fills gaps between actual data points only", () => {
+    const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
+    const chunkStart = userStart;
+    const chunkEnd = userStart + 4 * 60_000; // chunk covers minutes 0-4
+
+    // Data at minutes 0 and 2 — minute 1 is a gap within actual data bounds
+    const processedData = [
+      { ts: "2024-01-15T10:00:00", value: 42 },
+      { ts: "2024-01-15T10:02:00", value: 99 },
+    ];
+
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeChunkMetaData(chunkStart, chunkEnd, 60),
+      makeRangeMetadata(userStart, userEnd),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      0,     // noValueConfigOption
+      true,  // loading = streaming
+    );
+
+    // Minute 0 has data
+    expect(result.find((r: any) => r.ts === "2024-01-15T10:00:00").value).toBe(42);
+    // Minute 1 is a gap between data points — filled with noValueConfigOption
+    const m1 = result.find((r: any) => r.ts === "2024-01-15T10:01:00");
+    expect(m1).toBeDefined();
+    expect(m1.value).toBe(0);
+    // Minute 2 has data
+    expect(result.find((r: any) => r.ts === "2024-01-15T10:02:00").value).toBe(99);
+    // Minutes 3 and 4 are NOT filled (after actualMaxTime, overlay preserves old data)
+    expect(result.find((r: any) => r.ts === "2024-01-15T10:03:00")).toBeUndefined();
+    expect(result.find((r: any) => r.ts === "2024-01-15T10:04:00")).toBeUndefined();
+  });
+
+  it("RTL streaming: fills gaps within chunk range with noValueConfigOption", () => {
+    const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
+    const chunkStart = userEnd - 2 * 60_000; // from minute 3
+    const chunkEnd = userEnd;
+
+    // Data at minute 4 only — minute 3 and minute 4:00 (userEnd) are in range
+    const processedData = [{ ts: "2024-01-15T10:04:00", value: 99 }];
+
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeChunkMetaData(chunkStart, chunkEnd, 60),
+      makeRangeMetadata(userStart, userEnd),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      0,     // noValueConfigOption
+      true,  // loading = streaming
+    );
+
+    // Minute 3 should be filled with noValueConfigOption
+    const filledEntry = result.find(
+      (r: any) => r.ts === "2024-01-15T10:03:00",
+    );
+    expect(filledEntry).toBeDefined();
+    expect(filledEntry.value).toBe(0);
+
+    // Minute 5 (userEnd) should also be filled — no clamping to actualMaxTime
+    const userEndEntry = result.find(
+      (r: any) => r.ts === "2024-01-15T10:05:00",
+    );
+    expect(userEndEntry).toBeDefined();
+    expect(userEndEntry.value).toBe(0);
+  });
+
+  it("RTL streaming: fills beyond actualMaxTime up to userEnd", () => {
+    const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
+    const chunkStart = userEnd - 60_000; // chunk covers minute 4
+    const chunkEnd = userEnd;
+
+    // Data only at minute 3 — but userEnd is minute 5
+    const processedData = [{ ts: "2024-01-15T10:03:00", value: 1 }];
+
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeChunkMetaData(chunkStart, chunkEnd, 60),
+      makeRangeMetadata(userStart, userEnd),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      null,
+      true, // loading
+    );
+
+    // Minutes 4 and 5 should be filled (beyond actualMaxTime=minute 3)
+    const m4 = result.find((r: any) => r.ts === "2024-01-15T10:04:00");
+    const m5 = result.find((r: any) => r.ts === "2024-01-15T10:05:00");
+    expect(m4).toBeDefined();
+    expect(m4.value).toBeNull();
+    expect(m5).toBeDefined();
+    expect(m5.value).toBeNull();
+  });
+
+  it("LTR streaming: clamps both edges to actual data bounds", () => {
+    const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
+    const chunkStart = userStart;
+    const chunkEnd = userStart + 5 * 60_000; // chunk covers minutes 0-5
+
+    // Data at minutes 2 and 3 — minutes 0,1 before and 4,5 after actual data
+    const processedData = [
+      { ts: "2024-01-15T10:02:00", value: 1 },
+      { ts: "2024-01-15T10:03:00", value: 2 },
+    ];
+
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeChunkMetaData(chunkStart, chunkEnd, 60),
+      makeRangeMetadata(userStart, userEnd),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      null,
+      true, // loading
+    );
+
+    // Minutes 0 and 1 NOT filled (before actualMinTime — overlay preserves old data)
+    expect(result.find((r: any) => r.ts === "2024-01-15T10:00:00")).toBeUndefined();
+    expect(result.find((r: any) => r.ts === "2024-01-15T10:01:00")).toBeUndefined();
+
+    // Minutes 2 and 3 have real data
+    expect(result.find((r: any) => r.ts === "2024-01-15T10:02:00")?.value).toBe(1);
+    expect(result.find((r: any) => r.ts === "2024-01-15T10:03:00")?.value).toBe(2);
+
+    // Minutes 4 and 5 NOT filled (after actualMaxTime — overlay preserves old data)
+    expect(result.find((r: any) => r.ts === "2024-01-15T10:04:00")).toBeUndefined();
+    expect(result.find((r: any) => r.ts === "2024-01-15T10:05:00")).toBeUndefined();
   });
 
   it("LTR (invalid time_offset): no crash, returns filled data including user-end anchor", () => {
@@ -512,5 +660,179 @@ describe("fillMissingValues", () => {
 
     expect(Array.isArray(result)).toBe(true);
     expect(result.length).toBeGreaterThan(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Additional chart type support
+  // ---------------------------------------------------------------------------
+
+  it("fills data for area-stacked chart type", () => {
+    const processedData = [{ ts: "2024-01-15T10:00:00", value: 100 }];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("area-stacked"),
+      makeResultMetaData(60),
+      makeMetadata(),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      null,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ ts: "2024-01-15T10:00:00", value: 100 });
+  });
+
+  it("fills data for scatter chart type", () => {
+    const processedData = [{ ts: "2024-01-15T10:00:00", value: 55 }];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("scatter"),
+      makeResultMetaData(60),
+      makeMetadata(),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      null,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ ts: "2024-01-15T10:00:00", value: 55 });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Multiple y-axis and z-axis keys
+  // ---------------------------------------------------------------------------
+
+  it("fills null entries for multiple y-axis keys", () => {
+    const processedData = [{ ts: "2024-01-15T09:00:00", v1: 1, v2: 2 }];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeResultMetaData(60),
+      makeMetadata(),
+      ["ts"],
+      ["v1", "v2"],
+      [],
+      [],
+      0,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      ts: "2024-01-15T10:00:00",
+      v1: 0,
+      v2: 0,
+    });
+  });
+
+  it("includes z-axis keys in the null entry key set", () => {
+    const processedData = [{ ts: "2024-01-15T09:00:00", y: 1, z: 2 }];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeResultMetaData(60),
+      makeMetadata(),
+      ["ts"],
+      ["y"],
+      ["z"],
+      [],
+      null,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      ts: "2024-01-15T10:00:00",
+      y: null,
+      z: null,
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Multiple resultMetaData entries (chunk coverage union)
+  // ---------------------------------------------------------------------------
+
+  it("handles multiple resultMetaData entries: uses first histogram_interval", () => {
+    // Only the first resultMetaData's histogram_interval is used (line 56-58)
+    const multiMeta = [
+      { histogram_interval: 60 },
+      { histogram_interval: 120 },
+    ];
+    const processedData = [{ ts: "2024-01-15T10:00:00", value: 42 }];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      multiMeta,
+      makeMetadata(),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      null,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].value).toBe(42);
+  });
+
+  // ---------------------------------------------------------------------------
+  // LTR streaming: single data point (actualMin === actualMax)
+  // ---------------------------------------------------------------------------
+
+  it("LTR streaming: single data point clamped to one entry", () => {
+    const userStart = Date.UTC(2024, 0, 15, 10, 0, 0);
+    const userEnd = Date.UTC(2024, 0, 15, 10, 5, 0);
+    const chunkStart = userStart;
+    const chunkEnd = userStart + 3 * 60_000;
+
+    const processedData = [{ ts: "2024-01-15T10:02:00", value: 7 }];
+
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeChunkMetaData(chunkStart, chunkEnd, 60),
+      makeRangeMetadata(userStart, userEnd),
+      ["ts"],
+      ["value"],
+      [],
+      [],
+      0,
+      true, // loading
+    );
+
+    // Only the single data point should be returned (actualMin === actualMax)
+    expect(result).toHaveLength(1);
+    expect(result[0].value).toBe(7);
+  });
+
+  // ---------------------------------------------------------------------------
+  // xAxisKeys contains the time key in addition to another field
+  // ---------------------------------------------------------------------------
+
+  it("uses xAxisKeysWithoutTimeStamp[0] as uniqueKey when present", () => {
+    const processedData = [
+      { ts: "2024-01-15T10:00:00", category: "a", value: 10 },
+      { ts: "2024-01-15T10:00:00", category: "b", value: 20 },
+    ];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("bar"),
+      makeResultMetaData(60),
+      makeMetadata(),
+      ["ts", "category"], // two x-axis keys, "ts" is time, "category" is uniqueKey
+      ["value"],
+      [],
+      [],
+      null,
+    );
+
+    // Two entries (one per unique category value)
+    expect(result).toHaveLength(2);
+    const catA = result.find((r: any) => r.category === "a");
+    const catB = result.find((r: any) => r.category === "b");
+    expect(catA).toBeDefined();
+    expect(catB).toBeDefined();
   });
 });

@@ -1317,10 +1317,6 @@ const createDestination = () => {
       })
       .then(() => {
         dismiss();
-        q.notify({
-          type: "positive",
-          message: `Destination updated successfully.`,
-        });
         emit("updated", formData.value.name);
       })
       .catch((err: any) => {
@@ -1344,10 +1340,6 @@ const createDestination = () => {
       })
       .then(() => {
         dismiss();
-        q.notify({
-          type: "positive",
-          message: `Destination saved successfully.`,
-        });
         emit("created", formData.value.name);
       })
       .catch((err: any) => {
