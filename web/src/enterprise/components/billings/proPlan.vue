@@ -95,6 +95,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Billing is handled through your Azure account
         </div>
       </div>
+      <!-- External contract - billed offline, no Stripe portal to open -->
+      <div
+        v-else-if="subscriptionType === 'external-contract'"
+        class="full-width text-center"
+      >
+        <q-chip
+          color="grey-3"
+          text-color="grey-8"
+          icon="description"
+          label="Managed via contract"
+          class="q-px-md q-py-sm"
+        />
+        <div class="text-caption text-grey-7 q-mt-sm">
+          Billing is handled through your contract — contact your account manager for changes
+        </div>
+      </div>
       <!-- Stripe billing - show subscribe/manage buttons -->
       <q-btn
         v-else-if="planType == planName"
@@ -122,7 +138,7 @@ import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "proPlan",
-  props: ["planType", "billingProvider", "features", "pricingError"],
+  props: ["planType", "billingProvider", "subscriptionType", "features", "pricingError"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const planName = "pay-as-you-go";
