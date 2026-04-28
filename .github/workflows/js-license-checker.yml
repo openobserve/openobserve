@@ -74,4 +74,4 @@ jobs:
         if: steps.check_changes.outputs.has_changes == 'true' && steps.check_package_changes.outputs.has_package_changes == 'true'
         run: |
           npm install -g license-checker
-          cd web && license-checker --production --json --onlyAllow="MIT;ISC;Apache-2.0;BSD;MPL-2.0;Unlicense;CC-BY-4.0;Artistic-2.0;UNLICENSED;Python-2.0;BlueOak-1.0.0"
+          cd web && license-checker --production --json --onlyAllow="MIT;ISC;Apache-2.0;BSD;MPL-2.0;Unlicense;CC0-1.0;CC-BY-4.0;Artistic-2.0;UNLICENSED;Python-2.0;BlueOak-1.0.0"
