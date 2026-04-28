@@ -189,3 +189,68 @@ pub async fn bulk_update(jobs: Vec<CompactorManualJob>) -> Result<(), errors::Er
     tx.commit().await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_job() -> CompactorManualJob {
+        CompactorManualJob {
+            id: "id1".to_string(),
+            key: "key1".to_string(),
+            created_at: 0,
+            ended_at: 0,
+            status: Status::Pending,
+        }
+    }
+
+    #[test]
+    fn test_compactor_job_res_entry_strings_absent_when_empty() {
+        let entry = CompactorManualJobResEntry {
+            cluster: String::new(),
+            region: String::new(),
+            job: make_job(),
+        };
+        let json = serde_json::to_value(&entry).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("cluster"));
+        assert!(!obj.contains_key("region"));
+    }
+
+    #[test]
+    fn test_compactor_job_res_entry_strings_present_when_nonempty() {
+        let entry = CompactorManualJobResEntry {
+            cluster: "c1".to_string(),
+            region: "us-east".to_string(),
+            job: make_job(),
+        };
+        let json = serde_json::to_value(&entry).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("cluster"));
+        assert!(obj.contains_key("region"));
+    }
+
+    #[test]
+    fn test_compactor_job_status_res_errors_absent_when_empty() {
+        let res = CompactorManualJobStatusRes {
+            id: "i1".to_string(),
+            status: Status::Completed,
+            metadata: vec![],
+            errors: vec![],
+        };
+        let json = serde_json::to_value(&res).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("errors"));
+    }
+
+    #[test]
+    fn test_compactor_job_status_res_errors_present_when_nonempty() {
+        let res = CompactorManualJobStatusRes {
+            id: "i1".to_string(),
+            status: Status::Running,
+            metadata: vec![],
+            errors: vec![serde_json::json!({"msg": "fail"})],
+        };
+        let json = serde_json::to_value(&res).unwrap();
+        assert!(json.as_object().unwrap().contains_key("errors"));
+    }
+}

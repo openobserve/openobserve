@@ -144,3 +144,36 @@ pub fn create_router() -> Router {
         .route("/api/healthz", get(healthz))
         .route("/api/:org_id/reports/:name/send", put(send_report))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_http_response_optional_fields_absent_when_none() {
+        let r = HttpResponse {
+            code: 200,
+            message: "ok".to_string(),
+            error_detail: None,
+            trace_id: None,
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("error_detail"));
+        assert!(!obj.contains_key("trace_id"));
+    }
+
+    #[test]
+    fn test_http_response_optional_fields_present_when_some() {
+        let r = HttpResponse {
+            code: 500,
+            message: "err".to_string(),
+            error_detail: Some("detail".to_string()),
+            trace_id: Some("tid".to_string()),
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("error_detail"));
+        assert!(obj.contains_key("trace_id"));
+    }
+}
