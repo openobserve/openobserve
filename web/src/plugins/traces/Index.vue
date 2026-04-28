@@ -476,7 +476,10 @@ async function getStreamList() {
         }
 
         await extractFields();
+        const queryBeforeRestore = searchObj.data.editorValue;
         correlationFilters.restore();
+        const filterWasRestored =
+          !queryBeforeRestore && !!searchObj.data.editorValue;
 
         if (
           searchObj.data.editorValue &&
@@ -484,6 +487,7 @@ async function getStreamList() {
         )
           nextTick(() => {
             restoreFilters(searchObj.data.editorValue);
+            if (filterWasRestored) searchData();
           });
       })
       .catch((e) => {
