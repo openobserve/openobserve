@@ -132,7 +132,7 @@ async fn patch_sre_readonly_alerts_incidents() {
     use bytes::Bytes;
 
     const MIGRATION_ORG: &str = "_migration";
-    const FLAG_KEY: &str = "sre_readonly_alerts_incidents_v1";
+    const FLAG_KEY: &str = "sre_readonly_afolder_incidents_v1";
 
     if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
         .await
@@ -185,7 +185,7 @@ async fn patch_sre_readonly_alerts_incidents() {
     if let Err(e) =
         crate::service::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
     {
-        log::error!("Failed to set sre_readonly_alerts_incidents migration flag: {e}");
+        log::error!("Failed to set sre_readonly_afolder_incidents migration flag: {e}");
     } else {
         log::info!("sre-readonly alerts/incidents patch complete");
     }

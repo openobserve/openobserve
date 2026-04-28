@@ -1042,11 +1042,14 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
             // Other DB errors should bubble up rather than triggering creation
             if err.to_string().contains("User not found") {
                 // Drop any orphaned mixed-case row in `users` left over from a
-                // pre-fix run. `users::remove` is case-insensitive, so it's a
-                // no-op when no orphan exists; safe to call unconditionally
-                // since we only reach this branch when there's no `org_users`
-                // row, meaning any matching `users` row is unreferenced.
-                table::users::remove(&email).await?;
+                // pre-fix run. `db::user::delete` is case-insensitive at the
+                // table layer and also fans out a cluster-wide invalidation so
+                // the in-mem user cache (and super_cluster) drop the stale row
+                // — `table::users::remove` would skip both. Safe to call
+                // unconditionally: we only reach this branch when there's no
+                // `org_users` row, meaning any matching `users` row is
+                // unreferenced.
+                db::user::delete(&email).await?;
                 create_service_account_if_not_exists(&email).await?;
 
                 let token = generate_random_string(32);
