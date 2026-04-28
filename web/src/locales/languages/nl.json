@@ -388,7 +388,9 @@
     "turnOnLiveMode": "Live-modus inschakelen",
     "turnOffLiveMode": "Live-modus uitschakelen",
     "autoRunEnabled": "Automatisch uitvoeren ingeschakeld",
-    "selectStreamFirst": "Selecteer eerst een stream"
+    "selectStreamFirst": "Selecteer eerst een stream",
+    "traces": "Sporen",
+    "switchToLogs": "klik om terug te schakelen naar de logboeken"
   },
   "menu": {
     "home": "Home",
@@ -977,7 +979,8 @@
     "fieldName": "Veldnaam",
     "fieldRequired": "Veld is verplicht!",
     "dataType": "Gegevenstype",
-    "dataTypeRequired": "Gegevenstype is vereist!"
+    "dataTypeRequired": "Gegevenstype is vereist!",
+    "udsFieldAlreadyInSchema": "Een of meer geselecteerde velden maken al deel uit van het gedefinieerde schema"
   },
   "function": {
     "header": "Functies",

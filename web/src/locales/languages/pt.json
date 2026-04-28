@@ -388,7 +388,9 @@
     "turnOnLiveMode": "Ativar o modo Ao vivo",
     "turnOffLiveMode": "Desativar o modo ao vivo",
     "autoRunEnabled": "Execução automática ativada",
-    "selectStreamFirst": "Selecione um stream primeiro"
+    "selectStreamFirst": "Selecione um stream primeiro",
+    "traces": "Traços",
+    "switchToLogs": "clique para voltar para Logs"
   },
   "menu": {
     "home": "Início",
@@ -977,7 +979,8 @@
     "fieldName": "Nome do campo",
     "fieldRequired": "O campo é obrigatório!",
     "dataType": "Tipo de dados",
-    "dataTypeRequired": "O tipo de dados é obrigatório!"
+    "dataTypeRequired": "O tipo de dados é obrigatório!",
+    "udsFieldAlreadyInSchema": "Um ou mais campos selecionados já fazem parte do esquema definido"
   },
   "function": {
     "header": "Funções",

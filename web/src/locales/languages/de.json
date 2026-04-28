@@ -388,7 +388,9 @@
     "turnOnLiveMode": "Aktiviere den Live-Modus",
     "turnOffLiveMode": "Schalten Sie den Live-Modus aus",
     "autoRunEnabled": "Automatischer Lauf aktiviert",
-    "selectStreamFirst": "Wähle zuerst einen Stream"
+    "selectStreamFirst": "Wähle zuerst einen Stream",
+    "traces": "Spuren",
+    "switchToLogs": "klicken Sie hier, um zurück zu Logs zu wechseln"
   },
   "menu": {
     "home": "Startseite",
@@ -977,7 +979,8 @@
     "fieldName": "Feldname",
     "fieldRequired": "Feld ist erforderlich!",
     "dataType": "Datentyp",
-    "dataTypeRequired": "Datentyp ist erforderlich!"
+    "dataTypeRequired": "Datentyp ist erforderlich!",
+    "udsFieldAlreadyInSchema": "Ein oder mehrere ausgewählte Felder sind bereits Teil des definierten Schemas"
   },
   "function": {
     "header": "Funktionen",

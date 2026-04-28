@@ -388,7 +388,9 @@
     "turnOnLiveMode": "开启直播模式",
     "turnOffLiveMode": "关闭直播模式",
     "autoRunEnabled": "自动运行已启用",
-    "selectStreamFirst": "先选择一个直播"
+    "selectStreamFirst": "先选择一个直播",
+    "traces": "痕迹",
+    "switchToLogs": "点击切换回日志"
   },
   "menu": {
     "home": "主页",
@@ -977,7 +979,8 @@
     "fieldName": "字段名",
     "fieldRequired": "字段为必填字段！",
     "dataType": "数据类型",
-    "dataTypeRequired": "数据类型为必填项！"
+    "dataTypeRequired": "数据类型为必填项！",
+    "udsFieldAlreadyInSchema": "一个或多个选定字段已经是定义架构的一部分"
   },
   "function": {
     "header": "函数",
