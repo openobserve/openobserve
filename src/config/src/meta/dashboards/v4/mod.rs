@@ -654,4 +654,118 @@ mod tests {
         let json = serde_json::to_string(&qd).unwrap();
         assert!(!json.contains("filter"));
     }
+
+    #[test]
+    fn test_panel_config_default_all_none_absent() {
+        let cfg = PanelConfig::default();
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(!json.contains("\"unit\""));
+        assert!(!json.contains("unit_custom"));
+        assert!(!json.contains("decimals"));
+        assert!(!json.contains("topResults"));
+        assert!(!json.contains("axisWidth"));
+        assert!(!json.contains("axisBorderShow"));
+        assert!(!json.contains("legendWidth"));
+        assert!(!json.contains("mapSymbolStyle"));
+        assert!(!json.contains("drilldown"));
+        assert!(!json.contains("markLine"));
+        assert!(!json.contains("connectNulls"));
+        assert!(!json.contains("noValueReplacement"));
+        assert!(!json.contains("wrapTableCells"));
+    }
+
+    #[test]
+    fn test_panel_fields_default_all_none_absent() {
+        let pf = PanelFields::default();
+        let json = serde_json::to_string(&pf).unwrap();
+        assert!(!json.contains("\"z\""));
+        assert!(!json.contains("breakdown"));
+        assert!(!json.contains("latitude"));
+        assert!(!json.contains("longitude"));
+        assert!(!json.contains("weight"));
+        assert!(!json.contains("source"));
+        assert!(!json.contains("target"));
+        assert!(!json.contains("\"value\""));
+    }
+
+    #[test]
+    fn test_query_config_default_all_none_absent() {
+        let qc = QueryConfig::default();
+        let json = serde_json::to_string(&qc).unwrap();
+        assert!(!json.contains("layer_type"));
+        assert!(!json.contains("weight_fixed"));
+        assert!(!json.contains("\"limit\""));
+        assert!(!json.contains("\"min\""));
+        assert!(!json.contains("\"max\""));
+    }
+
+    #[test]
+    fn test_drill_down_all_some_present() {
+        let dd = DrillDown {
+            name: Some("nav".to_string()),
+            type_field: Some("link".to_string()),
+            target_blank: Some(false),
+            find_by: Some("field".to_string()),
+            data: Some(DrillDownData::default()),
+        };
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(json.contains("name"));
+        assert!(json.contains("type"));
+        assert!(json.contains("targetBlank"));
+        assert!(json.contains("findBy"));
+        assert!(json.contains("data"));
+    }
+
+    #[test]
+    fn test_mark_line_all_some_present() {
+        let ml = MarkLine {
+            name: Some("avg line".to_string()),
+            typee: Some("average".to_string()),
+            value: Some("50".to_string()),
+        };
+        let json = serde_json::to_string(&ml).unwrap();
+        assert!(json.contains("name"));
+        assert!(json.contains("type"));
+        assert!(json.contains("\"value\""));
+    }
+
+    #[test]
+    fn test_drill_down_data_all_some_present() {
+        let dd = DrillDownData {
+            url: Some("https://x.com".to_string()),
+            folder: Some("f".to_string()),
+            dashboard: Some("d".to_string()),
+            tab: Some("t".to_string()),
+            pass_all_variables: Some(true),
+            variables: Some(vec![]),
+        };
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(json.contains("url"));
+        assert!(json.contains("folder"));
+        assert!(json.contains("dashboard"));
+        assert!(json.contains("tab"));
+        assert!(json.contains("passAllVariables"));
+        assert!(json.contains("variables"));
+    }
+
+    #[test]
+    fn test_legend_width_some_present() {
+        let lw = LegendWidth {
+            value: Some(OrdF64::from(120.0)),
+            unit: Some("px".to_string()),
+        };
+        let json = serde_json::to_string(&lw).unwrap();
+        assert!(json.contains("value"));
+        assert!(json.contains("unit"));
+    }
+
+    #[test]
+    fn test_query_data_filter_some_present() {
+        let qd = QueryData {
+            filter: Some(vec![]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&qd).unwrap();
+        assert!(json.contains("filter"));
+    }
 }

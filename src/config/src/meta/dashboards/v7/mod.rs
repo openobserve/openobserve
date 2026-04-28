@@ -978,4 +978,125 @@ mod tests {
         let json = serde_json::to_string(&qd).unwrap();
         assert!(!json.contains("filter"));
     }
+
+    #[test]
+    fn test_drill_down_all_some_present() {
+        let dd = DrillDown {
+            name: Some("nav".to_string()),
+            type_field: Some("link".to_string()),
+            target_blank: Some(true),
+            find_by: Some("field".to_string()),
+            data: Some(DrillDownData::default()),
+        };
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(json.contains("name"));
+        assert!(json.contains("type"));
+        assert!(json.contains("targetBlank"));
+        assert!(json.contains("findBy"));
+        assert!(json.contains("data"));
+    }
+
+    #[test]
+    fn test_mark_line_all_some_present() {
+        let ml = MarkLine {
+            name: Some("avg".to_string()),
+            typee: Some("average".to_string()),
+            value: Some("50".to_string()),
+        };
+        let json = serde_json::to_string(&ml).unwrap();
+        assert!(json.contains("name"));
+        assert!(json.contains("type"));
+        assert!(json.contains("\"value\""));
+    }
+
+    #[test]
+    fn test_drill_down_data_all_some_present() {
+        let dd = DrillDownData {
+            url: Some("https://x.com".to_string()),
+            folder: Some("f".to_string()),
+            dashboard: Some("d".to_string()),
+            tab: Some("t".to_string()),
+            pass_all_variables: Some(false),
+            variables: Some(vec![]),
+            logs_mode: Some("mode".to_string()),
+            logs_query: Some("query".to_string()),
+        };
+        let json = serde_json::to_string(&dd).unwrap();
+        assert!(json.contains("url"));
+        assert!(json.contains("folder"));
+        assert!(json.contains("dashboard"));
+        assert!(json.contains("tab"));
+        assert!(json.contains("passAllVariables"));
+        assert!(json.contains("variables"));
+        assert!(json.contains("logsMode"));
+        assert!(json.contains("logsQuery"));
+    }
+
+    #[test]
+    fn test_query_data_filter_some_present() {
+        let qd = QueryData {
+            filter: Some(vec![]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&qd).unwrap();
+        assert!(json.contains("filter"));
+    }
+
+    #[test]
+    fn test_query_config_all_none_absent() {
+        let qc = QueryConfig {
+            promql_legend: String::new(),
+            layer_type: None,
+            weight_fixed: None,
+            limit: None,
+            min: None,
+            max: None,
+            time_shift: None,
+        };
+        let json = serde_json::to_string(&qc).unwrap();
+        assert!(!json.contains("layer_type"));
+        assert!(!json.contains("weight_fixed"));
+        assert!(!json.contains("\"limit\""));
+        assert!(!json.contains("\"min\""));
+        assert!(!json.contains("\"max\""));
+        assert!(!json.contains("timeShift"));
+    }
+
+    #[test]
+    fn test_color_cfg_all_some_present() {
+        let cfg = ColorCfg {
+            mode: Some("fixed".to_string()),
+            fixed_color: Some(vec!["red".to_string()]),
+            series_by: Some("last".to_string()),
+            color_by_series: Some(vec![]),
+        };
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("mode"));
+        assert!(json.contains("fixedColor"));
+        assert!(json.contains("seriesBy"));
+        assert!(json.contains("colorBySeries"));
+    }
+
+    #[test]
+    fn test_mapping_all_some_present() {
+        let m = Mapping {
+            typee: Some("value".to_string()),
+            value: Some("0".to_string()),
+            from: Some("0".to_string()),
+            to: Some("1".to_string()),
+            pattern: Some(".*".to_string()),
+            matchh: Some("exact".to_string()),
+            color: Some("red".to_string()),
+            text: Some("zero".to_string()),
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("type"));
+        assert!(json.contains("\"value\""));
+        assert!(json.contains("from"));
+        assert!(json.contains("to"));
+        assert!(json.contains("pattern"));
+        assert!(json.contains("match"));
+        assert!(json.contains("color"));
+        assert!(json.contains("text"));
+    }
 }
