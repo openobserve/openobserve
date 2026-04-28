@@ -266,6 +266,59 @@ mod tests {
     }
 
     #[test]
+    fn test_list_alerts_response_item_skip_fields_absent_when_none() {
+        let item = ListAlertsResponseBodyItem {
+            alert_id: svix_ksuid::Ksuid::new(None, None),
+            folder_id: "f1".to_string(),
+            folder_name: "folder".to_string(),
+            name: "alert".to_string(),
+            owner: None,
+            description: None,
+            alert_type: "anomaly_detection".to_string(),
+            condition: None,
+            trigger_condition: None,
+            enabled: false,
+            last_triggered_at: None,
+            last_satisfied_at: None,
+            is_real_time: false,
+            last_trained_at: None,
+            status: None,
+            last_error: None,
+        };
+        let json = serde_json::to_value(&item).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("condition"));
+        assert!(!obj.contains_key("trigger_condition"));
+        assert!(!obj.contains_key("last_trained_at"));
+        assert!(!obj.contains_key("status"));
+        assert!(!obj.contains_key("last_error"));
+    }
+
+    #[test]
+    fn test_generate_sql_response_metadata_none_absent() {
+        let r = GenerateSqlResponseBody {
+            sql: "SELECT 1".to_string(),
+            metadata: None,
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("metadata"));
+    }
+
+    #[test]
+    fn test_generate_sql_response_metadata_some_present() {
+        let r = GenerateSqlResponseBody {
+            sql: "SELECT 1".to_string(),
+            metadata: Some(GenerateSqlMetadata {
+                has_aggregation: true,
+                has_conditions: false,
+                has_group_by: false,
+            }),
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        assert!(json.as_object().unwrap().contains_key("metadata"));
+    }
+
+    #[test]
     fn test_anomaly_config_trigger_condition_derived_from_window_and_interval() {
         let id = valid_ksuid_str();
         let v = serde_json::json!({
