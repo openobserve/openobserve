@@ -14,7 +14,6 @@ export type {
   DropdownGroupProps,
   DropdownGroupSlots,
 } from "./ODropdownGroup.types";
-export type { DropdownSeparatorSlots } from "./ODropdownSeparator.types";
 
 export type DropdownAlign = "start" | "center" | "end";
 export type DropdownSide = "top" | "right" | "bottom" | "left";
@@ -39,6 +38,6 @@ export interface DropdownEmits {
 export interface DropdownSlots {
   /** The element that opens the dropdown — rendered as-child into the trigger */
   trigger?: () => unknown;
-  /** ODropdownItem / ODropdownGroup / ODropdownSeparator children */
+  /** ODropdownItem / ODropdownGroup children */
   default?: () => unknown;
 }

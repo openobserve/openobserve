@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { SeparatorProps } from './Separator.types'
+import type { SeparatorProps } from './OSeparator.types'
+import { Separator } from 'reka-ui'
 import { computed } from 'vue'
 
 const props = withDefaults(defineProps<SeparatorProps>(), {
@@ -75,9 +76,8 @@ const inlineStyle = computed<Record<string, string> | undefined>(() => {
 </script>
 
 <template>
-  <div
-    role="separator"
-    :aria-orientation="vertical ? 'vertical' : 'horizontal'"
+  <Separator
+    :orientation="vertical ? 'vertical' : 'horizontal'"
     :class="classes"
     :style="inlineStyle"
   />

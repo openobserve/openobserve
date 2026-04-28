@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import OSeparator from './Separator.vue'
+import OSeparator from './OSeparator.vue'
 
 describe('OSeparator', () => {
   // --- Default rendering ---
@@ -13,7 +13,8 @@ describe('OSeparator', () => {
 
   it('defaults to horizontal orientation', () => {
     const wrapper = mount(OSeparator)
-    expect(wrapper.attributes('aria-orientation')).toBe('horizontal')
+    // Reka omits aria-orientation for horizontal (ARIA implicit default); uses data-orientation instead
+    expect(wrapper.attributes('data-orientation')).toBe('horizontal')
   })
 
   it('applies horizontal base classes by default', () => {
