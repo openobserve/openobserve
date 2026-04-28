@@ -9,12 +9,10 @@
       unprefixed, so dark.css overrides apply correctly.
    ============================================================ */
 
-@theme inline {
-  /* ---- Separator --------------------------------------------- */
-
-  /* Line thickness — 1 px in both orientations */
+/* ── Light-mode defaults ─────────────────────────────────── */
+:root {
+  /* Separator */
   --spacing-separator: var(--spacing-px);
-  /* Line color — uses semantic border token */
   --color-separator: var(--color-border-default);
   --color-separator-strong: var(--color-border-strong);
 
@@ -27,26 +25,26 @@
   --color-button-primary-focus-ring: var(--color-primary-400);
 
   /* Button — secondary */
-  --color-button-secondary: var(--color-grey-100);
-  --color-button-secondary-hover: var(--color-grey-200);
-  --color-button-secondary-active: var(--color-grey-300);
-  --color-button-secondary-disabled: var(--color-grey-100);
-  --color-button-secondary-foreground: var(--color-grey-800);
-  --color-button-secondary-focus-ring: var(--color-grey-400);
+  --color-button-secondary: var(--color-surface-panel);
+  --color-button-secondary-hover: var(--color-primary-50);
+  --color-button-secondary-active: var(--color-primary-100);
+  --color-button-secondary-disabled: var(--color-surface-panel);
+  --color-button-secondary-foreground: var(--color-text-primary);
+  --color-button-secondary-focus-ring: var(--color-primary-400);
 
   /* Button — outline */
-  --color-button-outline-text: var(--color-grey-800);
-  --color-button-outline-border: var(--color-grey-300);
-  --color-button-outline-hover-bg: var(--color-grey-50);
-  --color-button-outline-hover-border: var(--color-grey-400);
-  --color-button-outline-active-bg: var(--color-grey-100);
-  --color-button-outline-focus-ring: var(--color-grey-400);
+  --color-button-outline-text: var(--color-text-primary);
+  --color-button-outline-border: var(--color-primary-300);
+  --color-button-outline-hover-bg: var(--color-primary-50);
+  --color-button-outline-hover-border: var(--color-primary-400);
+  --color-button-outline-active-bg: var(--color-primary-100);
+  --color-button-outline-focus-ring: var(--color-primary-400);
 
   /* Button — ghost */
-  --color-button-ghost-text: var(--color-grey-700);
-  --color-button-ghost-hover-bg: var(--color-grey-100);
-  --color-button-ghost-active-bg: var(--color-grey-200);
-  --color-button-ghost-focus-ring: var(--color-grey-400);
+  --color-button-ghost-text: var(--color-text-secondary);
+  --color-button-ghost-hover-bg: var(--color-primary-50);
+  --color-button-ghost-active-bg: var(--color-primary-100);
+  --color-button-ghost-focus-ring: var(--color-primary-400);
 
   /* Button — destructive */
   --color-button-destructive: var(--color-error-600);
@@ -61,7 +59,7 @@
   /* ToggleGroup */
   --color-toggle-item-bg: var(--color-surface-panel);
   --color-toggle-item-text: var(--color-text-secondary);
-  --color-toggle-item-hover-bg: var(--color-grey-100);
+  --color-toggle-item-hover-bg: var(--color-primary-50);
   --color-toggle-item-active-bg: var(--color-primary-600);
   --color-toggle-item-active-text: var(--color-white);
   --color-toggle-item-disabled: var(--color-text-disabled);
@@ -72,8 +70,8 @@
   --color-dropdown-bg: var(--color-surface-overlay);
   --color-dropdown-border: var(--color-border-default);
   --color-dropdown-item-text: var(--color-text-primary);
-  --color-dropdown-item-hover-bg: var(--color-grey-100);
-  --color-dropdown-item-active-bg: var(--color-grey-200);
+  --color-dropdown-item-hover-bg: var(--color-primary-50);
+  --color-dropdown-item-active-bg: var(--color-primary-100);
   --color-dropdown-item-disabled: var(--color-text-disabled);
   --color-dropdown-label: var(--color-text-secondary);
   --color-dropdown-separator: var(--color-border-default);
@@ -84,13 +82,11 @@
   --color-tabs-active-bg: var(--color-primary-100);
   --color-tabs-inactive-text: var(--color-text-secondary);
   --color-tabs-hover-text: var(--color-text-primary);
-  --color-tabs-hover-bg: var(--color-grey-100);
+  --color-tabs-hover-bg: var(--color-primary-50);
   --color-tabs-disabled-text: var(--color-text-disabled);
   --color-tabs-bar-border: var(--color-border-default);
   --color-tabs-focus-ring: var(--color-primary-400);
-  /* Tab bar standard height */
   --spacing-tabs-height: var(--spacing-10);
-  /* Tab bar compact height */
   --spacing-tabs-height-dense: var(--spacing-8);
 }
 
