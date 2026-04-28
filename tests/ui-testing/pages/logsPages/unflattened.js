@@ -12,7 +12,26 @@ class UnflattenedPage {
     }
 
     get streamDetailButton() {
-        return this.page.getByRole('button', { name: 'Stream Detail' }).first();
+        // The Stream Detail tab inside the detail panel.
+        // On some UIs the panel auto-opens when a stream is selected from the list.
+        return this.page.locator('[data-test="log-stream-detail-stream-detail-tab"]').first();
+    }
+
+    async openStreamDetail(streamName) {
+        // Wait for stream list to populate after search
+        await this.page.waitForTimeout(2000);
+
+        // Click the "Stream Detail" action button for the stream row.
+        // (Clicking the stream name text only selects the row — it does not
+        // open the detail dialog. Each row has a "Stream Detail" action button
+        // that opens the dialog with Schema/Configuration/etc. tabs.)
+        const detailBtn = this.page.getByRole('button', { name: /Stream Detail/i }).first();
+        await detailBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await detailBtn.click({ force: true });
+
+        // Wait for the dialog to render — the Schema tab is one of the tabs
+        // inside the detail dialog and signals the dialog is ready
+        await this.page.getByRole('tab', { name: 'Schema' }).first().waitFor({ state: 'visible', timeout: 15000 });
     }
 
     get storeOriginalDataToggle() {

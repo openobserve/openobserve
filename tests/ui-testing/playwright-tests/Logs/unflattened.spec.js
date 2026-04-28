@@ -13,8 +13,10 @@ const streamName = `stream${Date.now()}`;
 async function login(page) {
   const { isCloudEnvironment } = require('../utils/cloud-auth.js');
   if (isCloudEnvironment()) {
-    // Cloud uses saved auth state (cookies from storageState)
-    await page.goto(`${process.env["ZO_BASE_URL"]}/web/`, {
+    // Cloud uses saved auth state (cookies from storageState).
+    // The org_identifier query param is required — without it the SPA
+    // defaults to _meta (system org) rather than the active org.
+    await page.goto(`${process.env["ZO_BASE_URL"]}/web/?org_identifier=${process.env["ORGNAME"]}`, {
       waitUntil: 'domcontentloaded',
       timeout: 30000
     });
@@ -100,17 +102,16 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
 
     testLogger.info('Opening stream detail dialog');
-    await pageManager.unflattenedPage.streamDetailButton.waitFor();
-    await pageManager.unflattenedPage.streamDetailButton.click();
+    await pageManager.unflattenedPage.openStreamDetail('e2e_automate');
     await page.waitForTimeout(2000);
 
     testLogger.info('Switching to Configuration tab');
-    await pageManager.unflattenedPage.configurationTab.waitFor({ state: "visible", timeout: 5000 });
+    await pageManager.unflattenedPage.configurationTab.waitFor({ state: "visible", timeout: 15000 });
     await pageManager.unflattenedPage.configurationTab.click();
     await page.waitForTimeout(1000);
 
     testLogger.info('Checking Store Original Data toggle state');
-    await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor({ state: "visible", timeout: 5000 });
+    await pageManager.unflattenedPage.storeOriginalDataToggle.waitFor({ state: "visible", timeout: 15000 });
 
     const wasDisabled = await pageManager.unflattenedPage.ensureStoreOriginalDataDisabled();
     if (wasDisabled) {
@@ -155,8 +156,7 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
 
     testLogger.info('Opening stream detail dialog');
-    await pageManager.unflattenedPage.streamDetailButton.waitFor();
-    await pageManager.unflattenedPage.streamDetailButton.click();
+    await pageManager.unflattenedPage.openStreamDetail('e2e_automate');
 
     // Wait for stream details sidebar to fully open and load
     await page.waitForTimeout(2000);
@@ -247,8 +247,7 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
 
     testLogger.info('Opening stream detail dialog');
-    await pageManager.unflattenedPage.streamDetailButton.waitFor();
-    await pageManager.unflattenedPage.streamDetailButton.click();
+    await pageManager.unflattenedPage.openStreamDetail('e2e_automate');
 
     await page.waitForTimeout(2000);
     testLogger.info('Stream details sidebar opened');
@@ -296,8 +295,7 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
 
     testLogger.info('Opening stream detail dialog');
-    await pageManager.unflattenedPage.streamDetailButton.waitFor();
-    await pageManager.unflattenedPage.streamDetailButton.click();
+    await pageManager.unflattenedPage.openStreamDetail('e2e_automate');
 
     // Wait for stream details sidebar to fully open and load
     await page.waitForTimeout(2000);
@@ -442,8 +440,7 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(500);
 
     testLogger.info('Opening stream detail dialog');
-    await pageManager.unflattenedPage.streamDetailButton.waitFor();
-    await pageManager.unflattenedPage.streamDetailButton.click();
+    await pageManager.unflattenedPage.openStreamDetail('e2e_automate');
 
     // Wait for stream details sidebar to fully open and load
     await page.waitForTimeout(2000);

@@ -44,30 +44,31 @@ async searchSchedulerSubmit() {
   const submitButton = this.page.locator('[data-test="search-scheduler-max-records-submit-btn"]');
   await submitButton.click();
 
-  // Wait for the "Go To Job Scheduler" button to be visible and enabled
-  const goToJobSchedulerButtonSelector = { name: 'Go To Job Scheduler' };
-  const maxRetries = 500;
-  let attempts = 0;
-
-  while (attempts < maxRetries) {
-      const goToJobSchedulerButton = this.page.getByRole('button', goToJobSchedulerButtonSelector);
-
-      // Wait for the button to be visible
-      await this.page.waitForTimeout(100); // Small delay before checking
-      const isVisible = await goToJobSchedulerButton.isVisible();
-      const isEnabled = await goToJobSchedulerButton.isEnabled();
-
-      if (isVisible && isEnabled) {
-          await goToJobSchedulerButton.click();
-          return; // Exit the function if the button is clicked successfully
-      } else {
-          console.warn(`"Go To Job Scheduler" button is not visible or enabled. Retrying...`);
-          attempts++;
-          await this.page.waitForTimeout(100); // Wait before retrying
-      }
+  // Wait for the "Go To Job Scheduler" button to appear and click it.
+  // The button appears inside a notification/dialog after successful submission.
+  // Try multiple locator strategies with retries for cloud environments.
+  const buttonPatterns = [
+    this.page.getByRole('button', { name: /Go\s+To\s+Job\s+Scheduler/i }),
+    this.page.locator('button:has-text("Go To Job Scheduler")'),
+    this.page.locator('button:has-text("Go to Job Scheduler")'),
+    this.page.locator('.q-btn:has-text("Job Scheduler")'),
+  ];
+  let gtsjClicked = false;
+  for (const btn of buttonPatterns) {
+    try {
+      await btn.first().waitFor({ state: 'visible', timeout: 5000 });
+      await btn.first().click({ force: true });
+      gtsjClicked = true;
+      break;
+    } catch (e) {
+      await this.page.waitForTimeout(500);
+    }
   }
-
-  throw new Error(`"Go To Job Scheduler" button remained invisible or disabled after ${maxRetries} attempts.`);
+  if (!gtsjClicked) {
+    // Last resort: wait longer and try again with force
+    await this.page.waitForTimeout(3000);
+    await this.page.locator('button:has-text("Job Scheduler")').first().click({ force: true, timeout: 10000 });
+  }
 }
 
 

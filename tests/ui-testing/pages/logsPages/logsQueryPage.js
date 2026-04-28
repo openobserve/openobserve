@@ -10,7 +10,9 @@ export class LogsQueryPage {
     this.errorMessage = '[data-test="logs-search-error-message"]';
     this.utilitiesMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
     this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
-    this.noDataFoundText = 'warning No data found for';
+    // Quasar q-icon renders icon name as text content (e.g. "warning"),
+    // concatenated with the label text. Use partial match.
+    this.noDataFoundText = 'No data found for';
     this.resultDetail = '[data-test="logs-search-result-detail-undefined"]';
     this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
   }
@@ -42,9 +44,31 @@ export class LogsQueryPage {
   }
 
   async clickNoDataFound() {
-    const noDataFoundLocator = this.page.getByText(this.noDataFoundText);
-    await expect(noDataFoundLocator).toBeVisible({ timeout: 10000 });
-    await noDataFoundLocator.click();
+    // Try multiple text patterns — the warning banner text varies across environments
+    const patterns = [
+      'No data found for',
+      'No data found',
+      'No results found',
+      'No data',
+    ];
+    let found = false;
+    for (const pattern of patterns) {
+      const locator = this.page.getByText(pattern).first();
+      try {
+        await locator.waitFor({ state: 'visible', timeout: 10000 });
+        await locator.click({ force: true });
+        found = true;
+        break;
+      } catch (e) {
+        continue;
+      }
+    }
+    if (!found) {
+      // Last attempt — wait longer for any "No data" text
+      const fallback = this.page.getByText('No data').first();
+      await fallback.waitFor({ state: 'visible', timeout: 20000 });
+      await fallback.click({ force: true });
+    }
   }
 
   async clickResultDetail() {

@@ -43,9 +43,12 @@ export class LoginPage {
   }
 
   async login() {
-    // Cloud uses saved auth state (cookies from storageState) — no form login needed
+    // Cloud uses saved auth state (cookies from storageState) — no form login needed.
+    // org_identifier query param is required — without it the SPA defaults to
+    // _meta (system org) instead of the active org from saved state.
     if (isCloudEnvironment()) {
-      await this.page.goto(`${process.env["ZO_BASE_URL"]}/web/`, {
+      const orgParam = process.env["ORGNAME"] ? `?org_identifier=${process.env["ORGNAME"]}` : '';
+      await this.page.goto(`${process.env["ZO_BASE_URL"]}/web/${orgParam}`, {
         waitUntil: 'domcontentloaded',
         timeout: 30000
       });
