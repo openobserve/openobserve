@@ -56,3 +56,9 @@ CLAUDE.md
 .mcp.json
 tests/ui-testing/playwright-tests/Dashboards/DASHBOARD_VARIABLES_FIXES.md
 tests/ui-testing/fixtures/correlation.json
+tests/ui-testing/bug-*/
+tests/ui-testing/bug-*
+tests/ui-testing/test-artifacts/
+tests/ui-testing/FINAL_TEST_ASSIST_REPORT.md
+test-assist-results/
+.playwright-mcp/
