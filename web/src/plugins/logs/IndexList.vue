@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-cy="index-dropdown"
         :placeholder="placeHolderText"
         input-debounce="0"
+        popup-content-style="height: 400px"
         behavior="menu"
         borderless
         dense
