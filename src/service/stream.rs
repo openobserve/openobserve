@@ -741,7 +741,7 @@ pub async fn update_stream_settings(
     }
 
     if !new_settings.extended_retention_days.add.is_empty() {
-        let mut seen = Vec::new();
+        let mut seen = std::collections::HashSet::new();
         let new_retention: Vec<_> = new_settings
             .extended_retention_days
             .add
@@ -750,7 +750,7 @@ pub async fn update_stream_settings(
                 if seen.contains(r) || settings.extended_retention_days.contains(r) {
                     false
                 } else {
-                    seen.push(r.clone());
+                    seen.insert(r.clone());
                     true
                 }
             })
@@ -904,7 +904,7 @@ pub async fn update_stream_settings(
     }
 
     if !new_settings.partition_keys.add.is_empty() {
-        let mut seen = Vec::new();
+        let mut seen = std::collections::HashSet::new();
         let new_partition: Vec<_> = new_settings
             .partition_keys
             .add
@@ -913,7 +913,7 @@ pub async fn update_stream_settings(
                 if seen.contains(k) || settings.partition_keys.contains(k) {
                     false
                 } else {
-                    seen.push(k.clone());
+                    seen.insert(k.clone());
                     true
                 }
             })
