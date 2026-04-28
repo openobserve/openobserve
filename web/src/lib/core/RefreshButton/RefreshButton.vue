@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import OButton from '../Button/Button.vue'
+import OButton from '../Button/OButton.vue'
 import type { RefreshButtonProps, RefreshButtonEmits } from './RefreshButton.types'
 
 const props = withDefaults(defineProps<RefreshButtonProps>(), {
