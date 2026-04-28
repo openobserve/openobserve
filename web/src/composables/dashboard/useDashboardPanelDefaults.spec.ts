@@ -63,6 +63,11 @@ describe("getDefaultDashboardPanelData", () => {
       expect(fields.z).toEqual([]);
       expect(fields.breakdown).toEqual([]);
     });
+
+    it("initializes per-query vrlFunctionFieldList as empty array", () => {
+      const { data } = getDefaultDashboardPanelData(makeStore());
+      expect(data.queries[0].vrlFunctionFieldList).toEqual([]);
+    });
   });
 
   describe("config section", () => {

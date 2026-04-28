@@ -117,6 +117,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const newQuery: any = {
       query: "",
       vrlFunctionQuery: "",
+      vrlFunctionFieldList: [],
       customQuery:
         dashboardPanelData?.data?.queries?.[
           dashboardPanelData?.layout?.currentQueryIndex

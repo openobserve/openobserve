@@ -236,6 +236,8 @@ describe("useDashboardPanel", () => {
       expect(panel.dashboardPanelData.data.queries.length).toBe(
         initialLength + 1,
       );
+      const newQuery = panel.dashboardPanelData.data.queries[initialLength];
+      expect(newQuery.vrlFunctionFieldList).toEqual([]);
     });
 
     it("should remove queries when more than one exists", () => {

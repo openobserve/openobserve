@@ -1346,6 +1346,51 @@ test.describe("Multi-SQL Query Support", () => {
     );
 
     test(
+      "switching query tabs keeps per-query VRL content",
+      { tag: ["@multiSQL", "@vrl", "@P1"] },
+      async ({ page }) => {
+        const pm = new PageManager(page);
+        const msql = pm.dashboardMultiSQL;
+        const dashboardName = generateDashboardName();
+
+        await buildPanel(page, pm, dashboardName, {
+          chartType: "bar",
+          yField: "kubernetes_container_hash",
+        });
+
+        await msql.switchToQueryTab(0);
+        await enterVrlForActiveQuery(page, VRL_Q1);
+
+        await msql.addQueryTab(1);
+        await pm.chartTypeSelector.selectStreamType("logs");
+        await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.searchAndAddField(
+          "kubernetes_namespace_name",
+          "y"
+        );
+        await enterVrlForActiveQuery(page, VRL_Q2);
+
+        await msql.switchToQueryTab(0);
+        await expect(
+          page.locator('[data-test="dashboard-vrl-function-editor"]')
+        ).toContainText("kubernetes_container_hash", { timeout: 10000 });
+
+        await msql.switchToQueryTab(1);
+        await expect(
+          page.locator('[data-test="dashboard-vrl-function-editor"]')
+        ).toContainText("kubernetes_namespace_name", { timeout: 10000 });
+
+        await pm.dashboardPanelActions.applyDashboardBtn();
+        await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+        await pm.dashboardPanelActions.verifyChartRenders(expect);
+
+        await msql.applyAndSave(pm);
+        await cleanupTestDashboard(page, pm, dashboardName);
+      }
+    );
+
+    test(
       "empty VRL on both queries is a no-op, chart renders normally",
       { tag: ["@multiSQL", "@vrl", "@P1"] },
       async ({ page }) => {

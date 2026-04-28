@@ -42,7 +42,10 @@ export const buildValueMappingCache = (
 
   mappings.forEach((mapping: any) => {
     if (mapping && mapping.text) {
-      if (mapping.from !== undefined && mapping.to !== undefined) {
+      if (mapping.type === "regex") {
+        // Regex mapping – stored with a special prefix; pattern tested during lookup
+        cache.set(`__regex_${mapping.pattern ?? ""}`, mapping.text);
+      } else if (mapping.from !== undefined && mapping.to !== undefined) {
         // Range mapping – encoded key so direct + range share the same Map
         cache.set(`__range_${mapping.from}_${mapping.to}`, mapping.text);
       } else if (mapping.value !== undefined && mapping.value !== null) {
@@ -66,6 +69,15 @@ export const lookupValueMapping = (
     return cache.get(value);
   }
 
+  // Coerce to string once – mapping values are always stored as strings (from the
+  // UI text input) but cell data may be numeric. Reused for range, and regex checks.
+  const strValue = String(value);
+
+  // String coercion fallback e.g. key "3" vs numeric value 3
+  if (cache.has(strValue)) {
+    return cache.get(strValue);
+  }
+
   // Range match (numbers only)
   if (typeof value === "number") {
     const entries = Array.from(cache.entries());
@@ -78,6 +90,20 @@ export const lookupValueMapping = (
         if (!isNaN(from) && !isNaN(to) && value >= from && value <= to) {
           return text;
         }
+      }
+    }
+  }
+
+  // Regex match
+  for (const [key, text] of cache.entries()) {
+    if (typeof key === "string" && key.startsWith("__regex_")) {
+      const pattern = key.slice(8); // "__regex_".length === 8
+      try {
+        if (new RegExp(pattern).test(strValue)) {
+          return text;
+        }
+      } catch {
+        // invalid regex pattern, skip
       }
     }
   }

@@ -852,6 +852,14 @@ export const usePanelFields = ({
     ) {
       dashboardPanelData.meta.stream.customQueryFields = [];
       dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
+      // Also clear the per-query stored VRL field list for the current query
+      const currentQuery =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ];
+      if (currentQuery) {
+        currentQuery.vrlFunctionFieldList = [];
+      }
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.splice(

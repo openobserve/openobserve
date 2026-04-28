@@ -953,28 +953,33 @@ export default defineComponent({
         annotations,
       ],
       async () => {
-        // emit vrl function field list
-        if (data.value?.length && data.value[0] && data.value[0].length) {
-          // Find the index of the record with max attributes
-          const maxAttributesIndex = data.value[0].reduce(
-            (
-              maxIndex: string | number | any,
-              obj: {},
-              currentIndex: any,
-              array: Array<Record<string, unknown>>,
-            ) => {
-              const numAttributes = Object.keys(obj).length;
-              const maxNumAttributes = Object.keys(array[maxIndex]).length;
-              return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
-            },
-            0,
-          );
-
-          const recordwithMaxAttribute = data.value[0][maxAttributesIndex];
-
-          const responseFields = Object.keys(recordwithMaxAttribute);
-
-          emit("updated:vrlFunctionFieldList", responseFields);
+        // emit vrl function field list per query index
+        if (data.value?.length) {
+          const perQueryFields: string[][] = [];
+          for (let qi = 0; qi < data.value.length; qi++) {
+            const queryData = data.value[qi];
+            if (queryData && queryData.length) {
+              const maxAttributesIndex = queryData.reduce(
+                (
+                  maxIndex: string | number | any,
+                  obj: {},
+                  currentIndex: any,
+                  array: Array<Record<string, unknown>>,
+                ) => {
+                  const numAttributes = Object.keys(obj).length;
+                  const maxNumAttributes = Object.keys(array[maxIndex]).length;
+                  return numAttributes > maxNumAttributes
+                    ? currentIndex
+                    : maxIndex;
+                },
+                0,
+              );
+              perQueryFields.push(Object.keys(queryData[maxAttributesIndex]));
+            } else {
+              perQueryFields.push([]);
+            }
+          }
+          emit("updated:vrlFunctionFieldList", perQueryFields);
         }
         if (panelData.value.chartType == "custom_chart")
           errorDetail.value = {

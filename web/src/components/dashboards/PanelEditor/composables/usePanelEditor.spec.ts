@@ -46,6 +46,7 @@ describe("usePanelEditor", () => {
         queries: [
           {
             query: "SELECT * FROM logs",
+            vrlFunctionFieldList: [],
             customQuery: false,
             fields: {
               stream: "logs",
@@ -606,6 +607,79 @@ describe("usePanelEditor", () => {
       expect(dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([
         { name: "timestamp", type: "Utf8" },
         { name: "otherField", type: "Utf8" },
+      ]);
+    });
+
+    it("should accept per-query field payload and store per-query VRL fields", () => {
+      dashboardPanelData.data.queries.push({
+        query: "SELECT * FROM logs_2",
+        vrlFunctionFieldList: [],
+        customQuery: false,
+        fields: {
+          stream: "logs",
+          stream_type: "logs",
+          x: [{ alias: "x_alias_q2", isDerived: false }],
+          y: [],
+          z: [],
+          breakdown: [],
+          filter: { conditions: [] },
+        },
+      });
+
+      dashboardPanelData.data.queries[0].fields.x = [
+        { alias: "x_alias_q1", isDerived: false },
+      ];
+
+      const { updateVrlFunctionFieldList } = usePanelEditor(options);
+
+      updateVrlFunctionFieldList([
+        ["x_alias_q1", "q1_vrl"],
+        ["x_alias_q2", "q2_vrl"],
+      ]);
+
+      expect(dashboardPanelData.data.queries[0].vrlFunctionFieldList).toEqual([
+        { name: "q1_vrl", type: "Utf8" },
+      ]);
+      expect(dashboardPanelData.data.queries[1].vrlFunctionFieldList).toEqual([
+        { name: "q2_vrl", type: "Utf8" },
+      ]);
+      expect(dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([
+        { name: "q1_vrl", type: "Utf8" },
+      ]);
+    });
+
+    it("should sync meta VRL fields when current query tab changes", async () => {
+      dashboardPanelData.data.queries.push({
+        query: "SELECT * FROM logs_2",
+        vrlFunctionFieldList: [],
+        customQuery: false,
+        fields: {
+          stream: "logs",
+          stream_type: "logs",
+          x: [],
+          y: [],
+          z: [],
+          breakdown: [],
+          filter: { conditions: [] },
+        },
+      });
+
+      const { updateVrlFunctionFieldList } = usePanelEditor(options);
+
+      updateVrlFunctionFieldList([
+        ["q1_vrl"],
+        ["q2_vrl"],
+      ]);
+
+      expect(dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([
+        { name: "q1_vrl", type: "Utf8" },
+      ]);
+
+      dashboardPanelData.layout.currentQueryIndex = 1;
+      await nextTick();
+
+      expect(dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([
+        { name: "q2_vrl", type: "Utf8" },
       ]);
     });
   });

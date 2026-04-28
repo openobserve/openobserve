@@ -475,53 +475,27 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    * Update VRL function field list
    * @param fieldList - List of fields
    */
-  const updateVrlFunctionFieldList = (fieldList: any): void => {
-    // Extract all panelSchema alias
+  /**
+   * Build alias list for a given query index (used to filter out non-VRL fields)
+   */
+  const buildAliasListForQuery = (queryIndex: number): string[] => {
     const aliasList: any[] = [];
+    const query = dashboardPanelData.data.queries[queryIndex];
+    if (!query) return aliasList;
 
-    // If auto sql
-    if (
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].customQuery === false
-    ) {
-      // Add x axis alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.x?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
-        }
+    if (query.customQuery === false) {
+      query?.fields?.x?.forEach((it: any) => {
+        if (!it.isDerived) aliasList.push(it.alias);
       });
-
-      // Add breakdown alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.breakdown?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
-        }
+      query?.fields?.breakdown?.forEach((it: any) => {
+        if (!it.isDerived) aliasList.push(it.alias);
       });
-
-      // Add y axis alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.y?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
-        }
+      query?.fields?.y?.forEach((it: any) => {
+        if (!it.isDerived) aliasList.push(it.alias);
       });
-
-      // Add z axis alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.z?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
-        }
+      query?.fields?.z?.forEach((it: any) => {
+        if (!it.isDerived) aliasList.push(it.alias);
       });
-
-      // Add special field aliases (latitude, longitude, weight, source, target, value, name, value_for_maps)
       const specialFields = [
         "latitude",
         "longitude",
@@ -533,23 +507,51 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
         "value_for_maps",
       ];
       specialFields.forEach((fieldName) => {
-        const field =
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.[fieldName];
-        if (field?.alias && !field?.isDerived) {
-          aliasList.push(field.alias);
-        }
+        const field = query?.fields?.[fieldName];
+        if (field?.alias && !field?.isDerived) aliasList.push(field.alias);
       });
     }
 
-    // Remove custom query fields from field list
     dashboardPanelData.meta.stream.customQueryFields.forEach((it: any) => {
       aliasList.push(it.name);
     });
 
-    // Rest will be vrl function fields
-    const filteredFieldList = fieldList
+    return aliasList;
+  };
+
+  const updateVrlFunctionFieldList = (fieldList: any): void => {
+    const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+
+    // New format: fieldList is string[][] (one array per query index)
+    if (Array.isArray(fieldList) && Array.isArray(fieldList[0])) {
+      const perQueryFields: string[][] = fieldList;
+
+      // Store each query's VRL field list separately
+      perQueryFields.forEach((fields: string[], queryIndex: number) => {
+        const query = dashboardPanelData.data.queries[queryIndex];
+        if (!query) return;
+        const aliasList = buildAliasListForQuery(queryIndex);
+        const filteredFieldList = fields
+          .filter(
+            (field: string) =>
+              !aliasList.some(
+                (alias: string) => alias.toLowerCase() === field.toLowerCase(),
+              ),
+          )
+          .map((field: string) => ({ name: field, type: "Utf8" }));
+        query.vrlFunctionFieldList = filteredFieldList;
+      });
+
+      // Sync active query's VRL fields to meta for the field selector UI
+      const activeQuery = dashboardPanelData.data.queries[currentQueryIndex];
+      dashboardPanelData.meta.stream.vrlFunctionFieldList =
+        activeQuery?.vrlFunctionFieldList ?? [];
+      return;
+    }
+
+    // Legacy format: fieldList is string[] (single query)
+    const aliasList = buildAliasListForQuery(currentQueryIndex);
+    const filteredFieldList = (fieldList as string[])
       .filter(
         (field: any) =>
           !aliasList.some(
@@ -557,6 +559,11 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
           ),
       )
       .map((field: any) => ({ name: field, type: "Utf8" }));
+
+    if (dashboardPanelData.data.queries[currentQueryIndex]) {
+      dashboardPanelData.data.queries[currentQueryIndex].vrlFunctionFieldList =
+        filteredFieldList;
+    }
 
     dashboardPanelData.meta.stream.vrlFunctionFieldList = filteredFieldList;
   };
@@ -699,6 +706,17 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     );
     disable.value = panelsValues.some((item: any) => item === true);
   });
+
+  // Watch currentQueryIndex ΓÇö restore the active query's per-query VRL field list
+  // so the field selector shows the correct VRL-derived fields per query tab
+  watch(
+    () => dashboardPanelData.layout.currentQueryIndex,
+    (newIndex) => {
+      const query = dashboardPanelData.data.queries[newIndex];
+      dashboardPanelData.meta.stream.vrlFunctionFieldList =
+        (query?.vrlFunctionFieldList) ?? [];
+    },
+  );
 
   // Check if externalChartData has actual VALUE (not just if the ref exists)
   // A ref is always truthy even if its value is undefined, so we must check .value

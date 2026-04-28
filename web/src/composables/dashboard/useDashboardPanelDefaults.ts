@@ -129,6 +129,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
       {
         query: "",
         vrlFunctionQuery: "",
+        vrlFunctionFieldList: [],
         customQuery: false,
         joins: [],
         fields: {
