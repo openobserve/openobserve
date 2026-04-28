@@ -21,6 +21,19 @@ import type { FieldAlias } from "@/services/service_streams";
 
 const fieldNamesCache = new Map<string, string[]>();
 const semanticGroupsCache = new Map<string, FieldAlias[]>();
+let lastSeenOrgId: string | null = null;
+
+function evictOrgCacheIfSwitched(orgId: string): void {
+  if (lastSeenOrgId !== null && lastSeenOrgId !== orgId) {
+    // Org switched — remove all cached entries for the previous org so stale
+    // identity config and semantic groups are not reused.
+    for (const key of fieldNamesCache.keys()) {
+      if (key.startsWith(`${lastSeenOrgId}/`)) fieldNamesCache.delete(key);
+    }
+    semanticGroupsCache.delete(lastSeenOrgId);
+  }
+  lastSeenOrgId = orgId;
+}
 
 async function loadSemanticGroups(orgId: string): Promise<FieldAlias[]> {
   if (semanticGroupsCache.has(orgId)) return semanticGroupsCache.get(orgId)!;
@@ -41,6 +54,7 @@ export async function getCorrelationFieldNames(
   streamName: string,
   streamSchemaFields: { name: string }[],
 ): Promise<string[]> {
+  evictOrgCacheIfSwitched(orgId);
   const key = `${orgId}/${streamName}`;
   if (fieldNamesCache.has(key)) return fieldNamesCache.get(key)!;
 
@@ -104,15 +118,17 @@ export function extractCorrelationFilters(
     whereClause = queryStr.slice(whereIdx).replace(/^WHERE\s+/i, "");
   }
 
-  const conditionRegex = /(\w+)\s*=\s*'([^']+)'/gi;
+  // Match field = 'value' where value may contain SQL-escaped single quotes ('')
+  const conditionRegex = /(\w+)\s*=\s*'((?:[^']|'')*)'/gi;
   let m;
   while ((m = conditionRegex.exec(whereClause)) !== null) {
     if (trackedSet.has(m[1])) {
+      const value = m[2].replace(/''/g, "'");
       const existing = filters.findIndex((f) => f.field === m[1]);
       if (existing >= 0) {
-        filters[existing].value = m[2];
+        filters[existing].value = value;
       } else {
-        filters.push({ field: m[1], value: m[2] });
+        filters.push({ field: m[1], value });
       }
     }
   }
@@ -166,6 +182,7 @@ export function clearCorrelationFilters(
 export function clearCorrelationCache(): void {
   fieldNamesCache.clear();
   semanticGroupsCache.clear();
+  lastSeenOrgId = null;
 }
 
 // ── Generic composable ────────────────────────────────────────────────────────

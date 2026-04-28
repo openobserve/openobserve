@@ -173,7 +173,7 @@ export const useSearchResponseHandler = () => {
     }
   };
 
-  const handleStreamingHits = (
+  const handleStreamingHits = async (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
     isPagination: boolean,
@@ -217,7 +217,7 @@ export const useSearchResponseHandler = () => {
     }
 
     refreshPagination(true);
-    processPostPaginationData();
+    await processPostPaginationData();
   };
 
   const processPostPaginationData = async () => {
