@@ -544,7 +544,7 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   describe("Stream Selection", () => {
-    it("should select the stream with latest data by default", async () => {
+    it("should not select the stream with latest data by default", async () => {
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -565,7 +565,7 @@ describe("Index.vue (Main Traces Page)", () => {
       // getStreamList uses an un-awaited .then() chain; poll until it resolves
       await vi.waitFor(
         () => {
-          expect(mockSearchObj.data.stream.selectedStream.value).toBeTruthy();
+          expect(mockSearchObj.data.stream.selectedStream.value).toBeFalsy();
         },
         { timeout: 2000 },
       );
@@ -2143,6 +2143,26 @@ describe("Index.vue (Main Traces Page)", () => {
   });
 
   describe("extractFields — field labels", () => {
+    beforeEach(() => {
+      // Supply a stream query param so loadStreamLists() selects the "default"
+      // stream automatically (no URL param → no auto-selection after the
+      // default auto-select was removed from the production code).
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { stream: "default" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+    });
+
+    afterEach(() => {
+      // Restore the default (no query params) so other describe blocks are unaffected.
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: {}, name: "traces", path: "/traces" },
+      } as any);
+    });
+
     it("should label the duration field with the plain field name without unit suffix", async () => {
       // Ensure a stream is available so getStreamList selects one and extractFields runs.
       // The outer beforeEach already configures mockGetStreams → mockStreamList (which
@@ -2183,7 +2203,6 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(durationField).toBeDefined();
       expect(durationField!.label).toBe("duration");
-      expect(durationField!.label).not.toBe("duration (µs)");
     });
   });
 
