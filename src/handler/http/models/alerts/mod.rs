@@ -1120,7 +1120,7 @@ mod tests {
     fn test_alert_skip_fields_present_when_some() {
         let mut alert: Alert = serde_json::from_value(serde_json::json!({})).unwrap();
         alert.template = Some("my-template".to_string());
-        alert.context_attributes = Some(std::collections::HashMap::from([(
+        alert.context_attributes = Some(HashMap::from([(
             "env".to_string(),
             "prod".to_string(),
         )]));
