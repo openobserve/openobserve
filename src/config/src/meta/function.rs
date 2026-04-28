@@ -437,4 +437,40 @@ mod tests {
         assert!(!t.is_result_array_vrl());
         assert!(!t.is_vrl());
     }
+
+    #[test]
+    fn test_transform_streams_none_absent_from_json() {
+        let t = Transform {
+            function: ". = {}".to_string(),
+            name: "fn1".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0),
+            streams: None,
+        };
+        let json = serde_json::to_value(&t).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("streams"));
+    }
+
+    #[test]
+    fn test_transform_streams_some_present_in_json() {
+        let t = Transform {
+            function: ". = {}".to_string(),
+            name: "fn2".to_string(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0),
+            streams: Some(vec![StreamOrder {
+                stream: "my_stream".to_string(),
+                order: 1,
+                stream_type: StreamType::Logs,
+                is_removed: false,
+                apply_before_flattening: false,
+            }]),
+        };
+        let json = serde_json::to_value(&t).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("streams"));
+        assert_eq!(obj["streams"].as_array().unwrap().len(), 1);
+    }
 }

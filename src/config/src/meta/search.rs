@@ -3502,4 +3502,64 @@ mod tests {
         let five = Interval::FiveMinutes;
         assert_eq!(five.get_interval_seconds(), 300);
     }
+
+    #[test]
+    fn test_response_skip_serializing_if_empty_fields_absent() {
+        let r = Response::default();
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        // Vec::is_empty fields
+        assert!(!obj.contains_key("columns"));
+        assert!(!obj.contains_key("function_error"));
+        assert!(!obj.contains_key("order_by_metadata"));
+        // String::is_empty fields
+        assert!(!obj.contains_key("response_type"));
+        assert!(!obj.contains_key("trace_id"));
+        // Option::is_none fields
+        assert!(!obj.contains_key("histogram_interval"));
+        assert!(!obj.contains_key("new_start_time"));
+        assert!(!obj.contains_key("new_end_time"));
+        assert!(!obj.contains_key("work_group"));
+        assert!(!obj.contains_key("order_by"));
+        assert!(!obj.contains_key("converted_histogram_query"));
+        assert!(!obj.contains_key("histogram_breakdown_field"));
+        assert!(!obj.contains_key("is_histogram_eligible"));
+        assert!(!obj.contains_key("query_index"));
+        assert!(!obj.contains_key("peak_memory_usage"));
+    }
+
+    #[test]
+    fn test_response_skip_serializing_if_set_fields_present() {
+        let mut r = Response::default();
+        r.columns = vec!["col1".to_string()];
+        r.function_error = vec!["err".to_string()];
+        r.response_type = "json".to_string();
+        r.trace_id = "t1".to_string();
+        r.histogram_interval = Some(3600);
+        r.new_start_time = Some(1000);
+        r.new_end_time = Some(2000);
+        r.work_group = Some("wg".to_string());
+        r.order_by = Some(OrderBy::Desc);
+        r.converted_histogram_query = Some("SELECT ...".to_string());
+        r.histogram_breakdown_field = Some("level".to_string());
+        r.is_histogram_eligible = Some(true);
+        r.query_index = Some(3);
+        r.peak_memory_usage = Some(512.0);
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("columns"));
+        assert!(obj.contains_key("function_error"));
+        assert!(obj.contains_key("response_type"));
+        assert!(obj.contains_key("trace_id"));
+        assert!(obj.contains_key("histogram_interval"));
+        assert!(obj.contains_key("new_start_time"));
+        assert!(obj.contains_key("new_end_time"));
+        assert!(obj.contains_key("work_group"));
+        assert!(obj.contains_key("order_by"));
+        assert!(obj.contains_key("converted_histogram_query"));
+        assert!(obj.contains_key("histogram_breakdown_field"));
+        assert!(obj.contains_key("is_histogram_eligible"));
+        assert!(obj.contains_key("query_index"));
+        assert!(obj.contains_key("peak_memory_usage"));
+    }
 }
