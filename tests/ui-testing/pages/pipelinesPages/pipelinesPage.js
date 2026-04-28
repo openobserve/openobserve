@@ -180,6 +180,26 @@ export class PipelinesPage {
         this.discardChangesDialog = page.getByText('Discard Changes');
         this.discardChangesOkBtn = page.locator('.q-dialog').locator('[data-test="confirm-button"]');
         this.scheduledPipelineCancelBtn = page.locator('button').filter({ hasText: 'Cancel' }).first();
+
+        // Bug #11498 - Run Query button (in scheduled pipeline dialog)
+        // Use text filter to distinguish from the SearchBar's identical data-test selector
+        this.runQueryButton = page.locator('[data-test="logs-search-bar-refresh-btn"]').filter({ hasText: 'Run Query' });
+        // Fallback: any visible Run Query button in dialogs
+        this.runQueryButtonAny = page.locator('[data-test="logs-search-bar-refresh-btn"]').first();
+
+        // Bug #11483 - Destination form locators
+        this.createStreamToggle = page.locator('[data-test="create-stream-toggle"]');
+        this.destinationTypeCard = (type) => page.locator(`[data-test="destination-type-card-${type}"]`);
+        this.step1ContinueBtn = page.locator('[data-test="step1-continue-btn"]');
+        this.step1CancelBtn = page.locator('[data-test="step1-cancel-btn"]');
+        this.step3BackBtn = page.locator('[data-test="step3-back-btn"]');
+        this.destinationCancelBtn = page.locator('[data-test="add-destination-cancel-btn"]');
+        this.destinationSubmitBtn = page.locator('[data-test="add-destination-submit-btn"]');
+        this.destinationNameInput = page.locator('[data-test="add-destination-name-input"]');
+        this.destinationUrlInput = page.locator('[data-test="add-destination-url-input"]');
+        this.destinationEndpointInput = page.locator('[data-test="add-destination-url-endpoint-input"]');
+        this.notifyContainer = page.locator('#q-notify');
+        this.notificationItems = page.locator('#q-notify .q-notification');
     }
 
     // Methods from original PipelinesPage
@@ -3265,5 +3285,176 @@ export class PipelinesPage {
         } catch (cleanupError) {
             testLogger.warn(`Pipeline cleanup failed (non-critical): ${cleanupError.message}`);
         }
+    }
+
+    // ========== Bug #11498: Run Query Disabled State ==========
+
+    /**
+     * Check if the Run Query button is disabled (no stream selected)
+     * @returns {Promise<boolean>} True if button is disabled
+     */
+    async isRunQueryDisabled() {
+        await this.runQueryButton.waitFor({ state: 'visible', timeout: 5000 });
+        const isDisabled = await this.runQueryButton.isDisabled();
+        testLogger.info(`Run Query disabled state: ${isDisabled}`);
+        return isDisabled;
+    }
+
+    /**
+     * Check if the Run Query button is enabled (stream selected)
+     * @returns {Promise<boolean>} True if button is enabled
+     */
+    async isRunQueryEnabled() {
+        await this.runQueryButton.waitFor({ state: 'visible', timeout: 5000 });
+        const isDisabled = await this.runQueryButton.isDisabled();
+        testLogger.info(`Run Query enabled state: ${!isDisabled}`);
+        return !isDisabled;
+    }
+
+    /**
+     * Expect Run Query button to be disabled
+     */
+    async expectRunQueryDisabled() {
+        await this.runQueryButton.waitFor({ state: 'visible', timeout: 5000 });
+        await expect(this.runQueryButton).toBeDisabled({ timeout: 3000 });
+        testLogger.info('✅ Run Query button is disabled as expected');
+    }
+
+    /**
+     * Expect Run Query button to be enabled
+     */
+    async expectRunQueryEnabled() {
+        await this.runQueryButton.waitFor({ state: 'visible', timeout: 5000 });
+        await expect(this.runQueryButton).toBeEnabled({ timeout: 3000 });
+        testLogger.info('✅ Run Query button is enabled as expected');
+    }
+
+    // ========== Bug #11483: Destination Save Notification ==========
+
+    /**
+     * Fill the CreateDestinationForm with basic details and submit
+     * @param {string} name - Destination name
+     * @param {string} url - Base URL
+     * @param {string} endpoint - Endpoint path
+     */
+    async fillAndSubmitDestinationForm(name, url, endpoint) {
+        // Step 1: Should already be on step 1 by default
+        // Select destination type (OpenObserve is default)
+        await this.destinationTypeCard('openobserve').click();
+        testLogger.info('Selected destination type: openobserve');
+        await this.step1ContinueBtn.click();
+        await this.page.waitForTimeout(500);
+
+        // Step 2: Fill connection details
+        await this.destinationNameInput.waitFor({ state: 'visible', timeout: 5000 });
+        await this.destinationNameInput.fill(name);
+        await this.destinationUrlInput.fill(url);
+        await this.destinationEndpointInput.fill(endpoint);
+
+        // Scroll to submit button
+        await this.destinationSubmitBtn.scrollIntoViewIfNeeded();
+        await this.page.waitForTimeout(300);
+
+        testLogger.info('Destination form filled, clicking submit');
+        await this.destinationSubmitBtn.click();
+    }
+
+    /**
+     * Get the count of current notification popups
+     * @returns {Promise<number>} Number of visible notifications
+     */
+    async getNotificationCount() {
+        await this.page.waitForTimeout(1000); // Wait for notification animation to complete
+        const count = await this.notificationItems.count();
+        testLogger.info(`Notification count: ${count}`);
+        return count;
+    }
+
+    /**
+     * Wait for a specific notification text to appear
+     * @param {string} text - Expected notification text
+     * @param {number} timeout - Timeout in ms
+     */
+    async expectNotificationWithText(text, timeout = 5000) {
+        await expect(this.notifyContainer).toContainText(text, { timeout });
+        testLogger.info(`✅ Notification with text "${text}" appeared`);
+    }
+
+    /**
+     * Verify that only 1 notification appears (no duplicate notifications)
+     * @param {string} expectedText - The expected notification text
+     */
+    async expectSingleNotification(expectedText) {
+        await this.expectNotificationWithText(expectedText);
+        const count = await this.getNotificationCount();
+        expect(count).toBe(1);
+        testLogger.info(`✅ Single notification verified (count: ${count})`);
+    }
+
+    /**
+     * Dismiss all visible notifications
+     */
+    async dismissAllNotifications() {
+        const count = await this.notificationItems.count();
+        if (count > 0) {
+            // Click each notification's dismiss button (q-notification has a close btn)
+            const dismissButtons = this.page.locator('#q-notify .q-notification__close');
+            const dismissCount = await dismissButtons.count();
+            for (let i = 0; i < dismissCount; i++) {
+                await dismissButtons.first().click().catch(() => {});
+                await this.page.waitForTimeout(200);
+            }
+        }
+        testLogger.info('Notifications dismissed');
+    }
+
+    // ========== Bug #11400: Query Editor Warning Decorations ==========
+
+    /**
+     * Set value in the Monaco query editor and verify warning markers exist
+     * @param {string} queryText - SQL query to set in the editor
+     * @returns {Promise<boolean>} True if warning markers are found
+     */
+    async setQueryAndCheckWarnings(queryText) {
+        // Focus the editor and set value using eval
+        await this.scheduledPipelineSqlEditor.click();
+        await this.page.waitForTimeout(300);
+
+        // Use Monaco API to set value and check for markers
+        const hasWarnings = await this.page.evaluate((query) => {
+            // Try to find the Monaco editor instance
+            const editorElement = document.querySelector('.monaco-editor');
+            if (!editorElement) return false;
+
+            // Access the editor instance from the known global or via __vue__
+            // Monaco stores editor instances - try to find by model
+            const model = editorElement.__vue__?.editorObj?.getModel() ||
+                          // fallback: use monaco global if exposed
+                          (window.monaco?.editor?.getModels?.()?.[0]);
+
+            if (!model) return false;
+
+            // Set value
+            model.setValue(query);
+
+            // Check markers for "dq-validation" owner
+            const markers = window.monaco?.editor?.getModelMarkers?.({ owner: 'dq-validation' }) || [];
+            return markers.length > 0;
+        }, queryText);
+
+        testLogger.info(`Warning markers found: ${hasWarnings}`);
+        return hasWarnings;
+    }
+
+    /**
+     * Expect warning markers to be present in the editor (double-quote validation)
+     */
+    async expectWarningMarkersPresent() {
+        const hasMarkers = await this.page.evaluate(() => {
+            const markers = window.monaco?.editor?.getModelMarkers?.({ owner: 'dq-validation' }) || [];
+            return markers.length > 0;
+        });
+        expect(hasMarkers).toBe(true);
+        testLogger.info('✅ Warning markers are present in the editor');
     }
 }

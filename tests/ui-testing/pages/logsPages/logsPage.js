@@ -6907,4 +6907,115 @@ export class LogsPage {
     getQueryEditorLocator() {
         return this.page.locator(this.logsSearchBarQueryEditor);
     }
+
+    // ============================================================================
+    // MONACO SUGGESTION WIDGET METHODS - Bug #11400 auto-suggestions tests
+    // ============================================================================
+
+    /**
+     * Trigger Monaco's suggestion popup (Ctrl+Space) in the query editor.
+     * The editor must be focused first, and content should be set so cursor
+     * is positioned at a location where suggestions can be provided.
+     */
+    async triggerEditorSuggestions() {
+        // Focus the editor's input area
+        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
+        await inputArea.click({ force: true });
+        await this.page.waitForTimeout(300);
+        // Trigger suggestion widget
+        await this.page.keyboard.press('Control+Space');
+        await this.page.waitForTimeout(500);
+        testLogger.info('Triggered editor suggestions via Ctrl+Space');
+    }
+
+    /**
+     * Check if the Monaco suggestion widget is currently visible.
+     * @returns {Promise<boolean>} True if the suggest-widget has the 'visible' class
+     */
+    async isSuggestionWidgetVisible() {
+        const isVisible = await this.page.evaluate(() => {
+            const widget = document.querySelector('.monaco-editor .suggest-widget');
+            if (!widget) return false;
+            return widget.classList.contains('visible') || widget.classList.contains('focused');
+        });
+        testLogger.info(`Suggestion widget visible: ${isVisible}`);
+        return isVisible;
+    }
+
+    /**
+     * Wait for the suggestion widget to become visible.
+     * @param {number} timeout - Timeout in ms (default: 5000)
+     */
+    async waitForSuggestionWidgetVisible(timeout = 5000) {
+        await this.page.waitForFunction(() => {
+            const widget = document.querySelector('.monaco-editor .suggest-widget');
+            if (!widget) return false;
+            return widget.classList.contains('visible') || widget.classList.contains('focused');
+        }, { timeout });
+        testLogger.info('Suggestion widget became visible');
+    }
+
+    /**
+     * Get all suggestion label texts from the suggestion widget.
+     * @returns {Promise<string[]>} Array of label text content
+     */
+    async getSuggestionLabels() {
+        const labels = await this.page.evaluate(() => {
+            const rows = document.querySelectorAll('.suggest-widget.visible .monaco-list-row');
+            return Array.from(rows).map(row => {
+                // Monaco renders labels inside .contents .main .label-name or directly in the row
+                const labelEl = row.querySelector('.contents .main .label-name');
+                if (labelEl) return labelEl.textContent || '';
+                // Fallback: get full row text content
+                return row.textContent || '';
+            });
+        });
+        testLogger.info(`Suggestion labels: [${labels.join(', ')}]`);
+        return labels;
+    }
+
+    /**
+     * Check if the suggestion widget contains any function names that should NOT
+     * appear in value context (e.g., match_all, fuzzy_match, match_all_raw_ignore_case).
+     * @returns {Promise<{hasFunctions: boolean, foundFunctions: string[]}>}
+     */
+    async checkSuggestionForFunctions() {
+        const functionNames = ['match_all', 'fuzzy_match', 'match_all_raw_ignore_case'];
+        const result = await this.page.evaluate((fns) => {
+            const rows = document.querySelectorAll('.suggest-widget.visible .monaco-list-row');
+            const rowTexts = Array.from(rows).map(row => row.textContent || '');
+            const foundFunctions = fns.filter(fn =>
+                rowTexts.some(text => text.includes(fn))
+            );
+            return {
+                hasFunctions: foundFunctions.length > 0,
+                foundFunctions,
+                rowCount: rowTexts.length,
+                firstFew: rowTexts.slice(0, 5),
+            };
+        }, functionNames);
+        testLogger.info('Suggestion function check', result);
+        return result;
+    }
+
+    /**
+     * Set query content in the editor and return focus for further interaction.
+     * Unlike setQueryEditorContent(), this version types the query character by
+     * character to ensure Monaco's suggestion watcher fires naturally.
+     * @param {string} query - The SQL query to type
+     */
+    async typeQueryInEditor(query) {
+        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
+        await inputArea.click({ force: true });
+        await this.page.waitForTimeout(300);
+        // First clear existing content via Ctrl+A + delete
+        await this.page.keyboard.press('Control+a');
+        await this.page.waitForTimeout(100);
+        await this.page.keyboard.press('Delete');
+        await this.page.waitForTimeout(200);
+        // Type the query character by character with small delay
+        await this.page.keyboard.type(query, { delay: 30 });
+        await this.page.waitForTimeout(500);
+        testLogger.info(`Typed query in editor: "${query.substring(0, 60)}..."`);
+    }
 }
