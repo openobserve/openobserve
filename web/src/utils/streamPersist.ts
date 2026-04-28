@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   logs: (orgId: string) => `oo_selected_stream_logs_${orgId}`,
   traces: (orgId: string) => `oo_selected_stream_traces_${orgId}`,
   metrics: (orgId: string) => `oo_selected_stream_metrics_${orgId}`,

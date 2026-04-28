@@ -72,7 +72,7 @@ const mockStreamList = {
       stream_type: "traces",
       stats: {
         doc_time_min: 1000000000000,
-        doc_time_max: 1755853746625720,
+        doc_time_max: 1755853746625721,
         doc_num: 500,
         file_num: 5,
         storage_size: 512000,
@@ -2363,7 +2363,7 @@ describe("Traces Index — auto-run liveMode initialisation", () => {
     localWrapper?.unmount();
     localStorage.removeItem("oo_toggle_auto_run");
     (store.state.zoConfig as any).auto_query_enabled = false;
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("should set liveMode to true when auto_query_enabled=true and no saved preference exists", async () => {
@@ -2475,7 +2475,7 @@ describe("Traces Index — debouncedAutoRunOnQuery", () => {
     vi.useRealTimers();
     localWrapper?.unmount();
     (store.state.zoConfig as any).auto_query_enabled = false;
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("should NOT call searchData when liveMode is false and query changes", async () => {
@@ -2576,7 +2576,7 @@ describe("Traces Index — debouncedAutoRunOnDatetime", () => {
     vi.useRealTimers();
     localWrapper?.unmount();
     (store.state.zoConfig as any).auto_query_enabled = false;
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("should NOT trigger auto-run for absolute datetime type even with liveMode=true", async () => {
@@ -2694,7 +2694,7 @@ describe("Traces Index — stream selection persistence", () => {
     // Reset data.stream to a plain object so other describe blocks are unaffected
     mockSearchObj.data.stream = plainStream();
     (store.state.zoConfig as any).auto_query_enabled = false;
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("should call restoreTracesStream with the org identifier when auto_query_enabled=true and no URL stream param", async () => {
@@ -2808,13 +2808,10 @@ describe("Traces Index — stream selection persistence", () => {
   it("should select the most-recently-updated stream as fallback when no persisted/URL stream matches", async () => {
     (store.state.zoConfig as any).auto_query_enabled = true;
     mockRestoreTracesStream.mockReturnValue(""); // no persisted stream
-    // mockStreamList has "default" (doc_time_max: 1755853746625720) and "test-stream" (same value)
-    // The component picks the last one that has the max doc_time_max
+    // mockStreamList has "default" (doc_time_max: 1755853746625720) and "test-stream" (doc_time_max: 1755853746625721)
+    // The component picks the stream with the highest doc_time_max, which is "test-stream"
     localWrapper = mountStubbed();
     await flushPromises();
-    // Either stream is acceptable — just verify one was selected
-    expect(["default", "test-stream"]).toContain(
-      mockSearchObj.data.stream.selectedStream.value,
-    );
+    expect(mockSearchObj.data.stream.selectedStream.value).toBe("test-stream");
   });
 });

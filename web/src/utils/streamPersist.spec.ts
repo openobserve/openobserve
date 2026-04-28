@@ -21,6 +21,7 @@ import {
   restoreTracesStream,
   saveMetricsStream,
   restoreMetricsStream,
+  STORAGE_KEYS,
 } from "./streamPersist";
 
 beforeEach(() => {
@@ -35,9 +36,9 @@ afterEach(() => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const LOGS_KEY = (org: string) => `oo_selected_stream_logs_${org}`;
-const TRACES_KEY = (org: string) => `oo_selected_stream_traces_${org}`;
-const METRICS_KEY = (org: string) => `oo_selected_stream_metrics_${org}`;
+const LOGS_KEY = (org: string) => STORAGE_KEYS.logs(org);
+const TRACES_KEY = (org: string) => STORAGE_KEYS.traces(org);
+const METRICS_KEY = (org: string) => STORAGE_KEYS.metrics(org);
 
 // ---------------------------------------------------------------------------
 // saveLogsStream / restoreLogsStream
