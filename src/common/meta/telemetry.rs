@@ -383,4 +383,16 @@ mod test_telemetry {
             .send_track_event("test_event", None, false, false)
             .await;
     }
+
+    #[test]
+    fn test_get_base_info_populates_required_keys() {
+        let mut data = HashMap::new();
+        let result = get_base_info(&mut data);
+        assert!(result.contains_key("cpu_count"));
+        assert!(result.contains_key("total_memory"));
+        assert!(result.contains_key("os"));
+        assert!(result.contains_key("zo_version"));
+        assert!(result.contains_key("deployment_type"));
+        assert!(result.contains_key("host_name"));
+    }
 }
