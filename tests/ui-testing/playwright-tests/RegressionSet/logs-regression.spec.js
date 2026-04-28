@@ -1611,10 +1611,18 @@ test.describe("Logs Regression Bugs", () => {
 
     // Select stream to populate field values
     await pm.logsPage.selectStream("e2e_automate");
-
-    // Wait for query editor and auto-search to populate field values
     await pm.logsPage.waitForQueryEditorVisible();
-    await page.waitForTimeout(2000);
+
+    // Wait for auto-search to complete, which populates field values in
+    // Monaco's suggestion cache. This ensures the suggestion widget will
+    // have data when triggered via Ctrl+Space.
+    testLogger.info('Waiting for auto-search to populate field values...');
+    await page.waitForResponse(
+      (resp) => resp.url().includes('/_search') && resp.status() === 200,
+      { timeout: 60000 },
+    );
+    await page.waitForTimeout(1000); // Small buffer for Monaco to process field values
+    testLogger.info('✅ Auto-search completed, field values cached');
 
     // Set the query with cursor in VALUE context (after = operator)
     // The cursor will be positioned at the end, right after "= "
@@ -1624,50 +1632,23 @@ test.describe("Logs Regression Bugs", () => {
     );
     await page.waitForTimeout(500);
 
-    // Trigger the suggestion widget via Ctrl+Space
+    // Trigger the suggestion widget via Ctrl+Space and wait for it to appear.
+    // Using waitForSuggestionWidgetVisible() makes this deterministic:
+    // if the widget never appears (e.g., no completions available), the test
+    // will fail with a clear timeout, not silently skip.
     await pm.logsPage.triggerEditorSuggestions();
-    await page.waitForTimeout(500);
+    await pm.logsPage.waitForSuggestionWidgetVisible(5000);
+    testLogger.info('✅ Suggestion widget appeared');
 
-    // Check if the suggestion widget appeared
-    const widgetVisible = await pm.logsPage.isSuggestionWidgetVisible();
+    // Verify the suggestion widget does NOT contain function names
+    const result = await pm.logsPage.checkSuggestionForFunctions();
+    testLogger.info('Suggestion widget analysis', result);
+    expect(result.hasFunctions).toBe(false);
+    testLogger.info('✅ Functions correctly filtered from value suggestions');
 
-    if (widgetVisible) {
-      // Verify the suggestion widget does NOT contain function names
-      const result = await pm.logsPage.checkSuggestionForFunctions();
-      testLogger.info('Suggestion widget analysis', result);
-      expect(result.hasFunctions).toBe(false);
-      testLogger.info('✅ Functions correctly filtered from value suggestions');
-
-      // Verify suggestions contain actual field values (not functions)
-      expect(result.rowCount).toBeGreaterThan(0);
-      testLogger.info(`✅ ${result.rowCount} value suggestions shown`);
-    } else {
-      // If field values are not yet cached, this test is still informative
-      testLogger.info('⚠️ Suggestion widget not visible (field values may not be loaded yet)');
-      testLogger.info('   Functions were NOT shown in value context (no suggestion popup)');
-
-      // Re-run a query to populate field values, then try again
-      await pm.logsPage.clickRefreshButton();
-      await page.waitForTimeout(3000);
-
-      // Re-set the query and try again
-      await pm.logsPage.setQueryEditorContent(
-        'SELECT * FROM "e2e_automate" WHERE kubernetes_container_name = '
-      );
-      await page.waitForTimeout(500);
-      await pm.logsPage.triggerEditorSuggestions();
-      await page.waitForTimeout(500);
-
-      const widgetVisibleAfterSearch = await pm.logsPage.isSuggestionWidgetVisible();
-      if (widgetVisibleAfterSearch) {
-        const result = await pm.logsPage.checkSuggestionForFunctions();
-        expect(result.hasFunctions).toBe(false);
-        testLogger.info('✅ Functions correctly filtered from value suggestions (after re-query)');
-      } else {
-        testLogger.warn('⚠️ Suggestion widget still not visible after search — skipping');
-        test.skip(true, 'Suggestion widget not available (field values not cached after retry)');
-      }
-    }
+    // Verify suggestions contain actual field values (not functions)
+    expect(result.rowCount).toBeGreaterThan(0);
+    testLogger.info(`✅ ${result.rowCount} value suggestions shown`);
 
     // Verify the query text was set correctly
     await pm.logsPage.expectQueryEditorContainsText('kubernetes_container_name');
