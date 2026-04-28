@@ -106,8 +106,17 @@ pub const STREAM_NAME_LABEL: &str = "o2_stream_name";
 pub const STREAM_NAME_LABEL_OLD: &str = "stream_name";
 pub const DEFAULT_STREAM_NAME: &str = "default";
 
-const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
-    "log", "message", "msg", "content", "data", "body", "json", "error",
+const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 10] = [
+    "log",
+    "message",
+    "msg",
+    "content",
+    "data",
+    "body",
+    "json",
+    "error",
+    "llm_input",
+    "llm_output",
 ];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
