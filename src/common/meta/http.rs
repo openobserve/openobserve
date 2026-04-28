@@ -431,4 +431,21 @@ mod tests {
         assert_eq!(response.name, Some("name-1".into()));
         assert_eq!(response.trace_id, Some("trace-1".into()));
     }
+
+    #[test]
+    fn test_optional_fields_serialized_when_some() {
+        let response = HttpResponse {
+            code: 200,
+            message: "ok".to_string(),
+            id: Some("id-123".to_string()),
+            name: Some("my-name".to_string()),
+            error_detail: Some("detail".to_string()),
+            trace_id: Some("trace-abc".to_string()),
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"id\""));
+        assert!(json.contains("\"name\""));
+        assert!(json.contains("error_detail"));
+        assert!(json.contains("trace_id"));
+    }
 }

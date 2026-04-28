@@ -964,4 +964,28 @@ mod tests {
         let (_, body) = build_quota_email_message("o", "o", 50, false, 50, 100);
         assert!(body.contains("50%"), "fallback should include percentage");
     }
+
+    #[test]
+    fn test_ai_usage_request_body_optional_fields_absent_when_none() {
+        let body = AiUsageRequestBody {
+            feature: "chat",
+            session_id: None,
+            incident_id: None,
+        };
+        let json = serde_json::to_string(&body).unwrap();
+        assert!(!json.contains("session_id"));
+        assert!(!json.contains("incident_id"));
+    }
+
+    #[test]
+    fn test_ai_usage_request_body_optional_fields_present_when_some() {
+        let body = AiUsageRequestBody {
+            feature: "chat",
+            session_id: Some("sess-123"),
+            incident_id: Some("inc-456"),
+        };
+        let json = serde_json::to_string(&body).unwrap();
+        assert!(json.contains("session_id"));
+        assert!(json.contains("incident_id"));
+    }
 }

@@ -1106,6 +1106,33 @@ mod tests {
     }
 
     #[test]
+    fn test_alert_skip_fields_absent_when_default() {
+        let alert: Alert = serde_json::from_value(serde_json::json!({})).unwrap();
+        let json = serde_json::to_value(&alert).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("template"));
+        assert!(!obj.contains_key("context_attributes"));
+        assert!(!obj.contains_key("updated_at"));
+        assert!(!obj.contains_key("deduplication"));
+    }
+
+    #[test]
+    fn test_alert_skip_fields_present_when_some() {
+        let mut alert: Alert = serde_json::from_value(serde_json::json!({})).unwrap();
+        alert.template = Some("my-template".to_string());
+        alert.context_attributes = Some(std::collections::HashMap::from([(
+            "env".to_string(),
+            "prod".to_string(),
+        )]));
+        alert.updated_at = Some(1_700_000_000);
+        let json = serde_json::to_value(&alert).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("template"));
+        assert!(obj.contains_key("context_attributes"));
+        assert!(obj.contains_key("updated_at"));
+    }
+
+    #[test]
     fn test_trigger_condition_timezone_none_absent() {
         let tc = TriggerCondition {
             timezone: None,
