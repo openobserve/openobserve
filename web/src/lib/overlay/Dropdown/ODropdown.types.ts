@@ -6,6 +6,7 @@ import type { DropdownMenuContentProps, DropdownMenuRootProps } from "reka-ui";
 
 // Re-export family types so callers can import everything from one place if needed
 export type {
+  DropdownItemVariant,
   DropdownItemProps,
   DropdownItemEmits,
   DropdownItemSlots,

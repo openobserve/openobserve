@@ -42,6 +42,16 @@
     --color-button-ghost-hover-bg: var(--color-primary-900);
     --color-button-ghost-active-bg: var(--color-primary-800);
 
+    /* ghost-primary */
+    --color-button-ghost-primary-text: var(--color-primary-400);
+    --color-button-ghost-primary-hover-bg: var(--color-primary-900);
+    --color-button-ghost-primary-active-bg: var(--color-primary-800);
+
+    /* ghost-destructive */
+    --color-button-ghost-destructive-text: var(--color-error-400);
+    --color-button-ghost-destructive-hover-bg: var(--color-surface-overlay);
+    --color-button-ghost-destructive-active-bg: var(--color-surface-overlay);
+
     /* destructive */
     --color-button-destructive-focus-ring: var(--color-error-300);
 
@@ -50,6 +60,8 @@
     /* Dropdown */
     --color-dropdown-item-hover-bg: var(--color-primary-900);
     --color-dropdown-item-active-bg: var(--color-primary-800);
+    --color-dropdown-item-destructive-text: var(--color-error-400);
+    --color-dropdown-item-destructive-hover-bg: var(--color-surface-overlay);
 
     /* ToggleGroup */
     --color-toggle-item-hover-bg: var(--color-primary-900);

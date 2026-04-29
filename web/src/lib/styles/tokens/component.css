@@ -47,6 +47,18 @@
   --color-button-ghost-hover-ring: var(--color-primary-300);
   --color-button-ghost-focus-ring: var(--color-primary-400);
 
+  /* Button — ghost-primary (flat + primary color text) */
+  --color-button-ghost-primary-text: var(--color-primary-600);
+  --color-button-ghost-primary-hover-bg: var(--color-primary-50);
+  --color-button-ghost-primary-active-bg: var(--color-primary-100);
+  --color-button-ghost-primary-focus-ring: var(--color-primary-400);
+
+  /* Button — ghost-destructive (flat + destructive color text) */
+  --color-button-ghost-destructive-text: var(--color-error-600);
+  --color-button-ghost-destructive-hover-bg: var(--color-error-50);
+  --color-button-ghost-destructive-active-bg: var(--color-error-100);
+  --color-button-ghost-destructive-focus-ring: var(--color-error-400);
+
   /* Button — destructive */
   --color-button-destructive: var(--color-error-600);
   --color-button-destructive-hover: var(--color-error-700);
@@ -76,6 +88,9 @@
   --color-dropdown-item-disabled: var(--color-text-disabled);
   --color-dropdown-label: var(--color-text-secondary);
   --color-dropdown-separator: var(--color-border-default);
+  /* Dropdown item — destructive */
+  --color-dropdown-item-destructive-text: var(--color-error-600);
+  --color-dropdown-item-destructive-hover-bg: var(--color-error-50);
 
   /* Icon sizes */
   --text-icon-xs: var(--spacing-3);   /* 12px */
@@ -136,6 +151,18 @@
   --color-button-ghost-hover-ring: var(--color-button-ghost-hover-ring);
   --color-button-ghost-focus-ring: var(--color-button-ghost-focus-ring);
 
+  /* Button — ghost-primary */
+  --color-button-ghost-primary-text: var(--color-button-ghost-primary-text);
+  --color-button-ghost-primary-hover-bg: var(--color-button-ghost-primary-hover-bg);
+  --color-button-ghost-primary-active-bg: var(--color-button-ghost-primary-active-bg);
+  --color-button-ghost-primary-focus-ring: var(--color-button-ghost-primary-focus-ring);
+
+  /* Button — ghost-destructive */
+  --color-button-ghost-destructive-text: var(--color-button-ghost-destructive-text);
+  --color-button-ghost-destructive-hover-bg: var(--color-button-ghost-destructive-hover-bg);
+  --color-button-ghost-destructive-active-bg: var(--color-button-ghost-destructive-active-bg);
+  --color-button-ghost-destructive-focus-ring: var(--color-button-ghost-destructive-focus-ring);
+
   /* Button — destructive */
   --color-button-destructive: var(--color-button-destructive);
   --color-button-destructive-hover: var(--color-button-destructive-hover);
@@ -165,6 +192,8 @@
   --color-dropdown-item-disabled: var(--color-dropdown-item-disabled);
   --color-dropdown-label: var(--color-dropdown-label);
   --color-dropdown-separator: var(--color-dropdown-separator);
+  --color-dropdown-item-destructive-text: var(--color-dropdown-item-destructive-text);
+  --color-dropdown-item-destructive-hover-bg: var(--color-dropdown-item-destructive-hover-bg);
 
   /* Icon sizes */
   --text-icon-xs: var(--text-icon-xs);

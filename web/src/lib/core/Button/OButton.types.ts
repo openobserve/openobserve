@@ -11,10 +11,12 @@ export type ButtonVariant =
   | "secondary"
   | "outline"
   | "ghost"
+  | "ghost-primary"
+  | "ghost-destructive"
   | "destructive";
 
-/** Size controls height, padding, and font-size only */
-export type ButtonSize = "sm" | "md" | "lg" | "icon";
+/** Size controls height, padding, font-size, and border-radius */
+export type ButtonSize = "sm" | "md" | "lg" | "icon" | "icon-circle";
 
 export interface ButtonProps extends PrimitiveProps {
   /** Visual style variant */

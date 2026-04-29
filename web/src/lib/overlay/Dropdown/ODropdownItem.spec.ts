@@ -70,4 +70,23 @@ describe("ODropdownItem", () => {
     const item = wrapper.find(".tw\\:text-dropdown-item-text");
     expect(item.exists()).toBe(true);
   });
+
+  it("applies default variant classes when variant is not set", () => {
+    const wrapper = mountItemInDropdown(
+      {},
+      { default: () => h("span", "Action") },
+    );
+    expect(wrapper.html()).toContain("tw:text-dropdown-item-text");
+  });
+
+  it('applies destructive variant classes when variant="destructive"', () => {
+    const wrapper = mountItemInDropdown(
+      { variant: "destructive" },
+      { default: () => h("span", "Delete") },
+    );
+    expect(wrapper.html()).toContain("tw:text-dropdown-item-destructive-text");
+    expect(wrapper.html()).toContain(
+      "tw:data-[highlighted]:bg-dropdown-item-destructive-hover-bg",
+    );
+  });
 });

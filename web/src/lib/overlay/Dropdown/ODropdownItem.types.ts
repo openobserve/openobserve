@@ -2,7 +2,12 @@
  * ODropdownItem.types.ts — public types for ODropdownItem.
  */
 
+/** Visual intent of the item */
+export type DropdownItemVariant = "default" | "destructive";
+
 export interface DropdownItemProps {
+  /** Visual intent — use destructive for Delete/Remove actions */
+  variant?: DropdownItemVariant;
   /** Prevents the user from interacting with this item */
   disabled?: boolean;
   /** Text used for typeahead matching (overrides text content) */

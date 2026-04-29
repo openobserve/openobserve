@@ -174,6 +174,7 @@ Run through the checklist in [references/component-guide.md](references/componen
 7. **Generic** — No app-specific logic (no store, router, API imports)?
 8. **Accessibility** — ARIA, keyboard, focus ring?
 9. **Tests** — Coverage, no snapshot-only?
+10. **Colour visibility** — Open the component in the browser in both light and dark mode and confirm: all text labels are readable at resting state, all icons are clearly visible, no foreground token resolves to a colour that blends into the background. Fix failing states by updating the token value, not by adding inline classes.
 
 ## Critical Rules
 
@@ -183,7 +184,7 @@ Run through the checklist in [references/component-guide.md](references/componen
 - **NEVER** use hardcoded colors (`tw:bg-[#4f46e5]`)
 - **NEVER** use hardcoded px values in token definitions — e.g. `--spacing-foo: 40px` → must be `var(--spacing-10)` referencing a `base.css` primitive
 - **NEVER** use SCSS — only `.css` token files and Tailwind
-- **NEVER** ship a component without dark mode token coverage
+- **NEVER** ship a component where resting/inactive foreground colours are invisible or near-invisible. `text-secondary` (grey-500 on white ≈ 3.7:1) fails WCAG AA for normal-weight body text. For interactive labels (tab names, button text, icon inside a control) that must be readable at rest, use `text-primary` (grey-900) or a dedicated component token with sufficient contrast. Reserve `text-secondary` only for supporting/helper text where reduced prominence is intentional and the context is clearly decorative. Icons rendered via `OIcon` use `currentColor` — if the parent token is too light, the icon will be invisible. Always verify resting, hover, active, and disabled states in the browser at 100% zoom in both light and dark modes before shipping.
 - **NEVER** ship half a family (e.g. OTabs without OTab, OTabPanel, OTabPanels)
 - **NEVER** install a headless library (other than reka-ui / @tanstack/vue-form) without user confirmation
 - **NEVER** cross-import between library groups
