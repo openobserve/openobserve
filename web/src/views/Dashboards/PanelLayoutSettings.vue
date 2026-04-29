@@ -88,17 +88,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-icon>
         </div>
       </div>
-      <div class="flex justify-center q-mt-lg">
+      <div class="flex justify-center q-mt-lg tw:gap-2">
         <OButton
-          variant="secondary"
-          size="sm"
+          variant="outline"
+          size="sm-action"
           v-close-popup="true"
           data-test="panel-layout-settings-cancel"
           >{{ t("dashboard.cancel") }}</OButton
         >
         <OButton
           variant="primary"
-          size="sm"
+          size="sm-action"
           type="submit"
           data-test="panel-layout-settings-save"
           >{{ t("dashboard.save") }}</OButton

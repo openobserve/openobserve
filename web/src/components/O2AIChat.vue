@@ -232,12 +232,11 @@
             />
           </q-card-section>
 
-          <q-card-actions align="right" class="q-px-md q-pb-md">
-            <OButton variant="secondary" @click="showEditTitleDialog = false"
+          <q-card-actions align="right" class="q-px-md q-pb-md tw:gap-2">
+            <OButton variant="outline" size="sm-action" @click="showEditTitleDialog = false"
               >Cancel</OButton
             >
-            <q-space />
-            <OButton variant="primary" class="q-ml-sm" @click="saveEditedTitle"
+            <OButton variant="primary" size="sm-action" @click="saveEditedTitle"
               >Save</OButton
             >
           </q-card-actions>
@@ -302,12 +301,11 @@
             />
           </q-card-section>
 
-          <q-card-actions align="right" class="q-px-md q-pb-md">
-            <OButton variant="secondary" @click="showEditTitleDialog = false"
+          <q-card-actions align="right" class="q-px-md q-pb-md tw:gap-2">
+            <OButton variant="outline" size="sm-action" @click="showEditTitleDialog = false"
               >Cancel</OButton
             >
-            <q-space />
-            <OButton variant="primary" class="q-ml-sm" @click="saveEditedTitle"
+            <OButton variant="primary" size="sm-action" @click="saveEditedTitle"
               >Save</OButton
             >
           </q-card-actions>

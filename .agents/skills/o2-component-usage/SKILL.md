@@ -54,6 +54,46 @@ All O2 components automatically support dark mode via design tokens. No dark-mod
 
 ---
 
+## Cancel / Save Button Standard (MANDATORY)
+
+> **All cancel/save button pairs in forms, dialogs, and config panels MUST follow this exact pattern — no exceptions.**
+
+### Standard Pattern
+
+```vue
+<!-- Parent container: always use tw:gap-2 (never individual q-ml / q-mr on buttons) -->
+<div class="tw:flex tw:gap-2">
+  <!-- Cancel -->
+  <OButton variant="outline" size="sm-action" @click="...">
+    {{ t("...cancel") }}
+  </OButton>
+
+  <!-- Save / Submit / Update / OK -->
+  <OButton variant="primary" size="sm-action" type="submit" @click="...">
+    {{ t("...save") }}
+  </OButton>
+</div>
+```
+
+### Rules
+
+| Property | Cancel | Save / Submit / OK |
+|----------|--------|--------------------|
+| `variant` | `"outline"` | `"primary"` |
+| `size` | `"sm-action"` | `"sm-action"` |
+| Spacing | remove `class="q-ml-*"` / `class="q-mr-*"` from button — use `tw:gap-2` on parent | same |
+
+- **`variant="secondary"` is NEVER correct for a cancel button** — always use `variant="outline"`.
+- **`size="sm"` is NEVER correct for cancel/save** — always use `size="sm-action"`.
+- **Never use `<q-space />`** between cancel and save buttons — use `tw:gap-2` on the parent container.
+- **Never use `class="q-ml-sm"` / `class="q-ml-md"` on an OButton** — move spacing to parent gap.
+- This rule applies to every file in the codebase: IAM, dashboards, settings, alerts, pipelines, etc.
+
+### Destructive / Other actions in the same row
+Buttons like Delete, Reject, etc. in the same action row should match the `size="sm-action"` for visual consistency, but keep their own `variant` (e.g. `variant="destructive"`).
+
+---
+
 # Quasar to O2 Migration Workflow
 
 Use this section when **migrating existing Quasar component usages** to O2 across the codebase.
