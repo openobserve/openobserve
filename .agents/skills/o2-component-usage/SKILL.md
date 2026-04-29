@@ -29,6 +29,10 @@ For the full list of built components, their import paths, family groupings, and
 8. **HARD RULE — Always analyse style before replacing; any visual difference must become a variant.** Before making any replacement, inspect the element's existing inline styles, utility classes, and every scoped-CSS rule targeting it (via its class names). For each visual property that differs from the O2 component's default appearance, you must add a new `variant` to the O2 component using the `o2-component-create` skill first. Never start the replacement without confirming that every needed variant already exists. This rule has no exceptions.
 9. **HARD RULE — Scoped CSS classes become variants, never stay at the usage level.** If the original element is targeted by a scoped `<style>` block (e.g. `.my-class { color: red }` applied as `class="my-class"`), that styling MUST be converted into a named variant inside the O2 component. Remove the scoped rule from the file and use the variant prop instead. Never leave scoped-CSS overrides pointing at an O2 component.
 
+10. **Exception — Parent-controlled reveal / layout-only positioning is handled by a wrapper, not a variant.** If a scoped CSS rule triggers **on a parent's state** (e.g. `.parent:hover .my-class { opacity: 1 }`) or contains only layout/positioning properties (`margin`, `flex-shrink`, `position`, `opacity: 0` for hide/show) — wrap the O2 component in a plain `<span class="my-wrap">` and keep those rules on the wrapper class, not on the O2 component itself. The visibility / layout state of the wrapper is NOT a button variant.
+
+11. **HARD RULE — Always audit child components too.** When a migration target is a parent component (e.g. a view, panel, or dialog), you MUST also inspect every child component it renders — whether through `<ChildComponent />` in the template or via dynamic slots. For every child component file: grep it for `q-btn`, `q-btn-dropdown`, `<button>`, `<input>`, `<select>`, `<textarea>`, `<a>` (used as a button) and apply the same migration rules. Do NOT consider a parent "done" while any of its rendered children still contain un-migrated elements.
+
 ## Component Not in Catalog?
 
 1. **Do NOT silently fall back to a raw `<div>` or any structureless wrapper.**
@@ -83,6 +87,8 @@ grep_search for "<q-{component-name}" across web/src/ (isRegexp: false)
 ```
 
 Record: file path, number of usages per file, total count across all variants of the family.
+
+**Child component expansion (REQUIRED):** For every parent file in your audit list, grep its template for `<ComponentName` imports and recursively add each child component's file to the audit list. A parent is not fully migrated until all files it renders — direct children, grandchildren, slot content — have also been audited and migrated. Do not stop at the top-level file.
 
 ---
 
