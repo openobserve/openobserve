@@ -56,14 +56,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="ov-row-title">{{ item.title }}</div>
             <div class="ov-row-desc">{{ item.description }}</div>
           </div>
-          <OButton
-            variant="outline"
-            size="sm"
-            class="ov-investigate-btn"
-            @click="goToAlert(item)"
-          >
-            {{ t("overview.investigate") }}
-          </OButton>
+          <span class="ov-investigate-wrap">
+            <OButton
+              variant="ghost-primary"
+              size="sm"
+              @click="goToAlert(item)"
+            >
+              {{ t("overview.investigate") }}
+            </OButton>
+          </span>
         </div>
       </div>
     </section>
@@ -109,14 +110,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span v-if="inc.assigned_to"> · {{ inc.assigned_to }}</span>
             </div>
           </div>
-          <OButton
-            variant="outline"
-            size="sm"
-            class="ov-investigate-btn"
-            @click="goToIncident(inc)"
-          >
-            {{ t("overview.investigate") }}
-          </OButton>
+          <span class="ov-investigate-wrap">
+            <OButton
+              variant="ghost-primary"
+              size="sm"
+              @click="goToIncident(inc)"
+            >
+              {{ t("overview.investigate") }}
+            </OButton>
+          </span>
         </div>
       </div>
     </section>
@@ -134,18 +136,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="ov-svc-header">
             <span class="ov-svc-name">{{ svc.label }}</span>
-            <OButton
-              variant="ghost"
-              size="icon"
-              class="ov-svc-info-btn"
-              :title="t('overview.viewLatencyCharts')"
-              @click="openServicePanel(svc, $event)"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                <path d="M12 16v-4m0-4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-            </OButton>
+            <span class="ov-svc-info-wrap">
+              <OButton
+                variant="ghost-muted"
+                size="icon"
+                :title="t('overview.viewLatencyCharts')"
+                @click="openServicePanel(svc, $event)"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                  <path d="M12 16v-4m0-4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </OButton>
+            </span>
           </div>
           <div class="ov-svc-flags">
             <span v-if="svc.errorFlag" class="ov-svc-flag ov-flag-error" :title="t('overview.elevatedErrorRate')">
@@ -802,22 +805,9 @@ watch(isIncidentsEnabled, (enabled) => {
   text-overflow: ellipsis;
 }
 
-.ov-investigate-btn {
+.ov-investigate-wrap {
   flex-shrink: 0;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--o2-primary-color);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
   white-space: nowrap;
-  transition: background 0.15s;
-
-  &:hover {
-    background: var(--o2-hover-accent);
-  }
 }
 
 /* ── Dimension badges — exact match to IncidentList.vue ── */
@@ -1050,28 +1040,11 @@ body.body--dark {
   white-space: nowrap;
 }
 
-.ov-svc-info-btn {
+.ov-svc-info-wrap {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-  width: 1.25em;
-  height: 1.25em;
-  padding: 0;
-  border: none;
-  border-radius: 0.25em;
-  background: transparent;
-  color: var(--o2-text-muted);
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    background 0.15s;
   margin-left: 0.25rem;
-
-  &:hover {
-    color: var(--o2-primary-color);
-    background: var(--o2-hover-gray);
-  }
 }
 
 .ov-svc-flags {

@@ -12,6 +12,8 @@ export type ButtonVariant =
   | "outline"
   | "ghost"
   | "ghost-primary"
+  | "ghost-muted"
+  | "ghost-subtle"
   | "ghost-destructive"
   | "destructive";
 
@@ -37,6 +39,8 @@ export interface ButtonProps extends PrimitiveProps {
   loading?: boolean;
   /** Native button type attribute — only meaningful when as="button" */
   type?: "button" | "submit" | "reset";
+  /** Makes the button a block-level element ( full width, flex instead of inline-flex ) */
+  block?: boolean;
 }
 
 export interface ButtonEmits {
