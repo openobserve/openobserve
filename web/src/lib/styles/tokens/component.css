@@ -44,6 +44,7 @@
   --color-button-ghost-text: var(--color-text-secondary);
   --color-button-ghost-hover-bg: var(--color-primary-50);
   --color-button-ghost-active-bg: var(--color-primary-100);
+  --color-button-ghost-hover-ring: var(--color-primary-300);
   --color-button-ghost-focus-ring: var(--color-primary-400);
 
   /* Button — destructive */
@@ -125,6 +126,7 @@
   --color-button-ghost-text: var(--color-button-ghost-text);
   --color-button-ghost-hover-bg: var(--color-button-ghost-hover-bg);
   --color-button-ghost-active-bg: var(--color-button-ghost-active-bg);
+  --color-button-ghost-hover-ring: var(--color-button-ghost-hover-ring);
   --color-button-ghost-focus-ring: var(--color-button-ghost-focus-ring);
 
   /* Button — destructive */
