@@ -15,7 +15,7 @@
 
 use config::meta::{
     dashboards::{
-        Dashboard, ListDashboardsParams, v1::Dashboard as DashboardV1,
+        Dashboard, DashboardListError, ListDashboardsParams, v1::Dashboard as DashboardV1,
         v2::Dashboard as DashboardV2, v3::Dashboard as DashboardV3, v4::Dashboard as DashboardV4,
         v5::Dashboard as DashboardV5, v6::Dashboard as DashboardV6, v7::Dashboard as DashboardV7,
         v8::Dashboard as DashboardV8,
@@ -149,28 +149,67 @@ pub async fn get_by_id(
 }
 
 /// Lists dashboards.
-pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
+///
+/// Dashboards that fail to deserialize are not included in the returned list.
+/// Instead, error details for those dashboards are returned in the second
+/// element of the tuple so callers can report them without blocking the
+/// successfully loaded dashboards.
+pub async fn list(
+    params: ListDashboardsParams,
+) -> Result<(Vec<(Folder, Dashboard)>, Vec<DashboardListError>), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let dashboards = list_models(client, params)
-        .await?
-        .into_iter()
-        .map(|(f, d)| {
-            let f = Folder::from(f);
-            let d = Dashboard::try_from(d)?;
-            Ok((f, d))
-        })
-        .collect::<Result<_, errors::Error>>()?;
-    Ok(dashboards)
+    let mut dashboards = Vec::new();
+    let mut list_errors = Vec::new();
+
+    for (f, d) in list_models(client, params).await? {
+        let folder = Folder::from(f);
+        // Extract identifiers before try_from consumes the model.
+        let dash_id = d.dashboard_id.clone();
+        let dash_title = d.title.clone();
+        let folder_id = d.folder_id.clone();
+        match Dashboard::try_from(d) {
+            Ok(dash) => dashboards.push((folder, dash)),
+            Err(e) => {
+                log::warn!(
+                    "Skipping dashboard {} ({}) in folder {}: deserialization failed: {}",
+                    dash_id,
+                    dash_title,
+                    folder_id,
+                    e
+                );
+                list_errors.push(DashboardListError {
+                    dashboard_id: dash_id,
+                    folder_id,
+                    title: dash_title,
+                    error: e.to_string(),
+                });
+            }
+        }
+    }
+
+    Ok((dashboards, list_errors))
 }
 
-/// Lists all existing dashboards
+/// Lists all existing dashboards.
+///
+/// Dashboards that fail to deserialize are skipped and logged as warnings.
 pub async fn list_all() -> Result<Vec<(String, Dashboard)>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let dashboards = list_all_models(client)
-        .await?
-        .into_iter()
-        .map(|(org, db)| Ok((org, Dashboard::try_from(db)?)))
-        .collect::<Result<_, errors::Error>>()?;
+    let mut dashboards = Vec::new();
+    for (org, db) in list_all_models(client).await? {
+        let dash_id = db.dashboard_id.clone();
+        match Dashboard::try_from(db) {
+            Ok(dash) => dashboards.push((org, dash)),
+            Err(e) => {
+                log::warn!(
+                    "Skipping dashboard {} in org {}: deserialization failed: {}",
+                    dash_id,
+                    org,
+                    e
+                );
+            }
+        }
+    }
     Ok(dashboards)
 }
 

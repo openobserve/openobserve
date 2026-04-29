@@ -246,7 +246,7 @@ pub async fn delete_folder(
     match folder_type {
         FolderType::Dashboards => {
             let params = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
-            let dashboards = table::dashboards::list(params).await?;
+            let (dashboards, _) = table::dashboards::list(params).await?;
             if !dashboards.is_empty() {
                 return Err(FolderError::DeleteWithDashboards);
             }

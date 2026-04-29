@@ -180,7 +180,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     };
 
     let functions = db::functions::list(org_id).await.unwrap_or_default();
-    let dashboards = table::dashboards::list(ListDashboardsParams::new(org_id))
+    let (dashboards, _list_errors) = table::dashboards::list(ListDashboardsParams::new(org_id))
         .await
         .unwrap_or_default();
 

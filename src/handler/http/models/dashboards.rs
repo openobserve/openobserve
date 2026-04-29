@@ -15,7 +15,7 @@
 
 use chrono::{DateTime, FixedOffset, Utc};
 use config::meta::{
-    dashboards::{Dashboard as MetaDashboard, v1, v2, v3, v4, v5, v6, v7, v8},
+    dashboards::{Dashboard as MetaDashboard, DashboardListError, v1, v2, v3, v4, v5, v6, v7, v8},
     folder::Folder as MetaFolder,
 };
 use serde::{Deserialize, Deserializer, Serialize};
@@ -108,6 +108,10 @@ pub struct ListDashboardsQuery {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ListDashboardsResponseBody {
     pub dashboards: Vec<ListDashboardsResponseBodyItem>,
+    /// Dashboards that could not be deserialized. Empty when all dashboards
+    /// loaded successfully.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub errors: Vec<DashboardListError>,
 }
 
 /// An item in the list returned by the `ListDashboards` endpoint.
@@ -261,10 +265,13 @@ impl ListDashboardsQuery {
     }
 }
 
-impl From<Vec<(MetaFolder, MetaDashboard)>> for ListDashboardsResponseBody {
-    fn from(value: Vec<(MetaFolder, MetaDashboard)>) -> Self {
-        let dashboards = value.into_iter().map(|fd| fd.into()).collect();
-        Self { dashboards }
+impl From<(Vec<(MetaFolder, MetaDashboard)>, Vec<DashboardListError>)>
+    for ListDashboardsResponseBody
+{
+    fn from(value: (Vec<(MetaFolder, MetaDashboard)>, Vec<DashboardListError>)) -> Self {
+        let (items, errors) = value;
+        let dashboards = items.into_iter().map(|fd| fd.into()).collect();
+        Self { dashboards, errors }
     }
 }
 

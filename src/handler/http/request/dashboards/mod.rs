@@ -15,8 +15,8 @@
 
 use axum::{
     extract::{Path, Query},
-    http::HeaderMap,
-    response::Response,
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
 };
 use config::meta::dashboards::Dashboard;
 use hashbrown::HashMap;
@@ -87,10 +87,20 @@ impl From<DashboardError> for Response {
             DashboardError::PanelAlreadyExists(panel_id, tab_id) => MetaHttpResponse::conflict(
                 format!("Panel with id {panel_id} already exists in tab {tab_id}"),
             ),
-            DashboardError::PutValidationFailed(errors) => MetaHttpResponse::bad_request(format!(
-                "Dashboard validation failed: {}",
-                errors.join("; ")
-            )),
+            DashboardError::PutValidationFailed(errors) => {
+                #[derive(serde::Serialize)]
+                struct ValidationErrorResponse {
+                    code: u16,
+                    message: String,
+                    errors: Vec<config::meta::dashboards::validation::ValidationError>,
+                }
+                let body = ValidationErrorResponse {
+                    code: 400,
+                    message: "Dashboard validation failed".into(),
+                    errors,
+                };
+                (StatusCode::BAD_REQUEST, axum::Json(body)).into_response()
+            }
         }
     }
 }
@@ -242,11 +252,11 @@ pub async fn list_dashboards(
     let Some(user_id) = get_user_id(&headers) else {
         return MetaHttpResponse::unauthorized("User ID not found in request headers");
     };
-    let dashboards = match dashboards::list_dashboards(&user_id, params).await {
-        Ok(dashboards) => dashboards,
+    let result = match dashboards::list_dashboards(&user_id, params).await {
+        Ok(result) => result,
         Err(err) => return err.into(),
     };
-    let resp_body: ListDashboardsResponseBody = dashboards.into();
+    let resp_body: ListDashboardsResponseBody = result.into();
     MetaHttpResponse::json(resp_body)
 }
 

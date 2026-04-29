@@ -16,7 +16,7 @@
 use config::{
     TIMESTAMP_COL_NAME, ider,
     meta::{
-        dashboards::{Dashboard, ListDashboardsParams, v8},
+        dashboards::{Dashboard, DashboardListError, ListDashboardsParams, v8},
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         stream::{DistinctField, StreamType},
     },
@@ -136,7 +136,7 @@ pub enum DashboardError {
 
     /// Error that occurs when dashboard validation fails against the shared JSON Schema.
     #[error("Dashboard validation failed: {0:?}")]
-    PutValidationFailed(Vec<String>),
+    PutValidationFailed(Vec<config::meta::dashboards::validation::ValidationError>),
 }
 
 async fn add_distinct_field_entry(
@@ -431,12 +431,12 @@ pub async fn update_dashboard(
 pub async fn list_dashboards(
     user_id: &str,
     params: ListDashboardsParams,
-) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
+) -> Result<(Vec<(Folder, Dashboard)>, Vec<DashboardListError>), DashboardError> {
     let org_id = params.org_id.clone();
     let folder_id = params.folder_id.clone();
-    let dashboards = table::dashboards::list(params).await?;
+    let (dashboards, list_errors) = table::dashboards::list(params).await?;
     let dashboards = filter_permitted_dashboards(&org_id, user_id, dashboards, folder_id).await?;
-    Ok(dashboards)
+    Ok((dashboards, list_errors))
 }
 
 #[tracing::instrument]
@@ -622,16 +622,12 @@ async fn put(
                     let validation_errors =
                         config::meta::dashboards::validation::validate_dashboard(v8_json);
                     if !validation_errors.is_empty() {
-                        let error_messages: Vec<String> = validation_errors
-                            .iter()
-                            .map(|e| e.message.clone())
-                            .collect();
                         log::warn!(
                             "Dashboard validation errors for {}: {:?}",
                             dashboard_id,
-                            error_messages
+                            validation_errors
                         );
-                        return Err(DashboardError::PutValidationFailed(error_messages));
+                        return Err(DashboardError::PutValidationFailed(validation_errors));
                     }
                 } else {
                     log::error!(
@@ -639,7 +635,12 @@ async fn put(
                         dashboard_id
                     );
                     return Err(DashboardError::PutValidationFailed(vec![
-                        "Internal error: dashboard missing v8 data for validation".into(),
+                        config::meta::dashboards::validation::ValidationError {
+                            path: String::new(),
+                            message: "Internal error: dashboard missing v8 data for validation"
+                                .into(),
+                            code: "INTERNAL_ERROR".into(),
+                        },
                     ]));
                 }
             }
@@ -649,9 +650,15 @@ async fn put(
                     dashboard_id,
                     e
                 );
-                return Err(DashboardError::PutValidationFailed(vec![format!(
-                    "Internal error: failed to serialize dashboard for validation: {e}"
-                )]));
+                return Err(DashboardError::PutValidationFailed(vec![
+                    config::meta::dashboards::validation::ValidationError {
+                        path: String::new(),
+                        message: format!(
+                            "Internal error: failed to serialize dashboard for validation: {e}"
+                        ),
+                        code: "INTERNAL_ERROR".into(),
+                    },
+                ]));
             }
         }
     }

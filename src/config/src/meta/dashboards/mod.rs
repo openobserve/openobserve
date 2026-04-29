@@ -109,6 +109,18 @@ impl Dashboard {
     }
 }
 
+/// Error information for a dashboard that failed to deserialize during a list
+/// operation. The list endpoint returns successfully deserialized dashboards
+/// alongside these errors so that a single corrupt dashboard does not block
+/// the entire response.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct DashboardListError {
+    pub dashboard_id: String,
+    pub folder_id: String,
+    pub title: String,
+    pub error: String,
+}
+
 pub mod reports;
 pub mod usage_report;
 pub mod v1;
