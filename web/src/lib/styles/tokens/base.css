@@ -55,6 +55,10 @@
 
   /* --- Spacing scale --- */
   --spacing-px:  1px;
+  --spacing-3:   0.75rem;   /* 12px */
+  --spacing-4:   1rem;      /* 16px */
+  --spacing-5:   1.25rem;   /* 20px */
+  --spacing-6:   1.5rem;    /* 24px */
   --spacing-8:   2rem;      /* 32px */
   --spacing-10:  2.5rem;    /* 40px */
 
