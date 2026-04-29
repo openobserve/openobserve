@@ -18,7 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <div
       class="sql-bar tw:flex tw:flex-row tw:items-center tw:justify-between"
-      :style="{ backgroundColor: store.state.theme === 'dark' ? 'transparent' : 'var(--color-primary-100)' }"
+      :style="{
+        backgroundColor:
+          store.state.theme === 'dark'
+            ? 'transparent'
+            : 'var(--color-primary-100)',
+      }"
       @click.stop="onDropDownClick"
     >
       <div
@@ -48,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
-              <span>{{ 'Query ' + (index + 1) }}</span>
+              <span>{{ "Query " + (index + 1) }}</span>
               <q-icon
                 v-if="promqlMode"
                 :name="
@@ -84,15 +89,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTab>
           </OTabs>
         </div>
-        <q-btn
+        <OButton
           v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
-          round
-          flat
+          variant="ghost"
+          size="icon"
           @click.stop="addTab"
-          icon="add"
-          style="margin-right: 10px"
           data-test="`dashboard-panel-query-tab-add`"
-        ></q-btn>
+        >
+          <template #icon-left><q-icon name="add" /></template>
+        </OButton>
       </div>
       <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
         <q-toggle
@@ -229,14 +234,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </q-item>
                       </template>
                     </q-select>
-                    <q-btn
-                      padding="xs"
-                      class=""
-                      size="sm"
-                      flat
-                      icon="info_outline"
+                    <OButton
+                      variant="ghost"
+                      size="icon"
                       data-test="dashboard-addpanel-config-drilldown-info"
                     >
+                      <template #icon-left
+                        ><q-icon name="info_outline"
+                      /></template>
                       <q-tooltip
                         class="bg-grey-8"
                         anchor="bottom middle"
@@ -245,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("dashboard.vrlExtractionTooltip") }}
                       </q-tooltip>
-                    </q-btn>
+                    </OButton>
                   </div>
                 </div>
               </div>
@@ -261,8 +266,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 // @ts-nocheck
 import {
   defineComponent,
@@ -288,6 +293,7 @@ import { useStore } from "vuex";
 import useFunctions from "@/composables/useFunctions";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
@@ -297,6 +303,7 @@ export default defineComponent({
     ConfirmDialog,
     QueryTypeSelector,
     UnifiedQueryEditor,
+    OButton,
   },
   emits: ["searchdata", "run-query"],
   methods: {
@@ -521,13 +528,13 @@ export default defineComponent({
       ],
       ([streamFields, customFields, groupedFields, functions]) => {
         // Flatten schema fields from all selected streams (the Fields panel source).
-        const schemaFields = (groupedFields as any[] ?? []).flatMap(
+        const schemaFields = ((groupedFields as any[]) ?? []).flatMap(
           (group: any) => group.schema ?? [],
         );
         // Merge all sources; deduplicate by name so fields don't appear twice.
         const allFields = [
-          ...(streamFields as any[] ?? []),
-          ...(customFields as any[] ?? []),
+          ...((streamFields as any[]) ?? []),
+          ...((customFields as any[]) ?? []),
           ...schemaFields,
         ];
         const seen = new Set<string>();
@@ -536,7 +543,7 @@ export default defineComponent({
           seen.add(f.name);
           return true;
         });
-        sqlUpdateAllKeywords(uniqueFields, functions as any[] ?? []);
+        sqlUpdateAllKeywords(uniqueFields, (functions as any[]) ?? []);
       },
       { immediate: true },
     );

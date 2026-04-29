@@ -15,6 +15,7 @@ export type ButtonVariant =
   | "ghost-muted"
   | "ghost-subtle"
   | "ghost-destructive"
+  | "ghost-warning"
   | "destructive";
 
 /** Size controls height, padding, font-size, and border-radius */
@@ -23,6 +24,7 @@ export type ButtonSize =
   | "md"
   | "lg"
   | "icon"
+  | "icon-xs"
   | "icon-sm"
   | "icon-md"
   | "icon-lg"
@@ -37,6 +39,8 @@ export interface ButtonProps extends PrimitiveProps {
   disabled?: boolean;
   /** Shows loading state and disables interaction */
   loading?: boolean;
+  /** Applies active/selected state styling (overrides variant to primary appearance) */
+  active?: boolean;
   /** Native button type attribute — only meaningful when as="button" */
   type?: "button" | "submit" | "reset";
   /** Makes the button a block-level element ( full width, flex instead of inline-flex ) */

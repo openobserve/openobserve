@@ -38,21 +38,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-select>
 
-    <q-btn
-      class="q-mb-md add-folder-btn q-ml-xs"
+    <OButton
       data-test="dashboard-tab-new-add"
-      style="width: 40px"
+      variant="ghost"
+      size="icon"
       :style="computedStyle"
-      no-caps
-      dense
       @click="
         () => {
           showAddTabDialog = true;
         }
       "
     >
-      <q-icon name="add" size="xs" />
-    </q-btn>
+      <template #icon-left><q-icon name="add" /></template>
+    </OButton>
   </div>
   <!-- add/edit tab -->
   <q-dialog
@@ -83,7 +81,7 @@ import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "SelectTabDropdown",
-  components: { AddTab },
+  components: { AddTab, OButton },
   emits: ["tab-selected", "tab-list-updated"],
   props: {
     folderId: {

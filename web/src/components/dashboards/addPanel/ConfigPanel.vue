@@ -34,16 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Search bar -->
     <div class="config-search-wrapper tw:sticky">
       <div class="row no-wrap items-center" style="gap: 4px">
-        <q-btn
-          flat
-          round
-          dense
-          :icon="allSectionsExpanded ? 'unfold_less' : 'unfold_more'"
-          size="sm"
-          class="text-grey-6"
-          @click="toggleAllSections"
-        >
-        </q-btn>
+        <OButton variant="ghost" size="icon" @click="toggleAllSections">
+          <template #icon-left
+            ><q-icon
+              :name="allSectionsExpanded ? 'unfold_less' : 'unfold_more'"
+          /></template>
+        </OButton>
         <ConfigPanelSearch v-model="searchQuery" />
       </div>
     </div>
@@ -55,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <q-icon name="search_off" size="24px" class="q-mb-xs text-grey-5" />
       <div class="text-grey-6 text-caption">
-        {{ t('dashboard.configPanelNoResultsFound', { query: searchQuery }) }}
+        {{ t("dashboard.configPanelNoResultsFound", { query: searchQuery }) }}
       </div>
     </div>
 
@@ -154,13 +150,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'o2-toggle-button-lg-light'
               "
             />
-            <q-btn
-              padding="xs"
-              size="sm"
-              flat
-              icon="info_outline"
-              class="q-mt-xs"
-            >
+            <OButton variant="ghost" size="icon" class="tw:mt-1" @click.stop>
+              <template #icon-left><q-icon name="info_outline" /></template>
               <q-tooltip
                 anchor="bottom middle"
                 self="top middle"
@@ -171,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("dashboard.useDefaultTimeTooltip") }}
                 </span>
               </q-tooltip>
-            </q-btn>
+            </OButton>
           </div>
 
           <div v-if="useDefaultTime" class="q-mt-sm">
@@ -180,12 +171,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="
-                
-            showTimePicker ||
-               
-            (panelTimeRange !== null && panelTimeRange !== undefined)
-              
-          "
+                showTimePicker ||
+                (panelTimeRange !== null && panelTimeRange !== undefined)
+              "
               class="flex items-center no-wrap panel-time-picker-container"
             >
               <div class="panel-time-picker-btn">
@@ -215,13 +203,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div v-else>
-              <q-btn
+              <OButton
+                variant="outline"
+                size="sm"
                 @click="showTimePicker = true"
-                style="cursor: pointer; padding: 0px 5px"
-                :label="t('common.set')"
-                class="el-border"
                 data-test="dashboard-config-set-panel-time"
-              />
+                >{{ t("common.set") }}</OButton
+              >
             </div>
           </div>
         </div>
@@ -258,7 +246,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expand-icon-class="text-grey-6"
     >
       <div class="config-section-body">
-        <PromQLChartConfig :chart-type="dashboardPanelData.data.type" :is-config-option-visible="isConfigOptionVisible" />
+        <PromQLChartConfig
+          :chart-type="dashboardPanelData.data.type"
+          :is-config-option-visible="isConfigOptionVisible"
+        />
       </div>
     </q-expansion-item>
 
@@ -1140,7 +1131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template v-slot:label>
               <div style="display: flex; align-items: center; gap: 4px">
-                <span>{{ t('dashboard.axisLabelRotate') }}</span>
+                <span>{{ t("dashboard.axisLabelRotate") }}</span>
                 <q-icon
                   name="info"
                   size="20px"
@@ -1154,10 +1145,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="bg-grey-8"
                   >
                     <div>
-                      <span>{{ t('dashboard.axisLabelRotateTooltipText') }}</span>
+                      <span>{{
+                        t("dashboard.axisLabelRotateTooltipText")
+                      }}</span>
                       <br /><br />
-                      <b>{{ t('dashboard.axisLabelTooltipNotePrefix') }}</b>
-                      <span>{{ t('dashboard.axisLabelTooltipNoteText') }}</span>
+                      <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
+                      <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
                     </div>
                   </q-tooltip>
                 </q-icon>
@@ -1187,7 +1180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template v-slot:label>
               <div style="display: flex; align-items: center; gap: 4px">
-                <span>{{ t('dashboard.axisLabelTruncate') }}</span>
+                <span>{{ t("dashboard.axisLabelTruncate") }}</span>
                 <q-icon
                   name="info"
                   size="20px"
@@ -1201,10 +1194,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="bg-grey-8"
                   >
                     <div>
-                      <span>{{ t('dashboard.axisLabelTruncateTooltipText') }}</span>
+                      <span>{{
+                        t("dashboard.axisLabelTruncateTooltipText")
+                      }}</span>
                       <br /><br />
-                      <b>{{ t('dashboard.axisLabelTooltipNotePrefix') }}</b>
-                      <span>{{ t('dashboard.axisLabelTooltipNoteText') }}</span>
+                      <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
+                      <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
                     </div>
                   </q-tooltip>
                 </q-icon>
@@ -1449,7 +1444,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </q-input>
-
       </div>
     </q-expansion-item>
 
@@ -1484,13 +1478,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <q-btn
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            @click.stop
-          >
+          <OButton variant="ghost" size="icon" @click.stop>
+            <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -1499,12 +1488,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.pivotShowRowTotalsTooltip") }}
             </q-tooltip>
-          </q-btn>
+          </OButton>
         </q-toggle>
 
         <q-toggle
-          v-if="!promqlMode && isPivotMode && dashboardPanelData.data.config.table_pivot_show_row_totals"
-          v-show="isConfigOptionVisible('pivotTable', 'pivot-sticky-col-totals')"
+          v-if="
+            !promqlMode &&
+            isPivotMode &&
+            dashboardPanelData.data.config.table_pivot_show_row_totals
+          "
+          v-show="
+            isConfigOptionVisible('pivotTable', 'pivot-sticky-col-totals')
+          "
           v-model="dashboardPanelData.data.config.table_pivot_sticky_col_totals"
           :label="t('dashboard.pivotStickyColTotals')"
           data-test="dashboard-config-pivot-sticky-col-totals"
@@ -1516,13 +1511,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <q-btn
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            @click.stop
-          >
+          <OButton variant="ghost" size="icon" @click.stop>
+            <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -1531,7 +1521,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.pivotStickyColTotalsTooltip") }}
             </q-tooltip>
-          </q-btn>
+          </OButton>
         </q-toggle>
 
         <q-toggle
@@ -1548,13 +1538,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <q-btn
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            @click.stop
-          >
+          <OButton variant="ghost" size="icon" @click.stop>
+            <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -1563,12 +1548,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.pivotShowColTotalsTooltip") }}
             </q-tooltip>
-          </q-btn>
+          </OButton>
         </q-toggle>
 
         <q-toggle
-          v-if="!promqlMode && isPivotMode && dashboardPanelData.data.config.table_pivot_show_col_totals"
-          v-show="isConfigOptionVisible('pivotTable', 'pivot-sticky-row-totals')"
+          v-if="
+            !promqlMode &&
+            isPivotMode &&
+            dashboardPanelData.data.config.table_pivot_show_col_totals
+          "
+          v-show="
+            isConfigOptionVisible('pivotTable', 'pivot-sticky-row-totals')
+          "
           v-model="dashboardPanelData.data.config.table_pivot_sticky_row_totals"
           :label="t('dashboard.pivotStickyRowTotals')"
           data-test="dashboard-config-pivot-sticky-row-totals"
@@ -1580,13 +1571,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         >
-          <q-btn
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            @click.stop
-          >
+          <OButton variant="ghost" size="icon" @click.stop>
+            <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -1595,7 +1581,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.pivotStickyRowTotalsTooltip") }}
             </q-tooltip>
-          </q-btn>
+          </OButton>
         </q-toggle>
       </div>
     </q-expansion-item>
@@ -1619,13 +1605,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.configSectionValueTransformations") }}
-          <q-btn
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            @click.stop
-          >
+          <OButton variant="ghost" size="icon" @click.stop>
+            <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"
@@ -1634,7 +1615,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.configSectionValueTransformationsTooltip") }}
             </q-tooltip>
-          </q-btn>
+          </OButton>
         </div>
       </template>
       <div class="config-section-body">
@@ -1661,13 +1642,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.configSectionFieldOverrides") }}
-          <q-btn
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
-            @click.stop
-          >
+          <OButton variant="ghost" size="icon" @click.stop>
+            <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"
@@ -1676,7 +1652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.configSectionFieldOverridesTooltip") }}
             </q-tooltip>
-          </q-btn>
+          </OButton>
         </div>
       </template>
       <div class="config-section-body hide-child-title">
@@ -2091,7 +2067,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           stack-label
           emit-value
           :display-value="`${
-            dashboardPanelData.data.config.trellis?.layout ?? t('dashboard.none')
+            dashboardPanelData.data.config.trellis?.layout ??
+            t('dashboard.none')
           }`"
           :disable="isBreakdownFieldEmpty || hasTimeShifts"
           hide-bottom-space
@@ -2275,14 +2252,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.drilldown") }}
-          <q-btn
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
+          <OButton
+            variant="ghost"
+            size="icon"
             data-test="dashboard-addpanel-config-drilldown-info"
             @click.stop
           >
+            <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"
@@ -2291,7 +2267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.drilldownTooltip") }}
             </q-tooltip>
-          </q-btn>
+          </OButton>
         </div>
       </template>
       <div class="config-section-body">
@@ -2324,14 +2300,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.comparisonAgainst") }}
-          <q-btn
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
+          <OButton
+            variant="ghost"
+            size="icon"
             data-test="dashboard-addpanel-config-time-shift-info"
             @click.stop
           >
+            <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               anchor="bottom middle"
               self="top middle"
@@ -2342,7 +2317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dashboard.comparisonAgainstTooltip") }}
               </span>
             </q-tooltip>
-          </q-btn>
+          </OButton>
         </div>
       </template>
       <div class="config-section-body">
@@ -2373,13 +2348,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-        <q-btn
+        <OButton
+          variant="outline"
+          size="sm"
           @click="addTimeShift"
-          style="cursor: pointer; padding: 0px 5px"
-          :label="t('dashboard.addButton')"
-          class="el-border"
           data-test="dashboard-addpanel-config-time-shift-add-btn"
-        />
+          >{{ t("dashboard.addButton") }}</OButton
+        >
       </div>
     </q-expansion-item>
 
@@ -2402,14 +2377,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.markLines") }}
-          <q-btn
-            padding="xs"
-            size="sm"
-            flat
-            icon="info_outline"
+          <OButton
+            variant="ghost"
+            size="icon"
             data-test="dashboard-addpanel-config-markline-info"
             @click.stop
           >
+            <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"
@@ -2418,7 +2392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dashboard.markLinesTooltip") }}
             </q-tooltip>
-          </q-btn>
+          </OButton>
         </div>
       </template>
       <div class="config-section-body">
@@ -2451,8 +2425,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { computed, defineComponent, inject, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -2476,6 +2450,7 @@ import StepBefore from "@/components/icons/dashboards/StepBefore.vue";
 import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
 import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
 import PromQLChartConfig from "./PromQLChartConfig.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useStore } from "vuex";
 
 import { markRaw, watchEffect, watch } from "vue";
@@ -2526,6 +2501,7 @@ export default defineComponent({
     StepAfter,
     StepMiddle,
     PromQLChartConfig,
+    OButton,
   },
   props: ["dashboardPanelData", "variablesData", "panelData"],
   setup(props) {
@@ -2533,9 +2509,8 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { dashboardPanelData, promqlMode, isPivotMode } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const { dashboardPanelData, promqlMode, isPivotMode } =
+      useDashboardPanelData(dashboardPanelDataPageKey);
 
     const { t } = useI18n();
     const store = useStore();

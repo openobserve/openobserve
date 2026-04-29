@@ -66,17 +66,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              color="primary"
-              dense
+            <OButton
+              variant="primary"
               size="sm"
-              :label="sourceLabel"
-              class="q-pl-sm"
               :data-test="`dashboard-source-item-${sourceLabel}`"
             >
+              {{ sourceLabel }}
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
               <q-menu
                 class="field-function-menu-popup"
                 :data-test="`dashboard-source-item-${sourceLabel}-menu`"
@@ -115,15 +111,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon"
               :data-test="`dashboard-source-item-${sourceLabel}-remove`"
               @click="removeSource()"
-              icon="close"
-            />
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
           </div>
         </OButtonGroup>
         <div
@@ -189,17 +185,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              color="primary"
+            <OButton
+              variant="primary"
               size="sm"
-              :label="targetLabel"
               :data-test="`dashboard-target-item-${targetLabel}`"
-              class="q-pl-sm"
             >
+              {{ targetLabel }}
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
               <q-menu
                 class="field-function-menu-popup"
                 :data-test="`dashboard-target-item-${targetLabel}-menu`"
@@ -238,15 +230,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon"
               :data-test="`dashboard-target-item-${targetLabel}-remove`"
               @click="removeTarget()"
-              icon="close"
-            />
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
           </div>
         </OButtonGroup>
         <div
@@ -312,17 +304,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              color="primary"
+            <OButton
+              variant="primary"
               size="sm"
-              :label="valueLabel"
               :data-test="`dashboard-value-item-${valueLabel}`"
-              class="q-pl-sm"
             >
+              {{ valueLabel }}
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
               <q-menu
                 class="field-function-menu-popup"
                 :data-test="`dashboard-value-item-${valueLabel}-menu`"
@@ -361,15 +349,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon"
               :data-test="`dashboard-value-item-${valueLabel}-remove`"
               @click="removeValue()"
-              icon="close"
-            />
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
           </div>
         </OButtonGroup>
         <div
@@ -417,11 +405,13 @@ import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuil
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",
   components: {
     OButtonGroup,
+    OButton,
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     DashboardFiltersOption,

@@ -39,7 +39,11 @@
     </div>
 
     <div
-      :style="(!customQuery && !fields.isDerived) ? 'width: calc(100% - 134px); display: flex; flex-direction: column;' : 'width: max-content;'"
+      :style="
+        !customQuery && !fields.isDerived
+          ? 'width: calc(100% - 134px); display: flex; flex-direction: column;'
+          : 'width: max-content;'
+      "
     >
       <OTabs
         v-if="!customQuery && !fields.isDerived"
@@ -63,7 +67,11 @@
 
       <q-separator v-if="!customQuery && !fields.isDerived" />
 
-      <OTabPanels v-if="!customQuery && !fields.isDerived" v-model="fields.type" animated>
+      <OTabPanels
+        v-if="!customQuery && !fields.isDerived"
+        v-model="fields.type"
+        animated
+      >
         <OTabPanel name="build">
           <div class="tw:pt-2">
           <div style="display: flex">
@@ -92,21 +100,23 @@
         </OTabPanel>
       </OTabPanels>
 
-      <div class="tw:pt-2 tw:pr-3" v-if="!customQuery && !fields.isDerived && allowAggregation">
+      <div
+        class="tw:pt-2 tw:pr-3"
+        v-if="!customQuery && !fields.isDerived && allowAggregation"
+      >
         <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
           <span class="tw:font-bold">Having</span>
 
-          <q-btn
-            dense
-            outline
-            icon="add"
-            label="Add"
-            padding="xs sm"
-            class="el-border"
+          <OButton
+            variant="outline"
+            size="sm"
             @click="toggleHavingFilter"
             v-if="!isHavingFilterVisible()"
             data-test="dynamic-function-popup-having-add-btn"
-          />
+          >
+            <template #icon-left><q-icon name="add" /></template>
+            Add
+          </OButton>
         </div>
 
         <div
@@ -133,13 +143,14 @@
             data-test="dynamic-function-popup-having-value"
           />
 
-          <q-btn
-            dense
-            flat
-            icon="close"
+          <OButton
+            variant="ghost"
+            size="icon"
             @click="cancelHavingFilter"
             data-test="dynamic-function-popup-having-cancel-btn"
-          />
+          >
+            <template #icon-left><q-icon name="close" /></template>
+          </OButton>
         </div>
       </div>
       <div v-if="chartType === 'table'" class="q-mt-sm q-mb-sm">
@@ -165,19 +176,29 @@
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { ref, watch, nextTick } from "vue";
 import RawQueryBuilder from "./RawQueryBuilder.vue";
 import SelectFunction from "./SelectFunction.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
 export default {
   name: "DynamicFunctionPopUp",
-  components: { RawQueryBuilder, SelectFunction, SortByBtnGrp, OTabs, OTab, OTabPanels, OTabPanel },
+  components: {
+    RawQueryBuilder,
+    SelectFunction,
+    SortByBtnGrp,
+    OTabs,
+    OTab,
+    OTabPanels,
+    OTabPanel,
+    OButton,
+  },
   props: {
     modelValue: {
       type: Object,
@@ -206,7 +227,11 @@ export default {
 
     // if functionName property is missing for build type, selected function Name will be None -> null
     // Ensure functionName property exists for build type fields
-    if (fields.value && fields.value.type === 'build' && !('functionName' in fields.value)) {
+    if (
+      fields.value &&
+      fields.value.type === "build" &&
+      !("functionName" in fields.value)
+    ) {
       fields.value.functionName = null;
     }
 

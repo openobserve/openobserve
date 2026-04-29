@@ -13,17 +13,13 @@
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}}`"
     />
     <OButtonGroup>
-      <q-btn
-        square
-        icon-right="arrow_drop_down"
-        dense
-        :no-wrap="true"
-        color="primary"
+      <OButton
+        variant="primary"
         size="sm"
-        :label="computedLabel(condition)"
-        class="q-pl-sm"
         :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
       >
+        {{ computedLabel(condition) }}
+        <template #icon-right><q-icon name="arrow_drop_down" /></template>
         <q-menu
           class="q-pa-md"
           @show="(e: any) => loadFilterItem(condition.column)"
@@ -35,13 +31,14 @@
               v-model="condition.column"
               :data-test="`dashboard-add-condition-column-${conditionIndex}}`"
             />
-            <q-btn
-              size="xs"
-              dense
+            <OButton
+              variant="ghost"
+              size="icon"
               @click="removeColumnName"
-              icon="close"
               :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
-            />
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
           </div>
           <div style="height: 100%">
             <div class="q-pa-xs" style="height: 100%">
@@ -151,24 +148,26 @@
             </div>
           </div>
         </q-menu>
-      </q-btn>
-      <q-btn
-        size="xs"
-        dense
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon"
         @click="$emit('remove-condition')"
-        icon="close"
         data-test="dashboard-add-condition-remove"
-      />
+      >
+        <template #icon-left><q-icon name="close" /></template>
+      </OButton>
     </OButtonGroup>
   </div>
 </template>
 
 <script lang="ts">
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -183,7 +182,11 @@ export default defineComponent({
   name: "AddCondition",
   components: {
     OButtonGroup,
-    OTabs, OTab, OTabPanels, OTabPanel,
+    OButton,
+    OTabs,
+    OTab,
+    OTabPanels,
+    OTabPanel,
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     StreamFieldSelect,

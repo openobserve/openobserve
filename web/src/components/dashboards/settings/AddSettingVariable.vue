@@ -303,7 +303,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-item-label>
                           {{ scope.opt.name }}
                           <span
-                            v-if="scope.opt.name?.startsWith('$') || scope.opt.name?.startsWith('{{')"
+                            v-if="
+                              scope.opt.name?.startsWith('$') ||
+                              scope.opt.name?.startsWith('{{')
+                            "
                             class="text-grey-6 text-caption"
                           >
                             (variable)
@@ -363,7 +366,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-item-label>
                         {{ scope.opt.name }}
                         <span
-                          v-if="scope.opt.name?.startsWith('$') || scope.opt.name?.startsWith('{{')"
+                          v-if="
+                            scope.opt.name?.startsWith('$') ||
+                            scope.opt.name?.startsWith('{{')
+                          "
                           class="text-grey-6 text-caption"
                         >
                           (variable)
@@ -385,17 +391,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderless
                   hide-bottom-space
                 >
-                  <q-btn
-                    padding="xs"
-                    round
-                    flat
-                    class="q-ml-sm"
-                    no-caps
-                    icon="info"
+                  <OButton
+                    variant="ghost"
+                    size="icon"
                     data-test="dashboard-variable-max-record-size-info"
                   >
+                    <template #icon-left><q-icon name="info" /></template>
                     <q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </q-input>
               </div>
               <div>
@@ -510,29 +513,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       placeholder="Enter Value"
                     ></CommonAutoComplete>
-                    <q-btn
-                      size="sm"
-                      padding="12px 5px"
+                    <OButton
+                      variant="ghost"
+                      size="icon"
                       style="margin-bottom: 20px; flex-shrink: 0"
-                      flat
-                      dense
                       @click="removeFilter(index)"
-                      icon="close"
                       :data-test="`dashboard-variable-adhoc-close-${index}`"
-                    />
+                    >
+                      <template #icon-left><q-icon name="close" /></template>
+                    </OButton>
                   </div>
                 </div>
                 <div>
-                  <q-btn
-                    no-caps
-                    icon="add"
-                    no-outline
-                    class="q-mt-sm el-border"
+                  <OButton
+                    variant="outline"
+                    size="sm"
                     @click="addFilter"
                     data-test="dashboard-add-filter-btn"
                   >
+                    <template #icon-left><q-icon name="add" /></template>
                     Add Filter
-                  </q-btn>
+                  </OButton>
                 </div>
 
                 <!-- show error if filter has cycle -->
@@ -629,25 +630,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div>
-                <q-btn
-                  flat
-                  round
-                  :disable="variableData?.options?.length === 1"
+                <OButton
+                  variant="ghost"
+                  size="icon"
+                  :disabled="variableData?.options?.length === 1"
                   @click="removeField(index)"
                   :data-test="`dashboard-custom-variable-${index}-remove`"
-                  icon="cancel"
-                />
+                >
+                  <template #icon-left><q-icon name="cancel" /></template>
+                </OButton>
               </div>
             </div>
             <div class="flex flex-col">
-              <q-btn
-                no-caps
-                icon="add"
-                no-outline
-                class="q-mt-md el-border"
+              <OButton
+                variant="outline"
+                size="sm"
+                class="tw:mt-3"
                 @click="addField()"
-                >Add Option</q-btn
               >
+                <template #icon-left><q-icon name="add" /></template>
+                Add Option
+              </OButton>
             </div>
           </div>
           <!-- multiselect toggle for query values and custom variables-->
@@ -752,16 +755,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     borderless
                     hide-bottom-space
                   />
-                  <q-btn
+                  <OButton
                     v-if="variableData.multiSelect"
-                    size="sm"
-                    padding="12px 5px"
-                    flat
-                    dense
+                    variant="ghost"
+                    size="icon"
                     @click="removeCustomValue(index)"
-                    icon="close"
                     :data-test="`dashboard-variable-custom-close-${index}`"
-                  />
+                  >
+                    <template #icon-left><q-icon name="close" /></template>
+                  </OButton>
                 </div>
               </div>
 
@@ -770,15 +772,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex"
                 style="width: 50%"
               >
-                <q-btn
-                  no-caps
-                  icon="add"
-                  no-outline
-                  class="q-mt-md el-border"
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  class="tw:mt-3"
                   @click="addCustomValue"
                   data-test="dashboard-add-custom-value-btn"
                 >
-                </q-btn>
+                  <template #icon-left><q-icon name="add" /></template>
+                </OButton>
               </div>
             </div>
           </div>
@@ -834,31 +836,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-form>
       </div>
       <div class="sticky-footer">
-        <q-btn
-          :label="t('dashboard.cancel')"
-          class="o2-secondary-button tw:h-[36px]"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          flat
+        <OButton
+          variant="secondary"
+          size="sm"
           @click="close"
           data-test="dashboard-variable-cancel-btn"
-        />
-        <q-btn
-          type="submit"
+          >{{ t("dashboard.cancel") }}</OButton
+        >
+        <OButton
+          variant="primary"
+          size="sm"
+          class="tw:ml-3"
           :loading="saveVariableApiCall.isLoading.value"
-          class="o2-primary-button tw:h-[36px] q-ml-md"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-primary-button-dark'
-              : 'o2-primary-button-light'
-          "
-          flat
           @click="addVariableForm?.submit()"
           data-test="dashboard-variable-save-btn"
-          >Save</q-btn
+          >Save</OButton
         >
       </div>
     </div>
@@ -890,6 +882,7 @@ import {
 import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
 import DashboardHeader from "./common/DashboardHeader.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import useStreams from "@/composables/useStreams";
 import {
   buildVariablesDependencyGraph,
@@ -902,7 +895,7 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "AddSettingVariable",
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
-  components: { DashboardHeader, CommonAutoComplete },
+  components: { DashboardHeader, CommonAutoComplete, OButton },
   emits: ["close", "save"],
   setup(props, { emit }) {
     // Store dashboard data
@@ -1312,7 +1305,9 @@ export default defineComponent({
               // if stream type and stream is exists
               if (variableData?.query_data?.stream) {
                 // Check if stream is a variable reference (contains $)
-                const isVariableReference = variableData.query_data.stream?.includes('$') || variableData.query_data.stream?.includes('{{');
+                const isVariableReference =
+                  variableData.query_data.stream?.includes("$") ||
+                  variableData.query_data.stream?.includes("{{");
 
                 if (isVariableReference) {
                   // Don't fetch schema for variable references - field list will be empty
@@ -1339,7 +1334,9 @@ export default defineComponent({
             }
           } catch (error: any) {
             // Check if the error is for a variable reference (should be suppressed)
-            const isVariableReference = variableData?.query_data?.stream?.includes('$') || variableData?.query_data?.stream?.includes('{{');
+            const isVariableReference =
+              variableData?.query_data?.stream?.includes("$") ||
+              variableData?.query_data?.stream?.includes("{{");
 
             if (!isVariableReference) {
               // Only show error if it's NOT a variable reference
@@ -1550,8 +1547,7 @@ export default defineComponent({
         if (props.isFromAddPanel && props.dashboardVariablesList) {
           const isDuplicate = props.dashboardVariablesList.some(
             (v: any) =>
-              v.name === variableData.name &&
-              v.name !== props.variableName,
+              v.name === variableData.name && v.name !== props.variableName,
           );
           if (isDuplicate) {
             showErrorNotification(`Variable with same name already exists.`);
@@ -1619,10 +1615,11 @@ export default defineComponent({
     };
 
     const streamUpdated = async () => {
-
       try {
         // Check if stream is a variable reference FIRST (contains $)
-        const isVariableReference = variableData.query_data.stream?.includes('$') || variableData.query_data.stream?.includes('{{');
+        const isVariableReference =
+          variableData.query_data.stream?.includes("$") ||
+          variableData.query_data.stream?.includes("{{");
 
         if (isVariableReference) {
           // Don't reset field if it already has a value (editing mode)
@@ -1657,7 +1654,9 @@ export default defineComponent({
         }
       } catch (error: any) {
         // Only show error if it's not a variable reference
-        const isVariableReference = variableData.query_data.stream?.includes('$') || variableData.query_data.stream?.includes('{{');
+        const isVariableReference =
+          variableData.query_data.stream?.includes("$") ||
+          variableData.query_data.stream?.includes("{{");
 
         if (!isVariableReference) {
           showErrorNotification(error ?? "Failed to get stream fields", {

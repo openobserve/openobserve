@@ -51,22 +51,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OTab>
     </OTabs>
-    <q-btn
+    <OButton
       v-if="!viewOnly"
       v-show="isHovered"
-      class="text-bold no-border q-ml-xs"
-      no-outline
-      rounded
-      icon="add"
-      padding="xs"
+      variant="ghost"
+      size="icon"
+      class="tw:ml-1"
       @click="
         () => {
           showAddTabDialog = true;
         }
       "
       data-test="dashboard-tab-add-btn"
-      ><q-tooltip>Add Tab</q-tooltip></q-btn
     >
+      <template #icon-left><q-icon name="add" /></template>
+      <q-tooltip>Add Tab</q-tooltip>
+    </OButton>
     <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>
       <AddTab
         :dashboard-id="dashboardData?.dashboardId"
@@ -77,8 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { computed, inject, ref } from "vue";
 import { defineComponent } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
@@ -92,6 +93,7 @@ export default defineComponent({
     ConfirmDialog,
     OTabs,
     OTab,
+    OButton,
   },
   props: {
     dashboardData: {
