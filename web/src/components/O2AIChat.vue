@@ -2868,6 +2868,13 @@ export default defineComponent({
       window.dispatchEvent(new Event('resize'));
     };
 
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && store.state.isAiChatExpanded) {
+        store.dispatch('setIsAiChatExpanded', false);
+        window.dispatchEvent(new Event('resize'));
+      }
+    };
+
     const addNewChat = () => {
       detachCurrentStream();
 
@@ -4199,6 +4206,9 @@ export default defineComponent({
 
       // Load auto navigation preferences from localStorage
       loadAutoNavigationPreferences();
+
+      // Listen for Escape key to collapse expanded mode
+      document.addEventListener('keydown', handleEscape);
     });
 
     onUnmounted(()=>{
@@ -4238,6 +4248,9 @@ export default defineComponent({
       if(!store.state.currentChatTimestamp) {
         addNewChat();
       }
+
+      // Remove Escape key listener
+      document.removeEventListener('keydown', handleEscape);
     })
     //this watch is added to make sure that the chat gets updated
     // when the component is unmounted so that the main layout component can load the correct chat
