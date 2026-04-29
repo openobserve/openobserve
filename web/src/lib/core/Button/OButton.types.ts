@@ -20,6 +20,7 @@ export type ButtonVariant =
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =
+  | "xs"
   | "sm"
   | "md"
   | "lg"
@@ -28,7 +29,8 @@ export type ButtonSize =
   | "icon-sm"
   | "icon-md"
   | "icon-lg"
-  | "icon-circle";
+  | "icon-circle"
+  | "icon-circle-sm";
 
 export interface ButtonProps extends PrimitiveProps {
   /** Visual style variant */
