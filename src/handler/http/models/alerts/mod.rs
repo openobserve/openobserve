@@ -1304,4 +1304,66 @@ mod tests {
         assert_eq!(meta.vrl_function, Some("fn".to_string()));
         assert!(meta.conditions.is_none());
     }
+
+    #[test]
+    fn test_alert_from_meta_without_trigger_maps_fields() {
+        let mut meta_alert = meta_alerts::alert::Alert::default();
+        meta_alert.name = "test-alert".to_string();
+        meta_alert.org_id = "org1".to_string();
+        meta_alert.stream_name = "default".to_string();
+        meta_alert.enabled = true;
+        meta_alert.creates_incident = true;
+
+        let alert = Alert::from((meta_alert, None));
+        assert_eq!(alert.name, "test-alert");
+        assert_eq!(alert.org_id, "org1");
+        assert_eq!(alert.stream_name, "default");
+        assert!(alert.enabled);
+        assert!(alert.creates_incident);
+        assert!(alert.last_triggered_at.is_none());
+        assert!(alert.last_satisfied_at.is_none());
+    }
+
+    #[test]
+    fn test_alert_from_meta_with_trigger_no_timestamps() {
+        let mut meta_alert = meta_alerts::alert::Alert::default();
+        meta_alert.name = "triggered-alert".to_string();
+        let trigger = config::meta::triggers::Trigger::default();
+
+        let alert = Alert::from((meta_alert, Some(trigger)));
+        assert_eq!(alert.name, "triggered-alert");
+        // default trigger has no start/end time — timestamps remain None
+        assert!(alert.last_triggered_at.is_none());
+        assert!(alert.last_satisfied_at.is_none());
+    }
+
+    #[test]
+    fn test_alert_to_meta_maps_basic_fields() {
+        let json = serde_json::json!({
+            "name": "my-alert",
+            "org_id": "myorg",
+            "stream_name": "stream1",
+            "enabled": true,
+            "creates_incident": true
+        });
+        let alert: Alert = serde_json::from_value(json).unwrap();
+        let meta = meta_alerts::alert::Alert::from(alert);
+        assert_eq!(meta.name, "my-alert");
+        assert_eq!(meta.org_id, "myorg");
+        assert_eq!(meta.stream_name, "stream1");
+        assert!(meta.enabled);
+        assert!(meta.creates_incident);
+    }
+
+    #[test]
+    fn test_alert_to_meta_default_fields() {
+        let alert: Alert = serde_json::from_value(serde_json::json!({})).unwrap();
+        let meta = meta_alerts::alert::Alert::from(alert);
+        assert_eq!(meta.name, "");
+        assert_eq!(meta.org_id, "");
+        assert!(!meta.enabled);
+        assert!(!meta.creates_incident);
+        assert!(meta.id.is_none());
+        assert!(meta.owner.is_none());
+    }
 }
