@@ -2041,9 +2041,12 @@ export class LogsPage {
         try {
             await saveButton.waitFor({ state: 'visible', timeout: 30000 });
         } catch (e) {
-            // Button might not be in DOM at all — try pressing Enter as fallback
+            // Button never appeared — Enter as fallback then return so we
+            // don't fall through to the click path (which would also fail
+            // and trigger a second Enter, risking a double-submit)
             await this.page.keyboard.press('Enter');
             await this.page.waitForTimeout(1000);
+            return;
         }
 
         // Scroll the button into view if needed

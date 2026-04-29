@@ -11,12 +11,6 @@ class UnflattenedPage {
         return this.page.getByPlaceholder('Search Stream');
     }
 
-    get streamDetailButton() {
-        // The Stream Detail tab inside the detail panel.
-        // On some UIs the panel auto-opens when a stream is selected from the list.
-        return this.page.locator('[data-test="log-stream-detail-stream-detail-tab"]').first();
-    }
-
     async openStreamDetail(streamName) {
         // Wait for stream list to populate after search
         await this.page.waitForTimeout(2000);
