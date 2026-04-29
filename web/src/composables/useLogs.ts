@@ -367,131 +367,128 @@ const useLogs = () => {
   };
 
   const restoreUrlQueryParams = async (dashboardPanelData: any = null) => {
-    return new Promise((resolve) => {
-      searchObj.shouldIgnoreWatcher = true;
-      const queryParams: any = router.currentRoute.value.query;
-      // Allow SQL mode queries without stream param (will be auto-detected from SQL)
-      if (!queryParams.stream && queryParams.sql_mode !== "true") {
-        searchObj.shouldIgnoreWatcher = false;
-        return;
-      }
-
-      const date = {
-        startTime: Number(queryParams.from),
-        endTime: Number(queryParams.to),
-        relativeTimePeriod: queryParams.period || null,
-        type: queryParams.period ? "relative" : "absolute",
-      };
-
-      if (date.type === "relative") {
-        queryParams.period = date.relativeTimePeriod;
-      } else {
-        queryParams.from = date.startTime;
-        queryParams.to = date.endTime;
-      }
-
-      if (date) {
-        searchObj.data.datetime = date;
-      }
-
-      if (queryParams.query) {
-        searchObj.meta.sqlMode = queryParams.sql_mode == "true" ? true : false;
-        nextTick(() => {
-          searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
-          searchObj.data.query = b64DecodeUnicode(queryParams.query);
-        });
-      }
-
-      if (
-        queryParams.hasOwnProperty("defined_schemas") &&
-        queryParams.defined_schemas != ""
-      ) {
-        searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
-      }
-
-      if (
-        queryParams.refresh &&
-        enableRefreshInterval(parseInt(queryParams.refresh))
-      ) {
-        searchObj.meta.refreshInterval = parseInt(queryParams.refresh);
-      }
-
-      if (
-        queryParams.refresh &&
-        !enableRefreshInterval(parseInt(queryParams.refresh))
-      ) {
-        delete queryParams.refresh;
-      }
-
-      useLocalTimezone(queryParams.timezone);
-
-      if (queryParams.functionContent) {
-        searchObj.data.tempFunctionContent =
-          b64DecodeUnicode(queryParams.functionContent) || "";
-        searchObj.meta.functionEditorPlaceholderFlag = false;
-        searchObj.data.transformType = "function";
-      }
-
-      if (queryParams.stream_type) {
-        searchObj.data.stream.streamType = queryParams.stream_type;
-      } else {
-        searchObj.data.stream.streamType = "logs";
-      }
-
-      if (queryParams.type) {
-        searchObj.meta.pageType = queryParams.type;
-      }
-      searchObj.meta.quickMode =
-        queryParams.quick_mode == "false" ? false : true;
-
-      if (queryParams.stream) {
-        searchObj.data.stream.selectedStream = queryParams.stream.split(",");
-      }
-
-      if (queryParams.show_histogram) {
-        searchObj.meta.showHistogram =
-          queryParams.show_histogram == "true" ? true : false;
-      }
-
+    searchObj.shouldIgnoreWatcher = true;
+    const queryParams: any = router.currentRoute.value.query;
+    // Allow SQL mode queries without stream param (will be auto-detected from SQL)
+    if (!queryParams.stream && queryParams.sql_mode !== "true") {
       searchObj.shouldIgnoreWatcher = false;
-      if (
-        Object.hasOwn(queryParams, "type") &&
-        queryParams.type == "search_history_re_apply"
-      ) {
-        delete queryParams.type;
-      }
+      return;
+    }
 
-      if (store.state.zoConfig?.super_cluster_enabled && queryParams.regions) {
-        searchObj.meta.regions = queryParams.regions.split(",");
-      }
+    const date = {
+      startTime: Number(queryParams.from),
+      endTime: Number(queryParams.to),
+      relativeTimePeriod: queryParams.period || null,
+      type: queryParams.period ? "relative" : "absolute",
+    };
 
-      if (store.state.zoConfig?.super_cluster_enabled && queryParams.clusters) {
-        searchObj.meta.clusters = queryParams.clusters.split(",");
-      }
+    if (date.type === "relative") {
+      queryParams.period = date.relativeTimePeriod;
+    } else {
+      queryParams.from = date.startTime;
+      queryParams.to = date.endTime;
+    }
 
-      if (
-        queryParams.hasOwnProperty("logs_visualize_toggle") &&
-        queryParams.logs_visualize_toggle != ""
-      ) {
-        searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
-      }
+    if (date) {
+      searchObj.data.datetime = date;
+    }
 
-      //here we restore the fn editor state from the url query params
-      if (queryParams.fn_editor) {
-        searchObj.meta.showTransformEditor =
-          queryParams.fn_editor == "true" ? true : false;
-      }
+    if (queryParams.query) {
+      searchObj.meta.sqlMode = queryParams.sql_mode == "true" ? true : false;
+      // Added nextTick() for a purpose, don't remove.
+      // If value of sqlMode is changed, watcher gets called which resets the editor and query value
+      // The editor value and query value assigned below, is overrided by the watcher
+      await nextTick();
+      searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+      searchObj.data.query = b64DecodeUnicode(queryParams.query);
+    }
 
-      // TODO OK : Replace push with replace and test all scenarios
-      router.push({
-        query: {
-          ...queryParams,
-          sql_mode: searchObj.meta.sqlMode,
-          defined_schemas: searchObj.meta.useUserDefinedSchemas,
-        },
-      });
+    if (
+      queryParams.hasOwnProperty("defined_schemas") &&
+      queryParams.defined_schemas != ""
+    ) {
+      searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
+    }
 
-      resolve(true);
+    if (
+      queryParams.refresh &&
+      enableRefreshInterval(parseInt(queryParams.refresh))
+    ) {
+      searchObj.meta.refreshInterval = parseInt(queryParams.refresh);
+    }
+
+    if (
+      queryParams.refresh &&
+      !enableRefreshInterval(parseInt(queryParams.refresh))
+    ) {
+      delete queryParams.refresh;
+    }
+
+    useLocalTimezone(queryParams.timezone);
+
+    if (queryParams.functionContent) {
+      searchObj.data.tempFunctionContent =
+        b64DecodeUnicode(queryParams.functionContent) || "";
+      searchObj.meta.functionEditorPlaceholderFlag = false;
+      searchObj.data.transformType = "function";
+    }
+
+    if (queryParams.stream_type) {
+      searchObj.data.stream.streamType = queryParams.stream_type;
+    } else {
+      searchObj.data.stream.streamType = "logs";
+    }
+
+    if (queryParams.type) {
+      searchObj.meta.pageType = queryParams.type;
+    }
+    searchObj.meta.quickMode = queryParams.quick_mode == "false" ? false : true;
+
+    if (queryParams.stream) {
+      searchObj.data.stream.selectedStream = queryParams.stream.split(",");
+    }
+
+    if (queryParams.show_histogram) {
+      searchObj.meta.showHistogram =
+        queryParams.show_histogram == "true" ? true : false;
+    }
+
+    searchObj.shouldIgnoreWatcher = false;
+    if (
+      Object.hasOwn(queryParams, "type") &&
+      queryParams.type == "search_history_re_apply"
+    ) {
+      delete queryParams.type;
+    }
+
+    if (store.state.zoConfig?.super_cluster_enabled && queryParams.regions) {
+      searchObj.meta.regions = queryParams.regions.split(",");
+    }
+
+    if (store.state.zoConfig?.super_cluster_enabled && queryParams.clusters) {
+      searchObj.meta.clusters = queryParams.clusters.split(",");
+    }
+
+    if (
+      queryParams.hasOwnProperty("logs_visualize_toggle") &&
+      queryParams.logs_visualize_toggle != ""
+    ) {
+      searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
+    }
+
+    //here we restore the fn editor state from the url query params
+    if (queryParams.fn_editor) {
+      searchObj.meta.showTransformEditor =
+        queryParams.fn_editor == "true" ? true : false;
+    }
+
+    // TODO OK : Replace push with replace and test all scenarios
+    router.push({
+      query: {
+        ...queryParams,
+        sql_mode: searchObj.meta.sqlMode,
+        defined_schemas: searchObj.meta.useUserDefinedSchemas,
+      },
     });
   };
 
