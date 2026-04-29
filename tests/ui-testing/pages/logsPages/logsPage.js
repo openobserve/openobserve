@@ -2068,13 +2068,21 @@ export class LogsPage {
         await saveButton.scrollIntoViewIfNeeded().catch(() => {});
         await this.page.waitForTimeout(500);
 
-        // Try force-click, fall back to Enter key and content click
+        // Try force-click, fall back to content click then Enter
         try {
             return await saveButton.click({ force: true, timeout: 10000 });
         } catch (e) {
-            // Fallback: click the content span or press Enter
-            await this.page.locator(this.savedViewDialogSaveContent).click({ force: true, timeout: 5000 }).catch(() => {});
-            await this.page.keyboard.press('Enter');
+            // Fallback: click the content span, only press Enter if that fails too
+            // (otherwise a successful content click would be followed by a stray
+            // Enter, risking double-submit on the form)
+            let contentClicked = false;
+            try {
+                await this.page.locator(this.savedViewDialogSaveContent).click({ force: true, timeout: 5000 });
+                contentClicked = true;
+            } catch (e2) { /* fall through to Enter */ }
+            if (!contentClicked) {
+                await this.page.keyboard.press('Enter');
+            }
         }
     }
 
@@ -3510,7 +3518,9 @@ export class LogsPage {
     }
 
     async clickSchemaButton() {
-        const btn = this.page.getByRole('button').filter({ hasText: /schema/i }).first();
+        // Anchor the regex so we don't accidentally click the "infoschema"
+        // button (which also matches a loose /schema/i filter)
+        const btn = this.page.getByRole('button').filter({ hasText: /^schema$/i }).first();
         await btn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         return await btn.click({ force: true });
     }
