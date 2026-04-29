@@ -655,4 +655,19 @@ mod tests {
         assert!(obj.contains_key("alert_fingerprint_groups"));
         assert!(obj.contains_key("time_window_minutes"));
     }
+
+    #[test]
+    fn test_default_upgrade_window() {
+        assert_eq!(default_upgrade_window(), 30);
+    }
+
+    #[test]
+    fn test_default_max_group_size() {
+        assert_eq!(default_max_group_size(), 100);
+    }
+
+    #[test]
+    fn test_default_group_wait() {
+        assert_eq!(default_group_wait(), 30);
+    }
 }
