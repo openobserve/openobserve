@@ -347,4 +347,51 @@ mod tests {
         let active = into_active_model(m);
         assert_eq!(active.anomaly_id.unwrap(), "anom-pk");
     }
+
+    #[test]
+    fn test_patch_all_fields_updates_numeric_params() {
+        let original = make_model("anom-1", "org");
+        let mut active = original.into_active_model();
+        let mut replacement = make_model("anom-1", "org");
+        replacement.threshold = 99;
+        replacement.rcf_num_trees = 100;
+        replacement.rcf_tree_size = 512;
+        replacement.rcf_shingle_size = 16;
+        replacement.training_window_days = 30;
+        replacement.retrain_interval_days = 7;
+        patch_all_fields(&mut active, replacement);
+        assert_eq!(active.threshold.unwrap(), 99);
+        assert_eq!(active.rcf_num_trees.unwrap(), 100);
+        assert_eq!(active.rcf_tree_size.unwrap(), 512);
+        assert_eq!(active.rcf_shingle_size.unwrap(), 16);
+        assert_eq!(active.training_window_days.unwrap(), 30);
+        assert_eq!(active.retrain_interval_days.unwrap(), 7);
+    }
+
+    #[test]
+    fn test_patch_all_fields_updates_string_fields() {
+        let original = make_model("anom-1", "org");
+        let mut active = original.into_active_model();
+        let mut replacement = make_model("anom-1", "org");
+        replacement.stream_name = "new-stream".to_string();
+        replacement.stream_type = "metrics".to_string();
+        replacement.seasonality = "daily".to_string();
+        replacement.detection_function = "zscore".to_string();
+        patch_all_fields(&mut active, replacement);
+        assert_eq!(active.stream_name.unwrap(), "new-stream");
+        assert_eq!(active.stream_type.unwrap(), "metrics");
+        assert_eq!(active.seasonality.unwrap(), "daily");
+        assert_eq!(active.detection_function.unwrap(), "zscore");
+    }
+
+    #[test]
+    fn test_into_active_model_sets_all_fields() {
+        let m = make_model("anom-all", "org-all");
+        let active = into_active_model(m);
+        assert_eq!(active.anomaly_id.unwrap(), "anom-all");
+        assert_eq!(active.org_id.unwrap(), "org-all");
+        assert_eq!(active.stream_name.unwrap(), "default");
+        assert_eq!(active.enabled.unwrap(), true);
+        assert_eq!(active.threshold.unwrap(), 95);
+    }
 }
