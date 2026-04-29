@@ -310,6 +310,9 @@ mod tests {
             restored.query_identifier.trace_id,
             original.query_identifier.trace_id
         );
-        assert_eq!(restored.search_info.start_time, original.search_info.start_time);
+        assert_eq!(
+            restored.search_info.start_time,
+            original.search_info.start_time
+        );
     }
 }

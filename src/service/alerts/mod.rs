@@ -2032,7 +2032,11 @@ mod tests {
 
     #[test]
     fn test_build_expr_bool_bool_as_string_value() {
-        let cond = make_cond("active", Operator::EqualTo, Value::String("true".to_string()));
+        let cond = make_cond(
+            "active",
+            Operator::EqualTo,
+            Value::String("true".to_string()),
+        );
         let expr = build_expr(&cond, "", &DataType::Boolean).unwrap();
         assert_eq!(expr, "\"active\" = true");
     }
@@ -2067,7 +2071,11 @@ mod tests {
 
     #[test]
     fn test_build_expr_field_alias_override() {
-        let cond = make_cond("level", Operator::EqualTo, Value::String("error".to_string()));
+        let cond = make_cond(
+            "level",
+            Operator::EqualTo,
+            Value::String("error".to_string()),
+        );
         let expr = build_expr(&cond, "log_level", &DataType::Utf8).unwrap();
         assert_eq!(expr, "\"log_level\" = 'error'");
     }
@@ -2107,7 +2115,11 @@ mod tests {
 
     #[test]
     fn test_build_expr_int_invalid_string_returns_error() {
-        let cond = make_cond("n", Operator::EqualTo, Value::String("not_a_number".to_string()));
+        let cond = make_cond(
+            "n",
+            Operator::EqualTo,
+            Value::String("not_a_number".to_string()),
+        );
         let result = build_expr(&cond, "", &DataType::Int64);
         assert!(result.is_err());
     }
