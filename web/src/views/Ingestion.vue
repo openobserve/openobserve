@@ -105,7 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="confirmRUMUpdate"
           />
         </div>
-        <OTabs v-model="ingestTabType" horizontal align="left" class="q-ml-md">
+        <div class="q-ml-md">
+        <OTabs v-model="ingestTabType" horizontal align="left">
           <ORouteTab
             name="recommended"
             :to="{
@@ -221,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('ingestion.otherLabel')"
           />
         </OTabs>
+        </div>
       </div>
     </div>
     <div

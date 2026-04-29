@@ -75,10 +75,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabPanels
             v-model="activeTab"
             animated
-            swipeable
-            vertical
-            transition-prev="fade"
-            transition-next="fade"
           >
             <OTabPanel name="generalSettings" data-test="general-tab-panels-default">
               <GeneralSettings @save="refreshRequired" />

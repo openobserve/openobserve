@@ -131,11 +131,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="activeTab"
       animated
       keep-alive
-      class="tw:flex-1 tw:overflow-y-auto"
+      grow
+      scroll="y"
       data-test="tab-content-container"
     >
       <!-- Overview Tab -->
-      <OTabPanel name="overview" class="q-pa-sm" data-test="overview-tab">
+      <OTabPanel name="overview" padding="sm" data-test="overview-tab">
         <template v-if="event && Object.keys(event).length">
           <!-- Error Details -->
           <div
@@ -415,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanel>
 
       <!-- Network Tab -->
-      <OTabPanel name="network" class="q-pa-sm" data-test="network-tab">
+      <OTabPanel name="network" padding="sm" data-test="network-tab">
         <template v-if="networkResources.length > 0">
           <div class="tw:font-bold tw:mb-2 tw:text-sm">
             Network Requests ({{ networkResources.length }})
@@ -471,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanel>
 
       <!-- Console Tab -->
-      <OTabPanel name="console" class="q-pa-sm" data-test="console-tab">
+      <OTabPanel name="console" padding="sm" data-test="console-tab">
         <div class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm">
           Console logs coming soon
         </div>
@@ -480,7 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Performance Tab -->
       <OTabPanel
         name="performance"
-        class="q-pa-sm"
+        padding="sm"
         data-test="performance-tab"
       >
         <div class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm">
@@ -489,7 +490,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanel>
 
       <!-- Attributes Tab -->
-      <OTabPanel name="attributes" class="q-pa-sm" data-test="attributes-tab">
+      <OTabPanel name="attributes" padding="sm" data-test="attributes-tab">
         <div class="tw:flex tw:justify-start">
           <q-btn
             :label="t('common.copyToClipboard')"
