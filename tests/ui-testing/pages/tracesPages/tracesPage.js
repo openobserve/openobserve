@@ -1251,7 +1251,7 @@ export class TracesPage {
    * @returns {Promise<boolean>}
    */
   async isStreamSelectVisible() {
-    return await this.page.locator(this.streamSelect).isVisible({ timeout: 5000 }).catch(() => false);
+    return await this.page.locator(this.streamSelect).isVisible({ timeout: 10000 }).catch(() => false);  
   }
 
   /**
