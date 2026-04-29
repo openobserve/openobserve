@@ -249,4 +249,12 @@ mod tests {
             assert_eq!(expected, is_simple_distinct(physical_plan, index_fields));
         }
     }
+
+    #[test]
+    fn test_simple_distinct_visitor_initial_state() {
+        let fields = HashSet::from(["col".to_string()]);
+        let visitor = SimpleDistinctVisitor::new(fields.clone());
+        assert!(visitor.simple_distinct.is_none());
+        assert_eq!(visitor.index_fields, fields);
+    }
 }

@@ -128,4 +128,10 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_simple_count_visitor_initial_state() {
+        let visitor = SimpleCountVisitor::new();
+        assert!(!visitor.is_simple_count);
+    }
 }

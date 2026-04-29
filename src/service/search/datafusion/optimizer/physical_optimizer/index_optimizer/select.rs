@@ -144,4 +144,10 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_simple_select_visitor_initial_state() {
+        let visitor = SimpleSelectVisitor::new();
+        assert!(visitor.is_simple_select.is_none());
+    }
 }

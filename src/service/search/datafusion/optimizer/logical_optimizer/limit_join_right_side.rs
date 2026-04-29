@@ -382,4 +382,16 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_limit_join_right_side_rule_metadata() {
+        use datafusion::optimizer::OptimizerRule;
+        let rule = LimitJoinRightSide::new(100);
+        assert_eq!(rule.name(), "limit_join_right_side");
+        assert!(rule.supports_rewrite());
+        assert_eq!(
+            rule.apply_order(),
+            Some(datafusion::optimizer::optimizer::ApplyOrder::TopDown)
+        );
+    }
 }
