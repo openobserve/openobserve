@@ -319,16 +319,22 @@
       <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
         <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
           <div v-if="chatMessages.length === 0" class="welcome-section" :class="{ 'welcome-section--centered': centeredStart }">
-            <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full">
-              <img :src="o2AiTitleLogo" />
-              <div class="tw:relative tw:inline-block">
-                <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 Assistant</span>
-                <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
+            <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full" :class="{ 'tw:relative': centeredStart }">
+              <div
+                class="tw:flex tw:flex-col tw:items-center"
+                :class="{ 'tw:absolute tw:left-1/2 tw:-translate-x-1/2': centeredStart }"
+                :style="centeredStart ? { top: 'calc(50% - 150px)' } : {}"
+              >
+                <img :src="o2AiTitleLogo" />
+                <div class="tw:relative tw:inline-block">
+                  <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 Assistant</span>
+                  <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
+                </div>
               </div>
               <!-- Input rendered here when centeredStart so it appears mid-screen -->
               <div v-if="centeredStart" class="centered-input-wrap">
-                <div
-                  class="unified-input-box"
+                  <div
+                    class="unified-input-box"
                   :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
                   @dragover="handleDragOver"
                   @drop="handleDrop"
@@ -363,7 +369,7 @@
               </div>
             </div>
           </div>
-          <div v-for="(message, index) in processedMessages" 
+          <div v-for="(message, index) in processedMessages"
             :key="index" 
             class="message" 
             :class="[
