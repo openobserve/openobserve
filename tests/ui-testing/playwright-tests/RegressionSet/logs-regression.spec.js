@@ -1517,6 +1517,196 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('✓ PRIMARY CHECK PASSED: Last log maintains highlighting on expand');
   });
 
+  // ======================================================================
+  // Bug #11400: Query editor double-quote validation in Monaco editor
+  // Fix: PR #11403 - validateDoubleQuotes() flags double-quoted string values
+  // ======================================================================
+
+  test("Bug #11400: should validate double-quoted strings in query editor", {
+    tag: ['@P2', '@functional', '@bug11400', '@logs', '@regressionBugs']
+  }, async ({ page }) => {
+    testLogger.info("Testing double-quote validation in query editor (logs page context)");
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForTimeout(1000);
+
+    // Select a stream to populate the query editor
+    await pm.logsPage.selectStream("e2e_automate");
+
+    // Wait for query editor to be ready
+    await pm.logsPage.waitForQueryEditorVisible();
+    await page.waitForTimeout(1000);
+
+    // Set a query with double-quoted string value (should trigger warning via validateDoubleQuotes())
+    // Test query: SELECT * FROM "e2e_automate" WHERE "field" = "value"
+    // The regex in validateDoubleQuotes() matches: = "value" (double-quoted string after operator)
+    const queryWithDoubleQuotes = `SELECT * FROM "e2e_automate" WHERE "field" = "value"`;
+    await pm.logsPage.setQueryEditorContent(queryWithDoubleQuotes);
+
+    // Wait for Monaco's debounced validateDoubleQuotes() to execute (default debounce: 500ms)
+    await page.waitForTimeout(1000);
+
+    // Verify warning markers via POM method.
+    const hasWarnings = await pm.logsPage.hasEditorWarningMarkers();
+    testLogger.info(`Warning markers detected via DOM inspection: ${hasWarnings}`);
+
+    // PRIMARY CHECK: Warning decorations must be present for double-quoted string values
+    expect(hasWarnings).toBe(true);
+    testLogger.info('✅ Warning markers confirmed for double-quoted values');
+
+    // SECONDARY CHECK: Verify the query text was set correctly
+    await pm.logsPage.expectQueryEditorContainsText('"e2e_automate"');
+
+    testLogger.info("Test passed: Query editor validation verified");
+  });
+
+  // ======================================================================
+  // Bug #11400 sub-issue #1: Auto-suggestions should NOT include functions
+  // in value context (after = operator). Functions like match_all, fuzzy_match
+  // should only appear in keyword context, not as value suggestions.
+  // Fix: PR #11403 - analyzeSqlWhereClause() + effectiveKeywords computed property
+  // ======================================================================
+
+  test("Bug #11400: should filter functions from value suggestions in WHERE clause", {
+    tag: ['@P2', '@functional', '@bug11400', '@logs', '@regressionBugs']
+  }, async ({ page }) => {
+    testLogger.info("Testing that functions are filtered from value suggestions");
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForTimeout(1000);
+
+    // Select stream
+    await pm.logsPage.selectStream("e2e_automate");
+    await pm.logsPage.waitForQueryEditorVisible();
+
+    // Run a search to populate field values in Monaco's suggestion cache.
+    // Using an explicit search here is more reliable than depending on the
+    // auto-search after stream selection, which may not fire or may use a
+    // different API endpoint pattern in some environments.
+    testLogger.info('Running search to populate field values...');
+    const searchResponsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/_search') && resp.status() === 200,
+      { timeout: 30000 },
+    );
+    await pm.logsPage.clickSearchBarRefreshButton();
+    await searchResponsePromise.catch(() => testLogger.warn('Search response not captured'));
+    await page.waitForTimeout(1000); // Small buffer for Monaco to process field values
+    testLogger.info('✅ Field values cached');
+
+    // Set the query with cursor in VALUE context (after = operator)
+    // The cursor will be positioned at the end, right after "= "
+    // This is where analyzeSqlWhereClause() should detect value context
+    await pm.logsPage.setQueryEditorContent(
+      'SELECT * FROM "e2e_automate" WHERE kubernetes_container_name = '
+    );
+    await page.waitForTimeout(500);
+
+    // Trigger the suggestion widget via Ctrl+Space and wait for it to appear.
+    await pm.logsPage.triggerEditorSuggestions();
+    await pm.logsPage.waitForSuggestionWidgetVisible(5000);
+    testLogger.info('✅ Suggestion widget appeared');
+
+    // Verify the suggestion widget does NOT contain function names
+    const result = await pm.logsPage.checkSuggestionForFunctions();
+    testLogger.info('Suggestion widget analysis', result);
+    expect(result.hasFunctions).toBe(false);
+    testLogger.info('✅ Functions correctly filtered from value suggestions');
+
+    // Verify suggestions contain actual field values (not functions)
+    expect(result.rowCount).toBeGreaterThan(0);
+    testLogger.info(`✅ ${result.rowCount} value suggestions shown`);
+
+    // Verify the query text was set correctly
+    await pm.logsPage.expectQueryEditorContainsText('kubernetes_container_name');
+    testLogger.info("Test passed: Value suggestion filtering verified");
+  });
+
+  // ======================================================================
+  // Bug #11400 sub-issue #2: Mixed quote handling in multi-condition WHERE
+  // clauses. Fix: PR #11403 - hasOpenQuote regex scoped to textUpToCursor
+  // slice, not the full query. This ensures that in a query like:
+  //   WHERE http = 'te' AND host = 'te
+  // the open quote in the second condition ('te) is correctly detected even
+  // though the first condition has a closed quote ('te').
+  // ======================================================================
+
+  test("Bug #11400: should handle mixed quotes in multi-condition WHERE clauses", {
+    tag: ['@P2', '@functional', '@bug11400', '@logs', '@regressionBugs']
+  }, async ({ page }) => {
+    testLogger.info("Testing mixed quote handling in multi-condition WHERE clauses");
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForTimeout(1000);
+
+    // Select stream
+    await pm.logsPage.selectStream("e2e_automate");
+    await pm.logsPage.waitForQueryEditorVisible();
+
+    // Run a search to populate field values in Monaco's suggestion cache.
+    // Using an explicit search here is more reliable than depending on the
+    // auto-search after stream selection, which may not fire or may use a
+    // different API endpoint pattern in some environments.
+    testLogger.info('Running search to populate field values...');
+    const searchResponsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/_search') && resp.status() === 200,
+      { timeout: 30000 },
+    );
+    await pm.logsPage.clickSearchBarRefreshButton();
+    await searchResponsePromise.catch(() => testLogger.warn('Search response not captured'));
+    await page.waitForTimeout(1000); // Small buffer for Monaco to process field values
+    testLogger.info('✅ Auto-search completed, field values cached');
+
+    // Set multi-condition WHERE query with mixed quotes.
+    // The first condition has a properly closed quote: http = 'te'
+    // The second condition has a partial open quote: host = 'te
+    // The hasOpenQuote fix ensures the second condition correctly detects
+    // the opening quote, even though the first condition's quote is closed.
+    const mixedQuoteQuery = `SELECT * FROM "e2e_automate" WHERE http = 'te' AND host = 'te`;
+    await pm.logsPage.setQueryEditorContent(mixedQuoteQuery);
+
+    // Wait for Monaco to process the content
+    await page.waitForTimeout(500);
+
+    // Verify the query text is set correctly - the full query should be present
+    await pm.logsPage.expectQueryEditorContainsText('host = \'te');
+    testLogger.info('✅ Mixed quote query text verified in editor');
+
+    // Verify no error states are present (editor should not show errors for this pattern)
+    const hasErrorState = await pm.logsPage.getEditorErrorState();
+    testLogger.info(`Editor error state: ${hasErrorState}`);
+
+    // PRIMARY CHECK: Mixed quote pattern must not trigger editor errors
+    expect(hasErrorState).toBe('no-error');
+    testLogger.info('✅ No editor error states for mixed quote pattern');
+
+    // SECONDARY CHECK: Trigger Ctrl+Space to open suggestion widget in the
+    // value context of the second condition (after host = 'te).
+    // This is the key behavior the hasOpenQuote fix enables: the scoped
+    // regex must detect the open quote in the second condition independently
+    // from the closed quote in the first condition, so value completions work.
+    // Without the fix, the regex would see the closed quote ('te') from the
+    // first condition and fail to detect the open quote in the second.
+    testLogger.info('Triggering suggestion widget after partial open quote in second condition...');
+    await pm.logsPage.triggerEditorSuggestions();
+    await pm.logsPage.waitForSuggestionWidgetVisible(5000);
+    testLogger.info('✅ Suggestion widget appeared in mixed quote context');
+
+    // Verify functions are NOT in suggestions (value context filtering)
+    const result = await pm.logsPage.checkSuggestionForFunctions();
+    testLogger.info('Suggestion analysis in mixed quote context', result);
+    expect(result.hasFunctions).toBe(false);
+    testLogger.info('✅ No functions in mixed quote value suggestions');
+
+    // Verify actual field values are suggested (proving hasOpenQuote fix works)
+    expect(result.rowCount).toBeGreaterThan(0);
+    testLogger.info(`✅ ${result.rowCount} value suggestions in mixed quote context`);
+
+    testLogger.info("Test passed: Mixed quote handling verified");
+  });
+
   test.afterEach(async () => {
     testLogger.info('Logs regression test completed');
   });

@@ -20,9 +20,15 @@ test.describe("Traces Regression Bugs", () => {
     await navigateToBase(page);
     pm = new PageManager(page);
 
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
     // Navigate to traces page
     await pm.tracesPage.navigateToTraces();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Select the default stream as data is ingested for it only
+    await pm.tracesPage.isStreamSelectVisible()
+    await pm.tracesPage.selectTraceStream('default');
+    await page.waitForTimeout(2000);
 
     testLogger.info('Traces regression test setup completed');
   });
