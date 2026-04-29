@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OButton
               variant="primary"
-              size="sm"
+              size="chip"
               :data-test="`dashboard-name-item-${nameLabel}`"
             >
               {{ nameLabel }}
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="ghost"
-              size="icon"
+              size="icon-chip"
               :data-test="`dashboard-name-item-${nameLabel}-remove`"
               @click="removeMapName()"
             >
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OButton
               variant="primary"
-              size="sm"
+              size="chip"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
             >
               {{ valueLabel }}
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="ghost"
-              size="icon"
+              size="icon-chip"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-remove`"
               @click="removeMapValue()"
             >

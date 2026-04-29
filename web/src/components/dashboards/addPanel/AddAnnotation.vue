@@ -81,7 +81,7 @@
         </div>
       </q-card-section>
       <q-card-actions align="right">
-        <div class="tw:w-full tw:flex">
+        <div class="tw:w-full tw:flex tw:gap-2">
           <OButton
             v-if="annotationData.annotation_id"
             variant="destructive"
@@ -90,17 +90,12 @@
             >Delete</OButton
           >
           <div class="tw:flex-1"></div>
-          <OButton
-            variant="secondary"
-            size="sm"
-            class="tw:ml-3"
-            @click="handleClose"
+          <OButton variant="outline" size="sm" @click="handleClose"
             >Cancel</OButton
           >
           <OButton
             variant="primary"
             size="sm"
-            class="tw:ml-3"
             @click="saveAnnotation.execute()"
             :loading="saveAnnotation.isLoading?.value"
             :disabled="!annotationData.title"
@@ -118,12 +113,13 @@
         <q-card-section>
           Are you sure you want to delete this annotation?
         </q-card-section>
-        <q-card-actions align="right">
-          <OButton variant="secondary" size="sm" v-close-popup>Cancel</OButton>
+        <q-card-actions align="right" class="tw:gap-2">
+          <OButton variant="outline" size="sm-action" v-close-popup
+            >Cancel</OButton
+          >
           <OButton
             variant="destructive"
-            size="sm"
-            class="tw:ml-2"
+            size="sm-action"
             :loading="deleteAnnotation.isLoading.value"
             @click="deleteAnnotation.execute()"
             >Delete</OButton

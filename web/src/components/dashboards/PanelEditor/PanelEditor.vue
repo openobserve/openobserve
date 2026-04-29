@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
             <OButton
-              variant="primary"
+              variant="sidebar-toggle"
               size="icon-circle"
               :style="{ top: '14px', zIndex: 100 }"
               :class="
@@ -467,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
             <OButton
-              variant="primary"
+              variant="sidebar-toggle"
               size="icon-circle"
               :style="{ top: '14px', zIndex: 100 }"
               @click="collapseFieldList"

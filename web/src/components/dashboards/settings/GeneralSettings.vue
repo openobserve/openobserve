@@ -72,20 +72,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'o2-toggle-button-lg-light'
           "
         />
-        <div class="flex justify-center q-mt-lg">
+        <div class="flex justify-center q-mt-lg tw:gap-2">
           <OButton
             v-close-popup="true"
-            variant="secondary"
-            size="sm"
+            variant="outline"
+            size="sm-action"
             data-test="dashboard-general-setting-cancel-btn"
             >{{ t("dashboard.cancel") }}</OButton
           >
           <OButton
             :disabled="dashboardData.title.trim() === ''"
             variant="primary"
-            size="sm"
+            size="sm-action"
             type="submit"
-            class="tw:ml-3"
             :loading="saveDashboardApi.isLoading.value"
             data-test="dashboard-general-setting-save-btn"
             >{{ t("dashboard.save") }}</OButton

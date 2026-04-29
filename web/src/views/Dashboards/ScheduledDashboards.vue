@@ -53,8 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("dashboard.scheduledDashboards") }}
           </div>
 
-          <div class="tw:flex tw:items-center">
-            <div class="app-tabs-container tw:h-[36px] q-mr-sm">
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="app-tabs-container tw:h-[36px]">
               <app-tabs
                 class="tabs-selection-container"
                 :tabs="reportTypeTabs"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="filterQuery"
               borderless
               dense
-              class="q-ml-auto no-border"
+              class="no-border tw:border tw:border-[var(--q-color-button-border,#d1d5db)] tw:rounded-md tw:px-2 tw:h-9"
               :placeholder="t('reports.search')"
               hide-bottom-space
             >
@@ -79,19 +79,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OButton
               variant="primary"
-              size="sm"
+              size="sm-action"
               data-test="alert-list-add-alert-btn"
               @click="createNewReport"
               >{{ t("dashboard.newReport") }}</OButton
             >
 
             <div class="q-ml-sm">
-              <q-icon
-                name="cancel"
-                class="cursor-pointer"
-                size="20px"
-                v-close-popup="true"
-              />
+              <OButton variant="ghost" size="icon-sm" v-close-popup="true">
+                <template #icon-left><q-icon name="close" /></template>
+              </OButton>
             </div>
           </div>
         </div>

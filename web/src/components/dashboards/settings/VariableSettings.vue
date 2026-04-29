@@ -27,13 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="column full-height">
       <DashboardHeader title="Variables">
         <template #right>
-          <div>
+          <div class="tw:flex tw:gap-2">
             <!-- show variables dependencies if variables exist -->
             <OButton
               v-if="dashboardVariablesList.length > 0"
-              variant="secondary"
+              variant="outline"
               size="sm"
-              class="tw:ml-3"
               @click="showVariablesDependenciesGraphPopUp = true"
               data-test="dashboard-variable-dependencies-btn"
               >Show Dependencies</OButton
@@ -41,7 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="primary"
               size="sm"
-              class="tw:ml-3"
               @click="addVariables"
               data-test="dashboard-add-variable-btn"
               >{{ t("dashboard.newVariable") }}</OButton

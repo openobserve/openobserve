@@ -18,11 +18,13 @@ export type ButtonVariant =
   | "ghost-warning"
   | "ghost-neutral"
   | "outline-destructive"
+  | "sidebar-toggle"
   | "destructive";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =
   | "xs"
+  | "chip"
   | "sm"
   | "sm-action"
   | "xs"
@@ -31,6 +33,8 @@ export type ButtonSize =
   | "icon"
   | "icon-xs"
   | "icon-xs-circle"
+  | "icon-xs-sq"
+  | "icon-chip"
   | "icon-sm"
   | "icon-md"
   | "icon-lg"

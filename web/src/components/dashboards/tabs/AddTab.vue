@@ -62,11 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-add-tab-name"
         />
 
-        <div class="flex justify-start">
+        <div class="flex justify-start tw:gap-2">
           <OButton
             v-close-popup="true"
-            variant="secondary"
-            size="sm"
+            variant="outline"
+            size="sm-action"
             data-test="dashboard-add-cancel"
             >{{ t("dashboard.cancel") }}</OButton
           >
@@ -74,9 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="tabData.name.trim() === ''"
             :loading="onSubmit.isLoading.value"
             variant="primary"
-            size="sm"
+            size="sm-action"
             type="submit"
-            class="tw:ml-3"
             data-test="dashboard-add-tab-submit"
             >{{ t("dashboard.save") }}</OButton
           >

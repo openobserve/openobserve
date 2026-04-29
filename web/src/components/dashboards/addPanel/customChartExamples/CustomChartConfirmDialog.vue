@@ -83,12 +83,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-card-section>
 
-      <q-card-actions class="confirmActions">
+      <q-card-actions class="confirmActions tw:gap-2">
         <OButton
           v-close-popup
-          variant="secondary"
-          size="sm"
-          class="tw:mr-2"
+          variant="outline"
+          size="sm-action"
           @click="onCancel"
           data-test="cancel-button"
         >
@@ -97,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-close-popup
           variant="primary"
-          size="sm"
+          size="sm-action"
           @click="onConfirm"
           data-test="confirm-button"
         >
