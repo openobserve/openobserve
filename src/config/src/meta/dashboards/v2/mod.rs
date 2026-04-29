@@ -573,4 +573,10 @@ mod tests {
         assert!(json.contains("value"));
         assert!(json.contains("unit"));
     }
+
+    #[test]
+    fn test_datetime_now_has_zero_offset() {
+        let dt = datetime_now();
+        assert_eq!(dt.offset().local_minus_utc(), 0);
+    }
 }
