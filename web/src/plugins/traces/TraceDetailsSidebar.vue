@@ -404,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :span="span"
                     view-mode="formatted"
                     :instance-id="`${span.span_id}-output`"
-                />
+                  />
                 </div>
               </div>
             </div>
