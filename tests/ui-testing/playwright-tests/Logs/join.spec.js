@@ -160,7 +160,10 @@ test.describe("Join for logs", () => {
     await pm.logsPage.navigateToLogs();
     await pm.logsPage.selectIndexAndStreamJoin();
     await pm.logsPage.enableSQLMode();
-    await pm.logsPage.clickQuickModeToggle();
+    // Quick mode must be OFF so the full field list (incl. kubernetes_pod_name)
+    // is visible in the index panel — a blind toggle would flip whichever
+    // state was inherited from the previous test.
+    await pm.logsPage.ensureQuickModeState(false);
     await pm.logsPage.clickAllFieldsButton();
     await pm.logsPage.selectRunQuery();
     await pm.logsPage.clickInterestingFields();
@@ -175,7 +178,7 @@ test.describe("Join for logs", () => {
     await pm.logsPage.navigateToLogs();
     await pm.logsPage.selectIndexAndStreamJoin();
     await pm.logsPage.enableSQLMode();
-    await pm.logsPage.clickQuickModeToggle();
+    await pm.logsPage.ensureQuickModeState(false);
     await pm.logsPage.clickAllFieldsButton();
     await pm.logsPage.selectRunQuery();
 

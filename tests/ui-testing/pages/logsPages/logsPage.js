@@ -424,6 +424,13 @@ export class LogsPage {
             }
         }
         if (!defaultSelected) {
+            // Last-resort fallback: ensure the dropdown is open before clicking;
+            // after 3 retries through the Escape path, it may be closed and
+            // a force-click on a hidden toggle silently does nothing.
+            if (!(await defaultToggle.isVisible().catch(() => false))) {
+                await dropdownArrow.click({ force: true });
+                await this.page.waitForTimeout(1000);
+            }
             await defaultToggle.click({ force: true, timeout: 10000 });
         }
         await this.page.waitForTimeout(1000);
@@ -463,6 +470,11 @@ export class LogsPage {
             }
         }
         if (!e2eSelected) {
+            // Last-resort fallback: same dropdown-open guard as above
+            if (!(await e2eToggle.isVisible().catch(() => false))) {
+                await dropdownArrow.click({ force: true });
+                await this.page.waitForTimeout(1000);
+            }
             await e2eToggle.click({ force: true, timeout: 10000 });
         }
 
@@ -1450,8 +1462,9 @@ export class LogsPage {
         await this.page.waitForTimeout(500);
         await this.page.getByText('10', { exact: true }).click({ force: true });
         await this.page.waitForTimeout(3000);
-        // Wait for pagination text to appear
-        await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText('Showing', { timeout: 15000 });
+        // Wait for pagination text — assert "Showing 1 to 10" so we verify the
+        // 10-per-page contract was applied, not just that any pagination renders
+        await expect(this.page.locator('[data-test="logs-search-search-result"]')).toContainText('Showing 1 to 10', { timeout: 15000 });
     }
 
     async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
