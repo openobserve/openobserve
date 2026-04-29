@@ -2,6 +2,8 @@
 import type { IconProps, IconSlots } from "./OIcon.types";
 import { computed } from "vue";
 
+defineOptions({ inheritAttrs: false });
+
 const props = defineProps<IconProps>();
 defineSlots<IconSlots>();
 
@@ -32,41 +34,22 @@ const isFontIcon = computed<boolean>(
   () => Boolean(props.name) && !isImgIcon.value,
 );
 
-/**
- * Returns the Tailwind utility class for a named size alias, or null when
- * `size` is an arbitrary CSS length string (e.g. "14px", "1.5rem").
- */
-const namedSizeClass = computed<string | null>(() => {
-  if (!props.size) return null;
-  return NAMED_SIZE_CLASSES[props.size] ?? null;
-});
-
-/**
- * Inline style fallback — used ONLY when `size` is an arbitrary CSS length
- * string that has no token equivalent.  Named aliases never reach this path.
- */
-const arbitrarySizeStyle = computed<Record<string, string> | undefined>(() => {
-  if (!props.size || NAMED_SIZE_CLASSES[props.size]) return undefined;
-  return { fontSize: props.size };
-});
-
-const classes = computed<string>(() =>
-  [
-    // Layout — flex center so SVG slot content is centered in its box
-    "tw:inline-flex tw:items-center tw:justify-center",
-    // Prevent the icon from shrinking inside a flex parent
-    "tw:shrink-0",
-    // Reset line height so the font glyph is not taller than its em-box
-    "tw:leading-none",
-    // Prevent text selection on the font glyph
-    "tw:select-none",
-    // Add the Material Icons font class when rendering a named glyph
-    isFontIcon.value ? "material-icons" : "",
-    // Named size token class (null when size is an arbitrary string or omitted)
-    namedSizeClass.value ?? "",
-  ]
-    .filter(Boolean)
-    .join(" "),
+const classes = computed<string[]>(
+  () =>
+    [
+      // Layout — flex center so SVG slot content is centered in its box
+      "tw:inline-flex tw:items-center tw:justify-center",
+      // Prevent the icon from shrinking inside a flex parent
+      "tw:shrink-0",
+      // Reset line height so the font glyph is not taller than its em-box
+      "tw:leading-none",
+      // Prevent text selection on the font glyph
+      "tw:select-none",
+      // Add the Material Icons font class when rendering a named glyph
+      isFontIcon.value ? "material-icons" : "",
+      // Named size token class (only set when a named size alias is provided)
+      props.size ? (NAMED_SIZE_CLASSES[props.size] ?? "") : "",
+    ].filter(Boolean) as string[],
 );
 </script>
 
@@ -89,7 +72,7 @@ const classes = computed<string>(() =>
     For purely decorative icons add `aria-hidden="true"`.
     For semantic icons add `aria-label="…"` and `role="img"`.
   -->
-  <span :class="classes" :style="arbitrarySizeStyle">
+  <span :class="classes" v-bind="$attrs">
     <!-- Mode 1: Material Icons glyph -->
     <template v-if="isFontIcon">{{ name }}</template>
 

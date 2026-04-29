@@ -99,6 +99,12 @@
   --text-icon-lg: var(--spacing-6);   /* 24px */
   --text-icon-xl: var(--spacing-8);   /* 32px */
 
+  /* RefreshButton — staleness dot */
+  --color-refresh-dot-idle: var(--color-text-disabled);
+  --color-refresh-dot-fresh: var(--color-success-500);
+  --color-refresh-dot-stale: var(--color-warning-500);
+  --color-refresh-dot-critical: var(--color-error-500);
+
   /* Tabs */
   --color-tabs-indicator: var(--color-primary-600);
   --color-tabs-active-text: var(--color-primary-600);
@@ -201,6 +207,12 @@
   --text-icon-md: var(--text-icon-md);
   --text-icon-lg: var(--text-icon-lg);
   --text-icon-xl: var(--text-icon-xl);
+
+  /* RefreshButton — staleness dot */
+  --color-refresh-dot-idle: var(--color-refresh-dot-idle);
+  --color-refresh-dot-fresh: var(--color-refresh-dot-fresh);
+  --color-refresh-dot-stale: var(--color-refresh-dot-stale);
+  --color-refresh-dot-critical: var(--color-refresh-dot-critical);
 
   /* Tabs */
   --color-tabs-indicator: var(--color-tabs-indicator);
