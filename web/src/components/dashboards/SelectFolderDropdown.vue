@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-center items-start">
+  <div class="flex justify-center items-end tw:pb-[2px]">
     <!-- select new folder -->
     <q-select
       v-model="selectedFolder"
@@ -42,9 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OButton
       data-test="dashboard-folder-move-new-add"
-      variant="ghost"
-      size="icon"
-      :style="computedStyle"
+      variant="outline"
+      size="icon-sm"
       @click="
         () => {
           showAddFolderDialog = true;
@@ -123,7 +122,7 @@ export default defineComponent({
     };
 
     const computedStyle = computed(() => {
-      return "height: 35px; margin-top: 13px";
+      return "";
     });
 
     onActivated(() => {

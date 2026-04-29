@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <OButton
                     variant="primary"
-                    size="sm"
+                    size="chip"
                     :data-test="`dashboard-x-item-${itemX?.alias}`"
                   >
                     {{ xLabel[index] }}
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     variant="ghost"
-                    size="icon"
+                    size="icon-chip"
                     :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
                     @click="removeXAxisItemByIndex(index)"
                   >
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <OButton
                     variant="primary"
-                    size="sm"
+                    size="chip"
                     :data-test="`dashboard-b-item-${itemB?.alias}`"
                   >
                     {{ bLabel[index] }}
@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     variant="ghost"
-                    size="icon"
+                    size="icon-chip"
                     :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
                     @click="removeBreakdownItemByIndex(index)"
                   >
@@ -417,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 variant="primary"
-                size="sm"
+                size="chip"
                 :data-test="`dashboard-y-item-${itemY?.alias}`"
               >
                 {{ yLabel[index] }}
@@ -469,7 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="ghost"
-                size="icon"
+                size="icon-chip"
                 :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
                 @click="removeYAxisItemByIndex(index)"
               >
@@ -566,7 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   variant="primary"
-                  size="sm"
+                  size="chip"
                   :data-test="`dashboard-z-item-${itemZ?.alias}`"
                 >
                   {{ zLabel[index] }}
@@ -614,7 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <OButton
                   variant="ghost"
-                  size="icon"
+                  size="icon-chip"
                   :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
                   @click="removeZAxisItemByIndex(index)"
                 >

@@ -81,11 +81,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @folder-selected="selectedFolder = $event"
         />
 
-        <div class="flex justify-start q-mt-sm">
+        <div class="flex justify-start q-mt-sm tw:gap-2">
           <OButton
             v-close-popup="true"
-            variant="secondary"
-            size="sm"
+            variant="outline"
+            size="sm-action"
             data-test="dashboard-add-cancel"
             >{{ t("dashboard.cancel") }}</OButton
           >
@@ -94,9 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="dashboardData.name.trim() === ''"
             :loading="onSubmit.isLoading.value"
             variant="primary"
-            size="sm"
+            size="sm-action"
             type="submit"
-            class="tw:ml-3"
             >{{ t("dashboard.save") }}</OButton
           >
         </div>

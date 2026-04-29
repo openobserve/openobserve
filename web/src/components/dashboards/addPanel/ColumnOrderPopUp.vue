@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Footer -->
     <div class="sticky-footer q-pa-md">
       <OButton
-        variant="secondary"
+        variant="outline"
         size="sm"
         @click.stop="cancelEdit"
         data-test="dashboard-column-order-cancel-btn"

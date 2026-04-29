@@ -338,18 +338,17 @@
       />
     </div>
 
-    <q-card-actions class="confirmActions">
+    <q-card-actions class="confirmActions tw:gap-2">
       <OButton
-        variant="secondary"
-        size="sm"
+        variant="outline"
+        size="sm-action"
         @click="$emit('close')"
         data-test="cancel-button"
         >{{ t("confirmDialog.cancel") }}</OButton
       >
       <OButton
         variant="primary"
-        size="sm"
-        class="tw:ml-3"
+        size="sm-action"
         @click="saveDrilldown"
         data-test="confirm-button"
         :disabled="isFormValid"
