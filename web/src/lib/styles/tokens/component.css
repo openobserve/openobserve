@@ -77,6 +77,13 @@
   --color-dropdown-label: var(--color-text-secondary);
   --color-dropdown-separator: var(--color-border-default);
 
+  /* Icon sizes */
+  --text-icon-xs: var(--spacing-3);   /* 12px */
+  --text-icon-sm: var(--spacing-4);   /* 16px */
+  --text-icon-md: var(--spacing-5);   /* 20px */
+  --text-icon-lg: var(--spacing-6);   /* 24px */
+  --text-icon-xl: var(--spacing-8);   /* 32px */
+
   /* Tabs */
   --color-tabs-indicator: var(--color-primary-600);
   --color-tabs-active-text: var(--color-primary-600);
@@ -158,6 +165,13 @@
   --color-dropdown-item-disabled: var(--color-dropdown-item-disabled);
   --color-dropdown-label: var(--color-dropdown-label);
   --color-dropdown-separator: var(--color-dropdown-separator);
+
+  /* Icon sizes */
+  --text-icon-xs: var(--text-icon-xs);
+  --text-icon-sm: var(--text-icon-sm);
+  --text-icon-md: var(--text-icon-md);
+  --text-icon-lg: var(--text-icon-lg);
+  --text-icon-xl: var(--text-icon-xl);
 
   /* Tabs */
   --color-tabs-indicator: var(--color-tabs-indicator);
