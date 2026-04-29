@@ -48,28 +48,23 @@
               <div class="q-gutter-xs" style="height: 100%">
                 <OTabs v-model="condition.type" dense>
                   <OTab
-                    dense
                     name="list"
                     :label="t('common.list')"
-                    style="width: auto"
                     :data-test="`dashboard-add-condition-list-${conditionIndex}`"
                   ></OTab>
                   <OTab
-                    dense
                     name="condition"
                     :label="t('common.condition')"
-                    style="width: auto"
                     :data-test="`dashboard-add-condition-condition-${conditionIndex}`"
                   ></OTab>
                 </OTabs>
                 <q-separator></q-separator>
+                <div class="tw:h-full">
                 <OTabPanels
                   v-model="condition.type"
-                  dense
                   animated
-                  style="height: 100%"
                 >
-                  <OTabPanel dense name="condition">
+                  <OTabPanel name="condition">
                     <div class="flex column" style="height: 220px">
                       <q-select
                         dense
@@ -95,7 +90,7 @@
                       ></CommonAutoComplete>
                     </div>
                   </OTabPanel>
-                  <OTabPanel dense name="list">
+                  <OTabPanel name="list">
                     <q-select
                       dense
                       borderless
@@ -151,6 +146,7 @@
                     </q-select>
                   </OTabPanel>
                 </OTabPanels>
+                </div>
               </div>
             </div>
           </div>

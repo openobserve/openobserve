@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import type { OTabPanelsProps, OTabPanelsEmits, OTabPanelsSlots, TabPanelsContext } from './OTabPanels.types'
+import type { OTabPanelsProps, OTabPanelsEmits, OTabPanelsSlots, TabPanelsContext, TabPanelsScroll } from './OTabPanels.types'
 import { TAB_PANELS_CONTEXT_KEY } from './OTabPanels.types'
 import { computed, provide } from 'vue'
 
 const props = withDefaults(defineProps<OTabPanelsProps>(), {
   animated: false,
   keepAlive: false,
+  grow: false,
+  scroll: 'none',
 })
 
 defineEmits<OTabPanelsEmits>()
@@ -19,13 +21,23 @@ const context = computed<TabPanelsContext>(() => ({
 }))
 
 provide(TAB_PANELS_CONTEXT_KEY, context)
+
+const scrollClasses: Record<TabPanelsScroll, string> = {
+  none: 'tw:overflow-hidden',
+  auto: 'tw:overflow-auto',
+  y:    'tw:overflow-y-auto',
+}
+
+const rootClasses = computed<string[]>(() => {
+  const classes: string[] = ['o-tab-panels', scrollClasses[props.scroll]]
+  if (props.animated) classes.push('o-tab-panels--animated')
+  if (props.grow) classes.push('tw:flex-1')
+  return classes
+})
 </script>
 
 <template>
-  <div
-    class="o-tab-panels tw:overflow-hidden"
-    :class="{ 'o-tab-panels--animated': animated }"
-  >
+  <div :class="rootClasses">
     <slot />
   </div>
 </template>

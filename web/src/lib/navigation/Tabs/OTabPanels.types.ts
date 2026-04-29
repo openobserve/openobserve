@@ -3,6 +3,9 @@
  * OTabPanels is the container that shows the correct panel for the active tab.
  */
 
+/** Overflow/scroll behavior of the panels container */
+export type TabPanelsScroll = 'none' | 'auto' | 'y'
+
 export interface OTabPanelsProps {
   /** Currently active tab name — must be kept in sync with OTabs v-model */
   modelValue: string | number
@@ -10,6 +13,10 @@ export interface OTabPanelsProps {
   animated?: boolean
   /** Keeps all panel DOM alive when switching (avoids remounting) */
   keepAlive?: boolean
+  /** Adds `tw:flex-1` so panels fill remaining space in a flex parent. Default: false */
+  grow?: boolean
+  /** Overflow/scroll behavior of the panels container. Default: 'none' */
+  scroll?: TabPanelsScroll
 }
 
 export interface OTabPanelsEmits {

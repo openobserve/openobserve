@@ -38,11 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator class="tw:mb-6" />
 
     <OTabPanels v-model="activeTab" animated>
-      <OTabPanel name="quick-setup" class="tw:p-0">
+      <OTabPanel name="quick-setup">
         <AWSQuickSetup />
       </OTabPanel>
 
-      <OTabPanel name="individual-services" class="tw:p-0">
+      <OTabPanel name="individual-services">
         <AWSIndividualServices :initialSearch="searchQuery" />
       </OTabPanel>
     </OTabPanels>

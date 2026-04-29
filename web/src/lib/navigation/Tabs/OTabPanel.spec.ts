@@ -13,6 +13,9 @@ function mountTabPanel(options: {
   keepAlive?: boolean
   animated?: boolean
   content?: string
+  padding?: 'none' | 'sm' | 'md'
+  layout?: 'block' | 'flex-col' | 'flex-row'
+  stretch?: boolean
 } = {}) {
   const activeTab = options.activeTab ?? 'tab1'
   const keepAlive = options.keepAlive ?? false
@@ -21,6 +24,9 @@ function mountTabPanel(options: {
   return mount(OTabPanel, {
     props: {
       name: options.name ?? 'tab1',
+      ...(options.padding !== undefined && { padding: options.padding }),
+      ...(options.layout !== undefined && { layout: options.layout }),
+      ...(options.stretch !== undefined && { stretch: options.stretch }),
     },
     slots: {
       default: options.content ?? 'Panel content',
@@ -104,13 +110,67 @@ describe('OTabPanel', () => {
     expect(wrapper.find('[data-testid="inner"]').exists()).toBe(true)
   })
 
-  // --- No default padding ---
+  // --- padding prop ---
 
-  it('does not add default padding (consumers own their layout)', () => {
+  it('applies tw:p-0 by default (padding="none")', () => {
+    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
+    expect(wrapper.find('[role="tabpanel"]').classes()).toContain('tw:p-0')
+  })
+
+  it('applies tw:p-0 when padding="none"', () => {
+    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', padding: 'none' })
+    expect(wrapper.find('[role="tabpanel"]').classes()).toContain('tw:p-0')
+  })
+
+  it('applies tw:p-2 when padding="sm"', () => {
+    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', padding: 'sm' })
+    expect(wrapper.find('[role="tabpanel"]').classes()).toContain('tw:p-2')
+  })
+
+  it('applies tw:p-4 when padding="md"', () => {
+    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', padding: 'md' })
+    expect(wrapper.find('[role="tabpanel"]').classes()).toContain('tw:p-4')
+  })
+
+  // --- layout prop ---
+
+  it('applies no flex classes by default (layout="block")', () => {
+    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
+    const classes = wrapper.find('[role="tabpanel"]').classes()
+    expect(classes).not.toContain('tw:flex')
+  })
+
+  it('applies tw:flex tw:flex-col when layout="flex-col"', () => {
+    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', layout: 'flex-col' })
+    const classes = wrapper.find('[role="tabpanel"]').classes()
+    expect(classes).toContain('tw:flex')
+    expect(classes).toContain('tw:flex-col')
+  })
+
+  it('applies tw:flex tw:flex-row when layout="flex-row"', () => {
+    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', layout: 'flex-row' })
+    const classes = wrapper.find('[role="tabpanel"]').classes()
+    expect(classes).toContain('tw:flex')
+    expect(classes).toContain('tw:flex-row')
+  })
+
+  // --- stretch prop ---
+
+  it('does not add tw:h-full by default', () => {
+    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
+    expect(wrapper.find('[role="tabpanel"]').classes()).not.toContain('tw:h-full')
+  })
+
+  it('adds tw:h-full when stretch is true', () => {
+    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', stretch: true })
+    expect(wrapper.find('[role="tabpanel"]').classes()).toContain('tw:h-full')
+  })
+
+  // --- No default padding (legacy check) ---
+
+  it('does not add q-tab-panel class', () => {
     const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
     const panel = wrapper.find('[role="tabpanel"]')
-    // Should not have Quasar's default q-tab-panel padding class
-    expect(panel.classes()).not.toContain('tw:p-4')
     expect(panel.classes()).not.toContain('q-tab-panel')
   })
 })

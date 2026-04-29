@@ -236,11 +236,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <div class="text-bold q-mx-sm span_details_tabs">
     <OTabs
       v-model="activeTab"
       dense
       align="left"
-      class="text-bold q-mx-sm span_details_tabs"
       data-test="trace-details-sidebar-tabs"
     >
       <!-- LLM Preview Tab (conditional - shown first for LLM traces) -->
@@ -292,8 +292,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="trace-details-sidebar-tabs-correlated-metrics"
       />
     </OTabs>
+    </div>
     <q-separator style="width: 100%" />
-    <OTabPanels v-model="activeTab" class="span_details_tab-panels tw:grow">
+    <div class="span_details_tab-panels">
+    <OTabPanels v-model="activeTab" grow>
       <!-- LLM Preview Tab Panel -->
       <OTabPanel
         v-if="isLLMSpan"
@@ -924,6 +926,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OTabPanel>
     </OTabPanels>
+    </div>
   </div>
 </template>
 

@@ -9,6 +9,8 @@ function mountTabPanels(options: {
   modelValue?: string | number
   animated?: boolean
   keepAlive?: boolean
+  grow?: boolean
+  scroll?: 'none' | 'auto' | 'y'
   panels?: Array<{ name: string; content: string }>
 } = {}) {
   const panels = options.panels ?? [
@@ -21,6 +23,8 @@ function mountTabPanels(options: {
       modelValue: options.modelValue ?? 'tab1',
       animated: options.animated,
       keepAlive: options.keepAlive,
+      ...(options.grow !== undefined && { grow: options.grow }),
+      ...(options.scroll !== undefined && { scroll: options.scroll }),
     },
     slots: {
       default: panels.map(
@@ -83,5 +87,36 @@ describe('OTabPanels', () => {
     expect((panels[0].element as HTMLElement).style.display).not.toBe('none')
     expect((panels[1].element as HTMLElement).style.display).toBe('none')
     expect((panels[2].element as HTMLElement).style.display).toBe('none')
+  })
+
+  // --- scroll prop ---
+
+  it('applies tw:overflow-hidden by default (scroll="none")', () => {
+    const wrapper = mountTabPanels()
+    expect(wrapper.classes()).toContain('tw:overflow-hidden')
+  })
+
+  it('applies tw:overflow-auto when scroll="auto"', () => {
+    const wrapper = mountTabPanels({ scroll: 'auto' })
+    expect(wrapper.classes()).toContain('tw:overflow-auto')
+    expect(wrapper.classes()).not.toContain('tw:overflow-hidden')
+  })
+
+  it('applies tw:overflow-y-auto when scroll="y"', () => {
+    const wrapper = mountTabPanels({ scroll: 'y' })
+    expect(wrapper.classes()).toContain('tw:overflow-y-auto')
+    expect(wrapper.classes()).not.toContain('tw:overflow-hidden')
+  })
+
+  // --- grow prop ---
+
+  it('does not add tw:flex-1 by default', () => {
+    const wrapper = mountTabPanels()
+    expect(wrapper.classes()).not.toContain('tw:flex-1')
+  })
+
+  it('adds tw:flex-1 when grow is true', () => {
+    const wrapper = mountTabPanels({ grow: true })
+    expect(wrapper.classes()).toContain('tw:flex-1')
   })
 })

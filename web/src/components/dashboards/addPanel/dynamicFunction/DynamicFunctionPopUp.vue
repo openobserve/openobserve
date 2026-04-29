@@ -53,20 +53,19 @@
           name="build"
           label="Build"
           data-test="dynamic-function-popup-tab-build"
-          class="tab-item-bold"
         />
         <OTab
           name="raw"
           label="Raw"
           data-test="dynamic-function-popup-tab-raw"
-          class="tab-item-bold"
         />
       </OTabs>
 
       <q-separator v-if="!customQuery && !fields.isDerived" />
 
       <OTabPanels v-if="!customQuery && !fields.isDerived" v-model="fields.type" animated>
-        <OTabPanel name="build" style="padding: 0px; padding-top: 8px">
+        <OTabPanel name="build">
+          <div class="tw:pt-2">
           <div style="display: flex">
             <div style="width: calc(100% - 134px)">
               <div class="text-label-bold tw:pb-3">Configuration</div>
@@ -77,8 +76,10 @@
               />
             </div>
           </div>
+          </div>
         </OTabPanel>
-        <OTabPanel name="raw" style="padding: 0px; padding-top: 8px">
+        <OTabPanel name="raw">
+          <div class="tw:pt-2">
           <div style="display: flex; width: 100%">
             <div style="width: 100%; padding-right: 12px">
               <RawQueryBuilder
@@ -86,6 +87,7 @@
                 data-test="dynamic-function-popup-raw-query-builder"
               />
             </div>
+          </div>
           </div>
         </OTabPanel>
       </OTabPanels>
