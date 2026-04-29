@@ -394,39 +394,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <!-- add delete icon in actions column -->
                 <template #body-cell-actions="props">
-                  <q-td :props="props">
-                    <OButton
-                      v-if="props.row.actions == 'true'"
-                      :title="t('dashboard.move_to_another_folder')"
-                      size="icon"
-                      variant="ghost"
-                      @click.stop="showMoveDashboardPanel(props.row)"
-                      data-test="dashboard-move-to-another-folder"
-                    >
-                      <q-icon :name="outlinedDriveFileMove" size="16px" />
-                    </OButton>
-                    <OButton
-                      v-if="props.row.actions == 'true'"
-                      :title="t('dashboard.duplicate')"
-                      size="icon"
-                      variant="ghost"
-                      @click.stop="
-                        duplicateDashboard(props.row.id, props.row.folder_id)
-                      "
-                      data-test="dashboard-duplicate"
-                    >
-                      <q-icon name="content_copy" size="16px" />
-                    </OButton>
-                    <OButton
-                      v-if="props.row.actions == 'true'"
-                      :title="t('dashboard.delete')"
-                      size="icon"
-                      variant="ghost"
-                      @click.stop="showDeleteDialogFn(props)"
-                      data-test="dashboard-delete"
-                    >
-                      <q-icon :name="outlinedDelete" size="16px" />
-                    </OButton>
+                  <q-td :props="props" class="tw:overflow-visible">
+                    <div class="tw:flex tw:items-center tw:gap-1">
+                      <OButton
+                        v-if="props.row.actions == 'true'"
+                        :title="t('dashboard.move_to_another_folder')"
+                        size="icon"
+                        variant="ghost"
+                        @click.stop="showMoveDashboardPanel(props.row)"
+                        data-test="dashboard-move-to-another-folder"
+                      >
+                        <q-icon :name="outlinedDriveFileMove" size="16px" />
+                      </OButton>
+                      <OButton
+                        v-if="props.row.actions == 'true'"
+                        :title="t('dashboard.duplicate')"
+                        size="icon"
+                        variant="ghost"
+                        @click.stop="
+                          duplicateDashboard(props.row.id, props.row.folder_id)
+                        "
+                        data-test="dashboard-duplicate"
+                      >
+                        <q-icon name="content_copy" size="16px" />
+                      </OButton>
+                      <OButton
+                        v-if="props.row.actions == 'true'"
+                        :title="t('dashboard.delete')"
+                        size="icon"
+                        variant="ghost"
+                        @click.stop="showDeleteDialogFn(props)"
+                        data-test="dashboard-delete"
+                      >
+                        <q-icon :name="outlinedDelete" size="16px" />
+                      </OButton>
+                    </div>
                   </q-td>
                 </template>
                 <template #bottom="scope">
