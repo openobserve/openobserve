@@ -682,4 +682,16 @@ mod tests {
             StatusCode::BAD_REQUEST
         );
     }
+
+    // 500 Internal Server Error
+    #[test]
+    fn test_infra_error_is_internal_server_error() {
+        let err = infra::errors::Error::DbError(infra::errors::DbError::SeaORMError(
+            "db down".to_string(),
+        ));
+        assert_eq!(
+            status(PipelineError::InfraError(err)),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
 }
