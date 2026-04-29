@@ -1038,4 +1038,25 @@ mod tests {
     fn test_folder_not_found_is_not_found() {
         assert_eq!(status(ReportError::FolderNotFound), StatusCode::NOT_FOUND);
     }
+
+    // 400 Bad Request
+    #[test]
+    fn test_parse_cron_error_is_bad_request() {
+        use std::str::FromStr as _;
+        let cron_err = cron::Schedule::from_str("not-a-cron").unwrap_err();
+        assert_eq!(
+            status(ReportError::ParseCronError(cron_err)),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    // 500 Internal Server Error
+    #[test]
+    fn test_send_report_error_is_internal_server_error() {
+        use crate::service::dashboards::reports::SendReportError;
+        assert_eq!(
+            status(ReportError::SendReportError(SendReportError::NoDashboards)),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
 }
