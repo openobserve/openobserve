@@ -253,4 +253,44 @@ mod tests {
         let json = serde_json::to_value(&res).unwrap();
         assert!(json.as_object().unwrap().contains_key("errors"));
     }
+
+    #[test]
+    fn test_status_from_i64_all_variants() {
+        assert!(matches!(Status::from(0i64), Status::Pending));
+        assert!(matches!(Status::from(1i64), Status::Running));
+        assert!(matches!(Status::from(2i64), Status::Completed));
+    }
+
+    #[test]
+    fn test_try_from_job_to_string_roundtrip() {
+        let job = make_job();
+        let s = String::try_from(job.clone()).unwrap();
+        assert!(s.contains("id1"));
+        assert!(s.contains("key1"));
+    }
+
+    #[test]
+    fn test_from_model_to_compactor_manual_job() {
+        use crate::table::entity::compactor_manual_jobs::Model;
+        let model = Model {
+            id: "model-id".to_string(),
+            key: "model-key".to_string(),
+            created_at: 1000,
+            ended_at: 2000,
+            status: 1,
+        };
+        let job = CompactorManualJob::from(model);
+        assert_eq!(job.id, "model-id");
+        assert_eq!(job.key, "model-key");
+        assert_eq!(job.created_at, 1000);
+        assert_eq!(job.ended_at, 2000);
+        assert!(matches!(job.status, Status::Running));
+    }
+
+    #[test]
+    fn test_status_equality() {
+        assert!(Status::Pending == Status::Pending);
+        assert!(Status::Pending != Status::Running);
+        assert!(Status::Running != Status::Completed);
+    }
 }
