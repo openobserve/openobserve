@@ -484,6 +484,13 @@ watch(
 
 // Expose methods for parent components
 defineExpose({
+  // Focus the inner editor and move cursor to end of text
+  focus: () => {
+    if (editorRef.value?.focus) {
+      editorRef.value.focus();
+    }
+  },
+
   // AI generation
   generateQuery: async () => {
     if (editorRef.value?.handleGenerateSQL) {

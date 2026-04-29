@@ -884,6 +884,17 @@ export default defineComponent({
       }
     };
 
+    const focus = () => {
+      if (!editorObj) return;
+      editorObj.focus();
+      const model = editorObj.getModel();
+      if (model) {
+        const lastLine = model.getLineCount();
+        const lastColumn = model.getLineMaxColumn(lastLine);
+        editorObj.setPosition({ lineNumber: lastLine, column: lastColumn });
+      }
+    };
+
     const registerAutoCompleteProvider = () => {
       if (!props.showAutoComplete || !monaco) return;
       provider.value = monaco.languages.registerCompletionItemProvider(
@@ -1144,6 +1155,7 @@ export default defineComponent({
       editorRef,
       editorObj,
       setValue,
+      focus,
       resetEditorLayout,
       disableSuggestionPopup,
       triggerAutoComplete,

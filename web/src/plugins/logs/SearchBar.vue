@@ -2965,6 +2965,32 @@ export default defineComponent({
       },
     );
 
+    // Focus query editor when SQL mode is toggled ON
+    watch(
+      () => searchObj.meta.sqlMode,
+      (newVal) => {
+        if (newVal) {
+          nextTick(() => queryEditorRef.value?.focus());
+        }
+      },
+    );
+
+    // Focus function editor when toggled ON
+    watch(showFunctionEditor, (newVal) => {
+      if (newVal) {
+        nextTick(() => fnEditorRef.value?.focus());
+      }
+    });
+
+    // Focus query editor on initial page load
+    let initialFocusSet = false;
+    watch(queryEditorRef, (val) => {
+      if (val && !initialFocusSet) {
+        initialFocusSet = true;
+        nextTick(() => val.focus());
+      }
+    });
+
     onBeforeUnmount(() => {
       queryEditorRef.value = null;
       fnEditorRef.value = null;
