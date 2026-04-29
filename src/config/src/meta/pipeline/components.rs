@@ -1019,4 +1019,5 @@ mod tests {
         let json = serde_json::to_value(&params).unwrap();
         assert!(json.as_object().unwrap().contains_key("eval_template"));
     }
+
 }

@@ -813,4 +813,92 @@ mod tests {
         assert_eq!(obj["status"], "running");
         assert_eq!(obj["enabled"], true);
     }
+
+    #[test]
+    fn test_get_destination_streams_excludes_source_node() {
+        use config::meta::pipeline::{
+            Pipeline,
+            components::{Node, NodeData, PipelineSource},
+        };
+        use config::meta::stream::{StreamParams, StreamType};
+
+        let source = Node::new(
+            "source".to_string(),
+            NodeData::Stream(StreamParams::new("org", "src-stream", StreamType::Logs)),
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        let dest = Node::new(
+            "output-1".to_string(),
+            NodeData::Stream(StreamParams::new("org", "dst-stream", StreamType::Logs)),
+            100.0,
+            0.0,
+            "output".to_string(),
+        );
+        let pipeline = Pipeline {
+            id: "p1".to_string(),
+            version: 0,
+            enabled: true,
+            org: "org".to_string(),
+            name: "test".to_string(),
+            description: String::new(),
+            source: PipelineSource::default(),
+            nodes: vec![source, dest],
+            edges: vec![],
+        };
+
+        let result = get_destination_streams(&pipeline).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].stream_name.as_str(), "dst-stream");
+    }
+
+    #[test]
+    fn test_get_destination_streams_empty_pipeline_returns_error() {
+        use config::meta::pipeline::{Pipeline, components::PipelineSource};
+
+        let pipeline = Pipeline {
+            id: "p2".to_string(),
+            version: 0,
+            enabled: true,
+            org: "org".to_string(),
+            name: "test".to_string(),
+            description: String::new(),
+            source: PipelineSource::default(),
+            nodes: vec![],
+            edges: vec![],
+        };
+
+        assert!(get_destination_streams(&pipeline).is_err());
+    }
+
+    #[test]
+    fn test_get_destination_streams_excludes_query_node() {
+        use config::meta::pipeline::{
+            Pipeline,
+            components::{Node, NodeData, PipelineSource},
+        };
+        use config::meta::stream::{StreamParams, StreamType};
+
+        let query = Node::new(
+            "query".to_string(),
+            NodeData::Stream(StreamParams::new("org", "query-stream", StreamType::Logs)),
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        let pipeline = Pipeline {
+            id: "p3".to_string(),
+            version: 0,
+            enabled: true,
+            org: "org".to_string(),
+            name: "test".to_string(),
+            description: String::new(),
+            source: PipelineSource::default(),
+            nodes: vec![query],
+            edges: vec![],
+        };
+
+        assert!(get_destination_streams(&pipeline).is_err());
+    }
 }
