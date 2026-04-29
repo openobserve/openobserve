@@ -381,6 +381,57 @@ mod tests {
         let item = anomaly_config_to_list_item(&v).expect("should parse");
         assert!(item.description.is_none());
     }
+
+    #[test]
+    fn test_list_alerts_item_try_from_missing_alert_id_returns_err() {
+        let folder = meta_folders::Folder::default();
+        let alert = meta_alerts::Alert::default(); // id is None
+        let result = ListAlertsResponseBodyItem::try_from((folder, alert, None));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_list_alerts_body_try_from_propagates_err_when_alert_id_missing() {
+        let folder = meta_folders::Folder::default();
+        let alert = meta_alerts::Alert::default(); // id is None
+        let result = ListAlertsResponseBody::try_from(vec![(folder, alert, None)]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_list_alerts_item_try_from_realtime_alert() {
+        let mut alert = meta_alerts::Alert::default();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        alert.is_real_time = true;
+        let folder = meta_folders::Folder {
+            folder_id: "f1".to_string(),
+            name: "Folder".to_string(),
+            description: String::new(),
+        };
+        let item = ListAlertsResponseBodyItem::try_from((folder, alert, None)).unwrap();
+        assert_eq!(item.alert_type, "realtime");
+        assert!(item.is_real_time);
+    }
+
+    #[test]
+    fn test_list_alerts_item_try_from_scheduled_alert() {
+        let mut alert = meta_alerts::Alert::default();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        alert.is_real_time = false;
+        alert.name = "my-alert".to_string();
+        let folder = meta_folders::Folder::default();
+        let item = ListAlertsResponseBodyItem::try_from((folder, alert, None)).unwrap();
+        assert_eq!(item.alert_type, "scheduled");
+        assert_eq!(item.name, "my-alert");
+        assert!(!item.is_real_time);
+    }
+
+    #[test]
+    fn test_list_alerts_body_try_from_empty_vec_ok() {
+        let result = ListAlertsResponseBody::try_from(vec![]);
+        assert!(result.is_ok());
+        assert!(result.unwrap().list.is_empty());
+    }
 }
 
 #[derive(Default, Serialize, ToSchema)]
