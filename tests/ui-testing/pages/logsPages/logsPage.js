@@ -6997,4 +6997,49 @@ export class LogsPage {
         return result;
     }
 
+    /**
+     * Check if the Monaco query editor has warning-level decorations (squiggly
+     * underlines) in the DOM. Used to verify validateDoubleQuotes() markers.
+     * @returns {Promise<boolean>} True if .squiggly-warning elements found
+     */
+    async hasEditorWarningMarkers() {
+        try {
+            return await this.page.evaluate(() => {
+                const editorContainer =
+                    document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                if (!editorContainer) return false;
+                const warningSquiggles =
+                    editorContainer.querySelectorAll('.squiggly-warning');
+                return warningSquiggles.length > 0;
+            });
+        } catch (e) {
+            testLogger.warn('Error checking editor warning markers', { error: e.message });
+            return false;
+        }
+    }
+
+    /**
+     * Get the error state of the Monaco query editor DOM (not the Monaco API).
+     * Checks for red squiggly underlines and error overlay messages.
+     * @returns {Promise<string>} One of: 'no-error', 'has-error', 'has-error-widget', 'editor-not-found'
+     */
+    async getEditorErrorState() {
+        try {
+            return await this.page.evaluate(() => {
+                const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                if (!editor) return 'editor-not-found';
+                // Check for Monaco error squiggles (red underlines)
+                const squigglyError = editor.querySelector('.squiggly-error');
+                if (squigglyError) return 'has-error';
+                // Check for visible error messages in the editor area
+                const errorWidget = editor.querySelector('.contentWidgets .monaco-editor-overlaymessage');
+                if (errorWidget) return 'has-error-widget';
+                return 'no-error';
+            });
+        } catch (e) {
+            testLogger.warn('Error checking editor error state', { error: e.message });
+            return 'editor-not-found';
+        }
+    }
+
 }

@@ -1547,28 +1547,8 @@ test.describe("Logs Regression Bugs", () => {
     // Wait for Monaco's debounced validateDoubleQuotes() to execute (default debounce: 500ms)
     await page.waitForTimeout(1000);
 
-    // Verify warning markers via DOM inspection.
-    // Note: window.monaco is NOT globally exposed (module-scoped in CodeQueryEditor.vue),
-    // so we cannot use window.monaco.editor.getModelMarkers() directly.
-    // Instead, we check the DOM for .squiggly-warning elements — these are the
-    // precise CSS class Monaco renders for warning-level decorations (from
-    // validateDoubleQuotes()). We avoid checking generic decoration elements
-    // like .cdr which match any Monaco decoration (cursor overlays, bracket
-    // highlights, etc.) and would make the assertion pass vacuously.
-    const hasWarnings = await page.evaluate(() => {
-      try {
-        const editorContainer =
-          document.querySelector('[data-test="logs-search-bar-query-editor"]');
-        if (!editorContainer) return false;
-
-        const warningSquiggles =
-          editorContainer.querySelectorAll('.squiggly-warning');
-        return warningSquiggles.length > 0;
-      } catch (e) {
-        return false;
-      }
-    });
-
+    // Verify warning markers via POM method.
+    const hasWarnings = await pm.logsPage.hasEditorWarningMarkers();
     testLogger.info(`Warning markers detected via DOM inspection: ${hasWarnings}`);
 
     // PRIMARY CHECK: Warning decorations must be present for double-quoted string values
@@ -1695,18 +1675,7 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('✅ Mixed quote query text verified in editor');
 
     // Verify no error states are present (editor should not show errors for this pattern)
-    // The cursor is now after "host = 'te" (partial open quote in second condition)
-    const hasErrorState = await page.evaluate(() => {
-      const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]');
-      if (!editor) return 'editor-not-found';
-      // Check for Monaco error squiggles (red underlines)
-      const squigglyError = editor.querySelector('.squiggly-error');
-      if (squigglyError) return 'has-error';
-      // Check for visible error messages in the editor area
-      const errorWidget = editor.querySelector('.contentWidgets .monaco-editor-overlaymessage');
-      if (errorWidget) return 'has-error-widget';
-      return 'no-error';
-    });
+    const hasErrorState = await pm.logsPage.getEditorErrorState();
     testLogger.info(`Editor error state: ${hasErrorState}`);
 
     // PRIMARY CHECK: Mixed quote pattern must not trigger editor errors
