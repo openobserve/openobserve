@@ -105,6 +105,19 @@ pub async fn del_offset(
         .map_err(Into::into)
 }
 
+pub async fn reset_offset(time: i64) -> Result<u64, anyhow::Error> {
+    let prefix = "/compact/files/";
+    let ret = db::list(prefix).await?;
+    let count = ret.len() as u64;
+    for key in ret.keys() {
+        db::put(key, time.to_string().into(), db::NO_NEED_WATCH, None).await?;
+    }
+    let mut w = CACHES.write().await;
+    w.clear();
+    drop(w);
+    Ok(count)
+}
+
 pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
     let mut items = Vec::new();
     let key = "/compact/files/";
