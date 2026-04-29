@@ -435,4 +435,15 @@ mod tests {
             StatusCode::BAD_REQUEST
         );
     }
+
+    #[test]
+    fn test_infra_error_is_internal_server_error() {
+        let infra_err = infra::errors::Error::DbError(infra::errors::DbError::SeaORMError(
+            "db unavailable".to_string(),
+        ));
+        assert_eq!(
+            status(TemplateError::InfraError(infra_err)),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
 }

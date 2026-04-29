@@ -334,6 +334,53 @@ mod tests {
         assert_eq!(tc.period_minutes, 2); // 120 / 60
         assert_eq!(tc.frequency_minutes, 2); // "2m" → 2
     }
+
+    #[test]
+    fn test_anomaly_config_missing_name_returns_none() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id });
+        assert!(anomaly_config_to_list_item(&v).is_none());
+    }
+
+    #[test]
+    fn test_anomaly_config_empty_folder_id_defaults_to_default() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id, "name": "x", "folder_id": "" });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert_eq!(item.folder_id, "default");
+    }
+
+    #[test]
+    fn test_anomaly_config_last_error_non_empty_is_set() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id, "name": "x", "last_error": "oops" });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert_eq!(item.last_error, Some("oops".to_string()));
+    }
+
+    #[test]
+    fn test_anomaly_config_empty_last_error_is_none() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id, "name": "x", "last_error": "" });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert!(item.last_error.is_none());
+    }
+
+    #[test]
+    fn test_anomaly_config_training_completed_at_populates_last_trained_at() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id, "name": "x", "training_completed_at": 1_700_000i64 });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert_eq!(item.last_trained_at, Some(1_700_000i64));
+    }
+
+    #[test]
+    fn test_anomaly_config_empty_description_is_none() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id, "name": "x", "description": "" });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert!(item.description.is_none());
+    }
 }
 
 #[derive(Default, Serialize, ToSchema)]

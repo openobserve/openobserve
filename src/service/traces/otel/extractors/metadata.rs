@@ -213,4 +213,31 @@ mod tests {
         let result = MetadataExtractor.extract_session_id(&attrs, &resource);
         assert_eq!(result, Some("span_session".to_string()));
     }
+
+    #[test]
+    fn test_extract_user_id_from_service_user_id() {
+        let mut attrs = HashMap::new();
+        attrs.insert("service_user.id".to_string(), json::json!("svc_user"));
+        let result = MetadataExtractor.extract_user_id(&attrs, &HashMap::new());
+        assert_eq!(result, Some("svc_user".to_string()));
+    }
+
+    #[test]
+    fn test_extract_session_id_from_langfuse_metadata_langfuse_session_id() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "langfuse.observation.metadata.langfuse_session_id".to_string(),
+            json::json!("lf_meta_session"),
+        );
+        let result = MetadataExtractor.extract_session_id(&attrs, &HashMap::new());
+        assert_eq!(result, Some("lf_meta_session".to_string()));
+    }
+
+    #[test]
+    fn test_extract_session_id_from_service_session_id() {
+        let mut attrs = HashMap::new();
+        attrs.insert("service_session.id".to_string(), json::json!("svc_session"));
+        let result = MetadataExtractor.extract_session_id(&attrs, &HashMap::new());
+        assert_eq!(result, Some("svc_session".to_string()));
+    }
 }
