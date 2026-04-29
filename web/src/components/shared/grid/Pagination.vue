@@ -70,7 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="q-table__control q-ml-auto">
       <span class="q-table__bottom-item">
         {{ t("search.showing") }}
-        {{ resultTotal > 0 ?  (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1 : 0 }} -
+        {{
+          resultTotal > 0
+            ? (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1
+            : 0
+        }}
+        -
         {{
           scope.pagination.page * scope.pagination.rowsPerPage >= resultTotal
             ? resultTotal
@@ -102,27 +107,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <OButtonGroup>
-        <q-btn
-          icon="chevron_left"
-          :text-color="scope.isFirstPage ? '$light-text2' : '$dark'"
-          class="pageNav"
-          color="#FAFBFD"
-          size="sm"
-          flat
-          :disable="scope.isFirstPage"
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          :disabled="scope.isFirstPage"
           @click="scope.prevPage"
-        />
-        <q-separator vertical />
-        <q-btn
-          icon="chevron_right"
-          :text-color="scope.isLastPage ? '$light-text2' : '$dark'"
-          class="pageNav"
-          color="#FAFBFD"
-          size="sm"
-          flat
-          :disable="scope.isLastPage"
+        >
+          <template #icon-left><q-icon name="chevron_left" /></template>
+        </OButton>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          :disabled="scope.isLastPage"
           @click="scope.nextPage"
-        />
+        >
+          <template #icon-left><q-icon name="chevron_right" /></template>
+        </OButton>
       </OButtonGroup>
     </div>
   </div>
@@ -132,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import { defineComponent, ref } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -139,7 +140,7 @@ import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
   name: "QTablePagination",
-  components: { OButtonGroup },
+  components: { OButtonGroup, OButton },
   // eslint-disable-next-line vue/require-prop-types
   props: [
     "scope",
@@ -170,7 +171,7 @@ export default defineComponent({
     const toggleSidePanel = () => {
       store.dispatch(
         "setSearchCollapseToggle",
-        store.state.searchCollapsibleSection == 0 ? 20 : 0
+        store.state.searchCollapsibleSection == 0 ? 20 : 0,
       );
     };
 

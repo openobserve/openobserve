@@ -15,7 +15,7 @@
     <OButtonGroup>
       <OButton
         variant="primary"
-        size="sm"
+        size="chip"
         :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
       >
         {{ computedLabel(condition) }}
@@ -33,7 +33,7 @@
             />
             <OButton
               variant="ghost"
-              size="icon"
+              size="icon-chip"
               @click="removeColumnName"
               :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
             >
@@ -57,92 +57,89 @@
                 </OTabs>
                 <q-separator></q-separator>
                 <div class="tw:h-full">
-                <OTabPanels
-                  v-model="condition.type"
-                  animated
-                >
-                  <OTabPanel name="condition">
-                    <div class="flex column" style="height: 220px">
+                  <OTabPanels v-model="condition.type" animated>
+                    <OTabPanel name="condition">
+                      <div class="flex column" style="height: 220px">
+                        <q-select
+                          dense
+                          borderless
+                          hide-bottom-space
+                          v-model="condition.operator"
+                          :options="operators"
+                          :label="t('common.operator')"
+                          style="width: 100%"
+                          data-test="dashboard-add-condition-operator"
+                          class="o2-custom-select-dashboard"
+                        />
+                        <CommonAutoComplete
+                          v-if="
+                            !['Is Null', 'Is Not Null'].includes(
+                              condition.operator,
+                            )
+                          "
+                          :label="t('common.value')"
+                          v-model="condition.value"
+                          :items="dashboardVariablesFilterItems"
+                          searchRegex="(?:^|[^$])\$?(\w+)"
+                        ></CommonAutoComplete>
+                      </div>
+                    </OTabPanel>
+                    <OTabPanel name="list">
                       <q-select
                         dense
                         borderless
-                        hide-bottom-space
-                        v-model="condition.operator"
-                        :options="operators"
-                        :label="t('common.operator')"
-                        style="width: 100%"
-                        data-test="dashboard-add-condition-operator"
+                        v-model="condition.values"
+                        :options="sortedFilteredListOptions"
+                        :label="t('common.selectFilter')"
+                        multiple
+                        emit-value
+                        map-options
+                        :rules="[
+                          (val: any) =>
+                            val.length > 0 || 'At least 1 item required',
+                        ]"
+                        use-input
+                        @filter="filterListFn"
+                        data-test="dashboard-add-condition-list-tab"
                         class="o2-custom-select-dashboard"
-                      />
-                      <CommonAutoComplete
-                        v-if="
-                          !['Is Null', 'Is Not Null'].includes(
-                            condition.operator,
-                          )
-                        "
-                        :label="t('common.value')"
-                        v-model="condition.value"
-                        :items="dashboardVariablesFilterItems"
-                        searchRegex="(?:^|[^$])\$?(\w+)"
-                      ></CommonAutoComplete>
-                    </div>
-                  </OTabPanel>
-                  <OTabPanel name="list">
-                    <q-select
-                      dense
-                      borderless
-                      v-model="condition.values"
-                      :options="sortedFilteredListOptions"
-                      :label="t('common.selectFilter')"
-                      multiple
-                      emit-value
-                      map-options
-                      :rules="[
-                        (val: any) =>
-                          val.length > 0 || 'At least 1 item required',
-                      ]"
-                      use-input
-                      @filter="filterListFn"
-                      data-test="dashboard-add-condition-list-tab"
-                      class="o2-custom-select-dashboard"
-                    >
-                      <template v-slot:selected>
-                        {{
-                          condition.values[0]?.length > 15
-                            ? condition.values[0]?.substring(0, 15) + "..."
-                            : condition.values[0]
-                        }}
-                        {{
-                          condition.values?.length > 1
-                            ? " +" + (condition.values?.length - 1)
-                            : ""
-                        }}
-                      </template>
-                      <template
-                        v-slot:option="{
-                          itemProps,
-                          opt,
-                          selected,
-                          toggleOption,
-                        }"
                       >
-                        <q-item v-bind="itemProps">
-                          <q-item-section side>
-                            <q-checkbox
-                              dense
-                              :model-value="selected"
-                              @update:model-value="toggleOption(opt)"
-                              data-test="dashboard-add-condition-list-item"
-                            ></q-checkbox>
-                          </q-item-section>
-                          <q-item-section>
-                            <SanitizedHtmlRenderer :html-content="opt" />
-                          </q-item-section>
-                        </q-item>
-                      </template>
-                    </q-select>
-                  </OTabPanel>
-                </OTabPanels>
+                        <template v-slot:selected>
+                          {{
+                            condition.values[0]?.length > 15
+                              ? condition.values[0]?.substring(0, 15) + "..."
+                              : condition.values[0]
+                          }}
+                          {{
+                            condition.values?.length > 1
+                              ? " +" + (condition.values?.length - 1)
+                              : ""
+                          }}
+                        </template>
+                        <template
+                          v-slot:option="{
+                            itemProps,
+                            opt,
+                            selected,
+                            toggleOption,
+                          }"
+                        >
+                          <q-item v-bind="itemProps">
+                            <q-item-section side>
+                              <q-checkbox
+                                dense
+                                :model-value="selected"
+                                @update:model-value="toggleOption(opt)"
+                                data-test="dashboard-add-condition-list-item"
+                              ></q-checkbox>
+                            </q-item-section>
+                            <q-item-section>
+                              <SanitizedHtmlRenderer :html-content="opt" />
+                            </q-item-section>
+                          </q-item>
+                        </template>
+                      </q-select>
+                    </OTabPanel>
+                  </OTabPanels>
                 </div>
               </div>
             </div>
@@ -151,7 +148,7 @@
       </OButton>
       <OButton
         variant="ghost"
-        size="icon"
+        size="icon-chip"
         @click="$emit('remove-condition')"
         data-test="dashboard-add-condition-remove"
       >

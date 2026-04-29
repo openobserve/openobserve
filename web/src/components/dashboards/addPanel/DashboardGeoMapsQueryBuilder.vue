@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OButton
               variant="primary"
-              size="sm"
+              size="chip"
               :data-test="`dashboard-latitude-item-${latitudeLabel}`"
             >
               {{ latitudeLabel }}
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="ghost"
-              size="icon"
+              size="icon-chip"
               :data-test="`dashboard-latitude-item-${latitudeLabel}-remove`"
               @click="removeLatitude()"
             >
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OButton
               variant="primary"
-              size="sm"
+              size="chip"
               :data-test="`dashboard-longitude-item-${longitudeLabel}`"
             >
               {{ longitudeLabel }}
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="ghost"
-              size="icon"
+              size="icon-chip"
               :data-test="`dashboard-longitude-item-${longitudeLabel}-remove`"
               @click="removeLongitude()"
             >
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OButton
               variant="primary"
-              size="sm"
+              size="chip"
               :data-test="`dashboard-weight-item-${weightLabel}`"
             >
               {{ weightLabel }}
@@ -340,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="ghost"
-              size="icon"
+              size="icon-chip"
               :data-test="`dashboard-weight-item-${weightLabel}-remove`"
               @click="removeWeight()"
             >

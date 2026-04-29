@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon
             style="margin-top: 24px"
-            size="xs"
+            size="chip"
             :name="metricsIconMapping[selectedMetricTypeIcon || '']"
           />
         </template>
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-item-section avatar class="metric-explore-metric-icon">
               <q-icon
-                size="xs"
+                size="chip"
                 :name="
                   metricsIconMapping[scope.opt.metrics_meta.metric_type] || ''
                 "
@@ -263,8 +263,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <OButton
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="isAddXAxisNotAllowed"
                     @click="addXAxisItem(props.row)"
                     data-test="dashboard-add-x-data"
@@ -272,8 +272,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ dashboardPanelData.data.type != "h-bar" ? "+X" : "+Y" }}
                   </OButton>
                   <OButton
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="isAddYAxisNotAllowed"
                     @click="addYAxisItem(props.row)"
                     data-test="dashboard-add-y-data"
@@ -282,8 +282,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="dashboardPanelData.data.type == 'table'"
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="isAddBreakdownNotAllowed"
                     @click="addBreakDownAxisItem(props.row)"
                     data-test="dashboard-add-p-data"
@@ -301,8 +301,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dashboardPanelData.data.type == 'area-stacked' ||
                       dashboardPanelData.data.type == 'stacked'
                     "
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="isAddBreakdownNotAllowed"
                     @click="addBreakDownAxisItem(props.row)"
                     data-test="dashboard-add-b-data"
@@ -311,8 +311,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="dashboardPanelData.data.type == 'heatmap'"
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="isAddZAxisNotAllowed"
                     @click="addZAxisItem(props.row)"
                     data-test="dashboard-add-z-data"
@@ -325,8 +325,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery == false
                     "
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
                         (vrlField: any) => vrlField.name == props.row.name,
@@ -353,8 +353,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <OButton
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -366,8 +366,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     +Lat
                   </OButton>
                   <OButton
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -379,8 +379,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     +Lng
                   </OButton>
                   <OButton
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -397,8 +397,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery == false
                     "
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
                         (vrlField: any) => vrlField.name == props.row.name,
@@ -425,8 +425,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <OButton
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -438,8 +438,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     +N
                   </OButton>
                   <OButton
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -451,8 +451,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     +V
                   </OButton>
                   <OButton
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     @click="addFilteredItem(props.row)"
                     data-test="dashboard-add-filter-data"
                   >
@@ -475,8 +475,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <OButton
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -488,8 +488,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     +S
                   </OButton>
                   <OButton
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -501,8 +501,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     +T
                   </OButton>
                   <OButton
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -519,8 +519,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].customQuery == false
                     "
-                    variant="ghost"
-                    size="sm"
+                    variant="ghost-neutral"
+                    size="chip"
                     :disabled="
                       !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
                         (vrlField: any) => vrlField.name == props.row.name,
@@ -1289,7 +1289,7 @@ export default defineComponent({
           cursor: pointer;
         }
 
-        .q-btn {
+        button {
           border-left: 2px solid #d0d0d0;
         }
       }

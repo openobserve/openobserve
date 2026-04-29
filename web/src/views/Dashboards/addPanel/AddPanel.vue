@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               )
             "
             variant="outline"
-            size="icon-xs"
+            size="icon-sm"
             @click="showViewPanel = true"
             data-test="dashboard-panel-data-view-query-inspector-btn"
           >
@@ -76,15 +76,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-global-date-time-picker"
           />
           <OButton
-            variant="ghost-destructive"
-            size="sm"
+            variant="outline-destructive"
+            size="sm-action"
             @click="goBackToDashboardList"
             data-test="dashboard-panel-discard"
             >{{ t("panel.discard") }}</OButton
           >
           <OButton
-            variant="secondary"
-            size="sm"
+            variant="outline"
+            size="sm-action"
             data-test="dashboard-panel-save"
             @click.stop="savePanelData.execute()"
             :loading="savePanelData.isLoading.value"
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="config.isEnterprise === 'false'"
               variant="primary"
-              size="sm"
+              size="sm-action"
               data-test="dashboard-apply"
               :loading="searchRequestTraceIds.length > 0"
               :disabled="searchRequestTraceIds.length > 0"
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="
                   searchRequestTraceIds.length > 0 ? 'destructive' : 'primary'
                 "
-                size="sm"
+                size="sm-action"
                 @click="onApplyBtnClick"
               >
                 {{

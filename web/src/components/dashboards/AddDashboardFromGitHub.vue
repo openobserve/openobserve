@@ -135,15 +135,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="q-py-sm dashboard-footer-section">
         <div class="flex justify-end q-gutter-x-sm">
           <OButton
-            variant="secondary"
-            size="sm"
+            variant="outline"
+            size="sm-action"
             v-close-popup
             data-test="add-dashboard-github-cancel"
             >Cancel</OButton
           >
           <OButton
             variant="primary"
-            size="sm"
+            size="sm-action"
             :disabled="selectedDashboards.length === 0"
             @click="handleNext"
             data-test="add-dashboard-github-next"
@@ -189,16 +189,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-card-section>
 
-        <q-card-actions align="right" class="q-px-md q-pb-md">
+        <q-card-actions align="right" class="q-px-md q-pb-md tw:gap-2">
           <OButton
-            variant="secondary"
-            size="sm"
+            variant="outline"
+            size="sm-action"
             @click="showFolderSelection = false"
             >Back</OButton
           >
           <OButton
             variant="primary"
-            size="sm"
+            size="sm-action"
             :disabled="!selectedFolderObj"
             :loading="importing"
             @click="confirmAdd"

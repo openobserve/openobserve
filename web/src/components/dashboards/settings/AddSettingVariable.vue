@@ -837,16 +837,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="sticky-footer">
         <OButton
-          variant="secondary"
-          size="sm"
+          variant="outline"
+          size="sm-action"
           @click="close"
           data-test="dashboard-variable-cancel-btn"
           >{{ t("dashboard.cancel") }}</OButton
         >
         <OButton
           variant="primary"
-          size="sm"
-          class="tw:ml-3"
+          size="sm-action"
           :loading="saveVariableApiCall.isLoading.value"
           @click="addVariableForm?.submit()"
           data-test="dashboard-variable-save-btn"

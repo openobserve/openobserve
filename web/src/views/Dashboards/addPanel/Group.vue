@@ -34,7 +34,7 @@
       </div>
       <OButton
         variant="primary"
-        size="icon-circle"
+        size="icon-xs-circle"
         data-test="dashboard-add-condition-add"
       >
         <template #icon-left><q-icon name="add" /></template>

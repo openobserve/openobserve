@@ -4,16 +4,16 @@
     <OButton
       :active="!fieldObj.sortBy"
       variant="outline"
-      size="icon"
+      size="icon-xs"
       @click="updateSortOption(null)"
       data-test="dashboard-sort-by-item-clear"
     >
-      <template #icon-left><q-icon name="block" /></template>
+      <template #icon-left><q-icon name="close" size="14px" /></template>
     </OButton>
     <OButton
       :active="fieldObj.sortBy === 'ASC'"
       variant="outline"
-      size="icon"
+      size="icon-xs"
       @click="updateSortOption('ASC')"
       data-test="dashboard-sort-by-item-asc"
     >
@@ -22,7 +22,7 @@
     <OButton
       :active="fieldObj.sortBy === 'DESC'"
       variant="outline"
-      size="icon"
+      size="icon-xs"
       @click="updateSortOption('DESC')"
       data-test="dashboard-sort-by-item-desc"
     >

@@ -12,7 +12,7 @@
           <OButtonGroup align="center">
             <OButton
               variant="primary"
-              size="sm"
+              size="chip"
               :data-test="`dashboard-join-item-${index}`"
             >
               <div class="join-btn-content">
@@ -48,7 +48,7 @@
             </OButton>
             <OButton
               variant="ghost"
-              size="icon"
+              size="icon-chip"
               :data-test="`dashboard-join-item-${index}-remove`"
               @click="handleRemoveJoin(index)"
               :aria-label="t('panel.removeJoin')"
@@ -60,7 +60,7 @@
         </div>
         <OButton
           variant="primary"
-          size="icon"
+          size="icon-xs-circle"
           data-test="dashboard-add-join-btn"
           @click="handleAddJoin"
           :aria-label="t('panel.addJoin')"
