@@ -206,6 +206,8 @@ If the component you need is not in the table above:
 2. **Pass only documented props** — check `OComponentName.types.ts` for accepted props.
 3. **Use slots as documented** — check the component file for slot names.
 4. **Never mix old and new within a family** — do not use `OTabs` with `q-tab-panel`, or `OToggleGroup` with `q-btn`.
+5. **No hardcoded styling or utility classes** — never add ad-hoc classes (e.g. `class="px-2 text-sm font-bold"`) directly to an O2 component to patch appearance. All visual control must come from the component's own `variant`, `size`, `shape`, or other documented props. If the needed visual cannot be expressed through the component API, the component itself needs a new variant — do not paper over it with inline classes.
+6. **Preserve visual alignment on migration** — before replacing a Quasar component, note its current visual role (e.g. flat ghost-style action button, small dense toggle). Map it to the closest O2 `variant` and `size` prop rather than leaving it unstyled. An unstyled O2 component that looks wrong is worse than a styled Quasar component.
 
 ## Dark Mode
 
@@ -291,8 +293,10 @@ Replace in batches using `multi_replace_string_in_file`:
 1. **Detect script style first**: check if the file uses `<script setup lang="ts">` or `export default defineComponent({...})`
 2. Update imports: remove Quasar (if explicit), add O2 imports
 3. **If Options API** (`defineComponent`): register the components in `components: {}` — this is MANDATORY or Vue silently ignores the import and renders nothing
-4. Replace each template usage with O2 equivalent
-5. Keep all business logic, `v-model`, `v-if`, `v-for`, `@click` handlers intact — only replace the component tags and props
+4. **Analyse the existing visual style before replacing** — note the Quasar `color`, `flat`, `outline`, `dense`, `size` props and map each to the nearest O2 `variant`, `size`, or other documented prop. Do not leave the O2 component without a variant when the original had a visible style.
+5. **No hardcoded compensating classes** — if the O2 component looks slightly off after replacement, do NOT fix it by adding `class="..."` or `style="..."` to the element. Instead: (a) pick a better O2 variant, or (b) if no variant fits, add the missing variant to the component source via the `o2-component-create` skill first, then use it.
+6. Replace each template usage with O2 equivalent
+7. Keep all business logic, `v-model`, `v-if`, `v-for`, `@click` handlers intact — only replace the component tags and props
 
 **`components:` registration for Options API (CRITICAL):**
 
@@ -317,11 +321,13 @@ export default defineComponent({
 - [ ] Old `<q-*>` tag removed
 - [ ] O2 component imported
 - [ ] **If Options API: O2 components registered in `components: {}`** ← NEVER skip this
+- [ ] Quasar visual style analysed and mapped to O2 variant/size ← NEVER leave unstyled
 - [ ] All used props mapped (see tables below)
 - [ ] All slots mapped
 - [ ] All event handlers mapped
 - [ ] `v-close-popup` removed (not needed with O2 Dropdown)
 - [ ] No Quasar-only props left (`toggle-color`, `flat`, `push`, `spread`, etc.)
+- [ ] **No hardcoded `class` or `style` added to patch appearance** — variant props only
 
 ---
 
