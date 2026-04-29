@@ -15,35 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div :class="isCompact ? '' : 'q-pl-sm float-left'">
+  <div :class="isCompact ? 'tw:flex tw:items-center' : 'q-pl-sm float-left'">
     <!-- Compact mode: Simple toggle button with dropdown menu -->
-    <q-btn
+    <OButton
       v-if="isCompact"
       data-test="logs-search-bar-refresh-interval-btn"
-      flat
-      dense
-      no-caps
-      :class="[
-        'compact-refresh-btn',
-        isAnimating ? 'active-refresh-btn' : ''
-      ]"
+      size="icon-toolbar"
+      variant="outline"
+      :active="isAnimating"
     >
       <q-icon
         name="update"
-        :class="[
-          isAnimating ? 'rotating-icon' : '',
-          isAnimating ? 'text-white' : ''
-        ]"
+        :class="isAnimating ? 'rotating-icon' : ''"
         size="18px"
       />
       <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
-        {{ t('search.autoRefresh') }}: {{ selectedLabel }}
+        {{ t("search.autoRefresh") }}: {{ selectedLabel }}
       </q-tooltip>
 
       <!-- Dropdown menu for interval selection -->
       <q-menu content-style="z-index: 10001">
         <div class="row">
-          <div class="col col-12 q-pa-sm" style="text-align: center; width: 300px">
+          <div
+            class="col col-12 q-pa-sm"
+            style="text-align: center; width: 300px"
+          >
             <q-btn
               data-test="logs-search-off-refresh-interval"
               no-caps
@@ -95,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </q-menu>
-    </q-btn>
+    </OButton>
 
     <!-- Full mode: Dropdown with label -->
     <q-btn-dropdown
@@ -113,14 +109,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="update"
             :class="[
               isAnimating ? 'rotating-icon' : '',
-              isAnimating ? 'text-primary' : ''
+              isAnimating ? 'text-primary' : '',
             ]"
           />
           <div class="text-center">{{ selectedLabel }}</div>
         </div>
       </template>
       <div class="row">
-        <div class="col col-12 q-pa-sm" style="text-align: center; width: 300px">
+        <div
+          class="col col-12 q-pa-sm"
+          style="text-align: center; width: 300px"
+        >
           <q-btn
             data-test="logs-search-off-refresh-interval"
             no-caps
@@ -189,9 +188,11 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { generateDurationLabel } from "../utils/date";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "AutoRefreshInterval",
+  components: { OButton },
   props: {
     modelValue: {
       type: Number,
@@ -267,7 +268,9 @@ export default defineComponent({
       }
 
       // Find the label from refreshTimes
-      const found = refreshTimes.value.flat().find((it: any) => it.value == selectedValue.value);
+      const found = refreshTimes.value
+        .flat()
+        .find((it: any) => it.value == selectedValue.value);
       return found?.label || generateDurationLabel(selectedValue.value);
     });
 
@@ -344,7 +347,10 @@ export default defineComponent({
           item.disabled = isDisabled(item.value);
         });
       });
-      minRangeRestrictionMessageVal.value = t("common.minRefreshIntervalMessage", { interval: props.minRefreshInterval });
+      minRangeRestrictionMessageVal.value = t(
+        "common.minRefreshIntervalMessage",
+        { interval: props.minRefreshInterval },
+      );
     };
 
     onMounted(() => {
@@ -385,25 +391,6 @@ export default defineComponent({
   min-height: 30px;
   line-height: 30px;
   padding: 0px 5px;
-}
-
-.compact-refresh-btn {
-  min-width: 24px !important;
-  height: 28px !important;
-  padding: 2px 4px !important;
-  border: 1px solid var(--o2-border-color) !important;
-  border-radius: 4px !important;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-}
-
-.active-refresh-btn {
-  background-color: var(--q-primary) !important;
-  border-color: var(--q-primary) !important;
-}
-
-.active-refresh-btn:hover {
-  background-color: var(--q-primary) !important;
-  opacity: 0.9;
 }
 
 @keyframes rotate {

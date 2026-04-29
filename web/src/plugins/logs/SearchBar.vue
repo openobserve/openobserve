@@ -1005,68 +1005,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <q-separator class="tw:h-[29px] tw:w-[1px]" />
-                <q-btn-dropdown
-                  flat
-                  class="tw:h-[1.875rem] search-button-dropdown"
-                  :class="[
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-dropdown-button'
-                      : '',
-                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
-                    config.isEnterprise == 'true' &&
-                    visualizeSearchRequestTraceIds.length
-                      ? 'o2-color-cancel'
-                      : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                        ? 'o2-color-primary'
-                        : '',
-                    config.isEnterprise == 'true'
-                      ? 'search-button-dropdown-enterprise-border-radius'
-                      : 'search-button-normal-border-radius',
-                  ]"
-                  unelevated
-                  dense
-                >
-                  <!-- Normal mode or AI bar open: Refresh option -->
-                  <template
-                    v-if="
-                      !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                <q-separator class="tw:h-[1.875rem]! tw:w-[1px]" />
+                <ODropdown align="end" side="bottom">
+                  <template #trigger>
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs"
+                      :class="[
+                        !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
+                        config.isEnterprise == 'true' &&
+                        visualizeSearchRequestTraceIds.length
+                          ? 'o2-color-cancel'
+                          : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                            ? 'o2-color-primary'
+                            : '',
+                        config.isEnterprise == 'true'
+                          ? 'search-button-dropdown-enterprise-border-radius'
+                          : 'search-button-normal-border-radius',
+                      ]"
+                    >
+                      <q-icon name="arrow_drop_down" size="18px" />
+                    </OButton>
+                  </template>
+                  <ODropdownItem
+                    v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
+                    data-test="logs-search-bar-refresh-btn"
+                    data-cy="search-bar-visuzlie-hard-refresh-button"
+                    :disabled="
+                      config.isEnterprise == 'true' &&
+                      !!visualizeSearchRequestTraceIds.length
                     "
+                    @select="handleRunQueryFn(true)"
                   >
-                    <q-list class="tw:min-w-[200px] tw:py-1">
-                      <q-item
-                        data-test="logs-search-bar-refresh-btn"
-                        data-cy="search-bar-visuzlie-hard-refresh-button"
-                        clickable
-                        v-close-popup
-                        @click="handleRunQueryFn(true)"
-                        :disable="
-                          config.isEnterprise == 'true' &&
-                          !!visualizeSearchRequestTraceIds.length
-                        "
-                        class="tw:text-[12px] tw:rounded-md tw:mx-1"
-                      >
-                        <q-item-section avatar class="tw:min-w-0 tw:pr-2">
-                          <q-icon name="refresh" size="16px" />
-                        </q-item-section>
-                        <q-item-section>
-                          {{ t("search.refreshCacheAndRunQuery") }}
-                        </q-item-section>
-                      </q-item>
-                    </q-list>
-                  </template>
+                    <template #icon-left><q-icon name="refresh" size="16px" /></template>
+                    {{ t("search.refreshCacheAndRunQuery") }}
+                  </ODropdownItem>
+                  <p
+                    v-else
+                    class="tw:text-xs tw:text-gray-500 tw:text-center tw:px-3 tw:py-2"
+                  >
+                    {{ t("nlMode.noAdditionalOptions") }}
+                  </p>
+                </ODropdown>
 
-                  <!-- NLP Mode: No additional options -->
-                  <template v-else>
-                    <q-list class="tw:min-w-[140px] tw:p-2">
-                      <q-item-label
-                        class="tw:text-xs tw:text-gray-500 tw:text-center"
-                      >
-                        {{ t("nlMode.noAdditionalOptions") }}
-                      </q-item-label>
-                    </q-list>
-                  </template>
-                </q-btn-dropdown>
               </div>
               <div v-else class="tw:flex tw:items-center">
                 <!-- Cancel button when query is running -->
@@ -1117,68 +1098,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <q-separator class="tw:h-[29px] tw:w-[1px]" />
-                <q-btn-dropdown
-                  flat
-                  class="tw:h-[1.875rem] search-button-dropdown"
-                  :class="[
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-dropdown-button'
-                      : '',
-                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
-                    config.isEnterprise == 'true' &&
-                    visualizeSearchRequestTraceIds.length
-                      ? 'o2-color-cancel'
-                      : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                        ? 'o2-color-primary'
-                        : '',
-                    config.isEnterprise == 'true'
-                      ? 'search-button-dropdown-enterprise-border-radius'
-                      : 'search-button-normal-border-radius',
-                  ]"
-                  unelevated
-                  dense
-                >
-                  <!-- Normal mode or AI bar open: Refresh option -->
-                  <template
-                    v-if="
-                      !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                <q-separator class="tw:h-[1.875rem]! tw:w-[1px]" />
+                <ODropdown align="end" side="bottom">
+                  <template #trigger>
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs"
+                      :class="[
+                        !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
+                        config.isEnterprise == 'true' &&
+                        visualizeSearchRequestTraceIds.length
+                          ? 'o2-color-cancel'
+                          : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                            ? 'o2-color-primary'
+                            : '',
+                        config.isEnterprise == 'true'
+                          ? 'search-button-dropdown-enterprise-border-radius'
+                          : 'search-button-normal-border-radius',
+                      ]"
+                    >
+                      <q-icon name="arrow_drop_down" size="18px" />
+                    </OButton>
+                  </template>
+                  <ODropdownItem
+                    v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
+                    data-test="logs-search-bar-refresh-btn"
+                    data-cy="search-bar-visuzlie-hard-refresh-button"
+                    :disabled="
+                      config.isEnterprise == 'true' &&
+                      !!visualizeSearchRequestTraceIds.length
                     "
+                    @select="handleRunQueryFn(true)"
                   >
-                    <q-list class="tw:min-w-[200px] tw:py-1">
-                      <q-item
-                        data-test="logs-search-bar-refresh-btn"
-                        data-cy="search-bar-visuzlie-hard-refresh-button"
-                        clickable
-                        v-close-popup
-                        @click="handleRunQueryFn(true)"
-                        :disable="
-                          config.isEnterprise == 'true' &&
-                          !!visualizeSearchRequestTraceIds.length
-                        "
-                        class="tw:text-[12px] tw:rounded-md tw:mx-1"
-                      >
-                        <q-item-section avatar class="tw:min-w-0 tw:pr-2">
-                          <q-icon name="refresh" size="16px" />
-                        </q-item-section>
-                        <q-item-section>
-                          {{ t("search.refreshCacheAndRunQuery") }}
-                        </q-item-section>
-                      </q-item>
-                    </q-list>
-                  </template>
+                    <template #icon-left><q-icon name="refresh" size="16px" /></template>
+                    {{ t("search.refreshCacheAndRunQuery") }}
+                  </ODropdownItem>
+                  <p
+                    v-else
+                    class="tw:text-xs tw:text-gray-500 tw:text-center tw:px-3 tw:py-2"
+                  >
+                    {{ t("nlMode.noAdditionalOptions") }}
+                  </p>
+                </ODropdown>
 
-                  <!-- NL detected, AI bar not open: No additional options -->
-                  <template v-else>
-                    <q-list class="tw:min-w-[140px] tw:p-2">
-                      <q-item-label
-                        class="tw:text-xs tw:text-gray-500 tw:text-center"
-                      >
-                        {{ t("nlMode.noAdditionalOptions") }}
-                      </q-item-label>
-                    </q-list>
-                  </template>
-                </q-btn-dropdown>
               </div>
             </div>
             <div v-else class="tw:flex tw:items-center">
@@ -1264,109 +1226,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
               <q-separator
                 v-if="config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled"
-                class="tw:h-[29px] tw:w-[1px]"
+                class="tw:h-[1.875rem]! tw:w-[1px]"
               />
-              <q-btn-dropdown
+              <ODropdown
                 v-if="config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled"
-                flat
-                class="tw:h-[1.875rem] search-button-dropdown"
-                :class="[
-                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                    ? 'o2-ai-dropdown-button'
-                    : '',
-                  !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
-                  config.isEnterprise == 'true' &&
-                  (!!searchObj.data.searchRequestTraceIds.length ||
-                    !!searchObj.data.searchWebSocketTraceIds.length) &&
-                  (searchObj.loading == true ||
-                    searchObj.loadingHistogram == true)
-                    ? 'o2-color-cancel'
-                    : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                      ? 'o2-color-primary'
-                      : '',
-                  config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled
-                    ? 'search-button-dropdown-enterprise-border-radius'
-                    : 'search-button-normal-border-radius',
-                ]"
-                unelevated
-                dense
+                align="end"
+                side="bottom"
               >
-                <!-- SQL Mode / AI bar open: Refresh option + Live Mode toggle -->
-                <template
-                  v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
+                <template #trigger>
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs"
+                    :class="[
+                      !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
+                      config.isEnterprise == 'true' &&
+                      (!!searchObj.data.searchRequestTraceIds.length ||
+                        !!searchObj.data.searchWebSocketTraceIds.length) &&
+                      (searchObj.loading == true ||
+                        searchObj.loadingHistogram == true)
+                        ? 'o2-color-cancel'
+                        : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                          ? 'o2-color-primary'
+                          : '',
+                      config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled
+                        ? 'search-button-dropdown-enterprise-border-radius'
+                        : 'search-button-normal-border-radius',
+                    ]"
+                  >
+                    <q-icon name="arrow_drop_down" size="18px" />
+                  </OButton>
+                </template>
+                <!-- Normal mode: Refresh + Live Mode items -->
+                <ODropdownItem
+                  v-if="config.isEnterprise == 'true' && !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
+                  data-test="logs-search-bar-refresh-btn"
+                  data-cy="search-bar-refresh-button"
+                  :disabled="searchObj.loading == true || searchObj.loadingHistogram == true"
+                  @select="handleRunQueryFn(true)"
                 >
-                  <q-list class="tw:min-w-[200px] tw:py-1">
-                    <q-item
-                      v-if="config.isEnterprise == 'true'"
-                      data-test="logs-search-bar-refresh-btn"
-                      data-cy="search-bar-refresh-button"
-                      clickable
-                      v-close-popup
-                      :disable="
-                        searchObj.loading == true ||
-                        searchObj.loadingHistogram == true
-                      "
-                      @click="handleRunQueryFn(true)"
-                      class="tw:text-[12px] tw:rounded-md tw:mx-1"
-                    >
-                      <q-item-section avatar class="tw:min-w-0 tw:pr-2">
-                        <q-icon name="refresh" size="16px" />
-                      </q-item-section>
-                      <q-item-section>
-                        {{ t("search.refreshCacheAndRunQuery") }}
-                      </q-item-section>
-                    </q-item>
-
-                    <q-separator
-                      v-if="
-                        config.isEnterprise == 'true' &&
-                        store.state.zoConfig.auto_query_enabled
-                      "
-                      class="tw:my-1"
+                  <template #icon-left><q-icon name="refresh" size="16px" /></template>
+                  {{ t("search.refreshCacheAndRunQuery") }}
+                </ODropdownItem>
+                <ODropdownSeparator
+                  v-if="
+                    config.isEnterprise == 'true' &&
+                    store.state.zoConfig.auto_query_enabled &&
+                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                  "
+                />
+                <ODropdownItem
+                  v-if="store.state.zoConfig.auto_query_enabled && !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
+                  data-test="logs-search-bar-live-mode-toggle-btn"
+                  @select="toggleLiveMode"
+                >
+                  <template #icon-left>
+                    <q-icon
+                      :name="searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'"
+                      size="16px"
+                      :color="searchObj.meta.liveMode ? 'primary' : ''"
                     />
-
-                    <!-- Live Mode toggle � only when backend flag is enabled -->
-                    <q-item
-                      v-if="store.state.zoConfig.auto_query_enabled"
-                      data-test="logs-search-bar-live-mode-toggle-btn"
-                      clickable
-                      v-close-popup
-                      @click="toggleLiveMode"
-                      class="tw:text-[12px] tw:rounded-md tw:mx-1"
-                    >
-                      <q-item-section avatar class="tw:min-w-0 tw:pr-2">
-                        <q-icon
-                          :name="searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'"
-                          size="16px"
-                          :color="searchObj.meta.liveMode ? 'primary' : ''"
-                        />
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label class="tw:font-medium">
-                          {{
-                            searchObj.meta.liveMode
-                              ? t("search.turnOffLiveMode")
-                              : t("search.turnOnLiveMode")
-                          }}
-                        </q-item-label>
-                        <q-item-label caption class="tw:text-[11px]">
-                          {{ t("search.liveModeTooltip") }}
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </template>
-                <!-- NL detected, AI bar not open: Empty menu -->
-                <template v-else>
-                  <q-list class="tw:min-w-[140px] tw:p-2">
-                    <q-item-label
-                      class="tw:text-xs tw:text-gray-500 tw:text-center"
-                    >
-                      No additional options
-                    </q-item-label>
-                  </q-list>
-                </template>
-              </q-btn-dropdown>
+                  </template>
+                  <span>
+                    <div class="tw:font-medium tw:text-[12px]">
+                      {{
+                        searchObj.meta.liveMode
+                          ? t("search.turnOffLiveMode")
+                          : t("search.turnOnLiveMode")
+                      }}
+                    </div>
+                    <div class="tw:text-[11px] tw:text-muted-foreground">
+                      {{ t("search.liveModeTooltip") }}
+                    </div>
+                  </span>
+                </ODropdownItem>
+                <!-- NLP mode: info message -->
+                <p
+                  v-if="isNaturalLanguageDetected && !searchObj.meta.nlpMode"
+                  class="tw:text-xs tw:text-gray-500 tw:text-center tw:px-3 tw:py-2"
+                >
+                  {{ t("nlMode.noAdditionalOptions") }}
+                </p>
+              </ODropdown>
               <!-- Compact Auto Refresh Button -->
               <auto-refresh-interval
                 class="q-ml-xs"
@@ -2383,6 +2323,9 @@ import {
   Minimize,
 } from "lucide-vue-next";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import {
   getFieldFromExpression,
   hasFieldCondition,
@@ -2450,6 +2393,9 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     OButtonGroup,
+    ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
     DateTime,
     ShareButton,
     OButton,

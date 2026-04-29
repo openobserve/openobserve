@@ -143,6 +143,8 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   "icon-lg": "tw:h-12 tw:w-12 tw:p-0 tw:rounded-lg tw:gap-x-0",
   "icon-circle": "tw:size-8 tw:p-0 tw:rounded-full tw:gap-x-0",
   "icon-circle-sm": "tw:size-7 tw:p-0 tw:rounded-full tw:gap-x-0",
+  // 30×30px square — for toolbar icon buttons (auto-refresh, share, hamburger)
+  "icon-toolbar": "tw:size-[1.875rem] tw:p-0 tw:rounded-md tw:gap-x-0",
 };
 
 const activeClasses = [
