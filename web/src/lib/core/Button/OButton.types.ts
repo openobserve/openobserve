@@ -16,16 +16,21 @@ export type ButtonVariant =
   | "ghost-subtle"
   | "ghost-destructive"
   | "ghost-warning"
+  | "ghost-neutral"
+  | "outline-destructive"
   | "destructive";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =
   | "xs"
   | "sm"
+  | "sm-action"
+  | "xs"
   | "md"
   | "lg"
   | "icon"
   | "icon-xs"
+  | "icon-xs-circle"
   | "icon-sm"
   | "icon-md"
   | "icon-lg"

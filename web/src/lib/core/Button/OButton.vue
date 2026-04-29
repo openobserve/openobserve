@@ -92,15 +92,39 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:focus-visible:ring-2 tw:focus-visible:ring-[color:var(--q-warning)]/50",
     "tw:disabled:opacity-60",
   ].join(" "),
+  // Neutral ghost: inherits parent text color — used for compact inline action buttons
+  // where no color accent is desired (e.g. field adder buttons +X +Y +B +F)
+  "ghost-neutral": [
+    "tw:bg-transparent tw:text-inherit tw:border-0",
+    "tw:enabled:hover:bg-button-ghost-hover-bg",
+    "tw:enabled:active:bg-button-ghost-active-bg",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-focus-ring",
+    "tw:disabled:opacity-50",
+  ].join(" "),
+  // Outline destructive: transparent bg + red border + red text — use for destructive actions
+  // that need visible affordance without the full filled destructive background
+  "outline-destructive": [
+    "tw:bg-transparent tw:text-button-ghost-destructive-text tw:border tw:border-button-ghost-destructive-text",
+    "tw:enabled:hover:bg-button-ghost-destructive-hover-bg",
+    "tw:enabled:active:bg-button-ghost-destructive-active-bg",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-destructive-focus-ring",
+    "tw:disabled:opacity-50",
+  ].join(" "),
 };
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   xs: "tw:h-7 tw:ps-2.5 tw:pe-2.5 tw:text-xs tw:gap-1.5 tw:rounded",
   sm: "tw:h-9 tw:ps-3 tw:pe-3 tw:text-sm tw:gap-2 tw:rounded-md",
+  // Compact labeled size for inline field chips (axis items) — ~28px, matches Quasar dense button
+  xs: "tw:h-7 tw:ps-2 tw:pe-2 tw:text-xs tw:gap-1 tw:rounded",
+  "sm-action":
+    "tw:h-9 tw:ps-3 tw:pe-3 tw:min-w-[80px] tw:text-sm tw:gap-2 tw:rounded-md",
   md: "tw:h-10 tw:ps-4 tw:pe-4 tw:text-sm tw:gap-2 tw:rounded-lg",
   lg: "tw:h-12 tw:ps-6 tw:pe-6 tw:text-base tw:gap-3 tw:rounded-lg",
   icon: "tw:size-6 tw:p-0 tw:rounded-md tw:gap-x-0",
   "icon-xs": "tw:h-[30px] tw:px-2 tw:text-[18px] tw:rounded-md tw:gap-x-0",
+  // 24px round circle — for small inline add/action icon buttons (e.g. + Joins, + Filters)
+  "icon-xs-circle": "tw:size-6 tw:p-0 tw:rounded-full tw:gap-x-0",
   "icon-sm": "tw:h-9 tw:w-9 tw:p-0 tw:rounded-md tw:gap-x-0",
   "icon-md": "tw:h-10 tw:w-10 tw:p-0 tw:rounded-lg tw:gap-x-0",
   "icon-lg": "tw:h-12 tw:w-12 tw:p-0 tw:rounded-lg tw:gap-x-0",
