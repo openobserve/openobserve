@@ -809,12 +809,13 @@ export class LogsPage {
         await this.page.locator(this.queryButton).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.waitForTimeout(1000);
 
-        // Run + verify; if search returned a transient error (common on cloud
-        // when stream indexing is still catching up), retry once with a wait.
+        // Run + verify; if search returns a transient error (common on cloud
+        // when stream indexing is still catching up), retry with backoff.
         // Without this, downstream actions like clicking interesting fields
         // become no-ops because the page is in error state.
         const errorMessage = this.page.locator(this.errorMessage);
-        for (let attempt = 1; attempt <= 2; attempt++) {
+        const maxAttempts = 3;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             await this.page.locator(this.queryButton).click();
             await this.page.waitForTimeout(3000);
 
@@ -826,9 +827,10 @@ export class LogsPage {
                 return; // results visible — done
             } catch (e) {
                 if (await errorMessage.isVisible().catch(() => false)) {
-                    if (attempt < 2) {
-                        testLogger.debug('Query returned error; retrying after delay');
-                        await this.page.waitForTimeout(3000);
+                    if (attempt < maxAttempts) {
+                        testLogger.debug(`Query returned error (attempt ${attempt}/${maxAttempts}); retrying after delay`);
+                        // Backoff: 5s, 10s — allows alpha indexing to catch up
+                        await this.page.waitForTimeout(5000 * attempt);
                         continue;
                     }
                     testLogger.debug('Query completed with error message after retries');
@@ -1565,10 +1567,20 @@ export class LogsPage {
     // Interesting fields methods
     async clickInterestingFields() {
         // Pre-filter the field list so the target button is in view, then click.
-        // Caller is expected to validate via validateInterestingFields() / etc.
+        // Up to 2 attempts: in cloud the Vue handler can be momentarily not
+        // bound when the field list is mid-render, so the click silently
+        // misses. The 15s verify timeout is longer than typical Monaco
+        // render latency — clicking again while Monaco is still rendering
+        // would toggle the field OFF, which would break the caller.
         const field = 'kubernetes_pod_name';
+        const editor = this.page.locator(this.queryEditor);
         await this.fillIndexFieldSearchInput(field);
         await this.clickInterestingFieldButton(field);
+        try {
+            await expect(editor).toContainText(field, { timeout: 15000 });
+        } catch (e) {
+            await this.clickInterestingFieldButton(field);
+        }
     }
 
     async validateInterestingFields() {

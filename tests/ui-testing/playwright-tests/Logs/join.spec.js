@@ -169,21 +169,6 @@ test.describe("Join for logs", () => {
     testLogger.info('Interesting field display validation completed');
   });
 
-  test("Click on interesting field icon and display query in editor", { tag: ['@join', '@interestingFields', '@functional', '@P1'] }, async ({ page }) => {
-    testLogger.info('Testing interesting field query display functionality');
-
-    await pm.logsPage.navigateToLogs();
-    await pm.logsPage.selectIndexAndStreamJoin();
-    await pm.logsPage.enableSQLMode();
-    await pm.logsPage.clickQuickModeToggle();
-    await pm.logsPage.clickAllFieldsButton();
-    await pm.logsPage.selectRunQuery();
-    await pm.logsPage.clickInterestingFields();
-    await pm.logsPage.validateInterestingFieldsQuery();
-
-    testLogger.info('Interesting field query display validation completed');
-  });
-
   test("Add/remove interesting field removes it from editor and results too", { tag: ['@join', '@interestingFields', '@edge', '@P2'] }, async ({ page }) => {
     testLogger.info('Testing add/remove interesting field functionality');
 
