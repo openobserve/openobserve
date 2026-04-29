@@ -38,47 +38,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </h2>
         </div>
         <div class="panel-header-actions tw:flex tw:items-center tw:gap-2">
-          <q-btn-dropdown
-            flat
-            dense
-            size="sm"
-            class="tw:pl-[0.675rem]! tw:border! tw:border-[var(--o2-primary-btn-bg)]! tw:rounded! tw:text-[0.7rem]! tw:tracking-[0.03rem]! tw:text-[var(--o2-primary-btn-bg)]!"
-            label="View Related"
-            data-test="service-graph-node-panel-view-related-btn"
-          >
-            <q-list dense class="tw:min-w-[120px]">
-              <q-item
-                clickable
-                v-close-popup
-                @click="viewRelatedLogs"
-                data-test="service-graph-node-panel-view-related-logs-btn"
+          <ODropdown side="bottom" align="start">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="service-graph-node-panel-view-related-btn"
               >
-                <q-item-section class="tw:text-[var(--o2-text-2)]!"
-                  >Logs</q-item-section
-                >
-              </q-item>
-              <q-item
-                clickable
-                v-close-popup
-                @click="viewRelatedTraces"
-                data-test="service-graph-node-panel-view-related-traces-btn"
-              >
-                <q-item-section class="tw:text-[var(--o2-text-2)]!"
-                  >Traces</q-item-section
-                >
-              </q-item>
-            </q-list>
-          </q-btn-dropdown>
-          <q-btn
-            flat
-            dense
-            round
-            icon="cancel"
-            size="sm"
-            @click="handleClose"
-            data-test="service-graph-side-panel-close-btn"
+                View Related
+                <q-icon name="arrow_drop_down" size="1rem" />
+              </OButton>
+            </template>
+            <ODropdownItem
+              @select="viewRelatedLogs"
+              data-test="service-graph-node-panel-view-related-logs-btn"
+              >Logs</ODropdownItem
+            >
+            <ODropdownItem
+              @select="viewRelatedTraces"
+              data-test="service-graph-node-panel-view-related-traces-btn"
+              >Traces</ODropdownItem
+            >
+          </ODropdown>
+          <OButton
+            variant="ghost"
+            size="icon-circle"
             class="close-btn"
-          />
+            data-test="service-graph-side-panel-close-btn"
+            @click="handleClose"
+          >
+            <q-icon name="cancel" size="1rem" />
+          </OButton>
         </div>
       </div>
 
@@ -143,17 +133,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex-1" />
 
             <!-- View in Traces button -->
-            <q-btn
-              class="view-logs-btn o2-primary-button tw:py-[0.25rem]! tw:px-[0.25rem]!"
-              dense
-              unelevated
+            <OButton
+              variant="primary"
               size="sm"
+              class="view-logs-btn"
               data-test="service-graph-side-panel-view-in-traces-btn"
               @click="viewInTraces"
             >
-              <q-icon name="search" size="0.8rem" class="tw:pr-[0.12rem]" />
+              <template #icon-left>
+                <q-icon name="search" size="0.8rem" />
+              </template>
               View Traces
-            </q-btn>
+            </OButton>
           </div>
           <div class="charts-wrapper tw:py-0! tw:min-h-[10.875rem] tw:w-full">
             <div class="charts-container tw:w-full">
@@ -207,58 +198,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTabs>
 
             <!-- Resource tabs dropdown — shows/hides individual OTEL resource tabs -->
-            <q-btn
+            <ODropdown
               v-if="availableResourceTabConfigs.length > 0"
-              flat
-              dense
-              icon="tune"
-              size="1.1rem"
-              data-test="service-graph-node-panel-workload-fields-btn"
+              side="bottom"
+              align="end"
             >
-              <q-tooltip>{{ t("common.resources") }}</q-tooltip>
-              <q-menu anchor="bottom right" self="top right" :offset="[0, 4]">
-                <q-list
-                  dense
-                  class="tw:min-w-[12rem]!"
-                  data-test="service-graph-node-panel-workload-fields-menu"
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  data-test="service-graph-node-panel-workload-fields-btn"
                 >
-                  <template v-for="env in detectedEnvironments" :key="env.key">
-                    <q-item-label
-                      header
-                      class="tw:text-xs tw:pb-0 tw:py-[0.375rem]! tw:uppercase tw:tracking-wide"
-                    >
-                      {{ env.label }}
-                    </q-item-label>
-                    <q-item
-                      v-for="cfg in availableResourceTabConfigs.filter(
-                        (c) => c.environment === env.key,
-                      )"
-                      :key="cfg.id"
-                      tag="label"
-                      clickable
-                      :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
-                      class="tw:px-[0.325rem]! tw:h-[30px]! tw:min-h-[30px]!"
-                    >
-                      <q-item-section side class="tw:pr-[0rem]!">
-                        <q-checkbox
-                          v-model="selectedWorkloadFields"
-                          :val="cfg.id"
-                          size="xs"
-                        />
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label class="tw:text-xs">
-                          {{ cfg.label }}
-                          <q-tooltip>
-                            {{ cfg.groupField }}
-                          </q-tooltip>
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </template>
-                </q-list>
-              </q-menu>
-            </q-btn>
+                  <q-icon name="tune" size="1.1rem" />
+                  <q-tooltip>{{ t("common.resources") }}</q-tooltip>
+                </OButton>
+              </template>
+              <q-list
+                dense
+                class="tw:min-w-[12rem]!"
+                data-test="service-graph-node-panel-workload-fields-menu"
+              >
+                <template v-for="env in detectedEnvironments" :key="env.key">
+                  <q-item-label
+                    header
+                    class="tw:text-xs tw:pb-0 tw:py-[0.375rem]! tw:uppercase tw:tracking-wide"
+                  >
+                    {{ env.label }}
+                  </q-item-label>
+                  <q-item
+                    v-for="cfg in availableResourceTabConfigs.filter(
+                      (c) => c.environment === env.key,
+                    )"
+                    :key="cfg.id"
+                    tag="label"
+                    clickable
+                    :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
+                    class="tw:px-[0.325rem]! tw:h-[30px]! tw:min-h-[30px]!"
+                  >
+                    <q-item-section side class="tw:pr-[0rem]!">
+                      <q-checkbox
+                        v-model="selectedWorkloadFields"
+                        :val="cfg.id"
+                        size="xs"
+                      />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label class="tw:text-xs">
+                        {{ cfg.label }}
+                        <q-tooltip>
+                          {{ cfg.groupField }}
+                        </q-tooltip>
+                      </q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-list>
+            </ODropdown>
           </div>
           <OTabPanels v-model="activeTab" animated>
             <!-- Operations Tab -->
@@ -347,13 +342,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                     </template>
                     <template #cell-actions="{ row, column, active }">
-                      <q-btn
+                      <OButton
                         v-if="active"
-                        flat
-                        dense
-                        icon="search"
-                        size="xs"
-                        class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!"
+                        variant="ghost"
+                        size="icon"
+                        class="tw:ml-1 tw:absolute! tw:right-2!"
                         data-test="service-graph-side-panel-view-traces-btn"
                         @click.stop="
                           navigateToTraces({
@@ -370,8 +363,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           })
                         "
                       >
+                        <q-icon name="search" size="0.8rem" />
                         <q-tooltip>View in Traces</q-tooltip>
-                      </q-btn>
+                      </OButton>
                     </template>
                     <template #empty>
                       <div
@@ -438,13 +432,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     <template #cell-actions="{ row, column, active }">
-                      <q-btn
+                      <OButton
                         v-if="active"
-                        flat
-                        dense
-                        icon="search"
-                        size="xs"
-                        class="tw:ml-1 tw:p-[0.12rem]! tw:rounded! tw:absolute! tw:right-2! tw:text-[var(--o2-text-1)]! tw:bg-[var(--o2-card-bg-solid)]!"
+                        variant="ghost"
+                        size="icon"
+                        class="tw:ml-1 tw:absolute! tw:right-2!"
                         :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                         @click.stop="
                           navigateToTraces({
@@ -464,8 +456,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           })
                         "
                       >
+                        <q-icon name="search" size="0.8rem" />
                         <q-tooltip>View in Traces</q-tooltip>
-                      </q-btn>
+                      </OButton>
                     </template>
                     <template #cell-errors="{ item }">
                       <span
@@ -545,15 +538,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-graph-side-panel-metrics-error"
               >
                 <span>{{ metricsCorrelationError }}</span>
-                <q-btn
-                  flat
-                  dense
+                <OButton
+                  variant="ghost-primary"
                   size="sm"
-                  label="Retry"
-                  color="primary"
                   data-test="service-graph-side-panel-metrics-retry-btn"
                   @click="fetchMetricsCorrelation(true)"
-                />
+                  >Retry</OButton
+                >
               </div>
 
               <!-- Metrics dashboard -->
@@ -612,10 +603,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import {
   defineComponent,
   computed,
@@ -747,6 +741,9 @@ export default defineComponent({
     OTab,
     OTabPanels,
     OTabPanel,
+    OButton,
+    ODropdown,
+    ODropdownItem,
     TelemetryCorrelationDashboard,
     TenstackTable,
     RenderDashboardCharts,

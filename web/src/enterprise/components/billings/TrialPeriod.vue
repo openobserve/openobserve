@@ -23,18 +23,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="o2-trial-subtitle">Upgrade to a plan to continue enjoying the services by OpenObserve.</span>
       </div>
       <div class="col-2 q-mt-sm" v-if="currentPage != 'billing'">
-        <q-btn 
-          @click="redirectBilling" 
-          class="cursor-pointer text-capitalize bg-primary text-white q-px-md q-py-sm rounded-md float-right"
-          dense
-        >{{ t("billing.upgradeNow") }}</q-btn>
+        <OButton
+          variant="primary"
+          size="sm"
+          class="float-right"
+          @click="redirectBilling"
+          >{{ t("billing.upgradeNow") }}</OButton
+        >
       </div>
       <div class="col-2 q-mt-sm" v-if="currentPage == 'billing'">
-        <q-btn 
-          @click="redirectContactSupport" 
-          class="cursor-pointer text-capitalize bg-primary text-white q-px-md q-py-sm rounded-md float-right"
-          dense
-        >{{ t("billing.contactSupport") }}</q-btn>
+        <OButton
+          variant="primary"
+          size="sm"
+          class="float-right"
+          @click="redirectContactSupport"
+          >{{ t("billing.contactSupport") }}</OButton
+        >
       </div>
     </div>
   </div>
@@ -51,10 +55,11 @@ import config from "@/aws-exports";
 import { siteURL } from "@/constants/config";
 import { getDueDays } from "@/utils/zincutils";
 import BillingService from "@/services/billings";
-
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "TrialPeriod",
+  components: { OButton },
   props: ["currentPage"],
   methods: {
     getTrialPeriodMessage() {
