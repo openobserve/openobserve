@@ -217,6 +217,39 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn test_str_match_udf_name() {
+        let udf = StrMatchUdf::new();
+        assert_eq!(udf.name(), super::super::STR_MATCH_UDF_NAME);
+    }
+
+    #[test]
+    fn test_str_match_udf_return_type_is_boolean() {
+        let udf = StrMatchUdf::new();
+        let rt = udf.return_type(&[]).unwrap();
+        assert_eq!(rt, DataType::Boolean);
+    }
+
+    #[test]
+    fn test_str_match_ignore_case_udf_name() {
+        let udf = StrMatchIgnoreCaseUdf::new();
+        assert_eq!(udf.name(), super::super::STR_MATCH_UDF_IGNORE_CASE_NAME);
+    }
+
+    #[test]
+    fn test_str_match_ignore_case_return_type_is_boolean() {
+        let udf = StrMatchIgnoreCaseUdf::new();
+        let rt = udf.return_type(&[]).unwrap();
+        assert_eq!(rt, DataType::Boolean);
+    }
+
+    #[test]
+    fn test_str_match_udf_aliases_include_match_field() {
+        let udf = StrMatchUdf::new();
+        let aliases = udf.aliases();
+        assert!(aliases.iter().any(|a| a == super::super::MATCH_FIELD_UDF_NAME));
+    }
+
     #[tokio::test]
     async fn test_str_match_udf() {
         let sql = vec![
