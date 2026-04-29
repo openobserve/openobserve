@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="col"
         v-show="isLoading"
-        :style="{ width: store.state.isAiChatEnabled ? '75%' : '100%' }"
+        :style="{ width: store.state.isAiChatEnabled && !store.state.isAiChatExpanded ? '75%' : '100%' }"
         :key="store.state.selectedOrganization?.identifier"
       >
         <q-page-container v-if="isLoading">
@@ -93,21 +93,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
       <div
-        class="col-auto"
         v-show="store.state.isAiChatEnabled && isLoading"
-        style="
-          width: 25%;
-          max-width: 100%;
-          min-width: 75px;
-          z-index: 10;
-          padding-top: 44px;
-          padding-right: 0.625rem;
-        "
-        :class="
-          store.state.theme == 'dark'
-            ? 'dark-mode-chat-container'
-            : 'light-mode-chat-container'
-        "
+        class="col-auto"
+        :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
+        :style="store.state.isAiChatExpanded
+          ? 'position: fixed; top: 0; right: 0; width: 50%; max-width: 100%; min-width: 300px; height: 100vh; z-index: 200; background: var(--o2-card-bg-solid); box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);'
+          : 'width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: 44px; padding-right: 0.625rem;'"
       >
         <O2AIChat
           :header-height="42.5"
@@ -1094,6 +1085,7 @@ export default defineComponent({
 
     const closeChat = () => {
       store.dispatch("setIsAiChatEnabled", false);
+      store.dispatch("setIsAiChatExpanded", false);
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -1659,6 +1651,7 @@ body.ai-chat-open {
 }
 .light-mode-chat-container {
 }
+
 
 .ai-btn-active {
   background: linear-gradient(

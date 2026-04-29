@@ -119,6 +119,17 @@
               <q-tooltip :delay="500">Edit title</q-tooltip>
             </q-btn>
             <q-btn flat round dense size="md" icon="add" @click="addNewChat" />
+            <q-btn
+              flat
+              round
+              dense
+              size="md"
+              :icon="store.state.isAiChatExpanded ? 'close_fullscreen' : 'open_in_full'"
+              data-test="ai-chat-expand-btn"
+              @click="toggleExpand"
+            >
+              <q-tooltip :delay="500">{{ store.state.isAiChatExpanded ? 'Collapse' : 'Expand' }}</q-tooltip>
+            </q-btn>
             <q-btn flat round dense size="md" icon="close" @click="$emit('close')" />
           </div>
         </div>
@@ -2852,6 +2863,11 @@ export default defineComponent({
       displayedStreamingContent.value = '';
     };
 
+    const toggleExpand = () => {
+      store.dispatch('setIsAiChatExpanded', !store.state.isAiChatExpanded);
+      window.dispatchEvent(new Event('resize'));
+    };
+
     const addNewChat = () => {
       detachCurrentStream();
 
@@ -4769,6 +4785,7 @@ export default defineComponent({
       chatHistory,
       currentChatId,
       addNewChat,
+      toggleExpand,
       openHistory,
       loadChat,
       showEditTitleDialog,
@@ -4868,7 +4885,7 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background-color: var(--o2-card-bg);
+  background-color: var(--o2-card-bg-solid);
   border-radius: 0.375rem;
   box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
 
