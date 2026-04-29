@@ -1567,18 +1567,21 @@ export class LogsPage {
     // Interesting fields methods
     async clickInterestingFields() {
         // Pre-filter the field list so the target button is in view, then click.
-        // Up to 2 attempts: in cloud the Vue handler can be momentarily not
-        // bound when the field list is mid-render, so the click silently
-        // misses. The 15s verify timeout is longer than typical Monaco
-        // render latency — clicking again while Monaco is still rendering
-        // would toggle the field OFF, which would break the caller.
+        // Up to 2 attempts: the Vue handler can momentarily not be bound while
+        // the field list is mid-render in cloud, so the click silently misses.
         const field = 'kubernetes_pod_name';
         const editor = this.page.locator(this.queryEditor);
         await this.fillIndexFieldSearchInput(field);
         await this.clickInterestingFieldButton(field);
         try {
             await expect(editor).toContainText(field, { timeout: 15000 });
+            return;
         } catch (e) {
+            // First verify timed out. Before retrying the click, do a final
+            // textContent check — if Monaco was just slow to render and the
+            // field is actually present, retrying would toggle it back OFF.
+            const editorText = await editor.textContent().catch(() => '');
+            if (editorText && editorText.includes(field)) return;
             await this.clickInterestingFieldButton(field);
         }
     }
