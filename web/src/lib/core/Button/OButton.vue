@@ -95,6 +95,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 };
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
+  xs: "tw:h-7 tw:ps-2.5 tw:pe-2.5 tw:text-xs tw:gap-1.5 tw:rounded",
   sm: "tw:h-9 tw:ps-3 tw:pe-3 tw:text-sm tw:gap-2 tw:rounded-md",
   md: "tw:h-10 tw:ps-4 tw:pe-4 tw:text-sm tw:gap-2 tw:rounded-lg",
   lg: "tw:h-12 tw:ps-6 tw:pe-6 tw:text-base tw:gap-3 tw:rounded-lg",
@@ -104,6 +105,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   "icon-md": "tw:h-10 tw:w-10 tw:p-0 tw:rounded-lg tw:gap-x-0",
   "icon-lg": "tw:h-12 tw:w-12 tw:p-0 tw:rounded-lg tw:gap-x-0",
   "icon-circle": "tw:size-8 tw:p-0 tw:rounded-full tw:gap-x-0",
+  "icon-circle-sm": "tw:size-7 tw:p-0 tw:rounded-full tw:gap-x-0",
 };
 
 const activeClasses = [
@@ -141,6 +143,7 @@ function handleClick(event: MouseEvent): void {
     :disabled="as === 'button' ? disabled || loading : undefined"
     :aria-disabled="disabled || loading || undefined"
     :aria-busy="loading || undefined"
+    data-o2-btn
     v-bind="$attrs"
     @click="handleClick"
   >
