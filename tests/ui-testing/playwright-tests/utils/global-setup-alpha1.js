@@ -395,10 +395,12 @@ async function switchOrgViaDropdown(page, targetOrgId) {
   await searchInput.fill(target.name);
   await page.waitForTimeout(1500);
 
-  // Filter menu items by exact org name to avoid clicking a partial-name match
+  // Filter menu items by exact org name (regex anchors prevent partial matches
+  // — e.g. an org "Foo" would otherwise also match a row containing "Foo Bar")
+  const escapedName = target.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const menuItem = page
     .locator('[data-test="organization-menu-item-label-item-label"]')
-    .filter({ hasText: target.name })
+    .filter({ hasText: new RegExp(`^\\s*${escapedName}\\s*$`) })
     .first();
   await menuItem.waitFor({ state: 'visible', timeout: 5000 });
   await menuItem.click();

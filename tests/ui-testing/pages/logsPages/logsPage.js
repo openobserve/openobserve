@@ -440,9 +440,17 @@ export class LogsPage {
                 await this.page.waitForTimeout(500);
                 await dropdownArrow.click({ force: true });
                 await this.page.waitForTimeout(1000);
-                // Re-select default before retrying e2e_automate
-                await defaultToggle.click({ force: true });
-                await this.page.waitForTimeout(500);
+                // Re-select default only if it's no longer marked as selected
+                // (clicking an already-on Quasar toggle would deselect it)
+                const isDefaultOn = await defaultToggle
+                    .locator('.q-toggle__inner')
+                    .first()
+                    .evaluate(el => el.classList.contains('q-toggle__inner--truthy'))
+                    .catch(() => false);
+                if (!isDefaultOn) {
+                    await defaultToggle.click({ force: true });
+                    await this.page.waitForTimeout(500);
+                }
             }
         }
         if (!e2eSelected) {
@@ -796,32 +804,38 @@ export class LogsPage {
     async selectRunQuery() {
         // Ensure query editor is ready
         await this.ensureQueryEditorReady();
-        
-        // Wait for the query button to be visible and click it
+
+        // Wait for the query button to be visible
         await this.page.locator(this.queryButton).waitFor({ state: 'visible', timeout: 10000 });
-        
-        // Add a small wait to ensure the button is fully ready
         await this.page.waitForTimeout(1000);
-        
-        await this.page.locator(this.queryButton).click();
-        
-        // Wait for query execution and results to load
-        await this.page.waitForTimeout(3000);
-        
-        // Wait for either the logs table to appear or an error message
-        try {
-            await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { 
-                timeout: 15000,
-                state: 'visible' 
-            });
-        } catch (error) {
-            // If logs table doesn't appear, check for error message
-            const errorMessage = this.page.locator(this.errorMessage);
-            if (await errorMessage.isVisible()) {
-                testLogger.debug('Query completed with error message');
-            } else {
-                // Wait a bit more for any UI updates
-                await this.page.waitForTimeout(2000);
+
+        // Run + verify; if search returned a transient error (common on cloud
+        // when stream indexing is still catching up), retry once with a wait.
+        // Without this, downstream actions like clicking interesting fields
+        // become no-ops because the page is in error state.
+        const errorMessage = this.page.locator(this.errorMessage);
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            await this.page.locator(this.queryButton).click();
+            await this.page.waitForTimeout(3000);
+
+            try {
+                await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', {
+                    timeout: 15000,
+                    state: 'visible',
+                });
+                return; // results visible — done
+            } catch (e) {
+                if (await errorMessage.isVisible().catch(() => false)) {
+                    if (attempt < 2) {
+                        testLogger.debug('Query returned error; retrying after delay');
+                        await this.page.waitForTimeout(3000);
+                        continue;
+                    }
+                    testLogger.debug('Query completed with error message after retries');
+                } else {
+                    await this.page.waitForTimeout(2000);
+                }
+                return;
             }
         }
     }
