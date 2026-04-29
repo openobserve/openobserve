@@ -3685,4 +3685,34 @@ mod tests {
         assert!(obj.contains_key("sampling_ratio"));
         assert_eq!(obj["sampling_ratio"], serde_json::json!(0.5_f64));
     }
+
+    #[test]
+    fn test_deserialize_sql_old_format_string_array() {
+        // Old format: array of plain SQL strings
+        let json = r#"{"sql":["SELECT 1","SELECT 2"],"start_time":0,"end_time":100}"#;
+        let req: MultiStreamRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.sql.len(), 2);
+        assert_eq!(req.sql[0].sql, "SELECT 1");
+        assert!(req.sql[0].is_old_format);
+        assert_eq!(req.sql[1].sql, "SELECT 2");
+        assert!(req.sql[1].is_old_format);
+    }
+
+    #[test]
+    fn test_deserialize_sql_new_format_object_array() {
+        // New format: array of SqlQuery objects
+        let json = r#"{"sql":[{"sql":"SELECT 1","start_time":10,"end_time":20}],"start_time":0,"end_time":100}"#;
+        let req: MultiStreamRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.sql.len(), 1);
+        assert_eq!(req.sql[0].sql, "SELECT 1");
+        assert!(!req.sql[0].is_old_format);
+        assert_eq!(req.sql[0].start_time, Some(10));
+    }
+
+    #[test]
+    fn test_deserialize_sql_empty_array() {
+        let json = r#"{"sql":[],"start_time":0,"end_time":100}"#;
+        let req: MultiStreamRequest = serde_json::from_str(json).unwrap();
+        assert!(req.sql.is_empty());
+    }
 }
