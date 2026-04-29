@@ -1034,5 +1034,4 @@ mod tests {
     fn test_default_llm_span_identifier() {
         assert_eq!(default_llm_span_identifier(), "llm_input");
     }
-
 }

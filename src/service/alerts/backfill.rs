@@ -816,11 +816,13 @@ mod tests {
 
     #[test]
     fn test_get_destination_streams_excludes_source_node() {
-        use config::meta::pipeline::{
-            Pipeline,
-            components::{Node, NodeData, PipelineSource},
+        use config::meta::{
+            pipeline::{
+                Pipeline,
+                components::{Node, NodeData, PipelineSource},
+            },
+            stream::{StreamParams, StreamType},
         };
-        use config::meta::stream::{StreamParams, StreamType};
 
         let source = Node::new(
             "source".to_string(),
@@ -874,11 +876,13 @@ mod tests {
 
     #[test]
     fn test_get_destination_streams_excludes_query_node() {
-        use config::meta::pipeline::{
-            Pipeline,
-            components::{Node, NodeData, PipelineSource},
+        use config::meta::{
+            pipeline::{
+                Pipeline,
+                components::{Node, NodeData, PipelineSource},
+            },
+            stream::{StreamParams, StreamType},
         };
-        use config::meta::stream::{StreamParams, StreamType};
 
         let query = Node::new(
             "query".to_string(),
