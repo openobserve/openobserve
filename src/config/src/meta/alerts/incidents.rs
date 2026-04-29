@@ -1717,4 +1717,40 @@ mod tests {
     fn test_default_true() {
         assert!(default_true());
     }
+
+    #[test]
+    fn test_incident_event_factory_resolved_with_user() {
+        let event = IncidentEvent::resolved(Some("user@test.com".to_string()));
+        assert!(event.timestamp > 0);
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::Resolved { user_id: Some(ref u) } if u == "user@test.com"
+        ));
+    }
+
+    #[test]
+    fn test_incident_event_factory_resolved_without_user() {
+        let event = IncidentEvent::resolved(None);
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::Resolved { user_id: None }
+        ));
+    }
+
+    #[test]
+    fn test_incident_event_factory_ai_analysis_begin() {
+        let event = IncidentEvent::ai_analysis_begin();
+        assert!(event.timestamp > 0);
+        assert!(matches!(event.event_type, IncidentEventType::AIAnalysisBegin));
+    }
+
+    #[test]
+    fn test_incident_event_factory_ai_analysis_complete() {
+        let event = IncidentEvent::ai_analysis_complete();
+        assert!(event.timestamp > 0);
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::AIAnalysisComplete
+        ));
+    }
 }
