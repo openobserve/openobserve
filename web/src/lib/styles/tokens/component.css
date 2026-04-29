@@ -41,7 +41,7 @@
   --color-button-outline-focus-ring: var(--color-primary-400);
 
   /* Button — ghost */
-  --color-button-ghost-text: var(--color-text-secondary);
+  --color-button-ghost-text: var(--color-text-primary);
   --color-button-ghost-hover-bg: var(--color-primary-50);
   --color-button-ghost-active-bg: var(--color-primary-100);
   --color-button-ghost-hover-ring: var(--color-primary-300);
@@ -71,7 +71,7 @@
 
   /* ToggleGroup */
   --color-toggle-item-bg: var(--color-surface-panel);
-  --color-toggle-item-text: var(--color-text-secondary);
+  --color-toggle-item-text: var(--color-text-primary);
   --color-toggle-item-hover-bg: var(--color-primary-50);
   --color-toggle-item-active-bg: var(--color-primary-600);
   --color-toggle-item-active-text: var(--color-white);
@@ -103,7 +103,7 @@
   --color-tabs-indicator: var(--color-primary-600);
   --color-tabs-active-text: var(--color-primary-600);
   --color-tabs-active-bg: var(--color-primary-100);
-  --color-tabs-inactive-text: var(--color-text-secondary);
+  --color-tabs-inactive-text: var(--color-text-primary);
   --color-tabs-hover-text: var(--color-text-primary);
   --color-tabs-hover-bg: var(--color-primary-50);
   --color-tabs-disabled-text: var(--color-text-disabled);
