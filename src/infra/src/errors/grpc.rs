@@ -106,4 +106,19 @@ mod tests {
             Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(_))
         ));
     }
+
+    #[test]
+    fn test_from_datafusion_incompatible_data_types_extracts_field_name() {
+        let df_err = DataFusionError::Plan(
+            "Incompatible data types for field myField. Expected Int64 but got Utf8".to_string(),
+        );
+        let err = Error::from(df_err);
+        match err {
+            Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType(field)) => {
+                // The parsing extracts the substring after the first space in "for field <name>."
+                assert_eq!(field, "field myField");
+            }
+            _ => panic!("expected SearchFieldHasNoCompatibleDataType"),
+        }
+    }
 }

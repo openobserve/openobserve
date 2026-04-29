@@ -542,4 +542,78 @@ mod tests {
         assert_eq!(parsed["code"], 20011);
         assert_eq!(parsed["inner"], "bad input");
     }
+
+    #[test]
+    fn test_error_codes_from_json_codes_above_20010_fall_to_server_internal() {
+        // from_json only handles codes up to 20010; 20011-20013 fall through
+        for (code, inner) in [
+            (20011, "invalid_params"),
+            (20012, "rate_exceeded"),
+            (20013, "histogram_unavail"),
+        ] {
+            let json = format!(r#"{{"code":{code},"message":"x","inner":"{inner}"}}"#);
+            let result = ErrorCodes::from_json(&json).unwrap();
+            // The fallback wraps the entire input JSON string, not the inner value
+            match result {
+                ErrorCodes::ServerInternalError(_) => {}
+                other => panic!("expected ServerInternalError for code {code}, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_from_get_dashboard_error_wraps_in_db_error() {
+        let e = GetDashboardError::UnsupportedVersion(99);
+        let err = Error::from(e);
+        assert!(err.to_string().contains("DbError#"));
+    }
+
+    #[test]
+    fn test_from_put_dashboard_error_wraps_in_db_error() {
+        let e = PutDashboardError::FolderDoesNotExist;
+        let err = Error::from(e);
+        assert!(err.to_string().contains("DbError#"));
+    }
+
+    #[test]
+    fn test_from_template_error_wraps_in_db_error() {
+        let e = TemplateError::ConvertingId("bad-id".to_string());
+        let err = Error::from(e);
+        assert!(err.to_string().contains("DbError#"));
+    }
+
+    #[test]
+    fn test_from_destination_error_wraps_in_db_error() {
+        let e = DestinationError::AlertDestTemplateNotFound;
+        let err = Error::from(e);
+        assert!(err.to_string().contains("DbError#"));
+    }
+
+    #[test]
+    fn test_error_codes_get_message_all_remaining_variants() {
+        assert_eq!(
+            ErrorCodes::SearchFunctionNotDefined("my_fn".into()).get_message(),
+            "Search function not defined: my_fn"
+        );
+        assert_eq!(
+            ErrorCodes::SearchParquetFileNotFound.get_message(),
+            "Search parquet file not found"
+        );
+        assert_eq!(
+            ErrorCodes::SearchFieldHasNoCompatibleDataType("ts".into()).get_message(),
+            "Search field has no compatible data type: ts"
+        );
+        assert_eq!(
+            ErrorCodes::SearchSQLExecuteError("err".into()).get_message(),
+            "Search SQL execute error"
+        );
+        assert_eq!(
+            ErrorCodes::RatelimitExceeded("too fast".into()).get_message(),
+            "Ratelimit exceeded"
+        );
+        assert_eq!(
+            ErrorCodes::SearchHistogramNotAvailable("msg".into()).get_message(),
+            "Search histogram not available"
+        );
+    }
 }
