@@ -943,24 +943,22 @@ async function getQueryData(
     tracesPartitionMap[searchTraceId] = { partition: 0, chunks: {} };
 
     const isSpansMode = searchObj.meta.searchMode === "spans";
+    const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
+    const sortOrd = (
+      searchObj.meta.resultGrid.sortOrder || "desc"
+    ).toUpperCase();
+    const schemaFieldNames = searchObj.data.stream.selectedStreamFields.map(
+      (f: any) => f.name,
+    );
+    const validSortCol = (() => {
+      if (schemaFieldNames.length === 0) return sortCol;
+      return sortCol === "start_time" || schemaFieldNames.includes(sortCol)
+        ? sortCol
+        : "start_time";
+    })();
+
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
-      const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
-      const sortOrd = (
-        searchObj.meta.resultGrid.sortOrder || "desc"
-      ).toUpperCase();
-      const schemaFieldNames = searchObj.data.stream.selectedStreamFields.map(
-        (f: any) => f.name,
-      );
-      const validSortCol = (() => {
-        if (schemaFieldNames.length === 0) return sortCol;
-        return sortCol === "start_time" || schemaFieldNames.includes(sortCol)
-          ? sortCol
-          : "start_time";
-      })();
-      if (validSortCol !== sortCol) {
-        searchObj.meta.resultGrid.sortBy = "start_time";
-      }
       const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
       const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${validSortCol} ${sortOrd}`;
       return {
@@ -974,6 +972,10 @@ async function getQueryData(
         encoding: "base64",
       };
     })();
+
+    if (validSortCol !== sortCol) {
+      searchObj.meta.resultGrid.sortBy = "start_time";
+    }
 
     fetchQueryDataWithHttpStream(
       {
