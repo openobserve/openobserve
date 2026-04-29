@@ -71,4 +71,8 @@
     --color-tabs-active-bg: var(--color-primary-800);
     --color-tabs-hover-bg: var(--color-primary-900);
     --color-tabs-bar-border: var(--color-grey-700);
+
+    /* RefreshButton — staleness dot (slightly muted in dark mode) */
+    --color-refresh-dot-stale: var(--color-warning-700);
+    --color-refresh-dot-critical: var(--color-error-400);
 }
