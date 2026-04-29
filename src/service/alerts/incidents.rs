@@ -2080,4 +2080,71 @@ mod tests {
         // last AIAnalysisComplete is at recent_ts (30 seconds ago), cooldown = 5 minutes
         assert!(!cooldown_elapsed(&events, 5));
     }
+
+    #[test]
+    fn test_merge_correlation_results_sd_wins_over_semantic() {
+        use config::meta::alerts::incidents::KeyType;
+        let sd = ServiceDiscoveryResult {
+            group_values: [("ns".to_string(), "prod".to_string())].into(),
+            key_type: KeyType::Primary,
+            service_name: "svc-a".to_string(),
+        };
+        let sem = FilteredSemanticResult {
+            group_values: [("region".to_string(), "us-east".to_string())].into(),
+            key_type: KeyType::Secondary,
+        };
+        let (dims, key_type, reason) = merge_correlation_results(&Some(sd), &Some(sem));
+        assert_eq!(dims.get("ns").map(|s| s.as_str()), Some("prod"));
+        assert!(matches!(key_type, KeyType::Primary));
+        assert_eq!(reason, "service_discovery");
+    }
+
+    #[test]
+    fn test_merge_correlation_results_semantic_when_no_sd() {
+        use config::meta::alerts::incidents::KeyType;
+        let sem = FilteredSemanticResult {
+            group_values: [("cluster".to_string(), "us-west".to_string())].into(),
+            key_type: KeyType::Secondary,
+        };
+        let (dims, key_type, reason) = merge_correlation_results(&None, &Some(sem));
+        assert_eq!(dims.get("cluster").map(|s| s.as_str()), Some("us-west"));
+        assert!(matches!(key_type, KeyType::Secondary));
+        assert_eq!(reason, "semantic_extraction");
+    }
+
+    #[test]
+    fn test_merge_correlation_results_fallback_when_both_none() {
+        use config::meta::alerts::incidents::KeyType;
+        let (dims, key_type, reason) = merge_correlation_results(&None, &None);
+        assert!(dims.is_empty());
+        assert!(matches!(key_type, KeyType::AlertId));
+        assert_eq!(reason, "alert_id_fallback");
+    }
+
+    #[test]
+    fn test_extract_service_name_from_sd_result() {
+        use config::meta::alerts::incidents::KeyType;
+        let sd = ServiceDiscoveryResult {
+            group_values: HashMap::new(),
+            key_type: KeyType::Primary,
+            service_name: "payment-service".to_string(),
+        };
+        let labels = HashMap::new();
+        let name = extract_service_name_parallel(&labels, &Some(sd));
+        assert_eq!(name, "payment-service");
+    }
+
+    #[test]
+    fn test_extract_service_name_from_labels_fallback() {
+        let mut labels = HashMap::new();
+        labels.insert("service".to_string(), "billing".to_string());
+        let name = extract_service_name_parallel(&labels, &None);
+        assert_eq!(name, "billing");
+    }
+
+    #[test]
+    fn test_extract_service_name_defaults_to_unknown() {
+        let name = extract_service_name_parallel(&HashMap::new(), &None);
+        assert_eq!(name, "unknown");
+    }
 }
