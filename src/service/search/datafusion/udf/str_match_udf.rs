@@ -247,7 +247,11 @@ mod tests {
     fn test_str_match_udf_aliases_include_match_field() {
         let udf = StrMatchUdf::new();
         let aliases = udf.aliases();
-        assert!(aliases.iter().any(|a| a == super::super::MATCH_FIELD_UDF_NAME));
+        assert!(
+            aliases
+                .iter()
+                .any(|a| a == super::super::MATCH_FIELD_UDF_NAME)
+        );
     }
 
     #[tokio::test]
