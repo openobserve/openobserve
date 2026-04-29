@@ -27,8 +27,8 @@ use config::{
     meta::{
         promql,
         stream::{
-            DistinctField, PartitionTimeLevel, StreamField, StreamParams, StreamSettings,
-            StreamStats, StreamType, TimeRange, UpdateStreamSettings,
+            DistinctField, PartitionTimeLevel, StreamField, StreamParams, StreamPartition,
+            StreamSettings, StreamStats, StreamType, TimeRange, UpdateStreamSettings,
         },
     },
     utils::{flatten::format_label_name, json, time::now_micros, util::get_distinct_stream_name},
@@ -904,27 +904,26 @@ pub async fn update_stream_settings(
     }
 
     if !new_settings.partition_keys.add.is_empty() {
-        let mut seen = std::collections::HashSet::new();
-        let new_partition: Vec<_> = new_settings
-            .partition_keys
-            .add
-            .into_iter()
-            .filter(|k| {
-                if seen.contains(k) || settings.partition_keys.contains(k) {
-                    false
-                } else {
-                    seen.insert(k.clone());
-                    true
-                }
-            })
-            .collect();
-        settings.partition_keys.extend(new_partition);
+        let mut seen: Vec<StreamPartition> = Vec::new();
+        for k in new_settings.partition_keys.add {
+            if seen.iter().any(|s| s.field == k.field)
+                || settings.partition_keys.iter().any(|s| s.field == k.field)
+            {
+                continue;
+            }
+            seen.push(k.clone());
+            settings.partition_keys.push(k);
+        }
     }
 
     if !new_settings.partition_keys.remove.is_empty() {
-        settings
-            .partition_keys
-            .retain(|field| !new_settings.partition_keys.remove.contains(field));
+        settings.partition_keys.retain(|field| {
+            !new_settings
+                .partition_keys
+                .remove
+                .iter()
+                .any(|r| r.field == field.field)
+        });
     }
 
     // Handle cross_links updates
