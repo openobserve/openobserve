@@ -105,32 +105,32 @@
             </q-btn>
           </div>
 
-          <div>
+          <div class="tw:flex tw:items-center tw:gap-0">
             <!-- Edit title button -->
             <q-btn
               v-if="currentChatId"
               flat
               round
               dense
-              size="md"
+              size="sm"
               icon="edit"
               @click.stop="openEditTitleDialog"
             >
               <q-tooltip :delay="500">Edit title</q-tooltip>
             </q-btn>
-            <q-btn flat round dense size="md" icon="add" @click="addNewChat" />
+            <q-btn flat round dense size="sm" icon="add" @click="addNewChat" />
             <q-btn
               flat
               round
               dense
-              size="md"
+              size="sm"
               :icon="store.state.isAiChatExpanded ? 'close_fullscreen' : 'open_in_full'"
               data-test="ai-chat-expand-btn"
               @click="toggleExpand"
             >
-              <q-tooltip :delay="500">{{ store.state.isAiChatExpanded ? 'Collapse' : 'Expand' }}</q-tooltip>
+              <q-tooltip :delay="500">{{ store.state.isAiChatExpanded ? 'Collapse' : 'Expand' }} ({{ isMac ? '⌘' : 'Ctrl+' }}Shift+E)</q-tooltip>
             </q-btn>
-            <q-btn flat round dense size="md" icon="close" @click="$emit('close')" />
+            <q-btn flat round dense size="sm" icon="close" @click="$emit('close')" />
           </div>
         </div>
       </div>
@@ -1162,6 +1162,7 @@ export default defineComponent({
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
     const store = useStore ();
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
     const chatUpdated = computed(() => store.state.chatUpdated);
 
     // Chat history composable
@@ -2868,10 +2869,16 @@ export default defineComponent({
       window.dispatchEvent(new Event('resize'));
     };
 
-    const handleEscape = (e: KeyboardEvent) => {
+    const handleGlobalKeydown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && store.state.isAiChatExpanded) {
         store.dispatch('setIsAiChatExpanded', false);
         window.dispatchEvent(new Event('resize'));
+      }
+
+      // Ctrl/Cmd+Shift+E to toggle expand
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
+        e.preventDefault();
+        toggleExpand();
       }
     };
 
@@ -4208,7 +4215,7 @@ export default defineComponent({
       loadAutoNavigationPreferences();
 
       // Listen for Escape key to collapse expanded mode
-      document.addEventListener('keydown', handleEscape);
+      document.addEventListener('keydown', handleGlobalKeydown);
     });
 
     onUnmounted(()=>{
@@ -4250,7 +4257,7 @@ export default defineComponent({
       }
 
       // Remove Escape key listener
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('keydown', handleGlobalKeydown);
     })
     //this watch is added to make sure that the chat gets updated
     // when the component is unmounted so that the main layout component can load the correct chat
@@ -4830,6 +4837,7 @@ export default defineComponent({
       formatTime,
       loadHistory,
       store,
+      isMac,
       outlinedThumbUpOffAlt,
       outlinedThumbDownOffAlt,
       matThumbUpAlt,
