@@ -172,14 +172,7 @@ const searchObj = reactive(Object.assign({}, defaultObject));
 
 /** Default ordered column ID lists used when no localStorage entry exists. */
 export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
-  spans: [
-    "service_name",
-    "operation_name",
-    "duration",
-    "span_status",
-    "status_code",
-    "method",
-  ],
+  spans: ["service_name", "operation_name", "duration", "span_status"],
   traces: [
     "service_name",
     "operation_name",

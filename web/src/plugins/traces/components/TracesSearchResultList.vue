@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :row-class="traceRowClass"
           :sort-by="props.sortBy"
           :sort-order="props.sortOrder"
-          :sort-field-map="{ timestamp: 'start_time', duration: 'duration' }"
+          :sort-field-map="sortFieldMap"
           :row-height="28"
           :enable-column-reorder="true"
           :enable-row-expand="false"
@@ -61,7 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #cell-actions="{ row, column, active }">
             <CellActions
-              v-if="showCellActions && active && !column.columnDef.meta.disableCellAction"
+              v-if="
+                showCellActions &&
+                active &&
+                !column.columnDef.meta.disableCellAction
+              "
               :column="column"
               :row="row"
               :selected-stream-fields="
@@ -70,7 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hide-search-term-actions="false"
               :hide-ai="true"
               @copy="copyToClipboard(column.id, row[column.id])"
-              @add-search-term="(field, value, action) => addSearchTerm(field, value, action, row)"
+              @add-search-term="
+                (field, value, action) =>
+                  addSearchTerm(field, value, action, row)
+              "
               @send-to-ai-chat="sendToAiChat"
             />
           </template>
@@ -143,15 +150,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ item.spans }}
           </template>
 
-          <template #cell-method="{ item }">
-            {{ item.http_method || item.rpc_method || "—" }}
-          </template>
-
           <template #cell-status_code="{ item }">
-            <SpanStatusCodeBadge
-              :code="item.http_status_code"
-              :grpc-code="item.rpc_grpc_status_code"
-            />
+            <SpanStatusCodeBadge :code="item.http_status_code" />
           </template>
 
           <template #cell-span_status="{ item }">
@@ -326,9 +326,22 @@ const rowsPerPageOptions = [10, 25, 50, 100];
 const { searchObj, updatedLocalLogFilterField } = useTraces();
 const { buildColumns } = useTracesTableColumns();
 
+const timestampCol = computed(
+  () => store.state.zoConfig.timestamp_column || "_timestamp",
+);
+
+const sortFieldMap = computed<Record<string, string>>(() => ({
+  [timestampCol.value]: "start_time",
+  duration: "duration",
+}));
+
 onMounted(() => {
   if (!searchObj.data.resultGrid.columns.length) {
-    searchObj.data.resultGrid.columns = buildColumns(false, "traces", DEFAULT_TRACE_COLUMNS.traces);
+    searchObj.data.resultGrid.columns = buildColumns(
+      false,
+      "traces",
+      DEFAULT_TRACE_COLUMNS.traces,
+    );
   }
 });
 

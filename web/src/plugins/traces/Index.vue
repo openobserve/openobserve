@@ -949,8 +949,18 @@ async function getQueryData(
       const sortOrd = (
         searchObj.meta.resultGrid.sortOrder || "desc"
       ).toUpperCase();
+      const schemaFieldNames = searchObj.data.stream.selectedStreamFields.map(
+        (f: any) => f.name,
+      );
+      const validSortCol =
+        sortCol === "start_time" || schemaFieldNames.includes(sortCol)
+          ? sortCol
+          : "start_time";
+      if (validSortCol !== sortCol) {
+        searchObj.meta.resultGrid.sortBy = "start_time";
+      }
       const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
-      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${sortCol} ${sortOrd}`;
+      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${validSortCol} ${sortOrd}`;
       return {
         query: {
           sql: b64EncodeUnicode(spansSql),
@@ -1096,9 +1106,9 @@ async function getQueryData(
           if (!isPagination) {
             fetchTracesCount();
           }
-          correlationFilters.save().catch((e) =>
-            console.error("[correlation:save] error:", e),
-          );
+          correlationFilters
+            .save()
+            .catch((e) => console.error("[correlation:save] error:", e));
         },
         reset: (_payload: any) => {
           searchObj.data.queryResults = {};
