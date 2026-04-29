@@ -428,6 +428,15 @@ export class LogsPage {
         }
         await this.page.waitForTimeout(1000);
 
+        // The dropdown auto-closes after selecting default — re-open it
+        // before attempting to click e2e_automate, otherwise e2eToggle is
+        // never visible and we burn time in the retry loop.
+        const isDropdownStillOpen = await e2eToggle.isVisible().catch(() => false);
+        if (!isDropdownStillOpen) {
+            await dropdownArrow.click({ force: true });
+            await this.page.waitForTimeout(1000);
+        }
+
         // Select e2e_automate stream with retry
         let e2eSelected = false;
         for (let attempt = 1; attempt <= 3 && !e2eSelected; attempt++) {
