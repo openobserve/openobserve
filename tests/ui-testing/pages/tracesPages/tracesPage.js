@@ -198,24 +198,27 @@ export class TracesPage {
   // New helper methods for traces functionality
 
   async selectTraceStream(streamName = 'default') {
-    // Click to open dropdown
     const streamSelectLocator = this.page.locator(this.streamSelect);
+
+    // Click the q-select to open the dropdown menu
     await streamSelectLocator.click();
-    await this.page.locator('.q-menu, [role="listbox"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await this.page.locator('.q-menu').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
-    // Type stream name to filter
-    await streamSelectLocator.fill(streamName);
-    await this.page.locator(`[data-test*="stream-toggle-${streamName}"]`).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    // Type into the internal input to trigger the @filter filterStreamFn
+    await streamSelectLocator.fill('');
+    await streamSelectLocator.pressSequentially(streamName, { delay: 50 });
 
-    // Click on the stream toggle to select it
-    const streamToggleSelector = `[data-test="log-search-index-list-stream-toggle-${streamName}"] div`;
-    const streamToggle = this.page.locator(streamToggleSelector).first();
+    // Wait for filter to apply
+    await this.page.waitForTimeout(300);
 
-    // Wait for element and click if visible
-    if (await streamToggle.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await streamToggle.click();
+    // Click the matching option by role (Quasar renders q-select options with role="option")
+    const option = this.page.getByRole('option', { name: streamName }).first();
+    await option.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
+    if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await option.click();
     } else {
-      // Fallback: try clicking the first visible option
+      // Fallback: press Enter to select the first filtered option
       await this.page.keyboard.press('Enter');
     }
 
