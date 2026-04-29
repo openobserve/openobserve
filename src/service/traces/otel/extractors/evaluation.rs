@@ -414,4 +414,40 @@ mod tests {
         assert_eq!(eval.evaluator.version, Some("2.0".to_string()));
         assert_eq!(eval.evaluator.evaluator_type, EvaluatorType::Model);
     }
+
+    #[test]
+    fn test_has_any_true_when_quality_score_set() {
+        let scores = EvaluationScores {
+            quality_score: Some(0.9),
+            relevance: None,
+            completeness: None,
+            tool_effectiveness: None,
+            groundedness: None,
+            safety: None,
+            duration_ms: None,
+        };
+        assert!(scores.has_any());
+    }
+
+    #[test]
+    fn test_evaluation_has_any_delegates_to_scores() {
+        let eval = Evaluation {
+            scores: EvaluationScores {
+                quality_score: Some(0.8),
+                relevance: None,
+                completeness: None,
+                tool_effectiveness: None,
+                groundedness: None,
+                safety: None,
+                duration_ms: None,
+            },
+            commentary: None,
+            evaluator: EvaluatorInfo {
+                name: None,
+                version: None,
+                evaluator_type: EvaluatorType::Deterministic,
+            },
+        };
+        assert!(eval.has_any());
+    }
 }
