@@ -26,9 +26,9 @@ test.describe("Trace Error Filter testcases", () => {
     await pm.tracesPage.navigateToTracesUrl();
 
     // Select the default stream as data is ingested for it only
-    if (await pm.tracesPage.isStreamSelectVisible()) {
-      await pm.tracesPage.selectTraceStream('default');
-    }
+    await pm.tracesPage.isStreamSelectVisible()
+    await pm.tracesPage.selectTraceStream('default');
+    await page.waitForTimeout(2000);
 
     testLogger.info('Test setup completed for trace error filtering');
   });
