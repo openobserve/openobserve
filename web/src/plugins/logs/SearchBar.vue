@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="row tw:m-0! tw:p-[0.375rem]! tw:items-start!">
       <div class="float-right col flex tw:flex-wrap tw:items-center tw:gap-y-1">
-        <div class="button-group logs-visualize-toggle element-box-shadow">
-          <div class="row">
+        <div class="logs-visualize-toggle element-box-shadow">
+          <div class="button-group row">
             <div>
               <o-button
                 data-test="logs-logs-toggle"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="onLogsVisualizeToggleUpdate('logs')"
                 size="icon"
                 variant="ghost"
-                class="button button-left tw:rounded-r-none!"
+                class="button button-left tw:rounded-r-none! tw:size-[1.875rem]!"
               >
                 <q-icon name="search" size="16px" />
                 <q-tooltip>
@@ -50,14 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.meta.logsVisualizeToggle === 'visualize'
                     ? 'selected'
                     : '',
-                  'button button-center tw:rounded-none',
+                  'button button-center tw:rounded-none tw:size-[1.875rem]!',
                 ]"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
                 :disabled="isVisualizeDisabled"
                 size="icon"
                 variant="ghost"
               >
-                <q-icon :name="outlinedShowChart" size="16px" />
+                <q-icon name="show_chart" size="16px" />
                 <q-tooltip v-if="isVisualizeDisabled">
                   {{ t("search.enableSqlModeOrSelectSingleStream") }}
                 </q-tooltip>
@@ -67,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </o-button>
             </div>
             <div>
-              <!-- DEBUG: Build button should render here -->
               <o-button
                 data-test="logs-build-toggle"
                 :class="[
@@ -75,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'selected'
                     : '',
                   config.isEnterprise == 'true'
-                    ? 'button button-center tw:rounded-none'
-                    : 'button button-right tw:rounded-l-none!',
+                    ? 'button button-center tw:rounded-none tw:size-[1.875rem]!'
+                    : 'button button-right tw:rounded-l-none! tw:size-[1.875rem]!',
                 ]"
                 @click="onLogsVisualizeToggleUpdate('build')"
                 size="icon"
@@ -95,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.meta.logsVisualizeToggle === 'patterns'
                     ? 'selected'
                     : '',
-                  'button button-right tw:rounded-l-none!',
+                  'button button-right tw:rounded-l-none! tw:size-[1.875rem]!',
                 ]"
                 @click="onLogsVisualizeToggleUpdate('patterns')"
                 size="icon"
@@ -268,52 +267,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             "
                           >
-                            <q-btn
-                              :icon="
-                                favoriteViews.includes(props.row.view_id)
-                                  ? 'favorite'
-                                  : 'favorite_border'
-                              "
+                            <OButton
                               :title="t('common.favourite')"
                               class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
+                              variant="ghost"
+                              size="icon"
+                            >
+                              <q-icon
+                                :name="
+                                  favoriteViews.includes(props.row.view_id)
+                                    ? 'favorite'
+                                    : 'favorite_border'
+                                "
+                                size="xs"
+                              />
+                            </OButton>
                           </q-item-section>
                           <q-item-section
                             :data-test="`logs-search-bar-update-${props.row.view_name}-saved-view-btn`"
                             side
                             @click.stop="handleUpdateSavedView(props.row)"
                           >
-                            <q-btn
-                              icon="edit"
+                            <OButton
                               :title="t('common.edit')"
                               class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
+                              variant="ghost"
+                              size="icon"
+                            >
+                              <q-icon name="edit" size="xs" />
+                            </OButton>
                           </q-item-section>
                           <q-item-section
                             :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
                             side
                             @click.stop="handleDeleteSavedView(props.row)"
                           >
-                            <q-btn
-                              icon="delete"
+                            <OButton
                               :title="t('common.delete')"
                               class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
+                              variant="ghost"
+                              size="icon"
+                            >
+                              <q-icon name="delete" size="xs" />
+                            </OButton>
                           </q-item-section>
                         </q-item>
                       </q-td>
@@ -390,32 +386,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             side
                             @click.stop="handleUpdateSavedView(props.row)"
                           >
-                            <q-btn
-                              icon="edit"
+                            <OButton
                               :title="t('common.edit')"
                               class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
+                              variant="ghost"
+                              size="icon"
+                            >
+                              <q-icon name="edit" size="xs" />
+                            </OButton>
                           </q-item-section>
                           <q-item-section
                             :data-test="`logs-search-bar-delete-${props.row.view_name}-favorite-saved-view-btn`"
                             side
                             @click.stop="handleDeleteSavedView(props.row)"
                           >
-                            <q-btn
-                              icon="delete"
+                            <OButton
                               :title="t('common.delete')"
                               class="logs-saved-view-icon"
-                              padding="xs"
-                              unelevated
-                              size="xs"
-                              round
-                              flat
-                            ></q-btn>
+                              variant="ghost"
+                              size="icon"
+                            >
+                              <q-icon name="delete" size="xs" />
+                            </OButton>
                           </q-item-section>
                         </q-item>
                       </q-td>
@@ -442,15 +434,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tooltip>{{ t("search.resetFilters") }}</q-tooltip>
         </o-button>
         <!-- this is the button group responsible for showing all the utilities -->
-        <q-btn
+        <OButton
           data-test="logs-search-bar-utilities-menu-btn"
           class="group-menu-btn element-box-shadow"
-          menu-anchor="bottom left"
-          menu-self="top left"
-          icon="menu"
-          flat
+          variant="ghost"
+          size="icon"
         >
-          <q-menu>
+          <q-icon name="menu" size="16px" />
+          <q-menu
+            anchor="bottom left"
+            self="top left"
+          >
             <q-list>
               <!-- Histogram Toggle -->
               <q-item
@@ -641,7 +635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item>
             </q-list>
           </q-menu>
-        </q-btn>
+        </OButton>
       </div>
 
       <div class="float-right col-auto">
@@ -665,12 +659,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           button-size="xs"
         />
 
-        <q-btn
+        <OButton
           data-test="logs-search-bar-more-options-btn"
-          class="download-logs-btn q-px-sm element-box-shadow el-border"
-          style="padding: 0.25rem 0.25rem !important"
-          icon="menu"
+          class="download-logs-btn element-box-shadow el-border tw:size-[1.875rem]!"
+          variant="ghost"
+          size="icon"
         >
+          <q-icon name="menu" size="16px" />
           <q-menu>
             <q-list>
               <!-- Share Link (moved from toolbar at <= 1100px) -->
@@ -896,7 +891,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tooltip style="width: 110px">
             {{ t("search.moreActions") }}
           </q-tooltip>
-        </q-btn>
+        </OButton>
         <div class="float-left tw:mr-[4px]">
           <date-time
             ref="dateTimeRef"
@@ -963,35 +958,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 searchObj.meta.logsVisualizeToggle === 'build'
               "
             >
-              <div v-if="config.isEnterprise == 'true'" class="tw:flex">
-                <q-btn
+              <div v-if="config.isEnterprise == 'true'" class="tw:flex tw:items-center">
+                <OButton
                   v-if="visualizeSearchRequestTraceIds.length > 0"
                   data-test="logs-search-bar-visualize-cancel-btn"
-                  dense
-                  flat
                   :title="t('search.cancel')"
-                  class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
+                  variant="ghost"
+                  class="q-pa-none tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
                   @click="cancelVisualizeQueries"
-                  >{{ t("search.cancel") }}</q-btn
+                  >{{ t("search.cancel") }}</OButton
                 >
                 <!-- Main action button: "Ask AI" when NL detected + AI bar not open, otherwise "Run Query" -->
-                <q-btn
+                <OButton
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
-                  dense
-                  flat
+                  variant="ghost"
                   :title="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? t('search.generateQueryTooltip')
                       : t('search.runQuery')
                   "
-                  :disable="
+                  :disabled="
                     isGeneratingSQL ||
                     (isNaturalLanguageDetected &&
                       !searchObj.meta.nlpMode &&
                       !searchObj.data.stream.selectedStream.length)
                   "
-                  class="q-pa-none tw:h-[30px] element-box-shadow"
+                  class="q-pa-none tw:h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button'
@@ -1000,11 +993,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'search-button-enterprise-border-radius'
                       : 'search-button-normal-border-radius',
                   ]"
-                  :color="
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'primary'
-                      : undefined
-                  "
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? handleGenerateSQLQuery()
@@ -1016,11 +1004,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? t("search.generateQuery")
                       : t("search.runQuery")
                   }}
-                </q-btn>
+                </OButton>
                 <q-separator class="tw:h-[29px] tw:w-[1px]" />
                 <q-btn-dropdown
                   flat
-                  class="tw:h-[29px] search-button-dropdown"
+                  class="tw:h-[1.875rem] search-button-dropdown"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-dropdown-button'
@@ -1080,37 +1068,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </q-btn-dropdown>
               </div>
-              <div v-else class="tw:flex">
+              <div v-else class="tw:flex tw:items-center">
                 <!-- Cancel button when query is running -->
-                <q-btn
+                <OButton
                   v-if="visualizeSearchRequestTraceIds.length > 0"
                   data-test="logs-search-bar-visualize-cancel-btn"
-                  dense
-                  flat
+                  variant="ghost"
                   :title="t('search.cancel')"
-                  class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
+                  class="q-pa-none tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-enterprise-border-radius"
                   @click="cancelVisualizeQueries"
-                  >{{ t("search.cancel") }}</q-btn
+                  >{{ t("search.cancel") }}</OButton
                 >
                 <!-- Main action button -->
-                <q-btn
+                <OButton
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
-                  dense
-                  flat
+                  variant="ghost"
                   :title="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? t('search.generateQueryTooltip')
                       : t('search.runQuery')
                   "
-                  :disable="
+                  :disabled="
                     disable ||
                     isGeneratingSQL ||
                     (isNaturalLanguageDetected &&
                       !searchObj.meta.nlpMode &&
                       !searchObj.data.stream.selectedStream.length)
                   "
-                  class="q-pa-none tw:h-[30px] element-box-shadow"
+                  class="q-pa-none tw:h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button'
@@ -1119,11 +1105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'search-button-enterprise-border-radius'
                       : 'search-button-normal-border-radius',
                   ]"
-                  :color="
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'primary'
-                      : undefined
-                  "
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? handleGenerateSQLQuery()
@@ -1135,11 +1116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? t("search.generateQuery")
                       : t("search.runQuery")
                   }}
-                </q-btn>
+                </OButton>
                 <q-separator class="tw:h-[29px] tw:w-[1px]" />
                 <q-btn-dropdown
                   flat
-                  class="tw:h-[29px] search-button-dropdown"
+                  class="tw:h-[1.875rem] search-button-dropdown"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-dropdown-button'
@@ -1200,8 +1181,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-btn-dropdown>
               </div>
             </div>
-            <div v-else class="tw:flex">
-              <q-btn
+            <div v-else class="tw:flex tw:items-center">
+              <OButton
                 v-if="
                   config.isEnterprise == 'true' &&
                   (!!searchObj.data.searchRequestTraceIds.length ||
@@ -1211,29 +1192,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
-                dense
+                variant="ghost"
                 :title="t('search.cancel')"
-                class="q-pa-none o2-run-query-button o2-color-cancel element-box-shadow"
+                class="q-pa-none tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow"
                 :class="
                   config.isEnterprise == 'true'
                     ? 'search-button-enterprise-border-radius'
                     : 'search-button-normal-border-radius'
                 "
                 @click="cancelQuery"
-                >{{ t("search.cancel") }}</q-btn
+                >{{ t("search.cancel") }}</OButton
               >
               <!-- Main action button: "Ask AI" when NL detected but AI bar not open, otherwise "Run Query" -->
-              <q-btn
+              <OButton
                 v-else
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
-                dense
+                variant="ghost"
                 :title="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? t('search.generateQueryTooltip')
                     : t('search.runQuery')
                 "
-                class="q-pa-none tw:h-[30px] element-box-shadow"
+                class="q-pa-none tw:h-[1.875rem]! element-box-shadow"
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
@@ -1242,18 +1223,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'search-button-enterprise-border-radius'
                     : 'search-button-normal-border-radius',
                 ]"
-                :color="
-                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                    ? 'primary'
-                    : undefined
-                "
                 @click="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? handleGenerateSQLQuery()
                     : handleRunQueryFn()
                 "
                 :loading="searchObj.loading || searchObj.loadingHistogram"
-                :disable="
+                :disabled="
                   searchObj.loading == true ||
                   searchObj.loadingHistogram == true ||
                   isGeneratingSQL ||
@@ -1284,7 +1260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? t("search.generateQuery")
                     : t("search.runQuery")
                 }}
-              </q-btn>
+              </OButton>
               <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
               <q-separator
                 v-if="config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled"
@@ -1293,7 +1269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-btn-dropdown
                 v-if="config.isEnterprise == 'true' || store.state.zoConfig.auto_query_enabled"
                 flat
-                class="tw:h-[29px] search-button-dropdown"
+                class="tw:h-[1.875rem] search-button-dropdown"
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-dropdown-button'
@@ -1349,7 +1325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:my-1"
                     />
 
-                    <!-- Live Mode toggle — only when backend flag is enabled -->
+                    <!-- Live Mode toggle � only when backend flag is enabled -->
                     <q-item
                       v-if="store.state.zoConfig.auto_query_enabled"
                       data-test="logs-search-bar-live-mode-toggle-btn"
@@ -1600,12 +1576,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-splitter>
       </div>
-      <q-btn
+      <OButton
         data-test="logs-query-editor-full_screen-btn"
         :title="isFocused ? t('search.collapse') : t('search.expand')"
-        dense
-        size="10px"
-        round
+        variant="ghost"
+        size="icon"
         @click="isFocused = !isFocused"
         class="q-pa-xs tw:absolute! tw:z-50 fullscreen-hover-btn"
         :style="{
@@ -1627,7 +1602,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <Maximize size="0.8rem" v-if="!isFocused" />
         <Minimize size="0.8rem" v-else />
-      </q-btn>
+      </OButton>
     </div>
 
     <q-dialog ref="confirmDialog" v-model="confirmDialogVisible">
@@ -1637,18 +1612,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn
+          <OButton
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
-            :label="t('confirmDialog.cancel')"
-            color="primary"
+            variant="secondary"
+            size="sm"
             @click="cancelConfirmDialog"
-          />
-          <q-btn
+          >{{ t('confirmDialog.cancel') }}</OButton>
+          <OButton
             data-test="logs-search-bar-confirm-dialog-ok-btn"
-            :label="t('confirmDialog.ok')"
-            color="positive"
+            variant="primary"
+            size="sm"
             @click="confirmDialogOK"
-          />
+          >{{ t('confirmDialog.ok') }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -1662,18 +1637,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn
+          <OButton
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
-            :label="t('confirmDialog.cancel')"
-            color="primary"
+            variant="secondary"
+            size="sm"
             @click="cancelConfirmDialog"
-          />
-          <q-btn
+          >{{ t('confirmDialog.cancel') }}</OButton>
+          <OButton
             data-test="logs-search-bar-confirm-dialog-ok-btn"
-            :label="t('confirmDialog.ok')"
-            color="positive"
+            variant="primary"
+            size="sm"
             @click="confirmDialogOK"
-          />
+          >{{ t('confirmDialog.ok') }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -1720,37 +1695,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="custom-download-file-type-button-group"
               class="file-type-button-group q-mt-xs"
             >
-              <q-btn
+              <OButton
                 v-for="option in downloadCustomFileTypeOptions"
                 :key="option.value"
                 :data-test="`custom-download-file-type-${option.value}-btn`"
                 :class="
                   downloadCustomFileType === option.value ? 'selected' : ''
                 "
-                @click="downloadCustomFileType = option.value"
-                :label="option.label"
+                variant="outline"
                 size="sm"
-                outline
-              />
+                @click="downloadCustomFileType = option.value"
+              >{{ option.label }}</OButton>
             </OButtonGroup>
           </div>
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn
-            unelevated
-            class="q-mr-sm o2-secondary-button"
+          <OButton
+            variant="secondary"
+            size="sm"
+            class="q-mr-sm"
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
-            :label="t('confirmDialog.cancel')"
             v-close-popup
-          />
-          <q-btn
-            unelevated
-            class="q-mr-sm o2-primary-button"
+          >{{ t('confirmDialog.cancel') }}</OButton>
+          <OButton
+            variant="primary"
+            size="sm"
+            class="q-mr-sm"
             data-test="logs-search-bar-confirm-dialog-ok-btn"
-            :label="t('search.btnDownload')"
             @click="downloadRangeData"
-          />
+          >{{ t('search.btnDownload') }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -1802,29 +1776,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn
+          <OButton
             data-test="saved-view-dialog-cancel-btn"
-            unelevated
-            class="q-mr-sm o2-secondary-button"
-            :label="t('confirmDialog.cancel')"
+            variant="secondary"
+            size="sm"
+            class="q-mr-sm"
             v-close-popup
-          />
-          <q-btn
+          >{{ t('confirmDialog.cancel') }}</OButton>
+          <OButton
             data-test="saved-view-dialog-save-btn"
             v-if="!saveViewLoader"
-            unelevated
-            :label="t('common.save')"
-            class="o2-primary-button"
+            variant="primary"
+            size="sm"
             @click="handleSavedView"
-          />
-          <q-btn
+          >{{ t('common.save') }}</OButton>
+          <OButton
             data-test="saved-view-dialog-loading-btn"
             v-if="saveViewLoader"
-            unelevated
-            :label="t('confirmDialog.loading')"
-            color="primary"
-            class="text-bold"
-          />
+            variant="primary"
+            size="sm"
+            :loading="true"
+          >{{ t('confirmDialog.loading') }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -1888,28 +1860,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn
+          <OButton
             data-test="saved-function-dialog-cancel-btn"
-            unelevated
-            class="q-mr-sm o2-secondary-button"
-            :label="t('confirmDialog.cancel')"
+            variant="secondary"
+            size="sm"
+            class="q-mr-sm"
             v-close-popup
-          />
-          <q-btn
+          >{{ t('confirmDialog.cancel') }}</OButton>
+          <OButton
             data-test="saved-view-dialog-save-btn"
             v-if="!saveFunctionLoader"
-            unelevated
-            :label="t('confirmDialog.ok')"
-            class="o2-primary-button"
+            variant="primary"
+            size="sm"
             @click="saveFunction"
-          />
-          <q-btn
+          >{{ t('confirmDialog.ok') }}</OButton>
+          <OButton
             data-test="saved-function-dialog-loading-btn"
             v-if="saveFunctionLoader"
-            unelevated
-            :label="t('confirmDialog.loading')"
-            class="o2-primary-button"
-          />
+            variant="primary"
+            size="sm"
+            :loading="true"
+          >{{ t('confirmDialog.loading') }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -1963,11 +1934,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn
+          <OButton
             data-test="search-scheduler-max-records-cancel-btn"
-            unelevated
-            class="q-mr-sm o2-secondary-button"
-            :label="t('confirmDialog.cancel')"
+            variant="secondary"
+            size="sm"
+            class="q-mr-sm"
             v-close-popup
             @click="
               {
@@ -1975,15 +1946,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 searchObj.meta.showSearchScheduler = false;
               }
             "
-          />
-          <q-btn
+          >{{ t('confirmDialog.cancel') }}</OButton>
+          <OButton
             data-test="search-scheduler-max-records-submit-btn"
-            unelevated
-            :label="t('confirmDialog.ok')"
-            class="o2-primary-button"
+            variant="primary"
+            size="sm"
             @click="addJobScheduler"
             v-close-popup
-          />
+          >{{ t('confirmDialog.ok') }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -2010,22 +1980,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn
-            unelevated
-            class="q-mr-sm o2-secondary-button"
-            :label="t('confirmDialog.cancel')"
+          <OButton
+            variant="secondary"
+            size="sm"
+            class="q-mr-sm"
             v-close-popup
             @click="searchInspectDialog = false"
-          />
-          <q-btn
-            unelevated
-            :label="t('confirmDialog.ok')"
-            class="o2-primary-button"
-            :disable="!searchInspectTraceId.trim()"
+          >{{ t('confirmDialog.cancel') }}</OButton>
+          <OButton
+            variant="primary"
+            size="sm"
+            :disabled="!searchInspectTraceId.trim()"
             @click="navigateToSearchInspect"
             v-close-popup
             data-test="search-inspect-submit-btn"
-          />
+          >{{ t('confirmDialog.ok') }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -2069,7 +2038,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-none q-pa-md">
           <div class="text-h6">{{ t("search.savedViewsLabel") }}</div>
           <q-space />
-          <q-btn icon="cancel" flat round dense v-close-popup />
+          <OButton variant="ghost" size="icon-circle" v-close-popup>
+            <q-icon name="cancel" />
+          </OButton>
         </q-card-section>
 
         <q-separator />
@@ -2165,52 +2136,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             )
                           "
                         >
-                          <q-btn
-                            :icon="
-                              favoriteViews.includes(props.row.view_id)
-                                ? 'favorite'
-                                : 'favorite_border'
-                            "
+                          <OButton
                             :title="t('common.favourite')"
                             class="logs-saved-view-icon"
-                            padding="xs"
-                            unelevated
-                            size="xs"
-                            round
-                            flat
-                          ></q-btn>
+                            variant="ghost"
+                            size="icon"
+                          >
+                            <q-icon
+                              :name="
+                                favoriteViews.includes(props.row.view_id)
+                                  ? 'favorite'
+                                  : 'favorite_border'
+                              "
+                              size="xs"
+                            />
+                          </OButton>
                         </q-item-section>
                         <q-item-section
                           :data-test="`logs-search-bar-update-${props.row.view_name}-saved-view-btn`"
                           side
                           @click.stop="handleUpdateSavedView(props.row)"
                         >
-                          <q-btn
-                            icon="edit"
+                          <OButton
                             :title="t('common.edit')"
                             class="logs-saved-view-icon"
-                            padding="xs"
-                            unelevated
-                            size="xs"
-                            round
-                            flat
-                          ></q-btn>
+                            variant="ghost"
+                            size="icon"
+                          >
+                            <q-icon name="edit" size="xs" />
+                          </OButton>
                         </q-item-section>
                         <q-item-section
                           :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
                           side
                           @click.stop="handleDeleteSavedView(props.row)"
                         >
-                          <q-btn
-                            icon="delete"
+                          <OButton
                             :title="t('common.delete')"
                             class="logs-saved-view-icon"
-                            padding="xs"
-                            unelevated
-                            size="xs"
-                            round
-                            flat
-                          ></q-btn>
+                            variant="ghost"
+                            size="icon"
+                          >
+                            <q-icon name="delete" size="xs" />
+                          </OButton>
                         </q-item-section>
                       </q-item>
                     </q-td>
@@ -2284,32 +2252,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           side
                           @click.stop="handleUpdateSavedView(props.row)"
                         >
-                          <q-btn
-                            icon="edit"
+                          <OButton
                             :title="t('common.edit')"
                             class="logs-saved-view-icon"
-                            padding="xs"
-                            unelevated
-                            size="xs"
-                            round
-                            flat
-                          ></q-btn>
+                            variant="ghost"
+                            size="icon"
+                          >
+                            <q-icon name="edit" size="xs" />
+                          </OButton>
                         </q-item-section>
                         <q-item-section
                           :data-test="`logs-search-bar-delete-${props.row.view_name}-favorite-saved-view-btn`"
                           side
                           @click.stop="handleDeleteSavedView(props.row)"
                         >
-                          <q-btn
-                            icon="delete"
+                          <OButton
                             :title="t('common.delete')"
                             class="logs-saved-view-icon"
-                            padding="xs"
-                            unelevated
-                            size="xs"
-                            round
-                            flat
-                          ></q-btn>
+                            variant="ghost"
+                            size="icon"
+                          >
+                            <q-icon name="delete" size="xs" />
+                          </OButton>
                         </q-item-section>
                       </q-item>
                     </q-td>
@@ -2424,7 +2388,6 @@ import {
   Maximize,
   Minimize,
 } from "lucide-vue-next";
-import { outlinedShowChart } from "@quasar/extras/material-icons-outlined";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import {
   getFieldFromExpression,
@@ -2818,9 +2781,9 @@ export default defineComponent({
     };
 
     // Responsive breakpoints: progressively move items into menus
-    // <= 1440px: saved views + reset → left hamburger menu
-    // <= 1280px: also histogram + SQL toggles → left hamburger menu
-    // <= 1024px: also share + transform selector → right overflow menu
+    // <= 1440px: saved views + reset ? left hamburger menu
+    // <= 1280px: also histogram + SQL toggles ? left hamburger menu
+    // <= 1024px: also share + transform selector ? right overflow menu
     const shouldMoveSavedViewToMenu = computed(
       () => windowWidth.value <= 1440,
     );
@@ -4850,7 +4813,7 @@ export default defineComponent({
           searchObj.data?.queryResults?.hits &&
           searchObj.data.queryResults.hits.length > 0;
 
-        // console.log("[SearchBar] Switching patterns → logs, hasLogs:", hasLogs);
+        // console.log("[SearchBar] Switching patterns ? logs, hasLogs:", hasLogs);
 
         // Reset pagination visibility when switching back to logs
         searchObj.meta.resultGrid.showPagination = true;
@@ -5430,7 +5393,6 @@ export default defineComponent({
       updateEditorWidth,
       showExplainDialog,
       openExplainDialog,
-      outlinedShowChart,
       isNaturalLanguageDetected,
       isGeneratingSQL,
       vrlEditorNlpMode,
@@ -5548,7 +5510,7 @@ export default defineComponent({
                   );
                 } else {
                   // Find the earliest clause that ends the WHERE conditions.
-                  // Standard SQL clause order: WHERE → GROUP BY → HAVING → ORDER BY → LIMIT.
+                  // Standard SQL clause order: WHERE ? GROUP BY ? HAVING ? ORDER BY ? LIMIT.
                   // We must insert the new filter before whichever comes first so it
                   // stays inside the WHERE clause rather than after GROUP BY / ORDER BY.
                   const terminatingClauses = [
@@ -5988,3 +5950,4 @@ export default defineComponent({
   }
 }
 </style>
+

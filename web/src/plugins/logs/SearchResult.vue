@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </div>
           <!-- Inspect Button -->
-          <q-btn
+          <OButton
             v-if="
               searchObj.data?.queryResults?.hits?.length > 0 &&
               searchObj.data.lastSearchTraceId &&
@@ -91,40 +91,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               config.isCloud == 'false' &&
               store.state.zoConfig.search_inspector_enabled
             "
-            no-caps
-            dense
-            color="primary"
-            icon="troubleshoot"
-            class="analyze-button inspect-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
-            size="xs"
-            padding="2px"
+            variant="ghost-primary"
+            size="icon-sm"
+            class="analyze-button inspect-button"
             @click="openSearchJobInspector"
             data-test="logs-inspect-button"
           >
+            <q-icon name="troubleshoot" size="xs" />
             <q-tooltip>
               {{ t("volumeInsights.searchInspectionsLabel") }}
             </q-tooltip>
-          </q-btn>
+          </OButton>
           <!-- Volume Analysis Button -->
-          <q-btn
+          <OButton
             v-if="
               searchObj.data?.queryResults?.hits?.length > 0 &&
               !searchObj.meta.sqlMode
             "
-            no-caps
-            dense
-            color="primary"
-            icon="timeline"
-            padding="2px"
-            class="analyze-button tw:h-[2rem] tw:text-[0.75rem]! tw:tracking-[0.03rem]! tw:font-bold!"
-            size="xs"
+            variant="ghost-primary"
+            size="icon-sm"
+            class="analyze-button"
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
           >
+            <q-icon name="timeline" size="xs" />
             <q-tooltip>
               {{ t("volumeInsights.analyzeTooltipLogs") }}
             </q-tooltip>
-          </q-btn>
+          </OButton>
           <ORefreshButton
             :last-run-at="searchObj.meta.lastRunAt"
             :loading="searchObj.loading || searchObj.loadingHistogram"
@@ -188,15 +182,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="getPageData('recordsPerPage')"
           ></q-select>
           <!-- Wrap Content Button -->
-          <q-btn
+          <OButton
             v-if="
               searchObj.meta.logsVisualizeToggle === 'logs' ||
               searchObj.meta.logsVisualizeToggle === 'patterns'
             "
             data-test="logs-search-result-wrap-table-content-btn"
-            icon="wrap_text"
-            flat
-            dense
+            variant="ghost"
+            size="icon"
             class="wrap-content-btn float-right"
             :class="{
               'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
@@ -205,10 +198,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
             "
           >
+            <q-icon name="wrap_text" />
             <q-tooltip>
               {{ t("search.messageWrapContent") }}
             </q-tooltip>
-          </q-btn>
+          </OButton>
         </div>
       </div>
 
@@ -307,12 +301,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-icon name="warning" color="warning" size="xs"></q-icon> Error
             while fetching histogram data.
-            <q-btn
-              @click="toggleErrorDetails"
+            <OButton
+              variant="secondary"
               size="sm"
-              data-test="logs-page-histogram-error-details-btn"
-              class="o2-secondary-button"
-              >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+              @click="toggleErrorDetails"
+            data-test="logs-page-histogram-error-details-btn"
+                >{{ t("search.histogramErrorBtnLabel") }}</OButton
             ><br />
             <span v-if="disableMoreErrorDetails">
               <SanitizedHtmlRenderer
@@ -594,11 +588,13 @@ import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import config from "@/aws-exports";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     ORefreshButton,
+    OButton,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
