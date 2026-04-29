@@ -15,9 +15,13 @@
 
 use chrono::{DateTime, FixedOffset, Utc};
 use config::meta::{
-    dashboards::{Dashboard as MetaDashboard, DashboardListError, v1, v2, v3, v4, v5, v6, v7, v8},
+    dashboards::{
+        Dashboard as MetaDashboard, DashboardListError, v1, v2, v3, v4, v5, v6, v7, v8,
+        validation::ValidationError,
+    },
     folder::Folder as MetaFolder,
 };
+use hashbrown::HashMap;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 use utoipa::ToSchema;
@@ -149,6 +153,9 @@ pub struct ListDashboardsResponseBodyItem {
     // TODO: All client APIs should return camelCase
     #[serde(rename = "updatedAt")]
     pub updated_at: i64,
+    /// Validation errors for this dashboard. Empty when valid.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub validation_errors: Vec<ValidationError>,
 }
 
 /// HTTP request body for `MoveDashboard` endpoint.
@@ -265,21 +272,31 @@ impl ListDashboardsQuery {
     }
 }
 
-impl From<(Vec<(MetaFolder, MetaDashboard)>, Vec<DashboardListError>)>
-    for ListDashboardsResponseBody
-{
-    fn from(value: (Vec<(MetaFolder, MetaDashboard)>, Vec<DashboardListError>)) -> Self {
-        let (items, errors) = value;
-        let dashboards = items.into_iter().map(|fd| fd.into()).collect();
+impl ListDashboardsResponseBody {
+    pub fn from_result(
+        items: Vec<(MetaFolder, MetaDashboard)>,
+        errors: Vec<DashboardListError>,
+        validation_errors: HashMap<String, Vec<ValidationError>>,
+    ) -> Self {
+        let dashboards = items
+            .into_iter()
+            .map(|(folder, dashboard)| {
+                let dash_id = dashboard.dashboard_id().unwrap_or_default().to_owned();
+                let v_errors = validation_errors.get(&dash_id).cloned().unwrap_or_default();
+                ListDashboardsResponseBodyItem::from_parts(folder, dashboard, v_errors)
+            })
+            .collect();
         Self { dashboards, errors }
     }
 }
 
-impl From<(MetaFolder, MetaDashboard)> for ListDashboardsResponseBodyItem {
+impl ListDashboardsResponseBodyItem {
     #[allow(deprecated)]
-    fn from(value: (MetaFolder, MetaDashboard)) -> Self {
-        let folder = value.0;
-        let dashboard = value.1;
+    fn from_parts(
+        folder: MetaFolder,
+        dashboard: MetaDashboard,
+        validation_errors: Vec<ValidationError>,
+    ) -> Self {
         Self {
             folder_id: folder.folder_id,
             folder_name: folder.name,
@@ -297,6 +314,7 @@ impl From<(MetaFolder, MetaDashboard)> for ListDashboardsResponseBodyItem {
             hash: dashboard.hash,
             version: dashboard.version,
             updated_at: dashboard.updated_at,
+            validation_errors,
             // Populate deprecated fields until they are removed from the API.
             v1: dashboard.v1,
             v2: dashboard.v2,

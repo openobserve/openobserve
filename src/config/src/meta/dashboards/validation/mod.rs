@@ -19,8 +19,9 @@ pub mod schema;
 
 use serde::Serialize;
 use serde_json::Value;
+use utoipa::ToSchema;
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, ToSchema)]
 pub struct ValidationError {
     pub path: String,
     pub message: String,

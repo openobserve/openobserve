@@ -256,7 +256,11 @@ pub async fn list_dashboards(
         Ok(result) => result,
         Err(err) => return err.into(),
     };
-    let resp_body: ListDashboardsResponseBody = result.into();
+    let resp_body = ListDashboardsResponseBody::from_result(
+        result.dashboards,
+        result.load_errors,
+        result.validation_errors,
+    );
     MetaHttpResponse::json(resp_body)
 }
 

@@ -16,7 +16,9 @@
 use config::{
     TIMESTAMP_COL_NAME, ider,
     meta::{
-        dashboards::{Dashboard, DashboardListError, ListDashboardsParams, v8},
+        dashboards::{
+            Dashboard, DashboardListError, ListDashboardsParams, v8, validation::ValidationError,
+        },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         stream::{DistinctField, StreamType},
     },
@@ -427,16 +429,58 @@ pub async fn update_dashboard(
     Ok(dashboard)
 }
 
+/// Result of listing dashboards, including per-dashboard validation errors.
+pub struct ListDashboardsResult {
+    pub dashboards: Vec<(Folder, Dashboard)>,
+    pub load_errors: Vec<DashboardListError>,
+    /// Validation errors keyed by dashboard ID. Only v8 dashboards are validated.
+    pub validation_errors: HashMap<String, Vec<ValidationError>>,
+}
+
 #[tracing::instrument]
 pub async fn list_dashboards(
     user_id: &str,
     params: ListDashboardsParams,
-) -> Result<(Vec<(Folder, Dashboard)>, Vec<DashboardListError>), DashboardError> {
+) -> Result<ListDashboardsResult, DashboardError> {
     let org_id = params.org_id.clone();
     let folder_id = params.folder_id.clone();
-    let (dashboards, list_errors) = table::dashboards::list(params).await?;
+    let (dashboards, load_errors) = table::dashboards::list(params).await?;
     let dashboards = filter_permitted_dashboards(&org_id, user_id, dashboards, folder_id).await?;
-    Ok((dashboards, list_errors))
+
+    // Run schema + native validation on each v8 dashboard.
+    let mut validation_errors: HashMap<String, Vec<ValidationError>> = HashMap::new();
+    for (_folder, dashboard) in &dashboards {
+        if dashboard.version != 8 {
+            continue;
+        }
+        let dashboard_id = match dashboard.dashboard_id() {
+            Some(id) => id.to_string(),
+            None => continue,
+        };
+        let json_value = match serde_json::to_value(dashboard) {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!(
+                    "Failed to serialize dashboard {} for validation: {}",
+                    dashboard_id,
+                    e
+                );
+                continue;
+            }
+        };
+        if let Some(v8_json) = json_value.get("v8") {
+            let errors = config::meta::dashboards::validation::validate_dashboard(v8_json);
+            if !errors.is_empty() {
+                validation_errors.insert(dashboard_id, errors);
+            }
+        }
+    }
+
+    Ok(ListDashboardsResult {
+        dashboards,
+        load_errors,
+        validation_errors,
+    })
 }
 
 #[tracing::instrument]
