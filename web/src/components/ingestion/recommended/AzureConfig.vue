@@ -55,15 +55,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Creates an Event Hub namespace, Event Hub, and all required
             resources in your Azure subscription.
           </p>
-          <q-btn
-            color="primary"
-            unelevated
+          <OButton
+            variant="primary"
+            size="sm"
             @click="handleDeploy"
             data-test="azure-activity-logs-deploy-btn"
           >
-            <q-icon name="rocket_launch" left size="sm" />
+            <template #icon-left
+              ><q-icon name="rocket_launch" size="sm"
+            /></template>
             Deploy to Azure
-          </q-btn>
+          </OButton>
         </div>
       </div>
     </div>
@@ -130,24 +132,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Log categories to enable
                 </div>
                 <div class="tw:flex tw:gap-2">
-                  <q-btn
-                    flat
-                    dense
-                    size="sm"
-                    color="primary"
-                    label="Select all"
+                  <OButton
+                    variant="ghost-primary"
+                    size="xs"
                     @click="
                       enabledCategories = LOG_CATEGORIES.map((c) => c.value)
                     "
-                  />
-                  <q-btn
-                    flat
-                    dense
-                    size="sm"
-                    color="primary"
-                    label="Clear"
+                    >Select all</OButton
+                  >
+                  <OButton
+                    variant="ghost-primary"
+                    size="xs"
                     @click="enabledCategories = []"
-                  />
+                    >Clear</OButton
+                  >
                 </div>
               </div>
               <div
@@ -240,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -272,7 +271,7 @@ const activityLogsIntegration = azureIntegrations.find(
 
 export default defineComponent({
   name: "AzureConfig",
-  components: { CopyContent, OToggleGroup, OToggleGroupItem },
+  components: { CopyContent, OToggleGroup, OToggleGroupItem, OButton },
   setup() {
     const store = useStore();
     const q = useQuasar();

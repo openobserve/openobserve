@@ -79,22 +79,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-chip>
           </div>
           <div class="tw:flex tw:gap-2" @click.stop>
-            <q-btn
-              flat
-              dense
-              size="sm"
-              color="primary"
-              label="Select all"
-              @click="selectAll"
-            />
-            <q-btn
-              flat
-              dense
-              size="sm"
-              color="primary"
-              label="Deselect all"
-              @click="deselectAll"
-            />
+            <OButton variant="ghost-primary" size="xs" @click="selectAll"
+              >Select all</OButton
+            >
+            <OButton variant="ghost-primary" size="xs" @click="deselectAll"
+              >Deselect all</OButton
+            >
           </div>
         </div>
 
@@ -185,22 +175,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </div>
             <div class="tw:flex tw:gap-2" @click.stop>
-              <q-btn
-                flat
-                dense
-                size="sm"
-                color="primary"
-                label="Select all"
+              <OButton
+                variant="ghost-primary"
+                size="xs"
                 @click="selectAllRegions"
-              />
-              <q-btn
-                flat
-                dense
-                size="sm"
-                color="primary"
-                label="Clear"
+                >Select all</OButton
+              >
+              <OButton
+                variant="ghost-primary"
+                size="xs"
                 @click="targetRegions = []"
-              />
+                >Clear</OButton
+              >
             </div>
           </div>
 
@@ -253,10 +239,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Launch -->
       <div class="tw:flex tw:items-center tw:gap-3 tw:mb-6">
-        <q-btn
-          color="primary"
-          unelevated
-          :disable="
+        <OButton
+          variant="primary"
+          size="sm"
+          :disabled="
             enabledServices.length === 0 ||
             (deploymentMode === 'stackset' && targetRegions.length === 0)
           "
@@ -267,13 +253,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'aws-stackset-launch-btn'
           "
         >
-          <q-icon name="cloud_upload" left size="sm" />
+          <template #icon-left
+            ><q-icon name="cloud_upload" size="sm"
+          /></template>
           {{
             deploymentMode === "single"
               ? "Launch CloudFormation Stack"
               : "Open StackSets Console"
           }}
-        </q-btn>
+        </OButton>
         <span
           v-if="enabledServices.length === 0"
           class="tw:text-sm text-negative"
@@ -310,13 +298,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:font-semibold step-label">
                 Parameters to enter in the AWS wizard
               </div>
-              <q-btn
-                flat
-                dense
-                size="sm"
-                icon="close"
+              <OButton
+                variant="ghost"
+                size="icon-circle-sm"
                 @click="showParamHelper = false"
-              />
+              >
+                <q-icon name="close" />
+              </OButton>
             </div>
             <p class="tw:text-xs tw:mb-3 mode-hint">
               The StackSets console doesn't support URL pre-fill. Enter these
@@ -331,17 +319,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="param-key">{{ param.key }}</div>
                 <div class="param-value">
                   <span class="param-val-text">{{ param.value }}</span>
-                  <q-btn
-                    flat
-                    dense
-                    round
-                    size="xs"
-                    icon="content_copy"
-                    color="primary"
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-circle"
                     @click="copyParam(param.value)"
                   >
+                    <q-icon name="content_copy" />
                     <q-tooltip>Copy</q-tooltip>
-                  </q-btn>
+                  </OButton>
                 </div>
               </div>
             </div>
@@ -380,6 +365,7 @@ import {
   AWS_REGIONS,
   QUICK_SETUP_SERVICES,
 } from "@/utils/awsIntegrations";
+import OButton from "@/lib/core/Button/OButton.vue";
 import segment from "@/services/segment_analytics";
 
 const COMPLETE_TEMPLATE_URL =
@@ -387,7 +373,7 @@ const COMPLETE_TEMPLATE_URL =
 
 export default defineComponent({
   name: "AWSQuickSetup",
-  components: { OToggleGroup, OToggleGroupItem },
+  components: { OToggleGroup, OToggleGroupItem, OButton },
   setup() {
     const store = useStore();
     const q = useQuasar();
