@@ -44,31 +44,30 @@ export class LogsQueryPage {
   }
 
   async clickNoDataFound() {
-    // Try multiple text patterns — the warning banner text varies across environments
+    // Scope all matching to the search error/no-data container so the
+    // fallback `getByText('No data')` doesn't accidentally match unrelated
+    // UI (table empty-states, tooltips, dialogs, etc).
+    const errorContainer = this.page.locator(this.errorMessage);
     const patterns = [
       'No data found for',
       'No data found',
       'No results found',
       'No data',
     ];
-    let found = false;
     for (const pattern of patterns) {
-      const locator = this.page.getByText(pattern).first();
+      const locator = errorContainer.getByText(pattern).first();
       try {
         await locator.waitFor({ state: 'visible', timeout: 10000 });
         await locator.click({ force: true });
-        found = true;
-        break;
+        return;
       } catch (e) {
         continue;
       }
     }
-    if (!found) {
-      // Last attempt — wait longer for any "No data" text
-      const fallback = this.page.getByText('No data').first();
-      await fallback.waitFor({ state: 'visible', timeout: 20000 });
-      await fallback.click({ force: true });
-    }
+    // Last attempt — wait longer for any "No data" text scoped to the container
+    const fallback = errorContainer.getByText('No data').first();
+    await fallback.waitFor({ state: 'visible', timeout: 20000 });
+    await fallback.click({ force: true });
   }
 
   async clickResultDetail() {

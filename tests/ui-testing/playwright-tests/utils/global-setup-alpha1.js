@@ -395,7 +395,13 @@ async function switchOrgViaDropdown(page, targetOrgId) {
   await searchInput.fill(target.name);
   await page.waitForTimeout(1500);
 
-  await page.locator('[data-test="organization-menu-item-label-item-label"]').first().click();
+  // Filter menu items by exact org name to avoid clicking a partial-name match
+  const menuItem = page
+    .locator('[data-test="organization-menu-item-label-item-label"]')
+    .filter({ hasText: target.name })
+    .first();
+  await menuItem.waitFor({ state: 'visible', timeout: 5000 });
+  await menuItem.click();
 
   // Wait for URL to reflect new org (Vue router updates on store change)
   await page.waitForFunction(
@@ -561,7 +567,14 @@ async function verifySharedAuth(baseUrl) {
   const page = await context.newPage();
 
   try {
-    await page.goto(`${baseUrl}/web/`, { timeout: 60000, waitUntil: 'domcontentloaded' });
+    // Navigate with org_identifier so the SPA loads the target org and the
+    // URL reflects it — without this, page.url() never has the param and
+    // the active-org check below would always trigger a needless re-switch.
+    const targetOrg = process.env.ORGNAME;
+    const navUrl = (targetOrg && targetOrg !== 'default')
+      ? `${baseUrl}/web/?org_identifier=${encodeURIComponent(targetOrg)}`
+      : `${baseUrl}/web/`;
+    await page.goto(navUrl, { timeout: 60000, waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     // If we ended up on Dex or login page, the session is invalid
@@ -577,7 +590,6 @@ async function verifySharedAuth(baseUrl) {
     testLogger.info('[alpha1] Shared auth verified — menu visible');
 
     // Re-apply org switch + persist if active org doesn't match target
-    const targetOrg = process.env.ORGNAME;
     if (targetOrg && targetOrg !== 'default') {
       const activeOrg = new URL(page.url()).searchParams.get('org_identifier');
       if (activeOrg !== targetOrg) {

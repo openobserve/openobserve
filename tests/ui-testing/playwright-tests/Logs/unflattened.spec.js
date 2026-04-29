@@ -16,7 +16,7 @@ async function login(page) {
     // Cloud uses saved auth state (cookies from storageState).
     // The org_identifier query param is required — without it the SPA
     // defaults to _meta (system org) rather than the active org.
-    await page.goto(`${process.env["ZO_BASE_URL"]}/web/?org_identifier=${process.env["ORGNAME"]}`, {
+    await page.goto(`${process.env["ZO_BASE_URL"]}/web/?org_identifier=${encodeURIComponent(process.env["ORGNAME"])}`, {
       waitUntil: 'domcontentloaded',
       timeout: 30000
     });

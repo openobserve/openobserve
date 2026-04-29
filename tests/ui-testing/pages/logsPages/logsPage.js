@@ -1550,18 +1550,11 @@ export class LogsPage {
 
     // Interesting fields methods
     async clickInterestingFields() {
+        // Pre-filter the field list so the target button is in view, then click.
+        // Caller is expected to validate via validateInterestingFields() / etc.
         const field = 'kubernetes_pod_name';
-        const editor = this.page.locator(this.queryEditor);
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            await this.clickInterestingFieldButton(field);
-            try {
-                await expect(editor).toContainText(field, { timeout: 5000 });
-                return;
-            } catch (e) {
-                if (attempt === 3) throw e;
-                // Click had no visible effect (Vue handler not yet bound) — retry the click
-            }
-        }
+        await this.fillIndexFieldSearchInput(field);
+        await this.clickInterestingFieldButton(field);
     }
 
     async validateInterestingFields() {
@@ -2977,25 +2970,11 @@ export class LogsPage {
     }
 
     async clickInterestingFieldButton(field) {
-        const locator = this.page.locator(this.interestingFieldBtn(field)).first();
-        // Retry loop: field list may load slowly on cloud
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-                await locator.waitFor({ state: 'visible', timeout: 8000 });
-                await locator.click({ force: true });
-                return;
-            } catch (e) {
-                if (attempt < 3) {
-                    // Clear search, wait, and re-type to retrigger field list filter
-                    await this.page.locator(this.logSearchIndexListFieldSearchInput).clear();
-                    await this.page.waitForTimeout(500);
-                    await this.page.locator(this.logSearchIndexListFieldSearchInput).fill(field);
-                    await this.page.waitForTimeout(1500);
-                } else {
-                    await locator.click({ force: true, timeout: 10000 });
-                }
-            }
-        }
+        // Default click (no force) — Playwright auto-waits for actionability
+        // and scrolls into view. force:true was previously used here but
+        // skips the stability check, leading to the click landing while the
+        // Vue handler hasn't been (re-)bound and silently doing nothing.
+        await this.page.locator(this.interestingFieldBtn(field)).first().click();
     }
 
     async expectInterestingFieldInEditor(field) {

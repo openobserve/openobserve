@@ -47,7 +47,9 @@ export class LoginPage {
     // org_identifier query param is required — without it the SPA defaults to
     // _meta (system org) instead of the active org from saved state.
     if (isCloudEnvironment()) {
-      const orgParam = process.env["ORGNAME"] ? `?org_identifier=${process.env["ORGNAME"]}` : '';
+      const orgParam = process.env["ORGNAME"]
+        ? `?org_identifier=${encodeURIComponent(process.env["ORGNAME"])}`
+        : '';
       await this.page.goto(`${process.env["ZO_BASE_URL"]}/web/${orgParam}`, {
         waitUntil: 'domcontentloaded',
         timeout: 30000
