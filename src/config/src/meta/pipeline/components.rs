@@ -1020,4 +1020,19 @@ mod tests {
         assert!(json.as_object().unwrap().contains_key("eval_template"));
     }
 
+    #[test]
+    fn test_default_sampling_rate() {
+        assert!((default_sampling_rate() - 0.01).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_default_enable_llm_judge() {
+        assert!(default_enable_llm_judge());
+    }
+
+    #[test]
+    fn test_default_llm_span_identifier() {
+        assert_eq!(default_llm_span_identifier(), "llm_input");
+    }
+
 }
