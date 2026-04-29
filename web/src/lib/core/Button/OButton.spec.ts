@@ -124,6 +124,20 @@ describe("OButton", () => {
     expect(wrapper.classes().join(" ")).toContain("tw:bg-button-destructive");
   });
 
+  it("applies ghost-primary variant classes", () => {
+    const wrapper = mount(OButton, { props: { variant: "ghost-primary" } });
+    expect(wrapper.classes().join(" ")).toContain(
+      "tw:text-button-ghost-primary-text",
+    );
+  });
+
+  it("applies ghost-destructive variant classes", () => {
+    const wrapper = mount(OButton, { props: { variant: "ghost-destructive" } });
+    expect(wrapper.classes().join(" ")).toContain(
+      "tw:text-button-ghost-destructive-text",
+    );
+  });
+
   // --- Size classes ---
 
   it("applies md size classes by default", () => {
@@ -143,7 +157,14 @@ describe("OButton", () => {
 
   it("applies icon size classes", () => {
     const wrapper = mount(OButton, { props: { size: "icon" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:size-9");
+    expect(wrapper.classes().join(" ")).toContain("tw:size-6");
+  });
+
+  it("applies icon-circle size classes with rounded-full", () => {
+    const wrapper = mount(OButton, { props: { size: "icon-circle" } });
+    const classes = wrapper.classes().join(" ");
+    expect(classes).toContain("tw:size-8");
+    expect(classes).toContain("tw:rounded-full");
   });
 
   // --- Keyboard ---

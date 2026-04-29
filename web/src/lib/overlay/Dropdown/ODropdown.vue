@@ -26,7 +26,8 @@ defineSlots<DropdownSlots>();
 // Vue boolean-casts absent `open` prop to `false`, which would lock
 // DropdownMenuRoot into controlled-closed mode. We manage state ourselves
 // so reka-ui stays responsive in both uncontrolled and controlled usage.
-const internalOpen = ref(false);
+// Initialise from props.open so `open=true` works on first render.
+const internalOpen = ref(props.open ?? false);
 
 watch(
   () => props.open,

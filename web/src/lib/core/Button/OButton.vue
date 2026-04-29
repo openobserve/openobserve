@@ -48,6 +48,20 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-focus-ring",
     "tw:disabled:text-text-disabled",
   ].join(" "),
+  "ghost-primary": [
+    "tw:bg-transparent tw:text-button-ghost-primary-text tw:border-0",
+    "tw:enabled:hover:bg-button-ghost-primary-hover-bg",
+    "tw:enabled:active:bg-button-ghost-primary-active-bg",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-primary-focus-ring",
+    "tw:disabled:text-text-disabled",
+  ].join(" "),
+  "ghost-destructive": [
+    "tw:bg-transparent tw:text-button-ghost-destructive-text tw:border-0",
+    "tw:enabled:hover:bg-button-ghost-destructive-hover-bg",
+    "tw:enabled:active:bg-button-ghost-destructive-active-bg",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-destructive-focus-ring",
+    "tw:disabled:text-text-disabled",
+  ].join(" "),
   destructive: [
     "tw:bg-button-destructive tw:text-button-destructive-foreground",
     "tw:enabled:hover:bg-button-destructive-hover",
@@ -62,6 +76,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   md: "tw:h-10 tw:ps-4 tw:pe-4 tw:text-sm tw:gap-2 tw:rounded-lg",
   lg: "tw:h-12 tw:ps-6 tw:pe-6 tw:text-base tw:gap-3 tw:rounded-lg",
   icon: "tw:size-6 tw:p-0 tw:rounded-md tw:gap-x-0",
+  "icon-circle": "tw:size-8 tw:p-0 tw:rounded-full tw:gap-x-0",
 };
 
 const classes = computed<string[]>(() => [
