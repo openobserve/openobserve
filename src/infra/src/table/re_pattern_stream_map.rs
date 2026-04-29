@@ -325,4 +325,43 @@ mod tests {
             assert_eq!(ApplyPolicy::from(s.as_str()), policy);
         }
     }
+
+    #[test]
+    fn test_pattern_association_entry_from_model_maps_all_fields() {
+        let model = Model {
+            id: 42,
+            org: "myorg".to_string(),
+            stream: "logs".to_string(),
+            stream_type: "logs".to_string(),
+            field: "email".to_string(),
+            pattern_id: "pat-1".to_string(),
+            policy: "Redact".to_string(),
+            apply_at: "AtIngestion".to_string(),
+        };
+        let entry = PatternAssociationEntry::from(model);
+        assert_eq!(entry.id, 42);
+        assert_eq!(entry.org, "myorg");
+        assert_eq!(entry.stream, "logs");
+        assert_eq!(entry.field, "email");
+        assert_eq!(entry.pattern_id, "pat-1");
+        assert_eq!(entry.policy, PatternPolicy::Redact);
+        assert_eq!(entry.apply_at, ApplyPolicy::AtIngestion);
+    }
+
+    #[test]
+    fn test_pattern_association_entry_from_model_drop_field_both() {
+        let model = Model {
+            id: 1,
+            org: "org".to_string(),
+            stream: "stream".to_string(),
+            stream_type: "metrics".to_string(),
+            field: "ip".to_string(),
+            pattern_id: "p2".to_string(),
+            policy: "DropField".to_string(),
+            apply_at: "Both".to_string(),
+        };
+        let entry = PatternAssociationEntry::from(model);
+        assert_eq!(entry.policy, PatternPolicy::DropField);
+        assert_eq!(entry.apply_at, ApplyPolicy::Both);
+    }
 }
