@@ -174,7 +174,10 @@ mod tests {
     #[test]
     fn test_ratelimit_error_not_found_display() {
         let err = RatelimitError::NotFound("rule-123".to_string());
-        assert_eq!(err.to_string(), "ratelimit rule with ID rule-123 not found.");
+        assert_eq!(
+            err.to_string(),
+            "ratelimit rule with ID rule-123 not found."
+        );
     }
 
     #[test]

@@ -558,9 +558,8 @@ fn format_trace_id(trace_id: Option<String>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::service::search::inspector::SearchInspectorFields;
-
     use super::*;
+    use crate::service::search::inspector::SearchInspectorFields;
 
     #[test]
     fn test_format_trace_id_none_returns_empty() {
@@ -585,9 +584,7 @@ mod tests {
     #[test]
     fn test_format_trace_id_two_parts_second_non_numeric_keeps_first() {
         assert_eq!(
-            format_trace_id(Some(
-                "21aae3eed2c6fd63aabba9feed664331-Evlj599".to_string()
-            )),
+            format_trace_id(Some("21aae3eed2c6fd63aabba9feed664331-Evlj599".to_string())),
             "21aae3eed2c6fd63aabba9feed664331"
         );
     }

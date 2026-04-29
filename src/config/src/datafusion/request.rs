@@ -226,7 +226,10 @@ mod tests {
         let recovered = FlightSearchRequest::from(proto);
         assert_eq!(recovered.query_identifier.trace_id, "trace-1");
         assert_eq!(recovered.search_info.start_time, 1_000);
-        assert_eq!(recovered.super_cluster_info.user_id, Some("alice".to_string()));
+        assert_eq!(
+            recovered.super_cluster_info.user_id,
+            Some("alice".to_string())
+        );
     }
 
     #[test]

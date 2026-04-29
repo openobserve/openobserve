@@ -275,7 +275,10 @@ mod tests {
         let model = make_model(&id, "pipeline", type_json);
         let result = model.try_into(None);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap().module, destinations::Module::Pipeline { .. }));
+        assert!(matches!(
+            result.unwrap().module,
+            destinations::Module::Pipeline { .. }
+        ));
     }
 
     #[test]
@@ -285,7 +288,10 @@ mod tests {
         let model = make_model(&id, "UNKNOWN_MODULE", type_json);
         let result = model.try_into(None);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap().module, destinations::Module::Pipeline { .. }));
+        assert!(matches!(
+            result.unwrap().module,
+            destinations::Module::Pipeline { .. }
+        ));
     }
 
     #[test]
