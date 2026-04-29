@@ -24,7 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="max-width: 100%; overflow: hidden"
     >
       <q-btn
-        v-if="searchObj.data.stream.streamType && searchObj.data.stream.streamType !== 'logs'"
+        v-if="
+          searchObj.data.stream.streamType &&
+          searchObj.data.stream.streamType !== 'logs'
+        "
         data-test="log-search-index-list-stream-type-badge"
         flat
         dense
@@ -45,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-cy="index-dropdown"
         :placeholder="placeHolderText"
         input-debounce="0"
-        popup-content-style="height: 400px"
         behavior="menu"
         borderless
         dense
@@ -73,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item>
         </template>
         <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-          <q-item style="cursor: pointer">
+          <q-item v-bind="itemProps" style="cursor: pointer">
             <q-item-section @click="handleSingleStreamSelect(opt)">
               <q-item-label>{{ opt.label }}</q-item-label>
             </q-item-section>
@@ -102,7 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-no-field-found-text"
         class="text-center col-10 q-mx-none q-pt-md"
       >
-        <q-icon name="info" color="primary" size="xs" />
+        <q-icon name="info" color="primary"
+size="xs" />
         {{ t("search.noFieldFoundInStream") }}
       </div>
     </div>
@@ -135,7 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :active-exclude-field-values="activeExcludeFilterValues"
         :expanded-fields="expandedFields"
         :selected-streams-count="searchObj.data.stream.selectedStream.length"
-        :default-values-count="store.state.zoConfig?.query_values_default_num || 10"
+        :default-values-count="
+          store.state.zoConfig?.query_values_default_num || 10
+        "
         :show-user-defined-schema-toggle="showUserDefinedSchemaToggle"
         :use-user-defined-schemas="searchObj.meta.useUserDefinedSchemas"
         :user-defined-schema-btn-group-option="userDefinedSchemaBtnGroupOption"
@@ -220,10 +225,7 @@ import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
-import {
-  saveLogsStreamType,
-  saveLogsStream,
-} from "@/utils/streamPersist";
+import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 
 interface Filter {
@@ -297,7 +299,8 @@ export default defineComponent({
       extractValueQuery,
     } = useLogs();
 
-    const { filterHitsColumns, extractFields, getStreamList } = useStreamFields();
+    const { filterHitsColumns, extractFields, getStreamList } =
+      useStreamFields();
 
     const { searchObj, streamSchemaFieldsIndexMapping } = searchState();
 
@@ -366,16 +369,27 @@ export default defineComponent({
     const lastFieldFetchPayloads = ref<Record<string, any[]>>({});
     // Caches the original (no-keyword) values so clearing the search box
     // restores them instantly without a new API call.
-    const cachedFieldValues = ref<Record<string, { key: string; count: number }[]>>({});
+    const cachedFieldValues = ref<
+      Record<string, { key: string; count: number }[]>
+    >({});
     // Caches the per-stream values alongside cachedFieldValues so "load more"
     // appends correctly after a search is cleared.
-    const cachedStreamFieldValues = ref<Record<string, Record<string, { values: { key: string; count: number }[] }>>>({});
+    const cachedStreamFieldValues = ref<
+      Record<
+        string,
+        Record<string, { values: { key: string; count: number }[] }>
+      >
+    >({});
     // Tracks the cumulative size requested per field (grows on "load more").
     const fieldValuesCurrentSize = ref<Record<string, number>>({});
     // Stores finalized values from previous pages (immutable during streaming).
-    const fieldValuesFinalizedValues = ref<Record<string, { key: string; count: number }[]>>({});
+    const fieldValuesFinalizedValues = ref<
+      Record<string, { key: string; count: number }[]>
+    >({});
     // Stores the pinned time range from the first request per field.
-    const fieldValuesTimeRange = ref<Record<string, { start_time: number; end_time: number }>>({});
+    const fieldValuesTimeRange = ref<
+      Record<string, { start_time: number; end_time: number }>
+    >({});
     // Tracks the active keyword search term per field so "load more" re-applies it.
     const fieldSearchKeywords = ref<Record<string, string>>({});
 
@@ -397,12 +411,18 @@ export default defineComponent({
       { label: t("search.logs"), value: "logs", icon: outlinedSearch },
       { label: t("search.traces"), value: "traces", icon: outlinedAccountTree },
       { label: t("search.metrics"), value: "metrics", icon: outlinedBarChart },
-      { label: t("search.enrichmentTables"), value: "enrichment_tables", icon: outlinedTableView },
+      {
+        label: t("search.enrichmentTables"),
+        value: "enrichment_tables",
+        icon: outlinedTableView,
+      },
     ];
 
     const streamTypeIcon = computed(() => {
       const current = searchObj.data.stream.streamType;
-      return streamTypes.find((t) => t.value === current)?.icon ?? outlinedSearch;
+      return (
+        streamTypes.find((t) => t.value === current)?.icon ?? outlinedSearch
+      );
     });
 
     const streamTypeLabel = computed(() => {
@@ -555,7 +575,7 @@ export default defineComponent({
       () => streamList.value,
       () => {
         if (streamOptions.value.length === 0) {
-          streamOptions.value = streamList.value;
+          streamOptions.value = [...streamList.value];
         }
       },
       {
@@ -677,11 +697,15 @@ export default defineComponent({
 
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
-        streamOptions.value = streamList.value;
         const needle = val.toLowerCase();
-        streamOptions.value = streamOptions.value.filter(
-          (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
-        );
+        const source = streamList.value || [];
+        if (!needle) {
+          streamOptions.value = [...source];
+        } else {
+          streamOptions.value = source.filter(
+            (v: any) => v.label.toLowerCase().indexOf(needle) > -1,
+          );
+        }
       });
     };
 
@@ -733,8 +757,7 @@ export default defineComponent({
           /^([^=!<>\s()"]+)(\s*(?:!=|=)\s*.*)$/,
         );
         if (fieldAndOperator) {
-          searchObj.data.stream.addToFilter =
-            `${quoteSqlIdentifierIfNeeded(fieldAndOperator[1])}${fieldAndOperator[2]}`;
+          searchObj.data.stream.addToFilter = `${quoteSqlIdentifierIfNeeded(fieldAndOperator[1])}${fieldAndOperator[2]}`;
           return;
         }
       }
@@ -862,9 +885,13 @@ export default defineComponent({
         lastFieldFetchPayloads.value[name] = [];
         delete cachedFieldValues.value[name];
         delete cachedStreamFieldValues.value[name];
-        fieldValuesCurrentSize.value[name] = store.state.zoConfig?.query_values_default_num || 10;
+        fieldValuesCurrentSize.value[name] =
+          store.state.zoConfig?.query_values_default_num || 10;
         fieldValuesFinalizedValues.value[name] = [];
-        fieldValuesTimeRange.value[name] = { start_time: startISOTimestamp, end_time: endISOTimestamp };
+        fieldValuesTimeRange.value[name] = {
+          start_time: startISOTimestamp,
+          end_time: endISOTimestamp,
+        };
         delete fieldSearchKeywords.value[name];
         let query_context = "";
         let query = searchObj.data.query;
@@ -989,7 +1016,10 @@ export default defineComponent({
 
             // Build SQL with the expanded field's own filter condition removed so
             // field value counts are not constrained by that filter.
-            const rawSQL = query_context.replace("[INDEX_NAME]", selectedStream);
+            const rawSQL = query_context.replace(
+              "[INDEX_NAME]",
+              selectedStream,
+            );
             let sqlForValues = rawSQL;
             try {
               const parsedForValues = fnParsedSQL(rawSQL);
@@ -1133,7 +1163,12 @@ export default defineComponent({
         fetchValuesWithWebsocket({
           ...payload,
           size: newSize,
-          ...(pinnedTime ? { start_time: pinnedTime.start_time, end_time: pinnedTime.end_time } : {}),
+          ...(pinnedTime
+            ? {
+                start_time: pinnedTime.start_time,
+                end_time: pinnedTime.end_time,
+              }
+            : {}),
           ...(keyword ? { keyword } : {}),
         });
       }
@@ -1141,7 +1176,8 @@ export default defineComponent({
 
     const searchFieldValues = (fieldName: string, searchTerm: string) => {
       // Reset pagination whenever the search term changes.
-      fieldValuesCurrentSize.value[fieldName] = store.state.zoConfig?.query_values_default_num || 10;
+      fieldValuesCurrentSize.value[fieldName] =
+        store.state.zoConfig?.query_values_default_num || 10;
       delete fieldValuesFinalizedValues.value[fieldName];
       // Track the active keyword so "load more" can re-apply it.
       fieldSearchKeywords.value[fieldName] = searchTerm;
@@ -1484,8 +1520,14 @@ export default defineComponent({
 
       // Pre-allocate the stream slot on fresh loads (skip on "load more"
       // so existing per-stream values survive until replaced by new data).
-      const isLoadMore = (fieldValuesFinalizedValues.value[fieldName]?.length || 0) > 0;
-      if (!isLoadMore && fieldName && streamName && streamFieldValues.value[fieldName])
+      const isLoadMore =
+        (fieldValuesFinalizedValues.value[fieldName]?.length || 0) > 0;
+      if (
+        !isLoadMore &&
+        fieldName &&
+        streamName &&
+        streamFieldValues.value[fieldName]
+      )
         streamFieldValues.value[fieldName][streamName] = { values: [] };
 
       const wsPayload = {
@@ -1665,7 +1707,8 @@ export default defineComponent({
 
           // Merge with finalized values from previous pages.
           const finalized = fieldValuesFinalizedValues.value[fieldName] || [];
-          const currentSize = fieldValuesCurrentSize.value[fieldName] || pageSize;
+          const currentSize =
+            fieldValuesCurrentSize.value[fieldName] || pageSize;
 
           if (finalized.length > 0) {
             const finalizedKeys = new Set(finalized.map((v) => v.key));
