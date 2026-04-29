@@ -53,8 +53,14 @@ mod tests {
 
     #[test]
     fn test_memory_pool_type_from_str_greedy() {
-        assert_eq!("greedy".parse::<MemoryPoolType>(), Ok(MemoryPoolType::Greedy));
-        assert_eq!("GREEDY".parse::<MemoryPoolType>(), Ok(MemoryPoolType::Greedy));
+        assert_eq!(
+            "greedy".parse::<MemoryPoolType>(),
+            Ok(MemoryPoolType::Greedy)
+        );
+        assert_eq!(
+            "GREEDY".parse::<MemoryPoolType>(),
+            Ok(MemoryPoolType::Greedy)
+        );
         assert_eq!("".parse::<MemoryPoolType>(), Ok(MemoryPoolType::Greedy));
     }
 

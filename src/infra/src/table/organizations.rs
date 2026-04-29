@@ -403,4 +403,23 @@ mod tests {
         assert!(f.created_after.is_none());
         assert!(f.created_before.is_none());
     }
+
+    #[test]
+    #[cfg(not(feature = "cloud"))]
+    fn test_from_model_to_organization_record() {
+        use super::super::entity::organizations::Model;
+        let model = Model {
+            identifier: "test-org".to_string(),
+            org_name: "Test Org".to_string(),
+            org_type: 0,
+            created_at: 1_000_000,
+            updated_at: 2_000_000,
+        };
+        let rec = OrganizationRecord::from(model);
+        assert_eq!(rec.identifier, "test-org");
+        assert_eq!(rec.org_name, "Test Org");
+        assert_eq!(rec.org_type, OrganizationType::Default);
+        assert_eq!(rec.created_at, 1_000_000);
+        assert_eq!(rec.updated_at, 2_000_000);
+    }
 }

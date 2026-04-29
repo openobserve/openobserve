@@ -1563,7 +1563,10 @@ mod tests {
         let meta = std::fs::metadata(tmp.path()).unwrap();
         let etag = get_etag(&meta);
         // etag format: "{mtime_hex}-{size_hex}", size of "hello" is 5 = 0x5
-        assert!(etag.ends_with("-5"), "etag should end with '-5', got {etag}");
+        assert!(
+            etag.ends_with("-5"),
+            "etag should end with '-5', got {etag}"
+        );
         assert!(etag.contains('-'));
     }
 
