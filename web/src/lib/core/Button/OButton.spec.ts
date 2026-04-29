@@ -147,7 +147,7 @@ describe("OButton", () => {
 
   it("applies sm size classes", () => {
     const wrapper = mount(OButton, { props: { size: "sm" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:h-8");
+    expect(wrapper.classes().join(" ")).toContain("tw:h-9");
   });
 
   it("applies lg size classes", () => {
@@ -165,6 +165,27 @@ describe("OButton", () => {
     const classes = wrapper.classes().join(" ");
     expect(classes).toContain("tw:size-8");
     expect(classes).toContain("tw:rounded-full");
+  });
+
+  it("applies icon-sm size classes (h-9 w-9)", () => {
+    const wrapper = mount(OButton, { props: { size: "icon-sm" } });
+    const classes = wrapper.classes().join(" ");
+    expect(classes).toContain("tw:h-9");
+    expect(classes).toContain("tw:w-9");
+  });
+
+  it("applies icon-md size classes (h-10 w-10)", () => {
+    const wrapper = mount(OButton, { props: { size: "icon-md" } });
+    const classes = wrapper.classes().join(" ");
+    expect(classes).toContain("tw:h-10");
+    expect(classes).toContain("tw:w-10");
+  });
+
+  it("applies icon-lg size classes (h-12 w-12)", () => {
+    const wrapper = mount(OButton, { props: { size: "icon-lg" } });
+    const classes = wrapper.classes().join(" ");
+    expect(classes).toContain("tw:h-12");
+    expect(classes).toContain("tw:w-12");
   });
 
   // --- Keyboard ---

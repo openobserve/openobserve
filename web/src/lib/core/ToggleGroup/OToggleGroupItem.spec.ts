@@ -59,4 +59,21 @@ describe("OToggleGroupItem", () => {
     const btn = wrapper.find("button");
     expect(btn.attributes("data-disabled")).toBeDefined();
   });
+
+  // --- Size classes ---
+
+  it("applies md size classes by default", () => {
+    const wrapper = mountItem({ value: "x" });
+    const classes = wrapper.find("button").classes().join(" ");
+    expect(classes).toContain("tw:h-9");
+    expect(classes).toContain("tw:px-3");
+  });
+
+  it('applies xs size classes when size="xs"', () => {
+    const wrapper = mountItem({ value: "x", size: "xs" });
+    const classes = wrapper.find("button").classes().join(" ");
+    expect(classes).toContain("tw:px-2");
+    expect(classes).toContain("tw:py-0.5");
+    expect(classes).toContain("tw:text-xs");
+  });
 });

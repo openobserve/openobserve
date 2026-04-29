@@ -16,7 +16,15 @@ export type ButtonVariant =
   | "destructive";
 
 /** Size controls height, padding, font-size, and border-radius */
-export type ButtonSize = "sm" | "md" | "lg" | "icon" | "icon-circle";
+export type ButtonSize =
+  | "sm"
+  | "md"
+  | "lg"
+  | "icon"
+  | "icon-sm"
+  | "icon-md"
+  | "icon-lg"
+  | "icon-circle";
 
 export interface ButtonProps extends PrimitiveProps {
   /** Visual style variant */

@@ -129,74 +129,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('panel.apply')"
               @click="() => runQuery(false)"
             />
-            <OButtonGroup
-              v-if="config.isEnterprise === 'true'"
-              class="tw:h-[36px] q-ml-md o2-primary-button"
-              style="
-                padding-left: 0px !important ;
-                padding-right: 0px !important;
-                display: inline-flex;
-              "
-              :class="
-                store.state.theme === 'dark'
-                  ? searchRequestTraceIds.length > 0
-                    ? 'o2-negative-button-dark'
-                    : 'o2-secondary-button-dark'
-                  : searchRequestTraceIds.length > 0
-                    ? 'o2-negative-button-light'
-                    : 'o2-secondary-button-light'
-              "
-            >
-              <q-btn
+            <OButtonGroup v-if="config.isEnterprise === 'true'">
+              <OButton
                 :data-test="
                   searchRequestTraceIds.length > 0
                     ? 'dashboard-cancel'
                     : 'dashboard-apply'
                 "
-                no-caps
-                :label="
-                  searchRequestTraceIds.length > 0
-                    ? t('panel.cancel')
-                    : t('panel.apply')
+                :variant="
+                  searchRequestTraceIds.length > 0 ? 'destructive' : 'primary'
                 "
+                size="sm"
                 @click="onApplyBtnClick"
-              />
-
-              <q-btn-dropdown
-                class="text-bold no-border tw:px-0"
-                no-caps
-                flat
-                dense
-                auto-close
-                dropdown-icon="keyboard_arrow_down"
-                :disable="searchRequestTraceIds.length > 0"
               >
-                <q-list>
-                  <q-item
-                    clickable
-                    @click="runQuery(true)"
-                    :disable="searchRequestTraceIds.length > 0"
+                {{
+                  searchRequestTraceIds.length > 0
+                    ? t("panel.cancel")
+                    : t("panel.apply")
+                }}
+              </OButton>
+
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    :variant="
+                      searchRequestTraceIds.length > 0
+                        ? 'destructive'
+                        : 'primary'
+                    "
+                    size="icon-sm"
+                    :disabled="searchRequestTraceIds.length > 0"
                   >
-                    <q-item-section avatar>
-                      <q-icon
-                        size="xs"
-                        name="refresh"
-                        style="align-items: baseline; padding: 0px"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label
-                        style="
-                          font-size: 12px;
-                          align-items: baseline;
-                          padding: 0px;
-                        "
-                        >Refresh Cache & Apply</q-item-label
-                      >
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </q-btn-dropdown>
+                    <q-icon name="keyboard_arrow_down" size="xs" />
+                  </OButton>
+                </template>
+                <ODropdownItem @select="runQuery(true)">
+                  <div class="tw:flex tw:items-center tw:gap-2">
+                    <q-icon size="xs" name="refresh" />
+                    <span>Refresh Cache &amp; Apply</span>
+                  </div>
+                </ODropdownItem>
+              </ODropdown>
             </OButtonGroup>
           </template>
         </div>
@@ -293,6 +266,9 @@ import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -304,6 +280,9 @@ export default defineComponent({
 
   components: {
     OButtonGroup,
+    OButton,
+    ODropdown,
+    ODropdownItem,
     DateTimePickerDashboard,
     AddSettingVariable,
     QueryInspector,
