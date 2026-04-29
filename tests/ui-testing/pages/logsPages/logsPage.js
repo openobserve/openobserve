@@ -547,13 +547,17 @@ export class LogsPage {
         await streamAToggle.waitFor({ state: 'visible', timeout: 20000 });
         await streamAToggle.click();
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamA}`);
+        await this.page.waitForTimeout(2000);
 
         // Clear search and filter for second stream
         if (searchVisible) {
             testLogger.debug(`selectIndexAndStreamJoinUnion: Using search to filter for ${streamB}`);
             await searchInput.click();
+            await this.page.waitForTimeout(500);
             await searchInput.fill('');
+            await this.page.waitForTimeout(500);
             await searchInput.fill(streamB);
+            await this.page.waitForTimeout(1000);
         }
 
         // Select second stream
@@ -563,6 +567,7 @@ export class LogsPage {
         await streamBToggle.waitFor({ state: 'visible', timeout: 20000 });
         await streamBToggle.click();
         testLogger.debug(`selectIndexAndStreamJoinUnion: Selected stream ${streamB}`);
+        await this.page.waitForTimeout(2000);
 
         // Close dropdown
         await dropdownArrow.click();
@@ -1588,20 +1593,29 @@ export class LogsPage {
 
     // Interesting fields methods
     async clickInterestingFields() {
-        // Pre-filter the field list so the target button is in view, then click.
-        // Up to 2 attempts: the Vue handler can momentarily not be bound while
-        // the field list is mid-render in cloud, so the click silently misses.
         const field = 'kubernetes_pod_name';
         const editor = this.page.locator(this.queryEditor);
+
+        // Quick mode ON gates the star icons via v-if="showQuickMode".
+        // If the field list items are not visible, turn quick mode on and retry.
+        const fieldItem = this.page.locator('[data-test^="log-search-index-list-interesting-"]').first();
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            const isVisible = await fieldItem.isVisible().catch(() => false);
+            if (isVisible) break;
+            testLogger.warn(`Field list items not visible (attempt ${attempt}/2) — turning quick mode on`);
+            await this.ensureQuickModeState(true);
+            await this.page.waitForTimeout(1000);
+        }
+        if (!(await fieldItem.isVisible().catch(() => false))) {
+            throw new Error('Field list items still not visible after 2 quick-mode retries');
+        }
+
         await this.fillIndexFieldSearchInput(field);
         await this.clickInterestingFieldButton(field);
         try {
             await expect(editor).toContainText(field, { timeout: 15000 });
             return;
         } catch (e) {
-            // First verify timed out. Before retrying the click, do a final
-            // textContent check — if Monaco was just slow to render and the
-            // field is actually present, retrying would toggle it back OFF.
             const editorText = await editor.textContent().catch(() => '');
             if (editorText && editorText.includes(field)) return;
             await this.clickInterestingFieldButton(field);
@@ -3036,7 +3050,7 @@ export class LogsPage {
         // and scrolls into view. force:true was previously used here but
         // skips the stability check, leading to the click landing while the
         // Vue handler hasn't been (re-)bound and silently doing nothing.
-        await this.page.locator(this.interestingFieldBtn(field)).first().click();
+        await this.page.locator(`.field_overlay ${this.interestingFieldBtn(field)}`).click({ force: true });
     }
 
     async expectInterestingFieldInEditor(field) {
