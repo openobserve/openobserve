@@ -1540,4 +1540,56 @@ mod tests {
     fn test_parse_aggregation_cache_key_too_short_returns_none() {
         assert!(parse_aggregation_cache_key("too/short").is_none());
     }
+
+    #[test]
+    fn test_file_type_display_data() {
+        assert_eq!(FileType::Data.to_string(), "data");
+    }
+
+    #[test]
+    fn test_file_type_display_result() {
+        assert_eq!(FileType::Result.to_string(), "result");
+    }
+
+    #[test]
+    fn test_file_type_display_aggregation() {
+        assert_eq!(FileType::Aggregation.to_string(), "aggregation");
+    }
+
+    #[test]
+    fn test_get_etag_format() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), b"hello").unwrap();
+        let meta = std::fs::metadata(tmp.path()).unwrap();
+        let etag = get_etag(&meta);
+        // etag format: "{mtime_hex}-{size_hex}", size of "hello" is 5 = 0x5
+        assert!(etag.ends_with("-5"), "etag should end with '-5', got {etag}");
+        assert!(etag.contains('-'));
+    }
+
+    #[test]
+    fn test_last_modified_returns_datetime() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), b"test").unwrap();
+        let meta = std::fs::metadata(tmp.path()).unwrap();
+        let dt = last_modified(&meta);
+        // should be a recent timestamp (after year 2020)
+        assert!(dt.timestamp() > 1_577_836_800);
+    }
+
+    #[test]
+    fn test_get_bucket_idx_returns_valid_index() {
+        let idx = get_bucket_idx("some/file/path.parquet");
+        let cfg = config::get_config();
+        let max = cfg.disk_cache.bucket_num.max(1);
+        assert!(idx < max);
+    }
+
+    #[test]
+    fn test_get_bucket_idx_empty_string() {
+        let idx = get_bucket_idx("");
+        let cfg = config::get_config();
+        let max = cfg.disk_cache.bucket_num.max(1);
+        assert!(idx < max);
+    }
 }
