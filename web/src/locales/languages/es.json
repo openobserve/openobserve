@@ -3640,5 +3640,12 @@
     "clearAll": "Borrar todo",
     "clearAllTitle": "Borrar todos los chats",
     "clearAllMessage": "Esto borrará permanentemente todo el historial de chat. Esta acción no se puede deshacer."
+  },
+  "org_storage": {
+    "tabLabel": "Almacenamiento organizacional",
+    "title": "Almacenamiento organizacional",
+    "notEnabled": "el almacenamiento de la organización no está habilitado para esta organización",
+    "notConfigured": "configurar un proveedor de almacenamiento personalizado para los datos de esta organización",
+    "configured": "configurado"
   }
 }

@@ -3653,5 +3653,12 @@
     "clearAll": "Alles wissen",
     "clearAllTitle": "Alle chats wissen",
     "clearAllMessage": "Hiermee wordt alle chatgeschiedenis definitief verwijderd. Deze actie kan niet ongedaan worden gemaakt."
+  },
+  "org_storage": {
+    "tabLabel": "Opslag van de organisatie",
+    "title": "Opslag van de organisatie",
+    "notEnabled": "org-opslag is niet ingeschakeld voor deze organisatie",
+    "notConfigured": "configureer een aangepaste opslagprovider voor de gegevens van deze organisatie",
+    "configured": "geconfigureerd"
   }
 }

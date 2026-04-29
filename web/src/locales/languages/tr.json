@@ -3653,5 +3653,12 @@
     "clearAll": "Tümünü temizle",
     "clearAllTitle": "Tüm sohbetleri temizle",
     "clearAllMessage": "Bu, tüm sohbet geçmişini kalıcı olarak silecektir. Bu işlem geri alınamaz."
+  },
+  "org_storage": {
+    "tabLabel": "Kuruluş Depolama",
+    "title": "Kuruluş Depolama",
+    "notEnabled": "kuruluş depolama alanı bu kuruluş için etkin değil",
+    "notConfigured": "bu kuruluşun verileri için özel bir depolama sağlayıcısı yapılandırma",
+    "configured": "yapılandırılmış"
   }
 }

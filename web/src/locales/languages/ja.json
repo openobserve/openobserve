@@ -3642,5 +3642,12 @@
     "clearAll": "すべてクリア",
     "clearAllTitle": "すべてのチャットをクリア",
     "clearAllMessage": "これにより、すべてのチャット履歴が完全に削除されます。このアクションは元に戻せません。"
+  },
+  "org_storage": {
+    "tabLabel": "組織ストレージ",
+    "title": "組織ストレージ",
+    "notEnabled": "この組織では組織ストレージが有効になっていません",
+    "notConfigured": "この組織のデータ用のカスタムストレージプロバイダーを設定",
+    "configured": "設定済み"
   }
 }
