@@ -85,17 +85,17 @@
           <OButton
             v-if="annotationData.annotation_id"
             variant="destructive"
-            size="sm"
+            size="sm-action"
             @click="handleDeleteWithConfirm"
             >Delete</OButton
           >
           <div class="tw:flex-1"></div>
-          <OButton variant="outline" size="sm" @click="handleClose"
+          <OButton variant="outline" size="sm-action" @click="handleClose"
             >Cancel</OButton
           >
           <OButton
             variant="primary"
-            size="sm"
+            size="sm-action"
             @click="saveAnnotation.execute()"
             :loading="saveAnnotation.isLoading?.value"
             :disabled="!annotationData.title"
