@@ -952,10 +952,12 @@ async function getQueryData(
       const schemaFieldNames = searchObj.data.stream.selectedStreamFields.map(
         (f: any) => f.name,
       );
-      const validSortCol =
-        sortCol === "start_time" || schemaFieldNames.includes(sortCol)
+      const validSortCol = (() => {
+        if (schemaFieldNames.length === 0) return sortCol;
+        return sortCol === "start_time" || schemaFieldNames.includes(sortCol)
           ? sortCol
           : "start_time";
+      })();
       if (validSortCol !== sortCol) {
         searchObj.meta.resultGrid.sortBy = "start_time";
       }
