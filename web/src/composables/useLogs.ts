@@ -15,7 +15,7 @@
 
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { reactive, onBeforeMount } from "vue";
+import { reactive, onBeforeMount, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
@@ -285,7 +285,8 @@ const useLogs = () => {
       // in-progress and user select stream from dropdown in that case it loads data but it should wait for
       // additional details from the user like filter conditions and time range selection before load data
       // it should work in case of page refresh, navigate user from streams page or short url
-      let initialStreamSelected: boolean = searchObj.data.stream.selectedStream.length > 0;
+      let initialStreamSelected: boolean =
+        searchObj.data.stream.selectedStream.length > 0;
 
       await getStreamList();
       await getFunctions();
@@ -355,7 +356,7 @@ const useLogs = () => {
       if (
         Object.hasOwn(router.currentRoute.value.query, "type") &&
         (router.currentRoute.value.query.type == "search_history_re_apply" ||
-        router.currentRoute.value.query.type == "ai_chat_query")
+          router.currentRoute.value.query.type == "ai_chat_query")
       ) {
         delete router.currentRoute.value.query.type;
       }
@@ -366,124 +367,131 @@ const useLogs = () => {
   };
 
   const restoreUrlQueryParams = async (dashboardPanelData: any = null) => {
-    searchObj.shouldIgnoreWatcher = true;
-    const queryParams: any = router.currentRoute.value.query;
-    // Allow SQL mode queries without stream param (will be auto-detected from SQL)
-    if (!queryParams.stream && queryParams.sql_mode !== "true") {
+    return new Promise((resolve) => {
+      searchObj.shouldIgnoreWatcher = true;
+      const queryParams: any = router.currentRoute.value.query;
+      // Allow SQL mode queries without stream param (will be auto-detected from SQL)
+      if (!queryParams.stream && queryParams.sql_mode !== "true") {
+        searchObj.shouldIgnoreWatcher = false;
+        return;
+      }
+
+      const date = {
+        startTime: Number(queryParams.from),
+        endTime: Number(queryParams.to),
+        relativeTimePeriod: queryParams.period || null,
+        type: queryParams.period ? "relative" : "absolute",
+      };
+
+      if (date.type === "relative") {
+        queryParams.period = date.relativeTimePeriod;
+      } else {
+        queryParams.from = date.startTime;
+        queryParams.to = date.endTime;
+      }
+
+      if (date) {
+        searchObj.data.datetime = date;
+      }
+
+      if (queryParams.query) {
+        searchObj.meta.sqlMode = queryParams.sql_mode == "true" ? true : false;
+        nextTick(() => {
+          searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+          searchObj.data.query = b64DecodeUnicode(queryParams.query);
+        });
+      }
+
+      if (
+        queryParams.hasOwnProperty("defined_schemas") &&
+        queryParams.defined_schemas != ""
+      ) {
+        searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
+      }
+
+      if (
+        queryParams.refresh &&
+        enableRefreshInterval(parseInt(queryParams.refresh))
+      ) {
+        searchObj.meta.refreshInterval = parseInt(queryParams.refresh);
+      }
+
+      if (
+        queryParams.refresh &&
+        !enableRefreshInterval(parseInt(queryParams.refresh))
+      ) {
+        delete queryParams.refresh;
+      }
+
+      useLocalTimezone(queryParams.timezone);
+
+      if (queryParams.functionContent) {
+        searchObj.data.tempFunctionContent =
+          b64DecodeUnicode(queryParams.functionContent) || "";
+        searchObj.meta.functionEditorPlaceholderFlag = false;
+        searchObj.data.transformType = "function";
+      }
+
+      if (queryParams.stream_type) {
+        searchObj.data.stream.streamType = queryParams.stream_type;
+      } else {
+        searchObj.data.stream.streamType = "logs";
+      }
+
+      if (queryParams.type) {
+        searchObj.meta.pageType = queryParams.type;
+      }
+      searchObj.meta.quickMode =
+        queryParams.quick_mode == "false" ? false : true;
+
+      if (queryParams.stream) {
+        searchObj.data.stream.selectedStream = queryParams.stream.split(",");
+      }
+
+      if (queryParams.show_histogram) {
+        searchObj.meta.showHistogram =
+          queryParams.show_histogram == "true" ? true : false;
+      }
+
       searchObj.shouldIgnoreWatcher = false;
-      return;
-    }
+      if (
+        Object.hasOwn(queryParams, "type") &&
+        queryParams.type == "search_history_re_apply"
+      ) {
+        delete queryParams.type;
+      }
 
-    const date = {
-      startTime: Number(queryParams.from),
-      endTime: Number(queryParams.to),
-      relativeTimePeriod: queryParams.period || null,
-      type: queryParams.period ? "relative" : "absolute",
-    };
+      if (store.state.zoConfig?.super_cluster_enabled && queryParams.regions) {
+        searchObj.meta.regions = queryParams.regions.split(",");
+      }
 
-    if (date.type === "relative") {
-      queryParams.period = date.relativeTimePeriod;
-    } else {
-      queryParams.from = date.startTime;
-      queryParams.to = date.endTime;
-    }
+      if (store.state.zoConfig?.super_cluster_enabled && queryParams.clusters) {
+        searchObj.meta.clusters = queryParams.clusters.split(",");
+      }
 
-    if (date) {
-      searchObj.data.datetime = date;
-    }
+      if (
+        queryParams.hasOwnProperty("logs_visualize_toggle") &&
+        queryParams.logs_visualize_toggle != ""
+      ) {
+        searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
+      }
 
-    if (queryParams.query) {
-      searchObj.meta.sqlMode = queryParams.sql_mode == "true" ? true : false;
-      searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
-      searchObj.data.query = b64DecodeUnicode(queryParams.query);
-    }
+      //here we restore the fn editor state from the url query params
+      if (queryParams.fn_editor) {
+        searchObj.meta.showTransformEditor =
+          queryParams.fn_editor == "true" ? true : false;
+      }
 
-    if (
-      queryParams.hasOwnProperty("defined_schemas") &&
-      queryParams.defined_schemas != ""
-    ) {
-      searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
-    }
+      // TODO OK : Replace push with replace and test all scenarios
+      router.push({
+        query: {
+          ...queryParams,
+          sql_mode: searchObj.meta.sqlMode,
+          defined_schemas: searchObj.meta.useUserDefinedSchemas,
+        },
+      });
 
-    if (
-      queryParams.refresh &&
-      enableRefreshInterval(parseInt(queryParams.refresh))
-    ) {
-      searchObj.meta.refreshInterval = parseInt(queryParams.refresh);
-    }
-
-    if (
-      queryParams.refresh &&
-      !enableRefreshInterval(parseInt(queryParams.refresh))
-    ) {
-      delete queryParams.refresh;
-    }
-
-    useLocalTimezone(queryParams.timezone);
-
-    if (queryParams.functionContent) {
-      searchObj.data.tempFunctionContent =
-        b64DecodeUnicode(queryParams.functionContent) || "";
-      searchObj.meta.functionEditorPlaceholderFlag = false;
-      searchObj.data.transformType = "function";
-    }
-
-    if (queryParams.stream_type) {
-      searchObj.data.stream.streamType = queryParams.stream_type;
-    } else {
-      searchObj.data.stream.streamType = "logs";
-    }
-
-    if (queryParams.type) {
-      searchObj.meta.pageType = queryParams.type;
-    }
-    searchObj.meta.quickMode = queryParams.quick_mode == "false" ? false : true;
-
-    if (queryParams.stream) {
-      searchObj.data.stream.selectedStream = queryParams.stream.split(",");
-    }
-
-    if (queryParams.show_histogram) {
-      searchObj.meta.showHistogram =
-        queryParams.show_histogram == "true" ? true : false;
-    }
-
-    searchObj.shouldIgnoreWatcher = false;
-    if (
-      Object.hasOwn(queryParams, "type") &&
-      queryParams.type == "search_history_re_apply"
-    ) {
-      delete queryParams.type;
-    }
-
-    if (store.state.zoConfig?.super_cluster_enabled && queryParams.regions) {
-      searchObj.meta.regions = queryParams.regions.split(",");
-    }
-
-    if (store.state.zoConfig?.super_cluster_enabled && queryParams.clusters) {
-      searchObj.meta.clusters = queryParams.clusters.split(",");
-    }
-
-    if (
-      queryParams.hasOwnProperty("logs_visualize_toggle") &&
-      queryParams.logs_visualize_toggle != ""
-    ) {
-      searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
-    }
-
-    //here we restore the fn editor state from the url query params
-    if (queryParams.fn_editor) {
-      searchObj.meta.showTransformEditor =
-        queryParams.fn_editor == "true" ? true : false;
-    }
-
-    // TODO OK : Replace push with replace and test all scenarios
-    router.push({
-      query: {
-        ...queryParams,
-        sql_mode: searchObj.meta.sqlMode,
-        defined_schemas: searchObj.meta.useUserDefinedSchemas,
-      },
+      resolve(true);
     });
   };
 
@@ -513,7 +521,10 @@ const useLogs = () => {
     }
   };
 
-  const reorderArrayByReference = (arr1: string[], arr2: string[]): string[] => {
+  const reorderArrayByReference = (
+    arr1: string[],
+    arr2: string[],
+  ): string[] => {
     return [...arr1].sort((a, b) => {
       const indexA = arr2.indexOf(a);
       const indexB = arr2.indexOf(b);
