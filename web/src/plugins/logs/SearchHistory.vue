@@ -54,14 +54,15 @@
         </div>
 
         <div>
-          <q-btn
-            :label=" t('search_history.get_history')"
-            flat
+          <OButton
+            variant="primary"
+            size="sm"
+            class="q-ml-md"
             @click="fetchSearchHistory"
-            class="q-ml-md o2-primary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            :disable="isLoading"
-          />
+            :disabled="isLoading"
+          >
+            {{ t('search_history.get_history') }}
+          </OButton>
         </div>
       </div>
     </div>
@@ -88,16 +89,18 @@
               @click="triggerExpand(props)"
             >
               <q-td>
-                <q-btn
-                  dense
-                  flat
-                  size="xs"
-                  :icon="
-                    expandedRow != props.row.uuid
-                      ? 'expand_more'
-                      : 'expand_less'
-                  "
-                />
+                <OButton
+                  variant="ghost"
+                  size="icon"
+                >
+                  <q-icon
+                    :name="
+                      expandedRow != props.row.uuid
+                        ? 'expand_more'
+                        : 'expand_less'
+                    "
+                  />
+                </OButton>
               </q-td>
 
               <q-td
@@ -128,45 +131,34 @@
                       <strong
                         >SQL Query :
                         <span>
-                          <q-btn
-                            @click.stop="
-                              copyToClipboard(props.row.sql, 'SQL Query')
-                            "
-                            size="xs"
-                            dense
-                            flat
-                            icon="content_copy"
-                            class="copy-btn-sql tw:ml-2 tw:py-2 tw:px-2" /></span
+                          <OButton
+                            variant="ghost"
+                            size="icon"
+                            class="copy-btn-sql tw:ml-2"
+                            @click.stop="copyToClipboard(props.row.sql, 'SQL Query')"
+                          >
+                            <q-icon name="content_copy" />
+                          </OButton></span
                       ></strong>
-                      <q-btn
+                      <OButton
+                        variant="ghost-destructive"
+                        size="sm"
+                        class="copy-btn tw:mx-2"
                         @click.stop="goToLogs(props.row)"
-                        size="xs"
-                        label="Logs"
-                        dense
-                        class="copy-btn tw:py-2 tw:mx-2 tw:px-2"
-                        icon="search"
-                        flat
-                        style="
-                          color: #f2452f;
-                          border: #f2452f 1px solid;
-                          font-weight: bolder;
-                        "
-                      />
-                      <q-btn
+                      >
+                        <template #icon-left><q-icon name="search" /></template>
+                        Logs
+                      </OButton>
+                      <OButton
                         v-if="config.isEnterprise == 'true' && config.isCloud == 'false' && store.state.zoConfig.search_inspector_enabled"
+                        variant="ghost"
+                        size="sm"
+                        class="copy-btn"
                         @click.stop="goToInspector(props.row)"
-                        size="xs"
-                        label="Inspect"
-                        dense
-                        class="copy-btn tw:py-2 tw:px-2"
-                        icon="analytics"
-                        flat
-                        style="
-                          color: #5960b2;
-                          border: #5960b2 1px solid;
-                          font-weight: bolder;
-                        "
-                      />
+                      >
+                        <template #icon-left><q-icon name="analytics" /></template>
+                        Inspect
+                      </OButton>
                     </div>
                     <div class="tw:flex tw:items-start tw:justify-center">
                       <div class="scrollable-content expanded-sql">
@@ -182,18 +174,14 @@
                       <strong
                         >Function Definition :
                         <span>
-                          <q-btn
-                            @click.stop="
-                              copyToClipboard(
-                                props.row.function,
-                                'Function Defination',
-                              )
-                            "
-                            size="xs"
-                            dense
-                            flat
-                            icon="content_copy"
-                            class="copy-btn-function tw:ml-2 tw:py-2 tw:px-2" /></span
+                          <OButton
+                            variant="ghost"
+                            size="icon"
+                            class="copy-btn-function tw:ml-2"
+                            @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
+                          >
+                            <q-icon name="content_copy" />
+                          </OButton></span
                       ></strong>
                     </div>
 
@@ -288,6 +276,7 @@ import type { Ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
@@ -303,6 +292,7 @@ export default defineComponent({
     QTablePagination,
     AppTabs,
     QueryEditor,
+    OButton,
   },
   props: {
     isClicked: {
