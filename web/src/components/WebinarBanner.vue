@@ -81,10 +81,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <q-btn
+      <OButton
         v-if="webinarData.primaryButton"
-        no-caps
-        color="secondary"
+        variant="secondary"
+        as="a"
         class="webinar-home-register-btn"
         :href="webinarData.primaryButton.link"
         target="_blank"
@@ -92,9 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="webinar-home-register-btn"
       >
         {{ webinarData.primaryButton.text }}
-        <q-icon name="arrow_forward" class="q-ml-sm"
-size="1rem" />
-      </q-btn>
+        <q-icon name="arrow_forward" class="q-ml-sm" size="1rem" />
+      </OButton>
     </div>
   </div>
 </template>
@@ -102,6 +101,7 @@ size="1rem" />
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const store = useStore();
 
