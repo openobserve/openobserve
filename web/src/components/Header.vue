@@ -208,9 +208,9 @@ size="16px" class="q-mr-xs" />
         :borderless="true"
         flat
         dense
-        class="o2-button ai-hover-btn q-px-sm q-py-sm"
+        class="o2-button ai-hover-btn"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-        style="border-radius: 100%"
+        style="border-radius: 100%; padding: 0; height: 30px; width: 30px; top: 2px;"
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
       >

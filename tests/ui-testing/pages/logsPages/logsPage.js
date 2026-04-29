@@ -7076,4 +7076,139 @@ export class LogsPage {
     getQueryEditorLocator() {
         return this.page.locator(this.logsSearchBarQueryEditor);
     }
+
+    // ============================================================================
+    // MONACO SUGGESTION WIDGET METHODS - Bug #11400 auto-suggestions tests
+    // ============================================================================
+
+    /**
+     * Trigger Monaco's suggestion popup (Ctrl+Space) in the query editor.
+     * The editor must be focused first, and content should be set so cursor
+     * is positioned at a location where suggestions can be provided.
+     */
+    async triggerEditorSuggestions() {
+        // Focus the editor's input area (click auto-waits for actionability)
+        const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
+        await inputArea.click({ force: true });
+        // Trigger suggestion widget and wait for it to appear
+        await this.page.keyboard.press('Control+Space');
+        await this.waitForSuggestionWidgetVisible();
+        testLogger.info('Triggered editor suggestions via Ctrl+Space');
+    }
+
+    /**
+     * Check if the Monaco suggestion widget is currently visible.
+     * @returns {Promise<boolean>} True if the suggest-widget has the 'visible' class
+     */
+    async isSuggestionWidgetVisible() {
+        const isVisible = await this.page.evaluate(() => {
+            const widget = document.querySelector('.monaco-editor .suggest-widget');
+            if (!widget) return false;
+            return widget.classList.contains('visible') || widget.classList.contains('focused');
+        });
+        testLogger.info(`Suggestion widget visible: ${isVisible}`);
+        return isVisible;
+    }
+
+    /**
+     * Wait for the suggestion widget to become visible.
+     * @param {number} timeout - Timeout in ms (default: 5000)
+     */
+    async waitForSuggestionWidgetVisible(timeout = 5000) {
+        await this.page.waitForFunction(() => {
+            const widget = document.querySelector('.monaco-editor .suggest-widget');
+            if (!widget) return false;
+            return widget.classList.contains('visible') || widget.classList.contains('focused');
+        }, { timeout });
+        testLogger.info('Suggestion widget became visible');
+    }
+
+    /**
+     * Get all suggestion label texts from the suggestion widget.
+     * @returns {Promise<string[]>} Array of label text content
+     */
+    async getSuggestionLabels() {
+        const labels = await this.page.evaluate(() => {
+            const rows = document.querySelectorAll('.suggest-widget.visible .monaco-list-row');
+            return Array.from(rows).map(row => {
+                // Monaco renders labels inside .contents .main .label-name or directly in the row
+                const labelEl = row.querySelector('.contents .main .label-name');
+                if (labelEl) return labelEl.textContent || '';
+                // Fallback: get full row text content
+                return row.textContent || '';
+            });
+        });
+        testLogger.info(`Suggestion labels: [${labels.join(', ')}]`);
+        return labels;
+    }
+
+    /**
+     * Check if the suggestion widget contains any function names that should NOT
+     * appear in value context (e.g., match_all, fuzzy_match, match_all_raw_ignore_case).
+     * @returns {Promise<{hasFunctions: boolean, foundFunctions: string[]}>}
+     */
+    async checkSuggestionForFunctions() {
+        const functionNames = ['match_all', 'fuzzy_match', 'match_all_raw_ignore_case'];
+        const result = await this.page.evaluate((fns) => {
+            const rows = document.querySelectorAll('.suggest-widget.visible .monaco-list-row');
+            const rowTexts = Array.from(rows).map(row => row.textContent || '');
+            const foundFunctions = fns.filter(fn =>
+                rowTexts.some(text => text.includes(fn))
+            );
+            return {
+                hasFunctions: foundFunctions.length > 0,
+                foundFunctions,
+                rowCount: rowTexts.length,
+                firstFew: rowTexts.slice(0, 5),
+            };
+        }, functionNames);
+        testLogger.info('Suggestion function check', result);
+        return result;
+    }
+
+    /**
+     * Check if the Monaco query editor has warning-level decorations (squiggly
+     * underlines) in the DOM. Used to verify validateDoubleQuotes() markers.
+     * @returns {Promise<boolean>} True if .squiggly-warning elements found
+     */
+    async hasEditorWarningMarkers() {
+        try {
+            return await this.page.evaluate(() => {
+                const editorContainer =
+                    document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                if (!editorContainer) return false;
+                const warningSquiggles =
+                    editorContainer.querySelectorAll('.squiggly-warning');
+                return warningSquiggles.length > 0;
+            });
+        } catch (e) {
+            testLogger.warn('Error checking editor warning markers', { error: e.message });
+            return false;
+        }
+    }
+
+    /**
+     * Get the error state of the Monaco query editor DOM (not the Monaco API).
+     * Checks for red squiggly underlines and error overlay messages.
+     * @returns {Promise<string>} One of: 'no-error', 'has-error', 'has-error-widget', 'editor-not-found'
+     */
+    async getEditorErrorState() {
+        try {
+            return await this.page.evaluate(() => {
+                const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                if (!editor) return 'editor-not-found';
+                // Check for Monaco error squiggles (red underlines)
+                const squigglyError = editor.querySelector('.squiggly-error');
+                if (squigglyError) return 'has-error';
+                // Check for visible error messages in the editor area
+                const errorWidget = editor.querySelector('.contentWidgets .monaco-editor-overlaymessage');
+                if (errorWidget) return 'has-error-widget';
+                return 'no-error';
+            });
+        } catch (e) {
+            testLogger.warn('Error checking editor error state', { error: e.message });
+            return 'editor-not-found';
+        }
+    }
+
 }
