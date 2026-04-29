@@ -1976,7 +1976,15 @@ export default defineComponent({
       // After the tree is built, scroll the pre-selected span into view (e.g.
       // when arriving from spans search mode with a span_id in the URL).
       if (selectedSpanId.value) {
-        scrollSpanIntoView(selectedSpanId.value);
+        if (!spanMap.value[selectedSpanId.value]) {
+          showErrorNotification(
+            `Span ${selectedSpanId.value} not found in trace`,
+          );
+          searchObj.data.traceDetails.selectedSpanId = "";
+          searchObj.data.traceDetails.showSpanDetails = false;
+        } else {
+          scrollSpanIntoView(selectedSpanId.value);
+        }
       }
     }
 

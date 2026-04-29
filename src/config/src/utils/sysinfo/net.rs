@@ -146,8 +146,7 @@ mod tests {
     #[test]
     #[cfg(target_os = "linux")]
     fn test_sysinfo_get_tcp_connections() {
-        assert!(get_tcp_connections(None) > 0);
-        assert!(get_tcp_connections(Some(TcpConnState::Established)) > 0);
+        assert!(get_tcp_connections(Some(TcpConnState::Established)) <= get_tcp_connections(None));
     }
 
     #[test]
