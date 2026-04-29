@@ -922,6 +922,8 @@ export default defineComponent({
 
           searchObj.organizationIdetifier =
             router.currentRoute.value.query.org_identifier;
+          searchObj.data.stream.selectedStream.value =
+            router.currentRoute.value.query.stream;
           searchObj.data.stream.streamType =
             router.currentRoute.value.query.stream_type;
           resetSearchObj();
@@ -965,6 +967,8 @@ export default defineComponent({
         if (type == "search_scheduler") {
           searchObj.organizationIdetifier =
             router.currentRoute.value.query.org_identifier;
+          searchObj.data.stream.selectedStream.value =
+            router.currentRoute.value.query.stream;
           searchObj.data.stream.streamType =
             router.currentRoute.value.query.stream_type;
           resetSearchObj();
@@ -1300,6 +1304,7 @@ export default defineComponent({
     // Helper function for handling the trace explorer
     function handleTraceExplorer(queryParams) {
       searchObj.organizationIdentifier = queryParams.org_identifier;
+      searchObj.data.stream.selectedStream.value = queryParams.stream;
       searchObj.data.stream.streamType = queryParams.stream_type;
       resetSearchObj();
       resetStreamData();
@@ -3361,12 +3366,7 @@ export default defineComponent({
         // IMPORTANT: Don't clear query when switching from SQL mode to NLP mode
         // User may want to refine/fix their existing SQL query using AI
         // Only clear when not in NLP mode (i.e., switching to Quick mode or other modes)
-        // Also skip clearing when navigating from trace/stream explorer — the query was
-        // restored from URL params and should not be wiped by this watcher firing later
-        if (
-          !this.searchObj.meta.nlpMode &&
-          this.searchObj.meta.pageType === "logs"
-        ) {
+        if (!this.searchObj.meta.nlpMode) {
           this.searchObj.data.query = "";
           this.searchObj.data.editorValue = "";
         }
