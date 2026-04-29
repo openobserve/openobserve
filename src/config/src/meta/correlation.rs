@@ -672,4 +672,9 @@ mod tests {
         assert!(obj.contains_key("is_workload_type"));
         assert_eq!(obj["is_workload_type"], serde_json::json!(true));
     }
+
+    #[test]
+    fn test_default_upgrade_window() {
+        assert_eq!(default_upgrade_window(), 30);
+    }
 }

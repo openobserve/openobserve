@@ -425,4 +425,9 @@ mod tests {
         let json = serde_json::to_value(&tier).unwrap();
         assert!(json.as_object().unwrap().contains_key("condition"));
     }
+
+    #[test]
+    fn test_default_true_returns_true() {
+        assert!(default_true());
+    }
 }

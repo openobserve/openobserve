@@ -651,4 +651,9 @@ mod tests {
         let json = serde_json::to_value(&with_sources).unwrap();
         assert!(json.as_object().unwrap().contains_key("sources"));
     }
+
+    #[test]
+    fn test_default_include_defaults() {
+        assert!(default_include_defaults());
+    }
 }
