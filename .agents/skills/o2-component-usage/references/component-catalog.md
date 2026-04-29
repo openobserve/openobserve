@@ -1,82 +1,43 @@
 # O2 Component Catalog
 
-> **DRAFT** — Only add components here once they are built, reviewed, and merged into `web/src/lib/`.
+> **Living document** — Only add components here once they are built, reviewed, and merged into `web/src/lib/`.
 > Do not pre-populate with planned or hypothetical components.
+> **Update this file** every time a new O2 component is created (via `o2-component-create` skill) or a migration is completed.
 
 ---
 
 ## Built Components
 
-_None yet. This catalog will be populated as components are created using the `o2-component-create` skill._
+_None yet._
 
 ---
 
-## How to Add an Entry
+## Component Families
 
-When a component is built and ready, add a row:
+_None yet._
+
+---
+
+## How to Add a New Entry
+
+When a component is built and merged, add a row to the Built Components table:
+
+| O2 Component | Import path                        | Replaces   | Status |
+| ------------ | ---------------------------------- | ---------- | ------ |
+| `O{Name}`    | `@/lib/{group}/{Name}/O{Name}.vue` | `q-{name}` | Built  |
+
+Then add a section below with usage details:
 
 ```
-## {Group} / {ComponentName}
+### O{Name}
 
-**Import**: `import O{Name} from '@/lib/{group}/{Name}/{Name}.vue'`
-**Use for**: [short description of intended use cases]
-**Do NOT use for**: [what it is not designed for]
-**Props**: see `{Name}.types.ts`
+**Import**: `import O{Name} from '@/lib/{group}/{Name}/O{Name}.vue'`
+**Replaces**: `q-{name}`
+**Props**: see `O{Name}.types.ts` — permitted: size, variant, state only
 **Slots**: [list slot names]
 **Emits**: [list emits]
+**Family members**: [list if compound — all must be imported together]
 ```
-
-**Use for**: Any clickable action trigger — form submissions, navigation triggers, icon-only actions.  
-**Props**: `size` (`sm` | `md` | `lg`), `disabled`, `loading`, `type` (`button` | `submit` | `reset`)  
-**Slots**: `default` (label), `prefix` (icon left), `suffix` (icon right)  
-**Do NOT use for**: Navigation links (use `<router-link>` or `OLink`), decorative elements
-
-### OBadge ✅ (when built)
-
-**Use for**: Status indicators, counts, labels on list items.  
-**Props**: `variant` (`default` | `success` | `warning` | `error` | `info`)  
-**Do NOT use for**: Interactive elements, buttons styled as badges
-
-### OTag ✅ (when built)
-
-**Use for**: Removable labels, filter chips, selection tags.  
-**Props**: `removable`, `disabled`  
-**Emits**: `remove`  
-**Do NOT use for**: Static badges (use OBadge), navigation
-
-### OCard ✅ (when built)
-
-**Use for**: Grouping related content with a surface background.  
-**Slots**: `header`, `default`, `footer`  
-**Do NOT use for**: Inline content containers (use `div` with semantic tokens instead)
-
-### OAvatar 🔲
-
-**Use for**: User/entity visual representation with initials or image.
-
-### OIcon 🔲
-
-**Use for**: All icon rendering. Wraps lucide-vue-next icons with consistent sizing.  
-**Props**: `name`, `size`
-
----
-
-## forms/
-
-### OInput ✅ (when built)
-
-**Use for**: Single-line text, email, password, number, search inputs.  
-**Props**: `modelValue`, `type`, `placeholder`, `disabled`, `readonly`, `error`, `size`  
-**Emits**: `update:modelValue`, `blur`, `focus`  
-**Do NOT use for**: Multi-line text (use OTextarea)
-
-### OTextarea ✅ (when built)
-
-**Use for**: Multi-line text entry.  
-**Props**: `modelValue`, `rows`, `placeholder`, `disabled`, `error`, `resize`  
-**Do NOT use for**: Code editors (use Monaco), single-line inputs
-
-### OSelect ✅ (when built)
 
 **Use for**: Single or multi-option selection from a predefined list.  
 **Props**: `modelValue`, `options`, `multiple`, `disabled`, `placeholder`, `searchable`  

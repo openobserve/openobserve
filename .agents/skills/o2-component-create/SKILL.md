@@ -7,6 +7,8 @@ description: Create, audit, and refactor O2 internal Vue 3 component library com
 
 Use this skill when **creating**, **auditing**, **refactoring**, or **migrating** UI components in the O2 component library.
 
+> **Mandatory workflow**: Analysis → Design → Implement → Test → Validate. Steps cannot be skipped or reordered. No code may be written before the analysis report is complete.
+
 ## Key Facts
 
 - **Project**: `web/` inside the OpenObserve monorepo
@@ -84,11 +86,11 @@ export type {
   DropdownItemProps,
   DropdownItemEmits,
   DropdownItemSlots,
-} from "./ODropdownItem.types";
+} from "./ODropdownItem.types"
 export type {
   DropdownGroupProps,
   DropdownGroupSlots,
-} from "./ODropdownGroup.types";
+} from "./ODropdownGroup.types"
 ```
 
 **Why one file per component?** When a sub-component changes (e.g. new prop on `ODropdownItem`), you edit only `ODropdownItem.types.ts` and `ODropdownItem.spec.ts` — no risk of accidentally breaking the root component's types or tests.
@@ -96,8 +98,8 @@ export type {
 **No `index.ts` per component.** Import directly by path:
 
 ```ts
-import OButton from "@/lib/core/Button/OButton.vue";
-import type { ButtonProps } from "@/lib/core/Button/OButton.types";
+import OButton from "@/lib/core/Button/OButton.vue"
+import type { ButtonProps } from "@/lib/core/Button/OButton.types"
 ```
 
 A group-level barrel (`web/src/lib/core/index.ts`) is optional and added only once a group has multiple built components.
@@ -105,24 +107,105 @@ A group-level barrel (`web/src/lib/core/index.ts`) is optional and added only on
 - One component per folder. Compound sub-components co-locate in the same folder.
 - No extra files. Exception: large compound components may have a co-located composable (e.g. `useTable.ts`).
 
+## Prop Minimalism Principle
+
+**The smallest API surface wins.** Before adding any prop, ask: "Can the component make this decision internally?"
+
+Only three categories of props are permitted:
+
+| Category             | Examples                                    | Rationale                                 |
+| -------------------- | ------------------------------------------- | ----------------------------------------- |
+| **Semantic size**    | `size="sm" \| "md" \| "lg"`                 | Adapts to context without exposing pixels |
+| **Semantic variant** | `variant="primary" \| "ghost" \| "outline"` | Communicates intent, not style rules      |
+| **State**            | `disabled`, `loading`, `readonly`           | Behavioral flags only                     |
+
+**Forbidden props** (design decisions are baked into the component):
+
+- Shape/radius toggles (`rounded`, `pill`, `square`)
+- Color overrides (`color`, `text-color`, `bg-color`)
+- Border toggles (`bordered`, `no-border`, `outlined` separate from variant)
+- Spacing overrides (`dense`, `padding`, `compact`)
+- Any prop whose only effect is changing a CSS value
+
+If a genuine design need is not covered by the current variant set, **add a new named variant** — do not expose a raw style prop.
+
+---
+
 ## Workflow: Create a New Component
 
-### Step 1 — Scan Existing Code
+### Step 0 — Pre-Condition Check (MANDATORY)
 
-Before writing any code, scan for existing implementations:
+Before any code is written, confirm:
+
+- [ ] The component does NOT already exist in `web/src/lib/`
+- [ ] The equivalent Quasar component(s) have been identified (`q-btn`, `q-tabs`, etc.)
+- [ ] The target component family is fully scoped (e.g. "Tabs" means OTabs + OTab + OTabPanel + OTabPanels)
+
+**Do not proceed until all three are confirmed.**
+
+---
+
+### Step 1 — Full Codebase Analysis (MANDATORY — produce a written report)
+
+Scan the entire application before designing anything:
 
 ```
-grep_search for similar component names across web/src/components/
-grep_search for usage patterns in web/src/views/ and web/src/components/
+grep_search for "<q-{component-name}" across web/src/ to find all usages
+grep_search for every variant/modifier of the component (q-tabs, q-tab, q-tab-panels, q-tab-panel)
 ```
 
-- Identify all Quasar usages of the equivalent component (`q-btn`, `q-input`, etc.)
-- **Collect every visual style in active use**: record every `color`, `flat`, `outline`, `dense`, `size`, `round`, `push` combination that appears. These become required variants — the new O2 component must cover all of them.
-- Note what props and behaviors are actually used
-- Build a compatibility surface that covers all real usage, not just ideal usage
-- If this is a **family component**, identify all family members that need to be built
+**Required analysis output** — write out each of these before moving to Step 2:
 
-### Step 2 — Decide Design Tokens
+```
+## Analysis Report: {ComponentName}
+
+### Quasar equivalents found
+- <q-{name}> — {N} usages across {N} files
+
+### All props in active use
+| Prop | Values seen | Frequency |
+|------|-------------|-----------|
+| ...  | ...         | ...       |
+
+### All slots in active use
+| Slot name | Usage pattern |
+|-----------|---------------|
+
+### All event handlers in active use
+| Event | Handler pattern |
+|-------|----------------|
+
+### Visual variants identified
+List every distinct visual style: flat/ghost, outline, primary-colored, icon-only, dense/compact, etc.
+
+### Behavioral patterns
+List any non-trivial interaction: toggle state, routing, lazy-load, etc.
+
+### Proposed O2 variant set
+Based on ALL patterns above, the minimum named variants needed are: ...
+
+### Props that will be DROPPED (internal decisions)
+List every Quasar prop that will NOT be exposed as an O2 prop and why.
+```
+
+**⚠ Safeguard**: If any usage pattern cannot be covered by the proposed variant set, expand the variant set now — never leave a usage that would require a consumer to add inline styles.
+
+---
+
+### Step 2 — Design the Component API
+
+Using the analysis report:
+
+1. Define the minimal prop set (size, variant, state only — see Prop Minimalism Principle)
+2. Identify all **family members** that must be built together
+3. Write the `.types.ts` interface first — the API contract is reviewed before any `.vue` is created
+4. Verify every use-case from the analysis report is covered by the interface
+
+**Validation gate**: Every visual pattern from the analysis report must map to a named variant or be an intentionally dropped prop. No unmapped patterns allowed.
+
+---
+
+### Step 3 — Decide Design Tokens
 
 - List every visual property the component needs
 - Map to existing semantic tokens where possible
@@ -130,7 +213,9 @@ grep_search for usage patterns in web/src/views/ and web/src/components/
 - **Add tokens to BOTH** `web/src/lib/styles/tokens/component.css` (light) AND `web/src/lib/styles/tokens/dark.css` (dark overrides)
 - See [references/design-tokens.md](references/design-tokens.md) for naming conventions and dark mode pairing rules
 
-### Step 3 — Check Headless Library Need
+---
+
+### Step 4 — Check Headless Library Need
 
 - For ARIA-complex behavior: prefer **Reka UI** primitives — it is already confirmed
 - For other complex headless behavior (virtual scroll, form state):
@@ -138,65 +223,97 @@ grep_search for usage patterns in web/src/views/ and web/src/components/
   - **STOP** if the library is not confirmed — ask the user before installing
   - Only proceed after explicit confirmation
 
-### Step 4 — Implement
+---
+
+### Step 5 — Implement
 
 - Follow the Vue 3 SFC templates in [references/component-guide.md](references/component-guide.md)
 - All types in `.types.ts`, none inline in `.vue`
 - Strict TypeScript — no `any`, no implicit any
 - Every Tailwind class with `tw:` prefix
-- **`tw:` prefix with variant modifiers**: write the prefix **once** before the entire `variant:utility` string. `tw:data-[state=on]:bg-token` Γ£à ΓÇö `tw:data-[state=on]:tw:bg-token` Γ¥î. Confirm against `OTab.vue` as the ground-truth reference.
+- **`tw:` prefix with variant modifiers**: write the prefix **once** before the entire `variant:utility` string. `tw:data-[state=on]:bg-token` ✓ — `tw:data-[state=on]:tw:bg-token` ✗. Confirm against `OTab.vue` as the ground-truth reference.
 - RTL logical properties: `tw:ps-*`/`tw:pe-*`, not `tw:pl-*`/`tw:pr-*`; **and `tw:rounded-e-*`/`tw:rounded-s-*` for horizontal grouping**, not `tw:rounded-r-*`/`tw:rounded-l-*`. Vertical grouping (`rounded-t-*`/`rounded-b-*`) is fine as-is.
-- **Focus ring tokens**: `ring-*` utility classes must also go through the component token layer ΓÇö never reference base tokens directly in templates (e.g. use `ring-button-destructive-focus-ring`, not `ring-error-700`)
+- **Focus ring tokens**: `ring-*` utility classes must also go through the component token layer — never reference base tokens directly in templates
 - No SCSS. No `var(--*)` in templates. No hardcoded colors.
 - Variants via computed class map — see [references/component-guide.md](references/component-guide.md) § Variants
 - Accessibility: keyboard navigation, ARIA attributes, visible focus indicator
 - **Dark mode**: verify all token states look correct with `.dark` class on `<html>`
 
-### Step 5 — Write Tests
+---
+
+### Step 6 — Write Tests
 
 - See [references/component-guide.md](references/component-guide.md) § Tests for template
 - Cover: props, slots, emits, keyboard navigation, ARIA
-- **Reka UI context requirement**: components that require a root context (e.g. `DropdownMenuItem` inside `DropdownMenuRoot`) cannot be mounted standalone. Wrap them inside their open parent component in tests ΓÇö create a helper like `mountItemInDropdown()` that renders an open `ODropdown` with the item as a child.
+- **Reka UI context requirement**: components that require a root context cannot be mounted standalone. Wrap them inside their open parent component in tests — create a helper like `mountItemInParent()` that renders an open parent with the item as a child.
 - **`h()` import**: always import `h` from `'vue'`, never from `'vitest'`.
 
-### Step 6 — Validate
+---
+
+### Step 7 — Validate
 
 Run through the checklist in [references/component-guide.md](references/component-guide.md) § Completion Checklist before declaring done.
+
+**Additional validation: cross-reference analysis report**
+
+Go back to the Step 1 analysis report and confirm:
+
+- [ ] Every visual pattern from the report is covered by a named variant
+- [ ] Every in-use prop is either mapped to an O2 prop or documented as intentionally dropped
+- [ ] No usage in the codebase requires a consumer to add inline styles or classes to the O2 component
+- [ ] All text and icon colours are visually readable at resting state in both light and dark mode
+
+---
 
 ## Workflow: Audit / Refactor
 
 1. **Structure** — Correct `lib/` folder/file names, no `index.ts` per component?
-2. **Family completeness** — Are all family members built? (e.g. if OTabs exists, do OTab/OTabPanel/OTabPanels exist?)
-3. **TypeScript** — No `any`, all types in `.types.ts`?
-4. **Tokens** — No hardcoded colors or px values in token definitions, no SCSS, no `var(--*)` in templates?
-5. **Dark mode** — Every component token has a dark.css override? Tested in dark mode?
-6. **Quasar removal** — No `q-*` components inside library components?
-7. **Generic** — No app-specific logic (no store, router, API imports)?
-8. **Accessibility** — ARIA, keyboard, focus ring?
-9. **Tests** — Coverage, no snapshot-only?
-10. **Colour visibility** — Open the component in the browser in both light and dark mode and confirm: all text labels are readable at resting state, all icons are clearly visible, no foreground token resolves to a colour that blends into the background. Fix failing states by updating the token value, not by adding inline classes.
+2. **Family completeness** — Are all family members built?
+3. **Prop minimalism** — Does every prop fall into the three permitted categories (size, variant, state)?
+4. **TypeScript** — No `any`, all types in `.types.ts`?
+5. **Tokens** — No hardcoded colors or px values in token definitions, no SCSS, no `var(--*)` in templates?
+6. **Dark mode** — Every component token has a dark.css override? Tested in dark mode?
+7. **Quasar removal** — No `q-*` components inside library components?
+8. **Generic** — No app-specific logic (no store, router, API imports)?
+9. **Accessibility** — ARIA, keyboard, focus ring?
+10. **Tests** — Coverage, no snapshot-only?
+11. **Colour visibility** — Open the component in the browser in both light and dark mode and confirm all text labels are readable and icons are clearly visible. Fix by updating the token value, not by adding inline classes.
+
+---
+
+## Iterative Improvement Safeguard
+
+If during migration/replacement a usage pattern is found that the O2 component cannot handle:
+
+1. **STOP the replacement immediately**
+2. Go back to Step 1 analysis and add the missing pattern
+3. Update the component API (`.types.ts`) with the new variant or prop
+4. Implement the new variant in the component
+5. Only then resume the replacement
+
+**Never fix a missing case at the usage level** (inline class, style override). The component must be updated first.
+
+---
 
 ## Critical Rules
 
 - **NEVER** use Quasar components (`q-btn`, `q-input`, etc.) inside O2 library components
-- **NEVER** expose UI decision props (e.g. `rounded?: boolean`, `bordered?: boolean`) — design is baked in
+- **NEVER** expose UI decision props (e.g. `rounded?: boolean`, `bordered?: boolean`, `color?: string`) — design is baked in
 - **NEVER** use `var(--*)` in templates — Tailwind utilities only
 - **NEVER** use hardcoded colors (`tw:bg-[#4f46e5]`)
 - **NEVER** use hardcoded px values in token definitions — e.g. `--spacing-foo: 40px` → must be `var(--spacing-10)` referencing a `base.css` primitive
 - **NEVER** use SCSS — only `.css` token files and Tailwind
-- **NEVER** ship a component where resting/inactive foreground colours are invisible or near-invisible. `text-secondary` (grey-500 on white ≈ 3.7:1) fails WCAG AA for normal-weight body text. For interactive labels (tab names, button text, icon inside a control) that must be readable at rest, use `text-primary` (grey-900) or a dedicated component token with sufficient contrast. Reserve `text-secondary` only for supporting/helper text where reduced prominence is intentional and the context is clearly decorative. Icons rendered via `OIcon` use `currentColor` — if the parent token is too light, the icon will be invisible. Always verify resting, hover, active, and disabled states in the browser at 100% zoom in both light and dark modes before shipping.
+- **NEVER** ship a component where resting/inactive foreground colours are invisible or near-invisible. For interactive labels that must be readable at rest, use `text-primary` or a dedicated component token with sufficient contrast. Icons rendered via `OIcon` use `currentColor` — if the parent token is too light, the icon will be invisible. Always verify resting, hover, active, and disabled states in the browser at 100% zoom in both light and dark modes before shipping.
 - **NEVER** ship half a family (e.g. OTabs without OTab, OTabPanel, OTabPanels)
 - **NEVER** install a headless library (other than reka-ui / @tanstack/vue-form) without user confirmation
 - **NEVER** cross-import between library groups
 - **NEVER** import from `web/src/components/`, stores, router, or services inside `lib/`
-- **NEVER** ship a component with an incomplete variant set\*\* — before finalising, cross-reference every visual style that exists in the codebase for the Quasar equivalent and confirm that every one of those styles is covered by a variant. A missing variant forces consumers to add hardcoded classes, which is forbidden.
-- **OButton variant system (current)**: `primary`, `secondary`, `outline`, `ghost`, `ghost-primary`, `ghost-destructive`, `destructive`. Sizes: `sm` (32px), `md` (36px), `lg` (40px), `icon` (36×36px icon-only), `icon-circle` (32×32 rounded-full). Map Quasar: `flat`→`ghost`, `flat color="primary"`→`ghost-primary`, `flat color="negative"`→`ghost-destructive`, `outline`→`outline`, non-flat unelevated→`outline` or `secondary`, primary-colored→`primary`.
-- **OButton border behavior vs Quasar**: This project's `quasar-overrides.scss` gives ALL non-flat `q-btn` a `1px solid` border via `.q-btn:before`. When a new OButton variant is added that replaces a non-flat q-btn pattern, it MUST expose a visible border (use `tw:border` in at least the default state) to maintain visual parity. The `ghost` variant intentionally has no border — only use it as a replacement for explicitly `flat` or `no-border` Quasar buttons.
-- **OButtonGroup outer border**: The Quasar `.q-btn-group { border: 1px solid }` CSS is NOT replicated in OButtonGroup. OButtonGroup provides only inner dividers (`tw:divide-x`). Consumers that require an outer border (e.g. to match legacy `q-btn-group` appearance) must add `class="el-border"` to the OButtonGroup.
+- **NEVER** ship a component with an incomplete variant set — before finalising, cross-reference every visual style that exists in the codebase for the Quasar equivalent and confirm that every one of those styles is covered by a variant
+- **NEVER** skip the Step 1 analysis report — designing without analysis produces components that miss real usage patterns and force consumers into workarounds
 - **ALWAYS** use `tw:` prefix on every Tailwind utility
-- **ALWAYS** write variant modifiers with a **single** `tw:` prefix before the entire string: `tw:data-[state=on]:bg-token` Γ£à ΓÇö **never** double the prefix: `tw:data-[state=on]:tw:bg-token` Γ¥î
+- **ALWAYS** write variant modifiers with a **single** `tw:` prefix before the entire string: `tw:data-[state=on]:bg-token` ✓ — never double the prefix: `tw:data-[state=on]:tw:bg-token` ✗
 - **ALWAYS** use RTL logical border-radius variants for horizontal grouped elements: `tw:rounded-e-*` / `tw:rounded-s-*`, never `tw:rounded-r-*` / `tw:rounded-l-*`
-- **NEVER** reference base tokens in templates for any utility including focus rings ΓÇö always go through the component token layer
+- **NEVER** reference base tokens in templates for any utility including focus rings — always go through the component token layer
 
 ## References
 
