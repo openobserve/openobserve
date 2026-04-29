@@ -296,4 +296,31 @@ mod tests {
         assert_eq!(def.provider, "");
         assert_eq!(def.description, "A test model");
     }
+
+    #[test]
+    fn test_try_from_model_invalid_tiers_json_returns_err() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id);
+        model.tiers = serde_json::json!("not-an-array");
+        let result = ModelPricingDefinition::try_from(model);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_try_from_model_unknown_source_defaults() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id);
+        model.source = "unknown_source".to_string();
+        let def = ModelPricingDefinition::try_from(model).unwrap();
+        // PricingSource::from on unknown string should give default (not panic)
+        assert!(!format!("{:?}", def.source).is_empty());
+    }
+
+    #[test]
+    fn test_try_from_model_children_always_empty() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id);
+        let def = ModelPricingDefinition::try_from(model).unwrap();
+        assert!(def.children.is_empty());
+    }
 }

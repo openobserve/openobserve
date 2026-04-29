@@ -211,4 +211,29 @@ mod tests {
         let result = Template::try_from(model);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_try_from_model_http_type_case_insensitive() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id, None, "HTTP");
+        let tmpl = Template::try_from(model).unwrap();
+        assert!(matches!(tmpl.template_type, TemplateType::Http));
+    }
+
+    #[test]
+    fn test_try_from_model_is_default_true() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id, None, "http");
+        model.is_default = true;
+        let tmpl = Template::try_from(model).unwrap();
+        assert!(tmpl.is_default);
+    }
+
+    #[test]
+    fn test_try_from_model_body_preserved() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id, None, "http");
+        let tmpl = Template::try_from(model).unwrap();
+        assert_eq!(tmpl.body, r#"{"text": "alert"}"#);
+    }
 }
