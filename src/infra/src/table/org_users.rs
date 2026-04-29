@@ -587,4 +587,27 @@ mod tests {
         assert_eq!(p.org_id, "org-3");
         assert!(p.rum_token.is_none());
     }
+
+    #[test]
+    fn test_from_model_to_org_user_record() {
+        use super::super::entity::org_users::Model;
+        let model = Model {
+            id: "ou-1".to_string(),
+            email: "model@example.com".to_string(),
+            org_id: "myorg".to_string(),
+            role: 0, // maps to some UserRole variant
+            token: "tok-xyz".to_string(),
+            rum_token: Some("rum-abc".to_string()),
+            created_at: 1_000_000,
+            updated_at: 2_000_000,
+            allow_static_token: true,
+        };
+        let rec = OrgUserRecord::from(model);
+        assert_eq!(rec.email, "model@example.com");
+        assert_eq!(rec.org_id, "myorg");
+        assert_eq!(rec.token, "tok-xyz");
+        assert_eq!(rec.rum_token.as_deref(), Some("rum-abc"));
+        assert!(rec.allow_static_token);
+        assert_eq!(rec.created_at, 1_000_000);
+    }
 }

@@ -343,4 +343,28 @@ mod tests {
         assert!(!back.is_external);
         assert!(back.organizations.is_empty());
     }
+
+    #[test]
+    fn test_from_model_to_user_record() {
+        use super::super::entity::users::Model;
+        let model = Model {
+            id: "uid-1".to_string(),
+            email: "model@example.com".to_string(),
+            first_name: "Model".to_string(),
+            last_name: "User".to_string(),
+            password: "pw".to_string(),
+            salt: "salt".to_string(),
+            is_root: true,
+            password_ext: Some("ext".to_string()),
+            user_type: 0, // 0 = Internal
+            created_at: 1_000_000,
+            updated_at: 2_000_000,
+        };
+        let rec = UserRecord::from(model);
+        assert_eq!(rec.email, "model@example.com");
+        assert!(rec.is_root);
+        assert_eq!(rec.password_ext, Some("ext".to_string()));
+        assert_eq!(rec.created_at, 1_000_000);
+        assert_eq!(rec.updated_at, 2_000_000);
+    }
 }
