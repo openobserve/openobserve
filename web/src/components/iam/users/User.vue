@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("iam.basicUsers") }}
         </div>
-        <div class="full-width tw:flex tw:justify-end">
+        <div class="full-width tw:flex tw:justify-end tw:gap-3">
           <q-input
               v-model="filterQuery"
               borderless
@@ -48,13 +48,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div class="col-6" v-else>
-            <q-btn
-              class="q-ml-sm o2-primary-button tw:h-[36px]"
-              flat
-              :label="t(`user.add`)"
+            <OButton
+              variant="primary"
+              size="sm"
               @click="addRoutePush({})"
               data-test="add-basic-user"
-            />
+            >
+              {{ t('user.add') }}
+            </OButton>
           </div>
         </div>
         </div>
@@ -115,48 +116,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #body-cell-actions="props">
             <q-td :props="props" side>
-              <q-btn
+              <OButton
                 v-if="props.row.enableDelete && props.row.status != 'pending'"
                 :title="t('user.delete')"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                :icon="outlinedDelete"
+                variant="ghost"
+                size="icon-circle-sm"
                 @click="confirmDeleteAction(props)"
-                style="cursor: pointer !important"
                 :data-test="`delete-basic-user-${props.row.email}`"
               >
-              </q-btn>
-              <q-btn
+                <q-icon :name="outlinedDelete" />
+              </OButton>
+              <OButton
                 v-if="props.row.status == 'pending' && props.row.token"
                 :title="t('user.revoke_invite')"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                icon="cancel"
+                variant="ghost"
+                size="icon-circle-sm"
                 @click="confirmRevokeAction(props)"
-                style="cursor: pointer !important"
                 :data-test="`revoke-invite-${props.row.email}`"
               >
-              </q-btn>
-              <q-btn
+                <q-icon name="cancel" />
+              </OButton>
+              <OButton
                 v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
                 :title="t('user.update')"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                icon="edit"
+                variant="ghost"
+                size="icon-circle-sm"
                 @click="addRoutePush(props)"
-                style="cursor: pointer !important"
                 :data-test="`edit-basic-user-${props.row.email}`"
               >
-            </q-btn>
+                <q-icon name="edit" />
+              </OButton>
             </q-td>
           </template>
           <template #bottom="scope">
@@ -169,21 +158,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : t("user.header") + "s"
                 }}
               </div>
-              <q-btn
+              <OButton
                 v-if="selectedUsers.length > 0"
                 data-test="users-list-delete-users-btn"
-                class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-secondary-button-dark'
-                    : 'o2-secondary-button-light'
-                "
-                dense
+                variant="secondary"
+                size="sm"
+                class="tw:mr-2"
                 @click="openBulkDeleteDialog"
               >
-                <q-icon name="delete" size="16px" />
-                <span class="tw:ml-2">Delete</span>
-              </q-btn>
+                <template #icon-left><q-icon name="delete" /></template>
+                Delete
+              </OButton>
               <QTablePagination
               :scope="scope"
               :resultTotal="resultTotal"
@@ -235,18 +220,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated class="q-mr-sm">
+          <OButton v-close-popup="true" variant="outline" size="sm-action">
             {{ t("user.cancel") }}
-          </q-btn>
-          <q-btn
+          </OButton>
+          <OButton
             v-close-popup="true"
-            unelevated
-            class="no-border"
-            color="primary"
+            variant="primary"
+            size="sm-action"
             @click="deleteUser"
           >
             {{ t("user.ok") }}
-          </q-btn>
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -259,17 +243,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated class="q-mr-sm o2-secondary-button">
+          <OButton v-close-popup="true" variant="outline" size="sm-action">
             {{ t("user.cancel") }}
-          </q-btn>
-          <q-btn
+          </OButton>
+          <OButton
             v-close-popup="true"
-            unelevated
-            class="o2-primary-button"
+            variant="primary"
+            size="sm-action"
             @click="revokeInvite"
           >
             {{ t("user.ok") }}
-          </q-btn>
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -282,18 +266,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated class="q-mr-sm">
+          <OButton v-close-popup="true" variant="outline" size="sm-action">
             Cancel
-          </q-btn>
-          <q-btn
+          </OButton>
+          <OButton
             v-close-popup="true"
-            unelevated
-            class="no-border"
-            color="primary"
+            variant="primary"
+            size="sm-action"
             @click="bulkDeleteUsers"
           >
             OK
-          </q-btn>
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -303,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -336,6 +320,7 @@ export default defineComponent({
     NoData,
     AddUser,
     MemberInvitation,
+    OButton,
   },
   emits: [
     "updated:fields",

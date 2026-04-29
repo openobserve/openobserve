@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("serviceAccounts.header") }}
           </div>
-          <div class="full-width tw:flex tw:justify-end">
+          <div class="full-width tw:flex tw:justify-end tw:gap-3">
             <q-input
                 v-model="filterQuery"
                 borderless
@@ -43,12 +43,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon class="o2-search-input-icon" name="search" />
                 </template>
               </q-input>
-              <q-btn
-                class="q-ml-sm o2-primary-button tw:h-[36px]"
-                flat
-                :label="t(`serviceAccounts.add`)"
+              <OButton
+                variant="primary"
+                size="sm"
                 @click="addRoutePush({})"
-              />
+              >
+                {{ t('serviceAccounts.add') }}
+              </OButton>
           </div>
       </div>
       </div>
@@ -107,48 +108,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-badge>
                 </template>
                 <template v-else>
-                  <q-btn
+                  <OButton
                     data-test="service-accounts-refresh"
                     :title="t('serviceAccounts.refresh')"
-                    icon="refresh"
-                    class="q-ml-xs"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
-                    style="cursor: pointer !important"
+                    variant="ghost"
+                    size="icon-circle-sm"
                     @click="confirmRefreshAction(props.row)"
                   >
-                  </q-btn>
-                  <q-btn
+                    <q-icon name="refresh" />
+                  </OButton>
+                  <OButton
                     data-test="service-accounts-edit"
                     :title="t('serviceAccounts.update')"
-                    icon="edit"
-                    class="q-ml-xs"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
+                    variant="ghost"
+                    size="icon-circle-sm"
                     @click="addRoutePush(props)"
-                    style="cursor: pointer !important"
                   >
-                  </q-btn>
-                  <q-btn
+                    <q-icon name="edit" />
+                  </OButton>
+                  <OButton
                     data-test="service-accounts-delete"
                     :title="t('serviceAccounts.delete')"
-                    class="q-ml-xs"
-                    :icon="outlinedDelete"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
-                    style="cursor: pointer !important"
+                    variant="ghost"
+                    size="icon-circle-sm"
                     @click="confirmDeleteAction(props)"
                   >
-                  </q-btn>
+                    <q-icon :name="outlinedDelete" />
+                  </OButton>
                 </template>
               </q-td>
             </template>
@@ -157,21 +143,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
                   {{ resultTotal }} {{ t('serviceAccounts.header') }}
                 </div>
-                <q-btn
+                <OButton
                   v-if="selectedAccounts.length > 0"
                   data-test="service-accounts-list-delete-accounts-btn"
-                  class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-secondary-button-dark'
-                      : 'o2-secondary-button-light'
-                  "
-                  dense
+                  variant="secondary"
+                  size="sm"
+                  class="tw:mr-2"
                   @click="openBulkDeleteDialog"
                 >
-                  <q-icon name="delete" size="16px" />
-                  <span class="tw:ml-2">Delete</span>
-                </q-btn>
+                  <template #icon-left><q-icon name="delete" /></template>
+                  Delete
+                </OButton>
                 <QTablePagination
                   :scope="scope"
                   :resultTotal="resultTotal"
@@ -233,24 +215,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn
+          <OButton
             v-close-popup="true"
-            unelevated
-            class="q-mr-sm"
+            variant="outline"
+            size="sm-action"
             data-test="cancel-refresh-service-token"
           >
             {{ t("user.cancel") }}
-          </q-btn>
-          <q-btn
+          </OButton>
+          <OButton
             data-test="confirm-refresh-service-token"
             v-close-popup="true"
-            unelevated
-            class="no-border"
-            color="primary"
+            variant="primary"
+            size="sm-action"
             @click="refreshServiceToken(toBeRefreshed)"
           >
             {{ t("user.ok") }}
-          </q-btn>
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -262,18 +243,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated class="q-mr-sm">
+          <OButton v-close-popup="true" variant="outline" size="sm-action">
             {{ t("user.cancel") }}
-          </q-btn>
-          <q-btn
+          </OButton>
+          <OButton
             v-close-popup="true"
-            unelevated
-            class="no-border"
-            color="primary"
+            variant="primary"
+            size="sm-action"
             @click="deleteUser"
           >
             {{ t("user.ok") }}
-          </q-btn>
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -286,18 +266,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated class="q-mr-sm">
+          <OButton v-close-popup="true" variant="outline" size="sm-action">
             Cancel
-          </q-btn>
-          <q-btn
+          </OButton>
+          <OButton
             v-close-popup="true"
-            unelevated
-            class="no-border"
-            color="primary"
+            variant="primary"
+            size="sm-action"
             @click="bulkDeleteServiceAccounts"
           >
             OK
-          </q-btn>
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -306,7 +285,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
     <q-card-section  class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center" >
       <div>Service Account Token </div>
-          <q-btn data-test="sa-cancel-button" dense flat icon="cancel" size="md" @click="isShowToken = false" style="cursor: pointer" />
+          <OButton data-test="sa-cancel-button" variant="ghost" size="icon-circle-sm" @click="isShowToken = false">
+            <q-icon name="cancel" />
+          </OButton>
     </q-card-section>
 
     <q-card-section>
@@ -321,23 +302,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <!-- Buttons section taking 25% of the width -->
   <div class="tw:flex tw:justify-end tw:gap-1" style="flex: 1; max-width: 25%;">
-    <q-btn
-      @click.stop="copyToClipboard(serviceToken)"
-      size="lg"
-      dense
-      outline
+    <OButton
+      variant="outline"
+      size="icon-md"
       :title="t('serviceAccounts.copyToken')"
-      icon="content_copy"
-      class="q-mr-xs"
-    />
-    <q-btn
-      @click.stop="downloadTokenAsFile(serviceToken)"
-      size="lg"
-      dense
-      outline
+      class="tw:mr-1"
+      @click.stop="copyToClipboard(serviceToken)"
+    >
+      <q-icon name="content_copy" />
+    </OButton>
+    <OButton
+      variant="outline"
+      size="icon-md"
       :title="t('serviceAccounts.downloadToken')"
-      icon="file_download"
-    />
+      @click.stop="downloadTokenAsFile(serviceToken)"
+    >
+      <q-icon name="file_download" />
+    </OButton>
   </div>
   
 </div>
@@ -358,6 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 
 import { defineComponent, ref, onActivated, onBeforeMount, onMounted, watch } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -384,7 +366,7 @@ import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { QTablePagination,  NoData,AddServiceAccount, },
+  components: { QTablePagination, NoData, AddServiceAccount, OButton },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
