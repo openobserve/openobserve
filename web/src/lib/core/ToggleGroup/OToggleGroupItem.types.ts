@@ -4,11 +4,16 @@
 
 import type { AcceptableValue } from "reka-ui";
 
+/** Size controls padding and font-size — height is determined by content */
+export type ToggleGroupItemSize = "md" | "xs";
+
 export interface ToggleGroupItemProps {
   /** Unique value for this option — required */
   value: AcceptableValue;
   /** Disables only this item */
   disabled?: boolean;
+  /** Size controls padding and font-size. md (default) = full toolbar; xs = compact inline toggle */
+  size?: ToggleGroupItemSize;
 }
 
 export interface ToggleGroupItemSlots {

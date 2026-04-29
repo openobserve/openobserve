@@ -7,9 +7,15 @@ import { ToggleGroupItem } from "reka-ui";
 
 const props = withDefaults(defineProps<ToggleGroupItemProps>(), {
   disabled: false,
+  size: "md",
 });
 
 defineSlots<ToggleGroupItemSlots>();
+
+const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
+  md: "tw:h-9 tw:px-3 tw:text-sm",
+  xs: "tw:px-2 tw:py-0.5 tw:text-xs",
+};
 </script>
 
 <template>
@@ -19,9 +25,9 @@ defineSlots<ToggleGroupItemSlots>();
     :class="[
       // Layout
       'tw:inline-flex tw:items-center tw:justify-center tw:gap-2',
-      'tw:h-9 tw:px-3 tw:text-sm tw:font-medium tw:whitespace-nowrap',
+      sizeClasses[props.size],
       // Base state - inactive
-      'tw:bg-toggle-item-bg tw:text-toggle-item-text',
+      'tw:bg-toggle-item-bg tw:text-toggle-item-text tw:font-medium tw:whitespace-nowrap',
       'tw:transition-colors tw:duration-150',
       'tw:outline-none tw:cursor-pointer',
       // Hover (inactive only - :enabled equivalent)

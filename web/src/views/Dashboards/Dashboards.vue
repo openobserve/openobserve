@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- import dashboard button with dropdown -->
           <ODropdown side="bottom" align="end" data-test="dashboard-import">
             <template #trigger>
-              <OButton variant="outline" size="sm" class="q-ml-sm tw:h-9">
+              <OButton variant="outline" size="sm" class="q-ml-sm">
                 {{ t(`dashboard.import`) }}
                 <template #icon-right>
                   <q-icon name="expand_more" size="xs" />

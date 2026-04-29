@@ -417,16 +417,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- View mode toggle toolbar -->
         <div class="tw:flex tw:items-center tw:justify-start tw:pb-[0.3rem]">
           <OToggleGroup v-model="attributesViewMode" class="tw:rounded!">
-            <OToggleGroupItem
-              value="json"
-              class="tw:px-[0.5rem]! tw:py-[0.1rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]"
-              >JSON</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              value="table"
-              class="tw:px-[0.5rem]! tw:py-[0.1rem]! tw:text-[0.7rem]! tw:tracking-[0.03rem]"
-              >Table</OToggleGroupItem
-            >
+            <OToggleGroupItem value="json" size="xs">JSON</OToggleGroupItem>
+            <OToggleGroupItem value="table" size="xs">Table</OToggleGroupItem>
           </OToggleGroup>
         </div>
         <!-- JSON View -->

@@ -6,6 +6,7 @@ import type { AcceptableValue } from "reka-ui";
 
 // Re-export item types so callers can import everything from one place if needed
 export type {
+  ToggleGroupItemSize,
   ToggleGroupItemProps,
   ToggleGroupItemSlots,
 } from "./OToggleGroupItem.types";
