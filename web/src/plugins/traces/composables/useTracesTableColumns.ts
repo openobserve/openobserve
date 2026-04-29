@@ -108,16 +108,6 @@ const KNOWN_COLUMN_META: Record<
     size: 120,
     meta: { align: "center", slot: true, disableCellAction: true },
   },
-  status_code: {
-    header: "Status Code",
-    size: 140,
-    meta: { align: "center", slot: true, closable: true },
-  },
-  method: {
-    header: "Method",
-    size: 140,
-    meta: { align: "center", slot: true, closable: true },
-  },
   service_latency: {
     header: "Service Latency",
     size: 160,

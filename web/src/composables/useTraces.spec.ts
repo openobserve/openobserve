@@ -811,8 +811,6 @@ describe("useTraces", () => {
         "operation_name",
         "duration",
         "span_status",
-        "status_code",
-        "method",
       ]);
     });
 

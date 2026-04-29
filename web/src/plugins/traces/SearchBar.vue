@@ -820,6 +820,10 @@ export default defineComponent({
       // Clear brush selections from metrics dashboard
       searchObj.meta.metricsRangeFilters.clear();
 
+      // Reset sort to defaults
+      searchObj.meta.resultGrid.sortBy = "start_time";
+      searchObj.meta.resultGrid.sortOrder = "desc";
+
       // Emit event to notify parent that filters were reset
       emit("filters-reset");
 
