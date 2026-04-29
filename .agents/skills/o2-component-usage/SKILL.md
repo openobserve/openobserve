@@ -57,6 +57,7 @@ All O2 components use the `O` prefix (e.g. `OButton`, `OTabs`, `OModal`).
 | `ODropdownGroup`     | `@/lib/overlay/Dropdown/ODropdownGroup.vue`     | `q-item-section` group with label | Built  |
 | `ODropdownSeparator` | `@/lib/overlay/Dropdown/ODropdownSeparator.vue` | `q-separator` inside dropdown     | Built  |
 | `OSeparator`         | `@/lib/core/Separator/Separator.vue`            | `q-separator`                     | Built  |
+| `OIcon`              | `@/lib/core/Icon/OIcon.vue`                     | `q-icon`                          | Built  |
 | `OTabs`              | `@/lib/navigation/Tabs/OTabs.vue`               | `q-tabs`                          | Built  |
 | `OTab`               | `@/lib/navigation/Tabs/OTab.vue`                | `q-tab`                           | Built  |
 | `ORouteTab`          | `@/lib/navigation/Tabs/ORouteTab.vue`           | `q-route-tab`                     | Built  |
@@ -190,6 +191,61 @@ function handleOpenChange(v: boolean) {
   emit("update:open", v);
 }
 ```
+
+### Icon (replaces `q-icon`)
+
+```vue
+<!-- q-icon BEFORE -->
+<q-icon name="search" size="16px" />
+<q-icon name="info" size="md" color="primary" />
+<q-icon name="img:/path/to/icon.svg" size="24px" />
+<q-icon color="currentColor"><svg>…</svg></q-icon>
+
+<!-- OIcon AFTER -->
+<OIcon name="search" size="16px" aria-hidden="true" />
+<OIcon name="info" size="md" class="tw:text-primary-600" aria-hidden="true" />
+<OIcon name="img:/path/to/icon.svg" size="24px" aria-hidden="true" />
+<OIcon aria-hidden="true"><svg>…</svg></OIcon>
+```
+
+**OIcon props:**
+
+| Prop   | Type                                   | Notes                                                                                             |
+| ------ | -------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `name` | `string \| undefined`                  | Material Icons ligature (e.g. `'search'`). Prefix with `img:` for image icons. Omit for SVG slot. |
+| `size` | `'xs'\|'sm'\|'md'\|'lg'\|'xl'\|string` | Named sizes: xs=12px, sm=16px, md=20px, lg=24px, xl=32px. Any CSS length also accepted.           |
+
+**Key migration notes:**
+
+- **No `color` prop** — `OIcon` has no color prop. Icons render in `currentColor` by default, which means they inherit the text color of their parent automatically. **Set color on the parent element** using semantic tokens, not on the icon itself.
+
+  ```vue
+  <!-- ❌ Wrong — hardcoded base palette class on the icon -->
+  <OIcon name="info" class="tw:text-primary-600" />
+
+  <!-- ✅ Correct — color comes from the parent's semantic text token -->
+  <span class="tw:text-text-primary">
+    <OIcon name="info" aria-hidden="true" />
+    Info
+  </span>
+  ```
+
+  For the common Quasar `color` → semantic token mapping:
+
+  | Quasar `color` | Semantic token to set on parent |
+  | -------------- | ------------------------------- |
+  | `primary`      | `tw:text-text-primary`          |
+  | `secondary`    | `tw:text-text-secondary`        |
+  | `positive`     | `tw:text-success-700` ¹         |
+  | `negative`     | `tw:text-error-600`             |
+  | `warning`      | `tw:text-warning-700` ¹         |
+  | `currentColor` | no change — already the default |
+
+  > ¹ `success-700` and `warning-700` are base palette tokens exposed via semantic.css. If a dedicated semantic alias (`--color-text-success`, `--color-text-warning`) is added to `semantic.css` in the future, prefer that instead.
+
+- **Accessibility** — decorative icons must have `aria-hidden="true"`. Semantic icons (standalone, no adjacent label) need `aria-label="…"` and `role="img"`.
+- **Quasar named sizes** — `xs`, `sm`, `md`, `lg`, `xl` are supported and map through component tokens (`--text-icon-xs` … `--text-icon-xl`). Do NOT pass the Quasar pixel mapping manually.
+- **`@quasar/extras` SVG objects** — some usages pass `:name="outlinedWindow"` where the value is an SVG path string imported from `@quasar/extras`. For these, use `<OIcon>` with a `<svg>` slot instead of the `name` prop.
 
 ## Component Not Available?
 
