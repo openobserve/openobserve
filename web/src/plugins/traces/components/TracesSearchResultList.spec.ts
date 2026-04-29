@@ -66,14 +66,7 @@ vi.mock("@/composables/useTraces", () => ({
       "status",
       "service_latency",
     ],
-    spans: [
-      "service_name",
-      "operation_name",
-      "duration",
-      "span_status",
-      "status_code",
-      "method",
-    ],
+    spans: ["service_name", "operation_name", "duration", "span_status"],
   },
 }));
 
