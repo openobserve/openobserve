@@ -1611,17 +1611,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ confirmMessage }}
         </q-card-section>
 
-        <q-card-actions align="right">
+        <q-card-actions align="right" class="tw:gap-2">
           <OButton
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
-            variant="secondary"
-            size="sm"
+            variant="outline"
+            size="sm-action"
             @click="cancelConfirmDialog"
           >{{ t('confirmDialog.cancel') }}</OButton>
           <OButton
             data-test="logs-search-bar-confirm-dialog-ok-btn"
             variant="primary"
-            size="sm"
+            size="sm-action"
             @click="confirmDialogOK"
           >{{ t('confirmDialog.ok') }}</OButton>
         </q-card-actions>
@@ -1636,17 +1636,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ confirmMessageSavedView }}
         </q-card-section>
 
-        <q-card-actions align="right">
+        <q-card-actions align="right" class="tw:gap-2">
           <OButton
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
-            variant="secondary"
-            size="sm"
+            variant="outline"
+            size="sm-action"
             @click="cancelConfirmDialog"
           >{{ t('confirmDialog.cancel') }}</OButton>
           <OButton
             data-test="logs-search-bar-confirm-dialog-ok-btn"
             variant="primary"
-            size="sm"
+            size="sm-action"
             @click="confirmDialogOK"
           >{{ t('confirmDialog.ok') }}</OButton>
         </q-card-actions>
@@ -1710,18 +1710,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-card-section>
 
-        <q-card-actions align="right">
+        <q-card-actions align="right" class="tw:gap-2">
           <OButton
-            variant="secondary"
-            size="sm"
-            class="q-mr-sm"
+            variant="outline"
+            size="sm-action"
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
             v-close-popup
           >{{ t('confirmDialog.cancel') }}</OButton>
           <OButton
             variant="primary"
-            size="sm"
-            class="q-mr-sm"
+            size="sm-action"
             data-test="logs-search-bar-confirm-dialog-ok-btn"
             @click="downloadRangeData"
           >{{ t('search.btnDownload') }}</OButton>
@@ -1775,26 +1773,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-card-section>
 
-        <q-card-actions align="right">
+        <q-card-actions align="right" class="tw:gap-2">
           <OButton
             data-test="saved-view-dialog-cancel-btn"
-            variant="secondary"
-            size="sm"
-            class="q-mr-sm"
+            variant="outline"
+            size="sm-action"
             v-close-popup
           >{{ t('confirmDialog.cancel') }}</OButton>
           <OButton
             data-test="saved-view-dialog-save-btn"
             v-if="!saveViewLoader"
             variant="primary"
-            size="sm"
+            size="sm-action"
             @click="handleSavedView"
           >{{ t('common.save') }}</OButton>
           <OButton
             data-test="saved-view-dialog-loading-btn"
             v-if="saveViewLoader"
             variant="primary"
-            size="sm"
+            size="sm-action"
             :loading="true"
           >{{ t('confirmDialog.loading') }}</OButton>
         </q-card-actions>
@@ -1859,26 +1856,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-card-section>
 
-        <q-card-actions align="right">
+        <q-card-actions align="right" class="tw:gap-2">
           <OButton
             data-test="saved-function-dialog-cancel-btn"
-            variant="secondary"
-            size="sm"
-            class="q-mr-sm"
+            variant="outline"
+            size="sm-action"
             v-close-popup
           >{{ t('confirmDialog.cancel') }}</OButton>
           <OButton
             data-test="saved-view-dialog-save-btn"
             v-if="!saveFunctionLoader"
             variant="primary"
-            size="sm"
+            size="sm-action"
             @click="saveFunction"
           >{{ t('confirmDialog.ok') }}</OButton>
           <OButton
             data-test="saved-function-dialog-loading-btn"
             v-if="saveFunctionLoader"
             variant="primary"
-            size="sm"
+            size="sm-action"
             :loading="true"
           >{{ t('confirmDialog.loading') }}</OButton>
         </q-card-actions>
@@ -1933,12 +1929,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-card-section>
 
-        <q-card-actions align="right">
+        <q-card-actions align="right" class="tw:gap-2">
           <OButton
             data-test="search-scheduler-max-records-cancel-btn"
-            variant="secondary"
-            size="sm"
-            class="q-mr-sm"
+            variant="outline"
+            size="sm-action"
             v-close-popup
             @click="
               {
@@ -1950,7 +1945,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="search-scheduler-max-records-submit-btn"
             variant="primary"
-            size="sm"
+            size="sm-action"
             @click="addJobScheduler"
             v-close-popup
           >{{ t('confirmDialog.ok') }}</OButton>
@@ -1979,17 +1974,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="search-inspect-trace-id-input"
           />
         </q-card-section>
-        <q-card-actions align="right">
+        <q-card-actions align="right" class="tw:gap-2">
           <OButton
-            variant="secondary"
-            size="sm"
-            class="q-mr-sm"
+            variant="outline"
+            size="sm-action"
             v-close-popup
             @click="searchInspectDialog = false"
           >{{ t('confirmDialog.cancel') }}</OButton>
           <OButton
             variant="primary"
-            size="sm"
+            size="sm-action"
             :disabled="!searchInspectTraceId.trim()"
             @click="navigateToSearchInspect"
             v-close-popup
