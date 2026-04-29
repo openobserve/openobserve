@@ -99,12 +99,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-separator />
 
+    <div :class="['tab-panels-container', tab.startsWith('correlated-') ? 'full-height-panels' : '']">
     <OTabPanels
       data-test="log-detail-tab-container"
-      :class="['tab-panels-container', tab.startsWith('correlated-') ? 'full-height-panels' : '']"
       v-model="tab"
       animated
       keep-alive
+      grow
     >
       <OTabPanel name="json">
         <q-card-section
@@ -336,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanel>
 
       <!-- Correlated Logs Tab Panel (Custom Component) -->
-      <OTabPanel name="correlated-logs" class="full-height">
+      <OTabPanel name="correlated-logs" stretch>
         <CorrelatedLogsTable
           v-if="correlationProps"
           :service-name="correlationProps.serviceName"
@@ -381,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanel>
 
       <!-- Correlated Metrics Tab Panel -->
-      <OTabPanel name="correlated-metrics" class="full-height">
+      <OTabPanel name="correlated-metrics" stretch>
         <TelemetryCorrelationDashboard
           v-if="correlationProps"
           mode="embedded-tabs"
@@ -411,7 +412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanel>
 
       <!-- Correlated Traces Tab Panel -->
-      <OTabPanel name="correlated-traces" class="full-height">
+      <OTabPanel name="correlated-traces" stretch>
         <TelemetryCorrelationDashboard
           v-if="correlationProps"
           mode="embedded-tabs"
@@ -440,6 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OTabPanel>
     </OTabPanels>
+    </div>
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
     <q-separator v-if="tab === 'json' || tab === 'table'" />

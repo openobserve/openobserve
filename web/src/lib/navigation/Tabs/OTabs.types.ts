@@ -18,6 +18,8 @@ export interface OTabsProps {
   align?: TabsAlign
   /** Compact height mode (~32px instead of ~40px) */
   dense?: boolean
+  /** Adds a bottom border matching the design-system border color token. Default: false */
+  bordered?: boolean
 }
 
 export interface OTabsEmits {

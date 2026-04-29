@@ -22,8 +22,8 @@
       self="top left"
       no-route-dismiss
     >
+      <div class="tw:flex tw:justify-between">
       <OTabPanels
-        class="tw:flex tw:justify-between"
         v-model="picker.activeTab"
       >
         <OTabPanel name="relative">
@@ -85,6 +85,7 @@
           </div>
         </OTabPanel>
       </OTabPanels>
+      </div>
     </q-menu>
   </div>
 </template>

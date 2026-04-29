@@ -110,26 +110,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Tabs (only in dialog mode, hidden in embedded-tabs mode) -->
+      <div class="tw:px-4">
       <OTabs
         v-if="!isEmbeddedTabs"
         v-model="activeTab"
         dense
-        class="tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+        bordered
         align="left"
       >
         <OTab name="logs" :label="t('common.logs')" />
         <OTab name="metrics" :label="t('search.metrics')" />
         <OTab name="traces" :label="t('menu.traces')" />
       </OTabs>
-
-      <!-- Tab Panels -->
+      </div>
+      <div class="correlation-content">
       <OTabPanels
         v-model="activeTab"
         animated
-        class="correlation-content tw:flex-1 tw:overflow-auto"
+        grow
+        scroll="auto"
       >
         <!-- Logs Tab Panel -->
-        <OTabPanel name="logs" class="tw:p-0">
+        <OTabPanel name="logs">
           <!-- Refresh Button -->
           <div
             v-if="logsDashboardData"
@@ -184,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
 
         <!-- Metrics Tab Panel -->
-        <OTabPanel name="metrics" class="tw:p-0 tw:flex tw:flex-col">
+        <OTabPanel name="metrics" layout="flex-col">
           <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
           <q-splitter
             v-model="splitterModel"
@@ -446,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
 
         <!-- Traces Tab Panel -->
-        <OTabPanel name="traces" class="tw:p-0">
+        <OTabPanel name="traces">
           <!-- Refresh Button -->
 
           <!-- Loading State -->
@@ -597,6 +599,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OTabPanel>
       </OTabPanels>
+      </div>
     </q-card>
   </q-dialog>
 

@@ -52,6 +52,7 @@ const props = withDefaults(defineProps<OTabsProps>(), {
   orientation: 'horizontal',
   align: 'left',
   dense: false,
+  bordered: false,
 })
 
 const emit = defineEmits<OTabsEmits>()
@@ -157,7 +158,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
     <TabsList as-child :loop="true">
       <div
         ref="tablistRef"
-        :class="['o-tabs tw:flex tw:flex-col tw:relative', alignClasses[align]]"
+        :class="['o-tabs tw:flex tw:flex-col tw:relative', alignClasses[align], { 'tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]': bordered }]"
         @focusin="handleFocusin"
         @focusout="handleFocusout"
       >
@@ -181,7 +182,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
     as-child
     @update:model-value="(v) => onTabClick(v as string | number)"
   >
-    <div class="tw:flex tw:flex-row tw:items-stretch">
+    <div :class="['tw:flex tw:flex-row tw:items-stretch', { 'tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]': bordered }]">
       <!-- Left arrow -->
       <button
         v-show="hasOverflow"
