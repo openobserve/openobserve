@@ -120,4 +120,20 @@ mod tests {
         let result = StreamingAggregationContext::new(&request, hit).await;
         assert!(result.unwrap().is_none());
     }
+
+    #[test]
+    fn test_physical_optimizer_context_aggregate_topk_variant() {
+        let ctx = PhysicalOptimizerContext::AggregateTopk;
+        assert!(matches!(ctx, PhysicalOptimizerContext::AggregateTopk));
+    }
+
+    #[test]
+    #[cfg(not(feature = "enterprise"))]
+    fn test_physical_optimizer_context_streaming_aggregation_none() {
+        let ctx = PhysicalOptimizerContext::StreamingAggregation(None);
+        assert!(matches!(
+            ctx,
+            PhysicalOptimizerContext::StreamingAggregation(None)
+        ));
+    }
 }

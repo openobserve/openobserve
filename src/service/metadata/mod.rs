@@ -110,4 +110,12 @@ mod tests {
         let m = MetadataManager::default();
         drop(m);
     }
+
+    #[test]
+    fn test_metadata_type_variants() {
+        let t1 = MetadataType::TraceListIndexer;
+        let t2 = MetadataType::DistinctValues;
+        assert!(matches!(t1, MetadataType::TraceListIndexer));
+        assert!(matches!(t2, MetadataType::DistinctValues));
+    }
 }
