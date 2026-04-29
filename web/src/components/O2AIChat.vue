@@ -15,7 +15,7 @@
               @update:open="(v) => v && loadHistory()"
             >
               <template #trigger>
-                <OButton variant="ghost" class="chat-title-dropdown">
+                <OButton variant="ghost" size="sm">
                   <div
                     class="tw:flex tw:items-center tw:gap-2 tw:max-w-[220px]"
                   >
@@ -90,15 +90,16 @@
                               {{ formatTime(chat.timestamp) }}
                             </div>
                           </div>
+                          <span class="delete-history-wrap">
                           <OButton
                             variant="ghost-destructive"
                             size="icon"
-                            class="delete-history-btn"
                             @click.stop="deleteChat(chat.id)"
                           >
                             <q-icon name="delete" size="0.9rem" />
                             <q-tooltip :delay="500">Delete chat</q-tooltip>
                           </OButton>
+                          </span>
                         </div>
                       </q-item-section>
                     </q-item>
@@ -118,7 +119,7 @@
                   <q-separator />
                   <OButton
                     variant="ghost-destructive"
-                    class="clear-all-btn tw:w-full"
+                    :block="true"
                     @click.stop="
                       clearAllConversations;
                       titleMenuOpen = false;
@@ -5773,33 +5774,6 @@ export default defineComponent({
     .chat-title {
       font-weight: bold;
     }
-
-    .chat-title-dropdown {
-      padding: 6px 12px;
-      border-radius: 4px;
-      transition: background-color 0.2s;
-      max-width: 210px;
-      height: 32px;
-      min-height: 32px;
-      display: flex;
-      align-items: center;
-      overflow: hidden;
-
-      &:hover {
-        background-color: var(--q-hover-color);
-      }
-
-      span {
-        color: var(--q-primary-text);
-      }
-
-      .chat-title-text {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        max-width: 180px;
-      }
-    }
   }
 
   // Chat session title with typewriter animation
@@ -6568,12 +6542,15 @@ export default defineComponent({
 .history-item {
   position: relative;
 
-  .delete-history-btn {
+  .delete-history-wrap {
     opacity: 0;
     transition: opacity 0.2s;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
   }
 
-  &:hover .delete-history-btn {
+  &:hover .delete-history-wrap {
     opacity: 1;
   }
 }
@@ -6583,16 +6560,6 @@ export default defineComponent({
   padding: 8px;
   border-top: 1px solid var(--q-separator-color);
   flex-shrink: 0;
-
-  .clear-all-btn {
-    width: 100%;
-    color: var(--q-negative);
-    font-size: 13px;
-
-    &:hover {
-      background-color: rgba(var(--q-negative-rgb), 0.1);
-    }
-  }
 }
 
 // Scroll to bottom button styling

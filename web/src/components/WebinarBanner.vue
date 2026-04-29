@@ -84,8 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="webinarData.primaryButton"
         variant="secondary"
+        size="sm"
         as="a"
-        class="webinar-home-register-btn"
         :href="webinarData.primaryButton.link"
         target="_blank"
         rel="noopener noreferrer"
@@ -352,15 +352,5 @@ onMounted(async () => {
   span {
     line-height: 1;
   }
-}
-
-.webinar-home-register-btn {
-  flex-shrink: 0;
-  border-radius: 0.25rem !important;
-  font-size: 0.875rem !important;
-  padding: 0 1.25rem !important;
-  height: 2.375rem !important;
-  min-height: 2.375rem !important;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--q-secondary) 35%, transparent) !important;
 }
 </style>
