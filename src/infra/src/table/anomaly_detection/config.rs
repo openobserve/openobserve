@@ -260,3 +260,91 @@ fn into_active_model(m: Model) -> anomaly_detection_config::ActiveModel {
     // correct for INSERT — only UPDATE requires the PK to be Unchanged.
     m.into_active_model()
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::IntoActiveModel;
+
+    use super::*;
+
+    fn make_model(anomaly_id: &str, org_id: &str) -> Model {
+        Model {
+            anomaly_id: anomaly_id.to_string(),
+            org_id: org_id.to_string(),
+            stream_name: "default".to_string(),
+            stream_type: "logs".to_string(),
+            enabled: true,
+            name: "test-config".to_string(),
+            description: None,
+            query_mode: "sql".to_string(),
+            filters: None,
+            custom_sql: None,
+            detection_function: "rcf".to_string(),
+            histogram_interval: "1h".to_string(),
+            schedule_interval: "5m".to_string(),
+            detection_window_seconds: 3600,
+            training_window_days: 7,
+            retrain_interval_days: 1,
+            threshold: 95,
+            seasonality: "none".to_string(),
+            is_trained: false,
+            training_started_at: None,
+            training_completed_at: None,
+            last_error: None,
+            last_processed_timestamp: None,
+            current_model_version: 0,
+            rcf_num_trees: 50,
+            rcf_tree_size: 256,
+            rcf_shingle_size: 8,
+            alert_enabled: false,
+            alert_destinations: None,
+            folder_id: "folder-1".to_string(),
+            owner: None,
+            status: 0,
+            retries: 0,
+            last_updated: 0,
+            created_at: 1_000_000,
+            updated_at: 1_000_000,
+        }
+    }
+
+    #[test]
+    fn test_patch_all_fields_overwrites_org_id() {
+        let original = make_model("anom-1", "org-original");
+        let mut active = original.into_active_model();
+        let replacement = make_model("anom-1", "org-replaced");
+        patch_all_fields(&mut active, replacement);
+        assert_eq!(active.org_id.unwrap(), "org-replaced");
+    }
+
+    #[test]
+    fn test_patch_all_fields_does_not_change_created_at() {
+        let original = make_model("anom-1", "org");
+        let created_at_before = original.created_at;
+        let mut active = original.into_active_model();
+        let mut replacement = make_model("anom-1", "org");
+        replacement.created_at = 9_999_999;
+        patch_all_fields(&mut active, replacement);
+        // created_at must remain as the original value (not patched)
+        assert_eq!(active.created_at.unwrap(), created_at_before);
+    }
+
+    #[test]
+    fn test_patch_all_fields_updates_enabled_and_status() {
+        let original = make_model("anom-1", "org");
+        let mut active = original.into_active_model();
+        let mut replacement = make_model("anom-1", "org");
+        replacement.enabled = false;
+        replacement.status = 3;
+        patch_all_fields(&mut active, replacement);
+        assert!(!active.enabled.unwrap());
+        assert_eq!(active.status.unwrap(), 3);
+    }
+
+    #[test]
+    fn test_into_active_model_sets_pk() {
+        let m = make_model("anom-pk", "org");
+        let active = into_active_model(m);
+        assert_eq!(active.anomaly_id.unwrap(), "anom-pk");
+    }
+}
