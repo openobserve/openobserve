@@ -84,26 +84,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions class="confirmActions">
-        <q-btn
+        <OButton
           v-close-popup
-          unelevated
-          no-caps
-          class="q-mr-sm o2-secondary-button"
+          variant="secondary"
+          size="sm"
+          class="tw:mr-2"
           @click="onCancel"
           data-test="cancel-button"
         >
           {{ t("confirmDialog.cancel") }}
-        </q-btn>
-        <q-btn
+        </OButton>
+        <OButton
           v-close-popup
-          unelevated
-          no-caps
-          class="o2-primary-button"
+          variant="primary"
+          size="sm"
           @click="onConfirm"
           data-test="confirm-button"
         >
           {{ t("confirmDialog.ok") }}
-        </q-btn>
+        </OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -114,9 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "CustomChartConfirmDialog",
+  components: { OButton },
   emits: ["update:ok", "update:cancel"],
   props: {
     title: {

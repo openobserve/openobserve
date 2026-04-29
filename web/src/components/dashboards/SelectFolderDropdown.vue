@@ -20,7 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-select
       v-model="selectedFolder"
       :label="t('dashboard.selectFolderLabel')"
-      :options="store.state.organizationData.folders.map((item: any)=> {return {label: item.name, value: item.folderId}})"
+      :options="
+        store.state.organizationData.folders.map((item: any) => {
+          return { label: item.name, value: item.folderId };
+        })
+      "
       data-test="index-dropdown-stream_type"
       input-debounce="0"
       behavior="menu"
@@ -36,21 +40,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-select>
 
-    <q-btn
-      class="q-mb-md add-folder-btn"
+    <OButton
       data-test="dashboard-folder-move-new-add"
-      style="width: 40px;"
+      variant="ghost"
+      size="icon"
       :style="computedStyle"
-      no-caps
-      dense
       @click="
         () => {
           showAddFolderDialog = true;
         }
       "
     >
-      <q-icon name="add" size="xs" />
-    </q-btn>
+      <template #icon-left><q-icon name="add" /></template>
+    </OButton>
   </div>
   <!-- add folder -->
   <q-dialog
@@ -69,11 +71,12 @@ import { defineComponent, onActivated, ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useRoute } from "vue-router";
 
 export default defineComponent({
   name: "SelectedFolderDropdown",
-  components: { AddFolder },
+  components: { AddFolder, OButton },
   emits: ["folder-selected"],
   props: {
     activeFolderId: {
@@ -95,7 +98,8 @@ export default defineComponent({
       // else use default
       const activeFolderData = store.state.organizationData.folders.find(
         (item: any) =>
-          item.folderId === (props.activeFolderId ?? route.query.folder ?? "default")
+          item.folderId ===
+          (props.activeFolderId ?? route.query.folder ?? "default"),
       );
 
       return {
@@ -119,7 +123,7 @@ export default defineComponent({
     };
 
     const computedStyle = computed(() => {
-      return 'height: 35px; margin-top: 13px';
+      return "height: 35px; margin-top: 13px";
     });
 
     onActivated(() => {
@@ -132,14 +136,14 @@ export default defineComponent({
       () => {
         // refresh selected folder, on folders list change
         selectedFolder.value = getInitialFolderValue();
-      }
+      },
     );
 
     watch(
       () => selectedFolder.value,
       () => {
         emit("folder-selected", selectedFolder.value);
-      }
+      },
     );
 
     return {

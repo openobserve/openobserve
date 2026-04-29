@@ -66,17 +66,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              color="primary"
-              dense
+            <OButton
+              variant="primary"
               size="sm"
-              :label="nameLabel"
-              class="q-pl-sm"
               :data-test="`dashboard-name-item-${nameLabel}`"
             >
+              {{ nameLabel }}
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
               <q-menu
                 class="field-function-menu-popup"
                 :data-test="`dashboard-name-item-${nameLabel}-menu`"
@@ -115,15 +111,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon"
               :data-test="`dashboard-name-item-${nameLabel}-remove`"
               @click="removeMapName()"
-              icon="close"
-            />
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
           </div>
         </OButtonGroup>
         <div
@@ -190,17 +186,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="13px"
               class="'cursor-grab q-my-xs'"
             />
-            <q-btn
-              square
-              icon-right="arrow_drop_down"
-              no-caps
-              dense
-              color="primary"
+            <OButton
+              variant="primary"
               size="sm"
-              :label="valueLabel"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
-              class="q-pl-sm"
             >
+              {{ valueLabel }}
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
               <q-menu
                 class="field-function-menu-popup"
                 :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
@@ -239,15 +231,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </q-menu>
-            </q-btn>
-            <q-btn
-              style="height: 100%"
-              size="xs"
-              dense
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-remove`"
               @click="removeMapValue()"
-              icon="close"
-            />
+            >
+              <template #icon-left><q-icon name="close" /></template>
+            </OButton>
           </div>
         </OButtonGroup>
         <div
@@ -296,11 +288,13 @@ import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOpti
 import useNotifications from "@/composables/useNotifications";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "DashboardMapsQueryBuilder",
   components: {
     OButtonGroup,
+    OButton,
     SortByBtnGrp,
     CommonAutoComplete,
     SanitizedHtmlRenderer,

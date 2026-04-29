@@ -38,21 +38,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-select>
 
-    <q-btn
-      class="q-mb-md add-folder-btn q-ml-xs"
+    <OButton
       data-test="dashboard-dashboard-new-add"
-      style="width: 40px"
+      variant="ghost"
+      size="icon"
       :style="computedStyle"
-      no-caps
-      dense
       @click="
         () => {
           showAddDashboardDialog = true;
         }
       "
     >
-      <q-icon name="add" size="xs" />
-    </q-btn>
+      <template #icon-left><q-icon name="add" /></template>
+    </OButton>
   </div>
   <!-- add dashboard -->
   <q-dialog
@@ -63,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-dashboard-add-dialog"
   >
     <AddDashboard
-      :active-folder-id="(folderId as any)"
+      :active-folder-id="folderId as any"
       @updated="updateDashboardList"
       :show-folder-selection="false"
     />
@@ -75,13 +73,14 @@ import { defineComponent, onActivated, ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddDashboard from "@/components/dashboards/AddDashboard.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { getAllDashboardsByFolderId, getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";
 import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "SelectDashboardDropdown",
-  components: { AddDashboard },
+  components: { AddDashboard, OButton },
   emits: ["dashboard-selected", "dashboard-list-updated"],
   props: {
     folderId: {

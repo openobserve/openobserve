@@ -94,18 +94,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="13px"
                     class="cursor-grab q-my-xs"
                   />
-                  <q-btn
-                    square
-                    icon-right="arrow_drop_down"
-                    no-caps
-                    color="primary"
-                    dense
-                    :no-wrap="true"
+                  <OButton
+                    variant="primary"
                     size="sm"
-                    :label="xLabel[index]"
-                    class="q-pl-sm"
                     :data-test="`dashboard-x-item-${itemX?.alias}`"
                   >
+                    {{ xLabel[index] }}
+                    <template #icon-right
+                      ><q-icon name="arrow_drop_down"
+                    /></template>
                     <q-menu
                       :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
                       class="field-function-menu-popup"
@@ -144,15 +141,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </q-menu>
-                  </q-btn>
-                  <q-btn
-                    style="height: 100%"
-                    size="xs"
-                    dense
+                  </OButton>
+                  <OButton
+                    variant="ghost"
+                    size="icon"
                     :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
                     @click="removeXAxisItemByIndex(index)"
-                    icon="close"
-                  />
+                  >
+                    <template #icon-left><q-icon name="close" /></template>
+                  </OButton>
                 </div>
               </OButtonGroup>
             </div>
@@ -275,18 +272,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="13px"
                     class="cursor-grab q-my-xs"
                   />
-                  <q-btn
-                    square
-                    icon-right="arrow_drop_down"
-                    no-caps
-                    color="primary"
-                    dense
-                    :no-wrap="true"
+                  <OButton
+                    variant="primary"
                     size="sm"
-                    :label="bLabel[index]"
-                    class="q-pl-sm"
                     :data-test="`dashboard-b-item-${itemB?.alias}`"
                   >
+                    {{ bLabel[index] }}
+                    <template #icon-right
+                      ><q-icon name="arrow_drop_down"
+                    /></template>
                     <q-menu
                       :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
                       class="field-function-menu-popup"
@@ -325,15 +319,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </q-menu>
-                  </q-btn>
-                  <q-btn
-                    style="height: 100%"
-                    size="xs"
-                    dense
+                  </OButton>
+                  <OButton
+                    variant="ghost"
+                    size="icon"
                     :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
                     @click="removeBreakdownItemByIndex(index)"
-                    icon="close"
-                  />
+                  >
+                    <template #icon-left><q-icon name="close" /></template>
+                  </OButton>
                 </div>
               </OButtonGroup>
             </div>
@@ -421,18 +415,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="13px"
                 class="cursor-grab q-my-xs"
               />
-              <q-btn
-                icon-right="arrow_drop_down"
-                no-caps
-                dense
-                color="primary"
-                square
-                :no-wrap="true"
+              <OButton
+                variant="primary"
                 size="sm"
-                :label="yLabel[index]"
                 :data-test="`dashboard-y-item-${itemY?.alias}`"
-                class="q-pl-sm"
               >
+                {{ yLabel[index] }}
+                <template #icon-right
+                  ><q-icon name="arrow_drop_down"
+                /></template>
                 <q-menu
                   :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
                   class="field-function-menu-popup"
@@ -475,15 +466,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </q-menu>
-              </q-btn>
-              <q-btn
-                style="height: 100%"
-                size="xs"
-                dense
+              </OButton>
+              <OButton
+                variant="ghost"
+                size="icon"
                 :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
                 @click="removeYAxisItemByIndex(index)"
-                icon="close"
-              />
+              >
+                <template #icon-left><q-icon name="close" /></template>
+              </OButton>
             </div>
           </OButtonGroup>
         </div>
@@ -573,18 +564,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="13px"
                   class="cursor-grab q-my-xs"
                 />
-                <q-btn
-                  square
-                  icon-right="arrow_drop_down"
-                  no-caps
-                  dense
-                  :no-wrap="true"
-                  color="primary"
+                <OButton
+                  variant="primary"
                   size="sm"
-                  :label="zLabel[index]"
                   :data-test="`dashboard-z-item-${itemZ?.alias}`"
-                  class="q-pl-sm"
                 >
+                  {{ zLabel[index] }}
+                  <template #icon-right
+                    ><q-icon name="arrow_drop_down"
+                  /></template>
                   <q-menu
                     :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
                     class="field-function-menu-popup"
@@ -623,15 +611,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </q-menu>
-                </q-btn>
-                <q-btn
-                  style="height: 100%"
-                  size="xs"
-                  dense
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="icon"
                   :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
                   @click="removeZAxisItemByIndex(index)"
-                  icon="close"
-                />
+                >
+                  <template #icon-left><q-icon name="close" /></template>
+                </OButton>
               </div>
             </OButtonGroup>
           </div>
@@ -721,11 +709,13 @@ import { promQueryModeller } from "@/components/promql/operations/queryModeller"
 import type { PromVisualQuery } from "@/components/promql/types";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
   components: {
     OButtonGroup,
+    OButton,
     DashboardGeoMapsQueryBuilder,
     DashboardMapsQueryBuilder,
     DashboardSankeyChartBuilder,

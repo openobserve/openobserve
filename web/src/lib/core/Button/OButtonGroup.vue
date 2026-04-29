@@ -3,15 +3,24 @@ import type { ButtonGroupProps, ButtonGroupSlots } from "./OButtonGroup.types";
 
 const props = withDefaults(defineProps<ButtonGroupProps>(), {
   orientation: "horizontal",
+  align: "stretch",
 });
 
 defineSlots<ButtonGroupSlots>();
+
+const alignClasses: Record<NonNullable<ButtonGroupProps["align"]>, string> = {
+  stretch: "tw:items-stretch",
+  center: "tw:items-center",
+  start: "tw:items-start",
+  end: "tw:items-end",
+};
 </script>
 
 <template>
   <div
     :class="[
-      'tw:inline-flex tw:items-stretch',
+      'tw:inline-flex',
+      alignClasses[props.align],
       props.orientation === 'vertical' ? 'tw:flex-col' : 'tw:flex-row',
       // Divider between sibling buttons
       props.orientation === 'horizontal'

@@ -73,33 +73,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
         <div class="flex justify-center q-mt-lg">
-          <q-btn
-            ref="closeBtn"
+          <OButton
             v-close-popup="true"
-            :label="t('dashboard.cancel')"
-            class="o2-secondary-button tw:h-[36px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            flat
+            variant="secondary"
+            size="sm"
             data-test="dashboard-general-setting-cancel-btn"
-          />
-          <q-btn
-            :disable="dashboardData.title.trim() === ''"
-            :label="t('dashboard.save')"
-            class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
-            flat
+            >{{ t("dashboard.cancel") }}</OButton
+          >
+          <OButton
+            :disabled="dashboardData.title.trim() === ''"
+            variant="primary"
+            size="sm"
             type="submit"
+            class="tw:ml-3"
             :loading="saveDashboardApi.isLoading.value"
             data-test="dashboard-general-setting-save-btn"
-          />
+            >{{ t("dashboard.save") }}</OButton
+          >
         </div>
       </q-form>
     </div>
@@ -117,12 +107,14 @@ import DashboardHeader from "./common/DashboardHeader.vue";
 import { useLoading } from "@/composables/useLoading";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import useNotifications from "@/composables/useNotifications";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "GeneralSettings",
   components: {
     DashboardHeader,
     DateTimePickerDashboard,
+    OButton,
   },
   emits: ["save"],
   setup(props, { emit }) {
