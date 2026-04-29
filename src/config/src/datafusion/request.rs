@@ -286,4 +286,30 @@ mod tests {
         req.set_use_cache(false);
         assert!(!req.use_cache);
     }
+
+    #[test]
+    fn test_set_partition_stores_value() {
+        let mut req = make_flight_request();
+        req.set_partition(7);
+        assert_eq!(req.query_identifier.partition, 7);
+    }
+
+    #[test]
+    fn test_set_job_id_stores_value() {
+        let mut req = make_flight_request();
+        req.set_job_id("job-123".to_string());
+        assert_eq!(req.query_identifier.job_id, "job-123");
+    }
+
+    #[test]
+    fn test_from_proto_flight_to_flight_roundtrip() {
+        let original = make_flight_request();
+        let proto: cluster_rpc::FlightSearchRequest = original.clone().into();
+        let restored = FlightSearchRequest::from(proto);
+        assert_eq!(
+            restored.query_identifier.trace_id,
+            original.query_identifier.trace_id
+        );
+        assert_eq!(restored.search_info.start_time, original.search_info.start_time);
+    }
 }
