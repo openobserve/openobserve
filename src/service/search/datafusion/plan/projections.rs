@@ -649,6 +649,34 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_having_fields_none_is_noop() {
+        use config::meta::search::HavingNode;
+        let mut fields = HashSet::new();
+        extract_having_fields(&None::<HavingNode>, &mut fields);
+        assert!(fields.is_empty());
+    }
+
+    #[test]
+    fn test_get_col_name_column_expr() {
+        use datafusion::common::Column;
+        let col_expr = Expr::Column(Column::new_unqualified("myfield"));
+        assert_eq!(get_col_name(&col_expr), "myfield");
+    }
+
+    #[test]
+    fn test_get_expr_string_column_expr() {
+        use datafusion::common::Column;
+        let col_expr = Expr::Column(Column::new_unqualified("myfield"));
+        assert_eq!(get_expr_string(&col_expr), "myfield");
+    }
+
+    #[test]
+    fn test_operator_to_string_minus_op_fallback() {
+        let s = operator_to_string(&Operator::Minus);
+        assert!(!s.is_empty());
+    }
+
+    #[test]
     fn test_extract_having_fields_logical_and() {
         use config::meta::search::HavingNode;
         let node = HavingNode::LogicalOp {
