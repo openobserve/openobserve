@@ -121,6 +121,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </q-route-tab>
                 <q-route-tab
+                  v-if="config.isEnterprise == 'true' && (config.isCloud != 'true' || store.state.zoConfig.org_storage_enabled === true)"
+                  data-test="org-storage-tab"
+                  name="orgStorageSettings"
+                  :to="{
+                    name: 'orgStorageSettings',
+                    query: {
+                      org_identifier: store.state.selectedOrganization?.identifier,
+                    },
+                  }"
+                  content-class="tab_content"
+                  icon="cloud"
+                  :label="t('org_storage.tabLabel')"
+                >
+                </q-route-tab>
+                <q-route-tab
                   data-test="alert-templates-tab"
                   name="templates"
                   :to="{

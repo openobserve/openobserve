@@ -82,6 +82,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-management-revoke-contract-btn"
               @click.stop="confirmRevokeContract(props.row)"
             ></q-btn>
+            <q-btn
+              :label="props.row.org_storage_enabled ? 'Disable Storage' : 'Enable Storage'"
+              class="q-ml-xs text-capitalize"
+              unelevated
+              dense
+              size="sm"
+              padding="xs"
+              :text-color="props.row.org_storage_enabled ? 'negative' : 'positive'"
+              data-test="org-management-storage-toggle-btn"
+              @click.stop="toggleOrgStorage(props.row)"
+            ></q-btn>
           </q-td>
         </template>
         <template #top="scope">
@@ -246,6 +257,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OrganizationServices from "@/services/organizations";
+import orgStorageService from "@/services/org_storage";
 export default defineComponent({
   name: "PageAlerts",
   components: {
@@ -356,7 +368,7 @@ export default defineComponent({
         label: t("settings.actions"),
         align: "center",
         sortable: false,
-        style: "width: 280px",
+        style: "width: 430px",
       },
     ]);
     const perPageOptions: any = [
@@ -415,6 +427,7 @@ export default defineComponent({
               trial_expires_at: timestampToTimezoneDate(responseData[i].trial_expires_at, "UTC", "yyyy-MM-dd"),
               contract_end_date: responseData[i].contract_end_date || 0,
               contract_end_date_display: formatMicrosToDate(responseData[i].contract_end_date),
+              org_storage_enabled: responseData[i].org_storage_enabled || false,
             });
           }
 
@@ -545,6 +558,44 @@ export default defineComponent({
       });
     };
 
+    const toggleOrgStorage = (row: any) => {
+      const label = row.org_storage_enabled ? "Disable" : "Enable";
+      $q.dialog({
+        title: `${label} Org Storage`,
+        message: `Are you sure you want to ${label.toLowerCase()} org storage for "${row.name}"?`,
+        cancel: true,
+        persistent: true,
+      }).onOk(() => {
+        loading.value = true;
+        const dismiss = $q.notify({
+          spinner: true,
+          message: `${label.toLowerCase()}ing org storage...`,
+        });
+        orgStorageService
+          .enable(row.identifier)
+          .then(() => {
+            $q.notify({
+              type: "positive",
+              message: `Org storage ${label.toLowerCase()}d successfully.`,
+            });
+            getData();
+            loading.value = false;
+            dismiss();
+          })
+          .catch((error) => {
+            loading.value = false;
+            dismiss();
+            $q.notify({
+              type: "negative",
+              message:
+                error.response?.data?.message ||
+                `Failed to ${label.toLowerCase()} org storage.`,
+              timeout: 5000,
+            });
+          });
+      });
+    };
+
     const updateTrialPeriod = (org_id: string, extended_week: number) => {
       const payload = {
         new_end_date: getTimestampInMicroseconds(extended_week),
@@ -612,6 +663,7 @@ export default defineComponent({
       toggleContractDialog,
       submitContract,
       confirmRevokeContract,
+      toggleOrgStorage,
       formatMicrosToDate,
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {

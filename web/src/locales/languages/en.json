@@ -2716,6 +2716,13 @@
     "header": "Pipeline Destinations",
     "search": "Search destination"
   },
+  "org_storage": {
+    "tabLabel": "Org Storage",
+    "title": "Org Storage",
+    "notEnabled": "org storage is not enabled for this organization",
+    "notConfigured": "configure a custom storage provider for this organization's data",
+    "configured": "configured"
+  },
   "metrics": {
     "searchMetric": "Search for a Metric",
     "searchLabel": "Search metric label",
