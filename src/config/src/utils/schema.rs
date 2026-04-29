@@ -635,4 +635,39 @@ mod tests {
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("non-basic type"), "unexpected error: {msg}");
     }
+
+    #[test]
+    fn test_filter_source_no_filters_returns_true() {
+        assert!(filter_source_by_partition_key(
+            "/org/logs/stream/year=2024/month=01/",
+            &[]
+        ));
+    }
+
+    #[test]
+    fn test_filter_source_matching_value_returns_true() {
+        let filters = vec![("year".to_string(), vec!["2024".to_string()])];
+        assert!(filter_source_by_partition_key(
+            "/org/logs/stream/year=2024/month=01/",
+            &filters
+        ));
+    }
+
+    #[test]
+    fn test_filter_source_non_matching_value_returns_false() {
+        let filters = vec![("year".to_string(), vec!["2023".to_string()])];
+        assert!(!filter_source_by_partition_key(
+            "/org/logs/stream/year=2024/month=01/",
+            &filters
+        ));
+    }
+
+    #[test]
+    fn test_filter_source_key_absent_returns_true() {
+        let filters = vec![("region".to_string(), vec!["us-east".to_string()])];
+        assert!(filter_source_by_partition_key(
+            "/org/logs/stream/year=2024/",
+            &filters
+        ));
+    }
 }
