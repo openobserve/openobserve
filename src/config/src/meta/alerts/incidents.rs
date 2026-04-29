@@ -1741,7 +1741,10 @@ mod tests {
     fn test_incident_event_factory_ai_analysis_begin() {
         let event = IncidentEvent::ai_analysis_begin();
         assert!(event.timestamp > 0);
-        assert!(matches!(event.event_type, IncidentEventType::AIAnalysisBegin));
+        assert!(matches!(
+            event.event_type,
+            IncidentEventType::AIAnalysisBegin
+        ));
     }
 
     #[test]
