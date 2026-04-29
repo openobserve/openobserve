@@ -23,26 +23,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @dragover.prevent
       @drop="onTabDrop($event)"
     >
-      <button
+      <OButton
         v-for="tab in tabOrder"
         :key="tab.id"
+        variant="ghost"
         class="home-tab-btn"
-        :class="{ 'home-tab-active': activeHomeTab === tab.id, 'home-tab-dragging': draggingTab === tab.id }"
+        :class="{
+          'home-tab-active': activeHomeTab === tab.id,
+          'home-tab-dragging': draggingTab === tab.id,
+        }"
         draggable="true"
         @click="activeHomeTab = tab.id"
         @dragstart="onTabDragStart($event, tab.id)"
         @dragend="onTabDragEnd"
         @dragenter.prevent="onTabDragEnter(tab.id)"
       >
-        <q-icon name="drag_indicator" class="home-tab-drag-handle" size="0.875em" />
+        <q-icon
+          name="drag_indicator"
+          class="home-tab-drag-handle"
+          size="0.875em"
+        />
         {{ tab.label }}
-      </button>
+      </OButton>
     </div>
 
     <!-- O2 AI Assistant tab -->
     <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
       <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
-      <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
+      <O2AIChat
+        ref="homeChat"
+        :is-open="true"
+        :header-height="0"
+        :centered-start="true"
+      />
     </div>
 
     <!-- Overview tab -->
@@ -52,22 +65,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Usage tab (existing content) -->
     <div v-if="activeHomeTab === 'usage'" class="tw:h-full tw:overflow-y-auto">
-    <div v-if="!no_data_ingest && !isLoadingSummary" class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container card-container--col" :class="store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 40px)]' : 'tw:h-full'">
+      <div
+        v-if="!no_data_ingest && !isLoadingSummary"
+        class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container card-container--col"
+        :class="
+          store.state.isAiChatEnabled ? 'tw:h-[calc(100% - 40px)]' : 'tw:h-full'
+        "
+      >
         <!-- 1st section -->
-         <div class="banners-wrapper">
-            <div>
+        <div class="banners-wrapper">
+          <div>
             <WebinarBanner v-if="config.isCloud === 'true'" variant="home" />
             <TrialPeriod></TrialPeriod>
           </div>
-            <LicensePeriod v-if="!showUsageReportBanner" @update-license="goToLicensePage"></LicensePeriod>
-            <UsageReportBanner></UsageReportBanner>
-            <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
-          </div>
-        <div class="feature-card"
-        :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
-        role="region"
-        aria-label="Streams overview section"
-         >
+          <LicensePeriod
+            v-if="!showUsageReportBanner"
+            @update-license="goToLicensePage"
+          ></LicensePeriod>
+          <UsageReportBanner></UsageReportBanner>
+          <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
+        </div>
+        <div
+          class="feature-card"
+          :class="
+            store.state.theme === 'dark'
+              ? 'dark-stream-container'
+              : 'light-stream-container'
+          "
+          role="region"
+          aria-label="Streams overview section"
+        >
           <div class="row justify-between items-center streams-header">
             <div class="row tw:items-center tw:gap-2">
               <div class="tile-icon icon-bg-blue" aria-hidden="true">
@@ -75,398 +102,578 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="section-header">{{ t("home.streams") }}</div>
             </div>
-              <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-               aria-label="View all streams"
-               >
-                <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
-                <q-icon name="arrow_forward" class="view-arrow-icon" />
-                <router-link
-                  exact
-                  :to="{
-                    name: 'logstreams',
-                    query: { org_identifier: store.state.selectedOrganization?.identifier }
-                  }"
-                  class="absolute full-width full-height"
-                  aria-label="Navigate to streams page"
-                ></router-link>
-            </q-btn>
+            <OButton
+              variant="ghost"
+              size="icon-circle"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'view-button-dark'
+                  : 'view-button-light'
+              "
+              aria-label="View all streams"
+              :title="t('home.viewButton')"
+            >
+              <q-icon name="arrow_forward" class="view-arrow-icon" />
+              <router-link
+                exact
+                :to="{
+                  name: 'logstreams',
+                  query: {
+                    org_identifier:
+                      store.state.selectedOrganization?.identifier,
+                  },
+                }"
+                class="tw:absolute tw:inset-0"
+                aria-label="Navigate to streams page"
+              ></router-link>
+            </OButton>
           </div>
-
 
           <!-- Tiles -->
           <div class="tiles-grid">
             <div class="tile">
-              <div class="tile-content rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               role="article"
-               aria-label="Streams count statistics">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between">
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="tile-title">{{ t("home.streams") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="streamsIcon" alt="" />
-                  </div>
-                </div>
-
-                <!-- Performance text -->
-                <div v-if="false" class="performance-text"
-                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
-                >
-                  <q-icon name="arrow_upward" size="14px"  /> 2.89% from last week
-                </div>
-              </div>
-
-            <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end " aria-live="polite">
-              {{ animatedStreamsCount || summary.streams_count }}
-            </div>
-            </div>
-            </div>
-
-            <div class="tile">
-              <div class="tile-content rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               role="article"
-               aria-label="Events count statistics">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between" >
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="tile-title">{{ t("home.docsCountLbl") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="recordsIcon" alt="" />
-                  </div>
-                </div>
-
-                <!-- Performance text -->
-                <div v-if="false" class="performance-text "
-                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
-                >
-                  <q-icon name="arrow_upward" size="14px" /> 2.89% from last week
-                </div>
-              </div>
-
-            <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end " aria-live="polite">
-              {{ formattedAnimatedEventsCount }}
-            </div>
-            </div>
-            </div>
-
-            <div class="tile">
-              <div class="tile-content rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               role="article"
-               aria-label="Ingested data size statistics">
-              <!-- Top Section (60%) -->
-                <div class="column justify-between" >
+              <div
+                class="tile-content rounded-borders text-center column justify-between"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'dark-tile-content'
+                    : 'light-tile-content'
+                "
+                role="article"
+                aria-label="Streams count statistics"
+              >
+                <!-- Top Section (60%) -->
+                <div class="column justify-between">
                   <!-- Title row -->
                   <div class="row justify-between">
-                    <div class="tile-title">{{ t("home.totalDataIngested") }}</div>
+                    <div class="tile-title">{{ t("home.streams") }}</div>
+                    <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                      <img :src="streamsIcon" alt="" />
+                    </div>
+                  </div>
+
+                  <!-- Performance text -->
+                  <div
+                    v-if="false"
+                    class="performance-text"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'positive-increase-dark'
+                        : 'positive-increase-light'
+                    "
+                  >
+                    <q-icon name="arrow_upward" size="14px" /> 2.89% from last
+                    week
+                  </div>
+                </div>
+
+                <!-- Bottom Section (40%) -->
+                <div class="data-to-display row items-end" aria-live="polite">
+                  {{ animatedStreamsCount || summary.streams_count }}
+                </div>
+              </div>
+            </div>
+
+            <div class="tile">
+              <div
+                class="tile-content rounded-borders text-center column justify-between"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'dark-tile-content'
+                    : 'light-tile-content'
+                "
+                role="article"
+                aria-label="Events count statistics"
+              >
+                <!-- Top Section (60%) -->
+                <div class="column justify-between">
+                  <!-- Title row -->
+                  <div class="row justify-between">
+                    <div class="tile-title">{{ t("home.docsCountLbl") }}</div>
+                    <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                      <img :src="recordsIcon" alt="" />
+                    </div>
+                  </div>
+
+                  <!-- Performance text -->
+                  <div
+                    v-if="false"
+                    class="performance-text"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'positive-increase-dark'
+                        : 'positive-increase-light'
+                    "
+                  >
+                    <q-icon name="arrow_upward" size="14px" /> 2.89% from last
+                    week
+                  </div>
+                </div>
+
+                <!-- Bottom Section (40%) -->
+                <div class="data-to-display row items-end" aria-live="polite">
+                  {{ formattedAnimatedEventsCount }}
+                </div>
+              </div>
+            </div>
+
+            <div class="tile">
+              <div
+                class="tile-content rounded-borders text-center column justify-between"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'dark-tile-content'
+                    : 'light-tile-content'
+                "
+                role="article"
+                aria-label="Ingested data size statistics"
+              >
+                <!-- Top Section (60%) -->
+                <div class="column justify-between">
+                  <!-- Title row -->
+                  <div class="row justify-between">
+                    <div class="tile-title">
+                      {{ t("home.totalDataIngested") }}
+                    </div>
                     <div class="tile-icon icon-bg-blue" aria-hidden="true">
                       <img :src="ingestedSizeIcon" alt="" />
                     </div>
                   </div>
 
                   <!-- Performance text -->
-                  <div v-if="false" class="performance-text "
-                  :class="store.state.theme === 'dark' ? 'negative-increase-dark' : 'negative-increase-light'"
+                  <div
+                    v-if="false"
+                    class="performance-text"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'negative-increase-dark'
+                        : 'negative-increase-light'
+                    "
                   >
-                    <q-icon name="arrow_downward" size="14px" /> 2.89% from last week
+                    <q-icon name="arrow_downward" size="14px" /> 2.89% from last
+                    week
                   </div>
                 </div>
 
                 <!-- Bottom Section (40%) -->
-                <div class="data-to-display row items-end " aria-live="polite">
+                <div class="data-to-display row items-end" aria-live="polite">
                   {{ formattedAnimatedIngestedSize }}
                 </div>
               </div>
             </div>
 
-            
             <div class="tile" v-if="config.isCloud == 'false'">
-              <div class="tile-content rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               role="article"
-               aria-label="Compressed data size statistics">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between">
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="tile-title">{{ t("home.totalDataCompressed") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="compressedSizeIcon" alt="" />
+              <div
+                class="tile-content rounded-borders text-center column justify-between"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'dark-tile-content'
+                    : 'light-tile-content'
+                "
+                role="article"
+                aria-label="Compressed data size statistics"
+              >
+                <!-- Top Section (60%) -->
+                <div class="column justify-between">
+                  <!-- Title row -->
+                  <div class="row justify-between">
+                    <div class="tile-title">
+                      {{ t("home.totalDataCompressed") }}
+                    </div>
+                    <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                      <img :src="compressedSizeIcon" alt="" />
+                    </div>
+                  </div>
+
+                  <!-- Performance text -->
+                  <div
+                    v-if="false"
+                    class="performance-text"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'positive-increase-dark'
+                        : 'positive-increase-light'
+                    "
+                  >
+                    <q-icon name="arrow_upward" size="14px" /> 2.89% from last
+                    week
                   </div>
                 </div>
 
-                <!-- Performance text -->
-                <div v-if="false" class="performance-text "
-                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
-                >
-                  <q-icon name="arrow_upward" size="14px" /> 2.89% from last week
+                <!-- Bottom Section (40%) -->
+                <div class="data-to-display row items-end" aria-live="polite">
+                  {{ formattedAnimatedCompressedSize }}
                 </div>
               </div>
-
-            <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end " aria-live="polite">
-              {{ formattedAnimatedCompressedSize }}
-            </div>
-            </div>
             </div>
 
             <div class="tile" v-if="config.isCloud == 'false'">
-              <div class="tile-content rounded-borders text-center column justify-between "
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-               role="article"
-               aria-label="Index size statistics">
-              <!-- Top Section (60%) -->
-              <div class="column justify-between">
-                <!-- Title row -->
-                <div class="row justify-between">
-                  <div class="tile-title">{{ t("home.indexSizeLbl") }}</div>
-                  <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                    <img :src="indexSizeIcon" alt="" />
+              <div
+                class="tile-content rounded-borders text-center column justify-between"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'dark-tile-content'
+                    : 'light-tile-content'
+                "
+                role="article"
+                aria-label="Index size statistics"
+              >
+                <!-- Top Section (60%) -->
+                <div class="column justify-between">
+                  <!-- Title row -->
+                  <div class="row justify-between">
+                    <div class="tile-title">{{ t("home.indexSizeLbl") }}</div>
+                    <div class="tile-icon icon-bg-blue" aria-hidden="true">
+                      <img :src="indexSizeIcon" alt="" />
+                    </div>
+                  </div>
+
+                  <!-- Performance text -->
+                  <div
+                    v-if="false"
+                    class="performance-text"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'positive-increase-dark'
+                        : 'positive-increase-light'
+                    "
+                  >
+                    <q-icon name="arrow_upward" size="14px" /> 0.00% from last
+                    week
                   </div>
                 </div>
 
-                <!-- Performance text -->
-                <div v-if="false" class="performance-text "
-                :class="store.state.theme === 'dark' ? 'positive-increase-dark' : 'positive-increase-light'"
-                >
-                  <q-icon name="arrow_upward" size="14px" /> 0.00% from last week
+                <!-- Bottom Section (40%) -->
+                <div class="data-to-display row items-end" aria-live="polite">
+                  {{ formattedAnimatedIndexSize }}
                 </div>
               </div>
-
-            <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end " aria-live="polite">
-              {{ formattedAnimatedIndexSize }}
             </div>
-            </div>
-            </div>
-
+          </div>
         </div>
-
-        </div>
-      <!-- 2nd section -->
+        <!-- 2nd section -->
         <div class="charts-main-container">
           <!-- functions and dashboards tiles + 2 charts -->
-        <div class="functions-dashboards-column">
-
-          <div class="tile-wrapper">
-            <div class="feature-card rounded-borders text-center column justify-between"
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-              role="article"
-              aria-label="Functions count statistics">
-              <div class="column justify-between">
-                <div class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width">
-                  <div class="tile-icon icon-bg-orange tw:flex-shrink-0" aria-hidden="true">
-                    <img :src="functionsIcon" alt="" />
-                  </div>
-                  <div class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ t("home.functionTitle") }}</div>
-                  <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                  aria-label="View all functions"
-                  class="tw:flex-shrink-0"
+          <div class="functions-dashboards-column">
+            <div class="tile-wrapper">
+              <div
+                class="feature-card rounded-borders text-center column justify-between"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'dark-tile-content'
+                    : 'light-tile-content'
+                "
+                role="article"
+                aria-label="Functions count statistics"
+              >
+                <div class="column justify-between">
+                  <div
+                    class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width"
                   >
-                      <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
+                    <div
+                      class="tile-icon icon-bg-orange tw:flex-shrink-0"
+                      aria-hidden="true"
+                    >
+                      <img :src="functionsIcon" alt="" />
+                    </div>
+                    <div
+                      class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+                    >
+                      {{ t("home.functionTitle") }}
+                    </div>
+                    <OButton
+                      variant="ghost"
+                      size="icon-circle"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'view-button-dark'
+                          : 'view-button-light'
+                      "
+                      aria-label="View all functions"
+                      class="tw:flex-shrink-0"
+                      :title="t('home.viewButton')"
+                    >
                       <q-icon name="arrow_forward" class="view-arrow-icon" />
-                    <router-link
-                      exact
-                      :to="{
-                        name: 'functionList',
-                        query: { org_identifier: store.state.selectedOrganization?.identifier }
-                      }"
-                      class="absolute full-width full-height"
-                      aria-label="Navigate to functions page"
-                    ></router-link>
-                </q-btn>
-                </div>
-              </div>
-              <div class="data-to-display row items-end" aria-live="polite">
-                {{ animatedFunctionCount || summary.function_count }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Tile 2 -->
-          <div class="tile-wrapper">
-            <div class="feature-card rounded-borders text-center column justify-between"
-              :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-              role="article"
-              aria-label="Dashboards count statistics">
-              <div class="column justify-between">
-                <div class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width">
-                  <div class="tile-icon icon-bg-orange tw:flex-shrink-0" aria-hidden="true">
-                    <img :src="dashboardsIcon" alt="" />
+                      <router-link
+                        exact
+                        :to="{
+                          name: 'functionList',
+                          query: {
+                            org_identifier:
+                              store.state.selectedOrganization?.identifier,
+                          },
+                        }"
+                        class="tw:absolute tw:inset-0"
+                        aria-label="Navigate to functions page"
+                      ></router-link>
+                    </OButton>
                   </div>
-                  <div class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ t("home.dashboardTitle") }}</div>
-                  <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                  aria-label="View all dashboards"
-                  class="tw:flex-shrink-0"
-                  >
-                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
-                  <q-icon name="arrow_forward" class="view-arrow-icon" />
-                    <router-link
-                      exact
-                      :to="{
-                        name: 'dashboards',
-                        query: { org_identifier: store.state.selectedOrganization?.identifier }
-                      }"
-                      class="absolute full-width full-height"
-                      aria-label="Navigate to dashboards page"
-                    ></router-link>
-                </q-btn>
+                </div>
+                <div class="data-to-display row items-end" aria-live="polite">
+                  {{ animatedFunctionCount || summary.function_count }}
                 </div>
               </div>
-              <div class="data-to-display row items-end" aria-live="polite">
-                {{ animatedDashboardCount || summary.dashboard_count }}
+            </div>
+
+            <!-- Tile 2 -->
+            <div class="tile-wrapper">
+              <div
+                class="feature-card rounded-borders text-center column justify-between"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'dark-tile-content'
+                    : 'light-tile-content'
+                "
+                role="article"
+                aria-label="Dashboards count statistics"
+              >
+                <div class="column justify-between">
+                  <div
+                    class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width"
+                  >
+                    <div
+                      class="tile-icon icon-bg-orange tw:flex-shrink-0"
+                      aria-hidden="true"
+                    >
+                      <img :src="dashboardsIcon" alt="" />
+                    </div>
+                    <div
+                      class="tile-title tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+                    >
+                      {{ t("home.dashboardTitle") }}
+                    </div>
+                    <OButton
+                      variant="ghost"
+                      size="icon-circle"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'view-button-dark'
+                          : 'view-button-light'
+                      "
+                      aria-label="View all dashboards"
+                      class="tw:flex-shrink-0"
+                      :title="t('home.viewButton')"
+                    >
+                      <q-icon name="arrow_forward" class="view-arrow-icon" />
+                      <router-link
+                        exact
+                        :to="{
+                          name: 'dashboards',
+                          query: {
+                            org_identifier:
+                              store.state.selectedOrganization?.identifier,
+                          },
+                        }"
+                        class="tw:absolute tw:inset-0"
+                        aria-label="Navigate to dashboards page"
+                      ></router-link>
+                    </OButton>
+                  </div>
+                </div>
+                <div class="data-to-display row items-end" aria-live="polite">
+                  {{ animatedDashboardCount || summary.dashboard_count }}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-                  <!-- Chart 1 -->
-          <div class="feature-card first-chart-container rounded-borders tw:p-4"
-          :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
-          role="region"
-          aria-label="Alerts overview section"
+          <!-- Chart 1 -->
+          <div
+            class="feature-card first-chart-container rounded-borders tw:p-4"
+            :class="
+              store.state.theme === 'dark'
+                ? 'chart-container-dark'
+                : 'chart-container-light'
+            "
+            role="region"
+            aria-label="Alerts overview section"
           >
             <div class="details-container">
               <div class="row justify-between items-center">
                 <span class="text-title tw:flex tw:items-center tw:gap-2">
                   <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                      <img :src="alertsIcon" alt="" />
+                    <img :src="alertsIcon" alt="" />
                   </div>
                   {{ t("home.alertTitle") }}
                 </span>
-                <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                aria-label="View all alerts">
-                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
+                <OButton
+                  variant="ghost"
+                  size="icon-circle"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'view-button-dark'
+                      : 'view-button-light'
+                  "
+                  aria-label="View all alerts"
+                  :title="t('home.viewButton')"
+                >
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
                     :to="{
                       name: 'alertList',
-                      query: { org_identifier: store.state.selectedOrganization?.identifier }
+                      query: {
+                        org_identifier:
+                          store.state.selectedOrganization?.identifier,
+                      },
                     }"
-                    class="absolute full-width full-height"
+                    class="tw:absolute tw:inset-0"
                     aria-label="Navigate to alerts page"
                   ></router-link>
-              </q-btn>
+                </OButton>
               </div>
-              <div class="row q-pt-sm home-stat-row">
+              <div class="row tw:pt-2 home-stat-row">
                 <div class="column">
-                  <span class="text-subtitle">{{ t("home.scheduledAlert") }}</span>
-                  <span class="results-count" aria-live="polite">{{ animatedScheduledAlerts || summary.scheduled_alerts }}</span>
+                  <span class="text-subtitle">{{
+                    t("home.scheduledAlert")
+                  }}</span>
+                  <span class="results-count" aria-live="polite">{{
+                    animatedScheduledAlerts || summary.scheduled_alerts
+                  }}</span>
                 </div>
-                <q-separator vertical />
+                <OSeparator :vertical="true" />
                 <div class="column">
                   <span class="text-subtitle">{{ t("home.rtAlert") }}</span>
-                  <span class="results-count" aria-live="polite">{{ animatedRtAlerts || summary.rt_alerts }}</span>
+                  <span class="results-count" aria-live="polite">{{
+                    animatedRtAlerts || summary.rt_alerts
+                  }}</span>
                 </div>
               </div>
             </div>
-            <div class="custom-first-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)]  md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)] tw:w-full"  >
+            <div
+              class="custom-first-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)] md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)] tw:w-full"
+            >
               <CustomChartRenderer
                 :key="alertsPanelDataKey"
                 :data="alertsPanelData"
-                class="tw:w-full tw:h-full md:tw:h-[calc(100vh-400px)] "
+                class="tw:w-full tw:h-full md:tw:h-[calc(100vh-400px)]"
               />
             </div>
           </div>
-          <div class="feature-card second-chart-container rounded-borders tw:p-4"
-          :class="store.state.theme === 'dark' ? 'chart-container-dark' : 'chart-container-light'"
-          role="region"
-          aria-label="Pipelines overview section"
+          <div
+            class="feature-card second-chart-container rounded-borders tw:p-4"
+            :class="
+              store.state.theme === 'dark'
+                ? 'chart-container-dark'
+                : 'chart-container-light'
+            "
+            role="region"
+            aria-label="Pipelines overview section"
           >
             <div class="details-container">
               <div class="row justify-between items-center">
                 <span class="text-title tw:flex tw:items-center tw:gap-2">
                   <div class="tile-icon icon-bg-blue" aria-hidden="true">
-                      <img :src="pipelinesIcon" alt="" />
+                    <img :src="pipelinesIcon" alt="" />
                   </div>
                   {{ t("home.pipelineTitle") }}
                 </span>
-                <q-btn no-caps flat round :class="store.state.theme === 'dark' ? 'view-button-dark' : 'view-button-light'"
-                aria-label="View all pipelines">
-                  <q-tooltip>{{ t("home.viewButton") }}</q-tooltip>
+                <OButton
+                  variant="ghost"
+                  size="icon-circle"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'view-button-dark'
+                      : 'view-button-light'
+                  "
+                  aria-label="View all pipelines"
+                  :title="t('home.viewButton')"
+                >
                   <q-icon name="arrow_forward" class="view-arrow-icon" />
                   <router-link
                     exact
                     :to="{
                       name: 'pipelines',
-                      query: { org_identifier: store.state.selectedOrganization?.identifier }
+                      query: {
+                        org_identifier:
+                          store.state.selectedOrganization?.identifier,
+                      },
                     }"
-                    class="absolute full-width full-height"
+                    class="tw:absolute tw:inset-0"
                     aria-label="Navigate to pipelines page"
                   ></router-link>
-              </q-btn>
+                </OButton>
               </div>
-              <div class="row q-pt-sm home-stat-row">
+              <div class="row tw:pt-2 home-stat-row">
                 <div class="column">
-                  <span class="text-subtitle"> {{ t("home.schedulePipelineTitle") }}</span>
-                  <span class="results-count" aria-live="polite">{{ animatedScheduledPipelines || summary.scheduled_pipelines }}</span>
+                  <span class="text-subtitle">
+                    {{ t("home.schedulePipelineTitle") }}</span
+                  >
+                  <span class="results-count" aria-live="polite">{{
+                    animatedScheduledPipelines || summary.scheduled_pipelines
+                  }}</span>
                 </div>
-                <q-separator vertical />
+                <OSeparator :vertical="true" />
                 <div class="column">
-                  <span class="text-subtitle">{{ t("home.rtPipelineTitle") }}</span>
-                  <span class="results-count" aria-live="polite">{{ animatedRtPipelines || summary.rt_pipelines }}</span>
+                  <span class="text-subtitle">{{
+                    t("home.rtPipelineTitle")
+                  }}</span>
+                  <span class="results-count" aria-live="polite">{{
+                    animatedRtPipelines || summary.rt_pipelines
+                  }}</span>
                 </div>
               </div>
             </div>
-            <div class="custom-second-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)]  md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)]"  >
+            <div
+              class="custom-second-chart tw:my-auto xl:tw:min-h-[200px] tw:h-[calc(100vh-500px)] md:tw:h-[calc(100vh-500px)] lg:tw:h-[calc(100vh-550px)] xl:tw:h-[calc(100vh-645px)]"
+            >
               <CustomChartRenderer
                 :key="pipelinesPanelDataKey"
                 :data="pipelinesPanelData"
-                class="tw:w-full tw:h-full "
+                class="tw:w-full tw:h-full"
               />
             </div>
           </div>
         </div>
       </div>
       <div
-      v-if="no_data_ingest && !isLoadingSummary"
-      class="q-pa-md row items-start q-gutter-md home-no-data-panel"
-    >
-    <TrialPeriod></TrialPeriod>
-      <div class="my-card">
-        <div align="center" flat
-bordered class="my-card q-py-md">
-          <div class="text-h6">{{ t("home.noData") }}</div>
-          <div class="text-subtitle1">{{ t("home.ingestionMsg") }}</div>
-        </div>
+        v-if="no_data_ingest && !isLoadingSummary"
+        class="tw:p-4 row items-start tw:gap-4 home-no-data-panel"
+      >
+        <TrialPeriod></TrialPeriod>
+        <div class="my-card">
+          <div align="center" class="my-card tw:py-4">
+            <div class="tw:text-xl tw:font-medium">{{ t("home.noData") }}</div>
+            <div class="tw:text-base">{{ t("home.ingestionMsg") }}</div>
+          </div>
 
-        <q-separator />
+          <OSeparator />
 
-        <div align="center" class="q-py-sm">
-          <q-btn
-            no-caps
-            color="primary"
-            @click="() => $router.push({ name: 'ingestion' })"
-            flat
-            >{{ t("home.findIngestion") }}
-          </q-btn>
+          <div class="tw:py-2 tw:text-center">
+            <OButton
+              variant="ghost-primary"
+              @click="() => $router.push({ name: 'ingestion' })"
+              >{{ t("home.findIngestion") }}
+            </OButton>
+          </div>
         </div>
       </div>
+      <div v-if="isLoadingSummary">
+        <HomeViewSkeleton />
+      </div>
     </div>
-    <div v-if="isLoadingSummary">
-      <HomeViewSkeleton />
-    </div>
-    </div> <!-- end usage tab panel -->
-
+    <!-- end usage tab panel -->
   </q-page>
-
-
 </template>
 
 <script lang="ts">
 import { useQuasar } from "quasar";
-import { computed, defineComponent, ref, watch, onMounted, onUnmounted } from "vue";
+import {
+  computed,
+  defineComponent,
+  ref,
+  watch,
+  onMounted,
+  onUnmounted,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import orgService from "../services/organizations";
 import config from "../aws-exports";
-import { formatSizeFromMB, addCommasToNumber, getImageURL } from "@/utils/zincutils";
+import {
+  formatSizeFromMB,
+  addCommasToNumber,
+  getImageURL,
+} from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 import pipelines from "@/services/pipelines";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
@@ -481,6 +688,8 @@ import OverviewTab from "@/views/OverviewTab.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import { outlinedWindow } from "@quasar/extras/material-icons-outlined";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "PageHome",
@@ -501,7 +710,8 @@ export default defineComponent({
     const LS_TAB_ORDER_KEY = "o2_home_tab_order";
     const LS_ACTIVE_TAB_KEY = "o2_home_active_tab";
 
-    const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
+    const isEnterpriseOrCloud =
+      config.isEnterprise === "true" || config.isCloud === "true";
 
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string }[] = [];
@@ -536,7 +746,7 @@ export default defineComponent({
     const savedActiveTab = localStorage.getItem(LS_ACTIVE_TAB_KEY);
     const activeHomeTab = ref(savedActiveTab && DEFAULT_TABS.value.find(t => t.id === savedActiveTab) ? savedActiveTab : tabOrder.value[0].id);
 
-    watch(activeHomeTab, val => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
+    watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
 
     // Drag state
     const draggingTab = ref<string | null>(null);
@@ -564,14 +774,17 @@ export default defineComponent({
       if (!fromId || !toId || fromId === toId) return;
 
       const order = [...tabOrder.value];
-      const fromIdx = order.findIndex(t => t.id === fromId);
-      const toIdx   = order.findIndex(t => t.id === toId);
+      const fromIdx = order.findIndex((t) => t.id === fromId);
+      const toIdx = order.findIndex((t) => t.id === toId);
       if (fromIdx === -1 || toIdx === -1) return;
 
       const [moved] = order.splice(fromIdx, 1);
       order.splice(toIdx, 0, moved);
       tabOrder.value = order;
-      localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map(t => t.id)));
+      localStorage.setItem(
+        LS_TAB_ORDER_KEY,
+        JSON.stringify(order.map((t) => t.id)),
+      );
 
       draggingTab.value = null;
       dragOverTab.value = null;
@@ -579,7 +792,11 @@ export default defineComponent({
 
     // Show usage report banner when last_usage_report_ts > 0 and elapsed > 1 hour
     const showUsageReportBanner = computed(() => {
-      if (!store.state.zoConfig || !('last_usage_report_ts' in store.state.zoConfig)) return false;
+      if (
+        !store.state.zoConfig ||
+        !("last_usage_report_ts" in store.state.zoConfig)
+      )
+        return false;
       const ts = store.state.zoConfig.last_usage_report_ts;
       if (!ts || ts === 0) return false;
       const reportedAtMs = ts / 1000;
@@ -601,7 +818,12 @@ export default defineComponent({
     const animatedRtPipelines = ref(0);
 
     // Count-up animation function using requestAnimationFrame
-    const animateValue = (ref: any, start: number, end: number, duration: number) => {
+    const animateValue = (
+      ref: any,
+      start: number,
+      end: number,
+      duration: number,
+    ) => {
       if (start === end) {
         ref.value = end;
         return;
@@ -654,7 +876,8 @@ export default defineComponent({
           }
 
           const rawDocCount = res.data.streams?.total_records ?? 0;
-          const rawCompressedSize = res.data.streams?.total_compressed_size ?? 0;
+          const rawCompressedSize =
+            res.data.streams?.total_compressed_size ?? 0;
           const rawIngestedSize = res.data.streams?.total_storage_size ?? 0;
           const rawIndexSize = res.data.streams?.total_index_size ?? 0;
 
@@ -683,16 +906,56 @@ export default defineComponent({
           };
 
           // Animate counters
-          animateValue(animatedStreamsCount, 0, summary.value.streams_count, 500);
-          animateValue(animatedEventsCount, 0, summary.value.doc_count_raw, 500);
-          animateValue(animatedCompressedSize, 0, summary.value.compressed_size_raw, 500);
-          animateValue(animatedIngestedSize, 0, summary.value.ingested_size_raw, 500);
+          animateValue(
+            animatedStreamsCount,
+            0,
+            summary.value.streams_count,
+            500,
+          );
+          animateValue(
+            animatedEventsCount,
+            0,
+            summary.value.doc_count_raw,
+            500,
+          );
+          animateValue(
+            animatedCompressedSize,
+            0,
+            summary.value.compressed_size_raw,
+            500,
+          );
+          animateValue(
+            animatedIngestedSize,
+            0,
+            summary.value.ingested_size_raw,
+            500,
+          );
           animateValue(animatedIndexSize, 0, summary.value.index_size_raw, 500);
-          animateValue(animatedFunctionCount, 0, summary.value.function_count, 500);
-          animateValue(animatedDashboardCount, 0, summary.value.dashboard_count, 500);
-          animateValue(animatedScheduledAlerts, 0, summary.value.scheduled_alerts, 500);
+          animateValue(
+            animatedFunctionCount,
+            0,
+            summary.value.function_count,
+            500,
+          );
+          animateValue(
+            animatedDashboardCount,
+            0,
+            summary.value.dashboard_count,
+            500,
+          );
+          animateValue(
+            animatedScheduledAlerts,
+            0,
+            summary.value.scheduled_alerts,
+            500,
+          );
           animateValue(animatedRtAlerts, 0, summary.value.rt_alerts, 500);
-          animateValue(animatedScheduledPipelines, 0, summary.value.scheduled_pipelines, 500);
+          animateValue(
+            animatedScheduledPipelines,
+            0,
+            summary.value.scheduled_pipelines,
+            500,
+          );
           animateValue(animatedRtPipelines, 0, summary.value.rt_pipelines, 500);
 
           no_data_ingest.value = false;
@@ -719,276 +982,299 @@ export default defineComponent({
       getSummary(store.state.selectedOrganization.identifier);
     }
 
-  const alertsPanelData = computed (() => {
-    const healthyAlerts = summary.value.healthy_alerts || 0;
-    const failedAlerts = summary.value.failed_alerts || 0;
-    const total = healthyAlerts + failedAlerts;
+    const alertsPanelData = computed(() => {
+      const healthyAlerts = summary.value.healthy_alerts || 0;
+      const failedAlerts = summary.value.failed_alerts || 0;
+      const total = healthyAlerts + failedAlerts;
 
-    // If no data, show placeholder
-    if (total === 0) {
-      return {
-        chartType: "custom_chart",
-        title: {
-          text: t("home.noDataAvailable"),
-          left: "center",
-          top: "center",
-          textStyle: {
-            fontSize: 16,
-            fontWeight: "normal",
-            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
-          }
-        }
-      };
-    }
-
-    return {
-      chartType: "custom_chart",
-      title: {
-        text: "Last 15 minutes",
-        left: "65%",
-        top: "50%",
-        textStyle: {
-          fontSize: 16,
-          fontWeight: "normal",
-          color: store.state.theme === 'dark' ? '#D9D9D9' : '#262626'
-        }
-      },
-      tooltip: {
-        trigger: "item"
-      },
-      legend: {
-        top: "65%",
-        orient: "vertical",
-        left: "65%",
-        textStyle: {
-          color: store.state.theme === 'dark' ? '#DCDCDC' : '#232323'
-        }
-      },
-      series: [
-        {
-          name: "Alert Status",
-          type: "pie",
-          radius: ["35%", "55%"],
-          center: ["35%", "50%"],
-          startAngle: 0,
-          endAngle: 360,
-          label: {
-            formatter: "{d}%",
-            show: true,
-            fontSize: 14,
-            color: store.state.theme === 'dark' ? '#ffffff' : '#000000'
-          },
-          labelLine: {
-            show: true,
-            length: 15,
-            length2: 8,
-            lineStyle: {
-              width: 2
-            }
-          },
-          data: [
-            {
-              value: healthyAlerts,
-              name: "Success Alerts",
-              itemStyle: {
-                color: "#15ba73"
-              }
+      // If no data, show placeholder
+      if (total === 0) {
+        return {
+          chartType: "custom_chart",
+          title: {
+            text: t("home.noDataAvailable"),
+            left: "center",
+            top: "center",
+            textStyle: {
+              fontSize: 16,
+              fontWeight: "normal",
+              color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
             },
-            {
-              value: failedAlerts,
-              name: "Failed Alerts",
-              itemStyle: {
-                color: "#db373a"
-              }
-            }
-          ]
-        }
-      ]
-    };
-  });
+          },
+        };
+      }
 
-  const pipelinesPanelData = computed(() => {
-    const healthyPipelines = summary.value.healthy_pipelines || 0;
-    const failedPipelines = summary.value.failed_pipelines || 0;
-    const warningPipelines = summary.value.warning_pipelines || 0;
-    const total = healthyPipelines + failedPipelines + warningPipelines;
-
-    // If no data, show placeholder
-    if (total === 0) {
       return {
         chartType: "custom_chart",
         title: {
-          text: t("home.noDataAvailable"),
-          left: "center",
-          top: "center",
+          text: "Last 15 minutes",
+          left: "65%",
+          top: "50%",
           textStyle: {
             fontSize: 16,
             fontWeight: "normal",
-            color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
-          }
-        }
-      };
-    }
-
-    return {
-      chartType: "custom_chart",
-      xAxis: {
-        type: "category",
-        data: ["Healthy", "Failed", "Warning"],
-        name: "Last 15 minutes",
-        nameLocation: "middle",
-        nameGap: 30,
-        nameTextStyle: {
-          fontSize: 16,
-          fontWeight: "normal",
-          color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
-        },
-        axisLabel: {
-          fontSize: 14,
-          color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
-        }
-      },
-      yAxis: {
-        type: "value",
-        min: 0,
-        max: Math.ceil((healthyPipelines + failedPipelines + warningPipelines) / 3 / 10) * 10 || 10,
-        interval: 10,
-        name: "Number of Pipelines",
-        nameLocation: "middle",
-        nameGap: 60,
-        nameRotate: 90,
-        nameTextStyle: {
-          fontSize: 16,
-          fontWeight: "normal",
-          color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
-        },
-        axisLabel: {
-          fontSize: 12,
-          color: store.state.theme === 'dark' ? '#B7B7B7' : '#72777B'
-        },
-        splitLine: {
-          lineStyle: {
-            color: store.state.theme === 'dark' ? '#444' : '#e0e0e0'
-          }
-        },
-        offset: -20
-      },
-      series: [
-        {
-          data: [healthyPipelines, failedPipelines, warningPipelines],
-          type: "bar",
-          barWidth: "50%",
-          label: {
-            show: true,
-            position: "top",
-            fontSize: 14,
-            fontWeight: "bold",
-            color: store.state.theme === 'dark' ? '#CCCFD1' : '#2E3133'
+            color: store.state.theme === "dark" ? "#D9D9D9" : "#262626",
           },
-          itemStyle: {
-            color: function (params: any) {
-              const colors = ['#16b26a', '#db373b', '#ffc328'];
-              return colors[params.dataIndex];
-            }
-          }
-        }
-      ]
+        },
+        tooltip: {
+          trigger: "item",
+        },
+        legend: {
+          top: "65%",
+          orient: "vertical",
+          left: "65%",
+          textStyle: {
+            color: store.state.theme === "dark" ? "#DCDCDC" : "#232323",
+          },
+        },
+        series: [
+          {
+            name: "Alert Status",
+            type: "pie",
+            radius: ["35%", "55%"],
+            center: ["35%", "50%"],
+            startAngle: 0,
+            endAngle: 360,
+            label: {
+              formatter: "{d}%",
+              show: true,
+              fontSize: 14,
+              color: store.state.theme === "dark" ? "#ffffff" : "#000000",
+            },
+            labelLine: {
+              show: true,
+              length: 15,
+              length2: 8,
+              lineStyle: {
+                width: 2,
+              },
+            },
+            data: [
+              {
+                value: healthyAlerts,
+                name: "Success Alerts",
+                itemStyle: {
+                  color: "#15ba73",
+                },
+              },
+              {
+                value: failedAlerts,
+                name: "Failed Alerts",
+                itemStyle: {
+                  color: "#db373a",
+                },
+              },
+            ],
+          },
+        ],
+      };
+    });
+
+    const pipelinesPanelData = computed(() => {
+      const healthyPipelines = summary.value.healthy_pipelines || 0;
+      const failedPipelines = summary.value.failed_pipelines || 0;
+      const warningPipelines = summary.value.warning_pipelines || 0;
+      const total = healthyPipelines + failedPipelines + warningPipelines;
+
+      // If no data, show placeholder
+      if (total === 0) {
+        return {
+          chartType: "custom_chart",
+          title: {
+            text: t("home.noDataAvailable"),
+            left: "center",
+            top: "center",
+            textStyle: {
+              fontSize: 16,
+              fontWeight: "normal",
+              color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+            },
+          },
+        };
+      }
+
+      return {
+        chartType: "custom_chart",
+        xAxis: {
+          type: "category",
+          data: ["Healthy", "Failed", "Warning"],
+          name: "Last 15 minutes",
+          nameLocation: "middle",
+          nameGap: 30,
+          nameTextStyle: {
+            fontSize: 16,
+            fontWeight: "normal",
+            color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+          },
+          axisLabel: {
+            fontSize: 14,
+            color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",
+          },
+        },
+        yAxis: {
+          type: "value",
+          min: 0,
+          max:
+            Math.ceil(
+              (healthyPipelines + failedPipelines + warningPipelines) / 3 / 10,
+            ) * 10 || 10,
+          interval: 10,
+          name: "Number of Pipelines",
+          nameLocation: "middle",
+          nameGap: 60,
+          nameRotate: 90,
+          nameTextStyle: {
+            fontSize: 16,
+            fontWeight: "normal",
+            color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+          },
+          axisLabel: {
+            fontSize: 12,
+            color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+          },
+          splitLine: {
+            lineStyle: {
+              color: store.state.theme === "dark" ? "#444" : "#e0e0e0",
+            },
+          },
+          offset: -20,
+        },
+        series: [
+          {
+            data: [healthyPipelines, failedPipelines, warningPipelines],
+            type: "bar",
+            barWidth: "50%",
+            label: {
+              show: true,
+              position: "top",
+              fontSize: 14,
+              fontWeight: "bold",
+              color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",
+            },
+            itemStyle: {
+              color: function (params: any) {
+                const colors = ["#16b26a", "#db373b", "#ffc328"];
+                return colors[params.dataIndex];
+              },
+            },
+          },
+        ],
+      };
+    });
+
+    const compressedSizeIcon = computed(() => {
+      const icon =
+        store.state.theme === "dark"
+          ? "images/home/compressed_size_dark.svg"
+          : "images/home/compressed_size.svg";
+      return getImageURL(icon);
+    });
+
+    const ingestedSizeIcon = computed(() => {
+      const icon =
+        store.state.theme === "dark"
+          ? "images/home/ingested_size_dark.svg"
+          : "images/home/ingested_size.svg";
+      return getImageURL(icon);
+    });
+
+    const indexSizeIcon = computed(() => {
+      const icon =
+        store.state.theme === "dark"
+          ? "images/home/index_size_dark.svg"
+          : "images/home/index_size.svg";
+      return getImageURL(icon);
+    });
+
+    const recordsIcon = computed(() => {
+      const icon =
+        store.state.theme === "dark"
+          ? "images/home/records_dark.svg"
+          : "images/home/records.svg";
+      return getImageURL(icon);
+    });
+
+    const streamsIcon = computed(() => {
+      const icon =
+        store.state.theme === "dark"
+          ? "images/home/streams_dark.svg"
+          : "images/home/streams.svg";
+      return getImageURL(icon);
+    });
+
+    const functionsIcon = computed(() => {
+      const icon =
+        store.state.theme === "dark"
+          ? "images/home/function_tile_icon_dark.svg"
+          : "images/home/function_tile_icon.svg";
+      return getImageURL(icon);
+    });
+
+    const dashboardsIcon = computed(() => {
+      const icon =
+        store.state.theme === "dark"
+          ? "images/home/dashboards_tile_icon.svg"
+          : "images/home/dashboards_tile_icon.svg";
+      return getImageURL(icon);
+    });
+
+    const alertsIcon = computed(() => {
+      return getImageURL("images/home/alerts.svg");
+    });
+
+    const pipelinesIcon = computed(() => {
+      return getImageURL("images/home/pipeline.svg");
+    });
+
+    const goToLicensePage = () => {
+      router.push({ name: "license" });
     };
-  });
+    const getForwardIcon = computed(() => {
+      const icon =
+        store.state.theme === "dark"
+          ? "images/home/forward_dark.svg"
+          : "images/home/forward_light.svg";
+      return getImageURL(icon);
+    });
 
-  const compressedSizeIcon = computed(() => {
-    const icon = store.state.theme === 'dark' ? 'images/home/compressed_size_dark.svg' : 'images/home/compressed_size.svg';
-    return getImageURL(icon);
-  });
+    const formatEventCount = (num: number): string => {
+      if (num < 100000) return num.toString();
 
-  const ingestedSizeIcon = computed(() => {
-    const icon = store.state.theme === 'dark' ? 'images/home/ingested_size_dark.svg' : 'images/home/ingested_size.svg';
-    return getImageURL(icon);
-  });
+      const units = ["", "K", "M", "B", "T"];
+      let tier = Math.floor(Math.log10(num) / 3);
 
-  const indexSizeIcon = computed(() => {
-    const icon = store.state.theme === 'dark' ? 'images/home/index_size_dark.svg' : 'images/home/index_size.svg';
-    return getImageURL(icon);
-  });
+      // clamp to max unit (T)
+      if (tier >= units.length) tier = units.length - 1;
 
-  const recordsIcon = computed(() => {
-    const icon = store.state.theme === 'dark' ? 'images/home/records_dark.svg' : 'images/home/records.svg';
-    return getImageURL(icon);
-  });
+      const scaled = num / Math.pow(10, tier * 3);
+      return scaled.toFixed(1).replace(/\.0$/, "") + units[tier];
+    };
 
-  const streamsIcon = computed(() => {
-    const icon = store.state.theme === 'dark' ? 'images/home/streams_dark.svg' : 'images/home/streams.svg';
-    return getImageURL(icon);
-  });
+    // Computed property for formatted animated events count
+    const formattedAnimatedEventsCount = computed(() => {
+      return animatedEventsCount.value > 0
+        ? formatEventCount(animatedEventsCount.value)
+        : summary.value.doc_count;
+    });
 
-  const functionsIcon = computed(() => {
-    const icon = store.state.theme === 'dark' ? 'images/home/function_tile_icon_dark.svg' : 'images/home/function_tile_icon.svg';
-    return getImageURL(icon);
-  });
+    // Computed properties for formatted animated sizes
+    const formattedAnimatedCompressedSize = computed(() => {
+      return animatedCompressedSize.value > 0
+        ? formatSizeFromMB(animatedCompressedSize.value)
+        : summary.value.compressed_data;
+    });
 
-  const dashboardsIcon = computed(() => {
-    const icon = store.state.theme === 'dark' ? 'images/home/dashboards_tile_icon.svg' : 'images/home/dashboards_tile_icon.svg';
-    return getImageURL(icon);
-  });
+    const formattedAnimatedIngestedSize = computed(() => {
+      return animatedIngestedSize.value > 0
+        ? formatSizeFromMB(animatedIngestedSize.value)
+        : summary.value.ingested_data;
+    });
 
-
-  const alertsIcon = computed(() => {
-    return getImageURL('images/home/alerts.svg');
-  });
-
-  const pipelinesIcon = computed(() => {
-    return getImageURL('images/home/pipeline.svg');
-  });
-
-  const goToLicensePage = () => {
-    router.push({ name: 'license' });
-  };
-  const getForwardIcon = computed(() => {
-    const icon = store.state.theme === 'dark' ? 'images/home/forward_dark.svg' : 'images/home/forward_light.svg';
-    return getImageURL(icon);
-  });
-
-  const formatEventCount = (num: number): string => {
-  if (num < 100000) return num.toString();
-
-  const units = ["", "K", "M", "B", "T"];
-  let tier = Math.floor(Math.log10(num) / 3);
-
-  // clamp to max unit (T)
-  if (tier >= units.length) tier = units.length - 1;
-
-  const scaled = num / Math.pow(10, tier * 3);
-  return scaled.toFixed(1).replace(/\.0$/, "") + units[tier];
-};
-
-  // Computed property for formatted animated events count
-  const formattedAnimatedEventsCount = computed(() => {
-    return animatedEventsCount.value > 0
-      ? formatEventCount(animatedEventsCount.value)
-      : summary.value.doc_count;
-  });
-
-  // Computed properties for formatted animated sizes
-  const formattedAnimatedCompressedSize = computed(() => {
-    return animatedCompressedSize.value > 0
-      ? formatSizeFromMB(animatedCompressedSize.value)
-      : summary.value.compressed_data;
-  });
-
-  const formattedAnimatedIngestedSize = computed(() => {
-    return animatedIngestedSize.value > 0
-      ? formatSizeFromMB(animatedIngestedSize.value)
-      : summary.value.ingested_data;
-  });
-
-  const formattedAnimatedIndexSize = computed(() => {
-    return animatedIndexSize.value > 0
-      ? formatSizeFromMB(animatedIndexSize.value)
-      : summary.value.index_size;
-  });
-
-
-
+    const formattedAnimatedIndexSize = computed(() => {
+      return animatedIndexSize.value > 0
+        ? formatSizeFromMB(animatedIndexSize.value)
+        : summary.value.index_size;
+    });
 
     const homeChat = ref<any>(null);
     function onLoadChat(id: number) {
@@ -1005,7 +1291,9 @@ export default defineComponent({
       }
     }
     onMounted(() => window.addEventListener("o2:home-switch-tab", onSwitchTab));
-    onUnmounted(() => window.removeEventListener("o2:home-switch-tab", onSwitchTab));
+    onUnmounted(() =>
+      window.removeEventListener("o2:home-switch-tab", onSwitchTab),
+    );
 
     return {
       t,
@@ -1088,6 +1376,8 @@ export default defineComponent({
     OverviewTab,
     O2AIChat,
     HomeChatHistory,
+    OButton,
+    OSeparator,
   },
 });
 </script>
@@ -1107,33 +1397,33 @@ export default defineComponent({
 /* ===== 1. CSS Variables & Theme Mixins ===== */
 :root {
   // Accent colors (theme-independent)
-  --accent-blue: #397EF6;
-  --accent-orange: #EE5F26;
-  --accent-purple: #9333EA;
+  --accent-blue: #397ef6;
+  --accent-orange: #ee5f26;
+  --accent-purple: #9333ea;
 
   // Light theme colors (default)
   --tile-bg: #ffffff;
-  --tile-border: #E7EAEE;
-  --text-primary: #2E3133;
-  --text-secondary: #72777B;
+  --tile-border: #e7eaee;
+  --text-primary: #2e3133;
+  --text-secondary: #72777b;
   --hover-shadow: rgba(0, 0, 0, 0.3);
 }
 
 // Mixin for dark theme variables
 @mixin dark-theme-vars {
-  --tile-bg: #2B2C2D;
+  --tile-bg: #2b2c2d;
   --tile-border: #444444;
-  --text-primary: #CCCFD1;
-  --text-secondary: #B7B7B7;
+  --text-primary: #cccfd1;
+  --text-secondary: #b7b7b7;
   --hover-shadow: rgba(0, 0, 0, 0.6);
 }
 
 // Mixin for light theme variables
 @mixin light-theme-vars {
   --tile-bg: #ffffff;
-  --tile-border: #E7EAEE;
-  --text-primary: #2E3133;
-  --text-secondary: #72777B;
+  --tile-border: #e7eaee;
+  --text-primary: #2e3133;
+  --text-secondary: #72777b;
   --hover-shadow: rgba(0, 0, 0, 0.3);
 }
 
@@ -1142,7 +1432,9 @@ export default defineComponent({
   height: 100%;
   padding: 0.75rem;
   border-radius: 0.5rem;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
   contain: layout style paint;
   gap: 0.25rem;
 }
@@ -1150,7 +1442,9 @@ export default defineComponent({
 // Mixin for container base styles
 @mixin container-base {
   border-radius: 0.5rem;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
   animation: fadeInUp 0.5s ease-out backwards;
 }
 
@@ -1170,7 +1464,11 @@ export default defineComponent({
 
 /* ===== 2. Global Transitions ===== */
 * {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 // Disable transitions for animations
@@ -1220,7 +1518,7 @@ export default defineComponent({
 }
 .view-button-light {
   cursor: pointer;
-  padding: 0px
+  padding: 0px;
 }
 .view-button-dark {
   cursor: pointer;
@@ -1242,7 +1540,9 @@ export default defineComponent({
 
 .view-arrow-icon {
   font-size: 18px;
-  transition: transform 0.4s ease-in-out, opacity 0.4s ease-in-out;
+  transition:
+    transform 0.4s ease-in-out,
+    opacity 0.4s ease-in-out;
   pointer-events: none;
   position: relative;
   z-index: 1;
@@ -1258,19 +1558,21 @@ export default defineComponent({
 // Create second arrow that slides in using Material Icons font
 .view-button-light::after,
 .view-button-dark::after {
-  content: 'arrow_forward';
-  font-family: 'Material Icons';
+  content: "arrow_forward";
+  font-family: "Material Icons";
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%) translateX(-20px);
   opacity: 0;
-  transition: transform 0.4s ease-in-out, opacity 0.4s ease-in-out;
+  transition:
+    transform 0.4s ease-in-out,
+    opacity 0.4s ease-in-out;
   font-size: 18px;
   pointer-events: none;
   z-index: 1;
   line-height: 1;
-  font-feature-settings: 'liga';
+  font-feature-settings: "liga";
 }
 
 .view-button-light:hover::after,
@@ -1294,11 +1596,21 @@ export default defineComponent({
 }
 
 // Stagger animation for tiles
-.tile:nth-child(1) { animation-delay: 0ms; }
-.tile:nth-child(2) { animation-delay: 50ms; }
-.tile:nth-child(3) { animation-delay: 100ms; }
-.tile:nth-child(4) { animation-delay: 150ms; }
-.tile:nth-child(5) { animation-delay: 200ms; }
+.tile:nth-child(1) {
+  animation-delay: 0ms;
+}
+.tile:nth-child(2) {
+  animation-delay: 50ms;
+}
+.tile:nth-child(3) {
+  animation-delay: 100ms;
+}
+.tile:nth-child(4) {
+  animation-delay: 150ms;
+}
+.tile:nth-child(5) {
+  animation-delay: 200ms;
+}
 
 @keyframes fadeInUp {
   from {
@@ -1360,35 +1672,35 @@ export default defineComponent({
   line-height: 20px;
   letter-spacing: 0%;
 }
-.performance-text{
+.performance-text {
   border-radius: 50px;
   width: 160px;
   padding: 0px 8px;
   display: flex;
   align-items: center;
-  background-color: #EBFDF5;
+  background-color: #ebfdf5;
   color: #0e6842;
   font-size: 12px !important;
 }
-.positive-increase-light{
-  background-color: #EBFDF5;
-  border: 1px solid #E4E7EC;
+.positive-increase-light {
+  background-color: #ebfdf5;
+  border: 1px solid #e4e7ec;
   color: #0e6842;
 }
-.negative-increase-light{
-  background-color: #FFEBE9;
-  border: 1px solid #E4E7EC;
-  color: #B42318;
+.negative-increase-light {
+  background-color: #ffebe9;
+  border: 1px solid #e4e7ec;
+  color: #b42318;
 }
-.positive-increase-dark{
+.positive-increase-dark {
   background-color: #254421;
-  color: #A1FFd6;
+  color: #a1ffd6;
 }
-.negative-increase-dark{
-  background-color: #4A2323;
-  color: #FFD6D6;
+.negative-increase-dark {
+  background-color: #4a2323;
+  color: #ffd6d6;
 }
-.data-to-display{
+.data-to-display {
   font-size: 24px;
   font-weight: 600;
   line-height: 28px;
@@ -1513,7 +1825,7 @@ export default defineComponent({
 }
 
 .chart-container.loading::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -1540,28 +1852,28 @@ export default defineComponent({
   );
   background-size: 1000px 100%;
 }
-.text-title{
+.text-title {
   font-size: 18px;
   font-weight: 500;
   line-height: 20px;
   letter-spacing: 0%;
 }
-.text-subtitle{
+.text-subtitle {
   font-size: 14px;
   font-weight: 400;
   line-height: 20px;
   letter-spacing: 0%;
 }
-.results-count{
+.results-count {
   font-size: 20px;
   font-weight: 600;
   line-height: 24px;
 }
-.details-container{
+.details-container {
   gap: 8px;
   margin-bottom: 12px;
 }
-.charts-main-container{
+.charts-main-container {
   gap: 12px;
 }
 // .first-chart-container{
@@ -1571,7 +1883,7 @@ export default defineComponent({
 //   width: calc(65% - 16px);
 // }
 
-.ai-enabled-home-view{
+.ai-enabled-home-view {
   height: calc(100vh - 120px);
 }
 
@@ -1629,9 +1941,8 @@ export default defineComponent({
 .dashboards-tile-content,
 .chart-container,
 .streams-container {
-
   // &:hover {
-    // box-shadow: 0 4px 12px var(--hover-shadow);
+  // box-shadow: 0 4px 12px var(--hover-shadow);
   // }
 }
 
@@ -1717,7 +2028,10 @@ button:focus-visible {
   font-weight: 500;
   color: var(--o2-text-muted);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, opacity 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    opacity 0.15s;
   margin-bottom: -1px;
   display: inline-flex;
   align-items: center;
