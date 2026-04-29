@@ -3274,6 +3274,28 @@ export class PipelinesPage {
     // ========== Bug #11498: Run Query Disabled State ==========
 
     /**
+     * Check if the Run Query button is disabled (no stream selected)
+     * @returns {Promise<boolean>} True if button is disabled
+     */
+    async isRunQueryDisabled() {
+        await this.runQueryButton.waitFor({ state: 'visible', timeout: 5000 });
+        const isDisabled = await this.runQueryButton.isDisabled();
+        testLogger.info(`Run Query disabled state: ${isDisabled}`);
+        return isDisabled;
+    }
+
+    /**
+     * Check if the Run Query button is enabled (stream selected)
+     * @returns {Promise<boolean>} True if button is enabled
+     */
+    async isRunQueryEnabled() {
+        await this.runQueryButton.waitFor({ state: 'visible', timeout: 5000 });
+        const isDisabled = await this.runQueryButton.isDisabled();
+        testLogger.info(`Run Query enabled state: ${!isDisabled}`);
+        return !isDisabled;
+    }
+
+    /**
      * Expect Run Query button to be disabled
      */
     async expectRunQueryDisabled() {

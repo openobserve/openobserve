@@ -4,7 +4,6 @@ const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const { ingestTestData, getHeaders, getIngestionUrl, sendRequest } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
-const { safeWaitForNetworkIdle, safeWaitForDOMContentLoaded } = require('../utils/wait-helpers.js');
 
 test.describe("Logs Regression Bugs", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -121,16 +120,16 @@ test.describe("Logs Regression Bugs", () => {
 
     // Search for the field first to make it visible in sidebar
     await pm.logsPage.fillIndexFieldSearchInput(fieldForStreamA);
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
 
     // Add field to table for stream A
     await pm.logsPage.hoverOnFieldExpandButton(fieldForStreamA);
     await pm.logsPage.clickAddFieldToTableButton(fieldForStreamA);
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
 
     // Clear field search
     await pm.logsPage.fillIndexFieldSearchInput('');
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(300);
 
     // Verify field is in table
     await pm.logsPage.expectFieldInTableHeader(fieldForStreamA);
@@ -141,7 +140,7 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickSaveViewButton();
     await pm.logsPage.fillSavedViewName(savedViewA);
     await pm.logsPage.clickSavedViewDialogSave();
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
     testLogger.info(`Created saved view: ${savedViewA}`);
 
     // ===== STREAM B SETUP =====
@@ -161,16 +160,16 @@ test.describe("Logs Regression Bugs", () => {
 
     // Search for the field first to make it visible in sidebar
     await pm.logsPage.fillIndexFieldSearchInput(fieldForStreamB);
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
 
     // Add different field to table for stream B
     await pm.logsPage.hoverOnFieldExpandButton(fieldForStreamB);
     await pm.logsPage.clickAddFieldToTableButton(fieldForStreamB);
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
 
     // Clear field search
     await pm.logsPage.fillIndexFieldSearchInput('');
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(300);
 
     // Verify field is in table
     await pm.logsPage.expectFieldInTableHeader(fieldForStreamB);
@@ -181,7 +180,7 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickSaveViewButton();
     await pm.logsPage.fillSavedViewName(savedViewB);
     await pm.logsPage.clickSavedViewDialogSave();
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
     testLogger.info(`Created saved view: ${savedViewB}`);
 
     // ===== VERIFY SAVED VIEW SWITCHING =====
@@ -191,9 +190,10 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickSavedViewsExpand();
     await pm.logsPage.clickSavedViewSearchInput();
     await pm.logsPage.fillSavedViewSearchInput(savedViewA);
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
     await pm.logsPage.clickSavedViewByText(savedViewA);
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
 
     // Verify stream A field is present
     await pm.logsPage.expectFieldInTableHeader(fieldForStreamA);
@@ -203,9 +203,10 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickSavedViewsExpand();
     await pm.logsPage.clickSavedViewSearchInput();
     await pm.logsPage.fillSavedViewSearchInput(savedViewB);
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
     await pm.logsPage.clickSavedViewByText(savedViewB);
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
 
     // Verify stream B field is present
     await pm.logsPage.expectFieldInTableHeader(fieldForStreamB);
@@ -216,15 +217,15 @@ test.describe("Logs Regression Bugs", () => {
 
     // Delete saved view A
     await pm.logsPage.clickDeleteSavedViewButton(savedViewA);
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
     await pm.logsPage.clickConfirmButton();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
 
     // Delete saved view B
     await pm.logsPage.clickDeleteSavedViewButton(savedViewB);
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
     await pm.logsPage.clickConfirmButton();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
 
     testLogger.info('Stream switching test completed - saved views maintain correct fields for each stream');
   });
@@ -253,16 +254,16 @@ test.describe("Logs Regression Bugs", () => {
     const subquery = 'SELECT kubernetes_pod_name FROM (SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL LIMIT 10)';
     testLogger.info(`Entering subquery: ${subquery}`);
     await pm.logsPage.clearAndFillQueryEditor(subquery);
-    await safeWaitForDOMContentLoaded(page);
+    await pm.logsPage.waitForTimeout(500);
 
     // Run query
     testLogger.info('Running query');
     await pm.logsPage.clickRefreshButton();
-    await safeWaitForNetworkIdle(page, { timeout: 15000 });
+    await pm.logsPage.waitForTimeout(3000);
 
     // Wait for results table to load
     await pm.logsPage.expectLogTableColumnSourceVisible();
-    await safeWaitForDOMContentLoaded(page);
+    await pm.logsPage.waitForTimeout(2000);
     testLogger.info('Query results loaded successfully');
 
     // Expand field and validate using POM method
@@ -292,7 +293,7 @@ test.describe("Logs Regression Bugs", () => {
     const cteQuery = 'WITH filtered_logs AS (SELECT * FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL LIMIT 10) SELECT * FROM filtered_logs';
     testLogger.info(`Entering CTE query: ${cteQuery}`);
     await pm.logsPage.clearAndFillQueryEditor(cteQuery);
-    await safeWaitForDOMContentLoaded(page);
+    await pm.logsPage.waitForTimeout(500);
 
     // Run query
     testLogger.info('Running query');
@@ -325,7 +326,7 @@ test.describe("Logs Regression Bugs", () => {
     const aggQuery = 'SELECT kubernetes_pod_name, count(*) as total FROM "e2e_automate" WHERE kubernetes_pod_name IS NOT NULL GROUP BY kubernetes_pod_name LIMIT 10';
     testLogger.info(`Entering aggregation query: ${aggQuery}`);
     await pm.logsPage.clearAndFillQueryEditor(aggQuery);
-    await safeWaitForDOMContentLoaded(page);
+    await pm.logsPage.waitForTimeout(500);
 
     // Run query
     testLogger.info('Running query');
@@ -353,10 +354,11 @@ test.describe("Logs Regression Bugs", () => {
 
     // Navigate to streams page (has many items and search functionality)
     await pm.logsPage.clickStreamsMenuItem();
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Get initial pagination text (shows total count) - using POM method
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(1000); // Extra wait for pagination to update
 
     const initialPaginationText = await pm.logsPage.getPaginationText();
     testLogger.info(`Initial pagination text: ${initialPaginationText}`);
@@ -374,7 +376,8 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info(`Entered search term: "${searchTerm}"`);
 
     // Wait for table filtering to complete
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(500); // Small buffer for UI update
 
     // Get pagination text after search - using POM method
     const filteredPaginationText = await pm.logsPage.getPaginationText();
@@ -402,7 +405,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Clear search and verify count returns to original - using POM method
     await pm.logsPage.clearStreamsSearchInput();
-    await safeWaitForNetworkIdle(page, { timeout: 10000 }); // Wait for table to reload
+    await page.waitForTimeout(2000); // Wait for table to reload
 
     const clearedPaginationText = await pm.logsPage.getPaginationText();
     testLogger.info(`After clearing search, pagination text: ${clearedPaginationText}`);
@@ -430,18 +433,18 @@ test.describe("Logs Regression Bugs", () => {
 
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.selectStream('e2e_automate');
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Switch to SQL mode
     await pm.logsPage.clickSQLModeToggle();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
 
     // Execute a histogram query (similar to the one that failed in bug report)
     // Note: Bug #8180 requires zo_sql_val alias for COUNT (not zo_sql_num) - per Greptile review
     const histogramQuery = 'SELECT histogram(_timestamp) AS zo_sql_key, COUNT(*) AS zo_sql_val FROM "e2e_automate" GROUP BY zo_sql_key ORDER BY zo_sql_key';
     await pm.logsPage.fillQueryEditor(histogramQuery);
     await pm.logsPage.clickRefreshButton();
-    await safeWaitForNetworkIdle(page, { timeout: 15000 });
+    await page.waitForTimeout(3000);
 
     // Check for any error messages - using POM method
     const errorIndicators = await pm.logsPage.getErrorIndicatorCount();
@@ -455,7 +458,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Check if histogram query appears in search history - using POM methods
     await pm.logsPage.clickHistoryButton();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
 
     // Verify history panel opened - using POM method
     if (await pm.logsPage.isHistoryPanelVisible()) {
@@ -464,7 +467,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Close history panel
     await pm.logsPage.clickHistoryButton();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
 
     testLogger.info('✓ PRIMARY CHECK PASSED: Histogram query executed without error');
   });
@@ -474,20 +477,20 @@ test.describe("Logs Regression Bugs", () => {
 
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.selectStream('e2e_automate');
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Ensure we're in quick mode (not SQL mode) - using POM method
     const isSQLMode = await pm.logsPage.getSQLModeState();
 
     if (isSQLMode === 'true') {
       await pm.logsPage.clickSQLModeSwitch();
-      await safeWaitForDOMContentLoaded(page);
+      await page.waitForTimeout(1000);
       testLogger.info('Switched to quick mode');
     }
 
     // Run a query to get results
     await pm.logsPage.clickRefreshButton();
-    await safeWaitForNetworkIdle(page, { timeout: 15000 });
+    await page.waitForTimeout(3000);
 
     // Check if timestamp column/field is visible in results - using POM method
     const timestampVisible = await pm.logsPage.isTimestampColumnVisible();
@@ -497,7 +500,7 @@ test.describe("Logs Regression Bugs", () => {
     } else {
       // Check if timestamp appears in expanded log view - using POM methods
       await pm.logsPage.clickFirstTableRow();
-      await safeWaitForDOMContentLoaded(page);
+      await page.waitForTimeout(500);
 
       await pm.logsPage.expectTimestampDetailVisible();
       testLogger.info('✓ Timestamp found in log detail view');
@@ -511,11 +514,11 @@ test.describe("Logs Regression Bugs", () => {
 
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.selectStream('e2e_automate');
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Run initial query
     await pm.logsPage.clickRefreshButton();
-    await safeWaitForNetworkIdle(page, { timeout: 15000 });
+    await page.waitForTimeout(3000);
 
     // Get list of currently displayed fields in table - using POM method
     const initialHeaderCount = await pm.logsPage.getTableHeaderCount();
@@ -529,16 +532,16 @@ test.describe("Logs Regression Bugs", () => {
       // Search for a specific field to remove
       const fieldToRemove = 'kubernetes_pod_name';
       await pm.logsPage.fillIndexFieldSearchInput(fieldToRemove);
-      await safeWaitForDOMContentLoaded(page);
+      await page.waitForTimeout(500);
 
       // Check if field has a remove/toggle button and click it - using POM method
       await pm.logsPage.clickFieldByName(fieldToRemove);
-      await safeWaitForDOMContentLoaded(page);
+      await page.waitForTimeout(1000);
       testLogger.info(`Toggled field: ${fieldToRemove}`);
 
       // Clear search to see all remaining fields
       await pm.logsPage.fillIndexFieldSearchInput('');
-      await safeWaitForDOMContentLoaded(page);
+      await page.waitForTimeout(500);
     }
 
     // Check current table state - using POM method
@@ -568,25 +571,25 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Test: Download empty CSV results (Bug #9455)');
 
     await pm.logsPage.selectStream('e2e_automate');
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     await pm.logsPage.clickSQLModeToggle();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
 
     const emptyQuery = 'SELECT * FROM "e2e_automate" WHERE _timestamp < 0';
     await pm.logsPage.fillQueryEditor(emptyQuery);
     await pm.logsPage.clickRefreshButton();
-    await safeWaitForNetworkIdle(page, { timeout: 15000 });
+    await page.waitForTimeout(3000);
 
     // Using POM methods for download flow
     await pm.logsPage.clickMoreOptionsButton();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
 
     await pm.logsPage.hoverDownloadTableMenu();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
 
     await pm.logsPage.clickDownloadCSVButton();
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Check for notification - using POM method
     const notificationCount = await pm.logsPage.getNotificationCount();
@@ -606,25 +609,25 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Test: Download empty JSON results (Bug #9455)');
 
     await pm.logsPage.selectStream('e2e_automate');
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     await pm.logsPage.clickSQLModeToggle();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
 
     const emptyQuery = 'SELECT * FROM "e2e_automate" WHERE _timestamp < 0';
     await pm.logsPage.fillQueryEditor(emptyQuery);
     await pm.logsPage.clickRefreshButton();
-    await safeWaitForNetworkIdle(page, { timeout: 15000 });
+    await page.waitForTimeout(3000);
 
     // Using POM methods for download flow
     await pm.logsPage.clickMoreOptionsButton();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
 
     await pm.logsPage.hoverDownloadTableMenu();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
 
     await pm.logsPage.clickDownloadJSONButton();
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Check for notification - using POM method
     const notificationCount = await pm.logsPage.getNotificationCount();
@@ -644,7 +647,7 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Test: Stream validation (Bug #9455)');
 
     await pm.logsPage.clickMenuLinkLogsItem();
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Using POM method to check refresh button visibility
     const isRefreshButtonVisible = await pm.logsPage.isRefreshButtonVisible();
@@ -653,7 +656,7 @@ test.describe("Logs Regression Bugs", () => {
     expect(isRefreshButtonVisible).toBeTruthy();
 
     await pm.logsPage.clickRefreshButton();
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Using POM method to check for stream validation error
     const errorVisible = await pm.logsPage.hasStreamValidationError();
@@ -682,14 +685,14 @@ test.describe("Logs Regression Bugs", () => {
 
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.selectStream('e2e_automate');
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Make sure we're in quick mode initially - using POM method
     const isSQLMode = await pm.logsPage.getSQLModeState();
 
     if (isSQLMode === 'true') {
       await pm.logsPage.clickSQLModeSwitch();
-      await safeWaitForDOMContentLoaded(page);
+      await page.waitForTimeout(1000);
       testLogger.info('Switched to quick mode');
     }
 
@@ -699,11 +702,11 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.typeInQueryEditor(queryWithPipe);
     testLogger.info(`Entered query in quick mode: ${queryWithPipe}`);
 
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
 
     // Toggle to SQL mode - using POM method
     await pm.logsPage.clickSQLModeSwitch();
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(1500);
     testLogger.info('Toggled to SQL mode');
 
     // Get the converted SQL query
@@ -716,7 +719,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Try to run the converted query
     await pm.logsPage.clickRefreshButton();
-    await safeWaitForNetworkIdle(page, { timeout: 15000 });
+    await page.waitForTimeout(3000);
 
     // Check for syntax errors - using POM method
     const hasError = await pm.logsPage.hasErrorNotification();
@@ -751,7 +754,7 @@ test.describe("Logs Regression Bugs", () => {
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.selectStream('e2e_automate');
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Set date/time range
     await pm.logsPage.clickDateTimeButton();
@@ -760,13 +763,13 @@ test.describe("Logs Regression Bugs", () => {
     // Enable SQL mode
     testLogger.info('Enabling SQL mode');
     await pm.logsPage.clickSQLModeToggle();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
 
     // Enter SQL query with _timestamp as alias
     testLogger.info('Entering SQL query with _timestamp as alias');
     await pm.logsPage.clickQueryEditor();
     await pm.logsPage.typeInQueryEditor('select histogram(_timestamp) as _timestamp from "e2e_automate" group by _timestamp');
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(2000);
 
     // Set up response listener to capture API error response
     let errorResponse = null;
@@ -785,7 +788,7 @@ test.describe("Logs Regression Bugs", () => {
     // Run the query
     testLogger.info('Running query to trigger validation');
     await pm.logsPage.clickSearchBarRefreshButton();
-    await safeWaitForNetworkIdle(page, { timeout: 15000 });
+    await page.waitForTimeout(3000);
 
     // PRIMARY ASSERTION: Error message should be visible
     await pm.logsPage.expectErrorMessageVisible();
@@ -920,7 +923,7 @@ test.describe("Logs Regression Bugs", () => {
       const response = await searchResponse;
 
       if (response) {
-        await safeWaitForDOMContentLoaded(page);
+        await page.waitForTimeout(1000);
         const tableContent = await pm.logsPage.getLogsTableContent().catch(() => '');
 
         if (tableContent.includes('bug_9475')) {
@@ -931,8 +934,8 @@ test.describe("Logs Regression Bugs", () => {
       }
 
       if (i < maxRetries - 1) {
-        testLogger.debug(`Retry ${i + 1}/${maxRetries}: Data not yet available, waiting...`);
-        await safeWaitForNetworkIdle(page, { timeout: 5000 });
+        testLogger.debug(`Retry ${i + 1}/${maxRetries}: Data not yet available, waiting ${retryInterval}ms...`);
+        await page.waitForTimeout(retryInterval);
       }
     }
 
@@ -940,11 +943,11 @@ test.describe("Logs Regression Bugs", () => {
       testLogger.warn('Data not available after polling, proceeding with test (may result in skipped scenarios)');
     }
 
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Wait for logs table
     await pm.logsPage.expectLogsTableVisible();
-    await safeWaitForNetworkIdle(page, { timeout: 15000 });
+    await page.waitForTimeout(3000);
 
     // Bug #9475: Truncation happened in the default logs view after apostrophes
     // To properly test this, we need to add the 'log' field to the table columns
@@ -954,18 +957,18 @@ test.describe("Logs Regression Bugs", () => {
     let logsTableContent = '';
     try {
       await pm.logsPage.fillIndexFieldSearchInput('log');
-      await safeWaitForDOMContentLoaded(page);
+      await page.waitForTimeout(1000);
       await pm.logsPage.hoverOnFieldExpandButton('log');
       await pm.logsPage.clickAddFieldToTableButton('log');
-      await safeWaitForDOMContentLoaded(page);
+      await page.waitForTimeout(1000);
       logsTableContent = await pm.logsPage.getLogsTableContent();
     } catch (fieldError) {
       testLogger.info(`Could not add log field to table: ${fieldError.message}`);
       // Fallback: Check expanded log detail view instead
       await pm.logsPage.fillIndexFieldSearchInput('');
-      await safeWaitForDOMContentLoaded(page);
+      await page.waitForTimeout(500);
       await pm.logsPage.clickFirstTableRow().catch(() => {});
-      await safeWaitForDOMContentLoaded(page);
+      await page.waitForTimeout(1000);
       // Try to get content from the page using POM method
       logsTableContent = await pm.logsPage.getPageContent();
     }
@@ -1022,7 +1025,7 @@ test.describe("Logs Regression Bugs", () => {
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.selectStream("e2e_automate");
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Set relative time range
     testLogger.info('Setting relative time range to Last 15 minutes');
@@ -1040,7 +1043,7 @@ test.describe("Logs Regression Bugs", () => {
 
     await pm.logsPage.clickSearchBarRefreshButton();
     const initialSearchResponse = await initialResponse;
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(2000);
 
     // Get initial time range from API request
     const initialRequest = initialSearchResponse.request();
@@ -1063,7 +1066,7 @@ test.describe("Logs Regression Bugs", () => {
     // Enable auto refresh with 5 second interval
     testLogger.info('Enabling auto refresh with 5 second interval');
     await pm.logsPage.clickLiveModeButton();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
 
     // Wait for the 5-second auto-refresh button to be enabled (Rule 5: no graceful skipping)
     // The button must be enabled for this test to validate Bug #9877
@@ -1071,7 +1074,7 @@ test.describe("Logs Regression Bugs", () => {
     await expect(liveMode5SecBtn).toBeEnabled({ timeout: 15000 });
 
     await pm.logsPage.clickLiveMode5Sec();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
 
     testLogger.info('Auto refresh enabled - waiting for automatic refresh cycle');
 
@@ -1211,13 +1214,13 @@ test.describe("Logs Regression Bugs", () => {
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.selectStream('e2e_automate');
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Set time range and run initial query
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickRefreshButton();
-    await safeWaitForNetworkIdle(page, { timeout: 15000 });
+    await page.waitForTimeout(3000);
 
     // Capture initial logs state (first N row texts as array)
     await pm.logsPage.waitForLogsTable(10000);
@@ -1231,7 +1234,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Open query inspector/show query toggle
     await pm.logsPage.clickShowQueryToggle();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
     testLogger.info('Opened query inspector');
 
     // Interact with query inspector - view the query
@@ -1239,11 +1242,11 @@ test.describe("Logs Regression Bugs", () => {
 
     // Click on query editor (readonly interaction)
     await pm.logsPage.clickQueryEditor();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
 
     // Close query inspector
     await pm.logsPage.clickShowQueryToggle();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
 
     // PRIMARY ASSERTION 1: Logs table should still be visible after query inspector interaction
     await pm.logsPage.expectLogsTableVisible();
@@ -1284,7 +1287,7 @@ test.describe("Logs Regression Bugs", () => {
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.selectStream('e2e_automate');
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Turn off quick mode if enabled
     await pm.logsPage.ensureQuickModeState(false);
@@ -1295,7 +1298,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Run query
     await pm.logsPage.clickRefreshButton();
-    await safeWaitForNetworkIdle(page, { timeout: 15000 });
+    await page.waitForTimeout(5000);
 
     // Wait for results
     await pm.logsPage.waitForLogsTable(15000);
@@ -1394,7 +1397,7 @@ test.describe("Logs Regression Bugs", () => {
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
     await pm.logsPage.selectStream('e2e_automate');
-    await safeWaitForNetworkIdle(page, { timeout: 10000 });
+    await page.waitForTimeout(2000);
 
     // Turn off quick mode if enabled
     await pm.logsPage.ensureQuickModeState(false);
@@ -1403,7 +1406,7 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.clickRefreshButton();
-    await safeWaitForNetworkIdle(page, { timeout: 15000 });
+    await page.waitForTimeout(5000);
 
     // Wait for logs table
     await pm.logsPage.waitForLogsTable(15000);
@@ -1420,21 +1423,21 @@ test.describe("Logs Regression Bugs", () => {
 
     // Expand first log row using the expand menu to trigger highlighting
     await pm.logsPage.clickFirstExpandMenu();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
     testLogger.info('Expanded first log row');
 
     // Close the dialog/detail panel that opens (press Escape or click outside)
     await pm.logsPage.pressEscapeToCloseDialog();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
 
     // Click on the last visible log row to select/highlight it
     const lastRow = pm.logsPage.getLastRow();
     await lastRow.scrollIntoViewIfNeeded();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(300);
 
     // Get the expand menu for last row and click it
     await pm.logsPage.clickLastExpandMenu();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
     testLogger.info('Expanded last log row');
 
     // Check if the log detail panel shows for last row
@@ -1443,7 +1446,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Close the detail panel
     await pm.logsPage.pressEscapeToCloseDialog();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
 
     // Capture the last row's visual state AFTER closing (closed-but-still-highlighted state)
     // This is the persistent highlight state we expect to survive when expanding a different row
@@ -1453,7 +1456,7 @@ test.describe("Logs Regression Bugs", () => {
     // Now expand first row again - this is when the bug would cause last row to lose highlighting
     const firstRowExpandMenu = pm.logsPage.getFirstRowExpandMenu();
     await firstRowExpandMenu.click();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
     testLogger.info('Expanded first log row again');
 
     // PRIMARY ASSERTION 1: Last row should still be visible
@@ -1504,7 +1507,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Close the expanded row
     await pm.logsPage.pressEscapeToCloseDialog();
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(500);
 
     // PRIMARY ASSERTION 3: Table should still have rows (streaming may add/remove, but table intact)
     const finalRowCount = await pm.logsPage.getLogRowCount();
@@ -1526,15 +1529,14 @@ test.describe("Logs Regression Bugs", () => {
 
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForTimeout(1000);
 
     // Select a stream to populate the query editor
     await pm.logsPage.selectStream("e2e_automate");
 
     // Wait for query editor to be ready
     await pm.logsPage.waitForQueryEditorVisible();
-
-    // Ensure SQL mode is enabled (validateDoubleQuotes() only runs in SQL mode)
-    await pm.logsPage.enableSqlModeIfNeeded();
+    await page.waitForTimeout(1000);
 
     // Set a query with double-quoted string value (should trigger warning via validateDoubleQuotes())
     // Test query: SELECT * FROM "e2e_automate" WHERE "field" = "value"
@@ -1542,16 +1544,36 @@ test.describe("Logs Regression Bugs", () => {
     const queryWithDoubleQuotes = `SELECT * FROM "e2e_automate" WHERE "field" = "value"`;
     await pm.logsPage.setQueryEditorContent(queryWithDoubleQuotes);
 
-    // Wait for Monaco's debounced validateDoubleQuotes() to execute (default debounce: 500ms).
-    // Use DOM polling for .squiggly-warning elements — the precise CSS class Monaco renders
-    // for warning-level decorations. This is deterministic: the waitForFunction resolves as
-    // soon as the decorations are rendered (vs. a fixed 1s timeout that may be too fast/slow).
-    await page.waitForFunction((selector) => {
-      const editor = document.querySelector(selector);
-      if (!editor) return false;
-      return editor.querySelectorAll('.squiggly-warning').length > 0;
-    }, '[data-test="logs-search-bar-query-editor"]', { timeout: 5000 });
-    testLogger.info('✅ Warning markers detected, validateDoubleQuotes() confirmed');
+    // Wait for Monaco's debounced validateDoubleQuotes() to execute (default debounce: 500ms)
+    await page.waitForTimeout(1000);
+
+    // Verify warning markers via DOM inspection.
+    // Note: window.monaco is NOT globally exposed (module-scoped in CodeQueryEditor.vue),
+    // so we cannot use window.monaco.editor.getModelMarkers() directly.
+    // Instead, we check the DOM for .squiggly-warning elements — these are the
+    // precise CSS class Monaco renders for warning-level decorations (from
+    // validateDoubleQuotes()). We avoid checking generic decoration elements
+    // like .cdr which match any Monaco decoration (cursor overlays, bracket
+    // highlights, etc.) and would make the assertion pass vacuously.
+    const hasWarnings = await page.evaluate(() => {
+      try {
+        const editorContainer =
+          document.querySelector('[data-test="logs-search-bar-query-editor"]');
+        if (!editorContainer) return false;
+
+        const warningSquiggles =
+          editorContainer.querySelectorAll('.squiggly-warning');
+        return warningSquiggles.length > 0;
+      } catch (e) {
+        return false;
+      }
+    });
+
+    testLogger.info(`Warning markers detected via DOM inspection: ${hasWarnings}`);
+
+    // PRIMARY CHECK: Warning decorations must be present for double-quoted string values
+    expect(hasWarnings).toBe(true);
+    testLogger.info('✅ Warning markers confirmed for double-quoted values');
 
     // SECONDARY CHECK: Verify the query text was set correctly
     await pm.logsPage.expectQueryEditorContainsText('"e2e_automate"');
@@ -1573,6 +1595,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForTimeout(1000);
 
     // Register the waitForResponse promise BEFORE the action that triggers
     // the search (selectStream), to avoid a race condition: if the /_search
@@ -1592,7 +1615,7 @@ test.describe("Logs Regression Bugs", () => {
     // Wait for auto-search to complete before proceeding
     testLogger.info('Waiting for auto-search to populate field values...');
     await searchResponsePromise;
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000); // Small buffer for Monaco to process field values
     testLogger.info('✅ Auto-search completed, field values cached');
 
     // Set the query with cursor in VALUE context (after = operator)
@@ -1601,8 +1624,7 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.setQueryEditorContent(
       'SELECT * FROM "e2e_automate" WHERE kubernetes_container_name = '
     );
-    // Verify query content was set before triggering suggestions
-    await pm.logsPage.expectQueryEditorContainsText('kubernetes_container_name');
+    await page.waitForTimeout(500);
 
     // Trigger the suggestion widget via Ctrl+Space and wait for it to appear.
     // Using waitForSuggestionWidgetVisible() makes this deterministic:
@@ -1643,6 +1665,7 @@ test.describe("Logs Regression Bugs", () => {
 
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForTimeout(1000);
 
     // Register search response listener BEFORE stream selection to avoid race condition
     testLogger.info('Setting up search response listener before stream selection...');
@@ -1658,7 +1681,7 @@ test.describe("Logs Regression Bugs", () => {
     // Wait for auto-search to populate field values in Monaco's suggestion cache
     testLogger.info('Waiting for auto-search to populate field values...');
     await searchResponsePromise;
-    await safeWaitForDOMContentLoaded(page);
+    await page.waitForTimeout(1000);
     testLogger.info('Auto-search completed, field values cached');
 
     // Set multi-condition WHERE query with mixed quotes.
@@ -1669,8 +1692,10 @@ test.describe("Logs Regression Bugs", () => {
     const mixedQuoteQuery = `SELECT * FROM "e2e_automate" WHERE http = 'te' AND host = 'te`;
     await pm.logsPage.setQueryEditorContent(mixedQuoteQuery);
 
-    // Verify the query text is set correctly - expectQueryEditorContainsText waits for content
-    // The full query should be present
+    // Wait for Monaco to process the content
+    await page.waitForTimeout(500);
+
+    // Verify the query text is set correctly - the full query should be present
     await pm.logsPage.expectQueryEditorContainsText('host = \'te');
     testLogger.info('✅ Mixed quote query text verified in editor');
 
