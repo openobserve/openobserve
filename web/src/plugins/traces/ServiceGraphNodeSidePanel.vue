@@ -62,8 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODropdown>
           <OButton
             variant="ghost"
-            size="icon-circle"
-            class="close-btn"
+            size="icon"
             data-test="service-graph-side-panel-close-btn"
             @click="handleClose"
           >
@@ -134,9 +133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- View in Traces button -->
             <OButton
-              variant="primary"
+              variant="ghost-primary"
               size="sm"
-              class="view-logs-btn"
               data-test="service-graph-side-panel-view-in-traces-btn"
               @click="viewInTraces"
             >
@@ -2205,12 +2203,6 @@ export default defineComponent({
       filter: brightness(1.1);
       box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
     }
-  }
-
-  .close-btn {
-    flex-shrink: 0;
-    width: 24px;
-    height: 24px;
   }
 }
 

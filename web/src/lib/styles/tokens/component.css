@@ -59,6 +59,19 @@
   --color-button-ghost-destructive-active-bg: var(--color-error-100);
   --color-button-ghost-destructive-focus-ring: var(--color-error-400);
 
+  /* Button — ghost-muted (secondary text at rest → primary text + bg on hover) */
+  --color-button-ghost-muted-text: var(--color-text-secondary);
+  --color-button-ghost-muted-hover-text: var(--color-primary-600);
+  --color-button-ghost-muted-hover-bg: var(--color-primary-50);
+  --color-button-ghost-muted-active-bg: var(--color-primary-100);
+  --color-button-ghost-muted-focus-ring: var(--color-primary-400);
+
+  /* Button — ghost-subtle (secondary text, 60 % opacity at rest, full on hover) */
+  --color-button-ghost-subtle-text: var(--color-text-secondary);
+  --color-button-ghost-subtle-hover-bg: var(--color-primary-50);
+  --color-button-ghost-subtle-active-bg: var(--color-primary-100);
+  --color-button-ghost-subtle-focus-ring: var(--color-primary-400);
+
   /* Button — destructive */
   --color-button-destructive: var(--color-error-600);
   --color-button-destructive-hover: var(--color-error-700);
@@ -168,6 +181,19 @@
   --color-button-ghost-destructive-hover-bg: var(--color-button-ghost-destructive-hover-bg);
   --color-button-ghost-destructive-active-bg: var(--color-button-ghost-destructive-active-bg);
   --color-button-ghost-destructive-focus-ring: var(--color-button-ghost-destructive-focus-ring);
+
+  /* Button — ghost-muted */
+  --color-button-ghost-muted-text: var(--color-button-ghost-muted-text);
+  --color-button-ghost-muted-hover-text: var(--color-button-ghost-muted-hover-text);
+  --color-button-ghost-muted-hover-bg: var(--color-button-ghost-muted-hover-bg);
+  --color-button-ghost-muted-active-bg: var(--color-button-ghost-muted-active-bg);
+  --color-button-ghost-muted-focus-ring: var(--color-button-ghost-muted-focus-ring);
+
+  /* Button — ghost-subtle */
+  --color-button-ghost-subtle-text: var(--color-button-ghost-subtle-text);
+  --color-button-ghost-subtle-hover-bg: var(--color-button-ghost-subtle-hover-bg);
+  --color-button-ghost-subtle-active-bg: var(--color-button-ghost-subtle-active-bg);
+  --color-button-ghost-subtle-focus-ring: var(--color-button-ghost-subtle-focus-ring);
 
   /* Button — destructive */
   --color-button-destructive: var(--color-button-destructive);

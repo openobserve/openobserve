@@ -52,6 +52,15 @@
     --color-button-ghost-destructive-hover-bg: var(--color-surface-overlay);
     --color-button-ghost-destructive-active-bg: var(--color-surface-overlay);
 
+    /* ghost-muted */
+    --color-button-ghost-muted-hover-text: var(--color-primary-400);
+    --color-button-ghost-muted-hover-bg: var(--color-primary-900);
+    --color-button-ghost-muted-active-bg: var(--color-primary-800);
+
+    /* ghost-subtle */
+    --color-button-ghost-subtle-hover-bg: var(--color-primary-900);
+    --color-button-ghost-subtle-active-bg: var(--color-primary-800);
+
     /* destructive */
     --color-button-destructive-focus-ring: var(--color-error-300);
 

@@ -12,6 +12,7 @@ const props = withDefaults(defineProps<ButtonProps>(), {
   type: "button",
   disabled: false,
   loading: false,
+  block: false,
 });
 
 const emit = defineEmits<ButtonEmits>();
@@ -55,6 +56,20 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-primary-focus-ring",
     "tw:disabled:text-text-disabled",
   ].join(" "),
+  "ghost-muted": [
+    "tw:bg-transparent tw:text-button-ghost-muted-text tw:border-0",
+    "tw:enabled:hover:text-button-ghost-muted-hover-text tw:enabled:hover:bg-button-ghost-muted-hover-bg",
+    "tw:enabled:active:bg-button-ghost-muted-active-bg",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-muted-focus-ring",
+    "tw:disabled:text-text-disabled",
+  ].join(" "),
+  "ghost-subtle": [
+    "tw:bg-transparent tw:text-button-ghost-subtle-text tw:border-0 tw:opacity-60",
+    "tw:enabled:hover:opacity-100 tw:enabled:hover:bg-button-ghost-subtle-hover-bg",
+    "tw:enabled:active:bg-button-ghost-subtle-active-bg",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-subtle-focus-ring",
+    "tw:disabled:text-text-disabled tw:disabled:opacity-30",
+  ].join(" "),
   "ghost-destructive": [
     "tw:bg-transparent tw:text-button-ghost-destructive-text tw:border-0",
     "tw:enabled:hover:bg-button-ghost-destructive-hover-bg",
@@ -84,7 +99,10 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
 
 const classes = computed<string[]>(() => [
   // Base - layout, typography, interaction
-  "tw:inline-flex tw:items-center tw:justify-center tw:whitespace-nowrap",
+  props.block
+    ? "tw:flex tw:w-full tw:items-center tw:justify-center"
+    : "tw:inline-flex tw:items-center tw:justify-center",
+  "tw:whitespace-nowrap",
   "tw:font-medium tw:transition-colors tw:duration-150",
   "tw:outline-none",
   "tw:disabled:cursor-not-allowed tw:enabled:cursor-pointer",
