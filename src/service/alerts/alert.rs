@@ -2201,14 +2201,15 @@ async fn permitted_alerts(
         }
     }
 
-    // We also check for the `GET_INDIVIDUAL` permission on the dashboards.
-    // If the user has `GET_INDIVIDUAL` permission on a dashboard, then they will be able to see the
-    // dashboard. This is used to check if the user has permission to see a specific dashboard.
+    // We also check for the `GET_INDIVIDUAL_FROM_ROLE` permission on the dashboards.
+    // If the user has `GET_INDIVIDUAL_FROM_ROLE` permission on a dashboard, then they will be able
+    // to see the dashboard. This is used to check if the user has permission to see a specific
+    // dashboard.
 
     let permitted_objects = crate::handler::http::auth::validator::list_objects_for_user(
         org_id,
         user_id,
-        "GET_INDIVIDUAL",
+        "GET_INDIVIDUAL_FROM_ROLE",
         OFGA_MODELS.get("alerts").unwrap().key,
     )
     .await
