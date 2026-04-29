@@ -390,6 +390,11 @@ const onCloseColumn = (columnDef: any) => {
   searchObj.data.resultGrid.columns = searchObj.data.resultGrid.columns.filter(
     (c) => c.id !== columnDef.id,
   );
+
+  // If the closed column was the active sort column, reset to default
+  if (columnDef.id === props.sortBy) {
+    emit("sort-change", "start_time", "desc");
+  }
 };
 
 const traceRowClass = (row: any) => {

@@ -114,7 +114,7 @@ vi.mock("@/components/TenstackTable.vue", () => ({
       "defaultColumns",
       "selectedStreamFields",
     ],
-    emits: ["click:data-row", "sort-change"],
+    emits: ["click:data-row", "sort-change", "closeColumn", "update:columnOrder"],
     setup() {
       return { cellActionsColumn: cellActionsColumnRef };
     },
