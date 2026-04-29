@@ -4202,4 +4202,96 @@ mod tests {
         assert_eq!(pipeline_name, "some_pipe");
         assert_eq!(pipeline_id, "some_id");
     }
+
+    #[test]
+    fn test_get_destination_stream_excludes_source_node() {
+        use config::meta::pipeline::{
+            Pipeline,
+            components::{Node, PipelineSource},
+        };
+
+        let source_node = Node::new(
+            "source".to_string(),
+            NodeData::Stream(StreamParams::new("org", "input-stream", StreamType::Logs)),
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        let output_node = Node::new(
+            "output-1".to_string(),
+            NodeData::Stream(StreamParams::new("org", "output-stream", StreamType::Logs)),
+            100.0,
+            0.0,
+            "output".to_string(),
+        );
+        let pipeline = Pipeline {
+            id: "p1".to_string(),
+            version: 0,
+            enabled: true,
+            org: "org".to_string(),
+            name: "test".to_string(),
+            description: String::new(),
+            source: PipelineSource::default(),
+            nodes: vec![source_node, output_node],
+            edges: vec![],
+        };
+
+        let result = get_destination_stream_from_pipeline(&pipeline).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].stream_name.as_str(), "output-stream");
+    }
+
+    #[test]
+    fn test_get_destination_stream_no_stream_nodes_returns_error() {
+        use config::meta::pipeline::{
+            Pipeline,
+            components::{FunctionParams, Node, PipelineSource},
+        };
+
+        let func_node = Node::new(
+            "func-1".to_string(),
+            NodeData::Function(FunctionParams {
+                name: "my_func".to_string(),
+                after_flatten: false,
+                num_args: 0,
+            }),
+            0.0,
+            0.0,
+            "default".to_string(),
+        );
+        let pipeline = Pipeline {
+            id: "p2".to_string(),
+            version: 0,
+            enabled: true,
+            org: "org".to_string(),
+            name: "test".to_string(),
+            description: String::new(),
+            source: PipelineSource::default(),
+            nodes: vec![func_node],
+            edges: vec![],
+        };
+
+        let result = get_destination_stream_from_pipeline(&pipeline);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_destination_stream_empty_pipeline_returns_error() {
+        use config::meta::pipeline::{Pipeline, components::PipelineSource};
+
+        let pipeline = Pipeline {
+            id: "p3".to_string(),
+            version: 0,
+            enabled: true,
+            org: "org".to_string(),
+            name: "test".to_string(),
+            description: String::new(),
+            source: PipelineSource::default(),
+            nodes: vec![],
+            edges: vec![],
+        };
+
+        let result = get_destination_stream_from_pipeline(&pipeline);
+        assert!(result.is_err());
+    }
 }
