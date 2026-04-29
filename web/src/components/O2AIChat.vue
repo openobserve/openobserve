@@ -4177,10 +4177,25 @@ export default defineComponent({
           setTimeout(() => {
             componentReady.value = true;
             processPendingChips();
+            focusInput();
           }, 100);
         });
       }
     });
+
+    // Auto-focus input when chat is expanded
+    watch(
+      () => store.state.isAiChatExpanded,
+      (isExpanded) => {
+        if (isExpanded) {
+          nextTick(() => {
+            setTimeout(() => {
+              focusInput();
+            }, 150);
+          });
+        }
+      },
+    );
 
     // Watch for organization switches — reset current chat and reload history
     // scoped to the new org so users never see cross-org chat history.
