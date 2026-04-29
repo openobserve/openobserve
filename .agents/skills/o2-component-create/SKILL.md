@@ -84,11 +84,11 @@ export type {
   DropdownItemProps,
   DropdownItemEmits,
   DropdownItemSlots,
-} from "./ODropdownItem.types"
+} from "./ODropdownItem.types";
 export type {
   DropdownGroupProps,
   DropdownGroupSlots,
-} from "./ODropdownGroup.types"
+} from "./ODropdownGroup.types";
 ```
 
 **Why one file per component?** When a sub-component changes (e.g. new prop on `ODropdownItem`), you edit only `ODropdownItem.types.ts` and `ODropdownItem.spec.ts` — no risk of accidentally breaking the root component's types or tests.
@@ -96,8 +96,8 @@ export type {
 **No `index.ts` per component.** Import directly by path:
 
 ```ts
-import OButton from "@/lib/core/Button/OButton.vue"
-import type { ButtonProps } from "@/lib/core/Button/OButton.types"
+import OButton from "@/lib/core/Button/OButton.vue";
+import type { ButtonProps } from "@/lib/core/Button/OButton.types";
 ```
 
 A group-level barrel (`web/src/lib/core/index.ts`) is optional and added only once a group has multiple built components.
@@ -117,6 +117,7 @@ grep_search for usage patterns in web/src/views/ and web/src/components/
 ```
 
 - Identify all Quasar usages of the equivalent component (`q-btn`, `q-input`, etc.)
+- **Collect every visual style in active use**: record every `color`, `flat`, `outline`, `dense`, `size`, `round`, `push` combination that appears. These become required variants — the new O2 component must cover all of them.
 - Note what props and behaviors are actually used
 - Build a compatibility surface that covers all real usage, not just ideal usage
 - If this is a **family component**, identify all family members that need to be built
@@ -187,6 +188,7 @@ Run through the checklist in [references/component-guide.md](references/componen
 - **NEVER** install a headless library (other than reka-ui / @tanstack/vue-form) without user confirmation
 - **NEVER** cross-import between library groups
 - **NEVER** import from `web/src/components/`, stores, router, or services inside `lib/`
+- **NEVER** ship a component with an incomplete variant set\*\* — before finalising, cross-reference every visual style that exists in the codebase for the Quasar equivalent and confirm that every one of those styles is covered by a variant. A missing variant forces consumers to add hardcoded classes, which is forbidden.
 - **ALWAYS** use `tw:` prefix on every Tailwind utility
 - **ALWAYS** write variant modifiers with a **single** `tw:` prefix before the entire string: `tw:data-[state=on]:bg-token` Γ£à ΓÇö **never** double the prefix: `tw:data-[state=on]:tw:bg-token` Γ¥î
 - **ALWAYS** use RTL logical border-radius variants for horizontal grouped elements: `tw:rounded-e-*` / `tw:rounded-s-*`, never `tw:rounded-r-*` / `tw:rounded-l-*`
