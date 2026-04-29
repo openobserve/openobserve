@@ -475,4 +475,13 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_simple_topn_visitor_initial_state() {
+        let fields = HashSet::from(["service".to_string()]);
+        let visitor = SimpleTopnVisitor::new(fields.clone());
+        assert!(visitor.simple_topn.is_none());
+        assert!(visitor.secondary_sort_column.is_none());
+        assert_eq!(visitor.index_fields, fields);
+    }
 }

@@ -238,4 +238,11 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_simple_histogram_visitor_initial_state() {
+        let visitor = SimpleHistogramVisitor::new((1000, 2000));
+        assert!(visitor.simple_histogram.is_none());
+        assert_eq!(visitor.time_range, (1000, 2000));
+    }
 }
