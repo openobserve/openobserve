@@ -1668,4 +1668,45 @@ mod tests {
             StatusCode::INTERNAL_SERVER_ERROR
         );
     }
+
+    #[test]
+    fn test_infra_error_is_internal_server_error() {
+        let err = infra::errors::Error::DbError(infra::errors::DbError::SeaORMError(
+            "db unavailable".to_string(),
+        ));
+        assert_eq!(
+            status(AlertError::InfraError(err)),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_decode_vrl_is_bad_request() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::InvalidData, "bad vrl");
+        assert_eq!(
+            status(AlertError::DecodeVrl(io_err)),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_parse_cron_is_bad_request() {
+        use std::str::FromStr as _;
+        let cron_err = cron::Schedule::from_str("not-a-cron").unwrap_err();
+        assert_eq!(
+            status(AlertError::ParseCron(cron_err)),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_get_destination_with_template_error_is_internal_server_error() {
+        use crate::service::db::alerts::destinations::DestinationError;
+        assert_eq!(
+            status(AlertError::GetDestinationWithTemplateError(
+                DestinationError::NotFound
+            )),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
 }
