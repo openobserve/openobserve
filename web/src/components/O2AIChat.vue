@@ -105,32 +105,32 @@
             </q-btn>
           </div>
 
-          <div class="tw:flex tw:items-center tw:gap-0">
+          <div class="tw:flex tw:items-center tw:gap-1 chat-header-actions">
             <!-- Edit title button -->
             <q-btn
               v-if="currentChatId"
               flat
               round
               dense
-              size="sm"
+              size="md"
               icon="edit"
               @click.stop="openEditTitleDialog"
             >
               <q-tooltip :delay="500">Edit title</q-tooltip>
             </q-btn>
-            <q-btn flat round dense size="sm" icon="add" @click="addNewChat" />
+            <q-btn flat round dense size="md" icon="add" @click="addNewChat" />
             <q-btn
               flat
               round
               dense
-              size="sm"
+              size="md"
               :icon="store.state.isAiChatExpanded ? 'close_fullscreen' : 'open_in_full'"
               data-test="ai-chat-expand-btn"
               @click="toggleExpand"
             >
-              <q-tooltip :delay="500">{{ store.state.isAiChatExpanded ? 'Collapse' : 'Expand' }} ({{ isMac ? '⌘' : 'Ctrl+' }}Shift+E)</q-tooltip>
+              <q-tooltip :delay="500">{{ store.state.isAiChatExpanded ? 'Collapse' : 'Expand' }} ({{ isMac ? '⌘' : 'Ctrl+' }}B)</q-tooltip>
             </q-btn>
-            <q-btn flat round dense size="sm" icon="close" @click="$emit('close')" />
+            <q-btn flat round dense size="md" icon="close" @click="$emit('close')" />
           </div>
         </div>
       </div>
@@ -1077,6 +1077,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
 import { useChatHistory } from '@/composables/useChatHistory';
+import useKeyboardShortcuts from '@/composables/useKeyboardShortcuts';
 import { useAiDashboardEvents, getDashboardEventType } from '@/composables/useAiDashboardEvents';
 
 const { fetchAiChat, submitFeedback } = useAiChat();
@@ -2869,18 +2870,22 @@ export default defineComponent({
       window.dispatchEvent(new Event('resize'));
     };
 
-    const handleGlobalKeydown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && store.state.isAiChatExpanded) {
-        store.dispatch('setIsAiChatExpanded', false);
-        window.dispatchEvent(new Event('resize'));
-      }
-
-      // Ctrl/Cmd+Shift+E to toggle expand
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
-        e.preventDefault();
-        toggleExpand();
-      }
-    };
+    useKeyboardShortcuts([
+      {
+        key: 'Escape',
+        handler: () => {
+          if (store.state.isAiChatExpanded) {
+            store.dispatch('setIsAiChatExpanded', false);
+            window.dispatchEvent(new Event('resize'));
+          }
+        },
+      },
+      {
+        key: 'b',
+        ctrlOrMeta: true,
+        handler: () => toggleExpand(),
+      },
+    ]);
 
     const addNewChat = () => {
       detachCurrentStream();
@@ -4213,9 +4218,6 @@ export default defineComponent({
 
       // Load auto navigation preferences from localStorage
       loadAutoNavigationPreferences();
-
-      // Listen for Escape key to collapse expanded mode
-      document.addEventListener('keydown', handleGlobalKeydown);
     });
 
     onUnmounted(()=>{
@@ -4256,8 +4258,6 @@ export default defineComponent({
         addNewChat();
       }
 
-      // Remove Escape key listener
-      document.removeEventListener('keydown', handleGlobalKeydown);
     })
     //this watch is added to make sure that the chat gets updated
     // when the component is unmounted so that the main layout component can load the correct chat
