@@ -2017,4 +2017,67 @@ mod tests {
         assert!(!changed);
         assert_eq!(existing.len(), 1);
     }
+
+    #[test]
+    fn test_cooldown_elapsed_no_events_returns_true() {
+        assert!(cooldown_elapsed(&[], 5));
+    }
+
+    #[test]
+    fn test_cooldown_elapsed_no_ai_complete_event_returns_true() {
+        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
+        let events = vec![IncidentEvent {
+            timestamp: chrono::Utc::now().timestamp_micros(),
+            event_type: IncidentEventType::Created,
+        }];
+        assert!(cooldown_elapsed(&events, 5));
+    }
+
+    #[test]
+    fn test_cooldown_elapsed_recent_ai_complete_returns_false() {
+        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
+        // Timestamp = now - 30 seconds; cooldown = 5 minutes → not elapsed
+        let recent_ts = chrono::Utc::now().timestamp_micros() - 30 * 1_000_000;
+        let events = vec![IncidentEvent {
+            timestamp: recent_ts,
+            event_type: IncidentEventType::AIAnalysisComplete,
+        }];
+        assert!(!cooldown_elapsed(&events, 5));
+    }
+
+    #[test]
+    fn test_cooldown_elapsed_old_ai_complete_returns_true() {
+        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
+        // Timestamp = epoch (very old); cooldown = 1 minute → elapsed
+        let events = vec![IncidentEvent {
+            timestamp: 1_000_000, // 1 second after epoch
+            event_type: IncidentEventType::AIAnalysisComplete,
+        }];
+        assert!(cooldown_elapsed(&events, 1));
+    }
+
+    #[test]
+    fn test_cooldown_elapsed_uses_last_ai_complete() {
+        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
+        // Two AIAnalysisComplete events: old one and recent one
+        // Should use the last (most recent) one → not elapsed
+        let old_ts = 1_000_000i64;
+        let recent_ts = chrono::Utc::now().timestamp_micros() - 30 * 1_000_000;
+        let events = vec![
+            IncidentEvent {
+                timestamp: old_ts,
+                event_type: IncidentEventType::AIAnalysisComplete,
+            },
+            IncidentEvent {
+                timestamp: chrono::Utc::now().timestamp_micros(),
+                event_type: IncidentEventType::Created,
+            },
+            IncidentEvent {
+                timestamp: recent_ts,
+                event_type: IncidentEventType::AIAnalysisComplete,
+            },
+        ];
+        // last AIAnalysisComplete is at recent_ts (30 seconds ago), cooldown = 5 minutes
+        assert!(!cooldown_elapsed(&events, 5));
+    }
 }
