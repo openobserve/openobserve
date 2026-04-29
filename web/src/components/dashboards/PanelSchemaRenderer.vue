@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @click.stop
       >
-        <q-btn
+        <OButton
           v-if="
             showLegendsButton &&
             noData !== 'No Data' &&
@@ -204,19 +204,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'gauge',
             ].includes(panelSchema.type)
           "
-          color="primary"
-          icon="format_list_bulleted"
-          round
-          outline
-          size="sm"
+          variant="outline"
+          size="icon-circle"
           @click="$emit('show-legends')"
-          class="el-border"
         >
+          <template #icon-left><q-icon name="format_list_bulleted" /></template>
           <q-tooltip anchor="top middle" self="bottom right">
             Show Legends
           </q-tooltip>
-        </q-btn>
-        <q-btn
+        </OButton>
+        <OButton
           v-if="
             [
               'area',
@@ -232,20 +229,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             allowAnnotationsAdd &&
             !viewOnly
           "
-          color="primary"
-          :icon="isAddAnnotationMode ? 'cancel' : 'edit'"
-          round
-          outline
-          size="sm"
+          variant="outline"
+          size="icon-circle"
           @click="toggleAddAnnotationMode"
-          class="el-border"
         >
+          <template #icon-left
+            ><q-icon :name="isAddAnnotationMode ? 'cancel' : 'edit'"
+          /></template>
           <q-tooltip anchor="top middle" self="bottom right">
             {{
               isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations"
             }}
           </q-tooltip>
-        </q-btn>
+        </OButton>
       </div>
       <div
         class="crosslink-drilldown-menu"
@@ -406,6 +402,7 @@ const CustomChartRenderer = defineAsyncComponent(() => {
 const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
 });
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -421,6 +418,7 @@ export default defineComponent({
     AddAnnotation,
     CustomChartRenderer,
     LoadingProgress,
+    OButton,
   },
   props: {
     selectedTimeObj: {
@@ -981,8 +979,7 @@ export default defineComponent({
                   const gridModel = chartInstance
                     ?.getModel()
                     ?.getComponent("grid");
-                  const freshRect =
-                    gridModel?.coordinateSystem?.getRect();
+                  const freshRect = gridModel?.coordinateSystem?.getRect();
                   if (freshRect) {
                     previousOptionsSnapshot._gridRect = {
                       x: freshRect.x,

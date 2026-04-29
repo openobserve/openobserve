@@ -9,75 +9,65 @@
           :key="index"
           class="join-item"
         >
-          <OButtonGroup class="axis-field">
-            <div>
-              <q-btn
-                no-caps
-                dense
-                color="primary"
-                icon-right="arrow_drop_down"
-                square
-                :no-wrap="true"
-                size="sm"
-                :data-test="`dashboard-join-item-${index}`"
-                class="q-pl-sm"
+          <OButtonGroup align="center">
+            <OButton
+              variant="primary"
+              size="sm"
+              :data-test="`dashboard-join-item-${index}`"
+            >
+              <div class="join-btn-content">
+                <LeftJoinTypeSvg
+                  v-if="joinObj?.joinType === 'left'"
+                  :shouldFill="true"
+                  class="join-type-icon"
+                />
+                <InnerJoinTypeSvg
+                  v-else-if="joinObj?.joinType === 'inner'"
+                  :shouldFill="true"
+                  class="join-type-icon"
+                />
+                <RightJoinTypeSvg
+                  v-else-if="joinObj?.joinType === 'right'"
+                  :shouldFill="true"
+                  class="join-type-icon"
+                />
+                <span class="join-stream-label">{{ joinObj?.stream }}</span>
+              </div>
+              <q-menu
+                class="q-pa-md"
+                :data-test="`dashboard-join-menu-${index}`"
               >
-                <div class="join-btn-content">
-                  <LeftJoinTypeSvg
-                    v-if="joinObj?.joinType === 'left'"
-                    :shouldFill="true"
-                    class="join-type-icon"
-                  />
-                  <InnerJoinTypeSvg
-                    v-else-if="joinObj?.joinType === 'inner'"
-                    :shouldFill="true"
-                    class="join-type-icon"
-                  />
-                  <RightJoinTypeSvg
-                    v-else-if="joinObj?.joinType === 'right'"
-                    :shouldFill="true"
-                    class="join-type-icon"
-                  />
-                  <span class="join-stream-label">{{ joinObj?.stream }}</span>
-                </div>
-                <q-menu
-                  class="q-pa-md"
-                  :data-test="`dashboard-join-menu-${index}`"
-                >
-                  <AddJoinPopUp
-                    :class="themeClass"
-                    v-model="currentJoins[index]"
-                    :joinIndex="index"
-                    :mainStream="mainStreamName"
-                  />
-                </q-menu>
-              </q-btn>
-              <q-btn
-                class="remove-join-btn"
-                size="xs"
-                dense
-                :data-test="`dashboard-join-item-${index}-remove`"
-                icon="close"
-                @click="handleRemoveJoin(index)"
-                :aria-label="t('panel.removeJoin')"
-              >
-                <q-tooltip>{{ t("panel.removeJoin") }}</q-tooltip>
-              </q-btn>
-            </div>
+                <AddJoinPopUp
+                  :class="themeClass"
+                  v-model="currentJoins[index]"
+                  :joinIndex="index"
+                  :mainStream="mainStreamName"
+                />
+              </q-menu>
+              <template #icon-right><q-icon name="arrow_drop_down" /></template>
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon"
+              :data-test="`dashboard-join-item-${index}-remove`"
+              @click="handleRemoveJoin(index)"
+              :aria-label="t('panel.removeJoin')"
+            >
+              <template #icon-left><q-icon name="close" /></template>
+              <q-tooltip>{{ t("panel.removeJoin") }}</q-tooltip>
+            </OButton>
           </OButtonGroup>
         </div>
-        <q-btn
-          icon="add"
-          color="primary"
-          size="xs"
-          round
-          class="add-btn"
+        <OButton
+          variant="primary"
+          size="icon"
           data-test="dashboard-add-join-btn"
           @click="handleAddJoin"
           :aria-label="t('panel.addJoin')"
         >
+          <template #icon-left><q-icon name="add" /></template>
           <q-tooltip>{{ t("panel.addJoin") }}</q-tooltip>
-        </q-btn>
+        </OButton>
       </div>
     </div>
   </div>
@@ -86,6 +76,7 @@
 <script lang="ts">
 import { defineComponent, inject, onMounted, computed, watchEffect } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { watchDebounced } from "@vueuse/core";
@@ -150,6 +141,7 @@ export default defineComponent({
 
   components: {
     OButtonGroup,
+    OButton,
     AddJoinPopUp,
     LeftJoinTypeSvg,
     InnerJoinTypeSvg,
@@ -409,22 +401,6 @@ export default defineComponent({
   margin-right: 8px;
   margin-top: 4px;
   margin-bottom: 4px;
-}
-
-.remove-join-btn {
-  padding-top: 6px;
-  height: 100%;
-}
-
-.add-btn {
-  margin-top: 4px;
-  height: 24px !important;
-  padding: 0 !important;
-}
-
-.axis-field {
-  display: flex;
-  align-items: center;
 }
 
 .join-btn-content {

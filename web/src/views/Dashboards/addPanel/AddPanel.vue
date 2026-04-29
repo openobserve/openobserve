@@ -43,33 +43,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="flex q-gutter-sm">
-          <q-btn
-            outline
-            padding="xs sm"
-            class="q-mr-sm tw:h-[36px] el-border"
-            no-caps
-            label="Dashboard Tutorial"
+          <OButton
+            variant="outline"
+            size="sm"
             @click="showTutorial"
             data-test="dashboard-panel-tutorial-btn"
-          ></q-btn>
-          <q-btn
+            >Dashboard Tutorial</OButton
+          >
+          <OButton
             v-if="
               !['html', 'markdown', 'custom_chart'].includes(
                 dashboardPanelData.data.type,
               )
             "
-            outline
-            padding="sm"
-            class="q-mr-sm tw:h-[36px] el-border"
-            no-caps
-            icon="info_outline"
+            variant="outline"
+            size="icon-xs"
             @click="showViewPanel = true"
             data-test="dashboard-panel-data-view-query-inspector-btn"
           >
+            <template #icon-left><q-icon name="info_outline" /></template>
             <q-tooltip anchor="center left" self="center right"
-              >Query Inspector
-            </q-tooltip>
-          </q-btn>
+              >Query Inspector</q-tooltip
+            >
+          </OButton>
           <DateTimePickerDashboard
             v-if="selectedDate"
             v-model="selectedDate"
@@ -79,56 +75,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @hide="setTimeForVariables"
             data-test="dashboard-global-date-time-picker"
           />
-          <q-btn
-            outline
-            color="red"
-            no-caps
-            flat
-            class="o2-secondary-button tw:h-[36px] q-ml-md"
-            style="color: red !important"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            :label="t('panel.discard')"
+          <OButton
+            variant="ghost-destructive"
+            size="sm"
             @click="goBackToDashboardList"
             data-test="dashboard-panel-discard"
-          />
-          <q-btn
-            class="o2-secondary-button tw:h-[36px] q-ml-md"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
-            flat
-            :label="t('panel.save')"
+            >{{ t("panel.discard") }}</OButton
+          >
+          <OButton
+            variant="secondary"
+            size="sm"
             data-test="dashboard-panel-save"
             @click.stop="savePanelData.execute()"
             :loading="savePanelData.isLoading.value"
-          />
+            >{{ t("panel.save") }}</OButton
+          >
           <template
             v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
           >
-            <q-btn
+            <OButton
               v-if="config.isEnterprise === 'false'"
+              variant="primary"
+              size="sm"
               data-test="dashboard-apply"
-              class="tw:h-[36px] q-ml-md o2-primary-button"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-primary-button-dark'
-                  : 'o2-primary-button-light'
-              "
-              no-caps
-              flat
-              dense
               :loading="searchRequestTraceIds.length > 0"
-              :disable="searchRequestTraceIds.length > 0"
-              :label="t('panel.apply')"
+              :disabled="searchRequestTraceIds.length > 0"
               @click="() => runQuery(false)"
-            />
+              >{{ t("panel.apply") }}</OButton
+            >
             <OButtonGroup v-if="config.isEnterprise === 'true'">
               <OButton
                 :data-test="

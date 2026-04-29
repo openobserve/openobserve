@@ -70,20 +70,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               class="q-ml-auto no-border"
               :placeholder="t('reports.search')"
-             hide-bottom-space>
+              hide-bottom-space
+            >
               <template #prepend>
                 <q-icon name="search" class="cursor-pointer" />
               </template>
             </q-input>
 
-            <q-btn
+            <OButton
+              variant="primary"
+              size="sm"
               data-test="alert-list-add-alert-btn"
-              class="o2-primary-button tw:h-[36px] q-ml-md"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-              flat
-              :label="t(`dashboard.newReport`)"
               @click="createNewReport"
-            />
+              >{{ t("dashboard.newReport") }}</OButton
+            >
 
             <div class="q-ml-sm">
               <q-icon
@@ -130,6 +130,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToQuasarFormat } from "@/utils/date";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const props = defineProps({
   reports: {
@@ -203,23 +204,22 @@ onMounted(() => {
 const formatReports = () => {
   resultTotal.value = props.reports.length;
 
-  props.reports.length > 0 && props.reports.forEach((report: any, index) => {
-    scheduledReports.value.push({
-      "#": index + 1,
-      name: report.name,
-      tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
-      time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
-      frequency: getFrequencyValue(report.frequency),
-      last_triggered_at: report.last_triggered_at
-        ? convertUnixToQuasarFormat(report.last_triggered_at)
-        : "-",
-      created_at: convertUnixToQuasarFormat(
-        report.created_at,
-      ),
-      orgId: report.org_id,
-      isCached: !report?.destinations?.length,
+  props.reports.length > 0 &&
+    props.reports.forEach((report: any, index) => {
+      scheduledReports.value.push({
+        "#": index + 1,
+        name: report.name,
+        tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
+        time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
+        frequency: getFrequencyValue(report.frequency),
+        last_triggered_at: report.last_triggered_at
+          ? convertUnixToQuasarFormat(report.last_triggered_at)
+          : "-",
+        created_at: convertUnixToQuasarFormat(report.created_at),
+        orgId: report.org_id,
+        isCached: !report?.destinations?.length,
+      });
     });
-  });
 
   filterReports();
 };
