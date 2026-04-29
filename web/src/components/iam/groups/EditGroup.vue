@@ -62,21 +62,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex justify-end tw:w-full"
       style="position: sticky; bottom: 0.45rem; z-index: 2"
     >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex">
-      <q-btn
+      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">
+      <OButton
         data-test="edit-group-cancel-btn"
-        class="o2-secondary-button"
-        :label="t('alerts.cancel')"
-        no-caps
+        variant="outline"
+        size="sm-action"
         @click="cancelEditGroup"
-      />
-      <q-btn
+      >
+        {{ t('alerts.cancel') }}
+      </OButton>
+      <OButton
         data-test="edit-group-submit-btn"
-        :label="t('alerts.save')"
-        class="o2-primary-button q-ml-md"
-        no-caps
+        variant="primary"
+        size="sm-action"
         @click="saveGroupChanges"
-      />
+      >
+        {{ t('alerts.save') }}
+      </OButton>
       </div>
     </div>
   </div>
@@ -84,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";

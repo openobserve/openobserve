@@ -116,7 +116,6 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   xs: "tw:h-7 tw:ps-2.5 tw:pe-2.5 tw:text-xs tw:gap-1.5 tw:rounded",
   sm: "tw:h-9 tw:ps-3 tw:pe-3 tw:text-sm tw:gap-2 tw:rounded-md",
   // Compact labeled size for inline field chips (axis items) — ~28px, matches Quasar dense button
-  xs: "tw:h-7 tw:ps-2 tw:pe-2 tw:text-xs tw:gap-1 tw:rounded",
   "sm-action":
     "tw:h-9 tw:ps-3 tw:pe-3 tw:min-w-[80px] tw:text-sm tw:gap-2 tw:rounded-md",
   md: "tw:h-10 tw:ps-4 tw:pe-4 tw:text-sm tw:gap-2 tw:rounded-lg",
