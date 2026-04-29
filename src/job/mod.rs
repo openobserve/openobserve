@@ -66,13 +66,14 @@ async fn patch_sre_readonly_eval_templates() {
     const MIGRATION_ORG: &str = "_migration";
     const FLAG_KEY: &str = "sre_readonly_eval_templates_v1";
     const LOCK_KEY: &str = "/ofga/migration/sre_readonly_eval_templates";
-    // 5-minute timeout: enough for large deployments, releases lock if node dies mid-run
-    const LOCK_TTL_SECS: u64 = 300;
+    // How long a node waits to acquire the lock before giving up (not the lock's hold TTL,
+    // which is managed by NATS keepalive at ~10 s). 5 min is enough for large deployments.
+    const LOCK_WAIT_SECS: u64 = 300;
 
     // Acquire dist_lock first — serialises across all nodes.
     // KV flag is checked *inside* the lock to close the TOCTOU window between
     // "check flag" and "run + set flag".
-    let lock = match infra::dist_lock::lock(LOCK_KEY, LOCK_TTL_SECS).await {
+    let lock = match infra::dist_lock::lock(LOCK_KEY, LOCK_WAIT_SECS).await {
         Ok(l) => l,
         Err(e) => {
             log::error!("patch_sre_readonly_eval_templates: failed to acquire dist_lock: {e}");
@@ -137,16 +138,89 @@ async fn patch_sre_readonly_eval_templates() {
 }
 
 #[cfg(feature = "enterprise")]
+async fn patch_sre_readonly_alerts_incidents() {
+    use bytes::Bytes;
+
+    const MIGRATION_ORG: &str = "_migration";
+    const FLAG_KEY: &str = "sre_readonly_afolder_incidents_v1";
+    const LOCK_KEY: &str = "/ofga/migration/sre_readonly_alerts_incidents";
+    const LOCK_WAIT_SECS: u64 = 300;
+
+    let lock = match infra::dist_lock::lock(LOCK_KEY, LOCK_WAIT_SECS).await {
+        Ok(l) => l,
+        Err(e) => {
+            log::error!("patch_sre_readonly_alerts_incidents: failed to acquire dist_lock: {e}");
+            return;
+        }
+    };
+
+    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
+        .await
+        .is_ok()
+    {
+        if let Err(e) = infra::dist_lock::unlock(&lock).await {
+            log::error!("dist_lock unlock failed: {e}");
+        }
+        return;
+    }
+
+    let orgs = match crate::service::db::organization::list(None).await {
+        Ok(orgs) => orgs,
+        Err(e) => {
+            log::error!("Failed to list orgs for sre-readonly alerts/incidents patch: {e}");
+            if let Err(e) = infra::dist_lock::unlock(&lock).await {
+                log::error!("dist_lock unlock failed: {e}");
+            }
+            return;
+        }
+    };
+
+    let mut failed = false;
+    for org in &orgs {
+        if let Err(e) =
+            o2_openfga::authorizer::roles::patch_sre_readonly_role_alerts_incidents(&org.identifier)
+                .await
+        {
+            log::warn!(
+                "Failed to patch sre-readonly alerts/incidents for org '{}': {e}",
+                org.identifier
+            );
+            failed = true;
+        }
+    }
+
+    if failed {
+        log::warn!("sre-readonly alerts/incidents patch had failures — will retry on next startup");
+        if let Err(e) = infra::dist_lock::unlock(&lock).await {
+            log::error!("dist_lock unlock failed: {e}");
+        }
+        return;
+    }
+
+    if let Err(e) =
+        crate::service::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
+    {
+        log::error!("Failed to set sre_readonly_afolder_incidents migration flag: {e}");
+    } else {
+        log::info!("sre-readonly alerts/incidents patch complete");
+    }
+
+    if let Err(e) = infra::dist_lock::unlock(&lock).await {
+        log::error!("dist_lock unlock failed: {e}");
+    }
+}
+
+#[cfg(feature = "enterprise")]
 async fn backfill_sys_rca_agent_openfga_tuples() {
     use bytes::Bytes;
 
     const MIGRATION_ORG: &str = "_migration";
     const FLAG_KEY: &str = "sys_rca_agent_openfga_migration_v1";
     const LOCK_KEY: &str = "/ofga/migration/sys_rca_agent_tuples";
-    const LOCK_TTL_SECS: u64 = 300;
+    const LOCK_WAIT_SECS: u64 = 300;
 
     // Acquire dist_lock — serialises across all nodes.
-    let lock = match infra::dist_lock::lock(LOCK_KEY, LOCK_TTL_SECS).await {
+    let lock = match infra::dist_lock::lock(LOCK_KEY, LOCK_WAIT_SECS).await {
         Ok(l) => l,
         Err(e) => {
             log::error!("backfill_sys_rca_agent_openfga_tuples: failed to acquire dist_lock: {e}");
@@ -449,6 +523,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async {
             if let Err(e) = tokio::task::spawn(patch_sre_readonly_eval_templates()).await {
                 log::error!("patch_sre_readonly_eval_templates task panicked: {e}");
+            }
+        });
+        tokio::task::spawn(async {
+            if let Err(e) = tokio::task::spawn(patch_sre_readonly_alerts_incidents()).await {
+                log::error!("patch_sre_readonly_alerts_incidents task panicked: {e}");
             }
         });
     }
