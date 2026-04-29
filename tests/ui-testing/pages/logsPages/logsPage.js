@@ -6918,13 +6918,12 @@ export class LogsPage {
      * is positioned at a location where suggestions can be provided.
      */
     async triggerEditorSuggestions() {
-        // Focus the editor's input area
+        // Focus the editor's input area (click auto-waits for actionability)
         const inputArea = this.page.locator('[data-test="logs-search-bar-query-editor"] .inputarea');
         await inputArea.click({ force: true });
-        await this.page.waitForTimeout(300);
-        // Trigger suggestion widget
+        // Trigger suggestion widget and wait for it to appear
         await this.page.keyboard.press('Control+Space');
-        await this.page.waitForTimeout(500);
+        await this.waitForSuggestionWidgetVisible();
         testLogger.info('Triggered editor suggestions via Ctrl+Space');
     }
 
