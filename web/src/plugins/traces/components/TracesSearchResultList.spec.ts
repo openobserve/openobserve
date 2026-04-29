@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
@@ -58,8 +58,22 @@ vi.mock("@/composables/useTraces", () => ({
     updatedLocalLogFilterField: vi.fn(),
   }),
   DEFAULT_TRACE_COLUMNS: {
-    traces: ["service_name", "operation_name", "duration", "spans", "status", "service_latency"],
-    spans: ["service_name", "operation_name", "duration", "span_status", "status_code", "method"],
+    traces: [
+      "service_name",
+      "operation_name",
+      "duration",
+      "spans",
+      "status",
+      "service_latency",
+    ],
+    spans: [
+      "service_name",
+      "operation_name",
+      "duration",
+      "span_status",
+      "status_code",
+      "method",
+    ],
   },
 }));
 
@@ -114,7 +128,12 @@ vi.mock("@/components/TenstackTable.vue", () => ({
       "defaultColumns",
       "selectedStreamFields",
     ],
-    emits: ["click:data-row", "sort-change", "closeColumn", "update:columnOrder"],
+    emits: [
+      "click:data-row",
+      "sort-change",
+      "closeColumn",
+      "update:columnOrder",
+    ],
     setup() {
       return { cellActionsColumn: cellActionsColumnRef };
     },
@@ -373,6 +392,92 @@ describe("TracesSearchResultList", () => {
     });
   });
 
+  // ─── onCloseColumn — sort reset ──────────────────────────────────────────
+  describe("onCloseColumn — sort reset", () => {
+    const makeSpanHit = (id: string) => ({
+      trace_id: id,
+      service_name: "frontend",
+      operation_name: "GET /",
+      duration: 120000,
+      spans: 1,
+      span_status: "OK",
+      services: {},
+      start_time: Date.now() * 1_000_000,
+    });
+
+    beforeEach(() => {
+      // Set up columns so onCloseColumn has something to remove
+      sharedSearchObj.data.resultGrid.columns = [
+        { id: "service_name" },
+        { id: "duration" },
+        { id: "span_status" },
+      ];
+      sharedSearchObj.data.stream.selectedFields = [
+        "service_name",
+        "duration",
+        "span_status",
+      ];
+    });
+
+    afterEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [];
+      sharedSearchObj.data.stream.selectedFields = [];
+    });
+
+    it("should emit sort-change with defaults when the closed column is the active sort column", async () => {
+      wrapper = mount_({
+        hits: [makeSpanHit("s1")],
+        loading: false,
+        sortBy: "span_status",
+        sortOrder: "asc",
+        searchMode: "spans" as any,
+      });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
+      await table.vm.$emit("closeColumn", { id: "span_status" });
+
+      expect(wrapper.emitted("sort-change")).toBeTruthy();
+      expect(wrapper.emitted("sort-change")![0]).toEqual([
+        "start_time",
+        "desc",
+      ]);
+    });
+
+    it("should NOT emit sort-change when the closed column is NOT the active sort column", async () => {
+      wrapper = mount_({
+        hits: [makeSpanHit("s1")],
+        loading: false,
+        sortBy: "duration",
+        sortOrder: "desc",
+        searchMode: "spans" as any,
+      });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
+      await table.vm.$emit("closeColumn", { id: "span_status" });
+
+      expect(wrapper.emitted("sort-change")).toBeFalsy();
+    });
+
+    it("should remove the column from selectedFields and resultGrid.columns when closed", async () => {
+      wrapper = mount_({
+        hits: [makeSpanHit("s1")],
+        loading: false,
+        sortBy: "duration",
+        sortOrder: "desc",
+        searchMode: "spans" as any,
+      });
+      const table = wrapper.findComponent({ name: "TenstackTable" });
+      await table.vm.$emit("closeColumn", { id: "span_status" });
+
+      expect(sharedSearchObj.data.stream.selectedFields).not.toContain(
+        "span_status",
+      );
+      expect(
+        sharedSearchObj.data.resultGrid.columns.some(
+          (c: any) => c.id === "span_status",
+        ),
+      ).toBe(false);
+    });
+  });
+
   // ─── Cell slot split: span_status vs status ──────────────────────────────
   describe("cell slot split — span_status and status", () => {
     const makeSpanHit = (id: string) => ({
@@ -592,7 +697,9 @@ describe("TracesSearchResultList", () => {
         "null",
         "include",
       );
-      expect(sharedSearchObj.data.stream.addToFilter).toBe("start_time is null");
+      expect(sharedSearchObj.data.stream.addToFilter).toBe(
+        "start_time is null",
+      );
     });
 
     it("should set is null filter when fieldValue is null for a generic field", async () => {
