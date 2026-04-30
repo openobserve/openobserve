@@ -33,18 +33,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>
           <div class="subsection-label tw:mb-2">
             <span>{{ t("alerts.template") }}</span>
-            <q-btn
+            <OButton
               style="color: #a0a0a0"
-              no-caps
-              padding="xs"
-              size="sm"
-              flat
-              icon="info_outline"
+              variant="ghost"
+              size="icon-sm"
             >
+              <q-icon name="info_outline" />
               <q-tooltip>{{
                 t("alerts.alertSettings.templateTooltip")
               }}</q-tooltip>
-            </q-btn>
+            </OButton>
           </div>
           <div class="tw:flex tw:items-center tw:gap-2">
             <q-select
@@ -75,16 +73,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </template>
             </q-select>
-            <q-btn
-              icon="refresh"
-              padding="xs"
-              unelevated
-              size="sm"
-              round
-              flat
+            <OButton
+              variant="ghost"
+              size="icon-circle-sm"
               :title="t('alerts.advanced.refreshTemplates')"
               @click="$emit('refresh:templates')"
-            />
+            >
+              <q-icon name="refresh" />
+            </OButton>
           </div>
         </div>
 
@@ -92,28 +88,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>
           <div class="subsection-label tw:mb-2">
             <span>{{ t("alerts.additionalVariables") }}</span>
-            <q-btn
+            <OButton
               style="color: #a0a0a0"
-              no-caps
-              padding="xs"
-              size="sm"
-              flat
-              icon="info_outline"
+              variant="ghost"
+              size="icon-sm"
             >
+              <q-icon name="info_outline" />
               <q-tooltip>{{ t("alerts.advanced.variablesTooltip") }}</q-tooltip>
-            </q-btn>
+            </OButton>
           </div>
           <template v-if="!localVariables.length">
-            <q-btn
+            <OButton
               data-test="alert-variables-add-btn"
+              variant="outline"
               size="sm"
-              class="no-border o2-secondary-button tw:h-[28px]"
-              flat
-              no-caps
               @click="addVariable"
             >
               <span>{{ t("alerts.advanced.addVariable") }}</span>
-            </q-btn>
+            </OButton>
           </template>
           <template v-else>
             <div
@@ -142,27 +134,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="min-width: 200px"
                 @update:model-value="emitUpdate"
               />
-              <q-btn
+              <OButton
                 data-test="alert-variables-delete-variable-btn"
-                icon="delete_outline"
-                padding="xs"
-                unelevated
-                size="sm"
-                round
-                flat
+                variant="ghost"
+                size="icon-circle-sm"
                 @click="removeVariable(variable)"
-              />
-              <q-btn
+              >
+                <q-icon name="delete_outline" />
+              </OButton>
+              <OButton
                 data-test="alert-variables-add-variable-btn"
                 v-if="index === localVariables.length - 1"
-                icon="add"
-                padding="xs"
-                unelevated
-                size="sm"
-                round
-                flat
+                variant="ghost"
+                size="icon-circle-sm"
                 @click="addVariable"
-              />
+              >
+                <q-icon name="add" />
+              </OButton>
             </div>
           </template>
         </div>
@@ -190,19 +178,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
             <div class="subsection-label">
               <span>{{ t("alerts.row") }}</span>
-              <q-btn
+              <OButton
                 data-test="add-alert-row-input-info-btn"
                 style="color: #a0a0a0"
-                no-caps
-                padding="xs"
-                size="sm"
-                flat
-                icon="info_outline"
+                variant="ghost"
+                size="icon-sm"
               >
+                <q-icon name="info_outline" />
                 <q-tooltip>{{
                   t("alerts.advanced.rowTemplateTooltip")
                 }}</q-tooltip>
-              </q-btn>
+              </OButton>
             </div>
             <div class="tw:flex tw:items-center tw:gap-2">
               <span class="tw:text-xs tw:opacity-60">{{
@@ -254,6 +240,7 @@ import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export interface Variable {
   id: string;
@@ -263,7 +250,7 @@ export interface Variable {
 
 export default defineComponent({
   name: "Step6Advanced",
-  components: { OToggleGroup, OToggleGroupItem },
+  components: { OToggleGroup, OToggleGroupItem, OButton },
   props: {
     template: {
       type: String,

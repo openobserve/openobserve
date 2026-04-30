@@ -22,16 +22,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-bold q-px-sm  q-py-sm tw:flex tw:items-center tw:justify-between tw:gap-2">
           {{ t('dashboard.folders') }}
           <div>
-            <q-btn
-              class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              flat
+            <OButton
+              variant="outline"
+              size="icon"
               @click.stop="addFolder"
               data-test="dashboard-new-folder-btn"
               title="Add Folder"
             >
-            <q-icon name="add" size="xs" />
-          </q-btn>
+              <q-icon name="add" />
+            </OButton>
           </div>
         </div>
         <q-separator class="tw:mb-1 tw:mt-[3px]" size="2px"></q-separator>
@@ -73,15 +72,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               tab.name
               }}</span>
               <div class="hover-actions">
-              <q-btn
+              <OButton
                   v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
-                  dense
-                  flat
-                  icon="more_vert"
+                  variant="ghost"
+                  size="icon-circle-sm"
                   style="cursor: pointer; justify-self: end; height: 0.5rem"
-                  size="sm"
                   data-test="dashboard-more-icon"
               >
+                  <q-icon name="more_vert" />
                   <q-menu>
                   <q-list dense>
                       <q-item
@@ -112,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-item>
                   </q-list>
                   </q-menu>
-              </q-btn>
+              </OButton>
               </div>
           </div>
           </OTab>
@@ -149,6 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <script lang="ts">
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OButton from '@/lib/core/Button/OButton.vue';
   // @ts-nocheck
   import {
     computed,
@@ -212,6 +211,7 @@ export default defineComponent({
       MoveDashboardToAnotherFolder,
       OTabs,
       OTab,
+      OButton,
     },
     props: {
       type: {

@@ -29,18 +29,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-show="showScrollToBottom"
       class="scroll-to-bottom-container"
     >
-      <q-btn
+      <OButton
         round
-        flat
-        icon="arrow_downward"
+        variant="ghost"
+        size="icon-circle-sm"
         class="scroll-to-bottom-btn"
         @click="scrollToBottomSmooth"
-        size="sm"
       >
+        <q-icon name="arrow_downward" />
         <q-tooltip anchor="top middle" self="bottom middle">
           Scroll to bottom
         </q-tooltip>
-      </q-btn>
+      </OButton>
     </div>
   </div>
 </template>
@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, nextTick, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
+import OButton from '@/lib/core/Button/OButton.vue';
 import DOMPurify from 'dompurify';
 import { generateAlertSummary } from '@/utils/alerts/alertSummaryGenerator';
 

@@ -171,31 +171,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
                 <div class="col-2 q-ml-none">
-                  <q-btn
+                  <OButton
                     :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                    icon="delete"
-                    class="q-ml-xs iconHoverBtn"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
+                    class="q-ml-xs"
+                    variant="ghost"
+                    size="icon-circle-sm"
                     :title="t('alert_templates.edit')"
                     @click="deleteApiHeader(header)"
-                  />
-                  <q-btn
+                  >
+                    <q-icon name="delete" />
+                  </OButton>
+                  <OButton
                     data-test="add-destination-add-header-btn"
                     v-if="index === apiHeaders.length - 1"
-                    icon="add"
-                    class="q-ml-xs iconHoverBtn"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
+                    class="q-ml-xs"
+                    variant="ghost"
+                    size="icon-circle-sm"
                     :title="t('alert_templates.edit')"
                     @click="addApiHeader()"
-                  />
+                  >
+                    <q-icon name="add" />
+                  </OButton>
                 </div>
               </div>
             </div>
@@ -240,14 +236,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-subtitle2 q-mr-sm">
             It looks like you haven't created any Email Templates yet.
           </div>
-          <q-btn
-            label="Create Email Template"
+          <OButton
+            variant="outline"
             size="sm"
-            no-caps
-            class="o2-secondary-button"
-            style="border-radius: 4px; font-size: 12px"
             @click="createEmailTemplate"
-          />
+          >Create Email Template</OButton>
         </div>
         <!-- Name field for custom destinations or pipelines (not prebuilt) -->
         <div
@@ -383,31 +376,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="col-2 q-ml-none">
-                <q-btn
+                <OButton
                   :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                  icon="delete"
-                  class="q-ml-xs iconHoverBtn"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
+                  class="q-ml-xs"
+                  variant="ghost"
+                  size="icon-circle-sm"
                   :title="t('alert_templates.edit')"
                   @click="deleteApiHeader(header)"
-                />
-                <q-btn
+                >
+                  <q-icon name="delete" />
+                </OButton>
+                <OButton
                   data-test="add-destination-add-header-btn"
                   v-if="index === apiHeaders.length - 1"
-                  icon="add"
-                  class="q-ml-xs iconHoverBtn"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
+                  class="q-ml-xs"
+                  variant="ghost"
+                  size="icon-circle-sm"
                   :title="t('alert_templates.edit')"
                   @click="addApiHeader()"
-                />
+                >
+                  <q-icon name="add" />
+                </OButton>
               </div>
             </div>
           </div>
@@ -467,48 +456,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex justify-between q-px-lg q-py-lg full-width">
       <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
       <div v-if="isAlerts && (isPrebuiltDestination || (isUpdatingDestination && formData.destination_type !== 'custom'))" class="flex items-center tw:gap-2">
-        <q-btn
+        <OButton
           data-test="destination-preview-button"
-          :label="t('alert_destinations.preview')"
-          icon="preview"
-          outline
-          no-caps
-          class="tw:h-[36px] tw:mr-2"
+          variant="outline"
+          size="sm"
           @click="showPreview"
-        />
-        <q-btn
+        >
+          <template #icon-left><q-icon name="preview" /></template>
+          {{ t('alert_destinations.preview') }}
+        </OButton>
+        <OButton
           data-test="destination-test-button"
           :loading="isTestInProgress"
-          :label="t('alert_destinations.test')"
-          icon="send"
-          outline
-          no-caps
-          class="tw:h-[36px]"
+          variant="outline"
+          size="sm"
           @click="handleTestDestination"
-        />
+        >
+          <template #icon-left><q-icon name="send" /></template>
+          {{ t('alert_destinations.test') }}
+        </OButton>
       </div>
       <div v-else></div>
 
       <!-- Right side: Cancel and Save buttons -->
       <div class="flex items-center tw:gap-2">
-        <q-btn
+        <OButton
           data-test="add-destination-cancel-btn"
           v-close-popup="true"
-          class="o2-secondary-button tw:h-[36px]"
-          :label="t('alerts.cancel')"
-          no-caps
-          flat
+          variant="outline"
+          size="sm-action"
           @click="$emit('cancel:hideform')"
-        />
-        <q-btn
+        >{{ t('alerts.cancel') }}</OButton>
+        <OButton
           data-test="add-destination-submit-btn"
-          class="o2-primary-button no-border tw:h-[36px]"
-          :label="t('alerts.save')"
+          variant="primary"
+          size="sm-action"
           type="submit"
-          no-caps
-          flat
           @click="saveDestination"
-        />
+        >{{ t('alerts.save') }}</OButton>
       </div>
     </div>
     </div>
@@ -536,6 +521,7 @@ import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import OButton from '@/lib/core/Button/OButton.vue';
 import type {
   Template,
   DestinationData,
