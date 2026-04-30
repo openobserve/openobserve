@@ -1600,7 +1600,9 @@
     "axisLabelRotateTooltipText": "X 軸のラベルテキストを選択した角度 (度単位) で回転させると、ラベルが長い場合やラベルが混み合っている場合に読みやすくなります。",
     "axisLabelTruncateTooltipText": "X 軸のラベルを指定された幅 (ピクセル単位) に切り捨てます。",
     "axisLabelTooltipNotePrefix": "注記:",
-    "axisLabelTooltipNoteText": " このオプションは、時系列の X 軸フィールドではサポートされていません。"
+    "axisLabelTooltipNoteText": " このオプションは、時系列の X 軸フィールドではサポートされていません。",
+    "trellisIndependentYAxis": "独立した Y 軸スケール",
+    "trellisIndependentYAxisTooltip": "有効にすると、各トレリスチャートには、そのデータ範囲に基づいて独自のY軸スケールが表示されます。無効にすると、すべてのチャートが同じ Y 軸スケールを共有します。"
   },
   "panel": {
     "header": "パネル",

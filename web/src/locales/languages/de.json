@@ -1583,7 +1583,9 @@
     "axisLabelRotateTooltipText": "Drehen Sie den Beschriftungstext auf der X-Achse um einen bestimmten Winkel (in Grad), um die Lesbarkeit zu verbessern, wenn Beschriftungen lang oder überfüllt sind.",
     "axisLabelTruncateTooltipText": "Kürzt die Beschriftungen der X-Achse auf die angegebene Breite (in Pixeln).",
     "axisLabelTooltipNotePrefix": "Hinweis:",
-    "axisLabelTooltipNoteText": " Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt."
+    "axisLabelTooltipNoteText": " Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt.",
+    "trellisIndependentYAxis": "Unabhängige Y-Achsen-Skala",
+    "trellisIndependentYAxisTooltip": "Wenn diese Option aktiviert ist, hat jedes Trellis-Diagramm seine eigene Y-Achsenskala, die auf seinem Datenbereich basiert. Wenn diese Option deaktiviert ist, haben alle Diagramme dieselbe Y-Achsenskala."
   },
   "panel": {
     "header": "Panel",

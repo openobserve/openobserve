@@ -1583,7 +1583,9 @@
     "axisLabelRotateTooltipText": "按选定角度（以度为单位）旋转 x 轴标签文本，以提高标签较长或拥挤时的可读性。",
     "axisLabelTruncateTooltipText": "将 x 轴标签截断为指定宽度（以像素为单位）。",
     "axisLabelTooltipNotePrefix": "注意：",
-    "axisLabelTooltipNoteText": " 时间序列 x 轴字段不支持此选项。"
+    "axisLabelTooltipNoteText": " 时间序列 x 轴字段不支持此选项。",
+    "trellisIndependentYAxis": "独立的 Y 轴刻度",
+    "trellisIndependentYAxisTooltip": "启用后，每个网格图表将根据其数据范围拥有自己的 Y 轴比例。禁用后，所有图表共享相同的 Y 轴刻度。"
   },
   "panel": {
     "header": "面板",

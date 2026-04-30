@@ -1583,7 +1583,9 @@
     "axisLabelRotateTooltipText": "Gire o texto do rótulo do eixo x em um ângulo escolhido (em graus) para melhorar a legibilidade quando os rótulos estiverem longos ou cheios.",
     "axisLabelTruncateTooltipText": "Trunque os rótulos do eixo x na largura especificada (em pixels).",
     "axisLabelTooltipNotePrefix": "Nota:",
-    "axisLabelTooltipNoteText": " Essa opção não é suportada para campos do eixo x de séries temporais."
+    "axisLabelTooltipNoteText": " Essa opção não é suportada para campos do eixo x de séries temporais.",
+    "trellisIndependentYAxis": "Escala independente do eixo Y",
+    "trellisIndependentYAxisTooltip": "Quando ativado, cada gráfico de treliça terá sua própria escala do eixo Y com base em seu intervalo de dados. Quando desativados, todos os gráficos compartilham a mesma escala do eixo Y."
   },
   "panel": {
     "header": "Painel",

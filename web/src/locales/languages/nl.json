@@ -1581,7 +1581,9 @@
     "configSectionDrilldown": "Inzoomen",
     "configSectionComparison": "Vergelijking",
     "configSectionMarkLines": "Lijnen markeren",
-    "configSectionBackground": "Achtergrond"
+    "configSectionBackground": "Achtergrond",
+    "trellisIndependentYAxis": "Onafhankelijke schaal op de Y-as",
+    "trellisIndependentYAxisTooltip": "Indien ingeschakeld, heeft elk trellis-diagram zijn eigen Y-asschaal op basis van het gegevensbereik. Indien uitgeschakeld, hebben alle diagrammen dezelfde Y-asschaal."
   },
   "panel": {
     "header": "Paneel",

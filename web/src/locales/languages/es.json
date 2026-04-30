@@ -1583,7 +1583,9 @@
     "axisLabelRotateTooltipText": "Gire el texto de la etiqueta del eje x en un ángulo elegido (en grados) para mejorar la legibilidad cuando las etiquetas son largas o están abarrotadas.",
     "axisLabelTruncateTooltipText": "Trunque las etiquetas del eje x al ancho especificado (en píxeles).",
     "axisLabelTooltipNotePrefix": "Nota:",
-    "axisLabelTooltipNoteText": " Esta opción no es compatible con los campos del eje x de series temporales."
+    "axisLabelTooltipNoteText": " Esta opción no es compatible con los campos del eje x de series temporales.",
+    "trellisIndependentYAxis": "Escala independiente del eje Y",
+    "trellisIndependentYAxisTooltip": "Cuando se habilita, cada gráfico de enrejado tendrá su propia escala en el eje Y en función de su rango de datos. Cuando está deshabilitado, todos los gráficos comparten la misma escala en el eje Y."
   },
   "panel": {
     "header": "Panel",

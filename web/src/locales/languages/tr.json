@@ -1581,7 +1581,9 @@
     "configSectionDrilldown": "Detaya inme",
     "configSectionComparison": "Karşılaştırma",
     "configSectionMarkLines": "Çizgileri İşaretle",
-    "configSectionBackground": "Arkaplan"
+    "configSectionBackground": "Arkaplan",
+    "trellisIndependentYAxis": "Bağımsız Y ekseni ölçeği",
+    "trellisIndependentYAxisTooltip": "Etkinleştirildiğinde, her kafes grafiğinin veri aralığına bağlı olarak kendi Y ekseni ölçeği olacaktır. Devre dışı bırakıldığında, tüm grafikler aynı Y ekseni ölçeğini paylaşır."
   },
   "panel": {
     "header": "Panel",

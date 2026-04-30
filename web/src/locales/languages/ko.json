@@ -1581,7 +1581,9 @@
     "configSectionDrilldown": "드릴다운",
     "configSectionComparison": "비교",
     "configSectionMarkLines": "마크 라인",
-    "configSectionBackground": "백그라운드"
+    "configSectionBackground": "백그라운드",
+    "trellisIndependentYAxis": "독립 Y축 스케일",
+    "trellisIndependentYAxisTooltip": "활성화하면 각 격자 차트에 데이터 범위를 기반으로 하는 고유한 Y축 척도가 지정됩니다.비활성화하면 모든 차트가 동일한 Y축 스케일을 공유합니다."
   },
   "panel": {
     "header": "패널",

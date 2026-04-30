@@ -1581,7 +1581,9 @@
     "configSectionDrilldown": "Drilldown",
     "configSectionComparison": "Confronto",
     "configSectionMarkLines": "Segna linee",
-    "configSectionBackground": "Sfondo"
+    "configSectionBackground": "Sfondo",
+    "trellisIndependentYAxis": "Scala indipendente sull'asse Y",
+    "trellisIndependentYAxisTooltip": "Se abilitato, ogni grafico a traliccio avrà la propria scala sull'asse Y in base al suo intervallo di dati. Se disabilitato, tutti i grafici condividono la stessa scala sull'asse Y."
   },
   "panel": {
     "header": "Pannello",
