@@ -86,35 +86,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </div>
             <!-- Tab toggle -->
-            <div
-              class="tab-toggle tw:shrink-0 tw:ml-4"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'tab-toggle-dark'
-                  : 'tab-toggle-light'
-              "
+            <OToggleGroup
+              class="tw:shrink-0 tw:ml-4"
+              :model-value="activeTab"
+              @update:model-value="activeTab = ($event as string)"
             >
-              <button
-                class="tab-toggle-btn"
-                :class="activeTab === 'history' ? 'tab-toggle-btn-active' : ''"
-                @click="activeTab = 'history'"
+              <OToggleGroupItem
+                value="history"
+                size="sm"
                 data-test="alert-history-tab-history"
               >
-                <q-icon name="history" size="14px" />
+                <template #icon-left>
+                  <History class="tw:size-3.5 tw:shrink-0" />
+                </template>
                 History
-              </button>
-              <button
-                class="tab-toggle-btn"
-                :class="
-                  activeTab === 'condition' ? 'tab-toggle-btn-active' : ''
-                "
-                @click="activeTab = 'condition'"
+              </OToggleGroupItem>
+              <OToggleGroupItem
+                value="condition"
+                size="sm"
                 data-test="alert-history-tab-condition"
               >
-                <q-icon name="code" size="14px" />
+                <template #icon-left>
+                  <Code2 class="tw:size-3.5 tw:shrink-0" />
+                </template>
                 Condition
-              </button>
-            </div>
+              </OToggleGroupItem>
+            </OToggleGroup>
           </div>
         </div>
         <div class="col-auto tw:flex tw:items-center tw:gap-1">
@@ -531,6 +528,9 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
+import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
+import { History, Code2 } from 'lucide-vue-next';
 import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
@@ -970,54 +970,6 @@ watch(
 </script>
 
 <style lang="scss" scoped>
-/* ── Tab toggle (header) ── */
-.tab-toggle {
-  display: flex;
-  align-items: center;
-  height: 1.625rem; /* 26px — same as chips */
-  border-radius: 6px;
-  border: 1px solid;
-  overflow: hidden;
-}
-.tab-toggle-light {
-  border-color: #d1d5db;
-  background: #f3f4f6;
-}
-.tab-toggle-dark {
-  border-color: #374151;
-  background: #1f2937;
-}
-.tab-toggle-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 12px;
-  height: 100%;
-  font-size: 12px;
-  font-weight: 500;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  white-space: nowrap;
-  color: inherit;
-  line-height: 1;
-  transition:
-    background 0.15s,
-    color 0.15s;
-}
-.tab-toggle-btn + .tab-toggle-btn {
-  border-left: 1px solid;
-  border-color: inherit;
-}
-.tab-toggle-light .tab-toggle-btn-active {
-  background: #fff;
-  color: #1d4ed8;
-}
-.tab-toggle-dark .tab-toggle-btn-active {
-  background: #374151;
-  color: #60a5fa;
-}
-
 /* ── Code Block ── */
 .code-block {
   border-radius: 8px;
