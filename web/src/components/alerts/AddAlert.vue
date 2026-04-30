@@ -28,16 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0 tw:min-w-0">
 
             <!-- Back button — matches dashboard style -->
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              icon="arrow_back_ios_new"
+            <OButton
+              variant="outline"
+              size="icon-sm"
               data-test="add-alert-back-btn"
-              size="sm"
-              class="el-border"
               @click="goBackToAlertsList"
-            />
+            >
+              <q-icon name="arrow_back_ios_new" />
+            </OButton>
 
             <!-- EDIT MODE: (folder → chevron → name) -->
             <template v-if="beingUpdated || anomalyEditMode">
@@ -65,7 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
                 </span>
-                <q-btn v-if="anomalyConfig.status === 'failed'" flat no-caps dense size="xs" color="negative" icon="replay" :label="t('alerts.retry')" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" />
+                <OButton v-if="anomalyConfig.status === 'failed'" variant="ghost-destructive" size="xs" :loading="anomalyRetraining" @click="anomalyTriggerRetrain">
+                  <template #icon-left><q-icon name="replay" /></template>
+                  {{ t('alerts.retry') }}
+                </OButton>
               </template>
             </template>
 
@@ -339,26 +340,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
       >
-        <q-btn
+        <OButton
           data-test="add-alert-cancel-btn"
-          class="o2-secondary-button tw:h-[36px]"
-          :label="t('alerts.cancel')"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          variant="outline"
+          size="sm-action"
           @click="$emit('cancel:hideform')"
-        />
-        <q-btn
+        >{{ t('alerts.cancel') }}</OButton>
+        <OButton
           data-test="add-alert-submit-btn"
-          class="o2-primary-button no-border tw:h-[36px]"
-          :label="isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save')"
-          no-caps
-          flat
+          variant="primary"
+          size="sm-action"
           :loading="isAnomalyMode ? anomalySaving : false"
-          :disable="isAnomalyMode ? !canSaveAlert : false"
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          :disabled="isAnomalyMode ? !canSaveAlert : false"
           @click="handleSave"
-        />
+        >{{ isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save') }}</OButton>
       </div>
 
       </div><!-- end LEFT column wrapper -->
@@ -462,6 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, watch } from "vue";
+import OButton from '@/lib/core/Button/OButton.vue';
 
 import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
@@ -518,6 +514,7 @@ export default defineComponent({
     AnomalySummary,
     QueryEditor,
     InlineSelectFolderDropdown,
+    OButton,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
