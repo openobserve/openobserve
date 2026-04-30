@@ -238,7 +238,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts">
-
 import {
   ref,
   onBeforeMount,
