@@ -114,17 +114,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Footer -->
-    <div class="sticky-footer q-pa-md">
+    <div class="sticky-footer q-pa-md tw:flex tw:gap-2">
       <OButton
         variant="outline"
-        size="sm"
+        size="sm-action"
         @click.stop="cancelEdit"
         data-test="dashboard-column-order-cancel-btn"
         >{{ t("common.cancel") }}</OButton
       >
       <OButton
         variant="primary"
-        size="sm"
+        size="sm-action"
         @click.stop="saveEdit"
         data-test="dashboard-column-order-save-btn"
         >{{ t("common.save") }}</OButton
