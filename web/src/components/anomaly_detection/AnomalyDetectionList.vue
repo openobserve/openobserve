@@ -18,15 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:w-full tw:h-full">
     <!-- Toolbar: search + refresh -->
     <div class="tw:flex tw:items-center tw:justify-end tw:px-2 tw:py-2 tw:gap-2">
-      <q-btn
-        flat
-        round
-        dense
-        icon="refresh"
+      <OButton
+        variant="ghost"
+        size="icon-sm"
         :loading="loading"
         title="Refresh"
         @click="loadConfigs"
-      />
+      >
+        <RefreshCw class="tw:size-4" />
+      </OButton>
     </div>
 
     <q-table
@@ -107,63 +107,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #body-cell-actions="props">
         <q-td :props="props" class="tw:text-center">
           <!-- Edit -->
-          <q-btn
-            flat
-            round
-            dense
-            size="sm"
-            icon="edit"
+          <OButton
+            variant="ghost"
+            size="icon-sm"
             :title="t('alerts.edit')"
             @click="editConfig(props.row)"
-          />
+          >
+            <Pencil class="tw:size-4" />
+          </OButton>
           <!-- Pause / Resume — hidden while training or failed -->
-          <q-btn
+          <OButton
             v-if="props.row.status !== 'training' && props.row.status !== 'failed'"
-            flat
-            round
-            dense
-            size="sm"
-            :icon="props.row.enabled ? 'pause' : 'play_arrow'"
+            variant="ghost"
+            size="icon-sm"
             :title="props.row.enabled ? 'Pause' : 'Resume'"
             @click="toggleEnabled(props.row)"
-          />
+          >
+            <Pause v-if="props.row.enabled" class="tw:size-4" />
+            <Play v-else class="tw:size-4" />
+          </OButton>
           <!-- Stop Training — only shown while training -->
-          <q-btn
+          <OButton
             v-if="props.row.status === 'training'"
-            flat
-            round
-            dense
-            size="sm"
-            icon="stop_circle"
-            color="warning"
+            variant="ghost-warning"
+            size="icon-sm"
             title="Stop Training"
             :loading="cancellingId === props.row.anomaly_id"
             @click="confirmCancelTraining(props.row)"
-          />
+          >
+            <StopCircle class="tw:size-4" />
+          </OButton>
           <!-- Retrain / Retry -->
-          <q-btn
+          <OButton
             v-if="props.row.is_trained || props.row.status === 'failed'"
-            flat
-            round
-            dense
-            size="sm"
-            icon="model_training"
-            :color="props.row.status === 'failed' ? 'negative' : undefined"
+            :variant="props.row.status === 'failed' ? 'ghost-destructive' : 'ghost'"
+            size="icon-sm"
             :title="props.row.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining')"
             :loading="retrainingId === props.row.anomaly_id"
             @click="confirmRetrain(props.row)"
-          />
+          >
+            <BrainCircuit class="tw:size-4" />
+          </OButton>
           <!-- Delete -->
-          <q-btn
-            flat
-            round
-            dense
-            size="sm"
-            icon="delete"
-            color="negative"
+          <OButton
+            variant="ghost-destructive"
+            size="icon-sm"
             :title="t('alerts.delete')"
             @click="confirmDelete(props.row)"
-          />
+          >
+            <Trash2 class="tw:size-4" />
+          </OButton>
         </q-td>
       </template>
 
@@ -186,15 +179,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <strong>{{ pendingDeleteRow?.name }}</strong>?
           This will also delete the trained model.
         </q-card-section>
-        <q-card-actions align="right">
-          <q-btn flat :label="t('alerts.cancel')" v-close-popup />
-          <q-btn
-            flat
-            color="negative"
-            :label="t('alerts.delete')"
+        <q-card-actions align="right" class="tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="showDeleteDialog = false">{{ t('alerts.cancel') }}</OButton>
+          <OButton
+            variant="destructive"
+            size="sm-action"
             :loading="deleting"
             @click="deleteConfig"
-          />
+          >
+            {{ t('alerts.delete') }}
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -209,15 +203,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Stop the ongoing training for <strong>{{ pendingCancelRow?.name }}</strong>?
           The model will not be updated. You can retrigger training afterwards.
         </q-card-section>
-        <q-card-actions align="right">
-          <q-btn flat :label="t('alerts.cancel')" v-close-popup />
-          <q-btn
-            flat
-            color="warning"
-            label="Stop Training"
+        <q-card-actions align="right" class="tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="showCancelTrainingDialog = false">{{ t('alerts.cancel') }}</OButton>
+          <OButton
+            variant="ghost-warning"
+            size="sm-action"
             :loading="cancellingId === pendingCancelRow?.anomaly_id"
             @click="cancelTraining"
-          />
+          >
+            Stop Training
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -254,15 +249,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </q-card-section>
-        <q-card-actions align="right">
-          <q-btn flat :label="t('alerts.cancel')" v-close-popup />
-          <q-btn
-            flat
-            :color="pendingRetrainRow?.status === 'failed' ? 'negative' : 'primary'"
-            :label="pendingRetrainRow?.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining')"
+        <q-card-actions align="right" class="tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="showRetrainDialog = false">{{ t('alerts.cancel') }}</OButton>
+          <OButton
+            :variant="pendingRetrainRow?.status === 'failed' ? 'destructive' : 'primary'"
+            size="sm-action"
             :loading="retrainingId === pendingRetrainRow?.anomaly_id"
             @click="retrain"
-          />
+          >
+            {{ pendingRetrainRow?.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining') }}
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -276,9 +272,12 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { date } from "quasar";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { RefreshCw, Pencil, Pause, Play, StopCircle, BrainCircuit, Trash2 } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "AnomalyDetectionList",
+  components: { OButton, RefreshCw, Pencil, Pause, Play, StopCircle, BrainCircuit, Trash2 },
 
   props: {
     org_identifier: {

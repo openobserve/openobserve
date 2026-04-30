@@ -49,16 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleStreamRow(props)"
         >
           <q-td auto-width>
-            <q-btn
-              dense
-              flat
-              size="xs"
-              :icon="
-                expandedRow.name != props.row.name
-                  ? 'expand_more'
-                  : 'expand_less'
-              "
-            />
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+            >
+              <ChevronDown v-if="expandedRow.name != props.row.name" :size="14" />
+              <ChevronUp v-else :size="14" />
+            </OButton>
           </q-td>
           <q-td v-for="col in props.cols" :key="col.name" :props="props">
             {{ col.value }}
@@ -129,18 +126,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </q-td>
                     <q-td key="actions" :props="props">
-                      <q-btn
+                      <OButton
                         data-test="stream-association-delete-function-btn"
-                        :icon="outlinedDelete"
                         :title="t('function.deleteAssociatedFunction')"
                         class="q-ml-xs"
-                        padding="sm"
-                        unelevated
-                        size="sm"
-                        round
-                        flat
+                        variant="ghost-destructive"
+                        size="icon-sm"
                         @click.stop="deleteFunctionFromStream(props.row.name)"
-                      ></q-btn>
+                      >
+                        <Trash2 :size="14" />
+                      </OButton>
                     </q-td>
                   </q-tr>
                 </template>
@@ -185,13 +180,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ t("function.associatedFunctionHeader") }}
                     </div>
-                    <q-btn
+                    <OButton
                       data-test="stream-association-associate-function-btn"
-                      color="secondary"
-                      class="q-ml-md q-mb-xs text-bold no-border"
+                      variant="outline"
+                      size="sm-action"
+                      class="q-ml-md q-mb-xs"
                       @click="addFunctionInProgress = true"
-                      >Associate Function</q-btn
                     >
+                      Associate Function
+                    </OButton>
                   </div>
                 </template>
                 <template v-slot:no-data>
@@ -233,14 +230,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
         </div>
-        <q-btn
+        <OButton
           data-test="log-stream-refresh-stats-btn"
-          class="q-ml-md q-mb-xs text-bold no-border"
-          padding="sm lg"
-          color="secondary"
-          :label="t(`logStream.refreshStats`)"
+          class="q-ml-md q-mb-xs"
+          variant="outline"
+          size="sm-action"
           @click="getLogStream"
-        />
+        >
+          <RefreshCw :size="14" class="tw:mr-1" />
+          {{ t(`logStream.refreshStats`) }}
+        </OButton>
 
         <QTablePagination
           data-test="log-stream-table-pagination"
@@ -299,10 +298,12 @@ import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Trash2, ChevronDown, ChevronUp, RefreshCw } from "lucide-vue-next";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData },
+  components: { QTablePagination, SchemaIndex, NoData, OButton, Trash2, ChevronDown, ChevronUp, RefreshCw },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();

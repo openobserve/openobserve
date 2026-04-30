@@ -4,21 +4,16 @@
       {{ t('logStream.fields') }}
     </div>
     <template v-if="!fields.length">
-      <q-btn
+      <OButton
         data-test="add-stream-add-field-btn"
-        color="primary"
-        class="q-mt-sm text-bold add-field"
-        :label="t('logStream.addField')"
-        size="sm"
-        icon="add"
-        style="
-          border-radius: 4px;
-          text-transform: capitalize;
-          background: #f2f2f2 !important;
-          color: #000 !important;
-        "
+        variant="ghost"
+        size="sm-action"
+        class="q-mt-sm"
         @click="addApiHeader"
-      />
+      >
+        <Plus :size="14" class="tw:mr-1" />
+        {{ t('logStream.addField') }}
+      </OButton>
     </template>
     <template v-else>
       <div
@@ -120,34 +115,28 @@
           class="q-ml-none "
           style="margin-bottom: 8px;"
         >
-          <q-btn
+          <OButton
             data-test="add-stream-add-field-btn"
             v-if="index === fields.length - 1"
-            icon="add"
-            class="q-ml-xs "
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            flat
-            :disable="field.name === '' ||  (fields.length === 1 && field.name == '' )"
+            variant="ghost"
+            size="icon-sm"
+            class="q-ml-xs"
+            :disabled="field.name === '' || (fields.length === 1 && field.name == '')"
             :title="t('alert_templates.edit')"
             @click="addApiHeader()"
-            style="min-width: auto;border: 1px solid #5960B2; color: #5960B2;"
-          />
-          <q-btn
+          >
+            <Plus :size="14" />
+          </OButton>
+          <OButton
             data-test="add-stream-delete-field-btn"
-            :icon="outlinedDelete"
-            class="q-ml-xs "
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            flat
-            
+            variant="ghost-destructive"
+            size="icon-sm"
+            class="q-ml-xs"
             :title="t('alert_templates.edit')"
             @click="deleteApiHeader(field, index)"
-            style="min-width: auto; border: 1px solid #F2452F; color: #F2452F;"
+          >
+            <Trash2 :size="14" />
+          </OButton>
           />
         </div>
       </div>
@@ -160,6 +149,8 @@ import { useI18n } from "vue-i18n";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import { ref } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Plus, Trash2 } from "lucide-vue-next";
 
 defineProps({
   fields: {

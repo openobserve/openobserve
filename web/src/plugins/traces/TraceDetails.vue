@@ -219,11 +219,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem]"
           >
-            <AppTabs
-              :tabs="traceTabs"
-              :active-tab="activeTab"
-              @update:active-tab="activeTab = $event"
-            />
+            <OToggleGroup
+              :model-value="activeTab"
+              @update:model-value="activeTab = ($event as string)"
+            >
+              <OToggleGroupItem value="waterfall" size="sm">
+                <template #icon-left><AlignLeft class="tw:size-3.5 tw:shrink-0" /></template>
+                Waterfall
+              </OToggleGroupItem>
+              <OToggleGroupItem value="flame-graph" size="sm">
+                <template #icon-left><Flame class="tw:size-3.5 tw:shrink-0" /></template>
+                Flame Graph
+              </OToggleGroupItem>
+              <OToggleGroupItem value="map" size="sm">
+                <template #icon-left><Network class="tw:size-3.5 tw:shrink-0" /></template>
+                Trace Graph
+              </OToggleGroupItem>
+              <OToggleGroupItem v-if="hasLLMSpans" value="dag" size="sm">
+                <template #icon-left><GitBranch class="tw:size-3.5 tw:shrink-0" /></template>
+                DAG
+              </OToggleGroupItem>
+              <OToggleGroupItem
+                v-if="hasLLMSpans && evalPipelineExists && evalData.length > 0"
+                value="evaluations"
+                size="sm"
+              >
+                <template #icon-left><ClipboardCheck class="tw:size-3.5 tw:shrink-0" /></template>
+                Evaluations
+              </OToggleGroupItem>
+            </OToggleGroup>
           </div>
 
           <div class="tw:flex tw:items-center tw:space-x-2">
@@ -801,7 +825,9 @@ import {
   formatTimestamp,
   useTraceProcessing,
 } from "@/composables/traces/useTraceProcessing";
-import AppTabs from "@/components/common/AppTabs.vue";
+import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
+import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
+import { AlignLeft, Flame, Network, GitBranch, ClipboardCheck } from 'lucide-vue-next';
 import pipelineService from "@/services/pipelines";
 
 // Import FlameGraphView
@@ -893,7 +919,13 @@ export default defineComponent({
     TraceHeader,
     FlameGraphView,
     TraceEvaluationsView,
-    AppTabs,
+    OToggleGroup,
+    OToggleGroupItem,
+    AlignLeft,
+    Flame,
+    Network,
+    GitBranch,
+    ClipboardCheck,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
@@ -1212,28 +1244,7 @@ export default defineComponent({
       return Math.min(...spans.map((span: any) => span.start_time));
     });
 
-    // Tabs configuration matching TraceDetailsV2
-    const traceTabs = computed(() => {
-      const tabs = [
-        { label: "Waterfall", value: "waterfall" },
-        { label: "Flame Graph", value: "flame-graph" },
-        // { label: "Spans", value: "spans" },
-        { label: "Trace Graph", value: "map" },
-      ];
-      // Conditionally add DAG tab for LLM traces
-      if (hasLLMSpans.value) {
-        tabs.push({ label: "DAG", value: "dag" });
-      }
-      // Conditionally add Evaluations tab for LLM traces with evaluation data
-      if (
-        hasLLMSpans.value &&
-        evalPipelineExists.value &&
-        evalData.value.length > 0
-      ) {
-        tabs.push({ label: "Evaluations", value: "evaluations" });
-      }
-      return tabs;
-    });
+    // Tabs configuration matching TraceDetailsV2 — inlined into template
 
     const showTraceDetails = ref(false);
     const currentIndex = ref(0);
@@ -2765,7 +2776,6 @@ export default defineComponent({
       rootServiceName,
       traceStartTime,
       formatTimestamp,
-      traceTabs,
       // FlameGraph data
       flatSpans,
       traceMetadata,

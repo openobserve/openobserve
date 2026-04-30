@@ -30,14 +30,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-start">
               <div class="flex justify-between items-end">
 
-                  <div class="app-tabs-container tw:h-[36px] q-mr-sm">
-                      <app-tabs
-                      class="tabs-selection-container"
-                      :tabs="streamTabs"
-                      v-model:active-tab="streamActiveTab"
-                      @update:active-tab="filterLogStreamByTab"
-                    />
-                </div>
+              <OToggleGroup
+                  :model-value="streamActiveTab"
+                  @update:model-value="(v) => filterLogStreamByTab(v as string)"
+                  class="q-mr-sm"
+                >
+                  <OToggleGroupItem value="logs" size="sm">
+                    <template #icon-left><ScrollText class="tw:size-3.5 tw:shrink-0" /></template>
+                    {{ t("logStream.labelLogs") }}
+                  </OToggleGroupItem>
+                  <OToggleGroupItem value="metrics" size="sm">
+                    <template #icon-left><BarChart2 class="tw:size-3.5 tw:shrink-0" /></template>
+                    {{ t("logStream.labelMetrics") }}
+                  </OToggleGroupItem>
+                  <OToggleGroupItem value="traces" size="sm">
+                    <template #icon-left><GitFork class="tw:size-3.5 tw:shrink-0" /></template>
+                    {{ t("logStream.labelTraces") }}
+                  </OToggleGroupItem>
+                  <OToggleGroupItem value="metadata" size="sm">
+                    <template #icon-left><Info class="tw:size-3.5 tw:shrink-0" /></template>
+                    {{ t("logStream.labelMetadata") }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
               </div>
               <div data-test="streams-search-stream-input">
                 <q-input
@@ -53,22 +67,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </q-input>
               </div>
-              <q-btn
+              <OButton
                 data-test="log-stream-refresh-stats-btn"
-                class="q-ml-sm o2-secondary-button tw:h-[36px]"
-                flat
+                variant="outline"
+                size="sm-action"
+                class="q-ml-sm"
                 @click="getLogStream(true)"
               >
-                <span>{{ t(`logStream.refreshStats`) }}</span>
-              </q-btn>
-              <q-btn
+                {{ t(`logStream.refreshStats`) }}
+              </OButton>
+              <OButton
                 v-if="isSchemaUDSEnabled"
                 data-test="log-stream-add-stream-btn"
-                class="q-ml-sm o2-primary-button tw:h-[36px]"
-                flat
-                :label="t(`logStream.add`)"
+                variant="primary"
+                size="sm-action"
+                class="q-ml-sm"
                 @click="addStream"
-              />
+              >
+                {{ t(`logStream.add`) }}
+              </OButton>
             </div>
           </div>
         </div>
@@ -109,72 +126,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #body-cell-actions="props">
               <q-td :props="props">
-                <q-btn
+                <OButton
                   :title="t('logStream.explore')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
+                  variant="ghost"
+                  size="icon-sm"
                   @click="exploreStream(props)"
-                  icon="search"
                 >
-              </q-btn>
-                <q-btn
+                  <Search class="tw:size-4" />
+                </OButton>
+                <OButton
                   :title="t('logStream.schemaHeader')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
+                  variant="ghost"
+                  size="icon-sm"
                   @click="listSchema(props)"
-                  icon="list_alt"
                 >
-              </q-btn>
-                <q-btn
+                  <FileList2 class="tw:size-4" />
+                </OButton>
+                <OButton
                   :title="t('logStream.delete')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
+                  variant="ghost-destructive"
+                  size="icon-sm"
                   @click="confirmDeleteAction(props)"
-                  :icon="outlinedDelete"
                 >
-              </q-btn>
+                  <Trash2 class="tw:size-4" />
+                </OButton>
               </q-td>
             </template>
             <template v-slot:pagination="scope">
               <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4">
 
 
-              <div class="q-btn-group row no-wrap inline q-ml-md">
-                <q-btn
-                  icon="chevron_left"
-                  color="grey-8"
-                  round
-                  dense
-                  flat
-                  size="sm"
-                  class="q-px-sm"
-                  :disable="scope.isFirstPage"
+              <div class="tw:flex tw:items-center q-ml-md">
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  :disabled="scope.isFirstPage"
                   @click="scope.prevPage"
-                />
-                <hr
-                  class="q-separator q-separator--vertical"
-                  aria-orientation="vertical"
-                />
-                <q-btn
-                  icon="chevron_right"
-                  color="grey-8"
-                  round
-                  dense
-                  flat
-                  size="sm"
-                  class="q-px-sm"
-                  :disable="scope.isLastPage"
+                >
+                  <ChevronLeft class="tw:size-4" />
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  :disabled="scope.isLastPage"
                   @click="scope.nextPage"
-                />
+                >
+                  <ChevronRight class="tw:size-4" />
+                </OButton>
               </div>
               </div>
 
@@ -209,17 +207,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
                 <div class="q-table__separator tw:flex tw:items-center tw:w-full text-bold tw:text-[14px]">
                   {{scope.pagination.rowsNumber}} Stream(s)
-                  <q-btn
+                  <OButton
                   v-if="selected.length > 0"
-                  class="o2-secondary-button tw:h-[36px] tw:ml-4"
-                  flat
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  :disable="isDeleting"
+                  variant="outline-destructive"
+                  size="sm-action"
+                  class="tw:ml-4"
+                  :disabled="isDeleting"
                   @click="confirmBatchDeleteAction"
                 >
-                  <q-icon name="delete" size="16px" />
-                  <span class="tw:ml-2">{{ isDeleting ? 'Deleting...' : 'Delete' }}</span>
-              </q-btn>
+                  <template #icon-left><Trash2 class="tw:size-3.5 tw:shrink-0" /></template>
+                  {{ isDeleting ? 'Deleting...' : 'Delete' }}
+                </OButton>
                 </div>
                 <QTablePagination
                   :scope="scope"
@@ -271,23 +269,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Delete all pipelines and alerts associated with the stream
           </span>
           </div>
-        <q-card-actions class="confirmActionsLogStream">
-          <q-btn v-close-popup="true" unelevated class="q-mr-sm">
+        <q-card-actions class="confirmActionsLogStream tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="confirmDelete = false">
             {{ t("logStream.cancel") }}
-          </q-btn>
-          <q-btn
-            v-close-popup="true"
-            unelevated
-            class="no-border"
-            color="primary"
-            @click="deleteStream"
+          </OButton>
+          <OButton
+            variant="destructive"
+            size="sm-action"
+            @click="() => { deleteStream(); confirmDelete = false; }"
           >
             {{ t("logStream.ok") }}
-          </q-btn>
+          </OButton>
         </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog v-model="confirmBatchDelete">
       <q-card style="width: 420px">
         <q-card-section class="confirmBodyLogStream">
           <div class="head">{{ t("logStream.confirmBatchDeleteHead") }}</div>
@@ -299,19 +292,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Delete all pipelines and alerts associated with the selected streams
           </span>
           </div>
-        <q-card-actions class="confirmActionsLogStream">
-          <q-btn v-close-popup="true" unelevated class="q-mr-sm">
+        <q-card-actions class="confirmActionsLogStream tw:gap-2">
+          <OButton variant="outline" size="sm-action" @click="confirmBatchDelete = false">
             {{ t("logStream.cancel") }}
-          </q-btn>
-          <q-btn
-            v-close-popup="true"
-            unelevated
-            class="no-border"
-            color="primary"
-            @click="deleteBatchStream"
+          </OButton>
+          <OButton
+            variant="destructive"
+            size="sm-action"
+            @click="() => { deleteBatchStream(); confirmBatchDelete = false; }"
           >
             {{ t("logStream.ok") }}
-          </q-btn>
+          </OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -344,16 +335,19 @@ import {
   formatSizeFromMB,
 } from "../utils/zincutils";
 import config from "@/aws-exports";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { cloneDeep } from "lodash-es";
 import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
-import AppTabs from "@/components/common/AppTabs.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { Search, FileList2, Trash2, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
+import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
+import { ScrollText, BarChart2, GitFork, Info } from 'lucide-vue-next';
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, AddStream, AppTabs, },
+  components: { QTablePagination, SchemaIndex, NoData, AddStream, OButton, OToggleGroup, OToggleGroupItem, ScrollText, BarChart2, GitFork, Info, Search, FileList2, Trash2, ChevronLeft, ChevronRight, },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();
@@ -402,12 +396,7 @@ export default defineComponent({
 
     const pageRecordsPerPage = ref(pagination.value.rowsPerPage);
 
-    const streamTabs = [
-      { label: t("logStream.labelLogs"), value: "logs" },
-      { label: t("logStream.labelMetrics"), value: "metrics" },
-      { label: t("logStream.labelTraces"), value: "traces" },
-      { label: t("logStream.labelMetadata"), value: "metadata" },
-    ];
+    const streamTabs: never[] = [];
     const {
       getStreams,
       resetStreams,
@@ -972,7 +961,6 @@ export default defineComponent({
       maxRecordToReturn,
       showIndexSchemaDialog,
       changeMaxRecordToReturn,
-      outlinedDelete,
       isSchemaUDSEnabled,
       filterQuery,
       filterData,
@@ -1040,11 +1028,6 @@ export default defineComponent({
   justify-content: center;
   padding: 16px 22px 22px;
   display: flex;
-
-  .q-btn {
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
 }
 .checkbox-delete-associated-alerts-pipelines{
   .q-checkbox__inner{
