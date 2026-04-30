@@ -76,6 +76,50 @@ mod tests {
         let result = apply_label_selector(df, &schema, &label_selector);
         assert!(result.is_some());
     }
+
+    #[test]
+    fn test_apply_label_selector_existing_field_returns_some() {
+        let (df, schema) = make_df();
+        let mut label_selector = HashSet::new();
+        label_selector.insert("a".to_string());
+        let result = apply_label_selector(df, &schema, &label_selector);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_apply_label_selector_nonexistent_field_returns_some() {
+        let (df, schema) = make_df();
+        let mut label_selector = HashSet::new();
+        label_selector.insert("no_such_col".to_string());
+        let result = apply_label_selector(df, &schema, &label_selector);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_apply_matchers_unknown_field_is_skipped() {
+        let (df, schema) = make_df();
+        use promql_parser::label::{MatchOp, Matcher};
+        let matchers = Matchers::new(vec![Matcher {
+            op: MatchOp::Equal,
+            name: "unknown_col".to_string(),
+            value: "x".to_string(),
+        }]);
+        let result = apply_matchers(df, &schema, &matchers);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_apply_matchers_timestamp_col_is_skipped() {
+        let (df, schema) = make_df();
+        use promql_parser::label::{MatchOp, Matcher};
+        let matchers = Matchers::new(vec![Matcher {
+            op: MatchOp::Equal,
+            name: "_timestamp".to_string(),
+            value: "12345".to_string(),
+        }]);
+        let result = apply_matchers(df, &schema, &matchers);
+        assert!(result.is_ok());
+    }
 }
 
 use crate::service::search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
