@@ -360,9 +360,15 @@ mod tests {
             has_full_snapshot: true,
             index_in_view: 3,
             source: "browser".to_string(),
-            application: Application { id: "app-1".to_string() },
-            session: Session { id: "sess-1".to_string() },
-            view: View { id: "view-1".to_string() },
+            application: Application {
+                id: "app-1".to_string(),
+            },
+            session: Session {
+                id: "sess-1".to_string(),
+            },
+            view: View {
+                id: "view-1".to_string(),
+            },
         };
         let json = serde_json::to_string(&e).unwrap();
         let back: Event = serde_json::from_str(&json).unwrap();
