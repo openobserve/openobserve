@@ -121,20 +121,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Footer -->
           <div class="retry-dialog-footer">
-            <q-btn
-              flat
-              label="Cancel"
-              color="grey-7"
+            <OButton
+              variant="outline"
+              size="sm-action"
               @click="handleCancel"
               class="footer-btn"
-            />
-            <q-btn
-              unelevated
-              label="Retry"
-              color="primary"
+            >
+              Cancel
+            </OButton>
+            <OButton
+              variant="primary"
+              size="sm-action"
               @click="handleConfirm"
               class="footer-btn"
-            />
+            >
+              Retry
+            </OButton>
           </div>
         </div>
       </div>
@@ -152,9 +154,11 @@ import {
   nextTick,
 } from "vue";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "RetryJobDialog",
+  components: { OButton },
   props: {
     modelValue: {
       type: Boolean,

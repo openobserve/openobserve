@@ -49,12 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon class="o2-search-input-icon" name="search" />
                 </template>
               </q-input>
-              <q-btn
-                class="q-ml-sm o2-primary-button tw:h-[36px]"
-                flat
-                :label="t(`function.addEnrichmentTable`)"
+              <OButton
+                class="q-ml-sm"
+                variant="primary"
+                size="sm-action"
                 @click="showAddUpdateFn({})"
-              />
+              >
+                {{ t(`function.addEnrichmentTable`) }}
+              </OButton>
             </div>
           </div>
         </div>
@@ -163,57 +165,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-slot:body-cell-actions="props">
                 <q-td :props="props">
-                  <!-- Search button - show for uploaded tables or completed URL jobs -->
-                  <q-btn
+                  <OButton
                     v-if="!props.row.urlJobs || props.row.urlJobs.length === 0 || props.row.aggregateStatus === 'completed'"
                     :data-test="`${props.row.name}-explore-btn`"
                     :title="t('logStream.explore')"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
+                    variant="ghost"
+                    size="icon-sm"
                     @click="exploreEnrichmentTable(props)"
-                    icon="search"
-                  />
+                  >
+                    <Search :size="14" />
+                  </OButton>
 
                   <!-- Schema Settings button - show for uploaded tables or completed URL jobs -->
-                  <q-btn
+                  <OButton
                     v-if="!props.row.urlJobs || props.row.urlJobs.length === 0 || props.row.aggregateStatus === 'completed'"
-                    icon="list_alt"
                     :title="t('logStream.schemaHeader')"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    flat
+                    variant="ghost"
+                    size="icon-sm"
                     @click="listSchema(props)"
-                  />
+                  >
+                    <List :size="14" />
+                  </OButton>
 
                   <!-- Edit button - show for uploaded tables, completed URL jobs, or failed URL jobs (to add more URLs) -->
-                  <q-btn
+                  <OButton
                     v-if="!props.row.urlJobs || props.row.urlJobs.length === 0 || props.row.aggregateStatus === 'completed' || props.row.aggregateStatus === 'failed'"
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    icon="edit"
-                    round
-                    flat
                     :title="t('function.enrichmentTables')"
+                    variant="ghost"
+                    size="icon-sm"
                     @click="showAddUpdateFn(props)"
-                  />
+                  >
+                    <Pencil :size="14" />
+                  </OButton>
 
                   <!-- Delete button - always visible -->
-                  <q-btn
-                    padding="sm"
-                    unelevated
-                    size="sm"
-                    round
-                    :icon="outlinedDelete"
-                    flat
+                  <OButton
                     :title="t('function.delete')"
+                    variant="ghost-destructive"
+                    size="icon-sm"
                     @click="showDeleteDialogFn(props)"
-                  />
+                  >
+                    <Trash2 :size="14" />
+                  </OButton>
                 </q-td>
               </template>
 
@@ -234,21 +227,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
                       {{ resultTotal }} {{ t('function.enrichmentTables') }}
                     </div>
-                    <q-btn
+                    <OButton
                       v-if="selectedEnrichmentTables.length > 0"
                       data-test="enrichment-tables-bulk-delete-btn"
-                      class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'o2-secondary-button-dark'
-                          : 'o2-secondary-button-light'
-                      "
-                      dense
+                      variant="outline"
+                      size="sm-action"
+                      class="q-mr-sm"
                       @click="openBulkDeleteDialog"
                     >
-                      <q-icon name="delete" size="16px" />
-                      <span class="tw:ml-2">Delete</span>
-                    </q-btn>
+                      <Trash2 :size="14" class="tw:mr-1" />
+                      Delete
+                    </OButton>
                   </div>
                   <QTablePagination
                     :scope="scope"
@@ -331,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
+          <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="14" /></OButton>
         </q-card-section>
 
         <q-card-section>
@@ -391,6 +380,8 @@ import useStreams from "@/composables/useStreams";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Search, List, Pencil, Trash2, X } from "lucide-vue-next";
 
 export default defineComponent({
   name: "EnrichmentTableList",
@@ -401,6 +392,12 @@ export default defineComponent({
     ConfirmDialog,
     EnrichmentSchema,
     AppTabs,
+    OButton,
+    Search,
+    List,
+    Pencil,
+    Trash2,
+    X,
   },
   emits: [
     "updated:fields",

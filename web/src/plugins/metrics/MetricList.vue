@@ -124,16 +124,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ props.row.name }}
                         </div>
                         <div class="field_overlay">
-                          <q-btn
+                          <OButton
                             :data-test="`metrics-list-add-${props.row.name}-label-btn`"
-                            :icon="outlinedAdd"
-                            size="0.4rem"
+                            variant="ghost"
+                            size="icon-xs"
                             class="q-mr-none"
-                            @click.stop="
-                              addValueToEditor(props.row.name, '', '=')
-                            "
-                            round
-                          />
+                            @click.stop="addValueToEditor(props.row.name, '', '=')"
+                          >
+                            <Plus class="tw:size-3" />
+                          </OButton>
                         </div>
                       </div>
                     </template>
@@ -205,11 +204,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       : 'text-black'
                                   "
                                 >
-                                  <q-btn
+                                  <OButton
                                     class="q-mr-xs"
-                                    size="6px"
+                                    size="icon-xs"
+                                    variant="ghost"
                                     title="Include Term"
-                                    round
                                     @click="
                                       addValueToEditor(
                                         props.row.name,
@@ -218,15 +217,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       )
                                     "
                                   >
-                                    <q-icon>
-                                      <EqualIcon></EqualIcon>
-                                    </q-icon>
-                                  </q-btn>
-                                  <q-btn
+                                    <EqualIcon class="tw:size-3" />
+                                  </OButton>
+                                  <OButton
                                     class="q-mr-xs"
-                                    size="6px"
-                                    title="Include Term"
-                                    round
+                                    size="icon-xs"
+                                    variant="ghost"
+                                    title="Exclude Term"
                                     @click="
                                       addValueToEditor(
                                         props.row.name,
@@ -235,10 +232,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       )
                                     "
                                   >
-                                    <q-icon>
-                                      <NotEqualIcon></NotEqualIcon>
-                                    </q-icon>
-                                  </q-btn>
+                                    <NotEqualIcon class="tw:size-3" />
+                                  </OButton>
                                 </div>
                               </q-item>
                             </q-list>
@@ -298,11 +293,13 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { Plus } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label", "update:modelValue"],
-  components: { EqualIcon, NotEqualIcon },
+  components: { EqualIcon, NotEqualIcon, OButton, Plus },
   props: ["modelValue", "metricsList"],
   setup(props, { emit }) {
     const store = useStore();

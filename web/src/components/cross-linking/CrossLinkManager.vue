@@ -8,18 +8,16 @@
           {{ subtitle }}
         </div>
       </div>
-      <q-btn
+      <OButton
         v-if="!readonly"
-        dense
-        flat
-        no-caps
-        icon="add"
-        :label="t('crossLinks.addCrossLink')"
-        class="o2-secondary-button tw:h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        variant="outline"
+        size="sm-action"
         @click="onAddClick"
         data-test="add-cross-link-btn"
-      />
+      >
+        <Plus class="tw:size-4 tw:mr-1" />
+        {{ t('crossLinks.addCrossLink') }}
+      </OButton>
     </div>
 
     <!-- Links List -->
@@ -60,25 +58,22 @@
           </div>
           <!-- Actions -->
           <div v-if="!readonly" class="tw:flex tw:items-center tw:gap-1 tw:ml-2 tw:shrink-0">
-            <q-btn
-              dense
-              flat
-              round
-              icon="edit"
-              size="sm"
+            <OButton
+              variant="ghost"
+              size="icon-sm"
               @click="editLink(link)"
               :data-test="`cross-link-edit-${idx}`"
-            />
-            <q-btn
-              dense
-              flat
-              round
-              icon="delete"
-              size="sm"
-              color="negative"
+            >
+              <Pencil class="tw:size-4" />
+            </OButton>
+            <OButton
+              variant="ghost-destructive"
+              size="icon-sm"
               @click="removeLink(link)"
               :data-test="`cross-link-delete-${idx}`"
-            />
+            >
+              <Trash2 class="tw:size-4" />
+            </OButton>
           </div>
         </div>
       </div>
@@ -110,6 +105,8 @@ import { defineComponent, ref, computed, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { Plus, Pencil, Trash2 } from 'lucide-vue-next';
 
 export interface CrossLink {
   name: string;
@@ -120,7 +117,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkManager",
-  components: { CrossLinkDialog },
+  components: { CrossLinkDialog, OButton, Plus, Pencil, Trash2 },
   props: {
     modelValue: {
       type: Array as PropType<CrossLink[]>,
