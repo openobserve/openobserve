@@ -38,30 +38,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="position === 'top' && pageTitle"
       class="text-bold row items-center"
     >
-      <q-btn
+      <OButton
         v-if="
           collapsibleIcon === 'show' &&
           searchCollapseImage == 'collapse_sidebar_icon'
         "
-        :icon="'img:' + getImageURL('images/common/collapse_sidebar_icon.svg')"
+        variant="ghost"
+        size="icon"
         class="q-mr-sm"
-        size="sm"
-        round
-        flat
         @click="toggleSidePanel"
-      />
-      <q-btn
+      >
+        <img :src="getImageURL('images/common/collapse_sidebar_icon.svg')" width="16" height="16" />
+      </OButton>
+      <OButton
         v-if="
           collapsibleIcon === 'show' &&
           searchCollapseImage == 'expand_sidebar_icon'
         "
-        :icon="'img:' + getImageURL('images/common/expand_sidebar_icon.svg')"
+        variant="ghost"
+        size="icon"
         class="q-mr-sm"
-        size="sm"
-        round
-        flat
         @click="toggleSidePanel"
-      />
+      >
+        <img :src="getImageURL('images/common/expand_sidebar_icon.svg')" width="16" height="16" />
+      </OButton>
       <div class="q-ml-xs">
         {{ resultTotal }}
         {{ pageTitle.slice(-1) == "s" ? pageTitle.slice(0, -1) : pageTitle }}(s)

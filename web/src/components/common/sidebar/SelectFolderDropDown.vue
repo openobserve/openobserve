@@ -37,23 +37,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-select>
 
-      <q-btn
-        class="q-mb-md add-folder-btn"
-        :data-test="`${type}-folder-move-new-add`"
-        style="width: 40px;position: relative; top: 32px;"
-        :style="computedStyle"
-        no-caps
-        dense
-        @click="
-          () => {
-            showAddFolderDialog = true;
-          }
-        "
-        title="Add Folder"
-        :disable="disableDropdown"
-      >
-        <q-icon name="add" size="xs" />
-      </q-btn>
+      <div style="width: 40px; position: relative; top: 32px;" :style="computedStyle">
+        <OButton
+          variant="ghost"
+          size="icon"
+          :data-test="`${type}-folder-move-new-add`"
+          title="Add Folder"
+          :disabled="disableDropdown"
+          @click="() => { showAddFolderDialog = true; }"
+        >
+          <q-icon name="add" size="xs" />
+        </OButton>
+      </div>
     </div>
     <!-- add folder -->
     <q-dialog
@@ -77,10 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { useRoute } from "vue-router";
 import { computed } from "vue";
 import { getFoldersListByType } from "@/utils/commons";
+import OButton from "@/lib/core/Button/OButton.vue";
 
   export default defineComponent({
     name: "SelectedFolderDropdown",
-    components: { AddFolder },
+    components: { AddFolder, OButton },
     emits: ["folder-selected"],
     props: {
       activeFolderId: {

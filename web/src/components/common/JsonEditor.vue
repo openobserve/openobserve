@@ -75,24 +75,18 @@
     <q-space></q-space>
 
     <q-card-actions align="right" class="q-pa-md">
-      <q-btn
-        flat
-        no-caps
-        :label="t('common.cancel')"
-        class="q-ml-sm o2-secondary-button tw:h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+      <OButton
+        variant="outline"
+        size="sm-action"
         v-close-popup
         data-test="json-editor-cancel"
-      />
-      <q-btn
-        flat
-        no-caps
-        class="q-ml-sm o2-primary-button no-border tw:h-[36px]"
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        :label="t('common.save')"
+      >{{ t('common.cancel') }}</OButton>
+      <OButton
+        variant="primary"
+        size="sm-action"
         @click="saveChanges"
         data-test="json-editor-save"
-      />
+      >{{ t('common.save') }}</OButton>
     </q-card-actions>
     </div>
     <!-- o2aichat enableddd -->
@@ -114,12 +108,14 @@ import O2AIChat from "../O2AIChat.vue";
 import config from "@/aws-exports";
 import { ChatMessage, ChatHistoryEntry } from "@/ts/interfaces/chat";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "JsonEditor",
   components: {
     QueryEditor: defineAsyncComponent(() => import('@/components/CodeQueryEditor.vue')),
     O2AIChat,
+    OButton,
   },
   props: {
     data: {

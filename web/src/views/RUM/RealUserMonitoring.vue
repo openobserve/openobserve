@@ -84,16 +84,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div></div>
             </div>
           </div>
-          <q-btn
-            class="o2-primary-button tw:h-[36px]"
-            flat
-            no-caps
+          <OButton
+            variant="primary"
+            size="sm-action"
             :title="t('rum.getStartedTitle')"
             @click="getStarted"
           >
             {{ t("rum.getStartedLabel") }}
             <q-icon name="arrow_forward" size="1.25rem" class="q-ml-xs" />
-          </q-btn>
+          </OButton>
         </div>
       </div>
     </template>
@@ -122,6 +121,7 @@ import useRum from "@/composables/rum/useRum";
 import useStreams from "@/composables/useStreams";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const route = useRoute();
 const router = useRouter();

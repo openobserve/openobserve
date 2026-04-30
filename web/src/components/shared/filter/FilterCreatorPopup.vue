@@ -44,20 +44,16 @@
         </div>
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn
+        <OButton
           v-close-popup
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          :label="t('common.cancel')"
-          no-caps
-          flat
-        />
-        <q-btn
-          class="o2-primary-button no-border tw:h-[36px]"
-          :label="t('common.apply')"
-          no-caps
-          flat
+          variant="outline"
+          size="sm-action"
+        >{{ t('common.cancel') }}</OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
           @click="applyFilter"
-        />
+        >{{ t('common.apply') }}</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -68,8 +64,10 @@
 import { defineComponent, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
 export default defineComponent({
   name: "FilterCreatorPopup",
+  components: { OButton },
   props: [
     "fieldName",
     "fieldValues",

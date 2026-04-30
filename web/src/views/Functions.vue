@@ -130,17 +130,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #separator>
-          <q-btn
+          <OButton
             data-test="logs-search-field-list-collapse-btn"
-            :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
             :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
-            :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-            color="primary"
-            size="sm"
-            dense
-            round
+            variant="sidebar-button"
+            size="sidebar-button"
             @click="collapseSidebar"
-          />
+          >
+            <q-icon :name="showSidebar ? 'chevron_left' : 'chevron_right'" size="12px" />
+          </OButton>
         </template>
         <template v-slot:after>
           <!-- :templates="templates"
@@ -162,6 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OButton from '@/lib/core/Button/OButton.vue'
 import { defineComponent, ref, computed, onBeforeMount, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -171,7 +170,7 @@ import config from "@/aws-exports";
 
 export default defineComponent({
   name: "AppFunctions",
-  components: { OTabs, OTab, ORouteTab },
+  components: { OTabs, OTab, ORouteTab, OButton },
   emits: ["sendToAiChat"],
   setup(props, { emit }) {
     const store = useStore();
