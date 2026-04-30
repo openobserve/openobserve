@@ -120,11 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #separator>
-                <q-btn
+                <OButton
                   data-test="logs-search-field-list-collapse-btn"
-                  :icon="
-                    searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
-                  "
+                  variant="sidebar-button"
+                  size="sidebar-button"
                   :title="
                     searchObj.meta.showFields
                       ? t('traces.collapseFields')
@@ -135,12 +134,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'splitter-icon-collapse'
                       : 'splitter-icon-expand'
                   "
-                  color="primary"
-                  size="sm"
-                  dense
-                  round
                   @click="collapseFieldList"
-                />
+                >
+                  <template #icon-left>
+                    <q-icon :name="searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'" />
+                  </template>
+                </OButton>
               </template>
               <template #after>
                 <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
@@ -338,6 +337,7 @@ import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 
