@@ -19,7 +19,7 @@ const alignClasses: Record<NonNullable<ButtonGroupProps["align"]>, string> = {
 <template>
   <div
     :class="[
-      'tw:inline-flex',
+      'tw:inline-flex tw:rounded-md tw:overflow-hidden',
       alignClasses[props.align],
       props.orientation === 'vertical' ? 'tw:flex-col' : 'tw:flex-row',
       // Divider between sibling buttons
