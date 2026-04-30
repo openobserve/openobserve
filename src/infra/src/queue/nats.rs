@@ -241,8 +241,7 @@ fn format_key(key: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use super::format_key;
+    use super::{format_key, *};
 
     #[test]
     fn test_queue_nats_format_key() {
@@ -285,8 +284,7 @@ mod tests {
 
     #[test]
     fn test_with_consumer_name_sets_fields() {
-        let q = NatsQueue::new("prefix")
-            .with_consumer_name("My Consumer".to_string(), true);
+        let q = NatsQueue::new("prefix").with_consumer_name("My Consumer".to_string(), true);
         assert_eq!(q.consumer_name, "My_Consumer");
         assert!(q.is_durable);
     }

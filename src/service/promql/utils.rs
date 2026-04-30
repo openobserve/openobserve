@@ -43,9 +43,11 @@ mod tests {
     use super::*;
 
     fn make_df() -> (DataFrame, ArrowSchema) {
-        let schema = Arc::new(ArrowSchema::new(vec![
-            Field::new("a", DataType::Int32, false),
-        ]));
+        let schema = Arc::new(ArrowSchema::new(vec![Field::new(
+            "a",
+            DataType::Int32,
+            false,
+        )]));
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![Arc::new(Int32Array::from(vec![1, 2, 3]))],
@@ -53,7 +55,10 @@ mod tests {
         .unwrap();
         let ctx = SessionContext::new();
         let df = ctx.read_batch(batch).unwrap();
-        (df, ArrowSchema::new(vec![Field::new("a", DataType::Int32, false)]))
+        (
+            df,
+            ArrowSchema::new(vec![Field::new("a", DataType::Int32, false)]),
+        )
     }
 
     #[test]
