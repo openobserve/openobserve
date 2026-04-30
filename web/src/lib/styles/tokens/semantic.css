@@ -21,6 +21,8 @@
   --color-surface-base:    var(--color-white);
   --color-surface-panel:   var(--color-grey-50);
   --color-surface-overlay: var(--color-white);
+  --color-surface-subtle:       var(--color-grey-100);
+  --color-surface-subtle-hover: var(--color-grey-200);
 
   /* Borders */
   --color-border-default: var(--color-grey-200);
@@ -39,6 +41,8 @@
   --color-surface-base:    var(--color-surface-base);
   --color-surface-panel:   var(--color-surface-panel);
   --color-surface-overlay: var(--color-surface-overlay);
+  --color-surface-subtle:       var(--color-surface-subtle);
+  --color-surface-subtle-hover: var(--color-surface-subtle-hover);
 
   /* Borders */
   --color-border-default: var(--color-border-default);

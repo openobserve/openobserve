@@ -398,9 +398,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-utilities-menu-btn"
           class="group-menu-btn element-box-shadow"
           variant="ghost"
-          size="icon"
+          size="xs"
         >
-          <q-icon name="menu" size="16px" />
+          <Ellipsis class="tw:size-3.5 tw:shrink-0" />
+          More
           <q-menu
             anchor="bottom left"
             self="top left"
@@ -2277,7 +2278,7 @@ import {
   RefreshCcw,
   ScanSearch,
   Share,
-  Menu,
+  Ellipsis,
   Maximize,
   Minimize,
   Wrench,
@@ -2376,7 +2377,7 @@ export default defineComponent({
     RefreshCcw,
     Bookmark,
     Share,
-    Menu,
+    Ellipsis,
     Maximize,
     Minimize,
     Wrench,
