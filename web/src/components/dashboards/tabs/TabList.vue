@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    style="display: flex"
+    style="display: flex; align-items: center"
     @mouseover="isHovered = true"
     @mouseleave="isHovered = false"
   >
