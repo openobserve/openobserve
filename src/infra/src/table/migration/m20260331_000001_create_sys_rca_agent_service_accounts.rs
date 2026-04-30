@@ -203,8 +203,6 @@ mod users {
 
 #[cfg(test)]
 mod tests {
-    use svix_ksuid::KsuidLike;
-
     #[test]
     fn test_users_ksuid_from_hash_is_deterministic() {
         let email = "test@example.com".to_string();
