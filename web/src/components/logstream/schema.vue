@@ -1140,7 +1140,6 @@ export default defineComponent({
     Plus,
     Trash2,
     UserCheck,
-    LayoutList,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
