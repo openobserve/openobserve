@@ -131,29 +131,28 @@
                 </div>
               </q-menu>
             </q-btn>
-            <q-btn
-              size="xs"
-              dense
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
               @click="removeLabel(index)"
-              icon="close"
               :data-test="`promql-label-filter-remove-${index}`"
-            />
+            >
+              <q-icon name="close" size="14px" />
+            </OButton>
           </OButtonGroup>
         </div>
 
         <!-- Add Button -->
-        <q-btn
-          flat
-          dense
-          icon="add"
+        <OButton
+          variant="ghost-primary"
           size="sm"
-          color="primary"
           @click="addLabel"
           class="add-filter-btn"
           data-test="promql-add-label-filter"
         >
+          <q-icon name="add" size="14px" />
           <q-tooltip>Add label filter</q-tooltip>
-        </q-btn>
+        </OButton>
       </div>
     </div>
   </div>
@@ -162,6 +161,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, inject } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";

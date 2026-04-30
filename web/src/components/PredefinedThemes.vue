@@ -27,15 +27,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">Predefined Themes</div>
         <q-space />
-        <q-btn
-          label="Reset"
-          icon="refresh"
-          flat
-          dense
-          color="negative"
-          @click="resetToDefaultTheme"
+        <OButton
+          variant="ghost-destructive"
+          size="xs"
           class="q-mr-sm"
-        />
+          @click="resetToDefaultTheme"
+        >
+          <template #icon-left><q-icon name="refresh" size="14px" /></template>
+          Reset
+        </OButton>
         <OButton variant="ghost" size="icon" v-close-popup>
           <q-icon name="close" size="14px" />
         </OButton>
@@ -75,13 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label="Applied"
                   class="text-caption q-mr-xs"
                 />
-                <q-btn
-                  label="Apply"
-                  color="primary"
+                <OButton
+                  variant="primary"
                   size="sm"
-                  unelevated
                   @click="applyTheme(theme, 'light')"
-                />
+                >Apply</OButton>
               </div>
             </div>
 
@@ -118,13 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label="Applied"
                   class="text-caption q-mr-xs"
                 />
-                <q-btn
-                  label="Apply"
-                  color="primary"
+                <OButton
+                  variant="primary"
                   size="sm"
-                  unelevated
                   @click="applyCustomTheme('light')"
-                />
+                >Apply</OButton>
               </div>
             </div>
           </OTabPanel>
@@ -154,13 +150,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label="Applied"
                   class="text-caption q-mr-xs"
                 />
-                <q-btn
-                  label="Apply"
-                  color="primary"
+                <OButton
+                  variant="primary"
                   size="sm"
-                  unelevated
                   @click="applyTheme(theme, 'dark')"
-                />
+                >Apply</OButton>
               </div>
             </div>
 
@@ -197,13 +191,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   label="Applied"
                   class="text-caption q-mr-xs"
                 />
-                <q-btn
-                  label="Apply"
-                  color="primary"
+                <OButton
+                  variant="primary"
                   size="sm"
-                  unelevated
                   @click="applyCustomTheme('dark')"
-                />
+                >Apply</OButton>
               </div>
             </div>
           </OTabPanel>

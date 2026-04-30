@@ -5,14 +5,13 @@
         <q-icon name="link" size="sm" />
         <span class="header-title">Related Telemetry</span>
       </div>
-      <q-btn
-        icon="close"
-        flat
-        dense
-        round
-        size="sm"
+      <OButton
+        variant="ghost"
+        size="icon"
         @click="$emit('close')"
-      />
+      >
+        <q-icon name="close" size="16px" />
+      </OButton>
     </div>
 
     <div class="correlation-body">
@@ -135,14 +134,11 @@
                 class="query-item"
               >
                 <div class="query-stream">{{ query.stream }}</div>
-                <q-btn
-                  label="View"
+                <OButton
+                  variant="outline"
                   size="sm"
-                  color="primary"
-                  outline
-                  dense
                   @click="navigateToQuery(query, 'traces')"
-                />
+                >View</OButton>
               </div>
             </div>
           </div>
@@ -163,14 +159,11 @@
                 class="query-item"
               >
                 <div class="query-stream">{{ query.stream }}</div>
-                <q-btn
-                  label="View"
+                <OButton
+                  variant="outline"
                   size="sm"
-                  color="secondary"
-                  outline
-                  dense
                   @click="navigateToQuery(query, 'metrics')"
-                />
+                >View</OButton>
               </div>
             </div>
           </div>
@@ -191,14 +184,11 @@
                 class="query-item"
               >
                 <div class="query-stream">{{ query.stream }}</div>
-                <q-btn
-                  label="View"
+                <OButton
+                  variant="outline"
                   size="sm"
-                  color="accent"
-                  outline
-                  dense
                   @click="navigateToQuery(query, 'logs')"
-                />
+                >View</OButton>
               </div>
             </div>
           </div>
@@ -215,6 +205,7 @@ import { useStore } from "vuex";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext, CorrelationQuery } from "@/utils/telemetryCorrelation";
 import type { CorrelationResult } from "@/utils/telemetryCorrelation";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 interface Props {
   show: boolean;

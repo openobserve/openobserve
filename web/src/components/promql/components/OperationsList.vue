@@ -123,31 +123,30 @@
                     </div>
                   </q-menu>
                 </q-btn>
-                <q-btn
-                  size="xs"
-                  dense
+                <OButton
+                  variant="ghost"
+                  size="icon-xs-sq"
                   @click="removeOperation(index)"
-                  icon="close"
                   :data-test="`promql-operation-remove-${index}`"
-                />
+                >
+                  <q-icon name="close" size="14px" />
+                </OButton>
               </OButtonGroup>
             </div>
           </template>
         </draggable>
 
         <!-- Add Button -->
-        <q-btn
-          flat
-          dense
-          icon="add"
+        <OButton
+          variant="ghost-primary"
           size="sm"
-          color="primary"
           @click="showOperationSelector = true"
           class="add-operation-btn tw:ml-[0.25rem]"
           data-test="promql-add-operation"
         >
+          <q-icon name="add" size="14px" />
           <q-tooltip>Add operation</q-tooltip>
-        </q-btn>
+        </OButton>
       </div>
     </div>
 
