@@ -107,12 +107,26 @@ mod tests {
         prelude::{SessionConfig, SessionContext},
     };
 
+    use datafusion::physical_optimizer::PhysicalOptimizerRule;
+
     use super::*;
     use crate::service::search::datafusion::{
         optimizer::logical_optimizer::limit_join_right_side::LimitJoinRightSide,
         planner::extension_planner::OpenobserveQueryPlanner,
         table_provider::empty_table::NewEmptyTable,
     };
+
+    #[test]
+    fn test_join_reorder_rule_name() {
+        let rule = JoinReorderRule::new();
+        assert_eq!(rule.name(), "JoinReorderRule");
+    }
+
+    #[test]
+    fn test_join_reorder_rule_schema_check() {
+        let rule = JoinReorderRule::new();
+        assert!(rule.schema_check());
+    }
 
     #[tokio::test]
     async fn test_join_reorder() -> Result<()> {

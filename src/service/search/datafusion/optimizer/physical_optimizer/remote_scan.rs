@@ -404,6 +404,20 @@ impl Default for NewEmptyExecCountVisitor {
 mod tests {
     use super::*;
 
+    use datafusion::physical_optimizer::PhysicalOptimizerRule;
+
+    #[test]
+    fn test_remote_scan_rule_name() {
+        let rule = RemoteScanRule::new_test(HashMap::new(), false);
+        assert_eq!(rule.name(), "RemoteScanRule");
+    }
+
+    #[test]
+    fn test_remote_scan_rule_schema_check() {
+        let rule = RemoteScanRule::new_test(HashMap::new(), false);
+        assert!(rule.schema_check());
+    }
+
     #[test]
     fn test_table_name_visitor_new_initial_state() {
         let v = TableNameVisitor::new();
