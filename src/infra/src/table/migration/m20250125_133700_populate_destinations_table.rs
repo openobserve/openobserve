@@ -338,3 +338,48 @@ fn ksuid_from_hash(
     let hash = hasher.finalize();
     svix_ksuid::Ksuid::from_bytes(hash.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_dest(name: &str) -> meta_destinations::Destination {
+        meta_destinations::Destination {
+            name: name.to_string(),
+            url: String::new(),
+            method: meta_destinations::HTTPType::default(),
+            skip_tls_verify: false,
+            headers: None,
+            template: String::new(),
+            emails: vec![],
+            sns_topic_arn: None,
+            aws_region: None,
+            destination_type: meta_destinations::DestinationType::default(),
+        }
+    }
+
+    #[test]
+    fn test_ksuid_from_hash_is_deterministic() {
+        let d = make_dest("webhook-1");
+        let k1 = ksuid_from_hash(&d, "org1");
+        let k2 = ksuid_from_hash(&d, "org1");
+        assert_eq!(k1.to_string(), k2.to_string());
+    }
+
+    #[test]
+    fn test_ksuid_from_hash_different_orgs_differ() {
+        let d = make_dest("webhook-1");
+        let k1 = ksuid_from_hash(&d, "org-a");
+        let k2 = ksuid_from_hash(&d, "org-b");
+        assert_ne!(k1.to_string(), k2.to_string());
+    }
+
+    #[test]
+    fn test_ksuid_from_hash_different_names_differ() {
+        let d1 = make_dest("dest-alpha");
+        let d2 = make_dest("dest-beta");
+        let k1 = ksuid_from_hash(&d1, "org1");
+        let k2 = ksuid_from_hash(&d2, "org1");
+        assert_ne!(k1.to_string(), k2.to_string());
+    }
+}
