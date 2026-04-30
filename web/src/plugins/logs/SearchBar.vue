@@ -21,93 +21,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="searchBarComponent"
   >
     <div class="row tw:m-0! tw:p-[0.375rem]! tw:items-start!">
-      <div class="float-right col flex tw:flex-wrap tw:items-center tw:gap-y-1">
-        <div class="logs-visualize-toggle element-box-shadow">
-          <div class="button-group row">
-            <div>
-              <o-button
-                data-test="logs-logs-toggle"
-                :class="
-                  searchObj.meta.logsVisualizeToggle === 'logs'
-                    ? 'selected'
-                    : ''
-                "
-                @click="onLogsVisualizeToggleUpdate('logs')"
-                size="icon"
-                variant="ghost"
-                class="button button-left tw:rounded-r-none! tw:size-[1.875rem]!"
-              >
-                <q-icon name="search" size="16px" />
-                <q-tooltip>
-                  {{ t("common.search") }}
-                </q-tooltip>
-              </o-button>
-            </div>
-            <div>
-              <o-button
-                data-test="logs-visualize-toggle"
-                :class="[
-                  searchObj.meta.logsVisualizeToggle === 'visualize'
-                    ? 'selected'
-                    : '',
-                  'button button-center tw:rounded-none tw:size-[1.875rem]!',
-                ]"
-                @click="onLogsVisualizeToggleUpdate('visualize')"
-                :disabled="isVisualizeDisabled"
-                size="icon"
-                variant="ghost"
-              >
-                <q-icon name="show_chart" size="16px" />
-                <q-tooltip v-if="isVisualizeDisabled">
-                  {{ t("search.enableSqlModeOrSelectSingleStream") }}
-                </q-tooltip>
-                <q-tooltip v-else>
-                  {{ t("search.visualize") }}
-                </q-tooltip>
-              </o-button>
-            </div>
-            <div>
-              <o-button
-                data-test="logs-build-toggle"
-                :class="[
-                  searchObj.meta.logsVisualizeToggle === 'build'
-                    ? 'selected'
-                    : '',
-                  config.isEnterprise == 'true'
-                    ? 'button button-center tw:rounded-none tw:size-[1.875rem]!'
-                    : 'button button-right tw:rounded-l-none! tw:size-[1.875rem]!',
-                ]"
-                @click="onLogsVisualizeToggleUpdate('build')"
-                size="icon"
-                variant="ghost"
-              >
-                <q-icon name="construction" size="16px" />
-                <q-tooltip>
-                  {{ t("search.buildQuery") }}
-                </q-tooltip>
-              </o-button>
-            </div>
-            <div v-if="config.isEnterprise == 'true'">
-              <o-button
-                data-test="logs-patterns-toggle"
-                :class="[
-                  searchObj.meta.logsVisualizeToggle === 'patterns'
-                    ? 'selected'
-                    : '',
-                  'button button-right tw:rounded-l-none! tw:size-[1.875rem]!',
-                ]"
-                @click="onLogsVisualizeToggleUpdate('patterns')"
-                size="icon"
-                variant="ghost"
-              >
-                <q-icon name="pattern" size="16px" />
-                <q-tooltip>
-                  {{ t("search.showPatternsLabel") }}
-                </q-tooltip>
-              </o-button>
-            </div>
-          </div>
-        </div>
+      <div class="float-right col flex tw:items-center tw:gap-1 tw:flex-nowrap tw:overflow-hidden">
+        <!-- View Mode Toggle Group -->
+        <OToggleGroup
+          :model-value="searchObj.meta.logsVisualizeToggle"
+          @update:model-value="onLogsVisualizeToggleUpdate($event)"
+        >
+          <OToggleGroupItem data-test="logs-logs-toggle" value="logs" size="sm">
+            <template #icon-left>
+              <ScanSearch class="tw:size-3.5 tw:shrink-0" />
+            </template>
+            {{ t("common.search") }}
+          </OToggleGroupItem>
+
+          <OToggleGroupItem
+            data-test="logs-visualize-toggle"
+            :disabled="isVisualizeDisabled"
+            value="visualize"
+            size="sm"
+          >
+            <template #icon-left>
+              <ChartLine class="tw:size-3.5 tw:shrink-0" />
+            </template>
+            {{ t("search.visualize") }}
+            <q-tooltip v-if="isVisualizeDisabled">
+              {{ t("search.enableSqlModeOrSelectSingleStream") }}
+            </q-tooltip>
+          </OToggleGroupItem>
+
+          <OToggleGroupItem data-test="logs-build-toggle" value="build" size="sm">
+            <template #icon-left>
+              <Wrench class="tw:size-3.5 tw:shrink-0" />
+            </template>
+            {{ t("search.buildQuery") }}
+          </OToggleGroupItem>
+
+          <OToggleGroupItem
+            v-if="config.isEnterprise == 'true'"
+            data-test="logs-patterns-toggle"
+            value="patterns"
+            size="sm"
+          >
+            <template #icon-left>
+              <Layers class="tw:size-3.5 tw:shrink-0" />
+            </template>
+            {{ t("search.showPatternsLabel") }}
+          </OToggleGroupItem>
+        </OToggleGroup>
         <div
           v-if="!shouldMoveSqlToggleToMenu"
           class="toolbar-toggle-container element-box-shadow"
@@ -2320,8 +2280,12 @@ import {
   Menu,
   Maximize,
   Minimize,
+  Wrench,
+  Layers,
 } from "lucide-vue-next";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -2415,6 +2379,10 @@ export default defineComponent({
     Menu,
     Maximize,
     Minimize,
+    Wrench,
+    Layers,
+    OToggleGroup,
+    OToggleGroupItem,
   },
   emits: [
     "searchdata",
