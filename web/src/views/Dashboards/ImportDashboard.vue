@@ -29,24 +29,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <div class="flex justify-center">
+        <div class="flex justify-center tw:gap-2">
           <OButton
-            variant="secondary"
-            size="sm"
+            variant="outline"
+            size="sm-action"
             @click="goToCommunityDashboards"
             data-test="dashboard-panel-tutorial-btn"
             >{{ t("dashboard.communityDashboard") }}</OButton
           >
           <OButton
-            variant="secondary"
-            size="sm"
+            variant="outline"
+            size="sm-action"
             v-close-popup
             @click="goBack()"
             >{{ t("function.cancel") }}</OButton
           >
           <OButton
             variant="primary"
-            size="sm"
+            size="sm-action"
             :disabled="!!isLoading"
             type="submit"
             @click="importDashboard"
