@@ -209,20 +209,20 @@ const NUMERIC_SEVERITY_TO_SEMANTIC: Record<string, string> = {
 };
 
 const getSemanticColor = (
-  label: string,
+  label: unknown,
   isDarkTheme: boolean,
   fallbackPalette: string[],
 ): string => {
   const map = isDarkTheme ? SEMANTIC_COLORS_DARK : SEMANTIC_COLORS_LIGHT;
-  const lowerLabel = label.toLowerCase();
+  const lowerLabel = String(label ?? "").trim().toLowerCase();
 
   const directMatch = map[lowerLabel];
   if (directMatch) return directMatch;
 
   const semanticName = NUMERIC_SEVERITY_TO_SEMANTIC[lowerLabel];
-  if (semanticName) return map[semanticName] ?? fallbackPalette[getSeriesHash(label, fallbackPalette)];
+  if (semanticName) return map[semanticName] ?? fallbackPalette[getSeriesHash(String(label), fallbackPalette)];
 
-  return fallbackPalette[getSeriesHash(label, fallbackPalette)];
+  return fallbackPalette[getSeriesHash(String(label), fallbackPalette)];
 };
 
 export const convertStackedLogData = (
