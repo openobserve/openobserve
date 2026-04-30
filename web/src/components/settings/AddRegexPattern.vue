@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             class="o2-button ai-hover-btn q-px-sm q-py-sm"
             :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-            style="border-radius: 100%;"
+            style="border-radius: 6px;"
             @mouseenter="isHovered = true"
             @mouseleave="isHovered = false"
             >

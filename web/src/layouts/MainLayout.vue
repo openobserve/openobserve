@@ -1656,8 +1656,8 @@ body.ai-chat-open {
 .ai-btn-active {
   background: linear-gradient(
     135deg,
-    rgba(139, 92, 246, 0.35) 0%,
-    rgba(236, 72, 153, 0.35) 100%
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
   ) !important;
 
   .header-icon {
@@ -1670,8 +1670,8 @@ body.ai-chat-open {
 .ai-hover-btn {
   background: linear-gradient(
     135deg,
-    rgba(139, 92, 246, 0.3) 0%,
-    rgba(236, 72, 153, 0.4) 100%
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
   ) !important;
   transition:
     background 0.3s ease,

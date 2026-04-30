@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="tw:px-[0.625rem] q-pt-xs home-page" :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''">
 
-    <!-- Tab bar (drag to reorder) — hidden for OSS (single tab) -->
+    <!-- Tab bar (drag to reorder) — shown when multiple tabs exist -->
     <div
-      v-if="isEnterpriseOrCloud"
+      v-if="tabOrder.length > 1"
       class="home-tab-bar"
       @dragover.prevent
       @drop="onTabDrop($event)"
@@ -503,15 +503,17 @@ export default defineComponent({
 
     const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
 
-    const DEFAULT_TABS = isEnterpriseOrCloud
-      ? [
-          { id: "ai",       label: t("home.tabAiAssistant") },
-          { id: "overview", label: t("home.tabOverview")    },
-          { id: "usage",    label: t("home.tabUsage")       },
-        ]
-      : [
-          { id: "usage",    label: t("home.tabUsage")       },
-        ];
+    const DEFAULT_TABS = computed(() => {
+      const tabs: { id: string; label: string }[] = [];
+      if (isEnterpriseOrCloud && store.state.zoConfig.ai_enabled) {
+        tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
+      }
+      if (isEnterpriseOrCloud) {
+        tabs.push({ id: "overview", label: t("home.tabOverview") });
+      }
+      tabs.push({ id: "usage", label: t("home.tabUsage") });
+      return tabs;
+    });
 
     function loadTabOrder() {
       try {
@@ -519,20 +521,20 @@ export default defineComponent({
         if (saved) {
           const ids: string[] = JSON.parse(saved);
           const ordered = ids
-            .map(id => DEFAULT_TABS.find(t => t.id === id))
-            .filter(Boolean) as typeof DEFAULT_TABS;
+            .map(id => DEFAULT_TABS.value.find(t => t.id === id))
+            .filter(Boolean) as { id: string; label: string }[];
           // append any new tabs not yet in saved order
-          DEFAULT_TABS.forEach(t => { if (!ordered.find(o => o.id === t.id)) ordered.push(t); });
+          DEFAULT_TABS.value.forEach(t => { if (!ordered.find(o => o.id === t.id)) ordered.push(t); });
           return ordered;
         }
       } catch {}
-      return [...DEFAULT_TABS];
+      return [...DEFAULT_TABS.value];
     }
 
     const tabOrder = ref(loadTabOrder());
 
     const savedActiveTab = localStorage.getItem(LS_ACTIVE_TAB_KEY);
-    const activeHomeTab = ref(savedActiveTab && DEFAULT_TABS.find(t => t.id === savedActiveTab) ? savedActiveTab : tabOrder.value[0].id);
+    const activeHomeTab = ref(savedActiveTab && DEFAULT_TABS.value.find(t => t.id === savedActiveTab) ? savedActiveTab : tabOrder.value[0].id);
 
     watch(activeHomeTab, val => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
 
@@ -998,7 +1000,7 @@ export default defineComponent({
 
     function onSwitchTab(e: Event) {
       const tab = (e as CustomEvent).detail;
-      if (DEFAULT_TABS.find(t => t.id === tab)) {
+      if (DEFAULT_TABS.value.find(t => t.id === tab)) {
         activeHomeTab.value = tab;
       }
     }
