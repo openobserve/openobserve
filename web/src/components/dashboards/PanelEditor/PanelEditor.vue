@@ -96,8 +96,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
             <OButton
-              variant="sidebar-toggle"
-              size="icon-circle"
+              variant="sidebar-button"
+              size="sidebar-button"
               :style="{ top: '14px', zIndex: 100 }"
               :class="
                 dashboardPanelData.layout.showFieldList
@@ -467,8 +467,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
             <OButton
-              variant="sidebar-toggle"
-              size="icon-circle"
+              variant="sidebar-button"
+              size="sidebar-button"
               :style="{ top: '14px', zIndex: 100 }"
               @click="collapseFieldList"
             >
