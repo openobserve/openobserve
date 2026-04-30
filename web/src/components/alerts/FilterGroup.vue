@@ -26,17 +26,24 @@
     >
       <!-- V2: Group-level toggle only for nested groups (depth > 0) -->
       <!-- Root group (depth 0) doesn't need toggle - its logicalOperator is dummy -->
-      <div v-if="depth > 0" class="tw:w-fit operator-toggle-tabs" :class="store.state.theme === 'dark' ? 'dark-mode' : ''">
-        <button
-          v-for="tab in tabOptions"
-          :key="tab.value"
-          type="button"
-          class="operator-toggle-tab"
-          :class="{ active: label === tab.value }"
-          @click="toggleLabel(tab.value)"
+      <div v-if="depth > 0" class="tw:w-fit tw:relative tw:bottom-3.5">
+        <OToggleGroup
+          :model-value="label"
+          @update:model-value="toggleLabel($event as string)"
         >
-          {{ tab.label }}
-        </button>
+          <OToggleGroupItem
+            v-for="tab in tabOptions"
+            :key="tab.value"
+            :value="tab.value"
+            size="xs"
+          >
+            <template #icon-left>
+              <GitBranch v-if="tab.value === 'or'" class="tw:size-3 tw:shrink-0" />
+              <GitMerge v-else class="tw:size-3 tw:shrink-0" />
+            </template>
+            {{ tab.label }}
+          </OToggleGroupItem>
+        </OToggleGroup>
       </div>
       <!-- Spacer for root group to maintain consistent spacing -->
       <div v-else class="tw:h-[14px]"></div>
@@ -147,6 +154,9 @@
     import FilterCondition from './FilterCondition.vue';
     import { useStore } from 'vuex';
     import OButton from '@/lib/core/Button/OButton.vue';
+    import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
+    import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
+    import { GitBranch, GitMerge } from 'lucide-vue-next';
     import { useI18n } from 'vue-i18n';
     import { getUUID } from '@/utils/zincutils';
     import ConfirmDialog from '@/components/ConfirmDialog.vue';
@@ -570,52 +580,6 @@ defineExpose({
       }
     }
     
-  .operator-toggle-tabs {
-    position: relative;
-    bottom: 14px;
-    display: flex;
-    gap: 2px;
-    background: #ebebeb;
-    border-radius: 6px;
-    padding: 3px;
-
-    .operator-toggle-tab {
-      padding: 3px 10px;
-      border-radius: 4px;
-      border: none;
-      background: transparent;
-      color: rgba(0, 0, 0, 0.4);
-      font-size: 10px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      line-height: 1.4;
-
-      &:hover { color: rgba(0, 0, 0, 0.7); }
-
-      &.active {
-        background: #fff;
-        color: #1a1a1a;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-      }
-    }
-
-    &.dark-mode {
-      background: #333;
-
-      .operator-toggle-tab {
-        color: rgba(255, 255, 255, 0.6);
-
-        &:hover { color: rgba(255, 255, 255, 0.85); }
-
-        &.active {
-          background: #374151;
-          color: #e4e7eb;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-        }
-      }
-    }
-  }
 
 
   </style>
