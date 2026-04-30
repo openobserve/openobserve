@@ -38,107 +38,100 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tooltip>
       </q-toggle>
     </div>
-    <div style="border-right: 1px solid var(--o2-border-color)">
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
-        transformsLabel
-      }}</q-tooltip>
-      <q-btn-dropdown
-        data-test="logs-search-bar-function-dropdown"
-        v-model="functionModel"
-        size="12px"
-        :icon="transformIcon"
-        no-caps
-        class="btn-function no-case q-pr-none no-border no-outline tw:border-none"
-        :class="`${searchObj.data.transformType || 'transform'}-icon`"
-        label-class="no-case"
-      >
-        <q-tooltip :delay="0">
-          {{ transformsLabel }}
-        </q-tooltip>
-        <q-list data-test="logs-search-saved-function-list">
-          <!-- Search Input -->
-          <div
-            data-test="logs-search-bar-transform-type-select"
-            class="logs-transform-type o2-input q-mx-sm"
-            style="padding-top: 0"
+    <ODropdown v-model:open="functionModel" side="bottom" align="start">
+      <template #trigger>
+        <OButton
+          data-test="logs-search-bar-function-dropdown"
+          variant="ghost"
+          size="icon-toolbar"
+        >
+          <img v-if="transformIcon?.startsWith('img:')" :src="transformIcon.slice(4)" alt="Transform" class="tw:size-4" />
+          <q-icon v-else :name="transformIcon" size="16px" />
+          <q-icon name="arrow_drop_down" size="14px" class="tw:-ms-1" />
+          <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{ transformsLabel }}</q-tooltip>
+        </OButton>
+      </template>
+      <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
+        <!-- Search Input -->
+        <div
+          data-test="logs-search-bar-transform-type-select"
+          class="logs-transform-type o2-input q-mx-sm"
+          style="padding-top: 0"
+        >
+          <q-select
+            v-if="isActionsEnabled"
+            v-model="searchObj.data.transformType"
+            :options="transformTypes"
+            :label="t('search.transformType')"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-sm showLabelOnTop no-case"
+            stack-label
+            outlined
+            emit-value
+            filled
+            dense
+            clearable
+            @update:model-value="updateTransforms()"
+          />
+        </div>
+        <div>
+          <q-input
+            v-model="searchTerm"
+            dense
+            filled
+            borderless
+            clearable
+            debounce="300"
+            :placeholder="t('search.searchSavedFunction')"
+            data-test="function-search-input"
           >
-            <q-select
-              v-if="isActionsEnabled"
-              v-model="searchObj.data.transformType"
-              :options="transformTypes"
-              :label="t('search.transformType')"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-sm showLabelOnTop no-case"
-              stack-label
-              outlined
-              emit-value
-              filled
-              dense
-              clearable
-              @update:model-value="updateTransforms()"
-            />
-          </div>
-          <div>
-            <q-input
-              v-model="searchTerm"
-              dense
-              filled
-              borderless
-              clearable
-              debounce="300"
-              :placeholder="t('search.searchSavedFunction')"
-              data-test="function-search-input"
-            >
-              <template #prepend>
-                <q-icon name="search" />
-              </template>
-            </q-input>
-          </div>
+            <template #prepend>
+              <q-icon name="search" />
+            </template>
+          </q-input>
+        </div>
 
-          <div v-if="filteredTransformOptions.length">
-            <q-item
-              class="tw:border-b saved-view-item"
-              clickable
-              v-for="(item, i) in filteredTransformOptions"
-              :key="'transform-' + item?.name"
-              v-close-popup
-            >
-              <q-item-section
-                @click.stop="selectTransform(item, true)"
-                v-close-popup
+        <div v-if="filteredTransformOptions.length">
+          <q-item
+            class="tw:border-b saved-view-item"
+            clickable
+            v-for="(item, i) in filteredTransformOptions"
+            :key="'transform-' + item?.name"
+            @click="selectTransform(item, true)"
+          >
+            <q-item-section>
+              <q-item-label>{{ item.name }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </div>
+        <div v-else>
+          <q-item>
+            <q-item-section>
+              <q-item-label
+                v-if="searchObj.data.transformType === 'function'"
+                >{{ t("search.savedFunctionNotFound") }}</q-item-label
               >
-                <q-item-label>{{ item.name }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </div>
-          <div v-else>
-            <q-item>
-              <q-item-section>
-                <q-item-label
-                  v-if="searchObj.data.transformType === 'function'"
-                  >{{ t("search.savedFunctionNotFound") }}</q-item-label
-                >
-                <q-item-label
-                  v-if="searchObj.data.transformType === 'action'"
-                  >{{ t("search.actionsNotFound") }}</q-item-label
-                >
-                <q-item-label v-if="!searchObj.data.transformType">{{
-                  t("search.selectTransformType")
-                }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </div>
-        </q-list>
-      </q-btn-dropdown>
-    </div>
-    <q-btn
+              <q-item-label
+                v-if="searchObj.data.transformType === 'action'"
+                >{{ t("search.actionsNotFound") }}</q-item-label
+              >
+              <q-item-label v-if="!searchObj.data.transformType">{{
+                t("search.selectTransformType")
+              }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </div>
+      </q-list>
+    </ODropdown>
+    <OButton
       data-test="logs-search-bar-save-transform-btn"
-      class="save-transform-btn q-px-sm"
-      icon="save"
-      :disable="searchObj.data.transformType !== 'function'"
+      variant="ghost"
+      size="icon-toolbar"
+      :disabled="searchObj.data.transformType !== 'function'"
       @click="fnSavedFunctionDialog"
     >
+      <q-icon name="save" size="16px" />
       <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
         {{
           searchObj.data.transformType === "action"
@@ -146,13 +139,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : t("common.save")
         }}
       </q-tooltip>
-    </q-btn>
+    </OButton>
   </OButtonGroup>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
@@ -284,6 +279,7 @@ const updateEditorWidth = () => {
 };
 
 const selectTransform = (item: any, isSelected: boolean) => {
+  functionModel.value = false;
   if (searchObj.data.transformType === "function") {
     emit("select:function", item, isSelected);
   }

@@ -118,20 +118,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!shouldMoveSavedViewToMenu"
           class="q-ml-xs q-pa-none element-box-shadow el-border"
         >
-          <q-btn-dropdown
+          <!-- Save current view -->
+          <OButton
             data-test="logs-search-saved-views-btn"
-            v-model="savedViewDropdownModel"
+            variant="ghost"
+            size="icon-toolbar"
             @click="fnSavedView"
-            @show="loadSavedView"
-            split
-            icon="save"
-            icon-right="saved_search"
-            class="saved-views-dropdown no-border"
           >
+            <q-icon name="save" size="16px" />
+            <q-tooltip>{{ t("search.savedViewsLabel") }}</q-tooltip>
+          </OButton>
+          <!-- List saved views dropdown -->
+          <ODropdown
+            :open="savedViewDropdownModel"
+            @update:open="(v) => { savedViewDropdownModel = v; if (v) loadSavedView(); }"
+            side="bottom"
+            align="start"
+          >
+            <template #trigger>
+              <OButton variant="ghost" size="icon-toolbar">
+                <q-icon name="saved_search" size="16px" />
+                <q-icon name="arrow_drop_down" size="14px" class="tw:-ms-1" />
+                <q-tooltip>{{ t("search.listSavedViews") }}</q-tooltip>
+              </OButton>
+            </template>
+            <div
+              :style="localSavedViews.length > 0 ? 'width: 500px; max-height: 400px; overflow-y: auto' : 'width: 250px; max-height: 400px; overflow-y: auto'"
+            >
             <q-list
-              :style="
-                localSavedViews.length > 0 ? 'width: 500px' : 'width: 250px'
-              "
               data-test="logs-search-saved-view-list"
             >
               <q-item style="padding: 0px 0px 0px 0px">
@@ -376,23 +390,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
             </q-list>
-          </q-btn-dropdown>
-          <q-tooltip>
-            {{ t("search.savedViewsLabel") }}
-          </q-tooltip>
+            </div>
+          </ODropdown>
         </OButtonGroup>
         <!-- reset filters button - directly on toolbar (hidden when moved to menu) -->
-        <o-button
+        <OButton
           v-if="!shouldMoveSavedViewToMenu"
           data-test="logs-search-bar-reset-filters-btn"
-          class="group-menu-btn element-box-shadow tw:ms-1"
-          size="icon"
-          variant="ghost"
+          class="tw:ms-1"
+          size="icon-toolbar"
+          variant="outline"
           @click="resetFilters"
         >
           <q-icon name="restart_alt" size="16px" />
           <q-tooltip>{{ t("search.resetFilters") }}</q-tooltip>
-        </o-button>
+        </OButton>
         <!-- this is the button group responsible for showing all the utilities -->
         <OButton
           data-test="logs-search-bar-utilities-menu-btn"
@@ -622,9 +634,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OButton
           data-test="logs-search-bar-more-options-btn"
-          class="download-logs-btn element-box-shadow el-border tw:size-[1.875rem]!"
-          variant="ghost"
-          size="icon"
+          class="download-logs-btn"
+          variant="outline"
+          size="icon-toolbar"
         >
           <q-icon name="menu" size="16px" />
           <q-menu>
@@ -3624,6 +3636,7 @@ export default defineComponent({
     };
 
     const applySavedView = async (item) => {
+      savedViewDropdownModel.value = false;
       await cancelQuery();
       searchObj.shouldIgnoreWatcher = true;
       searchObj.meta.sqlMode = false;
