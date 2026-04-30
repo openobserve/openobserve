@@ -373,3 +373,18 @@ fn super_cluster_enabled() -> bool {
     }
     false
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_flight_service_impl_default() {
+        let _impl = FlightServiceImpl::default();
+    }
+
+    #[test]
+    fn test_super_cluster_disabled_in_oss() {
+        assert!(!super_cluster_enabled());
+    }
+}
