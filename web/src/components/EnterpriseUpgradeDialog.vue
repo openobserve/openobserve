@@ -247,7 +247,6 @@ const FEATURE_LINKS = {
   query_management: "query_mgmt",
   workload_management: "workload_mgmt",
   audit_trail: "audit_trail",
-  action_scripts: "action_scripts",
   sensitive_data_redaction: "data_redact",
   pipeline_remote_destinations: "pipeline_remote",
   query_optimizer: "query_opt",
@@ -521,14 +520,6 @@ export default defineComponent({
         icon: "fact_check",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.audit_trail,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.action_scripts.name"),
-        note: t("about.enterprise_offer.enterprise_features.action_scripts.note"),
-        icon: "code",
-        requiresHA: true,
-        cloudHidden: true, // Hide from Cloud layout
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.action_scripts,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.sensitive_data_redaction.name"),
