@@ -36,84 +36,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tooltip>
       </q-toggle>
     </div>
-    <div>
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
-        selectedFunctionTooltip
-      }}</q-tooltip>
-      <q-btn-dropdown
-        data-test="logs-search-bar-function-dropdown"
-        v-model="functionModel"
-        size="12px"
-        :icon="iconRight"
-        no-caps
-        class="btn-function no-case q-pr-none no-border no-outline tw:border-none"
-      >
-        <q-tooltip :delay="0">
-          {{ selectedFunctionTooltip }}
-        </q-tooltip>
-        <q-list data-test="logs-search-saved-function-list">
-          <!-- Search Input -->
-          <div>
-            <q-input
-              v-model="searchTerm"
-              dense
-              filled
-              borderless
-              clearable
-              debounce="300"
-              :placeholder="t('search.searchSavedFunction')"
-              data-test="function-search-input"
-            >
-              <template #prepend>
-                <q-icon name="search" />
-              </template>
-            </q-input>
-          </div>
+    <ODropdown v-model:open="functionModel" side="bottom" align="start">
+      <template #trigger>
+        <OButton
+          data-test="logs-search-bar-function-dropdown"
+          variant="ghost"
+          size="icon-toolbar"
+        >
+          <img :src="functionIconUrl" alt="Function" class="tw:size-4" />
+          <q-icon name="arrow_drop_down" size="14px" class="tw:-ms-1" />
+          <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{ selectedFunctionTooltip }}</q-tooltip>
+        </OButton>
+      </template>
+      <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
+        <!-- Search Input -->
+        <div>
+          <q-input
+            v-model="searchTerm"
+            dense
+            filled
+            borderless
+            clearable
+            debounce="300"
+            :placeholder="t('search.searchSavedFunction')"
+            data-test="function-search-input"
+          >
+            <template #prepend>
+              <q-icon name="search" />
+            </template>
+          </q-input>
+        </div>
 
-          <div v-if="filteredFunctionOptions.length">
-            <q-item
-              class="tw:border-b saved-view-item"
-              clickable
-              v-for="(item, i) in filteredFunctionOptions"
-              :key="'saved-view-' + i"
-              v-close-popup
-            >
-              <q-item-section
-                @click.stop="applyFunction(item, true)"
-                v-close-popup
-              >
-                <q-item-label>{{ item.name }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </div>
-          <div v-else>
-            <q-item>
-              <q-item-section>
-                <q-item-label>{{
-                  t("search.savedFunctionNotFound")
-                }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </div>
-        </q-list>
-      </q-btn-dropdown>
-    </div>
-    <q-btn
+        <div v-if="filteredFunctionOptions.length">
+          <q-item
+            class="tw:border-b saved-view-item"
+            clickable
+            v-for="(item, i) in filteredFunctionOptions"
+            :key="'saved-view-' + i"
+            @click="applyFunction(item, true)"
+          >
+            <q-item-section>
+              <q-item-label>{{ item.name }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </div>
+        <div v-else>
+          <q-item>
+            <q-item-section>
+              <q-item-label>{{
+                t("search.savedFunctionNotFound")
+              }}</q-item-label>
+            </q-item-section>
+          </q-item>
+        </div>
+      </q-list>
+    </ODropdown>
+    <OButton
       data-test="logs-search-bar-save-function-btn"
-      class="save-function-btn q-px-sm"
-      icon="save"
+      variant="ghost"
+      size="icon-toolbar"
       @click="fnSavedFunctionDialog"
     >
+      <q-icon name="save" size="16px" />
       <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
         {{ t("common.save") }}
       </q-tooltip>
-    </q-btn>
+    </OButton>
   </OButtonGroup>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";
@@ -154,6 +150,8 @@ const functionModel = ref(false);
 
 const searchTerm = ref("");
 
+const functionIconUrl = computed(() => iconRight.value.replace('img:', ''));
+
 const fnSavedFunctionDialog = () => {
   emit("save:function");
 };
@@ -176,6 +174,7 @@ const applyFunction = (
   item: { name: string; function: string },
   flag = false,
 ) => {
+  functionModel.value = false;
   emit("select:function", item, flag);
 };
 </script>
