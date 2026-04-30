@@ -1083,7 +1083,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
 import O2AIConfirmDialog from '@/components/O2AIConfirmDialog.vue';
 import { useChatHistory } from '@/composables/useChatHistory';
-import useKeyboardShortcuts from '@/composables/useKeyboardShortcuts';
+import { useShortcuts } from '@/lib/vue-shortcut-manager';
 import { useAiDashboardEvents, getDashboardEventType } from '@/composables/useAiDashboardEvents';
 
 const { fetchAiChat, submitFeedback } = useAiChat();
@@ -2876,9 +2876,10 @@ export default defineComponent({
       window.dispatchEvent(new Event('resize'));
     };
 
-    useKeyboardShortcuts([
+    useShortcuts([
       {
-        key: 'Escape',
+        key: 'escape',
+        description: 'Close AI chat',
         handler: () => {
           if (store.state.isAiChatExpanded) {
             store.dispatch('setIsAiChatExpanded', false);
@@ -2887,8 +2888,13 @@ export default defineComponent({
         },
       },
       {
-        key: 'b',
-        ctrlOrMeta: true,
+        key: 'ctrl+b',
+        description: 'Toggle AI chat',
+        handler: () => toggleExpand(),
+      },
+      {
+        key: 'meta+b',
+        description: 'Toggle AI chat',
         handler: () => toggleExpand(),
       },
     ]);
