@@ -110,6 +110,15 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-destructive-focus-ring",
     "tw:disabled:opacity-50",
   ].join(" "),
+  // Panel collapse: ghost muted — for sidebar panel header collapse/expand.
+  // Transparent bg, muted icon color, subtle hover. Blends into header without visual weight.
+  "panel-collapse": [
+    "tw:bg-transparent tw:text-button-ghost-muted-text tw:border-0",
+    "tw:enabled:hover:text-button-ghost-muted-hover-text tw:enabled:hover:bg-button-ghost-muted-hover-bg",
+    "tw:enabled:active:bg-button-ghost-muted-active-bg",
+    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-muted-focus-ring",
+    "tw:disabled:opacity-50",
+  ].join(" "),
   // Sidebar toggle: bg-surface border shadow — for persistent panel collapse/expand buttons
   "sidebar-toggle": [
     "tw:bg-[var(--q-color-btn-bg,var(--q-color-surface,#fff))] tw:text-button-ghost-text tw:border tw:border-button-border tw:shadow-sm",
@@ -145,6 +154,8 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   "icon-circle-sm": "tw:size-7 tw:p-0 tw:rounded-full tw:gap-x-0",
   // 30×30px square — for toolbar icon buttons (auto-refresh, share, hamburger)
   "icon-toolbar": "tw:size-[1.875rem] tw:p-0 tw:rounded-md tw:gap-x-0",
+  // 26px rounded-lg — compact modern icon button for panel header collapse/expand
+  "icon-panel": "tw:size-[1.625rem] tw:p-0 tw:rounded-lg tw:gap-x-0",
 };
 
 const activeClasses = [
