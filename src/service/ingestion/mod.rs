@@ -1177,6 +1177,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_thread_id_is_bounded_by_worker_num() {
+        let thread_id = get_thread_id();
+        let worker_num = config::get_config().limit.http_worker_num;
+        assert!(thread_id < worker_num);
+    }
+
+    #[test]
+    fn test_generate_record_id_is_positive() {
+        let id = generate_record_id("org1", "mystream", &StreamType::Logs);
+        assert!(id > 0);
+    }
+
+    #[test]
+    fn test_generate_record_id_increments_monotonically() {
+        let id1 = generate_record_id("org1", "mystream", &StreamType::Logs);
+        let id2 = generate_record_id("org1", "mystream", &StreamType::Logs);
+        assert!(id2 > id1);
+    }
+
+    #[test]
     fn test_create_log_ingestion_req_json() {
         let data = bytes::Bytes::from("{}");
         let result = create_log_ingestion_req(0, data);
