@@ -230,8 +230,8 @@ test.describe("Alerts Advanced Coverage Tests", () => {
      * 4. Ingests more data (same fingerprint, within time window)
      * 5. Verifies NO NEW notification - dedup suppressed the duplicate
      */
-    test("Deduplication validation - verify duplicate alerts are suppressed", {
-        tag: ['@alertsAdvanced', '@alerts', '@deduplication', '@dedupValidation', '@enterprise', '@skip']
+    test.skip("Deduplication validation - verify duplicate alerts are suppressed", {
+        tag: ['@alertsAdvanced', '@alerts', '@deduplication', '@dedupValidation', '@enterprise']
     }, async ({ page }) => {
         test.slow(); // Mark as slow test due to scheduled alert evaluation cycles
 
