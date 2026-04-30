@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       No functions found
                     </div>
                     <!-- <div>
-                    <q-btn @click="addFunctionInProgress = true">Associate Function</q-btn>
+                    <OButton variant="primary" @click="addFunctionInProgress = true">Associate Function</OButton>
                   </div> -->
                   </div>
                 </template>

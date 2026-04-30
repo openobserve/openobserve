@@ -124,218 +124,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <!-- Dropdown menu (shown when simplifiedPanelView is false) -->
-        <q-btn-dropdown
+        <ODropdown
           :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
-          dense
-          flat
-          label=""
-          no-caps
+          side="bottom"
+          align="end"
           v-if="!viewOnly && !simplifiedPanelView"
         >
-          <q-list dense class="panel-dropdown-list">
-            <q-item
-              v-if="!simplifiedPanelView"
-              clickable
-              v-close-popup="true"
-              @click="onPanelModifyClick('EditPanel')"
-            >
-              <q-item-section side>
-                <q-icon :name="outlinedEdit" size="xs" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-edit-panel"
-                  class="q-px-sm"
-                  >{{ t("panel.editPanel") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              v-if="!simplifiedPanelView"
-              clickable
-              v-close-popup="true"
-              @click="onPanelModifyClick('EditLayout')"
-            >
-              <q-item-section side>
-                <q-icon :name="outlinedDashboardCustomize" size="xs" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-edit-layout"
-                  class="q-px-sm"
-                  >{{ t("panel.editLayout") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              v-if="!simplifiedPanelView"
-              clickable
-              v-close-popup="true"
-              @click="onPanelModifyClick('DuplicatePanel')"
-            >
-              <q-item-section side>
-                <q-icon name="content_copy" size="xs" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-duplicate-panel"
-                  class="q-px-sm"
-                  >{{ t("panel.duplicate") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-close-popup="true"
-              @click="onPanelModifyClick('DeletePanel')"
-            >
-              <q-item-section side>
-                <q-icon name="delete_outline" size="xs" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-delete-panel"
-                  class="q-px-sm"
-                  >{{ t("panel.deletePanel") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-if="
-                !simplifiedPanelView && metaData && metaData.queries?.length > 0
-              "
-              v-close-popup="true"
-              @click="showViewPanel = true"
-            >
-              <q-item-section side>
-                <q-icon name="manage_search" size="xs" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-query-inspector-panel"
-                  class="q-px-sm"
-                  >{{ t("panel.queryInspector") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-if="
-                !simplifiedPanelView && metaData && metaData.queries?.length > 0
-              "
-              v-close-popup="true"
-              @click="
-                PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)
-              "
-            >
-              <q-item-section side>
-                <q-icon :name="outlinedFileDownload" size="xs" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-panel-download-as-csv-btn"
-                  class="q-px-sm"
-                  >{{ t("panel.downloadAsCSV") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-if="
-                !simplifiedPanelView && metaData && metaData.queries?.length > 0
-              "
-              v-close-popup="true"
-              @click="
-                PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)
-              "
-            >
-              <q-item-section side>
-                <q-icon name="data_object" size="xs" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-panel-download-as-json-btn"
-                  class="q-px-sm"
-                  >{{ t("panel.downloadAsJSON") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-if="
-                !simplifiedPanelView && metaData && metaData.queries?.length > 0
-              "
-              :disable="props.data.queryType != 'sql'"
-              v-close-popup="true"
-              @click="onLogPanel"
-            >
-              <q-item-section side>
-                <q-icon name="search" size="xs" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-move-to-logs-module"
-                  class="q-px-sm"
-                  >{{ t("panel.goToLogs") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              v-if="!simplifiedPanelView && config.isEnterprise === 'true'"
-              clickable
-              v-close-popup="true"
-              @click="onPanelModifyClick('Refresh')"
-            >
-              <q-item-section side>
-                <q-icon name="cached" size="xs" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-refresh-without-cache"
-                  class="q-px-sm"
-                  >Refresh Cache & Reload</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              v-if="!simplifiedPanelView"
-              clickable
-              v-close-popup="true"
-              @click="onPanelModifyClick('MovePanel')"
-            >
-              <q-item-section side>
-                <q-icon :name="outlinedDriveFileMove" size="xs" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-move-to-another-panel"
-                  class="q-px-sm"
-                  >{{ t("panel.moveToAnotherTab") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-if="
-                !simplifiedPanelView && metaData && metaData.queries?.length > 0
-              "
-              v-close-popup="true"
-              @click="onPanelModifyClick('CreateAlert')"
-            >
-              <q-item-section side>
-                <q-icon :name="outlinedReportProblem" size="xs" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-create-alert-from-panel"
-                  class="q-px-sm"
-                  >{{ t("panel.createAlert") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-btn-dropdown>
+          <template #trigger>
+            <OButton variant="ghost" size="icon-xs">
+              <q-icon name="more_vert" size="16px" />
+            </OButton>
+          </template>
+          <ODropdownItem
+            v-if="!simplifiedPanelView"
+            data-test="dashboard-edit-panel"
+            @select="onPanelModifyClick('EditPanel')"
+          >
+            <template #icon-left><q-icon :name="outlinedEdit" size="16px" /></template>
+            {{ t("panel.editPanel") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView"
+            data-test="dashboard-edit-layout"
+            @select="onPanelModifyClick('EditLayout')"
+          >
+            <template #icon-left><q-icon :name="outlinedDashboardCustomize" size="16px" /></template>
+            {{ t("panel.editLayout") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView"
+            data-test="dashboard-duplicate-panel"
+            @select="onPanelModifyClick('DuplicatePanel')"
+          >
+            <template #icon-left><q-icon name="content_copy" size="16px" /></template>
+            {{ t("panel.duplicate") }}
+          </ODropdownItem>
+          <ODropdownItem
+            variant="destructive"
+            data-test="dashboard-delete-panel"
+            @select="onPanelModifyClick('DeletePanel')"
+          >
+            <template #icon-left><q-icon name="delete_outline" size="16px" /></template>
+            {{ t("panel.deletePanel") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            data-test="dashboard-query-inspector-panel"
+            @select="showViewPanel = true"
+          >
+            <template #icon-left><q-icon name="manage_search" size="16px" /></template>
+            {{ t("panel.queryInspector") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            data-test="dashboard-panel-download-as-csv-btn"
+            @select="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
+          >
+            <template #icon-left><q-icon :name="outlinedFileDownload" size="16px" /></template>
+            {{ t("panel.downloadAsCSV") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            data-test="dashboard-panel-download-as-json-btn"
+            @select="PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)"
+          >
+            <template #icon-left><q-icon name="data_object" size="16px" /></template>
+            {{ t("panel.downloadAsJSON") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            :disabled="props.data.queryType != 'sql'"
+            data-test="dashboard-move-to-logs-module"
+            @select="onLogPanel"
+          >
+            <template #icon-left><q-icon name="search" size="16px" /></template>
+            {{ t("panel.goToLogs") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView && config.isEnterprise === 'true'"
+            data-test="dashboard-refresh-without-cache"
+            @select="onPanelModifyClick('Refresh')"
+          >
+            <template #icon-left><q-icon name="cached" size="16px" /></template>
+            Refresh Cache &amp; Reload
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView"
+            data-test="dashboard-move-to-another-panel"
+            @select="onPanelModifyClick('MovePanel')"
+          >
+            <template #icon-left><q-icon :name="outlinedDriveFileMove" size="16px" /></template>
+            {{ t("panel.moveToAnotherTab") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            data-test="dashboard-create-alert-from-panel"
+            @select="onPanelModifyClick('CreateAlert')"
+          >
+            <template #icon-left><q-icon :name="outlinedReportProblem" size="16px" /></template>
+            {{ t("panel.createAlert") }}
+          </ODropdownItem>
+        </ODropdown>
       </q-bar>
     </div>
 
@@ -457,6 +346,8 @@ import {
 } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
@@ -517,6 +408,8 @@ export default defineComponent({
     RelativeTime,
     PanelErrorButtons,
     OButton,
+    ODropdown,
+    ODropdownItem,
     ShowLegendsPopup: defineAsyncComponent(() => {
       return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
     }),
