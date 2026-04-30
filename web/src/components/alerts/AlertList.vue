@@ -36,14 +36,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex q-ml-auto tw:ps-2 items-center">
             <!-- Alert Tabs -->
-            <div class="app-tabs-container tw:h-[36px] q-mr-sm">
-              <app-tabs
-                class="tabs-selection-container"
-                :tabs="alertTabs"
-                v-model:active-tab="activeTab"
-                @update:active-tab="filterAlertsByTab"
-              />
-            </div>
+            <OToggleGroup
+              :model-value="activeTab"
+              @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
+              class="q-mr-sm"
+            >
+              <OToggleGroupItem value="all" size="sm">
+                <template #icon-left><List class="tw:size-3.5 tw:shrink-0" /></template>
+                {{ t("alerts.all") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="scheduled" size="sm">
+                <template #icon-left><CalendarClock class="tw:size-3.5 tw:shrink-0" /></template>
+                {{ t("alerts.scheduled") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="realTime" size="sm">
+                <template #icon-left><Zap class="tw:size-3.5 tw:shrink-0" /></template>
+                {{ t("alerts.realTime") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm">
+                <template #icon-left><TrendingUp class="tw:size-3.5 tw:shrink-0" /></template>
+                {{ t("alerts.anomalyDetection") }}
+              </OToggleGroupItem>
+            </OToggleGroup>
             <!-- Search for Alerts -->
             <q-input
               v-model="dynamicQueryModel"
@@ -898,8 +912,10 @@ import FolderList from "../common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import { toRaw } from "vue";
 import { nextTick } from "vue";
-import AppTabs from "@/components/common/AppTabs.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { List, CalendarClock, Zap, TrendingUp } from "lucide-vue-next";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
@@ -921,7 +937,12 @@ export default defineComponent({
     DedupSummaryCards,
     FolderList,
     MoveAcrossFolders,
-    AppTabs,
+    OToggleGroup,
+    OToggleGroupItem,
+    List,
+    CalendarClock,
+    Zap,
+    TrendingUp,
     SelectFolderDropDown,
     AlertHistoryDrawer,
     O2AIContextAddBtn,
@@ -2996,6 +3017,7 @@ export default defineComponent({
       symOutlinedSoundSampler,
       config,
       isCompactToolbar,
+      isAnomalyDetectionEnabled,
     };
   },
 });
