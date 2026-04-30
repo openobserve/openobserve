@@ -1373,34 +1373,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
                 @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
               />
-              <!-- Mode Toggle for Build Mode -->
               <div
                 v-if="searchObj.meta.logsVisualizeToggle === 'build'"
                 class="query-mode-toggle"
               >
                 <span class="mode-label">Mode:</span>
-                <div class="mode-buttons">
-                  <button
-                    :class="[
-                      'mode-btn',
-                      { selected: searchObj.meta.buildModeQueryEditorDisabled },
-                    ]"
-                    @click="onBuildModeToggle(true)"
-                  >
-                    Builder
-                  </button>
-                  <button
-                    :class="[
-                      'mode-btn',
-                      {
-                        selected: !searchObj.meta.buildModeQueryEditorDisabled,
-                      },
-                    ]"
-                    @click="onBuildModeToggle(false)"
-                  >
-                    Custom
-                  </button>
-                </div>
+                <OToggleGroup
+                  :model-value="searchObj.meta.buildModeQueryEditorDisabled ? 'builder' : 'custom'"
+                  @update:model-value="onBuildModeToggle(($event as string) === 'builder')"
+                >
+                  <OToggleGroupItem value="builder" size="sm">Builder</OToggleGroupItem>
+                  <OToggleGroupItem value="custom" size="sm">Custom</OToggleGroupItem>
+                </OToggleGroup>
               </div>
             </div>
           </template>
@@ -5821,37 +5805,6 @@ export default defineComponent({
     font-weight: 500;
     color: var(--o2-text-secondary);
   }
-
-  .mode-buttons {
-    display: flex;
-    border: 0.0625rem solid var(--o2-border-color);
-    border-radius: 0.375rem;
-    overflow: hidden;
-
-    .mode-btn {
-      border: none;
-      background: var(--o2-muted-background);
-      padding: 2px 8px;
-      font-size: 11px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      color: var(--o2-text-primary);
-
-      &:first-child {
-        border-right: 0.0625rem solid var(--o2-border-color);
-      }
-
-      &.selected {
-        background: var(--q-primary) !important;
-        color: white !important;
-        font-weight: 600;
-      }
-
-      &:hover:not(.selected) {
-        background: var(--o2-hover-accent);
-      }
-    }
-  }
 }
 
 // Dark mode support (both .dark-theme and .q-dark selectors)
@@ -5862,24 +5815,6 @@ export default defineComponent({
 
   .mode-label {
     color: rgba(255, 255, 255, 0.7);
-  }
-
-  .mode-buttons {
-    border-color: #3a3a3a;
-
-    .mode-btn {
-      background: #2a2a2a;
-      color: rgba(255, 255, 255, 0.8);
-
-      &:first-child {
-        border-color: #3a3a3a;
-      }
-
-      &:hover:not(.selected) {
-        background: #3a3a3a;
-        color: white;
-      }
-    }
   }
 }
 </style>

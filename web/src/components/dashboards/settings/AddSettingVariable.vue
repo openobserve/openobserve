@@ -676,57 +676,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="['query_values'].includes(variableData.type)">
             <div class="button-group multi-select-default-value-toggle">
               <div class="multi-select-default-value">By Default Select:</div>
-              <div class="row">
-                <div>
-                  <button
-                    data-test="dashboard-multi-select-default-value-toggle-first-value"
-                    :class="
-                      variableData.selectAllValueForMultiSelect === 'first'
-                        ? 'selected'
-                        : ''
-                    "
-                    class="button button-left"
-                    type="button"
-                    @click="variableData.selectAllValueForMultiSelect = 'first'"
-                  >
-                    First value
-                  </button>
-                </div>
-
-                <div>
-                  <button
-                    data-test="dashboard-multi-select-default-value-toggle-all-values"
-                    :class="
-                      variableData.selectAllValueForMultiSelect === 'all'
-                        ? 'selected'
-                        : ''
-                    "
-                    type="button"
-                    class="button button-middle"
-                    @click="variableData.selectAllValueForMultiSelect = 'all'"
-                  >
-                    All values
-                  </button>
-                </div>
-
-                <div>
-                  <button
-                    data-test="dashboard-multi-select-default-value-toggle-custom"
-                    :class="
-                      variableData.selectAllValueForMultiSelect === 'custom'
-                        ? 'selected'
-                        : ''
-                    "
-                    type="button"
-                    class="button button-right"
-                    @click="
-                      variableData.selectAllValueForMultiSelect = 'custom'
-                    "
-                  >
-                    Custom
-                  </button>
-                </div>
-              </div>
+              <OToggleGroup
+                :model-value="variableData.selectAllValueForMultiSelect"
+                @update:model-value="variableData.selectAllValueForMultiSelect = ($event as string)"
+              >
+                <OToggleGroupItem
+                  value="first"
+                  size="sm"
+                  data-test="dashboard-multi-select-default-value-toggle-first-value"
+                >First value</OToggleGroupItem>
+                <OToggleGroupItem
+                  value="all"
+                  size="sm"
+                  data-test="dashboard-multi-select-default-value-toggle-all-values"
+                >All values</OToggleGroupItem>
+                <OToggleGroupItem
+                  value="custom"
+                  size="sm"
+                  data-test="dashboard-multi-select-default-value-toggle-custom"
+                >Custom</OToggleGroupItem>
+              </OToggleGroup>
             </div>
             <!-- if selectAllValueForMultiSelect is custom then show this input -->
             <div
@@ -882,6 +851,8 @@ import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import useStreams from "@/composables/useStreams";
 import {
   buildVariablesDependencyGraph,
@@ -894,7 +865,7 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "AddSettingVariable",
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
-  components: { DashboardHeader, CommonAutoComplete, OButton },
+  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem },
   emits: ["close", "save"],
   setup(props, { emit }) {
     // Store dashboard data
@@ -1891,36 +1862,6 @@ export default defineComponent({
 }
 
 .multi-select-default-value-toggle {
-  .button-group {
-    border: 1px solid gray !important;
-    border-radius: 9px;
-  }
-
-  .button {
-    display: block;
-    cursor: pointer;
-    background-color: #f0eaea;
-    border: none;
-    font-size: 12px;
-    padding: 6px 4px;
-    color: black;
-  }
-
-  .button-left {
-    border-top-left-radius: 4px;
-    border-bottom-left-radius: 4px;
-    color: black;
-  }
-
-  .button-right {
-    border-top-right-radius: 4px;
-    border-bottom-right-radius: 4px;
-    color: black;
-  }
-  .selected {
-    background-color: var(--q-primary) !important;
-    color: white;
-  }
 }
 .multi-select-default-value {
   margin-top: 5px;
@@ -1965,18 +1906,6 @@ export default defineComponent({
   .sticky-footer {
     border-top: 1px solid #333;
     box-shadow: rgb(20, 20, 20) 0px -4px 7px 0px;
-  }
-
-  .multi-select-default-value-toggle {
-    .button {
-      background-color: rgba(255, 255, 255, 0.08);
-      color: #e0e0e0;
-    }
-
-    .button-left,
-    .button-right {
-      color: #e0e0e0;
-    }
   }
 
   .multi-select-default-value {
