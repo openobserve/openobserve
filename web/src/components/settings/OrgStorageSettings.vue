@@ -16,6 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="org-storage-settings ">
+    <div
+        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-4 tw:border-b-[1px]"
+      >
+        <div class="q-table__title tw:font-[600]">
+          {{ t('org_storage.title') }}
+        </div>
+      </div>
     <!-- Loading state -->
     <div v-if="loading" class="flex justify-center items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
       <q-spinner color="primary" size="2em" />
@@ -31,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ========== NOT CONFIGURED: cloud hero ========== -->
     <div
-      v-else-if="!isConfigured && isCloud"
+      v-else-if="true"
       class="hero-page"
       :class="store.state.theme === 'dark' ? 'hero-page--dark' : ''"
     >
@@ -164,13 +171,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ========== CONFIGURED ========== -->
     <div v-else>
-      <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-4 tw:border-b-[1px]"
-      >
-        <div class="q-table__title tw:font-[600]">
-          {{ t('org_storage.title') }}
-        </div>
-      </div>
 
       <div class="q-pa-md">
       <q-card
@@ -402,7 +402,7 @@ onMounted(() => {
 .hero-page {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - var(--navbar-height) - 60px);
+  min-height: calc(100vh - var(--navbar-height) - 100px);
 
   &__body {
     display: flex;
@@ -621,7 +621,7 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: calc(100vh - var(--navbar-height) - 60px);
+  min-height: calc(100vh - var(--navbar-height) - 160px);
   padding: 48px 24px;
   text-align: center;
 
