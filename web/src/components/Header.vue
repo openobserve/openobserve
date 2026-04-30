@@ -210,7 +210,7 @@ size="16px" class="q-mr-xs" />
         dense
         class="o2-button ai-hover-btn"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-        style="border-radius: 100%; padding: 0; height: 30px; width: 30px; top: 2px;"
+        style="border-radius: 6px; padding: 0; height: 30px; width: 30px; top: 2px;"
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
       >
