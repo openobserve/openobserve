@@ -93,6 +93,7 @@ import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationD
 import DiscoveredServices from "@/components/settings/DiscoveredServices.vue";
 import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Server, ScanSearch, Bell, Link2 } from "lucide-vue-next";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import serviceStreamsService from "@/services/service_streams";
 
@@ -178,18 +179,22 @@ export default defineComponent({
       {
         label: t("settings.correlation.discoveredServicesTab"),
         value: "services",
+        icon: Server,
       },
       {
         label: t("settings.correlation.serviceDiscoveryTab"),
         value: "discovery",
+        icon: ScanSearch,
       },
       {
         label: t("settings.correlation.alertCorrelationTab"),
         value: "alert-correlation",
+        icon: Bell,
       },
       {
         label: t("settings.correlation.fieldAliasesTab"),
         value: "field-aliases",
+        icon: Link2,
       },
     ]);
 

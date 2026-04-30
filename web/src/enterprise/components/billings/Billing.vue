@@ -137,6 +137,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import Usage from "./usage.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { HardDrive, Database } from "lucide-vue-next";
 import BillingService from "@/services/billings";
 
 export default defineComponent({
@@ -232,10 +233,12 @@ export default defineComponent({
     {
         label: 'Gb',
         value: "gb",
+        icon: HardDrive,
       },
       {
         label: 'Mb',
         value: "mb",
+        icon: Database,
       }
     ]
 

@@ -90,6 +90,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Shield, Users, Bot } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { onBeforeMount } from "vue";
@@ -131,10 +132,12 @@ const tabs = [
   {
     value: "roles",
     label: "Roles",
+    icon: Shield,
   },
   {
     value: "users",
     label: "Users",
+    icon: Users,
   },
 ];
 
@@ -142,6 +145,7 @@ if (store.state.zoConfig.service_account_enabled) {
   tabs.push({
     value: "serviceAccounts",
     label: "Service Accounts",
+    icon: Bot,
   });
 }
 

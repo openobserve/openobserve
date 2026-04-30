@@ -420,7 +420,7 @@ import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Copy, Link, GitBranch, Eye, ExternalLink } from "lucide-vue-next";
+import { Copy, Link, GitBranch, Eye, ExternalLink, AlignLeft, FileJson } from "lucide-vue-next";
 
 export default {
   name: "JsonPreview",
@@ -524,10 +524,12 @@ export default {
       {
         value: "flattened",
         label: t("search.flattened"),
+        icon: AlignLeft,
       },
       {
         value: "unflattened",
         label: t("search.original"),
+        icon: FileJson,
       },
     ];
 

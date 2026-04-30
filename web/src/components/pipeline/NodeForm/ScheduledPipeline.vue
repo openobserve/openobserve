@@ -1342,6 +1342,7 @@ import useLogs from "@/composables/useLogs";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Code2, BarChart2 } from "lucide-vue-next";
 
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
@@ -1510,10 +1511,12 @@ const tabOptions = computed(() => [
   {
     label: t("alerts.sql"),
     value: "sql",
+    icon: Code2,
   },
   {
     label: t("alerts.promql"),
     value: "promql",
+    icon: BarChart2,
     disabled: selectedStreamType.value !== "metrics",
     tooltipLabel:
       selectedStreamType.value !== "metrics"

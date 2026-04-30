@@ -355,6 +355,7 @@ import type { Ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Code2, Info } from "lucide-vue-next";
 import JsonPreview from "./JsonPreview.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -430,10 +431,12 @@ export default defineComponent({
       {
         label: t('search_scheduler_job.query_function'),
         value: "query",
+        icon: Code2,
       },
       {
         label: t('search_scheduler_job.more_details'),
         value: "more_details",
+        icon: Info,
       },
     ]);
 
