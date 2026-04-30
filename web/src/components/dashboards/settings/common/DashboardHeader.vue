@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="icon-xs"
-          class="tw:mr-4"
+          class="q-mr-sm"
           @click="onBackClicked"
         >
           <template #icon-left><q-icon name="arrow_back_ios_new" /></template>
