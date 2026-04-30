@@ -74,6 +74,7 @@ import { defineComponent, onActivated, ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddTab from "../../components/dashboards/tabs/AddTab.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useRoute } from "vue-router";
 import { getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";

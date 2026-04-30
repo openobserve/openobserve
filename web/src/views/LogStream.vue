@@ -17,78 +17,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
-    data-test="alert-list-page"
-    class="q-pa-none flex flex-col"
-  >
+  <div data-test="alert-list-page" class="q-pa-none flex flex-col">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-        <div class="card-container tw:mb-[0.625rem]">
-          <div class="flex items-center justify-between full-width tw:py-3 tw:px-4 tw:h-[68px]">
-            <div class="q-table__title tw:font-[600]" data-test="log-stream-title-text">
-              {{ t("logStream.header") }}
-            </div>
-            <div class="flex items-start">
-              <div class="flex justify-between items-end">
-
+      <div class="card-container tw:mb-[0.625rem]">
+        <div
+          class="flex items-center justify-between full-width tw:py-3 tw:px-4 tw:h-[68px]"
+        >
+          <div
+            class="q-table__title tw:font-[600]"
+            data-test="log-stream-title-text"
+          >
+            {{ t("logStream.header") }}
+          </div>
+          <div class="flex items-start">
+            <div class="flex justify-between items-end">
               <OToggleGroup
-                  :model-value="streamActiveTab"
-                  @update:model-value="(v) => filterLogStreamByTab(v as string)"
-                  class="q-mr-sm"
-                >
-                  <OToggleGroupItem value="logs" size="sm">
-                    <template #icon-left><ScrollText class="tw:size-3.5 tw:shrink-0" /></template>
-                    {{ t("logStream.labelLogs") }}
-                  </OToggleGroupItem>
-                  <OToggleGroupItem value="metrics" size="sm">
-                    <template #icon-left><BarChart2 class="tw:size-3.5 tw:shrink-0" /></template>
-                    {{ t("logStream.labelMetrics") }}
-                  </OToggleGroupItem>
-                  <OToggleGroupItem value="traces" size="sm">
-                    <template #icon-left><GitFork class="tw:size-3.5 tw:shrink-0" /></template>
-                    {{ t("logStream.labelTraces") }}
-                  </OToggleGroupItem>
-                  <OToggleGroupItem value="metadata" size="sm">
-                    <template #icon-left><Info class="tw:size-3.5 tw:shrink-0" /></template>
-                    {{ t("logStream.labelMetadata") }}
-                  </OToggleGroupItem>
-                </OToggleGroup>
-              </div>
-              <div data-test="streams-search-stream-input">
-                <q-input
-                  v-model="filterQuery"
-                  borderless
-                  dense
-                  class="q-ml-auto no-border o2-search-input tw:h-[36px]"
-                  :placeholder="t('logStream.search')"
-                  debounce="300"
-                >
-                  <template #prepend>
-                    <q-icon class="o2-search-input-icon" name="search" />
-                  </template>
-                </q-input>
-              </div>
-              <OButton
-                data-test="log-stream-refresh-stats-btn"
-                variant="outline"
-                size="sm-action"
-                class="q-ml-sm"
-                @click="getLogStream(true)"
+                :model-value="streamActiveTab"
+                @update:model-value="(v) => filterLogStreamByTab(v as string)"
+                class="q-mr-sm"
               >
-                {{ t(`logStream.refreshStats`) }}
-              </OButton>
-              <OButton
-                v-if="isSchemaUDSEnabled"
-                data-test="log-stream-add-stream-btn"
-                variant="primary"
-                size="sm-action"
-                class="q-ml-sm"
-                @click="addStream"
-              >
-                {{ t(`logStream.add`) }}
-              </OButton>
+                <OToggleGroupItem value="logs" size="sm">
+                  <template #icon-left
+                    ><ScrollText class="tw:size-3.5 tw:shrink-0"
+                  /></template>
+                  {{ t("logStream.labelLogs") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="metrics" size="sm">
+                  <template #icon-left
+                    ><BarChart2 class="tw:size-3.5 tw:shrink-0"
+                  /></template>
+                  {{ t("logStream.labelMetrics") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="traces" size="sm">
+                  <template #icon-left
+                    ><GitFork class="tw:size-3.5 tw:shrink-0"
+                  /></template>
+                  {{ t("logStream.labelTraces") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="metadata" size="sm">
+                  <template #icon-left
+                    ><Info class="tw:size-3.5 tw:shrink-0"
+                  /></template>
+                  {{ t("logStream.labelMetadata") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
             </div>
+            <div data-test="streams-search-stream-input">
+              <q-input
+                v-model="filterQuery"
+                borderless
+                dense
+                class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+                :placeholder="t('logStream.search')"
+                debounce="300"
+              >
+                <template #prepend>
+                  <q-icon class="o2-search-input-icon" name="search" />
+                </template>
+              </q-input>
+            </div>
+            <OButton
+              data-test="log-stream-refresh-stats-btn"
+              variant="outline"
+              size="sm-action"
+              class="q-ml-sm"
+              @click="getLogStream(true)"
+            >
+              {{ t(`logStream.refreshStats`) }}
+            </OButton>
+            <OButton
+              v-if="isSchemaUDSEnabled"
+              data-test="log-stream-add-stream-btn"
+              variant="primary"
+              size="sm-action"
+              class="q-ml-sm"
+              @click="addStream"
+            >
+              {{ t(`logStream.add`) }}
+            </OButton>
           </div>
         </div>
+      </div>
       <div class="tw:w-full tw:h-full">
         <div class="card-container tw:h-[calc(100vh-126px)]">
           <q-table
@@ -104,14 +113,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:pagination="pagination"
             :filter="filterQuery"
             :filter-method="filterData"
-            :style="logStream?.length
-                  ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)' 
-                  : 'width: 100%'"
+            :style="
+              logStream?.length
+                ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)'
+                : 'width: 100%'
+            "
             :rows-per-page-options="perPageOptions"
             @request="onRequest"
           >
             <template #no-data>
-              <div v-if="!loadingState" class="text-center full-width full-height">
+              <div
+                v-if="!loadingState"
+                class="text-center full-width full-height"
+              >
                 <NoData />
               </div>
               <div
@@ -122,7 +136,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #body-selection="scope">
-              <q-checkbox v-model="scope.selected" size="sm" :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'" class="o2-table-checkbox" />
+              <q-checkbox
+                v-model="scope.selected"
+                size="sm"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'o2-table-checkbox-dark'
+                    : 'o2-table-checkbox-light'
+                "
+                class="o2-table-checkbox"
+              />
             </template>
             <template #body-cell-actions="props">
               <q-td :props="props">
@@ -153,71 +176,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-td>
             </template>
             <template v-slot:pagination="scope">
-              <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4">
-
-
-              <div class="tw:flex tw:items-center q-ml-md">
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  :disabled="scope.isFirstPage"
-                  @click="scope.prevPage"
-                >
-                  <ChevronLeft class="tw:size-4" />
-                </OButton>
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  :disabled="scope.isLastPage"
-                  @click="scope.nextPage"
-                >
-                  <ChevronRight class="tw:size-4" />
-                </OButton>
+              <div
+                class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4"
+              >
+                <div class="tw:flex tw:items-center q-ml-md">
+                  <OButton
+                    variant="ghost"
+                    size="icon-sm"
+                    :disabled="scope.isFirstPage"
+                    @click="scope.prevPage"
+                  >
+                    <ChevronLeft class="tw:size-4" />
+                  </OButton>
+                  <OButton
+                    variant="ghost"
+                    size="icon-sm"
+                    :disabled="scope.isLastPage"
+                    @click="scope.nextPage"
+                  >
+                    <ChevronRight class="tw:size-4" />
+                  </OButton>
+                </div>
               </div>
-              </div>
-
             </template>
             <template v-slot:header="props">
-                  <q-tr :props="props">
-                    <!-- Adding this block to render the select-all checkbox -->
-                    <q-th auto-width>
-                      <q-checkbox
-                        v-model="props.selected"
-                        size="sm"
-                        :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                        class="o2-table-checkbox"
-                        @update:model-value="props.select"
-                      />
-                    </q-th>
+              <q-tr :props="props">
+                <!-- Adding this block to render the select-all checkbox -->
+                <q-th auto-width>
+                  <q-checkbox
+                    v-model="props.selected"
+                    size="sm"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'o2-table-checkbox-dark'
+                        : 'o2-table-checkbox-light'
+                    "
+                    class="o2-table-checkbox"
+                    @update:model-value="props.select"
+                  />
+                </q-th>
 
-                    <!-- Rendering the rest of the columns -->
-                    <q-th
-                      v-for="col in props.cols"
-                      :key="col.name"
-                      :props="props"
-                      :class="col.classes"
-                      :style="col.style"
-                    >
-                      {{ col.label }}
-                    </q-th>
-                  </q-tr>
-                </template>
+                <!-- Rendering the rest of the columns -->
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                  :class="col.classes"
+                  :style="col.style"
+                >
+                  {{ col.label }}
+                </q-th>
+              </q-tr>
+            </template>
 
             <template v-slot:bottom="scope">
-              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-                <div class="q-table__separator tw:flex tw:items-center tw:w-full text-bold tw:text-[14px]">
-                  {{scope.pagination.rowsNumber}} Stream(s)
-                  <OButton
-                  v-if="selected.length > 0"
-                  variant="outline-destructive"
-                  size="sm-action"
-                  class="tw:ml-4"
-                  :disabled="isDeleting"
-                  @click="confirmBatchDeleteAction"
+              <div
+                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+              >
+                <div
+                  class="q-table__separator tw:flex tw:items-center tw:w-full text-bold tw:text-[14px]"
                 >
-                  <template #icon-left><Trash2 class="tw:size-3.5 tw:shrink-0" /></template>
-                  {{ isDeleting ? 'Deleting...' : 'Delete' }}
-                </OButton>
+                  {{ scope.pagination.rowsNumber }} Stream(s)
+                  <OButton
+                    v-if="selected.length > 0"
+                    variant="outline-destructive"
+                    size="sm-action"
+                    class="tw:ml-4"
+                    :disabled="isDeleting"
+                    @click="confirmBatchDeleteAction"
+                  >
+                    <template #icon-left
+                      ><Trash2 class="tw:size-3.5 tw:shrink-0"
+                    /></template>
+                    {{ isDeleting ? "Deleting..." : "Delete" }}
+                  </OButton>
                 </div>
                 <QTablePagination
                   :scope="scope"
@@ -227,14 +259,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:changeRecordPerPage="changePagination"
                 />
               </div>
-
             </template>
-
-          </q-table> 
+          </q-table>
         </div>
       </div>
-    </div> 
-  
+    </div>
+
     <q-dialog
       v-model="showIndexSchemaDialog"
       position="right"
@@ -263,43 +293,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="head">{{ t("logStream.confirmDeleteHead") }}</div>
           <div class="para">{{ t("logStream.confirmDeleteMsg") }}</div>
         </q-card-section>
-        <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500">
-            <q-checkbox class="checkbox-delete-associated-alerts-pipelines" v-model="deleteAssociatedAlertsPipelines" />
+        <div
+          class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500"
+        >
+          <q-checkbox
+            class="checkbox-delete-associated-alerts-pipelines"
+            v-model="deleteAssociatedAlertsPipelines"
+          />
           <span class="delete-associated-alerts-pipelines-text">
             Delete all pipelines and alerts associated with the stream
           </span>
-          </div>
+        </div>
         <q-card-actions class="confirmActionsLogStream tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="confirmDelete = false">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            @click="confirmDelete = false"
+          >
             {{ t("logStream.cancel") }}
           </OButton>
           <OButton
             variant="destructive"
             size="sm-action"
-            @click="() => { deleteStream(); confirmDelete = false; }"
+            @click="
+              () => {
+                deleteStream();
+                confirmDelete = false;
+              }
+            "
           >
             {{ t("logStream.ok") }}
           </OButton>
         </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="confirmBatchDelete">
       <q-card style="width: 420px">
         <q-card-section class="confirmBodyLogStream">
           <div class="head">{{ t("logStream.confirmBatchDeleteHead") }}</div>
           <div class="para">{{ t("logStream.confirmBatchDeleteMsg") }}</div>
         </q-card-section>
-        <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500">
-            <q-checkbox class="checkbox-delete-associated-alerts-pipelines" v-model="deleteAssociatedAlertsPipelines" />
+        <div
+          class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500"
+        >
+          <q-checkbox
+            class="checkbox-delete-associated-alerts-pipelines"
+            v-model="deleteAssociatedAlertsPipelines"
+          />
           <span class="delete-associated-alerts-pipelines-text">
             Delete all pipelines and alerts associated with the selected streams
           </span>
-          </div>
+        </div>
         <q-card-actions class="confirmActionsLogStream tw:gap-2">
-          <OButton variant="outline" size="sm-action" @click="confirmBatchDelete = false">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            @click="confirmBatchDelete = false"
+          >
             {{ t("logStream.cancel") }}
           </OButton>
           <OButton
             variant="destructive"
             size="sm-action"
-            @click="() => { deleteBatchStream(); confirmBatchDelete = false; }"
+            @click="
+              () => {
+                deleteBatchStream();
+                confirmBatchDelete = false;
+              }
+            "
           >
             {{ t("logStream.ok") }}
           </OButton>
@@ -310,7 +372,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-
 import {
   computed,
   defineComponent,
@@ -339,15 +400,38 @@ import { cloneDeep } from "lodash-es";
 import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import { Search, FileList2, Trash2, ChevronLeft, ChevronRight } from 'lucide-vue-next';
-import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
-import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
-import { ScrollText, BarChart2, GitFork, Info } from 'lucide-vue-next';
+import OButton from "@/lib/core/Button/OButton.vue";
+import {
+  Search,
+  FileList2,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-vue-next";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { ScrollText, BarChart2, GitFork, Info } from "lucide-vue-next";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, AddStream, OButton, OToggleGroup, OToggleGroupItem, ScrollText, BarChart2, GitFork, Info, Search, FileList2, Trash2, ChevronLeft, ChevronRight, },
+  components: {
+    QTablePagination,
+    SchemaIndex,
+    NoData,
+    AddStream,
+    OButton,
+    OToggleGroup,
+    OToggleGroupItem,
+    ScrollText,
+    BarChart2,
+    GitFork,
+    Info,
+    Search,
+    FileList2,
+    Trash2,
+    ChevronLeft,
+    ChevronRight,
+  },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();
@@ -661,7 +745,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           deleteStreamName,
           deleteStreamType,
-          deleteAssociatedAlertsPipelines.value
+          deleteAssociatedAlertsPipelines.value,
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -697,7 +781,7 @@ export default defineComponent({
             store.state.selectedOrganization.identifier,
             stream.name,
             stream.stream_type,
-            deleteAssociatedAlertsPipelines.value
+            deleteAssociatedAlertsPipelines.value,
           ),
         );
       });
@@ -835,7 +919,9 @@ export default defineComponent({
           refresh: "0",
           query: "",
           type: "stream_explorer",
-          quick_mode: store.state.zoConfig.quick_mode_enabled ? "true" : "false",
+          quick_mode: store.state.zoConfig.quick_mode_enabled
+            ? "true"
+            : "false",
           org_identifier: store.state.selectedOrganization.identifier,
           ...dateTime,
         },
@@ -929,10 +1015,12 @@ export default defineComponent({
     };
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.hasOwnProperty("value") ? val.value : val;
-      pagination.value.rowsPerPage = val.hasOwnProperty("value") ? val.value : val;
+      pagination.value.rowsPerPage = val.hasOwnProperty("value")
+        ? val.value
+        : val;
       pagination.value.page = 1; // Reset to first page when changing records per page
       qTable.value?.requestServerInteraction({
-        pagination: pagination.value
+        pagination: pagination.value,
       });
     };
 
@@ -987,11 +1075,9 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>
 
 <style lang="scss">
-
 .bottom-bar {
   display: flex;
   width: 100%;
@@ -1018,7 +1104,7 @@ export default defineComponent({
   }
 }
 
-.delete-associated-alerts-pipelines-text{
+.delete-associated-alerts-pipelines-text {
   color: $light-text;
   font-size: 12px;
   font-weight: 500;
@@ -1029,14 +1115,14 @@ export default defineComponent({
   padding: 16px 22px 22px;
   display: flex;
 }
-.checkbox-delete-associated-alerts-pipelines{
-  .q-checkbox__inner{
+.checkbox-delete-associated-alerts-pipelines {
+  .q-checkbox__inner {
     height: 28px !important;
     min-height: 28px !important;
     width: 28px !important;
     min-width: 28px !important;
   }
-  .q-checkbox__bg{
+  .q-checkbox__bg {
     height: 16px !important;
     width: 16px !important;
   }
