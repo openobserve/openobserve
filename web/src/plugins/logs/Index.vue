@@ -80,11 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #separator>
-                <q-btn
+                <OButton
                   data-test="logs-search-field-list-collapse-btn"
-                  :icon="
-                    searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'
-                  "
+                  variant="sidebar-button"
+                  size="sidebar-button"
                   :title="
                     searchObj.meta.showFields
                       ? 'Collapse Fields'
@@ -95,12 +94,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'logs-splitter-icon-expand'
                       : 'logs-splitter-icon-collapse'
                   "
-                  color="primary"
-                  size="sm"
-                  dense
-                  round
                   @click="collapseFieldList"
-                />
+                >
+                  <template #icon-left>
+                    <q-icon :name="searchObj.meta.showFields ? 'chevron_left' : 'chevron_right'" />
+                  </template>
+                </OButton>
               </template>
               <template #after>
                 <div class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full">
@@ -490,6 +489,7 @@ import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import {
   saveLogsStream,
   restoreLogsStream,
@@ -502,6 +502,7 @@ export default defineComponent({
   components: {
     SearchBar,
     IndexList,
+    OButton,
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue"),
     ),
