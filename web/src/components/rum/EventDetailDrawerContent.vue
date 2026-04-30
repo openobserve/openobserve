@@ -52,15 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="col-auto">
-                <q-btn
-                  round
-                  flat
-                  dense
-                  size="sm"
-                  icon="cancel"
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
                   data-test="close-drawer-btn"
                   @click="$emit('close')"
-                />
+                >
+                  <X class="tw:size-4" />
+                </OButton>
               </div>
             </div>
             <div
@@ -389,24 +388,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
 
                     <!-- Clickable Trace Button -->
-                    <q-btn
+                    <OButton
                       v-if="item._oo_trace_id"
-                      dense
-                      :icon="outlinedAccountTree"
-                      outline
-                      size="0.75rem"
-                      class="tw:ml-[0.625rem]! tw:py-[0]! tw:px-[0.2rem]! tw:border-1! tw:border-[var(--o2-theme-color)]! tw:text-[var(--o2-theme-color)]!"
+                      variant="ghost"
+                      size="icon-chip"
                       title="View trace details"
                       data-test="view-trace-btn"
                       @click.stop="navigateToSpecificTrace(item._oo_trace_id)"
                     >
-                      <span
-                        v-if="item._oo_trace_id"
-                        class="tw:text-[10px] tw:pl-[0.2rem] tw:py-[0]! tw:text-[var(--o2-theme-primary)]"
-                      >
-                        Trace
-                      </span>
-                    </q-btn>
+                      <GitBranch class="tw:size-3" />
+                      <span v-if="item._oo_trace_id" class="tw:text-[10px] tw:pl-[0.2rem]">Trace</span>
+                    </OButton>
                   </div>
                 </div>
               </div>
@@ -492,15 +484,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Attributes Tab -->
       <OTabPanel name="attributes" padding="sm" data-test="attributes-tab">
         <div class="tw:flex tw:justify-start">
-          <q-btn
-            :label="t('common.copyToClipboard')"
-            dense
-            size="sm"
-            class="q-px-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
-            icon="content_copy"
-            @click="copyAttributesToClipboard"
+          <OButton
+            variant="outline"
+            size="sm-action"
+            class="q-px-sm"
             data-test="attributes-copy-btn"
-          />
+            @click="copyAttributesToClipboard"
+          >
+            <Copy class="tw:size-4 tw:mr-1" />
+            {{ t('common.copyToClipboard') }}
+          </OButton>
         </div>
         <div
           class="tw:p-2 tw:rounded tw:overflow-x-auto tw:font-mono tw:text-[10px]"
@@ -550,6 +543,8 @@ import EventDetailsSection from "./common/EventDetailsSection.vue";
 import EventTypeBadge from "./common/EventTypeBadge.vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
 import { formatDuration } from "@/utils/zincutils";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { X, GitBranch, Copy } from 'lucide-vue-next';
 
 const props = defineProps({
   event: {

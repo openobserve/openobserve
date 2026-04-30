@@ -28,13 +28,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
+          <OButton
             v-close-popup="true"
-            round
-            flat
-            icon="cancel"
+            variant="ghost"
+            size="icon-sm"
             data-test="close-dialog"
-          />
+          ><X :size="16" /></OButton>
         </div>
       </div>
     </q-card-section>
@@ -195,15 +194,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="
                               toggleIncludeSearchTerm(props.row.field, props.row.value, 'include')
                             "
-                            ><q-btn
+                            ><OButton
                               title="Add to search query"
-                              size="6px"
-                              round
+                              size="icon-xs"
+                              variant="ghost"
                               class="q-mr-sm pointer"
-                            >
-                              <q-icon color="currentColor">
-                                <EqualIcon></EqualIcon>
-                              </q-icon> </q-btn
+                            ><EqualIcon /></OButton
                             >{{ t("common.includeSearchTerm") }}</q-item-label
                           >
                         </q-item-section>
@@ -225,15 +221,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="
                               toggleExcludeSearchTerm(props.row.field, props.row.value, 'exclude')
                             "
-                            ><q-btn
+                            ><OButton
                               title="Add to search query"
-                              size="6px"
-                              round
+                              size="icon-xs"
+                              variant="ghost"
                               class="q-mr-sm pointer"
-                            >
-                              <q-icon color="currentColor">
-                                <NotEqualIcon></NotEqualIcon>
-                              </q-icon> </q-btn
+                            ><NotEqualIcon /></OButton
                             >{{ t("common.excludeSearchTerm") }}</q-item-label
                           >
                         </q-item-section>
@@ -252,15 +245,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             data-test="log-details-include-field-btn"
                             @click="addFieldToTable(props.row.field.toString())"
-                            ><q-btn
+                            ><OButton
                               title="Add to table"
-                              size="6px"
-                              round
+                              size="icon-xs"
+                              variant="ghost"
                               class="q-mr-sm pointer"
-                            >
-                              <q-icon
-                                color="currentColor"
-                                name="visibility" /></q-btn
+                            ><Eye :size="12" /></OButton
                             >{{ t("common.addFieldToTable") }}</q-item-label
                           >
                         </q-item-section>
@@ -270,15 +260,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             data-test="log-details-include-field-btn"
                             @click="addFieldToTable(props.row.field.toString())"
-                            ><q-btn
+                            ><OButton
                               title="Remove from table "
-                              size="6px"
-                              round
+                              size="icon-xs"
+                              variant="ghost"
                               class="q-mr-sm pointer"
-                            >
-                              <q-icon
-                                color="currentColor"
-                                name="visibility_off" /></q-btn
+                            ><EyeOff :size="12" /></OButton
                             >{{
                               t("common.removeFieldFromTable")
                             }}</q-item-label
@@ -297,12 +284,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <q-item-section>
                             <q-item-label>
-                              <q-btn
-                                icon="open_in_new"
-                                size="6px"
-                                round
+                              <OButton
+                                size="icon-xs"
+                                variant="ghost"
                                 class="q-mr-sm pointer"
-                              />{{ crossLink.name }}
+                              ><ExternalLink :size="12" /></OButton>{{ crossLink.name }}
                             </q-item-label>
                           </q-item-section>
                         </q-item>
@@ -448,14 +434,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap justify-between">
         <div class="col-1">
-          <q-btn
+          <OButton
             data-test="log-detail-previous-detail-btn"
-            class="o2-secondary-button tw:h-[36px]"
+            variant="outline"
+            size="sm-action"
             :disabled="currentIndex <= 0"
             @click="$emit('showPrevDetail', false, true)"
-            icon="navigate_before"
-            :label="t('common.previous')"
-          />
+          ><ChevronLeft :size="14" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
         </div>
         <div
           v-show="
@@ -477,26 +462,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></q-select>
           </div>
           <div class="">
-            <q-btn
+            <OButton
               data-test="logs-detail-table-search-around-btn"
-              class="o2-secondary-button tw:h-[36px]"
-              text-color="light-text"
-              flat
-              :label="t('common.searchAround')"
+              variant="outline"
+              size="sm-action"
               @click="searchTimeBoxed(rowData, Number(selectedRelativeValue))"
-            />
+            >{{ t('common.searchAround') }}</OButton>
           </div>
         </div>
         <div class="col-1 items-end" style="display: contents;">
-          <q-btn
+          <OButton
             data-test="log-detail-next-detail-btn"
-            class="o2-secondary-button tw:h-[36px]"
-            text-color="light-text"
+            variant="outline"
+            size="sm-action"
             :disabled="currentIndex >= totalLength - 1"
             @click="$emit('showNextDetail', true, false)"
-            icon-right="navigate_next"
-            :label="t('common.next')"
-          />
+          >{{ t('common.next') }}<ChevronRight :size="14" class="tw:ml-1" /></OButton>
         </div>
       </div>
     </q-card-section>
@@ -523,6 +504,8 @@ import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { X, Eye, EyeOff, ExternalLink, ChevronLeft, ChevronRight } from "lucide-vue-next";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
@@ -536,7 +519,7 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "SearchDetail",
   components: {
-    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable },
+    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, X, Eye, EyeOff, ExternalLink, ChevronLeft, ChevronRight },
   emits: [
     "showPrevDetail",
     "showNextDetail",

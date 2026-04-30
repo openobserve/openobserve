@@ -32,18 +32,15 @@
             </q-icon>
           </template>
           <template #right>
-            <q-btn
-              :label="t('search.runQuery')"
-              class="test-function-run-query-btn text-bold tw:ml-[12px] no-border"
-              padding="sm md"
-              icon="search"
-              no-caps
-              dense
-              size="xs"
-              color="primary"
+            <OButton
+              variant="primary"
+              size="sm-action"
               type="submit"
               :disabled="!selectedStream.name || !inputQuery || loading.events"
-            />
+            >
+              <Search :size="14" class="tw:mr-1" />
+              {{ t('search.runQuery') }}
+            </OButton>
           </template>
         </FullViewContainer>
         <div
@@ -335,6 +332,8 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Search } from "lucide-vue-next";
 
 const props = defineProps({
   vrlFunction: {

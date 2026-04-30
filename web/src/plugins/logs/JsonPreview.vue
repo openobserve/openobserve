@@ -10,32 +10,26 @@
         @update:active-tab="handleTabChange"
       />
 
-      <q-btn
+      <OButton
         :label="t('common.copyToClipboard')"
-        dense
-        size="sm"
-        no-caps
-        class="tw:mb-[0.375rem] q-px-sm copy-log-btn q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
-        icon="content_copy"
+        size="sm-action"
+        variant="outline"
+        class="tw:mb-[0.375rem] q-mr-sm"
         @click="copyLogToClipboard"
-      />
-      <q-btn
+      ><Copy :size="14" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
+      <OButton
         v-if="showViewRelatedBtn"
-        :label="t('search.viewRelated')"
-        dense
-        size="sm"
-        no-caps
-        class="log-preview-btn q-px-sm q-mr-sm"
-        icon="link"
-        color="secondary"
-        outline
+        size="sm-action"
+        variant="outline"
+        class="log-preview-btn q-mr-sm"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
+        <Link :size="14" class="tw:mr-1" />{{ t('search.viewRelated') }}
         <q-tooltip>
           {{ t("search.viewRelatedTooltip") }}
         </q-tooltip>
-      </q-btn>
+      </OButton>
       <div
         v-if="
           showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
@@ -102,18 +96,14 @@
             </div>
           </template>
         </q-select>
-        <q-btn
+        <OButton
           data-test="trace-view-logs-btn"
           v-close-popup="true"
-          class="text-bold traces-view-logs-btn q-px-sm view-trace-btn"
-          :label="t('search.viewTrace')"
-          padding="sm sm"
-          size="xs"
-          no-caps
-          dense
-          :icon="outlinedAccountTree"
+          class="traces-view-logs-btn"
+          size="sm-action"
+          variant="outline"
           @click="redirectToTraces"
-        />
+        ><GitBranch :size="14" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
@@ -164,15 +154,12 @@
             >
               <q-item-section>
                 <q-item-label
-                  ><q-btn
+                  ><OButton
                     title="Add to search query"
-                    size="6px"
-                    round
+                    size="icon-xs"
+                    variant="ghost"
                     class="q-mr-sm pointer"
-                  >
-                    <q-icon color="currentColor">
-                      <EqualIcon></EqualIcon>
-                    </q-icon> </q-btn
+                  ><EqualIcon /></OButton
                   >{{ t("common.includeSearchTerm") }}</q-item-label
                 >
               </q-item-section>
@@ -193,15 +180,12 @@
             >
               <q-item-section>
                 <q-item-label
-                  ><q-btn
+                  ><OButton
                     title="Add to search query"
-                    size="6px"
-                    round
+                    size="icon-xs"
+                    variant="ghost"
                     class="q-mr-sm pointer"
-                  >
-                    <q-icon color="currentColor">
-                      <NotEqualIcon></NotEqualIcon>
-                    </q-icon> </q-btn
+                  ><NotEqualIcon /></OButton
                   >{{ t("common.excludeSearchTerm") }}</q-item-label
                 >
               </q-item-section>
@@ -214,13 +198,12 @@
             >
               <q-item-section>
                 <q-item-label
-                  ><q-btn
+                  ><OButton
                     title="Add field to table"
-                    icon="visibility"
-                    size="6px"
-                    round
+                    size="icon-xs"
+                    variant="ghost"
                     class="q-mr-sm pointer"
-                  ></q-btn
+                  ><Eye :size="12" /></OButton
                   >{{ addOrRemoveLabel(key) }}</q-item-label
                 >
               </q-item-section>
@@ -237,12 +220,11 @@
               >
                 <q-item-section>
                   <q-item-label>
-                    <q-btn
-                      icon="open_in_new"
-                      size="6px"
-                      round
+                    <OButton
+                      size="icon-xs"
+                      variant="ghost"
                       class="q-mr-sm pointer"
-                    />{{ crossLink.name }}
+                    ><ExternalLink :size="12" /></OButton>{{ crossLink.name }}
                   </q-item-label>
                 </q-item-section>
               </q-item>
@@ -265,17 +247,17 @@
                     )
                   "
                   v-close-popup
-                  ><q-btn
+                  ><OButton
                     title="Send to AI Chat"
-                    size="6px"
-                    round
+                    size="icon-xs"
+                    variant="ghost"
                     class="q-mr-sm pointer"
                   >
                     <q-img
                       height="14px"
                       width="14px"
                       :src="getBtnLogo"
-                    /> </q-btn
+                    /> </OButton
                   >Send to AI Chat</q-item-label
                 >
               </q-item-section>
@@ -292,17 +274,17 @@
                   data-test="redirect-to-regex-pattern-btn"
                   @click.stop="createRegexPatternFromLogs(key, value[key])"
                   v-close-popup
-                  ><q-btn
+                  ><OButton
                     title="Add field to table"
-                    size="6px"
-                    round
+                    size="icon-xs"
+                    variant="ghost"
                     class="q-mr-sm pointer"
                   >
                     <q-img
                       height="14px"
                       width="14px"
                       :src="regexIcon"
-                    /> </q-btn
+                    /> </OButton
                   >{{
                     t("regex_patterns.create_regex_pattern_field")
                   }}</q-item-label
@@ -389,25 +371,20 @@
           </div>
         </q-card-section>
 
-        <q-card-actions align="right">
-          <q-btn
+        <q-card-actions align="right" class="tw:gap-2">
+          <OButton
             data-test="search-scheduler-max-records-cancel-btn"
-            unelevated
-            no-caps
-            class="q-mr-sm text-bold"
-            :label="t('confirmDialog.cancel')"
+            variant="outline"
+            size="sm-action"
             v-close-popup
-          />
-          <q-btn
+          >{{ t('confirmDialog.cancel') }}</OButton>
+          <OButton
             data-test="search-scheduler-max-records-submit-btn"
-            unelevated
-            no-caps
-            :label="t('confirmDialog.ok')"
-            color="secondary"
-            class="text-bold"
+            variant="primary"
+            size="sm-action"
             @click="confirmRegexPatternType"
             v-close-popup
-          />
+          >{{ t('confirmDialog.ok') }}</OButton>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -442,6 +419,8 @@ import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Copy, Link, GitBranch, Eye, ExternalLink } from "lucide-vue-next";
 
 export default {
   name: "JsonPreview",
@@ -488,6 +467,12 @@ export default {
     AppTabs,
     LogsHighLighting,
     ChunkedContent,
+    OButton,
+    Copy,
+    Link,
+    GitBranch,
+    Eye,
+    ExternalLink,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),

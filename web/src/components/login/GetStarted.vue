@@ -71,14 +71,18 @@
         </span>
       </q-checkbox>
     </div>
-    <q-btn
-      :disable="!isAgree || isSubmitting"
-      class="tw:w-full tw:h-[40px] tw:bg-[#6B76E3] tw:text-white tw:font-semibold  tw:mt-4 o2-primary-button"
-      label="Start your 14-day Trial"
-      no-caps
-      :loading="isSubmitting"
-      @click="onSubmit"
-    />
+    <div class="tw:w-full tw:mt-4">
+      <OButton
+        variant="primary"
+        size="md"
+        block
+        :disabled="!isAgree || isSubmitting"
+        :loading="isSubmitting"
+        @click="onSubmit"
+      >
+        Start your 14-day Trial
+      </OButton>
+    </div>
   </div>
 </div>
 
@@ -98,6 +102,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import OButton from '@/lib/core/Button/OButton.vue'
 import { useStore } from 'vuex'
 import { useQuasar } from 'quasar'
   import billings from '@/services/billings'

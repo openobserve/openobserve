@@ -98,25 +98,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="alert-v3-input"
                 style=" max-width: 160px"
               />
-              <q-btn
-                flat
-                round
-                dense
-                size="sm"
-                icon="close"
+              <OButton
+                variant="ghost"
+                size="icon-sm"
                 @click="removeFilter(idx)"
-              />
+              >
+                <X class="tw:size-4" />
+              </OButton>
             </div>
-            <q-btn
-              flat
-              no-caps
-              dense
-              :label="t('alerts.anomaly.addFilter')"
-              class="o2-secondary-button q-mt-sm"
-              size="sm"
-              style="width: 110px;"
+            <OButton
+              variant="outline"
+              size="sm-action"
+              class="q-mt-sm"
               @click="addFilter"
-            />
+            >
+              {{ t('alerts.anomaly.addFilter') }}
+            </OButton>
           </div>
         </div>
 
@@ -598,23 +595,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ config.threshold }}</span
                   >
                 </div>
-                <q-btn
-                  no-caps
-                  dense
-                  :disable="
+                <OButton
+                  variant="outline"
+                  size="sm-action"
+                  :disabled="
                     !config.stream_name ||
                     (config.query_mode === 'custom_sql' && !config.custom_sql)
                   "
-                  class="o2-secondary-button"
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                  :label="t('alerts.anomaly.loadData')"
-                  size="sm"
                   data-test="anomaly-sensitivity-load-btn"
                   @click="loadPreview"
                 >
+                  {{ t('alerts.anomaly.loadData') }}
                   <q-tooltip v-if="!config.stream_name">{{ t('alerts.anomaly.selectStreamFirstTooltip') }}</q-tooltip>
                   <q-tooltip v-else-if="config.query_mode === 'custom_sql' && !config.custom_sql">{{ t('alerts.anomaly.enterSqlFirst') }}</q-tooltip>
-                </q-btn>
+                </OButton>
               </div>
 
               <!-- Chart + Vertical Slider row -->
@@ -698,11 +692,13 @@ import {
 } from "@/utils/alerts/anomalyFilterOperators";
 import QueryEditor from "@/components/QueryEditor.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { X } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
 
-  components: { QueryEditor, PanelSchemaRenderer },
+  components: { QueryEditor, PanelSchemaRenderer, OButton, X },
 
   props: {
     config: {

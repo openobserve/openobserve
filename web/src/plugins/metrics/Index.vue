@@ -64,28 +64,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
             class="dashboard-icons tw:mx-2"
           >
-            <q-btn
+            <OButton
               v-if="
                 config.isEnterprise == 'true' && searchRequestTraceIds.length
               "
-              class="tw:text-xs tw:font-bold no-border"
+              variant="ghost-destructive"
+              size="sm-action"
               data-test="metrics-cancel"
-              padding="xs lg"
-              color="negative"
-              no-caps
-              :label="t('panel.cancel')"
               @click="cancelAddPanelQuery"
-            />
-            <q-btn
+            >
+              {{ t('panel.cancel') }}
+            </OButton>
+            <OButton
               v-else
-              class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
+              variant="primary"
+              size="sm-action"
               data-test="metrics-apply"
               :loading="disable"
-              :disable="disable"
-              no-caps
-              :label="t('metrics.runQuery')"
+              :disabled="disable"
               @click="runQuery"
-            />
+            >
+              {{ t('metrics.runQuery') }}
+            </OButton>
           </div>
         </div>
       </div>
@@ -113,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <add-to-dashboard
         @save="addPanelToDashboard"
+        @cancel="showAddToDashboardDialog = false"
         :dashboardPanelData="dashboardPanelData"
       />
     </q-dialog>
@@ -151,6 +152,7 @@ import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
+import OButton from '@/lib/core/Button/OButton.vue';
 
 export default defineComponent({
   name: "Metrics",
@@ -163,6 +165,7 @@ export default defineComponent({
     AddToDashboard,
     AutoRefreshInterval,
     PanelEditor,
+    OButton,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "metrics");

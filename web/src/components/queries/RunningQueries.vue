@@ -26,26 +26,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="running-queries-filter-container"
           class="flex items-center"
         >
-          <div
-            style="border: 1px solid #cacaca; padding: 2px; border-radius: 4px"
-            class="q-mr-sm query-management-tabs"
+          <OToggleGroup
+            :model-value="selectedQueryTypeTab"
+            @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
             data-test="running-queries-query-type-tabs"
+            class="q-mr-sm"
           >
-            <template v-for="visual in runningQueryTypes" :key="visual.value">
-              <q-btn
-                :color="visual.value === selectedQueryTypeTab ? 'primary' : ''"
-                :flat="visual.value === selectedQueryTypeTab ? false : true"
-                dense
-                emit-value
-                no-caps
-                class="query-management-query-tab-selection-btn"
-                style="height: 30px; margin: 0 0px; padding: 4px 12px"
-                @click="onChangeQueryTab(visual.value as 'summary' | 'all')"
-              >
-                {{ visual.label }}</q-btn
-              >
-            </template>
-          </div>
+            <OToggleGroupItem
+              v-for="visual in runningQueryTypes"
+              :key="visual.value"
+              :value="visual.value"
+              size="sm"
+            >
+              {{ visual.label }}
+            </OToggleGroupItem>
+          </OToggleGroup>
           <div class=" o2-select-input o2-input">
           <q-select
             v-model="selectedSearchField"
@@ -90,39 +85,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="running-queries-search-input"
           ></q-select>
           </div>
-          <q-btn
+          <OButton
             data-test="running-queries-refresh-btn"
-            class="q-ml-sm text-bold no-border o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme == 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            no-caps
-            :label="t(`queries.refreshQuery`)"
+            variant="outline"
+            size="sm-action"
+            class="q-ml-sm"
             @click="refreshData"
-          />
+          >
+            {{ t(`queries.refreshQuery`) }}
+          </OButton>
         </div>
       </div>
     </div>
     <div class="label-container tw:flex tw:justify-end q-py-sm tw:h-[54px]">
       <div v-if="selectedQueryTypeTab === 'all'">
-        <div
-          style="border: 1px solid #cacaca; padding: 2px; border-radius: 4px"
-          class="q-mr-md query-management-tabs q-mr-lg"
+        <OToggleGroup
+          :model-value="selectedSearchType"
+          @update:model-value="onChangeSearchType($event as string)"
+          class="q-mr-md q-mr-lg"
           data-test="running-queries-search-type-tabs"
         >
-          <template v-for="visual in searchTypes" :key="visual">
-            <q-btn
-              :color="visual === selectedSearchType ? 'primary' : ''"
-              :flat="visual === selectedSearchType ? false : true"
-              dense
-              no-caps
-              class="query-management-query-tab-selection-btn"
-              style="height: 30px; margin: 0 0px; padding: 4px 12px"
-              @click="onChangeSearchType(visual)"
-            >
-              {{ searchTypeLabels[visual] ?? visual }}</q-btn
-            >
-          </template>
-        </div>
+          <OToggleGroupItem
+            v-for="visual in searchTypes"
+            :key="visual"
+            :value="visual"
+            size="sm"
+          >
+            {{ searchTypeLabels[visual] ?? visual }}
+          </OToggleGroupItem>
+        </OToggleGroup>
       </div>
       <label class="q-my-sm text-bold"
         >Last Data Refresh Time: {{ lastRefreshed }}</label
@@ -167,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
       data-test="list-schema-dialog"
     >
-      <QueryList :schemaData="schemaData" />
+      <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
     </q-dialog>
   </div>
 </template>
@@ -190,6 +181,9 @@ import { useI18n } from "vue-i18n";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
+import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
+import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 import { durationFormatter } from "@/utils/zincutils";
 import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
@@ -197,7 +191,7 @@ import { getDuration } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "RunningQueries",
-  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList },
+  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem },
   setup() {
     const store = useStore();
     const schemaData = ref({});
@@ -863,12 +857,6 @@ export default defineComponent({
     height: 32px;
   }
 }
-.query-management-tabs {
-  :deep(.q-btn:before) {
-    border: none !important;
-  }
-}
-
 .label-container {
   display: flex;
   width: 100%;

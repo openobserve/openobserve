@@ -197,19 +197,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- TIER 3: Configuration Tabs -->
       <div class="alert-v3-tabs card-container" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
         <!-- Tab Headers -->
-        <div class="tw:flex tw:border-b tw:shrink-0" :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'">
-          <div
+        <OToggleGroup
+          :model-value="activeTab"
+          @update:model-value="activeTab = ($event as string)"
+          class="tw:shrink-0"
+        >
+          <OToggleGroupItem
             v-for="tab in alertTabs"
             :key="tab.key"
-            class="tw:px-4 tw:py-2.5 tw:cursor-pointer tw:text-sm tw:font-medium tw:relative tw:select-none tw:transition-colors"
-            :class="activeTab === tab.key
-              ? 'active-tab'
-              : (store.state.theme === 'dark' ? 'tw:text-gray-300 hover:tw:text-white' : 'tw:text-gray-600 hover:tw:text-gray-900')"
-            @click="activeTab = tab.key"
+            :value="tab.key"
+            size="sm"
           >
+            <template #icon-left>
+              <Shield v-if="tab.key === 'condition'" class="tw:size-3.5 tw:shrink-0" />
+              <SlidersHorizontal v-else-if="tab.key === 'advanced'" class="tw:size-3.5 tw:shrink-0" />
+              <TrendingUp v-else-if="tab.key === 'anomaly-config'" class="tw:size-3.5 tw:shrink-0" />
+              <Bell v-else-if="tab.key === 'anomaly-alerting'" class="tw:size-3.5 tw:shrink-0" />
+            </template>
             {{ tab.label }}{{ tab.required ? ' *' : '' }}
-          </div>
-        </div>
+          </OToggleGroupItem>
+        </OToggleGroup>
 
         <!-- Tab Content -->
         <q-form ref="addAlertForm" class="tw:flex-1 tw:overflow-auto" @submit="onSubmit">
@@ -458,6 +465,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, computed, watch } from "vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
+import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
+import { Shield, SlidersHorizontal, TrendingUp, Bell } from 'lucide-vue-next';
 
 import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
@@ -515,6 +525,12 @@ export default defineComponent({
     QueryEditor,
     InlineSelectFolderDropdown,
     OButton,
+    OToggleGroup,
+    OToggleGroupItem,
+    Shield,
+    SlidersHorizontal,
+    TrendingUp,
+    Bell,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
@@ -597,17 +613,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.active-tab {
-  color: var(--q-primary);
-  border-bottom: 2px solid var(--q-primary);
-  font-weight: 600;
-}
-
-.body--dark .active-tab {
-  color: #fff;
-  border-bottom-color: var(--q-primary);
-}
-
 .alert-v3-inline-label {
   font-size: 12px;
   font-weight: 600;
