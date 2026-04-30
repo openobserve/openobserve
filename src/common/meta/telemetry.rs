@@ -395,4 +395,27 @@ mod test_telemetry {
         assert!(result.contains_key("deployment_type"));
         assert!(result.contains_key("host_name"));
     }
+
+    #[test]
+    fn test_get_base_info_deployment_type_is_open_source() {
+        let mut data = HashMap::new();
+        let result = get_base_info(&mut data);
+        let deployment_type = result["deployment_type"].as_str().unwrap();
+        assert_eq!(deployment_type, "open_source");
+    }
+
+    #[test]
+    fn test_get_base_info_zo_version_nonempty() {
+        let mut data = HashMap::new();
+        let result = get_base_info(&mut data);
+        let version = result["zo_version"].as_str().unwrap();
+        assert!(!version.is_empty());
+    }
+
+    #[test]
+    fn test_get_base_info_mutates_input_data() {
+        let mut data = HashMap::new();
+        get_base_info(&mut data);
+        assert!(data.contains_key("cpu_count"));
+    }
 }
