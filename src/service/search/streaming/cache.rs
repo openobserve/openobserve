@@ -204,7 +204,6 @@ pub async fn handle_cache_responses_and_deltas(
 
     // Process cached responses and deltas in sorted order
     let mut req_no = 0;
-    let delta_start_timer = Instant::now();
     while cached_resp_iter.peek().is_some() || delta_iter.peek().is_some() {
         if let (Some(&delta), Some(cached)) = (delta_iter.peek(), cached_resp_iter.peek()) {
             req_no += 1;
@@ -229,7 +228,6 @@ pub async fn handle_cache_responses_and_deltas(
                 super::execution::process_delta(
                     req,
                     req_no,
-                    &delta_start_timer,
                     trace_id,
                     org_id,
                     stream_type,
@@ -269,7 +267,6 @@ pub async fn handle_cache_responses_and_deltas(
                     started_at,
                     is_result_array_skip_vrl,
                     backup_query_fn.clone(),
-                    &delta_start_timer,
                 )
                 .await?;
                 cached_resp_iter.next();
@@ -280,7 +277,6 @@ pub async fn handle_cache_responses_and_deltas(
             super::execution::process_delta(
                 req,
                 req_no,
-                &delta_start_timer,
                 trace_id,
                 org_id,
                 stream_type,
@@ -320,7 +316,6 @@ pub async fn handle_cache_responses_and_deltas(
                 started_at,
                 is_result_array_skip_vrl,
                 backup_query_fn.clone(),
-                &delta_start_timer,
             )
             .await?;
         }
@@ -377,8 +372,8 @@ async fn send_cached_responses(
     started_at: i64,
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
-    start_timer: &Instant,
 ) -> Result<(), infra::errors::Error> {
+    let start_timer = Instant::now();
     log::info!(
         "[HTTP2_STREAM]: Processing cached response for trace_id: {trace_id}, cache_order_by: {cache_order_by:?}, fallback_order_by_col: {fallback_order_by_col:?}"
     );
