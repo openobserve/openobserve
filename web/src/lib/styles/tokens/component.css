@@ -83,11 +83,12 @@
   --color-button-group-divider: var(--color-border-default);
 
   /* ToggleGroup */
-  --color-toggle-item-bg: var(--color-surface-panel);
+  --color-toggle-track-bg: var(--color-surface-subtle);
+  --color-toggle-item-bg: transparent;
   --color-toggle-item-text: var(--color-text-primary);
-  --color-toggle-item-hover-bg: var(--color-primary-50);
-  --color-toggle-item-active-bg: var(--color-primary-600);
-  --color-toggle-item-active-text: var(--color-white);
+  --color-toggle-item-hover-bg: var(--color-surface-subtle-hover);
+  --color-toggle-item-active-bg: var(--color-white);
+  --color-toggle-item-active-text: var(--color-text-primary);
   --color-toggle-item-disabled: var(--color-text-disabled);
   --color-toggle-border: var(--color-border-default);
   --color-toggle-focus-ring: var(--color-primary-400);
@@ -206,6 +207,7 @@
   --color-button-group-divider: var(--color-button-group-divider);
 
   /* ToggleGroup */
+  --color-toggle-track-bg: var(--color-toggle-track-bg);
   --color-toggle-item-bg: var(--color-toggle-item-bg);
   --color-toggle-item-text: var(--color-toggle-item-text);
   --color-toggle-item-hover-bg: var(--color-toggle-item-hover-bg);
