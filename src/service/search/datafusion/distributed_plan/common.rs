@@ -208,4 +208,70 @@ mod tests {
         let result = partial_err.lock().clone();
         assert!(result.starts_with("existing"));
     }
+
+    #[derive(Debug)]
+    struct TestNode;
+
+    impl config::meta::cluster::NodeInfo for TestNode {
+        fn get_grpc_addr(&self) -> String {
+            "localhost:9090".to_string()
+        }
+        fn get_auth_token(&self) -> String {
+            "token".to_string()
+        }
+        fn get_name(&self) -> String {
+            "test-node".to_string()
+        }
+        fn is_local(&self) -> bool {
+            true
+        }
+    }
+
+    #[test]
+    fn test_query_context_builder_methods() {
+        let node: Arc<dyn config::meta::cluster::NodeInfo> = Arc::new(TestNode);
+        let ctx = QueryContext::new(node)
+            .with_trace_id("trace-123")
+            .with_is_super(true)
+            .with_is_querier(true);
+
+        assert_eq!(ctx.trace_id, "trace-123");
+        assert!(ctx.is_super);
+        assert!(ctx.is_querier);
+    }
+
+    #[test]
+    fn test_query_context_default_values() {
+        let node: Arc<dyn config::meta::cluster::NodeInfo> = Arc::new(TestNode);
+        let ctx = QueryContext::new(node);
+        assert!(ctx.trace_id.is_empty());
+        assert!(!ctx.is_super);
+        assert!(!ctx.is_querier);
+        assert_eq!(ctx.num_rows, 0);
+        assert_eq!(ctx.req_id, 0);
+    }
+
+    #[test]
+    fn test_empty_stream_new_and_with_error() {
+        use arrow::datatypes::{DataType, Field, Schema};
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let partial_err = Arc::new(Mutex::new(String::new()));
+
+        let stream = EmptyStream::new(
+            "trace-abc",
+            schema.clone() as SchemaRef,
+            "localhost:9090",
+            false,
+            partial_err.clone(),
+            std::time::Instant::now(),
+        );
+        assert_eq!(stream.trace_id, "trace-abc");
+        assert_eq!(stream.grpc_addr, "localhost:9090");
+        assert!(!stream.is_querier);
+        assert!(stream.e.is_none());
+
+        let err_stream = stream.with_error(tonic::Status::internal("test"));
+        assert!(err_stream.e.is_some());
+    }
 }

@@ -215,4 +215,19 @@ mod tests {
         let addr = get_local_grpc_addr();
         assert!(addr.starts_with("http://") || addr.starts_with("https://"));
     }
+
+    #[test]
+    fn test_load_role_group_returns_valid() {
+        let rg = load_role_group();
+        // just ensure no panic, returns any valid RoleGroup
+        let _ = format!("{rg:?}");
+    }
+
+    #[test]
+    fn test_is_online_initial_state() {
+        // Initially NodeStatus is Prepare, so neither online nor offline
+        let online = is_online();
+        let offline = is_offline();
+        assert!(!(online && offline));
+    }
 }

@@ -285,4 +285,50 @@ mod tests {
             .with_partitions(4);
         assert_eq!(exec.partitions, 4);
     }
+
+    #[test]
+    fn test_data_returns_empty() {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec = NewEmptyExec::new("t", schema.clone(), None, &[], None, false, schema);
+        let data = exec.data().unwrap();
+        assert!(data.is_empty());
+    }
+
+    #[test]
+    fn test_execution_plan_name() {
+        use datafusion::physical_plan::ExecutionPlan;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec = NewEmptyExec::new("t", schema.clone(), None, &[], None, false, schema);
+        assert_eq!(ExecutionPlan::name(&exec), "NewEmptyExec");
+    }
+
+    #[test]
+    fn test_children_is_empty() {
+        use datafusion::physical_plan::ExecutionPlan;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec = NewEmptyExec::new("t", schema.clone(), None, &[], None, false, schema);
+        assert!(exec.children().is_empty());
+    }
+
+    #[test]
+    fn test_as_any_downcasts() {
+        use datafusion::physical_plan::ExecutionPlan;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec = NewEmptyExec::new("t", schema.clone(), None, &[], None, false, schema);
+        let any = exec.as_any();
+        assert!(any.downcast_ref::<NewEmptyExec>().is_some());
+    }
+
+    #[test]
+    fn test_properties_boundedness() {
+        use datafusion::physical_plan::{ExecutionPlan, execution_plan::Boundedness};
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec = NewEmptyExec::new("t", schema.clone(), None, &[], None, false, schema);
+        let props = exec.properties();
+        assert!(matches!(props.boundedness, Boundedness::Bounded));
+    }
 }

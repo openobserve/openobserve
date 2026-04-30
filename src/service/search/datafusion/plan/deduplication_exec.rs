@@ -402,9 +402,67 @@ fn generate_deduplication_arrays(
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::{BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array};
+    use arrow::{
+        array::{BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array},
+        datatypes::{DataType, Field, Schema},
+    };
+    use datafusion::physical_plan::empty::EmptyExec;
 
     use super::*;
+
+    fn make_exec() -> DeduplicationExec {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, false),
+            Field::new("b", DataType::Int64, true),
+        ]));
+        let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema.clone()));
+        let cols = vec![Column::new("a", 0)];
+        DeduplicationExec::new(input, cols, 100)
+    }
+
+    #[test]
+    fn test_deduplication_exec_name() {
+        let exec = make_exec();
+        assert_eq!(ExecutionPlan::name(&exec), "DeduplicationExec");
+    }
+
+    #[test]
+    fn test_deduplication_exec_columns() {
+        let exec = make_exec();
+        let cols = exec.deduplication_columns();
+        assert_eq!(cols.len(), 1);
+        assert_eq!(cols[0].name(), "a");
+    }
+
+    #[test]
+    fn test_deduplication_exec_max_rows() {
+        let exec = make_exec();
+        assert_eq!(exec.max_rows(), 100);
+    }
+
+    #[test]
+    fn test_deduplication_exec_supports_limit_pushdown() {
+        let exec = make_exec();
+        assert!(exec.supports_limit_pushdown());
+    }
+
+    #[test]
+    fn test_deduplication_exec_children() {
+        let exec = make_exec();
+        assert_eq!(exec.children().len(), 1);
+    }
+
+    #[test]
+    fn test_deduplication_exec_as_any() {
+        let exec = make_exec();
+        assert!(exec.as_any().downcast_ref::<DeduplicationExec>().is_some());
+    }
+
+    #[test]
+    fn test_deduplication_exec_metrics_some() {
+        let exec = make_exec();
+        assert!(exec.metrics().is_some());
+    }
 
     #[test]
     fn test_array_get_value_string() {

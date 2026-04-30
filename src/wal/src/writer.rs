@@ -306,6 +306,43 @@ mod tests {
     }
 
     #[test]
+    fn test_writer_new_path_and_size() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.wal");
+        let p: &std::path::Path = path.as_path();
+        let (writer, _) = Writer::new(p, 0, 4096, None).unwrap();
+        assert_eq!(writer.path(), &path);
+        let (written, uncompressed) = writer.size();
+        assert!(written > 0);
+        assert_eq!(written, uncompressed);
+    }
+
+    #[test]
+    fn test_writer_write_increases_size() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test2.wal");
+        let p: &std::path::Path = path.as_path();
+        let (mut writer, _) = Writer::new(p, 0, 4096, None).unwrap();
+        let (before, _) = writer.size();
+        writer.write(b"hello world").unwrap();
+        let (after, _) = writer.size();
+        assert!(after > before);
+    }
+
+    #[test]
+    fn test_writer_current_position_after_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test3.wal");
+        let p: &std::path::Path = path.as_path();
+        let (mut writer, _) = Writer::new(p, 0, 4096, None).unwrap();
+        let pos_before = writer.current_position().unwrap();
+        writer.write(b"data").unwrap();
+        writer.sync().unwrap();
+        let pos_after = writer.current_position().unwrap();
+        assert!(pos_after > pos_before);
+    }
+
+    #[test]
     fn test_hasher_wrapper_same_data_same_checksum() {
         let make_checksum = |data: &[u8]| -> u32 {
             let cursor = std::io::Cursor::new(Vec::<u8>::new());

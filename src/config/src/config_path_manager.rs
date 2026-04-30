@@ -91,4 +91,18 @@ mod tests {
         let result = set_config_file_path(PathBuf::from("/nonexistent/path/config.toml"));
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_get_config_file_path_returns_option() {
+        // just verify the fn returns without panic
+        let _ = get_config_file_path();
+    }
+
+    #[test]
+    fn test_update_last_hash_and_get() {
+        update_config_file_last_hash("hash-xyz".to_string());
+        let result = get_config_file_last_hash();
+        assert!(result.is_some());
+        assert_eq!(result.as_deref(), Some("hash-xyz"));
+    }
 }

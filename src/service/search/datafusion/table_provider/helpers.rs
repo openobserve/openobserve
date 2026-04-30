@@ -201,3 +201,40 @@ pub fn apply_combined_filter(
             .build()?,
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use arrow::datatypes::{DataType, Field, Schema};
+
+    use super::*;
+
+    fn make_exec() -> Arc<dyn ExecutionPlan> {
+        let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
+        Arc::new(datafusion::physical_plan::empty::EmptyExec::new(schema))
+    }
+
+    #[test]
+    fn test_apply_combined_filter_both_none_returns_input() {
+        let exec = make_exec();
+        let schema = exec.schema();
+        let schema_ref: arrow_schema::Schema = schema.as_ref().clone();
+        let result = apply_combined_filter(None, None, &schema_ref, &[], exec.clone(), None);
+        assert!(result.is_ok());
+        // should return the same plan (EmptyExec) since no filters
+        let plan = result.unwrap();
+        assert_eq!(plan.name(), "EmptyExec");
+    }
+
+    #[test]
+    fn test_apply_projection_empty_diff_rules_returns_input() {
+        use hashbrown::HashMap;
+
+        let exec = make_exec();
+        let schema = exec.schema();
+        let diff_rules: HashMap<String, DataType> = HashMap::new();
+        let result = apply_projection(&schema, &diff_rules, None, exec.clone());
+        assert!(result.is_ok());
+        let plan = result.unwrap();
+        assert_eq!(plan.name(), "EmptyExec");
+    }
+}

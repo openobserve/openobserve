@@ -244,6 +244,34 @@ mod tests {
     }
 
     #[test]
+    fn test_remote_scan_node_set_plan() {
+        let mut node = RemoteScanNode::default();
+        assert!(node.search_infos.plan.is_empty());
+        node.set_plan(vec![1, 2, 3]);
+        assert_eq!(node.search_infos.plan, vec![1u8, 2, 3]);
+    }
+
+    #[test]
+    fn test_get_flight_search_request_uses_query_identifier() {
+        let mut node = RemoteScanNode::default();
+        node.query_identifier.trace_id = "trace-abc".to_string();
+        node.search_infos.start_time = 100;
+        node.search_infos.end_time = 200;
+        let req = node.get_flight_search_request(0);
+        assert_eq!(req.query_identifier.trace_id, "trace-abc");
+    }
+
+    #[test]
+    fn test_get_flight_search_request_search_info_times() {
+        let mut node = RemoteScanNode::default();
+        node.search_infos.start_time = 500;
+        node.search_infos.end_time = 1000;
+        let req = node.get_flight_search_request(0);
+        assert_eq!(req.search_info.start_time, 500);
+        assert_eq!(req.search_info.end_time, 1000);
+    }
+
+    #[test]
     fn test_search_infos_get_search_info_with_files() {
         let infos = SearchInfos {
             plan: vec![1, 2, 3],
