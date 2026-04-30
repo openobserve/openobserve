@@ -30,7 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 External Destination
                 <div>
-                  <q-btn v-close-popup="true" round flat icon="cancel"> </q-btn>
+                  <OButton variant="ghost" size="icon" v-close-popup>
+                    <q-icon name="cancel" size="14px" />
+                  </OButton>
                 </div>
               </div>
             </div>
@@ -52,7 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <div v-if="createNewDestination" class="q-mt-sm q-mb-md col-12">
-              
             <!-- Create New Destination Form -->
             <CreateDestinationForm
               @created="handleDestinationCreated"
@@ -160,6 +161,7 @@ import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import OButton from "@/lib/core/Button/OButton.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CreateDestinationForm from "./CreateDestinationForm.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";

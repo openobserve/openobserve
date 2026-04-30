@@ -28,7 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter-method="filterData"
         :loading="loading"
         table-style="table-layout: fixed"
-        style="width: 100%; height: calc(100vh - var(--navbar-height) - 87px); overflow-y: auto;"
+        style="
+          width: 100%;
+          height: calc(100vh - var(--navbar-height) - 87px);
+          overflow-y: auto;
+        "
       >
         <template #no-data>
           <NoData />
@@ -126,13 +130,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Extend Trial Dialog -->
     <q-dialog v-model="extendTrialPrompt">
-      <q-card class="q-pa-sm" style="min-width: 450px;">
+      <q-card class="q-pa-sm" style="min-width: 450px">
         <q-toolbar>
           <q-toolbar-title>
-            <span class="text-weight-bold" :title="extendTrialDataRow.name">Extend Trial for {{ extendTrialDataRow.name }}</span>
-            <span class="text-subtitle2 flex">Set the new trial extension period.</span>
+            <span class="text-weight-bold" :title="extendTrialDataRow.name"
+              >Extend Trial for {{ extendTrialDataRow.name }}</span
+            >
+            <span class="text-subtitle2 flex"
+              >Set the new trial extension period.</span
+            >
           </q-toolbar-title>
-          <q-btn flat round dense icon="close" v-close-popup />
+          <OButton variant="ghost" size="icon" v-close-popup>
+            <q-icon name="close" size="14px" />
+          </OButton>
         </q-toolbar>
 
         <q-card-section>
@@ -147,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   'cursor-pointer q-px-sm q-py-xs page-border',
                   extendedTrial === page
                     ? 'bg-primary text-white'
-                    : 'bg-white text-gray-700 border-gray-3'
+                    : 'bg-white text-gray-700 border-gray-3',
                 ]"
               >
                 {{ page }}
@@ -161,14 +171,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-mr-md o2-secondary-button tw:h-[36px]"
             :label="t('common.cancel')"
             flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
           />
           <q-btn
             class="o2-primary-button no-border tw:h-[36px]"
             :label="`Extend trial by ${extendedTrial} week(s)`"
             flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            @click.stop="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
+            @click.stop="
+              updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)
+            "
           />
         </q-card-actions>
       </q-card>
@@ -176,20 +196,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- External Contract Dialog -->
     <q-dialog v-model="contractPrompt">
-      <q-card class="q-pa-sm" style="min-width: 500px;">
+      <q-card class="q-pa-sm" style="min-width: 500px">
         <q-toolbar>
           <q-toolbar-title>
             <span class="text-weight-bold" :title="contractDataRow.name">
-              {{ contractMode === 'create' ? 'Create' : 'Extend' }} External Contract for {{ contractDataRow.name }}
+              {{ contractMode === "create" ? "Create" : "Extend" }} External
+              Contract for {{ contractDataRow.name }}
             </span>
           </q-toolbar-title>
-          <q-btn flat round dense icon="close" v-close-popup />
+          <OButton variant="ghost" size="icon" v-close-popup>
+            <q-icon name="close" size="14px" />
+          </OButton>
         </q-toolbar>
 
         <q-card-section>
           <div class="q-mb-md">
             <div class="text-bold q-mb-xs">
-              {{ contractMode === 'create' ? 'End Date' : 'New End Date' }}
+              {{ contractMode === "create" ? "End Date" : "New End Date" }}
             </div>
             <q-input
               v-model="contractEndDate"
@@ -199,8 +222,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="contract-end-date-input"
             />
           </div>
-          <div v-if="contractMode === 'extend' && contractDataRow.contract_end_date" class="text-caption text-grey">
-            Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
+          <div
+            v-if="
+              contractMode === 'extend' && contractDataRow.contract_end_date
+            "
+            class="text-caption text-grey"
+          >
+            Current end date:
+            {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
           </div>
         </q-card-section>
 
@@ -211,14 +240,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('common.cancel')"
             no-caps
             flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-secondary-button-dark'
+                : 'o2-secondary-button-light'
+            "
           />
           <q-btn
             class="o2-primary-button no-border tw:h-[36px]"
-            :label="contractMode === 'create' ? 'Create Contract' : 'Extend Contract'"
+            :label="
+              contractMode === 'create' ? 'Create Contract' : 'Extend Contract'
+            "
             no-caps
             flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'o2-primary-button-dark'
+                : 'o2-primary-button-light'
+            "
             @click.stop="submitContract"
           />
         </q-card-actions>
@@ -227,7 +266,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </q-page>
 </template>
 <script lang="ts">
-
 import {
   ref,
   onBeforeMount,
@@ -245,11 +283,13 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OrganizationServices from "@/services/organizations";
+import OButton from "@/lib/core/Button/OButton.vue";
 export default defineComponent({
   name: "PageAlerts",
   components: {
     NoData,
     QTablePagination,
+    OButton,
   },
   setup() {
     const qTable = ref();
@@ -272,11 +312,14 @@ export default defineComponent({
     // Contract management state
     const contractPrompt = ref(false);
     const contractDataRow = ref<any>({});
-    const contractMode = ref<'create' | 'extend'>('create');
-    const contractEndDate = ref('');
+    const contractMode = ref<"create" | "extend">("create");
+    const contractEndDate = ref("");
 
     onMounted(() => {
-      if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
+      if (
+        store.state.zoConfig.meta_org ==
+        store.state.selectedOrganization.identifier
+      ) {
         getData();
       } else {
         router.replace({
@@ -284,7 +327,7 @@ export default defineComponent({
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
-        })
+        });
       }
     });
 
@@ -302,7 +345,7 @@ export default defineComponent({
         label: t("settings.org_name"),
         align: "left",
         sortable: true,
-        classes: 'w-[150px]'
+        classes: "w-[150px]",
       },
       {
         name: "identifier",
@@ -310,7 +353,7 @@ export default defineComponent({
         label: t("settings.org_identifier"),
         align: "left",
         sortable: false,
-        style: "col-3"
+        style: "col-3",
       },
       {
         name: "subscription_status",
@@ -318,7 +361,7 @@ export default defineComponent({
         label: t("settings.subscription_status"),
         align: "left",
         sortable: true,
-        style: "col-1"
+        style: "col-1",
       },
       {
         name: "billing_provider",
@@ -326,7 +369,7 @@ export default defineComponent({
         label: "Provider",
         align: "left",
         sortable: true,
-        style: "col-1"
+        style: "col-1",
       },
       {
         name: "created_on",
@@ -370,8 +413,8 @@ export default defineComponent({
       "0": "Free",
       "1": "Pay as you go",
       "2": "Enterprise",
-      "3": "External Contract"
-    }
+      "3": "External Contract",
+    };
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
@@ -380,7 +423,7 @@ export default defineComponent({
     };
 
     const formatMicrosToDate = (micros: number): string => {
-      if (!micros || micros <= 0) return '-';
+      if (!micros || micros <= 0) return "-";
       return timestampToTimezoneDate(micros, "UTC", "yyyy-MM-dd");
     };
 
@@ -398,7 +441,9 @@ export default defineComponent({
         message: "Please wait while loading data...",
       });
 
-      OrganizationServices.get_admin_org(store.state.selectedOrganization.identifier)
+      OrganizationServices.get_admin_org(
+        store.state.selectedOrganization.identifier,
+      )
         .then((response) => {
           const data = [];
           const responseData = response.data.data;
@@ -409,11 +454,21 @@ export default defineComponent({
               name: responseData[i].name,
               identifier: responseData[i].identifier,
               plan: subscriptionPlans[responseData[i].plan],
-              billing_provider: responseData[i].billing_provider || '-',
-              created_at: timestampToTimezoneDate(responseData[i].created_at, "UTC", "yyyy-MM-dd"),
-              trial_expires_at: timestampToTimezoneDate(responseData[i].trial_expires_at, "UTC", "yyyy-MM-dd"),
+              billing_provider: responseData[i].billing_provider || "-",
+              created_at: timestampToTimezoneDate(
+                responseData[i].created_at,
+                "UTC",
+                "yyyy-MM-dd",
+              ),
+              trial_expires_at: timestampToTimezoneDate(
+                responseData[i].trial_expires_at,
+                "UTC",
+                "yyyy-MM-dd",
+              ),
               contract_end_date: responseData[i].contract_end_date || 0,
-              contract_end_date_display: formatMicrosToDate(responseData[i].contract_end_date),
+              contract_end_date_display: formatMicrosToDate(
+                responseData[i].contract_end_date,
+              ),
             });
           }
 
@@ -440,21 +495,22 @@ export default defineComponent({
     const toggleExtendTrialDialog = (row: any) => {
       extendTrialPrompt.value = true;
       extendTrialDataRow.value = row;
-    }
+    };
 
-    const getTimestampInMicroseconds = (weeks: number) => (Date.now() + weeks * 7 * 24 * 60 * 60 * 1000) * 1000;
+    const getTimestampInMicroseconds = (weeks: number) =>
+      (Date.now() + weeks * 7 * 24 * 60 * 60 * 1000) * 1000;
 
-    const toggleContractDialog = (row: any, mode: 'create' | 'extend') => {
+    const toggleContractDialog = (row: any, mode: "create" | "extend") => {
       contractDataRow.value = row;
       contractMode.value = mode;
-      contractEndDate.value = '';
+      contractEndDate.value = "";
       contractPrompt.value = true;
     };
 
     const submitContract = () => {
       const metaOrg = store.state.selectedOrganization.identifier;
 
-      if (contractMode.value === 'create') {
+      if (contractMode.value === "create") {
         if (!contractEndDate.value) {
           $q.notify({ type: "negative", message: "End date is required." });
           return;
@@ -465,10 +521,16 @@ export default defineComponent({
         };
 
         loading.value = true;
-        const dismiss = $q.notify({ spinner: true, message: "Creating external contract..." });
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Creating external contract...",
+        });
         OrganizationServices.create_external_contract(metaOrg, payload)
           .then(() => {
-            $q.notify({ type: "positive", message: "External contract created successfully." });
+            $q.notify({
+              type: "positive",
+              message: "External contract created successfully.",
+            });
             contractPrompt.value = false;
             getData();
             loading.value = false;
@@ -479,7 +541,9 @@ export default defineComponent({
             dismiss();
             $q.notify({
               type: "negative",
-              message: error.response?.data?.message || "Failed to create external contract.",
+              message:
+                error.response?.data?.message ||
+                "Failed to create external contract.",
               timeout: 5000,
             });
           });
@@ -494,10 +558,16 @@ export default defineComponent({
         };
 
         loading.value = true;
-        const dismiss = $q.notify({ spinner: true, message: "Extending external contract..." });
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Extending external contract...",
+        });
         OrganizationServices.extend_external_contract(metaOrg, payload)
           .then(() => {
-            $q.notify({ type: "positive", message: "External contract extended successfully." });
+            $q.notify({
+              type: "positive",
+              message: "External contract extended successfully.",
+            });
             contractPrompt.value = false;
             getData();
             loading.value = false;
@@ -508,7 +578,9 @@ export default defineComponent({
             dismiss();
             $q.notify({
               type: "negative",
-              message: error.response?.data?.message || "Failed to extend external contract.",
+              message:
+                error.response?.data?.message ||
+                "Failed to extend external contract.",
               timeout: 5000,
             });
           });
@@ -517,17 +589,23 @@ export default defineComponent({
 
     const confirmRevokeContract = (row: any) => {
       $q.dialog({
-        title: 'Revoke External Contract',
+        title: "Revoke External Contract",
         message: `Are you sure you want to revoke the external contract for "${row.name}"? The organization will revert to the Free tier.`,
         cancel: true,
         persistent: true,
       }).onOk(() => {
         const metaOrg = store.state.selectedOrganization.identifier;
         loading.value = true;
-        const dismiss = $q.notify({ spinner: true, message: "Revoking external contract..." });
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Revoking external contract...",
+        });
         OrganizationServices.revoke_external_contract(metaOrg, row.identifier)
           .then(() => {
-            $q.notify({ type: "positive", message: "External contract revoked successfully." });
+            $q.notify({
+              type: "positive",
+              message: "External contract revoked successfully.",
+            });
             getData();
             loading.value = false;
             dismiss();
@@ -537,7 +615,9 @@ export default defineComponent({
             dismiss();
             $q.notify({
               type: "negative",
-              message: error.response?.data?.message || "Failed to revoke external contract.",
+              message:
+                error.response?.data?.message ||
+                "Failed to revoke external contract.",
               timeout: 5000,
             });
           });
@@ -547,17 +627,21 @@ export default defineComponent({
     const updateTrialPeriod = (org_id: string, extended_week: number) => {
       const payload = {
         new_end_date: getTimestampInMicroseconds(extended_week),
-        org_id
+        org_id,
       };
 
       loading.value = true;
       const dismiss = $q.notify({
         spinner: true,
-        message: "Please wait while processing trial period extension request...",
+        message:
+          "Please wait while processing trial period extension request...",
       });
-      OrganizationServices.extend_trial_period(store.state.selectedOrganization.identifier, payload)
+      OrganizationServices.extend_trial_period(
+        store.state.selectedOrganization.identifier,
+        payload,
+      )
         .then((response) => {
-          if(response.data) {
+          if (response.data) {
             $q.notify({
               type: "positive",
               message: "Trial period extended successfully.",
@@ -583,7 +667,7 @@ export default defineComponent({
             });
           }
         });
-    }
+    };
 
     return {
       t,
@@ -617,7 +701,11 @@ export default defineComponent({
         var filtered = [];
         terms = terms.toLowerCase();
         for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms) || rows[i]["identifier"].toLowerCase().includes(terms) || rows[i]["plan"].toLowerCase().includes(terms)) {
+          if (
+            rows[i]["name"].toLowerCase().includes(terms) ||
+            rows[i]["identifier"].toLowerCase().includes(terms) ||
+            rows[i]["plan"].toLowerCase().includes(terms)
+          ) {
             filtered.push(rows[i]);
           }
         }

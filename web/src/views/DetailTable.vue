@@ -24,19 +24,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true"
-round flat
-icon="cancel" />
+          <OButton variant="ghost" size="icon" v-close-popup>
+            <q-icon name="cancel" size="14px" />
+          </OButton>
         </div>
       </div>
     </q-card-section>
     <q-separator />
-    <OTabs
-      v-model="tab"
-      dense
-      class="text-grey"
-      align="justify"
-    >
+    <OTabs v-model="tab" dense class="text-grey" align="justify">
       <OTab name="table" :label="t('common.table')" />
       <OTab name="json" :label="t('common.json')" />
     </OTabs>
@@ -92,10 +87,11 @@ icon="cancel" />
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../utils/zincutils";
@@ -108,7 +104,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { OTabs, OTab, OTabPanels, OTabPanel },
+  components: { OTabs, OTab, OTabPanels, OTabPanel, OButton },
   props: {
     modelValue: {
       type: Object,

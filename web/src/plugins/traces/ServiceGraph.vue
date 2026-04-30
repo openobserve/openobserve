@@ -191,13 +191,15 @@
                 <div class="text-h6 q-mt-md tw:text-[var(--o2-text-primary)]">
                   {{ error }}
                 </div>
-                <q-btn
-                  outline
-                  color="primary"
-                  label="Retry"
+                <OButton
+                  variant="outline"
+                  size="sm-action"
                   @click="loadServiceGraph"
-                  class="q-mt-md"
-                />
+                  class="tw:mt-4"
+                >
+                  <template #icon-left><q-icon name="refresh" size="14px" /></template>
+                  Retry
+                </OButton>
               </div>
             </div>
             <div
@@ -267,20 +269,14 @@
       </q-card-section>
       <q-separator />
       <q-card-actions align="right">
-        <q-btn
-          flat
-          dense
-          no-caps
-          label="Close"
-          color="primary"
-          v-close-popup
-          class="o2-secondary-button tw:h-[2rem]"
-        />
-        <q-btn
-          label="Reset"
-          @click="resetSettings"
-          class="o2-primary-button tw:h-[2rem]"
-        />
+        <div class="tw:flex tw:gap-2">
+          <OButton variant="outline" size="sm-action" v-close-popup>
+            Close
+          </OButton>
+          <OButton variant="primary" size="sm-action" @click="resetSettings">
+            Reset
+          </OButton>
+        </div>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -318,12 +314,14 @@ import {
 } from "@/utils/traces/treeTooltipHelpers";
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "ServiceGraph",
   components: {
     ChartRenderer,
     ServiceGraphSidePanel,
+    OButton,
   },
   emits: ["view-traces"],
   setup(props, { emit }) {
