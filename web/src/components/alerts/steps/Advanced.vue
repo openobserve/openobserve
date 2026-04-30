@@ -199,12 +199,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="localRowTemplateType"
                 @update:model-value="emitUpdate"
               >
-                <OToggleGroupItem
-                  v-for="opt in rowTemplateTypeOptions"
-                  :key="opt.value"
-                  :value="opt.value"
-                  >{{ opt.label }}</OToggleGroupItem
-                >
+                <OToggleGroupItem value="String" size="sm">
+                  <template #icon-left><TypeIcon class="tw:size-3.5 tw:shrink-0" /></template>
+                  String
+                </OToggleGroupItem>
+                <OToggleGroupItem value="Json" size="sm">
+                  <template #icon-left><Braces class="tw:size-3.5 tw:shrink-0" /></template>
+                  JSON
+                </OToggleGroupItem>
               </OToggleGroup>
             </div>
           </div>
@@ -241,6 +243,7 @@ import { getUUID } from "@/utils/zincutils";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { Type as TypeIcon, Braces } from "lucide-vue-next";
 
 export interface Variable {
   id: string;
@@ -250,7 +253,7 @@ export interface Variable {
 
 export default defineComponent({
   name: "Step6Advanced",
-  components: { OToggleGroup, OToggleGroupItem, OButton },
+  components: { OToggleGroup, OToggleGroupItem, OButton, TypeIcon, Braces },
   props: {
     template: {
       type: String,
