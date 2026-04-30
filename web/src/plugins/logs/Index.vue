@@ -1148,7 +1148,7 @@ export default defineComponent({
 
           searchObj.meta.showHistogram = isHistogramEnabled();
 
-          restoreUrlQueryParams(dashboardPanelData);
+          await restoreUrlQueryParams(dashboardPanelData);
 
           if (
             store.state.zoConfig?.auto_query_enabled &&
@@ -1302,21 +1302,21 @@ export default defineComponent({
     };
 
     // Helper function for handling the trace explorer
-    function handleTraceExplorer(queryParams) {
+    async function handleTraceExplorer(queryParams) {
       searchObj.organizationIdentifier = queryParams.org_identifier;
       searchObj.data.stream.selectedStream.value = queryParams.stream;
       searchObj.data.stream.streamType = queryParams.stream_type;
       resetSearchObj();
       resetStreamData();
-      restoreUrlQueryParams(dashboardPanelData);
+      await restoreUrlQueryParams(dashboardPanelData);
       loadLogsData();
     }
 
     // Helper function for handling the stream explorer
-    function handleStreamExplorer() {
+    async function handleStreamExplorer() {
       resetSearchObj();
       resetStreamData();
-      restoreUrlQueryParams(dashboardPanelData);
+      await restoreUrlQueryParams(dashboardPanelData);
       loadLogsData();
     }
 

@@ -636,14 +636,16 @@ describe("useStreams Composable", () => {
       expect(setStreamsCalls[0][1].streams.list).toEqual(existingStreams);
     });
 
-    it("should handle addNewStreams with empty cache", () => {
+    it("should not seed cache when addNewStreams called with empty cache", () => {
       const newStreams = [{ name: "new-stream", stream_type: "logs" }];
-      
+
       mockStore.state.streams.logs = null;
-      
+
       streamsInstance.addNewStreams("logs", newStreams);
-      
-      expect(mockStore.dispatch).toHaveBeenCalled();
+
+      // Should NOT dispatch — partial results must not seed the cache,
+      // otherwise a full fetch on the logs page would be skipped.
+      expect(mockStore.dispatch).not.toHaveBeenCalled();
     });
   });
 

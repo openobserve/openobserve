@@ -180,6 +180,10 @@ export class PipelinesPage {
         this.discardChangesDialog = page.getByText('Discard Changes');
         this.discardChangesOkBtn = page.locator('.q-dialog').locator('[data-test="confirm-button"]');
         this.scheduledPipelineCancelBtn = page.locator('button').filter({ hasText: 'Cancel' }).first();
+
+        // Bug #11498 - Run Query button (in scheduled pipeline dialog)
+        // Use text filter to distinguish from the SearchBar's identical data-test selector
+        this.runQueryButton = page.locator('[data-test="logs-search-bar-refresh-btn"]').filter({ hasText: 'Run Query' });
     }
 
     // Methods from original PipelinesPage
@@ -3266,4 +3270,47 @@ export class PipelinesPage {
             testLogger.warn(`Pipeline cleanup failed (non-critical): ${cleanupError.message}`);
         }
     }
+
+    // ========== Bug #11498: Run Query Disabled State ==========
+
+    /**
+     * Check if the Run Query button is disabled (no stream selected)
+     * @returns {Promise<boolean>} True if button is disabled
+     */
+    async isRunQueryDisabled() {
+        await this.runQueryButton.waitFor({ state: 'visible', timeout: 5000 });
+        const isDisabled = await this.runQueryButton.isDisabled();
+        testLogger.info(`Run Query disabled state: ${isDisabled}`);
+        return isDisabled;
+    }
+
+    /**
+     * Check if the Run Query button is enabled (stream selected)
+     * @returns {Promise<boolean>} True if button is enabled
+     */
+    async isRunQueryEnabled() {
+        await this.runQueryButton.waitFor({ state: 'visible', timeout: 5000 });
+        const isDisabled = await this.runQueryButton.isDisabled();
+        testLogger.info(`Run Query enabled state: ${!isDisabled}`);
+        return !isDisabled;
+    }
+
+    /**
+     * Expect Run Query button to be disabled
+     */
+    async expectRunQueryDisabled() {
+        await this.runQueryButton.waitFor({ state: 'visible', timeout: 5000 });
+        await expect(this.runQueryButton).toBeDisabled({ timeout: 3000 });
+        testLogger.info('✅ Run Query button is disabled as expected');
+    }
+
+    /**
+     * Expect Run Query button to be enabled
+     */
+    async expectRunQueryEnabled() {
+        await this.runQueryButton.waitFor({ state: 'visible', timeout: 5000 });
+        await expect(this.runQueryButton).toBeEnabled({ timeout: 3000 });
+        testLogger.info('✅ Run Query button is enabled as expected');
+    }
+
 }

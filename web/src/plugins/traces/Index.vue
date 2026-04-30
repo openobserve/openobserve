@@ -398,8 +398,6 @@ const tracesPartitionMap: Record<
   { partition: number; chunks: Record<number, number> }
 > = {};
 
-searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
-
 const selectedStreamName = computed(
   () => searchObj.data.stream.selectedStream.value,
 );
@@ -519,7 +517,6 @@ function loadStreamLists() {
         : "";
     searchObj.data.stream.streamLists = [];
     if (searchObj.data.streamResults.list.length > 0) {
-      let lastUpdatedStreamTime = 0;
       let selectedStreamItemObj = {};
       let foundPriorityMatch = false;
       searchObj.data.streamResults.list.map((item: any) => {
@@ -547,20 +544,16 @@ function loadStreamLists() {
         ) {
           selectedStreamItemObj = itemObj;
           foundPriorityMatch = true;
-        } else if (
-          !foundPriorityMatch &&
-          !queryParams.stream &&
-          item.stats.doc_time_max >= lastUpdatedStreamTime
-        ) {
-          lastUpdatedStreamTime = item.stats.doc_time_max;
-          selectedStreamItemObj = itemObj;
         }
       });
 
       if (selectedStreamItemObj.label != undefined) {
         searchObj.data.stream.selectedStream = selectedStreamItemObj;
       } else {
-        searchObj.data.stream.selectedStream = {};
+        searchObj.data.stream.selectedStream = {
+          label: "",
+          value: "",
+        };
         searchObj.loading = false;
         searchObj.data.queryResults = {};
         searchObj.data.sortedQueryResults = [];
@@ -950,14 +943,24 @@ async function getQueryData(
     tracesPartitionMap[searchTraceId] = { partition: 0, chunks: {} };
 
     const isSpansMode = searchObj.meta.searchMode === "spans";
+    const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
+    const sortOrd = (
+      searchObj.meta.resultGrid.sortOrder || "desc"
+    ).toUpperCase();
+    const schemaFieldNames = searchObj.data.stream.selectedStreamFields.map(
+      (f: any) => f.name,
+    );
+    const validSortCol = (() => {
+      if (schemaFieldNames.length === 0) return sortCol;
+      return sortCol === "start_time" || schemaFieldNames.includes(sortCol)
+        ? sortCol
+        : "start_time";
+    })();
+
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
-      const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
-      const sortOrd = (
-        searchObj.meta.resultGrid.sortOrder || "desc"
-      ).toUpperCase();
       const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
-      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${sortCol} ${sortOrd}`;
+      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${validSortCol} ${sortOrd}`;
       return {
         query: {
           sql: b64EncodeUnicode(spansSql),
@@ -969,6 +972,10 @@ async function getQueryData(
         encoding: "base64",
       };
     })();
+
+    if (validSortCol !== sortCol) {
+      searchObj.meta.resultGrid.sortBy = "start_time";
+    }
 
     fetchQueryDataWithHttpStream(
       {
@@ -1103,9 +1110,9 @@ async function getQueryData(
           if (!isPagination) {
             fetchTracesCount();
           }
-          correlationFilters.save().catch((e) =>
-            console.error("[correlation:save] error:", e),
-          );
+          correlationFilters
+            .save()
+            .catch((e) => console.error("[correlation:save] error:", e));
         },
         reset: (_payload: any) => {
           searchObj.data.queryResults = {};
@@ -1175,6 +1182,9 @@ const updateNewDateTime = (startTime: number, endTime: number) => {
 async function extractFields() {
   try {
     searchObj.data.stream.selectedStreamFields = [];
+
+    if (!searchObj.data.stream?.selectedStream?.value) return;
+
     if (searchObj.data.streamResults.list.length > 0) {
       const schema = [];
       const ignoreFields = [
@@ -1420,28 +1430,24 @@ async function loadPageData() {
 
   //get stream list
   await getStreamList();
-}
-
-function runQueryIfRequested() {
-  const queryParams = router.currentRoute.value.query;
-  const hasStream = !!queryParams.stream;
-  const hasOrg = !!queryParams.org_identifier;
-  const hasPeriod =
-    !!queryParams.period || (!!queryParams.from && !!queryParams.to);
-  const shouldRunQuery = queryParams["run-query"] === "true";
-
-  if (hasStream && hasOrg && hasPeriod && shouldRunQuery) {
+  if (searchObj.data.stream.selectedStream.value) {
     searchData();
   }
 }
 
 onBeforeMount(async () => {
+  if (
+    searchObj.organizationIdentifier &&
+    searchObj.organizationIdentifier !==
+      store.state.selectedOrganization.identifier
+  ) {
+    resetSearchObj();
+  }
   setupContextProvider();
   restoreUrlQueryParams();
   await importSqlParser();
   if (!searchObj.loading) {
     await loadPageData();
-    runQueryIfRequested();
   }
 });
 
@@ -1466,20 +1472,15 @@ onActivated(async () => {
   if (params.reload === "true") {
     restoreUrlQueryParams();
     await loadPageData();
-    runQueryIfRequested();
   }
+
   if (
     searchObj.organizationIdentifier !=
     store.state.selectedOrganization.identifier
   ) {
+    resetSearchObj();
     restoreUrlQueryParams();
-    loadPageData();
-  }
-
-  if (router.currentRoute.value.path.indexOf("/traces") > -1) {
-    setTimeout(() => {
-      // if (searchResultRef.value) searchResultRef.value?.reDrawChart();
-    }, 300);
+    await loadPageData();
   }
 });
 
@@ -1646,7 +1647,7 @@ const onFiltersReset = () => {
 };
 
 const isStreamSelected = computed(() => {
-  return searchObj.data.stream.selectedStream.value.trim().length > 0;
+  return searchObj.data.stream?.selectedStream?.value?.trim()?.length > 0;
 });
 
 /**
