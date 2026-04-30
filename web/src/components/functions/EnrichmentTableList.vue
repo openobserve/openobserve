@@ -381,7 +381,7 @@ import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Search, List, Pencil, Trash2, X } from "lucide-vue-next";
+import { Search, List, Pencil, Trash2, X, LayoutList, Upload, Link } from "lucide-vue-next";
 
 export default defineComponent({
   name: "EnrichmentTableList",
@@ -656,14 +656,17 @@ export default defineComponent({
       {
         label: t("function.filterAll"),
         value: "all",
+        icon: LayoutList,
       },
       {
         label: t("function.filterFile"),
         value: "uploaded",
+        icon: Upload,
       },
       {
         label: t("function.filterUrl"),
         value: "file_url",
+        icon: Link,
       },
     ]);
 

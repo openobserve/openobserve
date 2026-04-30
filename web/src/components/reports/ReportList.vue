@@ -378,7 +378,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Pause, Play, Pencil, Trash2, FolderInput } from 'lucide-vue-next';
+import { Pause, Play, Pencil, Trash2, FolderInput, CalendarClock, Database } from 'lucide-vue-next';
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
@@ -423,8 +423,8 @@ const reportListTableRef: Ref<any> = ref(null);
 const reportsStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
 
 const tabs = reactive([
-  { label: t("reports.scheduled"), value: "shared" },
-  { label: t("reports.cached"),    value: "cached" },
+  { label: t("reports.scheduled"), value: "shared", icon: CalendarClock },
+  { label: t("reports.cached"),    value: "cached", icon: Database },
 ]);
 
 const perPageOptions: any = [

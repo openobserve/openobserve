@@ -233,6 +233,7 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
+import { Upload, Link } from "lucide-vue-next";
 
 export default defineComponent({
   name: "BaseImport",
@@ -255,10 +256,12 @@ export default defineComponent({
         {
           label: "File Upload / JSON",
           value: "import_json_file",
+          icon: Upload,
         },
         {
           label: "URL Import",
           value: "import_json_url",
+          icon: Link,
         },
       ],
     },

@@ -531,6 +531,7 @@ import type {
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Webhook, Mail, Zap } from "lucide-vue-next";
 import config from "@/aws-exports";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -630,6 +631,7 @@ const tabs = computed(() => {
       return [{
         label: t("alerts.webhook"),
         value: "http",
+        icon: Webhook,
         style: {
           width: "fit-content",
           padding: "4px 14px",
@@ -642,6 +644,7 @@ const tabs = computed(() => {
       return [{
         label: t("alerts.email"),
         value: "email",
+        icon: Mail,
         style: {
           width: "fit-content",
           padding: "4px 14px",
@@ -654,6 +657,7 @@ const tabs = computed(() => {
       return [{
         label: t("alerts.action"),
         value: "action",
+        icon: Zap,
         style: {
           width: "fit-content",
           padding: "4px 14px",
@@ -670,6 +674,7 @@ const tabs = computed(() => {
     {
       label: t("alerts.webhook"),
       value: "http",
+      icon: Webhook,
       style: {
         width: "fit-content",
         padding: "4px 14px",
@@ -681,6 +686,7 @@ const tabs = computed(() => {
     {
       label: t("alerts.email"),
       value: "email",
+      icon: Mail,
       style: {
         width: "fit-content",
         padding: "4px 14px",
@@ -698,6 +704,7 @@ const tabs = computed(() => {
     tabs.push({
       label: t("alerts.action"),
       value: "action",
+      icon: Zap,
       style: {
         width: "fit-content",
         padding: "4px 14px",
