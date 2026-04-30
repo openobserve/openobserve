@@ -8,7 +8,9 @@
       @click="updateSortOption(null)"
       data-test="dashboard-sort-by-item-clear"
     >
-      <template #icon-left><q-icon name="close" size="14px" /></template>
+      <template #icon-left
+        ><q-icon name="block" style="font-size: 16px"
+      /></template>
     </OButton>
     <OButton
       :active="fieldObj.sortBy === 'ASC'"
