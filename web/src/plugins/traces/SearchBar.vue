@@ -65,18 +65,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("traces.RedMetrics") }}
             </q-tooltip>
           </div>
-          <q-btn
+          <OButton
             data-test="traces-search-bar-reset-filters-btn"
-            no-caps
-            size="13px"
-            icon="restart_alt"
-            class="tw:flex tw:justify-center tw:items-center tw:w-[2rem] tw:min-h-[2rem]! tw:h-[2rem]! tw:mr-[0.375rem] tw:rounded-[0.375rem] el-border q-mr-sm"
+            variant="outline"
+            size="icon-toolbar"
+            class="tw:mr-[0.375rem]"
             @click="resetFilters"
           >
+            <q-icon name="restart_alt" size="16px" />
             <q-tooltip>
               {{ t("search.resetFilters") }}
             </q-tooltip>
-          </q-btn>
+          </OButton>
           <!-- Error Only Toggle -->
           <div
             class="q-pr-xs tw:mr-[0.375rem] tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem]"
@@ -232,14 +232,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
           </q-btn-dropdown>
         </div>
-        <q-btn
-          class="tw:mr-[0.375rem] float-left download-logs-btn q-pa-sm tw:min-h-[2rem] el-border q-mr-sm"
-          size="sm"
-          :disable="!searchObj.data.queryResults?.hits?.length"
-          icon="download"
+        <OButton
+          class="tw:mr-[0.375rem] tw:float-left"
+          variant="outline"
+          size="icon-toolbar"
+          :disabled="!searchObj.data.queryResults?.hits?.length"
           title="Export Traces"
           @click="downloadLogs"
-        />
+        >
+          <q-icon name="download" size="16px" />
+        </OButton>
         <share-button
           data-test="logs-search-bar-share-link-btn"
           :url="tracesShareURL"
@@ -267,14 +269,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:h-[2rem]!"
             @on:date-change="updateDateTime"
           />
-          <q-btn
+          <OButton
             data-test="service-graph-refresh-btn"
-            class="tw:mr-[0.375rem] tw:w-[1rem]! tw:min-h-[1.9rem]! tw:h-[1.9rem]! el-border"
-            icon="refresh"
+            variant="outline"
+            size="icon-toolbar"
+            class="tw:mr-[0.375rem]"
             @click="$emit('service-graph-refresh')"
           >
+            <q-icon name="refresh" size="16px" />
             <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
-          </q-btn>
+          </OButton>
           <OToggleGroup
             :model-value="searchObj.meta.serviceGraphVisualizationType"
             @update:model-value="onServiceGraphVisualizationChange($event)"
@@ -356,6 +360,7 @@ import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { Layers, GitFork, Network, GitBranch, Share2 } from "lucide-vue-next";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -379,6 +384,7 @@ export default defineComponent({
     ShareButton,
     OToggleGroup,
     OToggleGroupItem,
+    OButton,
     Layers,
     GitFork,
     Network,
